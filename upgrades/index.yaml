@@ -11,7 +11,8 @@ upgrades:
     note: upgrades/6.0.0-alpha.1.md
     summary: >-
       Opt-in execution engine with SQLite admission, detached model/check jobs, strict candidate acceptance,
-      unified Orca owner input and sealed runtime pins. Requires Node 22.13 or newer. Existing workflows
+      unified Orca owner input, sealed runtime pins and optional agent-led coordination through a bounded
+      manager decision function. Requires Node 22.13 or newer. Existing workflows
       stay on their recorded execution policy until paused, dispatches settled and explicitly retried with v6.
       Orca native write isolation is detection-only; native writers are serialized. This is an alpha trial,
       not a declaration that live provider integrations or a complete unattended workflow have passed.

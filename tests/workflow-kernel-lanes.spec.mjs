@@ -73,6 +73,7 @@ function fixture(t){
   const repo=path.join(root,'demo-backend'),host=path.join(root,'source','.claude');
   const workspaces=path.join(root,'workspaces','demo-backend');
   fs.mkdirSync(host,{recursive:true});
+  fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(host,'config.example.yaml'));
   fs.mkdirSync(workspaces,{recursive:true});
   const put=(relative,content)=>{
     const file=path.join(repo,relative);

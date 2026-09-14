@@ -37,6 +37,13 @@ test('v6 validator propagates pending async work instead of converting it to una
   assert.throws(()=>validateAccepted(f.store,f.state,f.op,f.ctx,f.input),error=>error===pending);
 });
 
+test('quota waiting preserves the candidate and does not consume validator failure allowance',t=>{
+  const f=fixture(t),quota=Object.assign(new Error('fresh provider quota is unavailable'),{code:'STARCI_MODEL_QUOTA_WAIT'});
+  f.ctx.validateOp=()=>{throw quota;};
+  assert.throws(()=>validateAccepted(f.store,f.state,f.op,f.ctx,f.input),error=>error===quota);
+  assert.equal(f.state.validatorUnavailable,undefined);assert.deepEqual(f.state.needUser,[]);assert.equal(f.op.validation,undefined);
+});
+
 test('v6 validator refuses truncated diff and unresolved references before model review',t=>{
   const f=fixture(t);let calls=0;f.ctx.validateOp=()=>{calls++;return {verdict:'accept'};};
   f.ctx.git=(command,args)=>args[0]==='diff'?{status:0,stdout:'x'.repeat(130*1024)}:{status:0,stdout:''};

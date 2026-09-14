@@ -12,7 +12,7 @@ import {createWorkflowModelEligibility} from '../kernel/model-policy.mjs';
 import {loadRuntimes} from '../kernel/schedule.mjs';
 import {retryOwnedBaseline,retryableV6Operation} from '../kernel/kernel.mjs';
 
-const fixture=t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-v6-adapter-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const state={id:'wf',worktree:dir,head:'a'.repeat(40),createdAt:1,engine:{major:6,generation:2,journalFile:path.join(dir,'journal.sqlite')},ops:[]};const store={appendEvent(){},saveState(){}};return {dir,state,store};};
+const fixture=t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-v6-adapter-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const state={id:'wf',worktree:dir,head:'a'.repeat(40),createdAt:1,engine:{major:6,generation:2,journalFile:path.join(dir,'journal.sqlite')},ops:[]};const store={dir:path.join(dir,'workflow'),appendEvent(){},saveState(){}},modelBudget={schema:'starci/runtime-budget@1',at:Date.now(),providers:{codex:{status:'ok',windows:{weekly:{usedPercent:10,resetsAt:null}}},claude:{status:'ok',windows:{weekly:{usedPercent:20,resetsAt:null}}},qwen:{status:'ok',windows:{weekly:{usedPercent:30,resetsAt:null}}}}};return {dir,state,store,modelBudget};};
 
 test('runtime exposes required validation and only sends evaluated providers to the detached model',t=>{
   const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})});
@@ -24,6 +24,21 @@ test('runtime exposes required validation and only sends evaluated providers to 
 test('runtime refuses a model function before launch when every candidate is unqualified',t=>{
   const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>{throw Error('must not launch');}}),runtime=createV6Runtime({...f,bridge,eligibility:()=>({eligible:false,reasons:['unqualified']})});
   assert.throws(()=>runtime.model('decide',{providers:['gpt-5.6-sol']},{id:'op',attempt:1}),/No evaluated model is eligible/);assert.equal(runtime.journal.listJobs().length,0);bridge.close();
+});
+
+test('agent manager uses its semantic decision id for durable replay and the global model admission path',t=>{
+  const f=fixture(t);f.state.engine.coordination='agent-v1';const bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),runtime=createV6Runtime({...f,bridge,eligibility:()=>({eligible:true})});
+  const snapshot={schema:'starci/manager-snapshot@1',workflowId:'wf',decisionId:'manager-semantic-a',generation:2,version:1,digest:'digest-a',basisDigest:'basis-a',goal:{job:'finish',definitionOfDone:['done']},progress:{ready:1},ops:[],blockers:[],actions:[{id:'act',type:'plan-verification',opId:'op',preconditions:[],summary:'Plan verification',contextRefIds:[]}],contextCatalog:[],noProgress:{round:0,budget:2}};
+  let first;try{runtime.manageWorkflow(snapshot,{providers:['gpt-5.6-sol']});}catch(error){assert.equal(error.code,'STARCI_JOB_PENDING');first=error.job.identity.jobId;}
+  const job=runtime.journal.getJob(first);assert.equal(job.op_id,'manager-semantic-a');assert.equal(job.role,'decide');assert.equal(job.payload.functionName,'manageWorkflow');assert.equal(JSON.stringify(job.payload).includes('pollTimestamp'),false);
+  let second;try{runtime.manageWorkflow(structuredClone(snapshot),{providers:['gpt-5.6-sol']});}catch(error){second=error.job.identity.jobId;}assert.equal(second,first,'the same semantic decision replays one durable job');bridge.close();
+});
+
+test('non-operation peer pools choose known quota after eligibility and wait when every quota is unknown',t=>{
+  const f=fixture(t);f.state.engine.coordination='agent-v1';const snapshot={schema:'starci/manager-snapshot@1',workflowId:'wf',decisionId:'manager-quota',generation:2,version:1,digest:'d',basisDigest:'b',goal:{job:'finish',definitionOfDone:['done']},progress:{},ops:[],blockers:[],actions:[{id:'act',type:'plan-verification',opId:'op',preconditions:[],summary:'plan',contextRefIds:[]}],contextCatalog:[],noProgress:{round:0,budget:2}};
+  f.modelBudget.providers.claude.windows.weekly.usedPercent=80;f.modelBudget.providers.codex.windows.weekly.usedPercent=10;const bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),runtime=createV6Runtime({...f,bridge,eligibility:()=>({eligible:true})});
+  assert.throws(()=>runtime.manageWorkflow(snapshot),error=>error.code==='STARCI_JOB_PENDING');assert.deepEqual(runtime.journal.listJobs()[0].payload.args.providers,['gpt-5.6-sol'],'the second peer wins because it has more known quota');bridge.close();
+  const unknown=fixture(t),other=createJobBridge({journalFile:unknown.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>{throw Error('must not launch');}});unknown.state.engine.coordination='agent-v1';unknown.modelBudget={schema:'starci/runtime-budget@1',at:Date.now(),providers:{}};const waiting=createV6Runtime({...unknown,bridge:other,eligibility:()=>({eligible:true})});assert.throws(()=>waiting.manageWorkflow({...snapshot,decisionId:'manager-unknown'}),error=>error.code==='STARCI_MODEL_QUOTA_WAIT'&&error.reasons.every(item=>item.known===false));assert.equal(waiting.journal.listJobs().length,0);other.close();
 });
 
 test('cached model completion replays after its probation scope is consumed',t=>{

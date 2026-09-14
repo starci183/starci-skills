@@ -2,6 +2,9 @@ import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {normalizeResolvedReferences} from './validator-transport.mjs';
+import {nonOperationModels} from '../scripts/config.mjs';
+import {MANAGER_SNAPSHOT,MANAGER_DECISION,MANAGER_DECISION_FORM,validateManagerSnapshot,validateManagerDecision} from './manager-contract.mjs';
+export {MANAGER_SNAPSHOT,MANAGER_DECISION,MANAGER_DECISION_FORM,validateManagerSnapshot,validateManagerDecision} from './manager-contract.mjs';
 
 /**
  * Model calls as functions: a fixed prompt frame, a required JSON schema, a headless provider command,
@@ -11,6 +14,10 @@ export const PLAN_OP='starci/op-plan@1';
 export const DECISION='starci/decision@1';
 export const GOAL_PLAN='starci/goal-plan@1';
 export const WORK_GOAL='starci/work-goal@1';
+export const DEFAULT_GOAL_ASSESSMENT_RUNTIMES=nonOperationModels('planner');
+export const DEFAULT_OPERATION_PLANNER_RUNTIMES=nonOperationModels('planner');
+export const DEFAULT_TECHNICAL_DECISION_RUNTIMES=nonOperationModels('kernelManager');
+export const DEFAULT_MANAGER_RUNTIMES=nonOperationModels('kernelManager');
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const unique=list=>[...new Set(list)];
@@ -168,6 +175,7 @@ export function validateForm(value,form){
     if(rule.type==='string'&&(typeof item!=='string'||!item.trim()))errors.push(`${key} must be a non-empty string`);
     if(rule.type==='string[]'&&!(Array.isArray(item)&&item.every(x=>typeof x==='string'&&x.trim())))errors.push(`${key} must be a list of strings`);
     if(rule.type==='object[]'&&!(Array.isArray(item)&&item.every(plain)))errors.push(`${key} must be a list of objects`);
+    if(rule.type==='number'&&(!Number.isInteger(item)||item<0))errors.push(`${key} must be a non-negative integer`);
     if(rule.enum&&!rule.enum.includes(item))errors.push(`${key} must be one of ${rule.enum.join(', ')}`);
     if(rule.minItems&&Array.isArray(item)&&item.length<rule.minItems)errors.push(`${key} needs at least ${rule.minItems} items`);
     if(rule.each&&Array.isArray(item))for(const [index,entry] of item.entries()){const inner=validateForm(entry,rule.each);for(const e of inner.errors)errors.push(`${key}[${index}]: ${e}`);}
@@ -258,7 +266,7 @@ export function callFunction({kind,payload,form,providers,cwd,runHeadless:run=ru
 }
 
 /** planOp: fill the input form of one operation node from SRS/SDS material and prior reports. */
-export function planOp({node,workflow,ownership,sdsMaterial,priorReports=[],providers=['claude-opus','qwen3.8-flash'],cwd,runHeadless:run}){
+export function planOp({node,workflow,ownership,sdsMaterial,priorReports=[],providers=DEFAULT_OPERATION_PLANNER_RUNTIMES,cwd,runHeadless:run}){
   const payload={operation:node.operation,scope:workflow,attempt:node.attempt??1,ownership,priorOpen:node.priorOpen??[],findings:node.findings??[],
     sdsSlice:node.sdsIds??[],material:sdsMaterial,priorReports:priorReports.map(r=>({outcome:r.outcome,summary:r.summary,open:r.open,files:r.files})),
     rules:['allowlist must be inside ownership','checks must be real commands runnable from the worktree','acceptance statements are verified one by one by review.verify','never plan process steps (ping, report, retry): they are fixed']};
@@ -349,7 +357,7 @@ const WORK_GOAL_RULES=[
  * `ledger` is given the ledger is a fact (the Work tree), so only the definition of done, the risks and the
  * questions are asked and no operation form is invented.
  */
-export function assessGoal({job,inputs=[],material=[],constraints=[],ledger=null,providers=['claude-opus','claude-fable-5.1'],cwd,runHeadless:run}){
+export function assessGoal({job,inputs=[],material=[],constraints=[],ledger=null,providers=DEFAULT_GOAL_ASSESSMENT_RUNTIMES,cwd,runHeadless:run}){
   const payload={job,inputs:inputs.map(input=>({kind:input.kind,ref:input.ref,summary:input.summary})),material,constraints,
     ...(ledger?{ledger}:{}),rules:ledger?WORK_GOAL_RULES:GOAL_RULES};
   if(ledger){
@@ -395,11 +403,18 @@ export function extractMaterial(files,{maxChars=60000,cwd=process.cwd()}={}){
 }
 
 /** decide: choose one option of a closed set for a crisis the policy table could not settle. */
-export function decide({situation,options,context={},providers=['claude-fable-5.1','claude-opus'],cwd,runHeadless:run}){
+export function decide({situation,options,context={},providers=DEFAULT_TECHNICAL_DECISION_RUNTIMES,cwd,runHeadless:run}){
   const form={...DECISION_FORM,option:{type:'string',enum:options}};
   const result=callFunction({kind:'decide',payload:{situation,options,context},form,providers,cwd,runHeadless:run});
   if(result.ok)result.value.schema=DECISION;
   return result;
+}
+
+/** Agent-led coordination chooses only among kernel-authored executable actions. */
+export function manageWorkflow({snapshot,providers=DEFAULT_MANAGER_RUNTIMES,cwd,runHeadless:run}){
+  const checked=validateManagerSnapshot(snapshot);need(checked.ok,`Invalid manager snapshot: ${checked.errors.join('; ')}`);
+  return callFunction({kind:'manageWorkflow',payload:snapshot,form:MANAGER_DECISION_FORM,providers,cwd,runHeadless:run,
+    role:'the bounded StarCi workflow manager; order only listed executable actions and never grant authority or answer for the owner',extra:value=>validateManagerDecision(value,snapshot)});
 }
 
 /* ------------------------------------------------------------------ the validator */
@@ -415,7 +430,7 @@ export function decide({situation,options,context={},providers=['claude-fable-5.
 export const VALIDATION='starci/op-validation@1';
 export const VALIDATOR_VERDICTS=['accept','reject','unavailable'];
 /** Sol first, Opus as the fallback: the user's choice, overridable by `validator.runtimes` in config.json. */
-export const DEFAULT_VALIDATOR_RUNTIMES=['gpt-5.6-sol','claude-opus'];
+export const DEFAULT_VALIDATOR_RUNTIMES=nonOperationModels('validator');
 export const VALIDATION_FORM={
   verdict:{type:'string',enum:['accept','reject']},summary:{type:'string'},
   findings:{type:'object[]',optional:true,each:{file:{type:'string'},line:{optional:true},assertion:{type:'string',optional:true},detail:{type:'string'}}}
@@ -527,7 +542,7 @@ export const OVERLAP_CASES=['reference','conflict'];
 export const PROVISION_KINDS=['credential','account','dataset','authority'];
 /** Fable first, Astra as the fallback: the host's supervisor runtimes, overridable by `supervisor.runtimes` in config.json. */
 /** Astra first: the critique is one call per goal and Fable's own weekly window is the scarcer one. `critique.runtimes` in config.json overrides it. */
-export const DEFAULT_CRITIC_RUNTIMES=['gpt-6-astra','claude-fable-5.1'];
+export const DEFAULT_CRITIC_RUNTIMES=nonOperationModels('validator');
 /** What a goal can rest on that the tree may not hold yet: the records the runtime authors first (`srs`, `sds`, `brand`) and the one it cannot (`decision`). */
 export const PREREQUISITE_KINDS=['srs','sds','brand','decision'];
 export const CRITIQUE_FORM={

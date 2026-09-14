@@ -68,8 +68,9 @@ are read leniently — an unknown kind or a missing name is dropped and counted 
 `workflow-status`. Nothing waits on them: the operation that needs one asks in its own tab when it gets there.
 
 It also names the `prerequisites` the goal rests on and the tree lacks (`srs | sds | brand | decision`, with the
-feature and why), which the kernel plans as intake first. Default providers are the host's `critique.runtimes`,
-`gpt-6-astra` then `claude-fable-5.1` (one call per goal, and Fable's week is the scarcer window); an exhausted chain is
+feature and why), which the kernel plans as intake first. Default runtimes are the host's
+`models.nonOperation.validator` Fable/Astra pool. Admission chooses an eligible member using known quota
+and capacity before the one call per goal; an unavailable pool is
 `{ok:false, verdict:'unavailable'}`, exactly as `validateOp`'s is. What the kernel does with the verdict — the
 `goal.md` section, the contract of every operation, and the refused approval — is in
 [workflow-kernel.md](workflow-kernel.md#phases).

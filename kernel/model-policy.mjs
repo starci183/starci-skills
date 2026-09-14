@@ -80,7 +80,7 @@ export function loadModelEligibilityContext({policyFile,qualificationsFile,proba
 }
 
 const HIGH_KINDS=['integration.verify','release.deliver','deployment.operate','data.correct','production.deploy'];
-const MODEL_KINDS=['model.assessGoal','model.planOp','model.decide','model.validateOp'];
+const MODEL_KINDS=['model.assessGoal','model.planOp','model.decide','model.validateOp','model.manageWorkflow'];
 export function workloadFor(op={},state={}){
   const declared=clean(op.kind||op.operation),functionName=clean(op.input?.functionName||op.functionName),kind=declared==='model'&&functionName?`model.${functionName}`:declared;
   const modelFunction=MODEL_KINDS.includes(kind)||op.jobType==='model-function'||declared==='judge';

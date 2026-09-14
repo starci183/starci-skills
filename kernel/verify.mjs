@@ -359,7 +359,7 @@ export function validateAccepted(store,state,op,ctx,{files,verified,produced=nul
     // and the validator can only say so if it was given the record the operation was supposed to read.
     brand:brandPayload(treeForVerdict(ctx,files)),
     memory:strict?'':readValidatorMemory(store),providers,skip:coolingRuntimes(ctx.allocator),cwd:ctx.cwd});}
-  catch(error){if(error?.code==='STARCI_JOB_PENDING')throw error;result={ok:false,verdict:'unavailable',reason:error.message};}
+  catch(error){if(['STARCI_JOB_PENDING','STARCI_MODEL_QUOTA_WAIT'].includes(error?.code))throw error;result={ok:false,verdict:'unavailable',reason:error.message};}
   const verdict=llm.VALIDATOR_VERDICTS.includes(result?.verdict)?result.verdict:'unavailable';
   const summary=oneLine(result?.summary),provider=result?.provider??null,reason=oneLine(result?.reason)||null;
   const findings=(Array.isArray(result?.findings)?result.findings:[]).filter(item=>item&&typeof item.file==='string');

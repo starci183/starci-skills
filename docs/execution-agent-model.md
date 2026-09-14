@@ -1,7 +1,8 @@
 # Execution agent model
 
 For explicitly enrolled 6.0 workflows, [the v6 contract](runtime-v6.md) replaces the 5-plus scheduling,
-acceptance and provisional-decision details below. The kernel and supervisor remain programs.
+acceptance and provisional-decision details below. The kernel and supervisor remain programs. An explicitly
+enrolled `agent-v1` workflow also has one bounded manager model function; other workflows retain their recorded policy.
 
 StarCi 5-plus has three kinds of participant, and only one of them is an agent.
 
@@ -20,8 +21,10 @@ StarCi 5-plus has three kinds of participant, and only one of them is an agent.
 3. **Operation agents.** One agent executes exactly one operation contract inside the workflow worktree
    and ends with exactly one typed report. It does not schedule, supervise, re-plan, or create worktrees.
 
-There is no Coordinator layer and no Workflow Manager layer. Those were agents asked to run a loop; the
-loop is now code, so the layers are gone rather than reassigned.
+There is no state-owning Coordinator or Workflow Manager layer. In agent-led v6, `manageWorkflow` is a
+typed decision function over a bounded, digest-bound snapshot. It orders kernel-authored executable action
+IDs and may request only listed opaque context references. The kernel alone persists the decision, rechecks
+preconditions and executes actions. Owner choices, authority changes and evidence acceptance stay outside the manager.
 
 The logical operation and its concrete runtime binding remain two things at one boundary: changing the
 allocated runtime does not change the operation's goal, ownership, input, output or authority.
@@ -49,8 +52,8 @@ logical operation; partial or unknown effects require reconciliation before any 
 
 ## One workflow, one worktree, a pool of operations
 
-A workflow is one approved goal, one branch, one worktree and up to ten concurrent operation agents
-inside it. Concurrency comes from disjoint allowlists, not from repository layout: two operations may
+A workflow is one approved goal, one branch and one worktree. Enrolled manager calls and all other admitted
+AI work share ten slots, so at most nine operation agents run while the manager holds one slot. Concurrency comes from disjoint allowlists, not from repository layout: two operations may
 overlap precisely when they cannot write the same file. One operation instance is never divided among
 several agents, and the ten-agent ceiling is not permission to shard one operation.
 
@@ -77,8 +80,9 @@ agent; the allocator decides which runtime, and the workflow's state directory i
   workflow gets a clean worktree and each operation a branded, identity-proven agent. Orca is a provider
   of those two capabilities; it is not a second architecture, and no Orca supervisor agent exists.
 
-Communication is one-directional and file-shaped. An operation reads its contract at launch and writes
+Operation communication is one-directional and file-shaped. An operation reads its contract at launch and writes
 one report; the kernel reads reports and writes state. Nothing is sent into a live agent's terminal, so
-a fenced mailbox or a staged prompt cannot lose an instruction. A decision the kernel cannot take
-mechanically goes to `decide`, or — when it changes the goal, scope, authority or safety envelope — back
-to the user. No layer may substitute for or perform work owned by a lower layer.
+a fenced mailbox or a staged prompt cannot lose an instruction. The manager receives a safe semantic
+projection rather than raw state, secret values or evidence bodies. A decision that changes the goal, scope,
+authority, accepted product meaning or safety envelope goes to the owner. No participant may substitute for
+or perform work owned by another participant.

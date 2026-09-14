@@ -13,10 +13,12 @@ import {GOAL_RECORD,WORK_LEDGER,allowlistsOverlap,byId,describeNode,dynamicBudge
   unique,workModule,workOpId,writeJson} from './common.mjs';
 import {decisionKindFor} from './io.mjs';
 import {isAsk,openOwnerAsk} from './owner.mjs';
+import {loadConfig,nonOperationModels} from '../scripts/config.mjs';
 import {laneView} from './lanes.mjs';
 import {intakeOp,scopeNames} from './intake.mjs';
 import {cutOpFor,cutPlanned,cutReason,deriveWorkOp,designGate,laneOf,laneText,laneWalked} from './sync.mjs';
 import {noteBrand} from './verify.mjs';
+import {quotaAwarePeers,readRuntimeBudget} from './budget.mjs';
 
 /**
  * The goal phase: everything that happens before the one human gate, and nothing that happens after it.
@@ -116,24 +118,25 @@ export function decidedRecords(api,at,loaded,{scope=[],max=40}={}){
   return records;
 }
 
-/** `<host>/config.json` may set `critique.runtimes`: the critics every goal is challenged on, first answer wins. Astra first by default: one call per goal, and Fable's week is the scarcer window. */
+/** The canonical non-operation role map chooses the goal critics; invalid configuration is a startup error. */
 export function critiqueRuntimes(host){
-  try{
-    const config=JSON.parse(fs.readFileSync(path.join(host,'config.json'),'utf8'));
-    const listed=Array.isArray(config?.critique?.runtimes)?config.critique.runtimes:typeof config?.critique==='string'?[config.critique]:null;
-    const runtimes=(listed??[]).filter(item=>typeof item==='string'&&item.trim()).map(item=>item.trim());
-    return runtimes.length?runtimes:llm.DEFAULT_CRITIC_RUNTIMES;
-  }catch{return llm.DEFAULT_CRITIC_RUNTIMES;}
+  return nonOperationModels('validator',loadConfig(host));
+}
+function quotaSelectedProviders(store,state,role,providers){
+  if(Array.isArray(providers))return providers;
+  const configured=nonOperationModels(role,loadConfig(state.host??undefined));
+  const budget=store?.dir?readRuntimeBudget(path.dirname(store.dir)):null;
+  return quotaAwarePeers(configured,loadRuntimes(),budget).providers.slice(0,1);
 }
 
 /**
  * Run the critique and record it. The providers are the host's supervisor runtimes (`supervisor.runtimes` in
- * config.json, astra then fable) unless the caller names its own chain. An unanswered critique is
+ * quota-aware validator pool unless the caller names its own providers. An unanswered critique is
  * `goal-critique-unavailable` and the workflow carries on: a dead provider is not a veto over the owner's job.
  */
 export function critiqueGoalPhase(store,state,{critiqueGoal=llm.critiqueGoal,providers=null,cwd=state.worktree,runHeadless,
   ledger=[],decisions=[],records=[],material=[],constraints=[]}={}){
-  const chain=providers??critiqueRuntimes(state.host??'');
+  const chain=critiqueGoal===llm.critiqueGoal?quotaSelectedProviders(store,state,'validator',providers):(providers??llm.DEFAULT_CRITIC_RUNTIMES);
   const critiqued=typeof critiqueGoal==='function'?critiqueGoal({job:state.job,scope:state.scope??[],ledger,decisions,
     records,material,brand:state.brand??null,constraints,providers:chain,cwd,runHeadless}):null;
   if(!critiqued?.ok){
@@ -357,7 +360,7 @@ export function planGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   const assessed=assessGoal({job:state.job,inputs:state.inputs,material,constraints:[
     `every op runs in the one worktree ${slash(state.worktree)} on branch ${state.branch}: allowlists of ops that may run in parallel must be disjoint`,
     `at most ${state.maxParallelOps??10} ops run at a time, and the kernel re-runs every declared check itself before it accepts a done`,
-    ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)],providers,cwd,runHeadless});
+    ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)],providers:assessGoal===llm.assessGoal?quotaSelectedProviders(store,state,'planner',providers):providers,cwd,runHeadless});
   if(!assessed?.ok){
     store.appendEvent({event:'goal-failed',attempts:assessed?.attempts??null});
     store.saveState(state);
@@ -535,7 +538,7 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
       `the ledger is the authored Work tree under ${slash(binding.ledgerRoot)} and is not yours to change`,
       ...(binding.sharedLedger?[`that tree is owned by ${binding.ownerRepository??slash(binding.ownerRepoRoot)}, not by this repository: the code is written here and the Work is recorded there`]:[]),
       `every op runs in the one worktree ${slash(state.worktree)} on branch ${state.branch} under the node's own allowlist`,
-      ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)],providers,cwd,runHeadless}):null;
+      ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)],providers:assessGoal===llm.assessGoal?quotaSelectedProviders(store,state,'planner',providers):providers,cwd,runHeadless}):null;
   if(assessed?.ok){
     state.definitionOfDone=[...(assessed.value.definitionOfDone??[])];
     // Difficulty x model capability: the assessment rates every node; the allocator routes by tier inside the quota.

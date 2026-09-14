@@ -21,7 +21,10 @@ StarCi keeps **local runtime preferences** in ignored `config.json` at the skill
    - `.dist/config.example.json` (built projection after `ensure-build`)
 3. Write a new `config.json` as pretty-printed JSON with the validated example values (`wx` create-only).
 
-Existing user `config.json` files are not migrated to YAML and must not be modified by example updates. Build projects the example into `.dist/config.example.json` for runtime packaging; that projection is not a second authored source.
+Existing user `config.json` files are never rewritten by example updates. The loader translates the former
+`supervisor`, `validator` and `critique` sections into the current in-memory pools and role map, so an existing local
+file keeps working without becoming another authored format. Build projects the example into
+`.dist/config.example.json` for runtime packaging; that projection is not a second authored source.
 
 ## Shape
 
@@ -30,6 +33,23 @@ Required keys only:
 - `language` — BCP-47-like tag (`vi`, `en`, …)
 - `model` — `null` (inherit host) or non-empty host model name
 - `effort` — one of `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra`
+- `models.selection` — `quota-aware`; selection happens before a call
+- `models.pools` — the two closed cross-provider pools, `fable-astra` and `opus-sol`; every member is a
+  known runtime with the role its consumers require
+- `models.nonOperation` — the closed mapping from the three non-operation roles to one declared pool
+
+| non-operation role | typed functions | default pool |
+| --- | --- | --- |
+| `planner` | `assessGoal`, `planOp` | `fable-astra` |
+| `kernelManager` | `manageWorkflow`, `decide` | `opus-sol` |
+| `validator` | `critiqueGoal`, `validateOp` | `fable-astra` |
+
+The named pools keep provider diversity without making one model a fallback. Before a call, admission chooses
+an eligible, qualified member using actual capacity and known quota; missing quota data is not treated as
+unlimited capacity. Functions retain separate typed inputs and independent contexts even when they share a
+pool. Operation-agent runtime selection continues to come from the operation policy and runtime catalog;
+this map does not override it. The runtime pin seals the accepted `config.json` digest so detached model jobs
+use the same role map.
 
 ## Related catalog ownership (not config)
 

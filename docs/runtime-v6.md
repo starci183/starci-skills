@@ -6,8 +6,11 @@ workflows retain their recorded policy until the explicit retry boundary in the 
 ## Participants and authority
 
 The supervisor is a program that watches kernel processes. It is neither Codex nor a chat. The kernel is
-the sole workflow-state writer: it schedules operations, requests bounded model functions, collects owner
-actions, checks evidence, integrates accepted changes and derives completion. A worker executes one op.
+the sole workflow-state writer: it derives executable actions, requests bounded model functions, collects owner
+actions, checks evidence, integrates accepted changes and derives completion. With explicit
+`engine.coordination: agent-v1` enrollment, a manager model function orders only the action IDs in a
+digest-bound kernel snapshot. The kernel rechecks each precondition before acting. The manager cannot create
+an action, edit Work or state, perform an operation, approve evidence, or answer for the owner. A worker executes one op.
 A validator is an independent execution that evaluates a sealed result against canonical requirements and
 machine evidence. It is not the worker's self-rating and is not made independent merely by choosing a
 different provider. A supervising chat observes and repairs this runtime; it does not fill product inputs,
@@ -19,7 +22,7 @@ Identity is `(workflowId, opId, attempt, generation, jobId)`. Replies, artifacts
 
 ## Scheduling and slow work
 
-The local SQLite journal atomically admits resource reservations and records durable jobs. All enrolled
+The local SQLite journal atomically admits resource reservations and records durable jobs. The manager,
 operation agents, planners, technical decision functions and model judges share a global ceiling of ten
 AI slots. Unrelated user chats are outside this enrollment. Operation/provider limits and exclusive resources
 still apply. Eligibility precedes budget and load ranking. Ready work is ordered by completion pressure,
@@ -29,7 +32,18 @@ Model and command-check jobs execute in detached processes. The kernel replays t
 to obtain the recorded result; pending work yields the tick without spending an operation retry. Expired
 leases become `effect_unknown` and retain capacity until actual settlement. A timeout, crash, empty readback
 or missing receipt is not proof an external effect did not occur. Idempotency or conclusive reconciliation
-is required before repeating an effect. A runtime switch alone does not reset an incident's progress budget.
+is required before repeating an effect. A runtime switch alone does not reset an incident's progress budget. The manager decision is durable model
+work bound to workflow, generation, decision version and snapshot digest. Pending execution yields the tick
+without an operation retry. Stale identity, unknown or duplicate action IDs, unlisted context requests and
+malformed output fail closed. Repeated no-progress remains a bounded, visible incident; free-form prose is
+never an executable fallback.
+
+Host-local `config.json` owns three non-operation roles: `planner` for `assessGoal`/`planOp`,
+`kernelManager` for `manageWorkflow`/`decide`, and `validator` for `critiqueGoal`/`validateOp`. The manager
+uses the cross-provider `opus-sol` pool; planner and validator use `fable-astra`. Admission selects an
+eligible, qualified member using known quota and capacity before the call; unknown quota is not unlimited.
+The functions keep separate typed inputs and independent contexts even when they share a pool. See
+[the local config format](config-format.md) for the complete closed role map.
 
 ## Candidate acceptance
 
@@ -69,7 +83,9 @@ Wrong or expired values return a precise correction request bound to the exact r
 ## Feedback and release evidence
 
 After feedback, repair the runtime, test it privately, seal a new build and explicitly retry the affected
-unfinished workflow operations with fresh agent contexts. Keep the goal, authority and accepted dependency
+unfinished workflow operations with fresh agent contexts. Agent-led coordination is a forward enrollment at
+that retry boundary; migration preserves settled owner actions, accepted Work, evidence and spent budgets and
+never reinterprets a model recommendation as an owner answer. Keep the goal, authority and accepted dependency
 outputs. Record whether the trial resumes existing Work or starts a clean end-to-end scenario. A resumed
 trial, unit tests, a synthetic credential form, and a container primitive probe are different evidence and
 must never be reported as interchangeable proof of unattended delivery.

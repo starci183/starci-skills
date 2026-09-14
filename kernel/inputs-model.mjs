@@ -139,7 +139,7 @@ export function createInputModel({binding,read=()=>readInputState(binding),prese
   };
   const queueAction=(state,request,action,actor)=>enqueue({schema:'starci/owner-action@1',action:{...action,
     workflowId:request.workflowId,opId:request.opId,attempt:request.attempt,generation:request.generation,jobId:request.jobId,
-    requestId:request.id,revision:request.revision,actor}});
+    requestId:request.id,revision:request.revision,...(request.optionsDigest?{optionsDigest:request.optionsDigest}:{}),actor}});
   const submit=body=>{
     // Refuse an entire malformed or foreign batch before the first write; never echo submitted strings.
     if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>key!=='entries')
@@ -190,11 +190,11 @@ export function createInputModel({binding,read=()=>readInputState(binding),prese
     return result.finally(()=>{for(const entry of entries)entry.value='';});
   };
   const submitOwnerAction=body=>{
-    if(!plain(body)||Object.keys(body).some(key=>!['requestId','revision','type','value'].includes(key))||typeof body.requestId!=='string'
+    if(!plain(body)||Object.keys(body).some(key=>!['requestId','revision','type','value','optionsDigest'].includes(key))||typeof body.requestId!=='string'
       ||!Number.isInteger(body.revision)||!['answer','choose','confirm'].includes(body.type))return {ok:false,code:'invalid-request'};
     const state=read();if(!state||state.finished)return {ok:false,code:'workflow-unavailable'};
     const request=deriveOwnerRequests(state).find(item=>item.id===body.requestId&&item.kind!=='credential');
-    if(!request||request.revision!==body.revision)return {ok:false,code:'request-changed'};
+    if(!request||request.revision!==body.revision||String(request.optionsDigest??'')!==String(body.optionsDigest??''))return {ok:false,code:'request-changed'};
     const result=queueAction(state,request,{type:body.type,value:body.value},{type:'owner',receiptId:crypto.randomBytes(16).toString('hex'),channel:'orca-input'});
     return result?.ok?{ok:true,code:'queued'}:{ok:false,code:result?.code??'inbox-unavailable'};
   };

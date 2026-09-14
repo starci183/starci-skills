@@ -15,7 +15,7 @@ workflow**, and the chat is the workflow's monitor, not another agent layer:
 | in a chat | in Orca |
 | --- | --- |
 | every command of the entry: `workflow-goal`, `workflow-approve`, `workflow-answer`, `workflow-run`, `workflow-status`, `workflow-list`, `workflow-stop`, `workflow-supervise` | the same commands |
-| operations run one after another as headless model processes; the kernel still verifies, commits and gates each slice itself | up to ten operations at once, each in an attested Orca terminal |
+| operations run one after another as headless model processes; the kernel still verifies, commits and gates each slice itself | admitted AI work shares ten slots; operation agents use attested Orca terminals and an enrolled manager uses one slot while it runs |
 | an operation kind the headless host cannot serve is reported `host-unsupported`; its `host` needUser item names the capability the kind needs and this host does not offer, as `model/hosts.yaml` declares it, so the chat relays it as "this needs the Orca host" and the workflow carries on with everything else | every kind the profiles declare |
 | `--lane` asks the host adapter for a worktree of its own; what the adapter cannot create it refuses, and the refusal is printed as it came | an Orca worktree row `[Workflow] <id>` |
 | no `[Kernel]` tab: the kernel's last words are `<dir>/kernel.log` | the `[Kernel] <id>` tab |

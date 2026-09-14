@@ -80,6 +80,9 @@ kernel/loads.mjs
 kernel/graph.mjs
 kernel/io.mjs
 kernel/ledger.mjs
+kernel/manager.mjs
+kernel/decision-inputs.mjs
+models/manager-contract.mjs
 kernel/reconciliation.mjs
 kernel/routing.mjs
 hosts/orca/adapter.mjs

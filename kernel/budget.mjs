@@ -88,12 +88,20 @@ export function runtimeWindows(profileEntry,budget){
  * window is at or past the limit and has not reset), `until` (that reset), `remaining` (the smallest share
  * left across its windows, 0-100) and the windows read. A runtime nobody can read is never exhausted here.
  */
-export function budgetVerdict(profileEntry,budget,{now=Date.now(),exhaustedPercent=EXHAUSTED_PERCENT}={}){
+export function budgetVerdict(profileEntry,budget,{now=Date.now(),exhaustedPercent=EXHAUSTED_PERCENT,requireFresh=false,maxAgeMs=DEFAULT_PROBE_MS*3}={}){
   const windows=runtimeWindows(profileEntry,budget);
   if(!windows.length)return {known:false,exhausted:false,until:null,remaining:null,windows:[]};
   const live=windows.filter(win=>!win.resetsAt||win.resetsAt>now);
+  if(requireFresh&&(!Number.isFinite(Number(budget?.at))||now-Number(budget.at)>maxAgeMs||Number(budget.at)>now||!live.length))return {known:false,exhausted:false,until:null,remaining:null,windows:[]};
   const full=live.filter(win=>win.usedPercent>=exhaustedPercent);
   const until=full.length?Math.max(...full.map(win=>win.resetsAt??now)):null;
   const remaining=live.length?Math.max(0,Math.min(...live.map(win=>100-win.usedPercent))):100;
   return {known:true,exhausted:full.length>0,until,remaining,windows};
+}
+
+/** Choose peers by fresh remaining provider quota. Config order breaks only an exact measured tie. */
+export function quotaAwarePeers(ids,runtimes,budget,{now=Date.now()}={}){
+  const reviewed=(ids??[]).map((id,index)=>({id,index,verdict:budgetVerdict(runtimes?.runtimes?.[id],budget,{now,requireFresh:true})}));
+  const available=reviewed.filter(item=>item.verdict.known&&!item.verdict.exhausted).sort((a,b)=>b.verdict.remaining-a.verdict.remaining||a.index-b.index);
+  return {ok:available.length>0,providers:available.map(item=>item.id),reviewed:reviewed.map(item=>({runtime:item.id,known:item.verdict.known,exhausted:item.verdict.exhausted,remaining:item.verdict.remaining,until:item.verdict.until}))};
 }

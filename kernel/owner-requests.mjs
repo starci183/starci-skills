@@ -15,7 +15,7 @@ const askKind=ask=>{
 };
 
 export function requestKey(spec){
-  return digest([clean(spec?.workflowId),clean(spec?.opId),Number(spec?.attempt??0),Number(spec?.generation??0),clean(spec?.jobId),clean(spec?.kind),clean(spec?.subject)]);
+  return digest([clean(spec?.workflowId),clean(spec?.opId),Number(spec?.attempt??0),Number(spec?.generation??0),clean(spec?.jobId),clean(spec?.kind),clean(spec?.subject),clean(spec?.optionsDigest)]);
 }
 
 function guidance(ask){
@@ -46,7 +46,7 @@ export function deriveOwnerRequests(state,{now=Date.now}={}){
     if(verification?.status==='verified')status='verified';
     else if(verification?.status==='rejected')status='needs-correction';
     const subject=clean(ask?.question?.subject||ask?.credential?.provider||ask?.question?.text||ask.id);
-    const base={workflowId,opId:clean(ask.id),attempt:Number(ask.attempt??ask.restarts??0),generation,jobId:clean(ask.jobId)||workflowJobId,kind,subject};
+    const base={workflowId,opId:clean(ask.id),attempt:Number(ask.attempt??ask.restarts??0),generation,jobId:clean(ask.jobId)||workflowJobId,kind,subject,optionsDigest:clean(ask.decisionOptionsDigest)||null};
     const optionSource=list(ask?.question?.options).length?ask.question.options:list(ask?.options).length?ask.options:list(decisionMarker?.options);
     return {...base,id:requestKey(base),status,revision:Number(ask.ownerRequestRevision??0),guidance:guidance(ask),decisionRecord:clean(decisionMarker?.record||ask?.question?.record)||null,
       options:optionSource.map((value,index)=>plain(value)?{id:clean(value.id)||String(index+1),label:clean(value.label||value.text)}:{id:String(index+1),label:clean(value)}).filter(item=>item.label),
@@ -68,6 +68,7 @@ export function applyOwnerAction(state,action,{now=Date.now,verificationReceipts
   const current=deriveOwnerRequests(state,{now}).find(item=>item.id===action.requestId);
   if(!current)return {ok:false,code:'request-stale'};
   if(action.workflowId!==current.workflowId||Number(action.generation)!==current.generation||Number(action.revision)!==current.revision)return {ok:false,code:'request-stale',current};
+  if(current.kind==='business-decision'&&clean(action.optionsDigest)!==clean(current.optionsDigest))return {ok:false,code:'decision-options-stale',current};
   const ask=list(state.ops).find(item=>item.id===current.opId);
   if(!ask)return {ok:false,code:'request-stale'};
   const type=clean(action.type),value=action.value;

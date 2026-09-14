@@ -1,12 +1,13 @@
 language: vi
 model: null
 effort: medium
-# Models the workflow kernel uses for triage and decide operations, strongest first; lower it to save budget.
-supervisor:
-  runtimes: [claude-fable-5.1, gpt-6-astra]
-# The one validator of a workflow: a headless call that accepts or rejects every op result before the kernel commits it, strongest first.
-validator:
-  runtimes: [gpt-5.6-sol, claude-opus]
-# The critics every goal is challenged on before its approval page is written, first valid answer wins; Astra first to spare Fable's week.
-critique:
-  runtimes: [gpt-6-astra, claude-fable-5.1]
+# Non-operation models are quota-aware peer pools. Eligibility and qualification still admit every actual call.
+models:
+  selection: quota-aware
+  pools:
+    fable-astra: [claude-fable-5.1, gpt-6-astra]
+    opus-sol: [claude-opus, gpt-5.6-sol]
+  nonOperation:
+    planner: fable-astra
+    kernelManager: opus-sol
+    validator: fable-astra

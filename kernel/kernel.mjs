@@ -21,6 +21,7 @@ import {planProtectedProof,proofFinding,proofPlan,protectedProofFinding,runAtBas
 import {evaluateAcceptance,kernelVerificationReceipt,resolveEvidencePacket} from '../checks/acceptance.mjs';
 import {protectedOracleManifest} from './candidate-bridge.mjs';
 import {prepareCandidateIntegration} from './candidates.mjs';
+import {buildManagerSnapshot,validateManagerDecision,managerProgressDigest} from './manager.mjs';
 import {stepsFor} from './contract.mjs';
 import * as work from './ledger.mjs';
 import * as llm from '../models/functions.mjs';
@@ -37,6 +38,7 @@ import {AUTHOR_KIND,PLAN_KIND,AUTHORS_RECORD,authorsRecord,BRAND_DECIDE,BRAND_KI
   tail,toOp,unique,validateCommandAt,workModule,workOpId,workValidateCommand,writeJson} from './common.mjs';
 import {ioBlock,kindsReadingBrand,undeclaredWrites,writesWorkRecords} from './io.mjs';
 import {readDistJson} from '../core/runtime-root.mjs';
+import {loadConfig,nonOperationModels} from '../scripts/config.mjs';
 import {recordDigests,reconcileIntake} from './reconciliation.mjs';
 import {renderChecksFor} from '../checks/render.mjs';
 import {laneOwnerOf,laneNameOf,laneRowTitle,laneView,openLane,settleLane,laneBranchRef} from './lanes.mjs';
@@ -47,6 +49,7 @@ import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,isAsk,openConflictDecision,ans
   mechanicalOwnerLine,noteOwnerList,ownerItems,ownerLines,waitsForOwner} from './owner.mjs';
 import {askFillLine,credentialAsked,fillCommand,fillWaitingAsks,inputReadyAsks,ownerFillLines,settleFilledAsks} from './fill.mjs';
 import {reconcileWorkflowInputs,recoverWorkflowInputReferences} from './inputs.mjs';
+import {reconcileCanonicalDecisionInputs} from './decision-inputs.mjs';
 import {INTEGRATION_RESEARCH_ORDER,integrationReadiness,prepareCredentialAsk,preparationFingerprint,relatedIntegrations} from './inputs-readiness.mjs';
 import {snapshotCredentialVersions,credentialReplacementFor} from './inputs-replacement.mjs';
 import {BRAND_PAYLOAD,attributedFiles,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
@@ -758,7 +761,7 @@ export function producedKindVerdict(op,observed,ctx){
   catch(error){return ctx?.v6?{ok:false,produced,undeclared:[],error:String(error?.message??error)}:{ok:true,produced,undeclared:[]};}
 }
 
-function scheduleOps(orca,store,state,ctx){
+export function activatePendingOps(store,state){
   for(const op of state.ops){
     if(op.status!=='pending')continue;
     const dependencies=op.dependsOn.map(id=>byId(state,id));
@@ -770,11 +773,17 @@ function scheduleOps(orca,store,state,ctx){
       store.appendEvent({event:'op-blocked',op:op.id,reason:'dependency blocked'});
       continue;
     }
-    if(dependencies.every(dependency=>!dependency||dependency.status==='done'))op.status='ready';
+    if(dependencies.every(dependency=>dependency?.status==='done'||(!dependency&&state.engine?.coordination!=='agent-v1')))op.status='ready';
   }
+}
+
+function scheduleOps(orca,store,state,ctx,{orderedOpIds=null}={}){
+  activatePendingOps(store,state);
   const launched=[];
   const ready=state.ops.filter(item=>item.status==='ready');
-  for(const op of ctx.v6?ctx.v6.rank(ready):ready){
+  const ranked=ctx.v6?ctx.v6.rank(ready):ready;
+  const selected=orderedOpIds?orderedOpIds.map(id=>ready.find(op=>op.id===id)).filter(Boolean):ranked;
+  for(const op of selected){
     ctx.currentOp=op;
     if(ctx.v6&&op.integrationPreparation){
       try{if(normalizePreparationAuthority(store,state,op,ctx))store.saveState(state);}
@@ -1355,6 +1364,7 @@ export function resumePaused(store,state){
     if(isAsk(shared.kind))continue;
     if(shared.status==='done'){
       op.status='ready';op.attempt+=1;op.waitingFor=null;
+      delete op.blockedByDependency;
       op.priorOpen=[`shared change ${shared.id} done at ${shared.head??state.head??'unknown'}`];
       op.dispatch=null;op.terminal=null;op.nudged=false;
       store.appendEvent({event:'shared-change-resumed',op:op.id,shared:shared.id,head:shared.head??state.head??null});
@@ -1364,12 +1374,120 @@ export function resumePaused(store,state){
     // A shared op blocked without a refusal is still alive - the kernel cools, re-admits or authors it - so its
     // requester keeps waiting; only a refused or failed shared change blocks the requester behind it.
     if(deadOp(shared)){
-      op.status='blocked';op.waitingFor=null;
+      op.status='blocked';op.blockedByDependency={id:shared.id,attempt:op.attempt};op.waitingFor=null;
       state.needUser.push({op:op.id,kind:'shared-change',detail:`${op.id} waits for the shared change ${shared.id}, which is ${shared.status}`});
-      store.appendEvent({event:'shared-change-blocked',op:op.id,shared:shared.id});
+      store.appendEvent({event:'shared-change-blocked',op:op.id,shared:shared.id,attempt:op.attempt});
     }
   }
   return resumed;
+}
+
+/** Re-admit only a dependency-block transition whose exact dependency later produced a completed operation. */
+export function recoverSatisfiedDependencyBlocks(store,state,{events=null}={}){
+  let history=events;const recovered=[];
+  for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal&&!item.fill&&!item.ownerRequest)){
+    if(op.v6Lease||op.v6Pending||op.dispatch||op.terminal)continue;
+    if(state.needUser.some(item=>item.op===op.id&&['authority','decision','credential','provision'].includes(item.kind)))continue;
+    const marker=plain(op.blockedByDependency)?op.blockedByDependency:null;
+    let dependency=marker?.id??(typeof op.blockedByDependency==='string'?op.blockedByDependency:null),receipt=null;
+    if(marker&&marker.attempt!==op.attempt)continue;
+    if(!dependency){
+      history??=store.readEvents();
+      receipt=[...history].reverse().find(event=>event.event==='shared-change-blocked'&&event.op===op.id);
+      dependency=receipt?.shared??null;
+      if(receipt?.attempt!==undefined&&receipt.attempt!==op.attempt)continue;
+      const index=receipt?history.lastIndexOf(receipt):-1;
+      const allowed=new Set(['need-user-answered','owner-line-dropped','need-user-stale-dropped','terminals-swept']);
+      if(index<0||history.slice(index+1).some(event=>event.op===op.id&&!allowed.has(event.event)))continue;
+    }
+    if(!dependency||(op.dependsOn??[]).includes(dependency)===false)continue;
+    const shared=byId(state,dependency);
+    if(!shared||isAsk(shared.kind)||shared.status!=='done'||shared.refusal)continue;
+    op.status='ready';op.attempt=(op.attempt??1)+1;op.dispatch=null;op.terminal=null;op.nudged=false;delete op.blockedByDependency;
+    op.priorOpen=[`shared change ${shared.id} later completed at ${shared.head??state.head??'unknown'}`];
+    state.needUser=state.needUser.filter(item=>!(item.op===op.id&&item.kind==='shared-change'));
+    store.appendEvent({event:'dependency-readmitted',op:op.id,dependency:shared.id,head:shared.head??state.head??null,proof:'shared-change-blocked receipt followed by completed dependency'});
+    recovered.push(op.id);
+  }
+  return recovered;
+}
+
+/** Drop an old review line only when a later accepted review receipt verifies every ledger item it covered. */
+export function sweepResolvedReviewLines(store,state){
+  const dropped=[];
+  state.needUser=state.needUser.filter(item=>{
+    if(item.kind!=='review'||!item.op)return true;
+    const old=byId(state,item.op),ids=old?.ledgerIds??[];
+    if(old?.status!=='done'||!ids.length)return true;
+    const key=groupKey(state,ids);
+    if((state.verifyFindings?.[key]??[]).length)return true;
+    const oldIndex=state.ops.indexOf(old);
+    const resolved=ids.every(id=>{
+      const ledger=ledgerItem(state,id);if(ledger?.status!=='verified')return false;
+      return (ledger.evidence??[]).some(receipt=>receipt.kind==='review.verify'&&receipt.opId!==old.id&&typeof receipt.head==='string'&&receipt.head&&
+        state.ops.some((review,index)=>index>oldIndex&&review.id===receipt.opId&&review.kind==='review.verify'&&review.status==='done'&&review.verdict==='pass'&&review.head===receipt.head&&
+          (review.ledgerIds??[]).includes(id)));
+    });
+    if(!resolved)return true;
+    dropped.push(item.op);store.appendEvent({event:'resolved-review-line-dropped',op:item.op,ledgerIds:ids,proof:'later accepted review receipt verifies every covered ledger item'});return false;
+  });
+  return dropped;
+}
+
+/** One strategic manager turn. The model chooses only ids whose executable meaning the kernel supplied. */
+export function coordinateManagedWorkflow(store,state,ctx){
+  if(state.engine?.coordination!=='agent-v1')return null;
+  activatePendingOps(store,state);
+  const ready=state.ops.filter(op=>op.status==='ready'&&!op.fill&&!op.ownerRequest&&!op.v6Lease);
+  const actions=ready.map(op=>({id:`${op.needsReplan?'replan':'dispatch'}:${op.id}`,type:op.needsReplan?'replan':'dispatch',opId:op.id,
+    preconditions:[`status:${op.id}:ready`,'no-live-lease','approved-operation-boundaries'],summary:`${op.needsReplan?'Replan':'Dispatch'} ${op.id} (${op.kind})`,contextRefIds:[]}));
+  if(verificationCandidates(state,ctx).length)actions.unshift({id:'plan-verification',type:'plan-verification',opId:null,preconditions:['completed-implementers','lane-ready','no-live-proof-for-group'],summary:'Plan the next mandatory verification from the canonical lane graph',contextRefIds:[]});
+  const blockers=state.needUser.slice(0,48).map((item,index)=>({id:`blocker:${index}:${item.op??'workflow'}`,kind:['decision','authority','credential','provision'].includes(item.kind)?'owner':'technical',opId:item.op??null,summary:String(item.kind??'blocked')}));
+  for(const [signature,entry] of Object.entries(state.anomalies??{}).filter(([,value])=>value.count>=TRIAGE_AFTER&&!value.triaged).slice(0,16))
+    blockers.push({id:`anomaly:${blockers.length}`,kind:'technical',opId:entry.detail?.op??null,summary:`repeated anomaly: ${String(signature).slice(0,120)}`});
+  state.engine.manager=plain(state.engine.manager)?state.engine.manager:{};
+  const manager=state.engine.manager,now=ctx.now?.()??Date.now(),progressDigest=managerProgressDigest(state);
+  if(manager.progressDigest!==progressDigest){manager.progressDigest=progressDigest;manager.noProgressRound=0;manager.incident=null;}
+  const busy=state.ops.filter(op=>['running','answering'].includes(op.status)&&!op.fill&&!op.ownerRequest);
+  const capacity={operationLimit:ctx.allocator?.maxParallelOps??null,nativeWriterLimit:ctx.v6?1:null,activeOperations:busy.length,globalAIJobLimit:10};
+  const makeSnapshot=()=>buildManagerSnapshot({state,actions,blockers,capacity,noProgress:{round:manager.noProgressRound??0,budget:2}});
+  let snapshot=makeSnapshot();
+  if(!actions.length&&!manager.pendingSnapshot)return {pending:false,waiting:true,dispatch:[]};
+  if(manager.incident?.basisDigest===snapshot.basisDigest)return {incident:true,dispatch:[]};
+  if(manager.lastBasisDigest===snapshot.basisDigest&&Array.isArray(manager.lastActions)){
+    const knownWait=busy.length>0||(ready.length>0&&ready.every(op=>/budget exhausted|cooling|no free slot|rate-limit|resource .*capacity|writer.*busy/i.test(String(op.deferral?.reason??''))));
+    if(knownWait||now-(manager.lastAppliedAt??now)<60000)return {pending:false,cached:true,dispatch:manager.lastActions.filter(id=>id.startsWith('dispatch:')).map(id=>id.slice(9))};
+    manager.noProgressRound=(manager.noProgressRound??0)+1;
+    snapshot=makeSnapshot();
+    if(manager.noProgressRound>2){manager.incident={kind:'manager-no-progress',basisDigest:snapshot.basisDigest,reason:'manager exhausted its bounded no-progress turns without executable progress or a known wait'};
+      store.appendEvent({event:'manager-no-progress',round:manager.noProgressRound,budget:2});store.saveState(state);return {incident:true,dispatch:[]};}
+  }
+  // Drain a pending durable turn before requesting another. A changed semantic snapshot cannot adopt its decision.
+  const requested=manager.pendingSnapshot??snapshot;
+  Object.assign(manager,{version:requested.version,basisDigest:requested.basisDigest,pendingDecisionId:requested.decisionId,pendingDigest:requested.digest,pendingSnapshot:requested});
+  store.saveState(state);
+  let result;
+  try{result=ctx.manageWorkflow(requested);}
+  catch(error){if(isJobPending(error)){if(manager.pendingNoted!==requested.decisionId){manager.pendingNoted=requested.decisionId;store.appendEvent({event:'manager-pending',decisionId:requested.decisionId,digest:requested.digest});store.saveState(state);}return {pending:true,dispatch:[]};}
+    manager.pendingSnapshot=null;manager.pendingDecisionId=null;manager.pendingDigest=null;
+    if(error?.code==='STARCI_MODEL_QUOTA_WAIT'){
+      const reason=String(error.message).slice(0,300);if(manager.quotaWait!==reason)store.appendEvent({event:'manager-quota-wait',reason});manager.quotaWait=reason;store.saveState(state);return {pending:true,quotaWait:true,dispatch:[]};}
+    manager.incident={kind:'manager-unavailable',basisDigest:requested.basisDigest,reason:String(error?.message??error).slice(0,300)};
+    store.appendEvent({event:'manager-unavailable',decisionId:requested.decisionId,reason:manager.incident.reason});store.saveState(state);return {incident:true,dispatch:[]};}
+  manager.pendingSnapshot=null;manager.pendingDecisionId=null;manager.pendingDigest=null;
+  if(requested.basisDigest!==snapshot.basisDigest||requested.generation!==snapshot.generation){
+    store.appendEvent({event:'manager-stale-discarded',decisionId:requested.decisionId,currentDigest:snapshot.digest});store.saveState(state);return {pending:false,stale:true,dispatch:[]};}
+  const decision=result?.value??result,checked=validateManagerDecision(decision,requested);
+  if(!checked.ok){manager.incident={kind:'manager-invalid',reason:checked.reason,digest:requested.digest,basisDigest:requested.basisDigest};store.appendEvent({event:'manager-refused',decisionId:requested.decisionId,reason:checked.reason});store.saveState(state);return {pending:false,incident:true,dispatch:[]};}
+  const dispatch=[];
+  for(const id of checked.orderedActionIds){
+    if(id==='plan-verification'){planVerifyOps(store,state,ctx);continue;}
+    if(id.startsWith('replan:')){const op=byId(state,id.slice(7));if(op?.status==='ready'&&op.needsReplan&&!op.v6Lease&&!op.fill&&!op.ownerRequest){ctx.currentOp=op;replanOp(store,state,op,ctx);}continue;}
+    if(id.startsWith('dispatch:')){const opId=id.slice(9),op=byId(state,opId);if(op?.status==='ready'&&!op.v6Lease&&!op.fill&&!op.ownerRequest)dispatch.push(opId);}
+  }
+  Object.assign(manager,{lastDecisionId:requested.decisionId,lastDigest:requested.digest,lastBasisDigest:requested.basisDigest,lastActions:[...checked.orderedActionIds],lastAppliedIteration:state.iterations,lastAppliedAt:now,incident:null});
+  store.appendEvent({event:'manager-applied',decisionId:requested.decisionId,digest:requested.digest,actions:checked.orderedActionIds});store.saveState(state);
+  return {pending:false,dispatch};
 }
 
 function handleBlocked(store,state,op,report,ctx){
@@ -2005,9 +2123,9 @@ function acceptReports(orca,store,state,ctx){
     let action;
     try{action=applyOpReport(orca,store,state,op,report,ctx);}
     catch(error){
-      if(!ctx.v6||!isJobPending(error))throw error;
+      if(!ctx.v6||(!isJobPending(error)&&error?.code!=='STARCI_MODEL_QUOTA_WAIT'))throw error;
       for(const key of Object.keys(op))delete op[key];Object.assign(op,before);
-      op.v6Pending={kind:'durable-job',jobId:error.job?.identity?.jobId,status:error.job?.status};
+      op.v6Pending=error?.code==='STARCI_MODEL_QUOTA_WAIT'?{kind:'model-quota-wait',status:'waiting',reason:String(error.message).slice(0,240)}:{kind:'durable-job',jobId:error.job?.identity?.jobId,status:error.job?.status};
       store.saveState(state);continue;
     }
     if(ctx.v6&&action==='acceptance-pending'){
@@ -2078,7 +2196,7 @@ const laneWantsReview=(state,id,ctx=null)=>{
  * ONCE for the whole group - never once per piece - when every child's build step is accepted, on a runtime none
  * of the children used. The parent's group acceptance is that proof's acceptance.
  */
-function planVerifyOps(store,state,ctx){
+export function verificationCandidates(state,ctx){
   const ready=state.ledger.filter(item=>item.status==='implemented').map(item=>item.id)
     .filter(id=>laneWantsReview(state,id,ctx))
     .filter(id=>{
@@ -2086,10 +2204,11 @@ function planVerifyOps(store,state,ctx){
       return ops.some(implementsLedger)&&ops.filter(implementsLedger).every(op=>op.status==='done')
         &&!ops.some(op=>kindRole(op.kind)==='verify'&&op.origin==='verify'&&liveStatus.includes(op.status));
     });
-  if(!ready.length)return [];
+  return verifyComponents(state,ready).map(component=>[...component].sort()).filter(ids=>!groupIncomplete(state,ids));
+}
+function planVerifyOps(store,state,ctx){
   const created=[];
-  for(const component of verifyComponents(state,ready)){
-    const ledgerIds=[...component].sort();
+  for(const ledgerIds of verificationCandidates(state,ctx)){
     const key=groupKey(state,ledgerIds);
     // One proof per group: a cut parent whose children are not all implemented yet waits for the rest of them.
     if(groupIncomplete(state,ledgerIds))continue;
@@ -2416,25 +2535,10 @@ export function withSupervisorPreference(profile,runtimes){
   copy.allocation.preference.decide=[...known,...((copy.allocation.preference.decide??[]).filter(id=>!known.includes(id)))];
   return copy;
 }
-export const DEFAULT_SUPERVISOR_RUNTIMES=['claude-fable-5.1','gpt-6-astra'];
-/** `<host>/config.json` may set `supervisor.runtimes`: the models triage and decide operations prefer, strongest first. */
-export function supervisorRuntimes(host){
-  try{
-    const config=JSON.parse(fs.readFileSync(path.join(host,'config.json'),'utf8'));
-    const listed=Array.isArray(config?.supervisor?.runtimes)?config.supervisor.runtimes:typeof config?.supervisor==='string'?[config.supervisor]:null;
-    const runtimes=(listed??[]).filter(item=>typeof item==='string'&&item.trim()).map(item=>item.trim());
-    return runtimes.length?runtimes:DEFAULT_SUPERVISOR_RUNTIMES;
-  }catch{return DEFAULT_SUPERVISOR_RUNTIMES;}
-}
-/** `<host>/config.json` may set `validator.runtimes`: the providers the one validator of a workflow is called on, in order. */
-export function validatorRuntimes(host){
-  try{
-    const config=JSON.parse(fs.readFileSync(path.join(host,'config.json'),'utf8'));
-    const listed=Array.isArray(config?.validator?.runtimes)?config.validator.runtimes:typeof config?.validator==='string'?[config.validator]:null;
-    const runtimes=(listed??[]).filter(item=>typeof item==='string'&&item.trim()).map(item=>item.trim());
-    return runtimes.length?runtimes:llm.DEFAULT_VALIDATOR_RUNTIMES;
-  }catch{return llm.DEFAULT_VALIDATOR_RUNTIMES;}
-}
+/** Closed non-operation model bindings come only from validated config.json. */
+export const supervisorRuntimes=host=>nonOperationModels('kernelManager',loadConfig(host));
+export const workflowModelConfigRoot=state=>isV6(state)&&state.engine.runtimePin?.root?state.engine.runtimePin.root:state.host??'';
+export const validatorRuntimes=host=>nonOperationModels('validator',loadConfig(host));
 /**
  * The task spec travels on one Orca command line, and Windows bounds a command line near 32k characters: a
  * 142-file allowlist once made `task-create` fail with ENAMETOOLONG and took the kernel down with it. A contract
@@ -2697,7 +2801,7 @@ function readmitCooled(store,state,ctx){
 export function guardedStage(store,state,ctx,stage,fn){
   try{fn();state.kernelErrors=0;if(ctx.v6&&state.engine.stageErrors)delete state.engine.stageErrors[stage];return 'ok';}
   catch(error){
-    if(isJobPending(error)){store.saveState(state);return 'deferred';}
+    if(isJobPending(error)||error?.code==='STARCI_MODEL_QUOTA_WAIT'){store.saveState(state);return 'deferred';}
     const message=String(error?.stack??error?.message??error).slice(0,600);
     state.kernelErrors=(state.kernelErrors??0)+1;
     if(ctx.v6){state.engine.stageErrors??={};state.kernelErrors=state.engine.stageErrors[stage]=(state.engine.stageErrors[stage]??0)+1;}
@@ -2725,7 +2829,11 @@ export function noteAnomaly(store,state,signature,detail){
 export function triageAnomaly(store,state,signature,ctx){
   const entry=state.anomalies?.[signature];
   if(!entry||entry.count<TRIAGE_AFTER||entry.triaged||typeof ctx.decide!=='function')return null;
-  const chosen=ctx.decide({situation:`Anomaly repeated ${entry.count} times: ${signature}`,options:TRIAGE_OPTIONS,providers:ctx.supervisor??DEFAULT_SUPERVISOR_RUNTIMES,
+  if(state.engine?.coordination==='agent-v1'){
+    if(!entry.managerObserved){entry.managerObserved=true;store.appendEvent({event:'manager-anomaly-observed',signature,count:entry.count});}
+    return 'manager';
+  }
+  const chosen=ctx.decide({situation:`Anomaly repeated ${entry.count} times: ${signature}`,options:TRIAGE_OPTIONS,providers:ctx.supervisor,
     context:{detail:entry.detail,recentEvents:store.readEvents({since:Math.max(0,(store.readEvents().at(-1)?.seq??0)-40)}).map(e=>`${e.event}${e.op?` ${e.op}`:''}${e.reason?` ${String(e.reason).slice(0,80)}`:''}`),ops:state.ops.map(op=>`${op.id}=${op.status}`)},cwd:state.worktree});
   const option=chosen?.ok&&TRIAGE_OPTIONS.includes(chosen.value.option)?chosen.value.option:'needUser';
   entry.triaged={option,rationale:chosen?.ok?chosen.value.rationale:null,at:Date.now()};
@@ -2821,7 +2929,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   // `validateOp:null` is an explicit choice to run without the validator; it is recorded once as `validator-skipped`.
   const ctx={cwd,allocator,planOp,decide,validateOp,template,wait,exec,git,launch,now,guards,work:null,orca,host:hostDescriptorOf({host}),
     reconcile,renderChecks,contractDigest,kindsProfile,deferPreparation,...(verifyPresence?{verifyPresence}:{}),
-    supervisor:supervisor??supervisorRuntimes(state.host??''),validator:validator??validatorRuntimes(state.host??'')};
+    supervisor:supervisor??supervisorRuntimes(workflowModelConfigRoot(state)),validator:validator??validatorRuntimes(workflowModelConfigRoot(state))};
   ctx.v6=v6Runtime??(isV6(state)?createV6Runtime({store,state,now,eligibility:modelEligibility,modelPolicy,git,
     exec:(command,options)=>ctx.v6.check(command,options,ctx.currentOp??null)}):null);
   if(ctx.v6){
@@ -2831,6 +2939,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     ctx.planOp=args=>ctx.v6.model('planOp',args,ctx.currentOp??null);
     ctx.decide=args=>ctx.v6.model('decide',args,ctx.currentOp??null);
     ctx.validateOp=args=>ctx.v6.model('validateOp',args,args.op??ctx.currentOp??null);
+    ctx.manageWorkflow=snapshot=>ctx.v6.manageWorkflow(snapshot);
     ctx.exec=(command,options)=>ctx.v6.check(command,options,ctx.currentOp??null);
     store.appendEvent({event:'engine-active',major:6,generation:state.engine.generation,assurance:state.engine.assurance});
   }
@@ -3037,6 +3146,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     }
   }
   // Operations created before a rule change carry their old check lists: the kernel-owned checks are stripped on load.
+  reconcileCanonicalDecisionInputs(store,state,ctx);
   for(const op of state.ops)if(Array.isArray(op.checks))op.checks=op.checks.filter(check=>!KERNEL_CHECK.test(check.name??''));
   reconcileWithOrca(orca,store,state,{cwd,wait,allocator});
   // The shared runtime ledger is a repository-wide file: this kernel's own entries for operations that are no
@@ -3047,6 +3157,8 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   sweepStaleTerminals(orca,store,state,{cwd});
   state.buildStamp=buildStamp();
   rejudgeParked(store,state,ctx);
+  recoverSatisfiedDependencyBlocks(store,state);
+  sweepResolvedReviewLines(store,state);
   // A finish declared `blocked` over the owner's list is withdrawn once that list is empty and work remains: the
   // items it finished over have been settled (re-judged, retried, taken provisionally) and the workflow is what it was.
   if(state.finished?.outcome==='blocked'&&!state.needUser.length&&state.ops.some(op=>['ready','pending','paused'].includes(op.status))){
@@ -3063,6 +3175,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator});if(!ctx.v6)sweepTreeStrays(store,state,ctx);}
     if((iteration>0&&iteration%RECONCILE_EVERY===0)||now()-(state.lastSweepAt??0)>=SWEEP_MS){sweepStaleTerminals(orca,store,state,{cwd,now});reviveSupervisor(store,state,ctx,{now});}
     if(stopRequested(store)){store.appendEvent({event:'stopped',reason:'stop flag'});releaseKernelTab(orca,store,state,{cwd,reason:'paused by stop flag'});store.saveState(state);return state;}
+    reconcileCanonicalDecisionInputs(store,state,ctx);
     applyInbox(store,state,ctx);
     if(state.restartRequested){const reason=state.restartRequested;state.restartRequested=null;store.appendEvent({event:'stopped',reason:`restart: ${reason}`});store.saveState(state);return state;}
     if(state.buildStamp&&buildStamp()&&buildStamp()!==state.buildStamp){store.appendEvent({event:'build-changed',from:state.buildStamp,to:buildStamp()});store.appendEvent({event:'stopped',reason:'build changed'});store.saveState(state);return state;}
@@ -3073,6 +3186,8 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     refuseForeignShared(store,state,{...ctx,orca});
     readmitCooled(store,state,ctx);
     resumePaused(store,state);
+    recoverSatisfiedDependencyBlocks(store,state,{events:[]});
+    sweepResolvedReviewLines(store,state);
     drainSharedQueue(store,state,ctx);
     // A provisional decision travels to everything built behind it, and the owner's list carries one line per
     // question - not the same line once per iteration.
@@ -3083,8 +3198,10 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     // What the owner would read now, recorded when - and only when - it differs from what they would have read
     // last tick. The event is the trail of the question, not a heartbeat of the list.
     noteOwnerList(store,state);
-    if(guardedStage(store,state,ctx,'sync',()=>{syncLedgerOps(store,state,ctx);planVerifyOps(store,state,ctx);})==='stop')break;
-    if(guardedStage(store,state,ctx,'schedule',()=>scheduleOps(orca,store,state,ctx))==='stop')break;
+    if(guardedStage(store,state,ctx,'sync',()=>{syncLedgerOps(store,state,ctx);if(state.engine?.coordination!=='agent-v1')planVerifyOps(store,state,ctx);})==='stop')break;
+    let managed=state.engine?.coordination==='agent-v1'?{pending:true,dispatch:[]}:null;
+    if(state.engine?.coordination==='agent-v1'&&guardedStage(store,state,ctx,'manager',()=>{managed=coordinateManagedWorkflow(store,state,ctx);})==='stop')break;
+    if(!managed?.pending&&!managed?.incident&&guardedStage(store,state,ctx,'schedule',()=>scheduleOps(orca,store,state,ctx,{orderedOpIds:managed?managed.dispatch:null}))==='stop')break;
     // A credential ask already waiting but with no command to copy - its custody was named in a place nothing had
     // read yet - is asked again every tick until it has one. Nothing else revisits it: it is not scheduled, and the
     // start migrations only see asks that are not waiting yet, so ask-6 waited with an empty line for an hour.
@@ -3105,6 +3222,9 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     let early=null;
     if(guardedStage(store,state,ctx,'accept',()=>{early=acceptReports(orca,store,state,ctx);})==='stop')break;
     if(Array.isArray(early)&&early.length){store.appendEvent({event:'accepted-early',ops:early.map(item=>item.op)});store.saveState(state);continue;}
+    // A strategic model call is a durable wait. Owner inbox, report acceptance and lease pulses ran above;
+    // do not classify that wait as worker starvation or finish while its result still needs reconciliation.
+    if(managed?.pending){store.saveState(state);wait(Math.min(pollMs,1000));continue;}
     if(running.length){
       if(ctx.v6&&state.ops.some(op=>op.v6Pending)){store.saveState(state);wait(Math.min(pollMs,1000));continue;}
       const inputWait=fillWaitingAsks(state).length>0;
@@ -3537,7 +3657,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const runtimeBinding={workflowId:state.id,from:state.from,run:state.run,hostAdapter:state.hostAdapter,launcher:state.launcher,
       kernelTerminalOwned:invocationOwnsTerminal,...(launchTask?{workflowTask:launchTask}:{})};
     store.appendEvent({event:binding?'run-bound':'run-resumed',run:state.run,from:state.from,iterations:state.iterations});
-    const runtimeProfile=withSupervisorPreference(loadRuntimes(),supervisorRuntimes(state.host));
+    const runtimeProfile=withSupervisorPreference(loadRuntimes(),supervisorRuntimes(workflowModelConfigRoot(state)));
     let modelPolicy=null;
     if(isV6(state)){
       const root=path.dirname(state.engine.journalFile);fs.mkdirSync(root,{recursive:true});
@@ -3554,7 +3674,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     }):null;
     const finished=(()=>{const release=acquireKernelLock(store);try{fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});return runLoop(orca,store,state,{cwd:worktree,wait,
       // Slots are derived from the operations that are actually running; saved loads may belong to a dead kernel.
-      supervisor:supervisorRuntimes(state.host),validator:validatorRuntimes(state.host),
+      supervisor:supervisorRuntimes(workflowModelConfigRoot(state)),validator:validatorRuntimes(workflowModelConfigRoot(state)),
       // Every kernel of this repository shares one runtime ledger beside the workflow directories, so an
       // expensive runtime another workflow is on is load here too and a provider cooldown is seen by all.
       // A sequential host (headless) caps the allocator at one operation whatever the approved quota says.

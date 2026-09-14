@@ -4,13 +4,28 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {CRITIQUE,CRITIQUE_FORM,DECISION_FORM,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,OVERLAP_CASES,PROVISION_KINDS,VALIDATOR_IO_RULE,VALIDATOR_RULES,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateOp} from '../models/functions.mjs';
+import {CRITIQUE,CRITIQUE_FORM,DECISION_FORM,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,MANAGER_DECISION,MANAGER_SNAPSHOT,OVERLAP_CASES,PROVISION_KINDS,VALIDATOR_IO_RULE,VALIDATOR_RULES,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,manageWorkflow,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateManagerDecision,validateManagerSnapshot,validateOp} from '../models/functions.mjs';
 
 const op=(id,extra={})=>({id,kind:'backend.implement',goal:`Build ${id}`,ledgerIds:[`L-${id}`],allowlist:[`apps/be/src/${id}`],
   references:['.starciwork/features/sales/sds.md#3'],checks:[{name:'unit',command:'npx vitest run sales'}],acceptance:[`${id} works`],dependsOn:[],...extra});
 const ledgerOf=(...ids)=>ids.map(id=>({id:`L-${id}`,title:`Thing ${id}`,inputRef:'bug-report#1',status:'absent'}));
 const goalPlan=()=>({definitionOfDone:['Order intake persists an order.'],ledger:ledgerOf('a','b'),ops:[op('a'),op('b')],risks:['Shared registration may be needed.']});
+const managerSnapshot=()=>({schema:MANAGER_SNAPSHOT,workflowId:'wf',decisionId:'manager-abc',generation:2,version:3,digest:'digest-3',basisDigest:'basis-3',
+  goal:{job:'Finish the approved workflow',definitionOfDone:['All accepted operations are complete.']},progress:{ready:1,blocked:0},
+  ops:[{id:'op-a',kind:'backend.implement',status:'ready'}],blockers:[],actions:[{id:'plan-op-a',type:'plan-operation',opId:'op-a',preconditions:['ready:op-a'],summary:'Plan the ready operation',contextRefIds:['ctx-op-a'],modelPreferences:['gpt-6-astra']}],
+  contextCatalog:[{id:'ctx-op-a',kind:'operation-contract',digest:'ctx-digest'}],noProgress:{round:0,budget:2}});
 const tmp=t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-llm-functions-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));return dir;};
+
+test('workflow manager returns only a snapshot-bound executable order and allowlisted context ids',()=>{
+  const snapshot=managerSnapshot(),answer={schema:MANAGER_DECISION,workflowId:'wf',decisionId:'manager-abc',generation:2,version:3,digest:'digest-3',basisDigest:'basis-3',orderedActionIds:['plan-op-a'],rationale:'Plan the only ready operation.',contextRequests:[{actionId:'plan-op-a',refIds:['ctx-op-a']}]};
+  assert.equal(validateManagerSnapshot(snapshot).ok,true);
+  const result=manageWorkflow({snapshot,providers:['gpt-6-astra'],runHeadless:()=>JSON.stringify(answer)});assert.equal(result.ok,true);assert.deepEqual(result.value,answer);
+  assert.equal(validateManagerDecision({...answer,digest:'stale'},snapshot).ok,false);
+  assert.equal(validateManagerDecision({...answer,orderedActionIds:['invented']},snapshot).ok,false);
+  assert.equal(validateManagerDecision({...answer,contextRequests:[{actionId:'plan-op-a',refIds:['raw/path']} ]},snapshot).ok,false);
+  assert.equal(validateManagerDecision({...answer,authority:'approved'},snapshot).ok,false,'free-form authority cannot enter the executor contract');
+  assert.equal(validateManagerSnapshot({...snapshot,pollTimestamp:Date.now()}).ok,false,'poll metadata cannot change manager identity');
+});
 
 test('the goal form is a contract: shape, unique ids, a real dependency order, a covered ledger and disjoint parallel allowlists',()=>{
   const base=goalPlan();
@@ -424,8 +439,8 @@ test('a critique that costs work must carry something to act on: evidence, requi
   assert.deepEqual(exhausted.result.objections,[]);
   assert.deepEqual(exhausted.result.attempts.map(item=>[item.provider,item.attempt]),
     [['claude-fable-5.1',0],['claude-fable-5.1',1],['gpt-6-astra',0]]);
-  // The supervisor runtimes are the default chain, and a goal with no job text is not a goal to critique.
-  assert.deepEqual(DEFAULT_CRITIC_RUNTIMES,['gpt-6-astra','claude-fable-5.1'],'astra first: one call per goal, and Fable has the scarcer week');
+  // Both validator-pool peers are available to the quota-aware selector; configuration order is not a fallback promise.
+  assert.deepEqual(new Set(DEFAULT_CRITIC_RUNTIMES),new Set(['gpt-6-astra','claude-fable-5.1']));
   // Objections written as sentences or with a kind outside the list are shaped, never sent back: the evidenced ones stay.
   const lenient=critiqueCall([JSON.stringify({verdict:'revise',required:['name the record'],objections:['just a sentence',{kind:'security',claim:'The token is read from a file nobody fills',evidence:'delivery.module.ts',consequence:'Delivery silently disabled.'}]})]);
   assert.equal(lenient.result.verdict,'revise');

@@ -12,6 +12,16 @@ sections:
       - Keep alpha limitations explicit. A resumed workflow trial is not a fresh end-to-end trial; a
         container mount probe is not an attested Orca worker sandbox. Preserve old tags and explain the
         independent engine identity when historical package versions compare higher.
+      - Agent-led coordination is an explicit v6 enrollment. The manager receives a bounded semantic
+        snapshot and orders only kernel-authored executable action IDs; the kernel remains the state writer,
+        rechecks preconditions and owns evidence acceptance. Count the manager inside the global ten-slot
+        limit. Never expose secrets, raw owner answers or evidence bodies to its context, and never migrate an
+        existing workflow into this mode without the authorized retry boundary.
+      - Keep the three non-operation roles in the closed `models.nonOperation` map in host-local
+        `config.json`; planner and validator use the Fable/Astra pool, while kernel manager and technical decide use
+        the Opus/Sol pool. Admission selects against eligibility, qualification, known quota, capacity and
+        budget before a call. Shared pools do not merge typed contexts, unknown quota is not unlimited, and
+        the pools never change operation-agent policy.
   - title: Maintaining StarCi 3.0
     blocks:
       - Read the current entry, selected code/contract and its consumers before editing. The user's

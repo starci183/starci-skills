@@ -15,7 +15,7 @@ import {superviseOnce} from '../kernel/supervisor.mjs';
 const fixture=t=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-v6-life-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return root;};
 function pinAt(root){
   const sourceRoot=path.join(root,'source');
-  for(const file of ['.dist/kernel/kernel.mjs','bin/starci.mjs','bin/starci-skills.mjs','scripts/config.mjs','core/runtime-root.mjs','core/yaml.mjs','init/AGENTS.md','init/CLAUDE.md','package.json','SKILL.md','docs/supervision-templates/op.md']){
+  for(const file of ['.dist/kernel/kernel.mjs','bin/starci.mjs','bin/starci-skills.mjs','scripts/config.mjs','config.json','core/runtime-root.mjs','core/yaml.mjs','init/AGENTS.md','init/CLAUDE.md','package.json','SKILL.md','docs/supervision-templates/op.md']){
     const target=path.join(sourceRoot,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,'synthetic pin fixture\n');
   }
   return sealRuntime({sourceRoot,buildsRoot:path.join(root,'builds'),version:'6.0.0-alpha.1'});
@@ -64,6 +64,15 @@ test('pending durable work does not count as a kernel error or spend an operatio
 test('enrollment refuses an unsettled worker without changing approved inputs',()=>{
   const state={ops:[{status:'running',dispatch:'ctx_live'}],inputs:['approved-ref']};
   assert.throws(()=>enrollV6({},state),/Settle live/);assert.deepEqual(state.inputs,['approved-ref']);assert.equal(state.engine,undefined);
+});
+
+test('explicit v6 enrollment starts fresh agent coordination without carrying an old manager binding',()=>{
+  const events=[],state={id:'wf',worktree:'C:/fixture',ops:[],inputs:['approved-ref'],engine:{generation:4,coordination:'legacy',modelSelections:{old:{}},manager:{decisionId:'stale'}}};
+  const store={appendEvent:event=>events.push(event),saveState(){}};
+  const enrolled=enrollV6(store,state,{journalFile:'C:/fixture/journal.sqlite',now:()=>123});
+  assert.equal(enrolled.coordination,'agent-v1');assert.equal(enrolled.generation,5);
+  assert.equal(enrolled.modelSelections,undefined);assert.equal(enrolled.manager,undefined);
+  assert.equal(events[0].coordination,'agent-v1');assert.deepEqual(state.inputs,['approved-ref']);
 });
 
 test('candidate quarantine surfaces one incident and retains the writer identity and evidence',()=>{

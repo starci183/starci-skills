@@ -11,7 +11,7 @@ export const canonicalTarget=name=>registry.targetAliases?.[name]??name;
 export const launchAllowed=launch=>plain(launch)&&(launch.kind==='managed-agent'||(launch.kind==='command-terminal'&&launch.dispatch==='return-preamble-and-send'&&typeof launch.command==='string'&&launch.command.trim().length>0));
 /** Select policy only; never switch models, dispatch workers or grant tools. */
 export function selectProfile({runtime,op,profile,config=loadConfig(),model=config.model,effort=config.effort,language=config.language,imageGenerationAvailable=false}) {
-  validateConfig({language,model,effort});
+  validateConfig(config);
   runtime=normalizeRuntime(runtime);
   if(!Object.hasOwn(runtimes,runtime)||typeof op!=='string'||!op||typeof imageGenerationAvailable!=='boolean'||(model!==null&&(typeof model!=='string'||!model.trim())))throw Error('Invalid runtime/profile selection');
   const role=registry.reasoningOps.includes(op)?'reasoning':'working';

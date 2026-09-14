@@ -195,6 +195,7 @@ function fixture(t){
   t.after(()=>{assert.equal(path.dirname(root),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(root).startsWith('starci-shared-ledger-'));fs.rmSync(root,{recursive:true,force:true});});
   const source=path.join(root,'source'),host=path.join(source,'.claude');
   fs.mkdirSync(host,{recursive:true});
+  fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(host,'config.example.yaml'));
   const owner=path.join(root,'demo-backend'),code=path.join(root,'demo-frontend');
   // The backend owns the one Work tree of the product; the frontend owns no `.starciwork` at all.
   repository(owner,{name:'@demo/backend',branch:'main',origin:'https://github.com/demo/demo-backend.git'});

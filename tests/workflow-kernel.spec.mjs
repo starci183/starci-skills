@@ -27,7 +27,7 @@ import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGra
 import {machineVerify} from '../kernel/kernel.mjs';
 import {attributedFiles} from '../kernel/verify.mjs';
 import {relocateLauncher,reviveSupervisor} from '../kernel/kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,prepareV6WorkGate,producedKindVerdict,restoreDurableCheckpoint,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,prepareV6WorkGate,producedKindVerdict,restoreDurableCheckpoint,recoverSatisfiedDependencyBlocks,sweepResolvedReviewLines,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -675,6 +675,46 @@ test('durable recovery keeps the validated coordinator of this invocation and sw
     assert.equal(harness.fake.terminals.has('term_old'),false);assert.deepEqual(closed.map(item=>item.terminal),['term_old']);
     assert.throws(()=>restoreDurableCheckpoint(state,{...checkpoint,id:'another-workflow'},{workflowId:state.id,from:'x',run:'y'}),/workflow identity mismatch/);
   }finally{harness.cleanup();}
+});
+
+test('a dependency block is re-admitted from its exact transition receipt when the dependency later completes',()=>{
+  const recorded=[];
+  const store={readEvents:()=>[{event:'shared-change-blocked',op:'requester',shared:'shared'}],appendEvent:event=>recorded.push(event)};
+  const requester={id:'requester',kind:'backend.implement',status:'blocked',refusal:null,attempt:2,dependsOn:['shared'],reports:[]};
+  const shared={id:'shared',kind:'backend.implement',status:'done',refusal:null,head:'a'.repeat(40)};
+  const ask={id:'ask',kind:'decision.prepare',status:'done',answer:null},ownerWait={id:'owner-wait',kind:'backend.implement',status:'paused',waitingFor:'ask',dependsOn:[]};
+  const state={ops:[requester,shared,ask,ownerWait],needUser:[{op:'requester',kind:'shared-change'},{op:'ask',kind:'decision'}],head:null};
+  assert.deepEqual(recoverSatisfiedDependencyBlocks(store,state),['requester']);
+  assert.deepEqual([requester.status,requester.attempt,requester.priorOpen.length],['ready',3,1]);
+  assert.equal(state.needUser.some(item=>item.op==='requester'),false);assert.equal(state.needUser.some(item=>item.op==='ask'),true);
+  assert.deepEqual([ownerWait.status,ownerWait.waitingFor],['paused','ask'],'an owner wait is unchanged');
+  assert.equal(recorded[0].event,'dependency-readmitted');
+  const refused={id:'refused',kind:'backend.implement',status:'blocked',refusal:'out-of-repository',dependsOn:['shared']};state.ops.push(refused);
+  assert.deepEqual(recoverSatisfiedDependencyBlocks(store,state,{events:[{event:'shared-change-blocked',op:'refused',shared:'shared'}]}),[]);
+  const stale={id:'stale',kind:'backend.implement',status:'blocked',refusal:null,attempt:3,dependsOn:['shared'],reports:[]};
+  const staleState={ops:[stale,shared],needUser:[{op:'stale',kind:'authority'}]};
+  assert.deepEqual(recoverSatisfiedDependencyBlocks(store,staleState,{events:[{event:'shared-change-blocked',op:'stale',shared:'shared',attempt:2},{event:'report',op:'stale',attempt:3}]}),[],
+    'a stale dependency receipt cannot erase a newer authority block');
+  staleState.needUser=[];stale.v6Lease={jobId:'live'};
+  assert.deepEqual(recoverSatisfiedDependencyBlocks(store,staleState,{events:[{event:'shared-change-blocked',op:'stale',shared:'shared',attempt:3}]}),[],'a live native lease is never inferred settled');
+  const decision={id:'decision',kind:'decision.prepare',status:'done'},ownerBlocked={id:'owner-blocked',kind:'backend.implement',status:'blocked',refusal:null,attempt:1,dependsOn:['decision'],blockedByDependency:{id:'decision',attempt:1}};
+  assert.deepEqual(recoverSatisfiedDependencyBlocks(store,{ops:[ownerBlocked,decision],needUser:[]},{events:[]}),[],'a completed decision operation is still an owner boundary');
+});
+
+test('a stale review line drops only after a later accepted review receipt resolves the current ledger proof',()=>{
+  const events=[],head='b'.repeat(40),id='node-a';
+  const old={id:'verify-old',kind:'review.verify',status:'done',verdict:'fail',ledgerIds:[id]};
+  const accepted={id:'verify-new',kind:'review.verify',status:'done',verdict:'pass',head,ledgerIds:[id]};
+  const state={ops:[old,accepted],ledger:[{id,status:'verified',evidence:[{opId:'verify-new',kind:'review.verify',head}]}],verifyFindings:{},needUser:[{op:'verify-old',kind:'review'},{op:'ask-real',kind:'decision'}]};
+  const store={appendEvent:event=>events.push(event)};
+  assert.deepEqual(sweepResolvedReviewLines(store,state),['verify-old']);assert.deepEqual(state.needUser.map(item=>item.op),['ask-real']);
+  assert.equal(events[0].event,'resolved-review-line-dropped');
+  const unresolved={...state,ops:[old],ledger:[{id,status:'implemented',evidence:[]}],verifyFindings:{[id]:['open finding']},needUser:[{op:'verify-old',kind:'review'},{op:'ask-real',kind:'decision'}]};
+  assert.deepEqual(sweepResolvedReviewLines(store,unresolved),[]);assert.deepEqual(unresolved.needUser.map(item=>item.op),['verify-old','ask-real']);
+  const earlier={id:'verify-earlier',kind:'review.verify',status:'done',verdict:'pass',head,ledgerIds:[id]};
+  const laterFailure={id:'verify-later-failure',kind:'review.verify',status:'done',verdict:'fail',ledgerIds:[id]};
+  const wrongOrder={ops:[earlier,laterFailure],ledger:[{id,status:'verified',evidence:[{opId:'verify-earlier',kind:'review.verify',head}]}],verifyFindings:{},needUser:[{op:'verify-later-failure',kind:'review'}]};
+  assert.deepEqual(sweepResolvedReviewLines(store,wrongOrder),[],'an accepted review before the failed review cannot resolve the newer failure');
 });
 
 /* ------------------------------------------------------------------ the Work ledger as the TODO list */
@@ -4112,7 +4152,7 @@ test('an unavailable validator never blocks a commit, is counted, and three in a
     assert.equal(state.validatorUnavailable,VALIDATOR_UNAVAILABLE_LIMIT);
     const asked=state.needUser.filter(item=>item.kind==='validator');
     assert.equal(asked.length,1,'the outage is one item, not one per op');
-    assert.match(asked[0].detail,/the validator answered nothing usable for 3 op results in a row \(gpt-5.6-sol, claude-opus\)/);
+    assert.match(asked[0].detail,/the validator answered nothing usable for 3 op results in a row \(claude-fable-5.1, gpt-6-astra\)/);
     assert.equal(state.finished.outcome,'blocked');
     const verdicts=fs.readFileSync(path.join(harness.store.dir,'validator','verdicts.jsonl'),'utf8').trim().split('\n').map(line=>JSON.parse(line));
     assert.deepEqual(verdicts.map(item=>item.verdict),['unavailable','unavailable','unavailable']);
@@ -4211,7 +4251,7 @@ test('the goal is critiqued before the approval: a sound verdict stands above th
     assert.deepEqual(asked[0].decisions.map(item=>item.id),['demo.payments.business.overview']);
     assert.deepEqual(asked[0].records,[{id:'demo.sales.architecture.sds.intake',kind:'architecture',
       title:'The accepted intake design.',statements:[]}]);
-    assert.deepEqual(asked[0].providers,['gpt-6-astra','claude-fable-5.1'],'the critic runs on the host critics: astra first, then fable');
+    assert.deepEqual(new Set(asked[0].providers),new Set(['gpt-6-astra','claude-fable-5.1']),'the injected critic sees both configured validator peers without a fallback-order promise');
     assert.ok(asked[0].constraints.some(item=>/may not add, drop or rewrite a node/.test(item)));
     assert.deepEqual(harness.goal.critique,{verdict:'sound',objections:0,required:0,provider:'stub-critic'});
     assert.equal(harness.state.critique.verdict,'sound');
@@ -4264,14 +4304,15 @@ test('a prerequisite the critique names and the tree lacks is planned as the int
   }finally{harness.cleanup();}
 });
 
-test('the critics are read from config.json `critique.runtimes`, astra then fable by default, and a bad file falls back',()=>{
+test('the critics use the canonical validator pool and invalid configuration fails closed',()=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-critics-'));
   try{
-    assert.deepEqual(critiqueRuntimes(root),['gpt-6-astra','claude-fable-5.1']);
-    fs.writeFileSync(path.join(root,'config.json'),JSON.stringify({critique:{runtimes:['claude-opus']}}));
-    assert.deepEqual(critiqueRuntimes(root),['claude-opus']);
+    fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));
+    assert.deepEqual(new Set(critiqueRuntimes(root)),new Set(['gpt-6-astra','claude-fable-5.1']));
+    fs.writeFileSync(path.join(root,'config.json'),JSON.stringify({language:'vi',model:null,effort:'medium',critique:{runtimes:['claude-opus','gpt-5.6-sol']}}));
+    assert.deepEqual(new Set(critiqueRuntimes(root)),new Set(['claude-opus','gpt-5.6-sol']));
     fs.writeFileSync(path.join(root,'config.json'),'{not json');
-    assert.deepEqual(critiqueRuntimes(root),['gpt-6-astra','claude-fable-5.1']);
+    assert.throws(()=>critiqueRuntimes(root));
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 

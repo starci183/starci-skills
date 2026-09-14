@@ -12,6 +12,8 @@ import {openJournal} from './journal.mjs';
 import {createAdmission} from './admission.mjs';
 import {resourceLocks} from './guards.mjs';
 import {kindRole} from './common.mjs';
+import {nonOperationModels} from '../scripts/config.mjs';
+import {budgetVerdict,readRuntimeBudget} from './budget.mjs';
 
 export const ENGINE_VERSION='6.0.0-alpha.1';
 export const isV6=state=>state?.engine?.major===6;
@@ -52,18 +54,19 @@ export function prepareGenerationRetry({journalFile,workflowId,generation,now=Da
     return {cancelled,unsettled};
   }finally{journal.close();}
 }
-const modelRole=name=>name==='validateOp'?'verify':name==='planOp'?'plan':'decide';
+const modelRole=name=>['critiqueGoal','validateOp'].includes(name)?'verify':['assessGoal','planOp'].includes(name)?'plan':'decide';
+const configuredModelRole=name=>['assessGoal','planOp'].includes(name)?'planner':['critiqueGoal','validateOp'].includes(name)?'validator':'kernelManager';
 const machineResource=key=>({key:`machine:${key}`,units:1});
-function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadRuntimes(),identity={}){
+function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadRuntimes(),identity={},budget=null,now=Date.now){
   if(typeof eligibility!=='function')throw Error(`Model eligibility is required for ${name}`);
   const role=modelRole(name),requested=Array.isArray(args?.providers)?args.providers:Object.keys(runtimes.runtimes??{});
   const job={kind:name==='validateOp'?'judge':'model',role,input:{functionName:name,args:modelInput(args)},...identity};
   const policyTargets=typeof modelPolicy?.providerFilter==='function'?new Set(modelPolicy.providerFilter(job)):null;
   const candidates=requested.map(id=>({id,runtime:{id,...runtimes.runtimes?.[id],model:runtimes.runtimes?.[id]?.target}})).filter(({runtime})=>runtime.target&&(runtime.roles??[]).includes(role)&&(!policyTargets||policyTargets.has(runtime.target)));
-  const eligible=candidates.map(candidate=>({...candidate,decision:eligibility(job,candidate.runtime)})).filter(item=>item.decision?.eligible===true);
-  const providers=eligible.slice(0,1).map(item=>item.id);
-  if(!providers.length)throw Error(`No evaluated model is eligible for ${name}`);
-  return {args:{...modelInput(args),providers},runtime:eligible[0].runtime,decision:eligible[0].decision,job};
+  const eligible=candidates.map((candidate,index)=>({...candidate,index,decision:eligibility(job,candidate.runtime),budget:budgetVerdict(candidate.runtime,budget,{now:now(),requireFresh:true})})).filter(item=>item.decision?.eligible===true);
+  const available=eligible.filter(item=>item.budget.known&&!item.budget.exhausted).sort((a,b)=>b.budget.remaining-a.budget.remaining||a.index-b.index),providers=available.slice(0,1).map(item=>item.id);
+  if(!providers.length){const error=Error(eligible.length?`No eligible ${name} model has known available provider quota`:`No evaluated model is eligible for ${name}`);if(eligible.length){error.code='STARCI_MODEL_QUOTA_WAIT';error.reasons=eligible.map(item=>({runtime:item.id,known:item.budget.known,exhausted:item.budget.exhausted,until:item.budget.until}));}throw error;}
+  const selected=available[0];return {args:{...modelInput(args),providers},runtime:selected.runtime,decision:selected.decision,job};
 }
 
 /** Opt in only at a settled workflow boundary. Canonical Work and approved goal references stay intact. */
@@ -71,16 +74,16 @@ export function enrollV6(store,state,{journalFile=journalFileFor(),runtimePin=nu
   if(state.ops.some(op=>op.dispatch&&['running','answering'].includes(op.status)))throw Error('Settle live operation dispatches before enrolling a workflow in v6');
   const previous=state.engine;
   state.engine={major:6,version:ENGINE_VERSION,generation:(previous?.generation??0)+1,journalFile:path.resolve(journalFile),
-    assurance:'detection-only',runtimePin:runtimePin??previous?.runtimePin??null,enrolledAt:now()};
+    assurance:'detection-only',coordination:'agent-v1',runtimePin:runtimePin??previous?.runtimePin??null,enrolledAt:now()};
   state.finished=null;state.phase='run';
   store.appendEvent({event:'engine-enrolled',major:6,generation:state.engine.generation,version:ENGINE_VERSION,
-    assurance:state.engine.assurance,note:'Existing accepted Work remains accepted; only unfinished operations receive the new execution policy.'});
+    assurance:state.engine.assurance,coordination:state.engine.coordination,note:'Existing accepted Work remains accepted; only unfinished operations receive the new execution policy.'});
   store.saveState(state);
   return state.engine;
 }
 
 /** Runtime bridge used by the real kernel. The kernel remains the only workflow state writer. */
-export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolicy=null,bridge=null,spawnChild=null,candidateBase=null,git=null,exec=null}={}){
+export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolicy=null,bridge=null,spawnChild=null,candidateBase=null,git=null,exec=null,modelBudget=null}={}){
   if(!isV6(state))return null;
   const owned=!bridge;
   bridge??=createJobBridge({journalFile:state.engine.journalFile,now,...(spawnChild?{spawnChild}:{}),eligibility:job=>job.kind==='model'||job.kind==='judge'?{eligible:Array.isArray(job.input?.args?.providers)&&job.input.args.providers.length>0,reasons:['no evaluated provider in durable model job']}:{eligible:false,reasons:['operation eligibility must name its selected runtime']},beforeSpawn:({job})=>{const meta=job.payload?.admission;if(meta?.mode!=='probation')return {ok:true,code:'qualified'};const consumed=modelPolicy?.consumeProbation?.({kind:job.kind,role:job.role,input:job.payload,workflowId:job.workflow_id,opId:job.op_id,attempt:job.attempt,generation:job.generation,jobId:job.job_id},meta.runtime);if(!consumed?.ok)return {ok:false,code:consumed?.code??'probation-unavailable'};store.saveState(state);return consumed;}});
@@ -90,12 +93,14 @@ export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolic
   candidateBase??=path.join(path.dirname(state.engine.journalFile),'candidates',state.id);
   const identity=op=>opIdentity(state,op);
   const unwrap=result=>{if(result?.pending)deferJob(result);if(result?.status!=='succeeded')throw Error(result?.result?.reason??`Durable job ${result?.status}`);return result.result;};
+  const requestModel=(name,args,op=null)=>{args=Array.isArray(args?.providers)?args:{...args,providers:nonOperationModels(configuredModelRole(name))};const bound=identity(op),base=modelInput(args),selectionKey=inputDigest({name,args:base,...bound});state.engine.modelSelections??={};let saved=state.engine.modelSelections[selectionKey],selected;
+    if(saved){const replayArgs={...base,providers:[saved.provider]},kind=name==='validateOp'?'judge':'model',role=modelRole(name),input={handler:'model-function',functionName:name,args:replayArgs,admission:{runtime:saved.runtime,mode:saved.mode}},jobId=bridgeJobId({...bound,kind,input}),existing=journal.getJob(jobId);if(existing&&existing.status!=='queued')selected={args:replayArgs,runtime:{id:saved.runtime},decision:{mode:saved.mode},job:{kind,role}};}
+    if(!selected){const budget=typeof modelBudget==='function'?modelBudget():modelBudget??readRuntimeBudget(path.dirname(store.dir));selected=eligibleModelSelection(name,args,eligibility,modelPolicy,runtimeProfile,bound,budget,now);saved={provider:selected.args.providers[0],runtime:selected.runtime.id,mode:selected.decision.mode??'qualified'};state.engine.modelSelections[selectionKey]=saved;store.saveState(state);}
+    return unwrap(replayModelFunction(bridge,name,selected.args,bound,{admission:{runtime:saved.runtime,mode:saved.mode},kind:selected.job?.kind??(name==='validateOp'?'judge':'model'),role:selected.job?.role??modelRole(name)}));};
   return {
     journal,admission,jobs,bridge,identity,requiredValidation:true,
-    model(name,args,op=null){const bound=identity(op),base=modelInput(args),selectionKey=inputDigest({name,args:base,...bound});state.engine.modelSelections??={};let saved=state.engine.modelSelections[selectionKey],selected;
-      if(saved){const replayArgs={...base,providers:[saved.provider]},kind=name==='validateOp'?'judge':'model',role=modelRole(name),input={handler:'model-function',functionName:name,args:replayArgs,admission:{runtime:saved.runtime,mode:saved.mode}},jobId=bridgeJobId({...bound,kind,input}),existing=journal.getJob(jobId);if(existing&&existing.status!=='queued')selected={args:replayArgs,runtime:{id:saved.runtime},decision:{mode:saved.mode},job:{kind,role}};}
-      if(!selected){selected=eligibleModelSelection(name,args,eligibility,modelPolicy,runtimeProfile,bound);saved={provider:selected.args.providers[0],runtime:selected.runtime.id,mode:selected.decision.mode??'qualified'};state.engine.modelSelections[selectionKey]=saved;store.saveState(state);}
-      return unwrap(replayModelFunction(bridge,name,selected.args,bound,{admission:{runtime:saved.runtime,mode:saved.mode},kind:selected.job?.kind??(name==='validateOp'?'judge':'model'),role:selected.job?.role??modelRole(name)}));},
+    model:requestModel,
+    manageWorkflow(snapshot,{providers=nonOperationModels('kernelManager')}={}){if(state.engine.coordination!=='agent-v1')throw Error('Agent-led coordination is not enrolled');return requestModel('manageWorkflow',{snapshot,providers},{id:snapshot.decisionId,attempt:1});},
     check(command,options={},op=null){const resources=declareMachineResources({kind:op?.kind,checks:[{command}],resources:options.resources});return unwrap(bridge.request({...identity(op),kind:'check',role:'machine-check',...(resources.length?{resources}:{}),input:{handler:'command',shellCommand:command,cwd:options.cwd??state.worktree,timeoutMs:options.timeoutMs??1800000,
       candidate:op?.v6CandidateDigest??state.head??null,...(options.env?{env:options.env}:{})}}));},
     reserveOperation(op,allocated){
