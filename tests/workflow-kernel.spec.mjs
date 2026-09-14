@@ -3032,6 +3032,27 @@ test('a blocked credential ask from an older build is taken over by the kernel a
   }finally{harness.cleanup();}
 });
 
+/** A credential ask waiting with no command to copy is asked again every tick, and named the moment its custody is knowable. */
+test('a fill-waiting ask with no command yet is named at the next tick, and the owner is told once',()=>{
+  const harness=setupWork({});
+  try{
+    const store=harness.store,state=harness.state;state.host=path.resolve('.');
+    const requester={...state.ops[0],id:'zalo-bot-author',kind:'work.author',status:'paused',waitingFor:'ask-6',dispatch:null,terminal:null,nodeId:null,
+      reports:[{outcome:'blocked',summary:'blocked',blocker:{kind:'authority',detail:'ZALO_BOT_TOKEN for zalo-bot-api in identity:chatbot-zalo-bot'}}]};
+    const ask={...state.ops[0],id:'ask-6',kind:'provision.ask',status:'running',origin:'ask',requesters:['zalo-bot-author'],nodeId:null,dispatch:null,terminal:null,
+      fill:true,fillCommand:null,credential:{variables:['ZALO_BOT_TOKEN'],custody:null,provider:null},reports:[],
+      allowlist:['.starciwork/features/sales/business/srs/business-rules/policy-decisions/**'],
+      question:{kind:'credential',stop:'credential',from:'zalo-bot-author',text:'Which command proves ZALO_BOT_TOKEN against zalo-bot-api?',options:[]}};
+    state.ops.push(requester,ask);
+    approve(store,state);state.run='run_wf';state.from='term_kernel';
+    const after=harness.run({maxIterations:2});
+    const named=after.ops.find(op=>op.id==='ask-6');
+    assert.equal(named.credential.custody,'identity:chatbot-zalo-bot','the slug the requester reported is the slug');
+    assert.match(String(named.fillCommand),/identity fill chatbot-zalo-bot --name ZALO_BOT_TOKEN/);
+    assert.deepEqual(events(store).filter(event=>event.event==='provision-fill-named').map(event=>event.ask),['ask-6'],'told once, not every tick');
+  }finally{harness.cleanup();}
+});
+
 /** A kernel that finds its supervisor's pulse stale and its pid gone starts one, once per window; a fresh pulse or no pulse means nothing. */
 test('a kernel revives a dead supervisor from its stale pulse, once per window, and leaves a live or absent one alone',()=>{
   const harness=setupWork({});
