@@ -34,6 +34,7 @@ import {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTermin
   recoverCoordinatorTab,reconcileWithOrca,releaseKernelTab,siblingKernelGone,sweepStaleTerminals} from './terminals.mjs';
 import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,isAsk,openConflictDecision,answerCommand,answerOrEscalate,answerOwnerQuestion,dedupeNeedUser,inheritProvisional,
   openOwnerAsk,provisionalLines,settleOwnerAsk,stopReasonFor} from './owner.mjs';
+import {askFillLine,credentialAsked,fillCommand,fillWaitingAsks,ownerFillLines,settleFilledAsks} from './fill.mjs';
 import {BRAND_PAYLOAD,attributedFiles,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
   kernelProof,machineVerify,noteBrand,opDiff,provenChecks,readValidatorMemory,recordVerdict,renderValidatorMemory,
   rereadBrand,sharedCheckCommand,treeForVerdict,treeVerdictFor,validateAccepted,validatorRejectLimit} from './verify.mjs';
@@ -78,6 +79,8 @@ export {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,recoverCoordinatorTab,reconcileWit
 export {ASK_KINDS,DECISION_PREPARE,PROVISION_ASK,isAsk,PROVISION_KINDS,QUESTION_KINDS,STOP_KINDS,answerCommand,answerOwnerQuestion,credentialNeed,
   decisionAllowlistFor,dedupeNeedUser,inheritProvisional,irreversibleEffect,openOwnerAsk,ownerProvisionNeed,
   provisionalLines,redactSecrets,stopReasonFor} from './owner.mjs';
+export {askFillLine,credentialAsked,custodyIn,fillCommand,fillWaitingAsks,ownerFillLines,settleCredentialPresence,
+  settleFilledAsks,variablesIn} from './fill.mjs';
 export {BRAND_PAYLOAD,attributedFiles,brandFields,brandPayload,brandSummary,changedFiles,machineVerify,opDiff,readValidatorMemory,
   renderValidatorMemory,sharedCheckCommand,treeForVerdict,treeVerdictFor,validatorRejectLimit} from './verify.mjs';
 export {LANE_LAYOUTS,KERNEL_PLANNED_KINDS,nodeLayout,laneOf,lanePredicates,designRecord,deriveWorkOp,syncLedgerOps,
@@ -467,6 +470,34 @@ function deferForBrand(store,state,op,ctx){
  */
 const TIME_BOUND_REFUSALS=['launch-cooling','rate-limited'];
 export const deadOp=op=>Boolean(op)&&(op.status==='failed'||(op.status==='blocked'&&Boolean(op.refusal)&&!TIME_BOUND_REFUSALS.includes(op.refusal)));
+/**
+ * The one operation the kernel never launches: a `provision.ask` for a credential. An agent in a tab printing
+ * a command for the owner to type was never a question the owner could answer, so the kernel prints ONE line -
+ * the variables, the custody, the exact `identity fill` command - and this op simply waits: `running`, no
+ * dispatch, no runtime, no slot, no deadline. It is settled by presence, at the tick, when the owner has run
+ * the command. The other stop kinds still ask in their own terminal: an account, a dataset or an authority has
+ * nothing to type into a prompt, and what the owner does for those is done outside this machine.
+ */
+function fillWaiting(orca,store,state,op,ctx){
+  if(op.kind!==PROVISION_ASK||op.question?.stop!=='credential')return false;
+  if(!op.fill){
+    let declared=[];
+    try{declared=ctx.work?work.declaredIntegrations(ctx.work.loaded).list:[];}catch{declared=[];}
+    op.credential=credentialAsked(op,{declared});
+    op.fill=true;op.fillCheckedAt=null;
+    op.fillCommand=op.credential.custody&&op.credential.variables.length
+      ?fillCommand({host:state.host,slug:op.credential.custody.replace(/^identity:/,''),
+        variables:op.credential.variables,workRoot:ctx.work?.at?.workRoot??null})
+      :null;
+    store.appendEvent({event:'provision-fill-waiting',ask:op.id,variables:[...op.credential.variables],
+      custody:op.credential.custody,command:op.fillCommand,requesters:[...(op.requesters??[])]});
+    // One line in the owner's own tab, once, when the question opens - never a wall of text every iteration.
+    try{notifyTerminal(orca,{cwd:state.worktree,terminal:state.from,text:askFillLine(op),wait:ctx.wait});}
+    catch{/* the tab may be gone; the same line is on every page that shows this workflow */}
+  }
+  op.status='running';op.dispatch=null;op.terminal=null;op.nudged=false;op.launchedAt=null;
+  return true;
+}
 function scheduleOps(orca,store,state,ctx){
   for(const op of state.ops){
     if(op.status!=='pending')continue;
@@ -483,7 +514,11 @@ function scheduleOps(orca,store,state,ctx){
   }
   const launched=[];
   for(const op of state.ops.filter(item=>item.status==='ready')){
-    const busy=state.ops.filter(item=>['running','answering'].includes(item.status));
+    // A credential is asked by one command the owner runs, so its ask is never dispatched to a runtime at all:
+    // it waits here, holding no runtime and no slot, until the custody holds every variable it named.
+    if(fillWaiting(orca,store,state,op,ctx))continue;
+    // An operation waiting on the owner occupies no parallel slot: the owner takes as long as the owner takes.
+    const busy=state.ops.filter(item=>['running','answering'].includes(item.status)&&!item.fill);
     if(busy.length>=ctx.allocator.maxParallelOps)break;
     // A design operation on a tree with no brand record is not launched at all: the brand is decided first.
     if(deferForBrand(store,state,op,ctx))continue;
@@ -1744,7 +1779,9 @@ export const OP_DEADLINE_MS={verify:3*60*60*1000,default:8*60*60*1000};
 export const opDeadlineFor=op=>Number.isFinite(op?.timeoutMs)&&op.timeoutMs>0?op.timeoutMs:kindRole(op?.kind)==='verify'?OP_DEADLINE_MS.verify:OP_DEADLINE_MS.default;
 export function settleStalled(orca,store,state,ctx,tick){
   const now=clockOf(ctx);
-  for(const op of state.ops.filter(item=>item.status==='running'&&Number.isFinite(item.launchedAt)&&now-item.launchedAt>opDeadlineFor(item))){
+  // An op waiting for the owner to fill a credential in has no deadline and no liveness: nothing is running for
+  // it. It leaves this loop only when the custody holds every variable, or when `workflow-answer` says so.
+  for(const op of state.ops.filter(item=>item.status==='running'&&!item.fill&&Number.isFinite(item.launchedAt)&&now-item.launchedAt>opDeadlineFor(item))){
     // Past its deadline: settled as an overrun and relaunched elsewhere, like a stall the probe cannot see.
     settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:'overrun',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
     ctx.allocator.release(op.runtime,{op:op.id});
@@ -1754,7 +1791,7 @@ export function settleStalled(orca,store,state,ctx,tick){
     if(op.restarts>RESTART_LIMIT){coolOp(store,state,op,ctx,`${op.id} overran its deadline ${op.restarts} times`);continue;}
     op.status='ready';op.dispatch=null;op.terminal=null;op.nudged=false;op.launchedAt=null;avoidRuntime(op,op.runtime,now);
   }
-  for(const op of state.ops.filter(item=>item.status==='running')){
+  for(const op of state.ops.filter(item=>item.status==='running'&&!item.fill&&item.dispatch)){
     const observed=(tick.liveness??[]).find(item=>item.dispatch===op.dispatch);
     if(!observed)continue;
     // A provision.ask is waiting for the owner in its tab by design: its idleness is the wait, not a stall.
@@ -2165,6 +2202,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   wait=sleepSync,exec=runCommand,git=spawnSync,launch=launchWithCandidate,maxIterations=Infinity,guards=kernelGuards,
   ledgerApi=work,validate=validateWorkTree,ledgerRoot=null,resolveLedger=resolveLedgerRoot,
   reconcile=reconcileIntakeSeam,renderChecks=renderChecksFor,contractDigest=contractDigestFor,kindsProfile=null,
+  verifyPresence=null,
   waitTimeoutMs=900000,tickMs=120000,pollMs=POLL_MS,now=Date.now,host=hostDescriptorOf(orca)}={}){
   need(state.approved,`Workflow ${state.id} is not approved; run workflow-approve --id ${state.id}`);
   need(plain(allocator),'A runtime allocator is required');
@@ -2172,7 +2210,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   required(state.run,'Orca run id');required(state.from,'own terminal handle');
   // `validateOp:null` is an explicit choice to run without the validator; it is recorded once as `validator-skipped`.
   const ctx={cwd,allocator,planOp,decide,validateOp,template,wait,exec,git,launch,now,guards,work:null,orca,host:hostDescriptorOf({host}),
-    reconcile,renderChecks,contractDigest,kindsProfile,
+    reconcile,renderChecks,contractDigest,kindsProfile,...(verifyPresence?{verifyPresence}:{}),
     supervisor:supervisor??supervisorRuntimes(state.host??''),validator:validator??validatorRuntimes(state.host??'')};
   // Which host runs this workflow is a fact of the run: a sequential host names itself so the log says why one op ran at a time.
   store.appendEvent({event:'host',name:ctx.host.name,capabilities:ctx.host.capabilities,sequential:ctx.host.sequential,maxParallelOps:allocator.maxParallelOps??null});
@@ -2405,6 +2443,9 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     if(merged)store.appendEvent({event:'need-user-deduplicated',dropped:merged,items:state.needUser.length});
     if(guardedStage(store,state,ctx,'sync',()=>{syncLedgerOps(store,state,ctx);planVerifyOps(store,state,ctx);})==='stop')break;
     if(guardedStage(store,state,ctx,'schedule',()=>scheduleOps(orca,store,state,ctx))==='stop')break;
+    // Has the owner run the fill command yet? Answered by the custody file and nothing else (`provision-filled`),
+    // after scheduling, because a credential ask becomes the owner's exactly by not being scheduled.
+    settleFilledAsks(store,state,ctx);
     state.allocation=typeof allocator.serialize==='function'?allocator.serialize():allocator.snapshot?.()??null;
     // A provider limit another kernel ran into is this kernel's limit too; it is recorded once, when it is learned.
     for(const notice of allocator.takeSharedNotices?.()??[])
@@ -2686,6 +2727,10 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       workNodes:state.ops.filter(op=>op.nodeId).map(op=>({op:op.id,node:op.nodeId,status:op.status,kind:op.kind,
         lane:laneText(laneWalked(state.lanes?.[op.nodeId]))||null,progress:laneProgress(state.lanes?.[op.nodeId])})),
       gates:state.gateResults,needUser:state.needUser,provisional:state.provisional??[],finished:state.finished,
+      // What the owner still owes: one line per credential, each with the exact command that fills it.
+      owner:ownerFillLines(state),
+      ownerFill:fillWaitingAsks(state).map(ask=>({op:ask.id,variables:[...(ask.credential?.variables??[])],
+        custody:ask.credential?.custody??null,command:ask.fillCommand??null,requesters:[...(ask.requesters??[])]})),
       events:store.readEvents().slice(-20),final:readJson(store.paths.final,null)};
   }
   if(command==='workflow-run'){
