@@ -351,6 +351,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
   op.task=launched.task.id;op.dispatch=launched.dispatchId;op.terminal=launched.terminal;op.nudged=false;
   // A launch is an external effect: the state that names it is written before anything else can interrupt the kernel.
   store.saveState(state);
+  op.launchedAt=clockOf(ctx);
   store.appendEvent({event:'launched',op:op.id,kind:op.kind,node:op.nodeId,attempt:op.attempt,runtime:op.runtime,target:op.target,
     dispatch:op.dispatch,terminal:op.terminal,allocation:launched.allocation??null});
   // Work v2 authors only uninvestigate, todo and done, so the launch is recorded in the node's kernel block.
@@ -463,7 +464,9 @@ function scheduleOps(orca,store,state,ctx){
   for(const op of state.ops){
     if(op.status!=='pending')continue;
     const dependencies=op.dependsOn.map(id=>byId(state,id));
-    if(dependencies.some(dependency=>dependency&&['blocked','failed'].includes(dependency.status))){
+    // Only a dependency that failed, or that the kernel refused for good, is dead; one blocked without a refusal is
+    // cooling, re-admitted or authored, and the op simply waits for it.
+    if(dependencies.some(dependency=>dependency&&(dependency.status==='failed'||(dependency.status==='blocked'&&dependency.refusal)))){
       op.status='blocked';
       state.needUser.push({op:op.id,kind:'authority',detail:`${op.id} can never start: it depends on ${op.dependsOn.join(', ')}`});
       store.appendEvent({event:'op-blocked',op:op.id,reason:'dependency blocked'});
@@ -1709,7 +1712,25 @@ function noteSilence(store,state,op,ctx){
   return true;
 }
 
+/**
+ * How long one attempt may run: a review three hours, a build eight, the op's own timeout when it names one. An
+ * attempt past that is over whatever the liveness probe says - a review once "worked" for eleven hours on a
+ * runtime that never came back, holding the job gates behind its allowlist the whole time.
+ */
+export const OP_DEADLINE_MS={verify:3*60*60*1000,default:8*60*60*1000};
+export const opDeadlineFor=op=>Number.isFinite(op?.timeoutMs)&&op.timeoutMs>0?op.timeoutMs:kindRole(op?.kind)==='verify'?OP_DEADLINE_MS.verify:OP_DEADLINE_MS.default;
 export function settleStalled(orca,store,state,ctx,tick){
+  const now=clockOf(ctx);
+  for(const op of state.ops.filter(item=>item.status==='running'&&Number.isFinite(item.launchedAt)&&now-item.launchedAt>opDeadlineFor(item))){
+    // Past its deadline: settled as an overrun and relaunched elsewhere, like a stall the probe cannot see.
+    settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:'overrun',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
+    ctx.allocator.release(op.runtime,{op:op.id});
+    op.restarts+=1;
+    store.appendEvent({event:'op-overrun',op:op.id,runtime:op.runtime,ranMs:now-op.launchedAt,deadlineMs:opDeadlineFor(op),restarts:op.restarts});
+    noteAnomaly(store,state,`overrun:${op.id}`,{op:op.id,runtime:op.runtime});
+    if(op.restarts>RESTART_LIMIT){coolOp(store,state,op,ctx,`${op.id} overran its deadline ${op.restarts} times`);continue;}
+    op.status='ready';op.dispatch=null;op.terminal=null;op.nudged=false;op.launchedAt=null;avoidRuntime(op,op.runtime,now);
+  }
   for(const op of state.ops.filter(item=>item.status==='running')){
     const observed=(tick.liveness??[]).find(item=>item.dispatch===op.dispatch);
     if(!observed)continue;
@@ -1966,6 +1987,8 @@ export function rejudgeParked(store,state,ctx){
 
 function readmitCooled(store,state,ctx){
   const now=typeof ctx?.now==='function'?ctx.now():Date.now();
+  // (A validator that rejected an op twice keeps its bound: the op stops there, and a fresh kernel start gives it
+  // exactly one more round - `validatorReset` - because the validator's rules may have changed. Not a cooldown.)
   for(const item of state.needUser.filter(entry=>['environment','authority'].includes(entry.kind)&&entry.op)){
     const op=state.ops.find(candidate=>candidate.id===item.op);
     if(!op||op.status!=='blocked'||op.refusal)continue;
@@ -1974,6 +1997,16 @@ function readmitCooled(store,state,ctx){
       op.refusal='rate-limited';op.coolUntil=now;
       state.needUser=state.needUser.filter(entry=>entry!==item);
       store.appendEvent({event:'rate-limit-cooling',op:op.id,runtime:op.runtime,until:op.coolUntil,restarts:op.restarts,migrated:true});
+      continue;
+    }
+    // "Can never start" over a dependency that is alive after all: the op waits for it again.
+    if(item.kind==='authority'&&/can never start: it depends on/.test(detail)){
+      const deps=(op.dependsOn??[]).map(id=>byId(state,id)).filter(Boolean);
+      if(!deps.some(dep=>dep.status==='failed'||(dep.status==='blocked'&&dep.refusal))){
+        state.needUser=state.needUser.filter(entry=>entry!==item);
+        op.status='pending';
+        store.appendEvent({event:'dependency-alive',op:op.id,dependsOn:op.dependsOn});
+      }
       continue;
     }
     // Retries spent on the whole-tree validator are a mechanical bound too: the op comes back with its retries
@@ -2168,6 +2201,15 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     store.appendEvent({event:'provisional-record-repaired',ask:entry.op,from:entry.decision,to:record});
     for(const op of state.ops)if(Array.isArray(op.provisional))op.provisional=op.provisional.map(id=>id===entry.decision?record:id);
     entry.decision=record;
+  }
+  // A running op launched before the deadline rule carries its launch time from the log, so the deadline holds.
+  {
+    let launches=null;
+    for(const op of state.ops.filter(item=>item.status==='running'&&!Number.isFinite(item.launchedAt))){
+      launches??=store.readEvents().filter(event=>event.event==='launched');
+      const last=launches.filter(event=>event.op===op.id&&event.dispatch===op.dispatch).at(-1)??launches.filter(event=>event.op===op.id).at(-1);
+      if(last?.at)op.launchedAt=last.at;
+    }
   }
   // Split children an older rule made of a record author are withdrawn: half an intake is not an operation.
   for(const op of state.ops.filter(item=>item.origin==='repair'&&authorsRecord(item.kind)&&!item.nodeId&&/ - only \`/.test(String(item.goal??''))&&['pending','ready','blocked'].includes(item.status)&&item.refusal!=='superseded')){
