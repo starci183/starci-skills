@@ -1000,6 +1000,34 @@ test('a record author an older rule split is run again as one operation, and its
   }finally{harness.cleanup();}
 });
 
+/**
+ * A gate repair holds only the files the gate's evidence names when it names any inside the job's allowlists -
+ * so the rest of the job keeps running beside it - and the whole job's allowlist only when the evidence names none.
+ */
+test('a gate repair is scoped to the files the failing gate names, and to the whole job only when it names none',()=>{
+  const file=name=>`apps/agentos-controlplane/src/${name}/index.ts`;
+  const plan={definitionOfDone:['both slices work'],ledger:[{id:'goal-1',title:'Sales slice',inputRef:'sds:3',status:'absent'}],
+    ops:['intake','receipt'].map(name=>({id:`op-${name}`,kind:'backend.implement',goal:`Implement ${name}.`,ledgerIds:['goal-1'],
+      allowlist:[file(name)],references:['sds.md'],checks:[{name:'integration',command:`npx vitest run ${name}`}],acceptance:[`${name} works`],dependsOn:[]}))};
+  const done=name=>({outcome:'done',summary:`${name} done.`,files:[file(name)],checks:[passing('integration',`npx vitest run ${name}`)]});
+  const harness=setup({plan,gates:['typecheck=npx tsc --noEmit'],dirty:[file('intake'),file('receipt')],
+    scripts:{'op-intake':[done('intake')],'op-receipt':[done('receipt')],
+      'verify-1':[{outcome:'done',summary:'Review passed.',files:[],checks:[passing('integration','npx vitest run intake')]}]}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    // The gate fails and names exactly one file of the job; everything else passes.
+    const state=harness.run({guards:stubGuards(),maxIterations:14,exec:command=>/tsc/.test(command)
+      ?{status:2,stdout:'',stderr:`${file('intake')}(3,7): error TS2307: Cannot find module './x'`}
+      :{status:0,stdout:`${command} ok`,stderr:''}});
+    const repair=state.ops.find(op=>op.origin==='gate');
+    assert.ok(repair,'a gate repair was planned');
+    assert.deepEqual(repair.allowlist,[file('intake')],'the repair holds only the file the gate named, so the rest of the job runs beside it');
+    const narrowed=events(harness.store).find(event=>event.event==='gate-scope-narrowed');
+    assert.deepEqual([narrowed.gates,narrowed.files],[['typecheck'],[file('intake')]]);
+  }finally{harness.cleanup();}
+});
+
 test('a mechanical line about an op that moved on is dropped from the owner\'s list every tick',()=>{
   const harness=setupWork();
   try{

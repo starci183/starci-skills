@@ -1651,9 +1651,16 @@ export function runGates(store,state,ctx){
     return {ok:false,repaired:false,results};
   }
   // The repair scope is the code every op touched - never the Work tree: a gate repair once carried `.starciwork`
-  // paths from a design op's allowlist and committed a kernel block into a frontend record.
+  // paths from a design op's allowlist and committed a kernel block into a frontend record. Narrower when the
+  // gate's own evidence names the files: a typecheck that fails in two files is a two-file repair, and a repair
+  // holding the whole job's allowlist held every other operation behind it for a morning. What it turns out to
+  // need beyond those files it asks for as a shared change, like any build.
+  const whole=unique(state.ops.flatMap(op=>op.allowlist)).filter(entry=>!/(^|\/)\.starciwork(\/|$)/.test(slash(entry)));
+  const named=unique(failed.flatMap(result=>pathsIn(result.evidence))).filter(file=>inside(file,whole));
+  const scope=named.length?named:whole;
+  if(named.length)store.appendEvent({event:'gate-scope-narrowed',gates:failed.map(result=>result.name),files:named});
   addOp(store,state,{kind:'backend.implement',goal:`Make the job gates pass: ${failed.map(result=>result.name).join(', ')}`,
-    ledgerIds:[],allowlist:unique(state.ops.flatMap(op=>op.allowlist)).filter(entry=>!/(^|\/)\.starciwork(\/|$)/.test(slash(entry))),references:[],
+    ledgerIds:[],allowlist:scope,references:[],
     checks:failed.map(result=>({name:result.name,command:result.command})),
     acceptance:failed.map(result=>`${result.name} exits 0`),
     findings:failed.map(result=>`${result.name} failed (exit ${result.exitCode}): ${result.evidence}`),origin:'gate'},
