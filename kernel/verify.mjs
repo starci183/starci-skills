@@ -144,7 +144,9 @@ export function machineVerify(state,op,{exec,cwd=state.worktree,work=null}={}){
  * report.files. `exclude` is the kernel-owned ledger set, which no operation commit may ever carry.
  */
 export function changedFiles(state,op,{git},allowlist=op.allowlist,{exclude=[]}={}){
-  const shown=git('git',['status','--porcelain'],{cwd:state.worktree,encoding:'utf8',windowsHide:true});
+  // Every untracked file by name: a new record is one file in a new folder, and `git status` collapses that to
+  // the folder, which no report ever names - so the record was never attributed to the op that wrote it.
+  const shown=git('git',['status','--porcelain','--untracked-files=all'],{cwd:state.worktree,encoding:'utf8',windowsHide:true});
   if(shown.status!==0)return [];
   return unique((shown.stdout??'').split('\n').map(line=>line.replace(/\s+$/,'')).filter(Boolean)
     .map(line=>normalize(line.slice(3).split(' -> ').at(-1).replace(/^"|"$/g,''))))
