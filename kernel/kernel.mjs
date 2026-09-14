@@ -2606,6 +2606,11 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     noteOwnerList(store,state);
     if(guardedStage(store,state,ctx,'sync',()=>{syncLedgerOps(store,state,ctx);planVerifyOps(store,state,ctx);})==='stop')break;
     if(guardedStage(store,state,ctx,'schedule',()=>scheduleOps(orca,store,state,ctx))==='stop')break;
+    // A credential ask already waiting but with no command to copy - its custody was named in a place nothing had
+    // read yet - is asked again every tick until it has one. Nothing else revisits it: it is not scheduled, and the
+    // start migrations only see asks that are not waiting yet, so ask-6 waited with an empty line for an hour.
+    for(const ask of state.ops.filter(op=>op.fill===true&&op.status==='running'&&!op.fillCommand&&!op.answer))
+      fillWaiting(orca,store,state,ask,ctx);
     // Has the owner run the fill command yet? Answered by the custody file and nothing else (`provision-filled`),
     // after scheduling, because a credential ask becomes the owner's exactly by not being scheduled.
     settleFilledAsks(store,state,ctx);
