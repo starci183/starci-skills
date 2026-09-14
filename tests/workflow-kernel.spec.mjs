@@ -2957,6 +2957,32 @@ test('a kernel that already has its run records run-resumed; only a real bind re
  * stall detector leaves it alone; an ask op on any other question is provisional, never waits, and an idle one
  * is nudged like any other op.
  */
+/**
+ * An attempt past its deadline is over whatever the liveness probe says: it is settled as an overrun and relaunched
+ * on another runtime, and a job gate waiting behind its allowlist is not held for a day by a probe that says "working".
+ */
+test('an op past its deadline is settled as an overrun and relaunched elsewhere, whatever the probe says',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    let clock=0;
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>clock,work:null};
+    const op=running(harness.state,'op-intake','ctx_long','gpt-6-astra');
+    op.kind='review.verify';op.launchedAt=0;
+    clock=2*60*60*1000;
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_long',liveness:'working'}]});
+    assert.equal(op.status,'running','two hours is inside a review\'s three');
+    clock=4*60*60*1000;
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_long',liveness:'working'}]});
+    const overrun=events(harness.store).find(event=>event.event==='op-overrun');
+    assert.deepEqual([overrun.op,overrun.runtime,overrun.deadlineMs],['op-intake','gpt-6-astra',3*60*60*1000]);
+    assert.equal(op.status,'ready');
+    assert.equal(op.restarts,1);
+    assert.ok(op.avoidRuntimes.includes('gpt-6-astra'),'the runtime that never came back is avoided for the cooldown');
+  }finally{harness.cleanup();}
+});
+
 test('an ask op waiting for a provision is not a stalled op; one on a provisional question is nudged like any other',()=>{
   const harness=setup({plan:salesPlan,scripts:{}});
   try{
