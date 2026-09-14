@@ -204,6 +204,11 @@ test('the render is a plain terminal page with tables and no control codes',t=>{
   assert.match(page,/## Reviews\n\| group \| rounds \| exhausted \|/);
   assert.match(page,/\| prod\.alpha\.one\+prod\.alpha\.two \| 3 \| yes \|/);
   assert.match(page,/## Validator {2}accepted 2, rejected 1, unavailable 0 \(from verdicts\)/);
+  // The one section that answers "where does it ask me?": every ask tab, every unanswered decision and every
+  // line that is really the owner's, each with the command or the tab that settles it. A `dynamic-op` line is a
+  // mechanical bound of the runtime, so it is not on it.
+  assert.match(page,new RegExp(`## Owner \\(1\\)\n- decision ask-1: prod\\.alpha\\.business\\.srs\\.policy-decision\\.d-refund: the runtime took option 2 - close it and issue a credit note and carried on\n  how: starci workflow-answer --id ${id} --op ask-1 --choice <n> \\[--note "\\.\\.\\."\\]`));
+  assert.ok(page.indexOf('## Owner (1)')<page.indexOf('## Runtimes'),'it is the first section of the page: the owner reads what waits on them first');
   assert.match(page,/## Needs you \(1\)\n- dynamic-op shared-1: shared-1 was created beyond the dynamic-op budget/);
   // Separate from "needs you": nothing is blocked on these, and only the ones the owner has not answered show.
   assert.match(page,/## Provisional decisions \(1\)\n- prod\.alpha\.business\.srs\.policy-decision\.d-refund: the runtime took option 2 - close it and issue a credit note and carried on\./);
