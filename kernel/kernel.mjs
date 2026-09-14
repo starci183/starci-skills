@@ -2447,6 +2447,17 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     settleOwnerAsk(store,state,ask,ask.reports.at(-1));
     store.appendEvent({event:'ask-resettled',ask:ask.id,requesters:paused.map(item=>item.id),reason:'the variable name in its report was masked by an older build'});
   }
+  // A credential ask an older build launched as an agent and that agent could not prepare (blocked, the owner's
+  // list holding "could not prepare the question") is a credential to fill in like any other: the kernel takes it
+  // over - one line, the `identity fill` command - and its requester waits on the custody, not on a tab.
+  for(const op of state.ops.filter(item=>item.kind===PROVISION_ASK&&item.question?.stop==='credential'&&!item.fill&&!item.answer&&['blocked','pending','ready'].includes(item.status))){
+    const was=op.status;
+    state.needUser=state.needUser.filter(line=>!(line.op===op.id&&line.kind==='decision'));
+    op.refusal=null;op.reports=op.reports??[];
+    if(ctx.orca&&op.terminal)closeOpTerminal(ctx.orca,store,state,op);
+    fillWaiting(orca,store,state,op,ctx);
+    store.appendEvent({event:'provision-fill-readmitted',ask:op.id,was,requesters:[...(op.requesters??[])]});
+  }
   // Split children an older rule made of a record author are withdrawn: half an intake is not an operation.
   for(const op of state.ops.filter(item=>item.origin==='repair'&&authorsRecord(item.kind)&&!item.nodeId&&/ - only \`/.test(String(item.goal??''))&&['pending','ready','blocked'].includes(item.status)&&item.refusal!=='superseded')){
     op.status='blocked';op.refusal='superseded';op.dispatch=null;op.terminal=null;
