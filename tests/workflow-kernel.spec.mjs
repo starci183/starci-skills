@@ -1042,6 +1042,41 @@ test('a report that failed only on the whole-tree validator is read as done, and
  * never a finish: the budget rolls with the UTC day. A finish an older rule declared over such a stall is withdrawn
  * on the next start, and the supervisor never treats it as finished.
  */
+/**
+ * An environment blocker an op reported is retried once per build - a new build is what changes the environment
+ * it saw - and a finish declared blocked over the owner's list is withdrawn once that list is empty and work remains.
+ */
+test('an op-reported environment blocker is retried once per build, and a blocked finish is withdrawn once the list is empty',()=>{
+  const harness=setupWork();
+  try{
+    const store=harness.store,state=harness.state;
+    const op=state.ops[0];
+    op.status='blocked';op.reports=[{attempt:1,outcome:'blocked',summary:'the operator forbids it',blocker:{kind:'environment',detail:'Compiled work.author excludes integration output'}}];
+    state.needUser.push({op:op.id,kind:'environment',detail:'Compiled work.author excludes integration output'});
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    state.finished={outcome:'blocked',reason:'the policy could not settle every goal item',report:'x'};state.phase='finished';
+    // The fixture's own ledger line is not the owner's item under test: the environment line is the only one left.
+    state.needUser=state.needUser.filter(item=>item.kind!=='ledger');
+    const before=store.readEvents().length;
+    const state2=harness.run({maxIterations:1});
+    const log=store.readEvents().slice(before);
+    assert.ok(log.some(event=>event.event==='environment-retried'&&event.op===op.id));
+    assert.ok(log.some(event=>event.event==='finish-withdrawn'&&/settled and work remains/.test(event.because)));
+    assert.equal(state2.finished,null);
+    assert.equal(state2.needUser.some(item=>item.kind==='environment'),false);
+    const again=state2.ops.find(item=>item.id===op.id);
+    assert.notEqual(again.status,'blocked');
+    assert.match(again.findings.at(-1),/the runtime was rebuilt since you reported the environment blocker/);
+    // The same build never retries it twice: a second start with the same stamp leaves a re-blocked op alone.
+    again.status='blocked';again.reports.push({attempt:2,outcome:'blocked',summary:'still',blocker:{kind:'environment',detail:'Compiled work.author excludes integration output'}});
+    state2.needUser.push({op:op.id,kind:'environment',detail:'still'});
+    const after=store.readEvents().length;
+    harness.run({maxIterations:1});
+    assert.equal(store.readEvents().slice(after).some(event=>event.event==='environment-retried'),false);
+  }finally{harness.cleanup();}
+});
+
 test('a stall over a spent daily budget is a wait, and a finish declared over one is withdrawn on start',()=>{
   const harness=setupWork();
   try{

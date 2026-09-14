@@ -2211,6 +2211,21 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
       if(last?.at)op.launchedAt=last.at;
     }
   }
+  // An environment blocker an op itself reported is retried once per build: a new build is what changes the
+  // environment the op saw (an operator that could not write an integration node, a rule that refused a path), and
+  // the op's next attempt is the only witness of whether it still holds. Once per build stamp, never in a loop.
+  {
+    const stamp=buildStamp();
+    for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal&&item.reports?.at?.(-1)?.blocker?.kind==='environment'&&stamp&&item.environmentRetryStamp!==stamp)){
+      const line=state.needUser.find(item=>item.op===op.id&&item.kind==='environment');
+      if(!line)continue;
+      state.needUser=state.needUser.filter(item=>item!==line);
+      op.environmentRetryStamp=stamp;
+      op.status='ready';op.attempt+=1;op.dispatch=null;op.terminal=null;op.nudged=false;
+      op.findings=unique([...(op.findings??[]),`the runtime was rebuilt since you reported the environment blocker "${firstLine(String(op.reports.at(-1).blocker.detail??''))}": try again against the current build, and report blocked again only if it still holds`]);
+      store.appendEvent({event:'environment-retried',op:op.id,build:stamp});
+    }
+  }
   // Split children an older rule made of a record author are withdrawn: half an intake is not an operation.
   for(const op of state.ops.filter(item=>item.origin==='repair'&&authorsRecord(item.kind)&&!item.nodeId&&/ - only \`/.test(String(item.goal??''))&&['pending','ready','blocked'].includes(item.status)&&item.refusal!=='superseded')){
     op.status='blocked';op.refusal='superseded';op.dispatch=null;op.terminal=null;
@@ -2306,6 +2321,12 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   sweepStaleTerminals(orca,store,state,{cwd});
   state.buildStamp=buildStamp();
   rejudgeParked(store,state,ctx);
+  // A finish declared `blocked` over the owner's list is withdrawn once that list is empty and work remains: the
+  // items it finished over have been settled (re-judged, retried, taken provisionally) and the workflow is what it was.
+  if(state.finished?.outcome==='blocked'&&!state.needUser.length&&state.ops.some(op=>['ready','pending','paused'].includes(op.status))){
+    store.appendEvent({event:'finish-withdrawn',outcome:state.finished.outcome,reason:state.finished.reason,because:'every item on the owner\'s list has been settled and work remains'});
+    state.finished=null;state.phase='run';state.stalls=0;state.stalledSince=null;
+  }
   for(let iteration=0;iteration<maxIterations&&!state.finished;iteration+=1){
     if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator});sweepTreeStrays(store,state,ctx);}
     if((iteration>0&&iteration%RECONCILE_EVERY===0)||now()-(state.lastSweepAt??0)>=SWEEP_MS)sweepStaleTerminals(orca,store,state,{cwd,now});
