@@ -3,6 +3,7 @@ import path from 'node:path';
 import {listWorkflows,workflowsRoot} from './store.mjs';
 import {integrationProofStatus,readLedgerTree} from './ledger.mjs';
 import {ownerItems,ownerSection} from './owner.mjs';
+import {askFillLine,fillWaitingAsks} from './fill.mjs';
 
 /**
  * One truthful status view of a workflow. This is what replaces "go and watch the agents": every number
@@ -281,6 +282,10 @@ export function buildView({repoRoot,id,now=Date.now(),dir:given=null}){
       exhausted:unique(events.filter(event=>event.event==='verify-exhausted').map(event=>event.component).filter(Boolean)),
       findings:Array.isArray(state.reviewFindings)?state.reviewFindings.length:0},
     validator:readValidator(dir,events),
+    // What the owner has to fill in: one credential per line, each with the exact command that does it. Every
+    // other question is asked in its own tab or taken provisionally, so this list is short by design.
+    ownerFill:fillWaitingAsks(state).map(ask=>({op:ask.id,variables:[...(ask.credential?.variables??[])],
+      custody:ask.credential?.custody??null,command:ask.fillCommand??null,line:askFillLine(ask)})),
     needUser:Array.isArray(state.needUser)?state.needUser:[],
     // The one place the owner looks: every ask tab, every provisional decision and every line that is really
     // theirs, in one list, each with the command or the tab that settles it. Derived, never stored.
@@ -374,6 +379,10 @@ export function renderView(view){
   lines.push('',`## Validator  accepted ${view.validator.accepted}, rejected ${view.validator.rejected}, unavailable ${view.validator.unavailable}${view.validator.source?` (from ${view.validator.source})`:' (no verdicts recorded)'}`);
   if(view.validator.lastSummary)lines.push(`last: ${view.validator.lastSummary}`);
 
+  // One line, one command. A question for the owner is a prompt they answer, not a command they compose: this
+  // is the exact line to copy, and the kernel settles the ask itself once the custody holds every variable.
+  if(view.ownerFill?.length)lines.push('',`## Owner (${view.ownerFill.length})`,
+    ...view.ownerFill.map(entry=>`- ${entry.line}`));
   lines.push('',`## Needs you (${view.needUser.length})`);
   lines.push(view.needUser.length?view.needUser.map(item=>`- ${item.kind??'item'}${item.node?` ${item.node}`:item.op?` ${item.op}`:''}: ${clip(item.detail??'',200)}`).join('\n'):'nothing is waiting on you');
   // Separate from "needs you" on purpose: nothing waits on these, and a workflow that finished done may still

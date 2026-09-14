@@ -21,7 +21,7 @@ import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGra
 import {machineVerify} from '../kernel/kernel.mjs';
 import {attributedFiles} from '../kernel/verify.mjs';
 import {relocateLauncher} from '../kernel/kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -1737,8 +1737,10 @@ test('a check re-run for a shared-ledger op names the tree at its owner: the bar
 
 test('a question only the owner can answer pauses the op and opens an ask op; an ask that reports a decision lifts its own stop, the answer is delivered, and a mechanical question stays with the kernel',()=>{
   const nodeId='demo.sales.implementation.backend.intake',file='apps/agentos-controlplane/src/sales/intake.ts';
-  const question={outcome:'ask',summary:'Need a ruling.',files:[],checks:[],question:{text:'Which Telegram bot token does the chatbot use, and where does the owner provide it?',options:['a stack secret named TELEGRAM_BOT_TOKEN','an environment variable on the host'],kind:'credential'}};
-  const askReport={outcome:'done',summary:'decision: demo.sales.business.srs.decision.d-telegram-token\n1. a stack secret named TELEGRAM_BOT_TOKEN\n2. an environment variable on the host',files:[],checks:[passing('work-tree-validates','node starci.mjs validate')]};
+  // A provision the owner opens on an outside system: there is nothing to type into a field, so this one is
+  // still asked by its own operation in its own tab. A credential is not - the kernel asks that one by form.
+  const question={outcome:'ask',summary:'Need a ruling.',files:[],checks:[],question:{text:'Which e-invoicing provider sandbox account does the chatbot deliver through, and who registers it?',options:['the provider\'s own sandbox tenant','a shared partner tenant'],kind:'account'}};
+  const askReport={outcome:'done',summary:'decision: demo.sales.business.srs.decision.d-telegram-token\n1. the provider\'s own sandbox tenant\n2. a shared partner tenant',files:[],checks:[passing('work-tree-validates','node starci.mjs validate')]};
   const harness=setupWork({dirty:[file],scripts:{[nodeId]:[question,{outcome:'done',summary:'Intake implemented with the ruling.',files:[file],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
     'ask-1':[askReport]}});
   try{
@@ -1749,12 +1751,12 @@ test('a question only the owner can answer pauses the op and opens an ask op; an
     const requester=after.ops.find(op=>op.id===nodeId),ask=after.ops.find(op=>['decision.prepare','provision.ask'].includes(op.kind));
     assert.ok(ask,'a decision.prepare op was opened');
     // The decision lands where the tree keeps its policy decisions, under the feature folder read from the tree.
-    assert.deepEqual([ask.id,ask.origin,ask.allowlist,ask.requesters,ask.question.kind,ask.question.from],['ask-1','ask',['.starciwork/features/sales/business/srs/business-rules/policy-decisions/**'],[nodeId],'credential',nodeId]);
-    assert.equal(ask.question.stop,'credential','a credential is one of the two stop reasons: the requester waits');
+    assert.deepEqual([ask.id,ask.origin,ask.allowlist,ask.requesters,ask.question.kind,ask.question.from],['ask-1','ask',['.starciwork/features/sales/business/srs/business-rules/policy-decisions/**'],[nodeId],'account',nodeId]);
+    assert.equal(ask.question.stop,'account','an account on an outside system is a stop reason: the requester waits');
     assert.deepEqual([requester.status,requester.waitingFor],['paused','ask-1']);
     assert.ok(events(store).some(event=>event.event==='owner-ask-opened'&&event.op===nodeId&&event.ask==='ask-1'));
     const contract=renderContract({template,op:ask,state:after,store,launcher:'L.mjs',run:'run_wf'});
-    assert.match(contract,/## Question for the owner\nAsked by `demo\.sales\.implementation\.backend\.intake` \(credential\): Which Telegram bot token/);
+    assert.match(contract,/## Question for the owner\nAsked by `demo\.sales\.implementation\.backend\.intake` \(account\): Which e-invoicing provider sandbox account/);
     assert.match(contract,/## Credentials and configuration/);
     // The ask op reads the records and reports a DECISION: "where does the owner provide it" is a design
     // question - where a value lives - and the word "token" only chose the tab. The kernel takes the report by
@@ -1765,9 +1767,9 @@ test('a question only the owner can answer pauses the op and opens an ask op; an
     assert.equal(after.needUser.some(item=>item.kind==='decision'),false,'nothing is left for the owner to provide');
     assert.deepEqual((after.provisional??[]).map(entry=>[entry.decision,entry.op,entry.recommended,entry.options.length]),
       [['demo.sales.business.srs.decision.d-telegram-token','ask-1',1,2]]);
-    assert.match(String(after.ops.find(op=>op.id===nodeId).answer),/^provisional: option 1 - a stack secret named TELEGRAM_BOT_TOKEN/);
+    assert.match(String(after.ops.find(op=>op.id===nodeId).answer),/^provisional: option 1 - the provider's own sandbox tenant/);
     // The owner answers through the inbox: the same option confirms what the runtime had already carried.
-    queueInbox(store,{kind:'answer',op:'ask-1',choice:'1',note:'the stack secret store, never a .env file'});
+    queueInbox(store,{kind:'answer',op:'ask-1',choice:'1',note:'our own tenant, never a partner\'s'});
     after=harness.run({maxIterations:6});
     const resumed=after.ops.find(op=>op.id===nodeId);
     assert.equal(after.needUser.some(item=>item.kind==='decision'),false,'the question is gone');
@@ -1856,6 +1858,91 @@ test('an environment blocker that names a credential is the question of the owne
     assert.deepEqual([requester.status,requester.waitingFor,requester.dependsOn.includes(ask.id)],['pending',null,true]);
     assert.equal(after.needUser.some(item=>item.kind==='authority'),false);
   }finally{open.cleanup();}
+});
+
+/**
+ * The owner's ruling of 2026-09-14, as the kernel keeps it. A credential used to be asked for by an agent in a
+ * terminal tab: it printed a wall of text with a command for the owner to compose and then polled them for the
+ * word `set`, and the owner looked at that tab and asked whether it was even asking them anything. So no agent
+ * is launched for a credential at all. The kernel prints ONE line - the variables, the custody, the exact
+ * command - the owner runs it and answers its prompts, and the kernel settles the ask itself by PRESENCE.
+ */
+test('a credential provision is never launched: the kernel prints one command, waits without a deadline, and settles the ask itself when the custody holds every variable',()=>{
+  const nodeId='demo.sales.implementation.backend.intake',file='apps/agentos-controlplane/src/sales/intake.ts';
+  const blocked={outcome:'blocked',summary:'Cannot deliver without the bot credentials.',files:[],checks:[],
+    blocker:{kind:'environment',detail:'TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are not provided; their custody identity:chatbot-telegram is declared and delivery.module.ts reads them at boot'}};
+  const done={outcome:'done',summary:'Intake implemented against the provided credentials.',files:[file],
+    checks:[passing('unit-tests-pass','npx vitest run intake')]};
+  const VARIABLES=['TELEGRAM_BOT_TOKEN','TELEGRAM_CHAT_ID'];
+  /** sops is not in a unit test; presence is the one thing it answers, so that answer is the seam. */
+  const custody=harness=>path.join(harness.repo,'.starciwork','_resources','identity','chatbot-telegram','secrets.enc.yaml');
+  const fillIn=harness=>{fs.mkdirSync(path.dirname(custody(harness)),{recursive:true});
+    fs.writeFileSync(custody(harness),'# sops-encrypted\n');};
+  const holds=names=>({name})=>names.includes(name)?{ok:true}:{ok:false,reason:`identity:chatbot-telegram does not hold ${name}`};
+
+  const harness=setupWork({dirty:[file],scripts:{[nodeId]:[blocked,done]}});
+  try{
+    const {store,state}=harness;
+    approve(store,state);state.run='run_wf';state.from='term_kernel';
+    let after=harness.run({maxIterations:3,verifyPresence:holds([])});
+    const ask=after.ops.find(op=>op.kind==='provision.ask');
+    assert.ok(ask,'the credential need is still the owner\'s question');
+    // Waiting, and waiting for nothing that runs: no dispatch, no runtime, no terminal, no launch deadline.
+    assert.deepEqual([ask.status,ask.fill,ask.dispatch,ask.terminal,ask.runtime,ask.launchedAt],
+      ['running',true,null,null,null,null]);
+    assert.equal(after.ops.find(op=>op.id===nodeId).status,'paused','the requester waits for the owner, not for an agent');
+    const log=events(store);
+    const waiting=log.filter(event=>event.event==='provision-fill-waiting');
+    assert.equal(waiting.length,1,'the owner is told once, not once per iteration');
+    assert.deepEqual([waiting[0].ask,waiting[0].variables,waiting[0].custody],[ask.id,VARIABLES,'identity:chatbot-telegram']);
+    // The exact command, with the tree it fills: the owner copies this line and nothing else.
+    assert.equal(waiting[0].command,ask.fillCommand);
+    assert.match(ask.fillCommand,/^node .*bin\/starci\.mjs identity fill chatbot-telegram --name TELEGRAM_BOT_TOKEN --name TELEGRAM_CHAT_ID --work-root .*\.starciwork$/);
+    assert.equal(log.some(event=>event.event==='launched'&&event.op===ask.id),false,'no runtime is ever asked to ask the owner');
+    assert.equal(log.some(event=>event.event==='allocation-deferred'&&event.op===ask.id),false,'and it holds no slot while it waits');
+    // The same line is what every page of this workflow shows.
+    assert.deepEqual(ownerFillLines(after),[`## Owner (1)`,`- ${askFillLine(ask)}`]);
+    assert.match(askFillLine(ask),/^Fill TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID for identity:chatbot-telegram: copy and run  node /);
+    // An op waiting for the owner is never a stall and never an overrun: it waits as long as the owner takes.
+    ask.launchedAt=1;
+    settleStalled(harness.fake.orca,store,after,{allocator:harness.allocator,now:()=>Date.now(),wait:noWait},
+      {liveness:[{dispatch:null,liveness:'dead'},{dispatch:ask.dispatch,liveness:'stalled-idle'}]});
+    assert.deepEqual([ask.status,ask.restarts],['running',0]);
+    assert.equal(events(store).some(event=>['op-overrun','settled'].includes(event.event)&&event.op===ask.id),false);
+    ask.launchedAt=null;
+    // The owner runs the command: the custody holds both variables, and the kernel sees it at the next tick.
+    fillIn(harness);
+    after=harness.run({maxIterations:8,verifyPresence:holds(VARIABLES)});
+    const settled=events(store).filter(event=>event.event==='provision-filled');
+    assert.deepEqual(settled.map(event=>[event.ask,event.variables,event.custody,event.via]),
+      [[ask.id,VARIABLES,'identity:chatbot-telegram','fill']]);
+    assert.deepEqual(events(store).filter(event=>event.event==='credential-present').map(event=>event.provided),
+      VARIABLES.map(name=>`${name} in identity:chatbot-telegram`));
+    assert.deepEqual([after.ops.find(op=>op.id===ask.id).status,after.ops.find(op=>op.id===nodeId).status],['done','done']);
+    assert.match(String(after.ops.find(op=>op.id===nodeId).answer),/The owner provided TELEGRAM_CHAT_ID in identity:chatbot-telegram/);
+    assert.equal(ownerFillLines(after).length,0,'nothing is owed once the custody holds it');
+  }finally{harness.cleanup();}
+
+  // `workflow-answer --note set` is the same ruling by the other door: it runs the same presence check, and a
+  // credential nobody filled in is a refusal that names what is missing - never a `done` taken on the word.
+  const byCommand=setupWork({dirty:[file],scripts:{[nodeId]:[blocked,done]}});
+  try{
+    const {store,state}=byCommand;
+    approve(store,state);state.run='run_wf';state.from='term_kernel';
+    let after=byCommand.run({maxIterations:3,verifyPresence:holds([])});
+    const ask=after.ops.find(op=>op.kind==='provision.ask');
+    queueInbox(store,{kind:'answer',op:ask.id,note:'set'});
+    after=byCommand.run({maxIterations:1,verifyPresence:holds([])});
+    const refused=events(store).find(event=>event.event==='inbox-rejected'&&event.kind==='answer');
+    assert.match(refused.reason,/TELEGRAM_BOT_TOKEN: identity:chatbot-telegram does not hold TELEGRAM_BOT_TOKEN/);
+    assert.match(refused.reason,/identity fill chatbot-telegram --name/);
+    assert.equal(after.ops.find(op=>op.id===ask.id).status,'running','a word is not a credential');
+    fillIn(byCommand);
+    queueInbox(store,{kind:'answer',op:ask.id,note:'set'});
+    after=byCommand.run({maxIterations:8,verifyPresence:holds(VARIABLES)});
+    assert.deepEqual(events(store).filter(event=>event.event==='provision-filled').map(event=>event.via),['command']);
+    assert.deepEqual([after.ops.find(op=>op.id===ask.id).status,after.ops.find(op=>op.id===nodeId).status],['done','done']);
+  }finally{byCommand.cleanup();}
 });
 
 // The first owner questions were written under `features/shared/` and `features/workspace/` - folders that do

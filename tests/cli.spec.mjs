@@ -427,3 +427,88 @@ test('identity set refuses with the exact reason when sops or its key is not the
   assert.equal(fs.existsSync(path.join(folder, 'secrets.enc.yaml')), false, 'nothing was written');
   assert.deepEqual(fs.readdirSync(folder), [], 'the plaintext sops needed is gone, whatever happened');
 });
+
+/**
+ * `identity fill` is the whole of what the owner does for a credential: one command the kernel printed for
+ * them, which then ASKS - `Fill PAY_API_KEY:` - and puts each answer straight into the custody. It exists
+ * because the previous shape was an agent in a tab printing a command for the owner to compose, and the owner
+ * could not tell they were being asked anything. What the test holds it to is what the ruling demanded: it
+ * asks per variable, it never shows or writes what was typed, and an empty answer is a skip, never a blank
+ * credential.
+ */
+test('identity fill asks for each variable in turn, puts every answer into the custody, and shows none of them', t => {
+  const parent = temporary(t);
+  const root = path.join(parent, '.starciwork');
+  assert.equal(run('init', root, '--id', 'workspace:test').status, 0);
+  const env = { ...process.env, ...fakeSops(t) };
+  const filled = spawnSync(process.execPath,
+    [cli, 'identity', 'fill', 'payments', '--name', 'PAY_API_KEY', '--name', 'PAY_WEBHOOK_SECRET'],
+    { encoding: 'utf8', cwd: parent, env, input: `${SYNTHETIC}\n${SYNTHETIC}-hook\n` });
+  assert.equal(filled.status, 0, filled.stderr);
+  // One prompt per variable, in the order the command named them, and the answer to each is never printed.
+  assert.match(filled.stderr, /Fill PAY_API_KEY: /);
+  assert.match(filled.stderr, /Fill PAY_WEBHOOK_SECRET: /);
+  assert.ok(filled.stderr.indexOf('Fill PAY_API_KEY') < filled.stderr.indexOf('Fill PAY_WEBHOOK_SECRET'), 'in order');
+  assert.match(filled.stderr, /PAY_API_KEY: present in identity:payments/);
+  assert.match(filled.stderr, /PAY_WEBHOOK_SECRET: present in identity:payments/);
+  const answer = JSON.parse(filled.stdout);
+  assert.deepEqual([answer.ok, answer.custody], [true, 'identity:payments']);
+  assert.deepEqual(answer.filled, [{ name: 'PAY_API_KEY', ok: true }, { name: 'PAY_WEBHOOK_SECRET', ok: true }]);
+  // Both values are in the custody and in nothing else this command said or wrote.
+  const folder = path.join(root, '_resources', 'identity', 'payments');
+  const secrets = fs.readFileSync(path.join(folder, 'secrets.enc.yaml'), 'utf8');
+  assert.equal(secrets, `# sops-encrypted\nPAY_API_KEY: ${SYNTHETIC}\nPAY_WEBHOOK_SECRET: ${SYNTHETIC}-hook\n`);
+  assert.deepEqual(parseYaml(fs.readFileSync(path.join(folder, 'resource.yaml'), 'utf8')).details.variables,
+    ['PAY_API_KEY', 'PAY_WEBHOOK_SECRET']);
+  const said = `${filled.stdout}${filled.stderr}${fs.readFileSync(path.join(folder, 'resource.yaml'), 'utf8')}`;
+  assert.equal(said.includes(SYNTHETIC), false, 'nothing the owner typed is printed or written outside the custody');
+
+  // An empty answer is a skip: no blank credential, and the command exits 1 because something is still owed.
+  const skipped = spawnSync(process.execPath, [cli, 'identity', 'fill', 'payments', '--name', 'PAY_REFUND_KEY'],
+    { encoding: 'utf8', cwd: parent, env, input: '\n' });
+  assert.equal(skipped.status, 1);
+  assert.match(skipped.stderr, /PAY_REFUND_KEY: skipped - nothing was entered/);
+  assert.deepEqual(JSON.parse(skipped.stdout).filled, [{ name: 'PAY_REFUND_KEY', ok: false, reason: 'skipped: nothing was entered' }]);
+  assert.equal(fs.readFileSync(path.join(folder, 'secrets.enc.yaml'), 'utf8').includes('PAY_REFUND_KEY'), false);
+
+  // A refusal is named per variable and exits 1; a value on the command line is refused before anything is read.
+  const noKey = spawnSync(process.execPath, [cli, 'identity', 'fill', 'invoicing', '--name', 'INVOICE_TOKEN'],
+    { encoding: 'utf8', cwd: parent, env: { ...process.env, ...fakeSops(t, { encryptStatus: 1 }) }, input: `${SYNTHETIC}\n` });
+  assert.equal(noKey.status, 1);
+  assert.match(noKey.stderr, /INVOICE_TOKEN: refused - .*no age or GPG key is configured/);
+  assert.equal(`${noKey.stdout}${noKey.stderr}`.includes(SYNTHETIC), false);
+  const onCommandLine = spawnSync(process.execPath, [cli, 'identity', 'fill', 'payments', SYNTHETIC, '--name', 'PAY_API_KEY'],
+    { encoding: 'utf8', cwd: parent, env, input: '' });
+  assert.equal(onCommandLine.status, 1);
+  assert.match(onCommandLine.stderr, /Invalid arguments/);
+});
+
+test('the fill prompt asks one variable at a time, writes each answer through setIdentitySecret, and echoes nothing back', async () => {
+  const { fillIdentitySecrets } = await import('../core/identity.mjs');
+  const said = [];
+  const output = { write: value => { said.push(value); return true; } };
+  const asked = [];
+  const answers = ['first-value', '', 'third-value'];
+  const prompt = question => { asked.push(question); return Promise.resolve(`${answers.shift()}\n`); };
+  const written = [];
+  const set = ({ workRoot, slug, name, value }) => {
+    written.push({ workRoot, slug, name, value });
+    return name === 'B_TOKEN' ? { ok: false, reason: 'sops is not on PATH' } : { ok: true, variables: [name] };
+  };
+  const result = await fillIdentitySecrets({ workRoot: '/tree/.starciwork', slug: 'payments',
+    names: ['A_TOKEN', 'B_TOKEN', 'C_TOKEN'], output, prompt, set });
+  // One question per variable, in order, and the second is skipped without ever reaching the custody.
+  assert.deepEqual(asked, ['Fill A_TOKEN: ', 'Fill B_TOKEN: ', 'Fill C_TOKEN: ']);
+  assert.deepEqual(written.map(entry => [entry.slug, entry.name, entry.value]),
+    [['payments', 'A_TOKEN', 'first-value'], ['payments', 'C_TOKEN', 'third-value']]);
+  assert.deepEqual(result.filled, [{ name: 'A_TOKEN', ok: true },
+    { name: 'B_TOKEN', ok: false, reason: 'skipped: nothing was entered' }, { name: 'C_TOKEN', ok: true }]);
+  assert.equal(result.ok, false, 'a variable that is not present leaves the command unfinished');
+  assert.equal(said.join('').includes('first-value'), false, 'nothing the owner typed is written back out');
+  assert.match(said.join(''), /A_TOKEN: present in identity:payments/);
+  // A variable that is not a variable is refused before a single question is asked.
+  await assert.rejects(fillIdentitySecrets({ workRoot: '/tree/.starciwork', slug: 'payments', names: ['not a var'], output, prompt, set }),
+    /A credential variable is a name like STRIPE_SECRET_KEY/);
+  await assert.rejects(fillIdentitySecrets({ workRoot: '/tree/.starciwork', slug: 'payments', names: [], output, prompt, set }),
+    /identity fill needs at least one --name/);
+});

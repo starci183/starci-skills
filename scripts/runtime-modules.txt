@@ -40,6 +40,7 @@ kernel/goal.mjs
 kernel/intake.mjs
 kernel/sync.mjs
 kernel/owner.mjs
+kernel/fill.mjs
 kernel/lanes.mjs
 kernel/terminals.mjs
 kernel/tab.mjs

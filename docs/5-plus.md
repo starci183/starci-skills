@@ -493,11 +493,16 @@ owner answers or the workflow finishes, and the op stays in it - a number typed 
 relayed by the op through `workflow-answer` itself. The report closed the tab once, and the owner opened
 six tabs and found the question in none of them.
 
-A provision is never asked for as a value. For a credential the owner puts it into custody with one command
-and replies `set`; the op then checks **only presence** - `sops exec-env <secrets.enc.yaml> 'node -e
-"process.exit(process.env.<VAR>?0:1)"'` - and reports `credential: <VAR> present in identity:<slug>`
-(`credential-present`). For an account, a dataset or an authority it reports `provided: <what>`. No value ever
-reaches a file, an event or a report, and `redactSecrets` masks anything key-shaped on the way through.
+A provision is never asked for as a value. For an account, a dataset or an authority the op asks in its tab and
+reports `provided: <what>` once the owner replies. **A credential is not asked in a tab at all**: a question for
+the owner has to be a question, and an agent printing a command for them to compose was not one. The kernel
+never launches that ask (`provision-fill-waiting`); it prints one line - the variables, the custody and the
+exact command - and the owner runs `starci identity fill <slug> --name <VAR> ...`, which asks `Fill <VAR>:`
+with the echo off, one variable at a time, and puts each answer straight into custody. The kernel settles the
+ask itself, by **presence only** - `sops exec-env <secrets.enc.yaml> 'node -e
+"process.exit(process.env.<VAR>?0:1)"'` - as `credential: <VAR> present in identity:<slug>`
+(`credential-present`, `provision-filled`). No value ever reaches a file, an event or a report, and
+`redactSecrets` masks anything key-shaped on the way through.
 
 Which of the two ops opened is a guess made from the sentence before anything was read, so it is a hint about
 the tab and never a ruling: the kernel accepts an ask by what the report says, so a `provision.ask` that found
