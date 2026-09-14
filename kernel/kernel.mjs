@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {spawnSync} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
 import {skillRoot} from '../core/runtime-root.mjs';
 import {getPath} from '../hosts/orca/calls.mjs';
 import {waitTick} from '../hosts/orca/protocol.mjs';
@@ -486,10 +486,24 @@ export const deadOp=op=>Boolean(op)&&(op.status==='failed'||(op.status==='blocke
  */
 function fillWaiting(orca,store,state,op,ctx){
   if(op.kind!==PROVISION_ASK||op.question?.stop!=='credential')return false;
-  if(!op.fill){
+  if(!op.fill||!op.credential?.custody||!op.credential?.variables?.length){
     let declared=[];
     try{declared=ctx.work?work.declaredIntegrations(ctx.work.loaded).list:[];}catch{declared=[];}
-    op.credential=credentialAsked(op,{declared});
+    const requesters=state.ops.filter(item=>(op.requesters??[]).includes(item.id));
+    const before=op.fillCommand??null;
+    op.credential=credentialAsked(op,{declared,requesters});
+    // Named before the tree was loaded (a start migration runs first), the custody may only be known now: the
+    // one line is printed when the command exists, and never twice for the same command.
+    if(op.fill&&before===null){
+      op.fillCommand=op.credential.custody&&op.credential.variables.length
+        ?fillCommand({host:state.host,slug:op.credential.custody.replace(/^identity:/,''),variables:op.credential.variables,workRoot:ctx.work?.at?.workRoot??null}):null;
+      if(op.fillCommand){
+        store.appendEvent({event:'provision-fill-named',ask:op.id,variables:[...op.credential.variables],custody:op.credential.custody,command:op.fillCommand});
+        try{notifyTerminal(orca,{cwd:state.worktree,terminal:state.from,text:askFillLine(op),wait:ctx.wait});}catch{/* the same line is on every page */}
+      }
+      return true;
+    }
+    if(op.fill)return true;
     op.fill=true;op.fillCheckedAt=null;
     op.fillCommand=op.credential.custody&&op.credential.variables.length
       ?fillCommand({host:state.host,slug:op.credential.custody.replace(/^identity:/,''),
@@ -2568,7 +2582,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   }
   for(let iteration=0;iteration<maxIterations&&!state.finished;iteration+=1){
     if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator});sweepTreeStrays(store,state,ctx);}
-    if((iteration>0&&iteration%RECONCILE_EVERY===0)||now()-(state.lastSweepAt??0)>=SWEEP_MS)sweepStaleTerminals(orca,store,state,{cwd,now});
+    if((iteration>0&&iteration%RECONCILE_EVERY===0)||now()-(state.lastSweepAt??0)>=SWEEP_MS){sweepStaleTerminals(orca,store,state,{cwd,now});reviveSupervisor(store,state,ctx,{now});}
     if(stopRequested(store)){store.appendEvent({event:'stopped',reason:'stop flag'});releaseKernelTab(orca,store,state,{cwd,reason:'paused by stop flag'});store.saveState(state);return state;}
     applyInbox(store,state,ctx);
     if(state.restartRequested){const reason=state.restartRequested;state.restartRequested=null;store.appendEvent({event:'stopped',reason:`restart: ${reason}`});store.saveState(state);return state;}
@@ -2678,6 +2692,38 @@ const launcherOf=host=>slash(path.join(host,'.dist','hosts','orca','launch.mjs')
  * whatever it finds. An absolute launcher that no longer exists is replaced by the one this build has, and the
  * exchange is recorded (`launcher-relocated`); a relative launcher (a test's stand-in) is left alone.
  */
+/**
+ * The supervisor revives a dead kernel; nobody revived a dead supervisor, and one afternoon both died in the same
+ * second and the workflow sat for an hour with nine ops "running" and nothing running them. Every round the
+ * supervisor writes `supervisor.lock {pid, at}` beside each store; a kernel that finds it stale (no round for
+ * SUPERVISOR_STALE_MS) with its pid gone starts one from the same command line, detached, at most once per
+ * SUPERVISOR_REVIVE_EVERY_MS - and says so (`supervisor-revived`). A lock that was never written is left alone:
+ * a kernel run by hand, or by a test, has no supervisor to miss.
+ */
+export const SUPERVISOR_STALE_MS=5*60*1000;
+export const SUPERVISOR_REVIVE_EVERY_MS=10*60*1000;
+export function reviveSupervisor(store,state,ctx,{now=Date.now,spawn=spawnDetached,alive=pidAlive}={}){
+  const file=path.join(path.dirname(store.dir),'supervisor.lock');
+  let lock=null;try{lock=JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}
+  if(!lock||typeof lock.at!=='number')return null;
+  if(now()-lock.at<SUPERVISOR_STALE_MS)return null;
+  if(lock.pid&&alive(lock.pid))return null;
+  if(state.supervisorRevivedAt&&now()-state.supervisorRevivedAt<SUPERVISOR_REVIVE_EVERY_MS)return null;
+  if(!state.host)return null;
+  const args=[path.join(state.host,'bin','starci.mjs'),'workflow-supervise','--host',state.host];
+  let pid=null;
+  try{pid=spawn(process.execPath,args,{cwd:state.worktree});}catch(error){store.appendEvent({event:'supervisor-revive-failed',reason:String(error?.message??error)});return null;}
+  state.supervisorRevivedAt=now();
+  store.appendEvent({event:'supervisor-revived',pid,silentMs:now()-lock.at,lastPid:lock.pid??null});
+  return pid;
+}
+function spawnDetached(executable,args,{cwd}){
+  const child=spawn(executable,args,{cwd,detached:true,stdio:'ignore',windowsHide:true});
+  child.unref();
+  return child.pid??null;
+}
+function pidAlive(pid){try{process.kill(pid,0);return true;}catch{return false;}}
+
 export function relocateLauncher(store,state){
   const current=state.launcher?slash(String(state.launcher)):null;
   if(!current||!path.isAbsolute(current)||fs.existsSync(current))return false;

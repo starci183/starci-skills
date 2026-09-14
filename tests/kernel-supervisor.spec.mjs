@@ -70,6 +70,19 @@ test('a workflow whose tree was named explicitly is started with the same --ledg
  * A lane does not move the store: it lives in the repository, so the supervisor lists it once whether it polls
  * from the base worktree or from the lane, and starts the kernel inside the lane - the tree that workflow owns.
  */
+test('a round that throws is logged and the next one runs; every round leaves a pulse beside the store',()=>{
+  const root=tmp();
+  try{
+    workflow(root,'live',{lastAt:1,stop:true});
+    const logged=[];let calls=0;
+    const result=superviseForever({repoRoot:root,launcher:'L.mjs',maxRounds:3,log:event=>logged.push(event),sleep:()=>{},pollMs:5,
+      probe:()=>{calls+=1;if(calls===1)throw Error('a state file read mid-write');return {ok:false,reason:'no orca in tests'};},stamp:()=>null});
+    assert.ok(result,'the supervisor survived the fault and returned normally');
+    const pulse=JSON.parse(fs.readFileSync(path.join(root,'.starciwork','_local','workflows','supervisor.lock'),'utf8'));
+    assert.equal(pulse.pid,process.pid);assert.ok(typeof pulse.at==='number');
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
 test('a rebuilt launcher ends the supervisor after it started its successor from the same command line',()=>{
   const root=tmp();
   try{
