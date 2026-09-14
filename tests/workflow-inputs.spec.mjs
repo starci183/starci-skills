@@ -10,11 +10,12 @@ import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import {identitySecretPresent} from '../core/identity.mjs';
 import {createInputModel,inputBinding,readInputState,credentialFields} from '../kernel/inputs-model.mjs';
 import {startInputServer,inputFiles,privateJson,INPUT_BODY_LIMIT} from '../kernel/inputs-server.mjs';
-import {reconcileWorkflowInputs} from '../kernel/inputs.mjs';
+import {reconcileWorkflowInputs,recoverWorkflowInputReferences} from '../kernel/inputs.mjs';
 import {integrationReadiness,prepareCredentialAsk,preparationFingerprint,relatedIntegrations} from '../kernel/inputs-readiness.mjs';
 import {settleFilledAsks,ownerFillLines,askFillLine} from '../kernel/fill.mjs';
 import {ownerItems} from '../kernel/owner.mjs';
-import {deferForIntegrationPreparation,refreshCredentialPreparation,applyOpReport} from '../kernel/kernel.mjs';
+import {createWorkflowState,deferForIntegrationPreparation,refreshCredentialPreparation,applyOpReport} from '../kernel/kernel.mjs';
+import {buildView} from '../kernel/view.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {declaredIntegrations} from '../kernel/ledger.mjs';
 import {createStore} from '../kernel/store.mjs';
@@ -31,9 +32,10 @@ const fixture=t=>{
   const repo=fs.mkdtempSync(path.join(os.tmpdir(),'si-'));
   t.after(()=>fs.rmSync(repo,{recursive:true,force:true}));
   const store=createStore({repoRoot:repo,id:'input-test'}),root=path.join(repo,'.starciwork');
-  const state={schema:'starci/workflow-state@1',id:'input-test',host,approved:true,worktree:repo,ledgerRoot:root,
-    scope:['demo'],ops:[{id:'op-a',kind:'integration.verify',goal:'Check the service connection',status:'paused',waitingFor:'ask-a',attempt:1,dependsOn:[],references:[]},inputAsk('ask-a')],
-    needUser:[],counters:{},lanes:{},dynamicOps:0,dynamicOpsBudget:64,iterations:0};
+  const state=createWorkflowState({job:'Verify the synthetic service connection',store,host,worktree:repo,branch:'test/input',
+    inputs:['srs:features/demo/business/index.yaml','sds:features/demo/architecture/index.yaml'],ledgerRoot:root,scope:['demo']});
+  state.approved=true;
+  state.ops=[{id:'op-a',kind:'integration.verify',goal:'Check the service connection',status:'paused',waitingFor:'ask-a',attempt:1,dependsOn:[],references:[]},inputAsk('ask-a')];
   store.saveState(state);return {repo,root,store,state,binding:inputBinding(state,store.dir)};
 };
 
@@ -268,20 +270,91 @@ function browserFixture(){
   }};return {orca,tabs,calls};
 }
 
-test('kernel input reconciliation starts once, recovers helper/browser restarts and never repeatedly focuses',t=>{
+test('collided GUI state recovers only the exact approved refs and preserves newer owner status and unrelated state',t=>{
+  for(const empty of [false,true]){
+    const f=fixture(t),refs=empty?[]:structuredClone(f.state.inputs);
+    const goal={schema:'starci/workflow-goal@1',id:f.state.id,job:f.state.job,inputs:refs};
+    fs.writeFileSync(f.store.paths.goalJson,JSON.stringify(goal));
+    f.state.inputs={...refs,phase:'ready',page:'previous-page',session:'a'.repeat(32),priorSession:null,lastCheckedAt:100,reason:null,createUncertain:false};
+    f.state.ownerInputs={phase:'starting',page:'current-page'};
+    const before=structuredClone(f.state);
+    assert.deepEqual(recoverWorkflowInputReferences(f.store,f.state),{ok:true,recovered:true});
+    assert.deepEqual(f.state.inputs,refs);assert.deepEqual(f.store.loadState().inputs,refs);
+    assert.deepEqual(f.state.ownerInputs,{phase:'starting',page:'current-page',session:'a'.repeat(32),priorSession:null,lastCheckedAt:100,reason:null,createUncertain:false});
+    const {inputs,ownerInputs,...rest}=f.state,{inputs:oldInputs,ownerInputs:oldSurface,...oldRest}=before;
+    assert.deepEqual(rest,oldRest);assert.deepEqual(JSON.parse(fs.readFileSync(f.store.paths.goalJson,'utf8')),goal);
+    assert.deepEqual(recoverWorkflowInputReferences(f.store,f.state),{ok:true,recovered:false});
+    assert.deepEqual(f.store.readEvents().map(({event,count,source})=>({event,count,source})),[
+      {event:'input-references-recovered',count:refs.length,source:'approved-goal'}]);
+    assert.equal(JSON.stringify(f.store.readEvents()).includes('features/demo'),false,'migration logs contain no input contents');
+  }
+});
+
+test('input collision recovery refuses malformed, mismatched and ungrounded state without inventing refs',t=>{
+  const cases=[
+    {change:f=>{f.state.inputs=null;}},
+    {change:f=>{f.state.inputs={phase:'ready',1:f.state.inputs[1]};}},
+    {change:f=>{f.state.inputs.extra=sentinel;}},
+    {change:f=>{f.state.inputs.phase='unknown';}},
+    {change:f=>{f.state.inputs.createUncertain='yes';}},
+    {change:f=>{f.state.inputs[0]={kind:'sds',ref:'foreign'};}},
+    {change:(_f,goal)=>{goal.inputs.reverse();}},
+    {change:(_f,goal)=>{goal.id='another-workflow';}},
+    {change:(_f,goal)=>{goal.job='Another approved job';}},
+    {change:(_f,goal)=>{goal.schema='foreign-goal';}},
+    {change:(_f,goal)=>{goal.inputs=null;}},
+    {change:f=>{f.state.approved=false;}},
+    {missing:true},{invalid:true}
+  ];
+  for(const sample of cases){
+    const f=fixture(t),goal={schema:'starci/workflow-goal@1',id:f.state.id,job:f.state.job,inputs:structuredClone(f.state.inputs)};
+    f.state.inputs={...f.state.inputs,phase:'ready',page:'synthetic-page'};
+    sample.change?.(f,goal);
+    if(!sample.missing)fs.writeFileSync(f.store.paths.goalJson,sample.invalid?'invalid json':JSON.stringify(goal));
+    const before=structuredClone(f.state),result=recoverWorkflowInputReferences(f.store,f.state);
+    assert.equal(result.ok,false);assert.match(result.reason,/^input-reference-(shape-invalid|goal-unavailable|goal-mismatch)$/);
+    assert.deepEqual(f.state,before);assert.deepEqual(f.store.readEvents(),[]);
+    assert.equal(JSON.stringify(result).includes(sentinel),false);
+  }
+});
+
+test('approved input references without credential waits do not start an owner input surface',t=>{
+  const f=fixture(t),b=browserFixture(),inputs=f.state.inputs;f.state.ops=[];
+  const result=reconcileWorkflowInputs(b.orca,f.store,f.state,{spawnProcess:()=>{throw Error('No helper is needed');}});
+  assert.deepEqual(result,{phase:'idle'});assert.equal(f.state.ownerInputs,undefined);
+  assert.equal(f.state.inputs,inputs);assert.equal(b.calls.length,0);
+});
+
+test('kernel input reconciliation preserves approved input refs across page, helper, replacement and workflow restarts',t=>{
   const f=fixture(t),b=browserFixture(),files=inputFiles(f.store.dir);let time=100000,launches=0;
+  const approvedInputs=structuredClone(f.state.inputs);
   const alive=new Set([101]);const spawnProcess=()=>{launches++;const child=new EventEmitter();child.pid=101;child.unref=()=>{};return child;};
   const opts={now:()=>time,alive:pid=>alive.has(pid),spawnProcess};
-  assert.equal(reconcileWorkflowInputs(b.orca,f.store,f.state,opts).phase,'starting');
+  const reconcile=state=>{
+    const inputs=state.inputs,result=reconcileWorkflowInputs(b.orca,f.store,state,opts);
+    assert.equal(state.inputs,inputs,'GUI reconciliation must not replace approved inputs');
+    assert.deepEqual(state.inputs,approvedInputs);
+    assert.deepEqual(state.inputs.map(item=>item.ref),approvedInputs.map(item=>item.ref),'goal material extraction remains usable');
+    assert.deepEqual(state.inputs.filter(item=>item.kind==='sds').map(item=>item.ref),['features/demo/architecture/index.yaml'],'owning design repair retains its input');
+    f.store.saveState(state);
+    const view=buildView({repoRoot:f.repo,id:state.id,now:time});
+    assert.deepEqual(view.ownerInputs,state.ownerInputs,'status exposes the separate owner surface');
+    return result;
+  };
+  assert.equal(reconcile(f.state).phase,'starting');
   const session=JSON.parse(fs.readFileSync(files.session,'utf8'));
   privateJson(files.lock,{pid:101,session:session.id});privateJson(files.server,{pid:101,session:session.id,port:32123});
-  time+=31000;assert.equal(reconcileWorkflowInputs(b.orca,f.store,f.state,opts).phase,'opening');
-  assert.equal(b.tabs.length,1);time+=31000;assert.equal(reconcileWorkflowInputs(b.orca,f.store,f.state,opts).phase,'ready');
-  const saved=structuredClone(f.state);time+=31000;reconcileWorkflowInputs(b.orca,f.store,saved,opts);assert.equal(launches,1);assert.equal(b.tabs.length,1);
-  alive.clear();time+=31000;reconcileWorkflowInputs(b.orca,f.store,saved,opts);assert.equal(launches,2);
+  time+=31000;assert.equal(reconcile(f.state).phase,'opening');
+  assert.equal(b.tabs.length,1);time+=31000;assert.equal(reconcile(f.state).phase,'ready');
+  const saved=f.store.loadState();time+=31000;reconcile(saved);assert.equal(launches,1);assert.equal(b.tabs.length,1);
+  alive.clear();time+=31000;reconcile(saved);assert.equal(launches,2);
   const next=JSON.parse(fs.readFileSync(files.session,'utf8'));alive.add(101);privateJson(files.lock,{pid:101,session:next.id});privateJson(files.server,{pid:101,session:next.id,port:32124});
-  time+=31000;reconcileWorkflowInputs(b.orca,f.store,saved,opts);assert.equal(b.tabs.length,1);assert.equal(b.calls.at(-1).name,'tab-goto');
-  b.tabs.length=0;time+=31000;reconcileWorkflowInputs(b.orca,f.store,saved,opts);assert.equal(b.tabs.length,1);
+  time+=31000;reconcile(saved);assert.equal(b.tabs.length,1);assert.equal(b.calls.at(-1).name,'tab-goto');
+  b.tabs.length=0;time+=31000;reconcile(saved);assert.equal(b.tabs.length,1);
+  saved.ops[1].credential.replacements=[{name:'SERVICE_TOKEN',reason:'expired',baseline:custodyVersion('a','1')}];
+  time+=31000;reconcile(saved);assert.equal(b.tabs.length,1);
+  saved.ops[1].status='done';saved.ops[1].answer={via:'fill'};saved.finished={outcome:'done'};
+  time+=31000;reconcile(saved);assert.deepEqual(f.store.loadState().inputs,approvedInputs);
   assert.equal(b.calls.some(call=>/switch|focus|terminal/.test(call.name)),false);
   assert.equal(JSON.stringify(f.state).includes(session.token),false);
 });

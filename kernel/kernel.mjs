@@ -37,7 +37,7 @@ import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,isAsk,openConflictDecision,ans
   openOwnerAsk,provisionalLines,redactSecrets,settleOwnerAsk,stopReasonFor,
   mechanicalOwnerLine,noteOwnerList,ownerItems,ownerLines,waitsForOwner} from './owner.mjs';
 import {askFillLine,credentialAsked,fillCommand,fillWaitingAsks,inputReadyAsks,ownerFillLines,settleFilledAsks} from './fill.mjs';
-import {reconcileWorkflowInputs} from './inputs.mjs';
+import {reconcileWorkflowInputs,recoverWorkflowInputReferences} from './inputs.mjs';
 import {INTEGRATION_RESEARCH_ORDER,integrationReadiness,prepareCredentialAsk,preparationFingerprint,relatedIntegrations} from './inputs-readiness.mjs';
 import {snapshotCredentialVersions,credentialReplacementFor} from './inputs-replacement.mjs';
 import {BRAND_PAYLOAD,attributedFiles,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
@@ -2445,6 +2445,20 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   verifyPresence=null,reconcileInputs=reconcileWorkflowInputs,refreshPreparation=refreshCredentialPreparation,deferPreparation=deferForIntegrationPreparation,
   waitTimeoutMs=900000,tickMs=120000,pollMs=POLL_MS,now=Date.now,host=hostDescriptorOf(orca)}={}){
   need(state.approved,`Workflow ${state.id} is not approved; run workflow-approve --id ${state.id}`);
+  // Restore the narrowly identified 5-plus GUI collision before any resumed operation reads goal inputs.
+  const recoveredInputs=recoverWorkflowInputReferences(store,state);
+  if(!recoveredInputs.ok){
+    if(!state.needUser.some(item=>item.code==='workflow-input-repair')){
+      state.needUser.push({kind:'environment',code:'workflow-input-repair',detail:`Runtime repair required: approved workflow input references cannot be restored from the matching goal (${recoveredInputs.reason}). No operation was resumed.`});
+      store.appendEvent({event:'input-reference-recovery-refused',reason:recoveredInputs.reason});
+    }
+    finish(store,state,'blocked','workflow input references require runtime repair');
+    return state;
+  }
+  if(recoveredInputs.recovered){
+    state.needUser=state.needUser.filter(item=>item.code!=='workflow-input-repair');
+    if(state.finished?.reason==='workflow input references require runtime repair'){state.finished=null;state.phase='run';}
+  }
   need(plain(allocator),'A runtime allocator is required');
   need(typeof template==='string'&&template.trim(),'The operation contract template is required');
   required(state.run,'Orca run id');required(state.from,'own terminal handle');

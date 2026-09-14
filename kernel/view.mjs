@@ -284,7 +284,7 @@ export function buildView({repoRoot,id,now=Date.now(),dir:given=null}){
     validator:readValidator(dir,events),
     // What the owner has to fill in: one credential per line, each with the exact command that does it. Every
     // other question is asked in its own tab or taken provisionally, so this list is short by design.
-    inputs:state.inputs??null,
+    ownerInputs:state.ownerInputs??null,
     inputPreparation:fillWaitingAsks(state).filter(ask=>!ask.credential?.ready).length,
     ownerFill:inputReadyAsks(state).map(ask=>({op:ask.id,variables:[...(ask.credential?.variables??[])],
       custody:ask.credential?.custody??null,command:ask.fillCommand??null,line:askFillLine(ask)})),

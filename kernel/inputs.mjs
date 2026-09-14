@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {loadConfig} from '../scripts/config.mjs';
+import {GOAL_RECORD,REF_KINDS,plain} from './common.mjs';
 import {fillWaitingAsks} from './fill.mjs';
 import {inputBinding} from './inputs-model.mjs';
 import {inputFiles,privateJson,processAlive} from './inputs-server.mjs';
@@ -11,7 +12,50 @@ const read=file=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{ret
 const OK=result=>result?.outcome==='ok';
 const WAIT_MS=30000;
 const bindingMatches=(a,b)=>a&&b&&['id','dir','workRoot','worktree','host'].every(key=>a[key]===b[key]);
-const status=(state,phase,extra={})=>(state.inputs={...state.inputs,phase,...extra});
+// Approved goal references remain in state.inputs; the owner surface has its own lifecycle.
+const status=(state,phase,extra={})=>(state.ownerInputs={...state.ownerInputs,phase,...extra});
+const SURFACE_PHASES=['idle','starting','restarting','checking','unavailable','opening','ready','finished'];
+const SURFACE_FIELDS={
+  phase:value=>SURFACE_PHASES.includes(value),
+  reason:value=>value===null||typeof value==='string',
+  lastCheckedAt:value=>Number.isFinite(value)&&value>=0,
+  session:value=>typeof value==='string'&&/^[a-f0-9]{32}$/.test(value),
+  priorSession:value=>value===null||typeof value==='string'&&/^[a-f0-9]{32}$/.test(value),
+  page:value=>value===null||typeof value==='string'&&value.length>0,
+  createUncertain:value=>typeof value==='boolean'
+};
+
+/** Recover only the earlier GUI/goal-key collision, from the unchanged approved goal's exact references. */
+export function recoverWorkflowInputReferences(store,state){
+  if(Array.isArray(state.inputs))return {ok:true,recovered:false};
+  const collided=state.inputs;
+  const refused=reason=>({ok:false,recovered:false,reason});
+  if(!plain(collided)||!SURFACE_PHASES.includes(collided.phase))return refused('input-reference-shape-invalid');
+  const numeric=Object.keys(collided).filter(key=>/^(0|[1-9][0-9]*)$/.test(key)).sort((a,b)=>Number(a)-Number(b));
+  if(numeric.some((key,index)=>key!==String(index)))return refused('input-reference-shape-invalid');
+  const surface={};
+  for(const [key,value] of Object.entries(collided)){
+    if(numeric.includes(key))continue;
+    if(!Object.hasOwn(SURFACE_FIELDS,key)||!SURFACE_FIELDS[key](value))return refused('input-reference-shape-invalid');
+    surface[key]=value;
+  }
+  const refs=numeric.map(key=>collided[key]);
+  const validRefs=items=>Array.isArray(items)&&items.every(item=>plain(item)&&Object.keys(item).length===2
+    &&REF_KINDS.includes(item.kind)&&typeof item.ref==='string'&&item.ref.trim().length>0);
+  if(!validRefs(refs)||(state.ownerInputs!=null&&!plain(state.ownerInputs)))return refused('input-reference-shape-invalid');
+  const goal=read(store.paths.goalJson);
+  if(!plain(goal))return refused('input-reference-goal-unavailable');
+  const equalRefs=(a,b)=>a.length===b.length&&a.every((item,index)=>item.kind===b[index].kind&&item.ref===b[index].ref);
+  if(!state.approved||goal.schema!==GOAL_RECORD||goal.id!==state.id||goal.job!==state.job
+    ||!validRefs(goal.inputs)||!equalRefs(refs,goal.inputs))return refused('input-reference-goal-mismatch');
+  // A corrected kernel may already have newer surface status. It wins over the retained legacy fields.
+  state.ownerInputs={...surface,...state.ownerInputs};
+  state.inputs=structuredClone(goal.inputs);
+  store.appendEvent({event:'input-references-recovered',count:state.inputs.length,source:'approved-goal'});
+  store.saveState(state);
+  return {ok:true,recovered:true};
+}
+
 const runtimeVersion=()=>crypto.createHash('sha256').update(fs.readFileSync(new URL('./inputs-server.mjs',import.meta.url)))
   .update(fs.readFileSync(new URL('./inputs-model.mjs',import.meta.url))).update(fs.readFileSync(new URL('./inputs-ui.mjs',import.meta.url)))
   .update(fs.readFileSync(new URL('./inputs-readiness.mjs',import.meta.url)))
@@ -22,7 +66,7 @@ const runtimeVersion=()=>crypto.createHash('sha256').update(fs.readFileSync(new 
 export function reconcileWorkflowInputs(orca,store,state,{host=orca?.host,now=Date.now,spawnProcess=spawn,alive=processAlive}={}){
   if(host?.name!=='orca')return {phase:'headless'};
   const waiting=fillWaitingAsks(state);
-  if(!waiting.length&&!state.inputs)return {phase:'idle'};
+  if(!waiting.length&&!state.ownerInputs)return {phase:'idle'};
   // The helper reads this snapshot independently while the kernel uses synchronous waits.
   store.saveState(state);
   let binding;
@@ -53,8 +97,8 @@ export function reconcileWorkflowInputs(orca,store,state,{host=orca?.host,now=Da
   }
   if(!session||server?.session!==session.id||!alive(server.pid)||lock?.session!==session.id)return status(state,'starting');
   const url=`http://127.0.0.1:${server.port}/inputs/${session.id}#${session.token}`;
-  if(at-(state.inputs?.lastCheckedAt??0)<WAIT_MS&&state.inputs?.session===session.id&&state.inputs?.page)return state.inputs;
-  const previousSession=state.inputs?.session!==session.id?state.inputs?.session:state.inputs?.priorSession;
+  if(at-(state.ownerInputs?.lastCheckedAt??0)<WAIT_MS&&state.ownerInputs?.session===session.id&&state.ownerInputs?.page)return state.ownerInputs;
+  const previousSession=state.ownerInputs?.session!==session.id?state.ownerInputs?.session:state.ownerInputs?.priorSession;
   status(state,'checking',{lastCheckedAt:at,session:session.id,priorSession:previousSession??null});
   // Browser operations are typed and verified. An unknown create is reconciled by list, never blindly repeated.
   try{
@@ -69,7 +113,7 @@ export function reconcileWorkflowInputs(orca,store,state,{host=orca?.host,now=Da
     const owned=tab=>{try{const address=new URL(tab.url);return address.hostname==='127.0.0.1'
       &&[session.id,previousSession].filter(Boolean).some(id=>address.pathname===`/inputs/${id}`);}catch{return false;}};
     const matches=tabs.filter(tab=>tab.url===url);
-    let tab=matches[0]??tabs.find(tab=>tab.browserPageId===state.inputs?.page&&owned(tab))??tabs.find(owned);
+    let tab=matches[0]??tabs.find(tab=>tab.browserPageId===state.ownerInputs?.page&&owned(tab))??tabs.find(owned);
     if(matches.length>1)return status(state,'unavailable',{reason:'duplicate-input-pages'});
     if(tab&&tab.url!==url){
       const updated=orca.invoke('tab-goto',{worktree:selector,page:tab.browserPageId,url},{cwd:state.worktree});
@@ -78,13 +122,13 @@ export function reconcileWorkflowInputs(orca,store,state,{host=orca?.host,now=Da
     }
     if(!tab){
       if(!waiting.length)return status(state,state.finished?'finished':'idle',{page:null});
-      if(state.inputs?.createUncertain)return status(state,'unavailable',{reason:'input-page-create-unconfirmed'});
+      if(state.ownerInputs?.createUncertain)return status(state,'unavailable',{reason:'input-page-create-unconfirmed'});
       // Persist intent BEFORE effect, so a crash after tab-create never causes an untracked second page.
-      state.inputs.createUncertain=true;store.saveState(state);
+      state.ownerInputs.createUncertain=true;store.saveState(state);
       const created=orca.invoke('tab-create',{worktree:selector,url},{cwd:state.worktree});
       const page=created.receipt?.result?.browserPageId;
       if(!OK(created)||!page){
-        if(created.effectState==='none')state.inputs.createUncertain=false;
+        if(created.effectState==='none')state.ownerInputs.createUncertain=false;
         return status(state,'unavailable',{reason:'input-page-create-unconfirmed'});
       }
       return status(state,'opening',{page,reason:null,createUncertain:false});

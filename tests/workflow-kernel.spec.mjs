@@ -312,6 +312,44 @@ test('the goal phase writes goal.md and goal.json and stops: nothing is launched
   }finally{harness.cleanup();}
 });
 
+test('kernel restart recovers collided approved input refs before any downstream input consumer',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    const {store,state}=harness;approve(store,state);state.run='run_wf';state.from='term_kernel';
+    const refs=structuredClone(state.inputs),ops=structuredClone(state.ops);
+    state.inputs={...refs,phase:'ready',page:'synthetic-existing-page'};store.saveState(state);
+    Object.assign(state,store.loadState());
+    let consumed=false;
+    harness.run({maxIterations:0,refreshPreparation:(_store,resumed)=>{
+      assert.deepEqual(resumed.inputs.map(item=>item.ref),refs.map(item=>item.ref));
+      assert.deepEqual(resumed.inputs.filter(item=>item.kind==='sds'),refs);consumed=true;
+    }});
+    assert.equal(consumed,true);assert.deepEqual(state.inputs,refs);assert.deepEqual(store.loadState().inputs,refs);
+    assert.deepEqual(state.ops,ops);assert.equal(state.ownerInputs.page,'synthetic-existing-page');
+    assert.equal(state.approved,true);assert.equal(state.iterations,0);assert.equal(harness.fake.dispatches.size,0);
+    assert.equal(events(store).filter(event=>event.event==='input-references-recovered').length,1);
+    harness.run({maxIterations:0});assert.equal(events(store).filter(event=>event.event==='input-references-recovered').length,1);
+  }finally{harness.cleanup();}
+});
+
+test('kernel restart refuses ungrounded input recovery before launching or reading downstream inputs',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    const {store,state}=harness;approve(store,state);state.run='run_wf';state.from='term_kernel';
+    state.inputs={...state.inputs,phase:'ready'};
+    fs.rmSync(store.paths.goalJson);
+    const collided=structuredClone(state.inputs),ops=structuredClone(state.ops);
+    harness.run({refreshPreparation:()=>{throw Error('A refused resume cannot reach downstream input consumers');}});
+    assert.equal(state.finished.outcome,'blocked');assert.equal(state.finished.reason,'workflow input references require runtime repair');
+    assert.equal(state.needUser.filter(item=>item.code==='workflow-input-repair').length,1);
+    assert.deepEqual(state.inputs,collided);assert.deepEqual(state.ops,ops);assert.equal(state.approved,true);
+    assert.equal(state.iterations,0);assert.equal(harness.fake.dispatches.size,0);
+    assert.equal(events(store).some(event=>event.event==='host'),false,'refusal happens before normal startup');
+    assert.equal(events(store).filter(event=>event.event==='input-reference-recovery-refused').length,1);
+    harness.run();assert.equal(state.needUser.filter(item=>item.code==='workflow-input-repair').length,1);
+  }finally{harness.cleanup();}
+});
+
 test('after the approval three independent operations launch in one iteration on three runtimes, and a dependent one waits for its dependency',()=>{
   const file=name=>`apps/agentos-controlplane/src/${name}/index.ts`;
   const op4='op-receipt';
@@ -1897,12 +1935,12 @@ test('kernel startup discovers existing credential waits before the first tick, 
     assert.equal(requester.attempt,originalAttempt+1);
     assert.ok(state.ops.some(op=>op.integrationPreparation?.owner===owner),'existing owning-record repair is admitted on startup');
     assert.deepEqual(requester.allowlist,originalAllowlist,'requester authority is preserved');
-    assert.equal(launches,1);assert.equal(state.inputs.phase,'starting');
+    assert.equal(launches,1);assert.equal(state.ownerInputs.phase,'starting');
     const session=JSON.parse(fs.readFileSync(files.session,'utf8'));
     assert.equal(session.binding.workRoot,path.join(harness.repo,'.starciwork'));
     privateJson(files.lock,{pid:101,session:session.id});privateJson(files.server,{pid:101,session:session.id,port:32123});
     harness.run(options);
-    assert.equal(launches,1);assert.equal(state.inputs.page,'synthetic-input-page');
+    assert.equal(launches,1);assert.equal(state.ownerInputs.page,'synthetic-input-page');
     assert.equal(browserCalls.filter(call=>call.name==='tab-create').length,1);
     assert.equal(browserCalls.find(call=>call.name==='tab-create').params.worktree,`path:${state.worktree.replaceAll('\\','/')}`);
     assert.equal(state.approved,true);assert.equal(state.iterations,0,'startup did not need a scheduling tick or model launch');
