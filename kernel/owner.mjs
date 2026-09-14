@@ -202,6 +202,8 @@ export function openOwnerAsk(store,state,op,question,ctx,report=null){
   // The shape of the tab is a HINT, not a ruling: whichever of the two forms is opened, the ask op may come back
   // with either answer and the kernel takes it by what the report says (`settleOwnerAsk`).
   const stop=stopReasonFor(question,report);
+  const v6=ctx?.v6===true||Number(state?.engine?.major)>=6;
+  const ownerRequired=v6&&!MECHANICAL_QUESTION.test(String(question?.kind??''));
   const by=stop?(declaredStopOf(question,report)?'declared':'words'):'none';
   const kind=stop??(question.kind&&QUESTION_KINDS.includes(String(question.kind))?question.kind:'decision');
   const same=state.ops.find(item=>isAsk(item.kind)&&liveStatus.includes(item.status)&&item.question?.text===question.text&&item.question?.inputRevision===question.inputRevision);
@@ -218,12 +220,12 @@ export function openOwnerAsk(store,state,op,question,ctx,report=null){
   const file=op.dispatch?store.reportPath(op.dispatch):null;
   if(file&&fs.existsSync(file))fs.renameSync(file,`${file}.asked-${op.reports.length}`);
   op.dispatch=null;op.terminal=null;op.nudged=false;
-  if(stop){op.status='paused';op.waitingFor=ask.id;}
+  if(stop||ownerRequired){op.status='paused';op.waitingFor=ask.id;}
   // No stop reason: the op is not paused. It depends on the ask op - so nothing schedules it before the
   // recommendation exists - and the kernel resumes it with that recommendation as a provisional answer. An op
   // that is already finished is not restarted by a question raised on its behalf: it only carries the decision.
   else{op.dependsOn=unique([...(op.dependsOn??[]),ask.id]);if(liveStatus.includes(op.status)){op.status='pending';op.waitingFor=null;}}
-  store.appendEvent({event:'owner-ask-opened',op:op.id,ask:ask.id,kind,stop:stop??null,by,provisional:!stop,question:firstLine(question.text)});
+  store.appendEvent({event:'owner-ask-opened',op:op.id,ask:ask.id,kind,stop:stop??null,by,provisional:!stop&&!ownerRequired,ownerRequired,question:firstLine(question.text)});
   return 'owner-ask';
 }
 
@@ -243,15 +245,16 @@ export function openConflictDecision(store,state,intake,conflict,ctx){
   let recordPath=null;
   try{recordPath=slash(ctx?.work?.node?.(record)?.path??'')||null;}catch{recordPath=null;}
   const folder=recordPath?recordPath.replace(/\/index\.yaml$/,''):null;
+  const v6=ctx?.v6===true||Number(state?.engine?.major)>=6;
   const ask=addOp(store,state,{kind:DECISION_PREPARE,nodeId:null,
-    goal:`Take the conflict ${intake.id} recorded provisionally: ${firstLine(conflict.detail??`${conflict.record} conflicts with what ${intake.intake?.scope??intake.id} needs`)}`,
+    goal:`${v6?`Present the conflict ${intake.id} recorded to the owner`:`Take the conflict ${intake.id} recorded provisionally`}: ${firstLine(conflict.detail??`${conflict.record} conflicts with what ${intake.intake?.scope??intake.id} needs`)}`,
     question:{kind:'decision',prepared:true,stop:null,record,from:intake.id,options:[...(conflict.options??[])],
-      text:`${conflict.detail??`${conflict.record} conflicts with what ${intake.intake?.scope??intake.id} needs`} The decision record ${record} is already written with both sides, the numbered options and one recommendation: read it, print the question and the options in this terminal, and report \`decision: ${record}\` with \`recommended: <n>\` - the runtime takes it provisionally and the owner overturns it later with workflow-answer. Write nothing.`},
+      text:`${conflict.detail??`${conflict.record} conflicts with what ${intake.intake?.scope??intake.id} needs`} The decision record ${record} is already written with both sides and numbered options: read it and report \`decision: ${record}\` with ${v6?'the options. The authenticated owner must choose; do not select an option.':'`recommended: <n>`; the runtime takes it provisionally and the owner may overturn it.'} Write nothing.`},
     // The record's own folder when the tree knows it; the feature's policy-decisions folder otherwise. The op writes nothing either way.
     ledgerIds:[],allowlist:folder?[`.starciwork/${folder}/**`]:decisionAllowlistFor(state,intake,ctx),references:unique([...(recordPath?[recordPath]:[]),...(intake.references??[]).slice(0,8)]),
-    checks:[],acceptance:[`the summary begins \`decision: ${record}\` with \`recommended: <n>\` and the numbered options, and no file changed`],
+    checks:[],acceptance:[v6?`the summary begins \`decision: ${record}\` with the numbered options and no selected answer, and no file changed`:`the summary begins \`decision: ${record}\` with \`recommended: <n>\` and the numbered options, and no file changed`],
     origin:'ask',requesters:[]},`conflict of ${intake.id} taken provisionally`);
-  if(ask)store.appendEvent({event:'owner-ask-opened',op:intake.id,ask:ask.id,kind:'decision',stop:null,by:'none',provisional:true,record,question:firstLine(conflict.detail??record)});
+  if(ask)store.appendEvent({event:'owner-ask-opened',op:intake.id,ask:ask.id,kind:'decision',stop:null,by:'none',provisional:!v6,ownerRequired:v6,record,question:firstLine(conflict.detail??record)});
   return ask;
 }
 
@@ -311,6 +314,13 @@ export function settleOwnerAsk(store,state,ask,report){
     store.appendEvent({event:'owner-ask-answered-from-record',ask:ask.id,record,requesters:requesters.map(item=>item.id)});
     return;
   }
+  if(Number(state?.engine?.major)>=6){
+    const record=(String(marker(summary,'decision')??'').match(/^\S+/)??[])[0]??null,options=optionsOf(ask,summary);
+    ask.ownerRequestStatus='waiting-owner';
+    state.needUser.push({op:ask.id,kind:'decision',detail:`${ask.question?.text??ask.goal} - answer in the workflow owner page`,record,options,requesters:requesters.map(item=>item.id)});
+    store.appendEvent({event:'owner-question',ask:ask.id,record,options:options.length,ownerRequired:true,requesters:requesters.map(item=>item.id)});
+    return;
+  }
   // The owner answered in the tab while the op was still open: the same ruling as the command, by another door.
   const inTerminal=(String(marker(summary,'answered-by-owner')??'').match(/^\d+/)??[])[0]??null;
   if(inTerminal){
@@ -344,6 +354,35 @@ export function settleOwnerAsk(store,state,ask,report){
   }
   const recommended=Number((String(marker(summary,'recommended')??'').match(/^\d+/)??[])[0]??1)||1;
   openProvisional(store,state,ask,{record,options,recommended,requesters});
+}
+
+/** Resume exactly once after the kernel has accepted an authenticated owner inbox action. */
+export function continueOwnerRequest(store,state,{receipt,currentRequest}={}){
+  if(receipt?.schema!=='starci/owner-action-receipt@1'||receipt.status!=='applied'||!currentRequest
+    ||receipt.requestId!==currentRequest.id||receipt.opId!==currentRequest.opId||receipt.revision!==currentRequest.revision)return {ok:false,code:'owner-continuation-receipt-invalid'};
+  const ask=state.ops.find(item=>item.id===receipt.opId);
+  if(!ask||ask.ownerAnswer?.receiptId!==receipt.ownerReceiptId)return {ok:false,code:'owner-continuation-answer-mismatch'};
+  if(ask.ownerContinuationReceipt===receipt.ownerReceiptId)return {ok:true,code:'already-continued',resumed:[]};
+  const resumed=[];
+  for(const requester of requestersOf(state,ask)){
+    if(requester.ownerContinuationReceipts?.includes(receipt.ownerReceiptId))continue;
+    requester.ownerContinuationReceipts=unique([...(requester.ownerContinuationReceipts??[]),receipt.ownerReceiptId]);
+    const chosen=ask.ownerAnswer?.type==='choose'?(ask.question?.options??[]).find(option=>(typeof option==='object'?String(option.id):String((ask.question.options??[]).indexOf(option)+1))===String(ask.ownerAnswer.value)):null;
+    const value=ask.ownerAnswer?.kind==='credential-presence'?'Credential presence is stored in the declared custody; no value is carried here.'
+      :ask.ownerAnswer?.type==='confirm'?'confirmed':ask.ownerAnswer?.type==='choose'?`selected ${typeof chosen==='object'?(chosen.label??chosen.text??chosen.id):(chosen??ask.ownerAnswer.value)}`:`answered ${String(ask.ownerAnswer?.value??'').slice(0,1000)}`;
+    const record=ask.question?.record?` for decision record ${ask.question.record}`:'';
+    requester.answer=`Authenticated owner action ${receipt.ownerReceiptId}${record}: ${value}`;
+    if(requester.waitingFor===ask.id||requester.dependsOn?.includes(ask.id)){
+      requester.waitingFor=null;requester.dependsOn=(requester.dependsOn??[]).filter(id=>id!==ask.id);
+      if(['paused','pending','blocked'].includes(requester.status)){requester.status='ready';requester.refusal=null;}
+      resumed.push(requester.id);
+    }
+  }
+  ask.ownerContinuationReceipt=receipt.ownerReceiptId;
+  if(['answered','saved','verified'].includes(currentRequest.status))ask.status='done';
+  state.needUser=(state.needUser??[]).filter(item=>item.op!==ask.id);
+  store.appendEvent({event:'owner-action-continued',ask:ask.id,receiptId:receipt.ownerReceiptId,actionType:receipt.actionType,resumed});
+  return {ok:true,code:'continued',resumed};
 }
 
 /**

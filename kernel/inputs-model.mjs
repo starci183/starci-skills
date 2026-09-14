@@ -6,8 +6,11 @@ import {identityPaths,identitySecretPresent,identitySecretVersion,VARIABLE,SLUG}
 import {credentialVersionChanged} from './inputs-replacement.mjs';
 import {fillWaitingAsks,workRootOf} from './fill.mjs';
 import {integrationReadiness} from './inputs-readiness.mjs';
+import {deriveOwnerRequests} from './owner-requests.mjs';
+import {enqueueOwnerInbox} from './owner-inbox.mjs';
 
 const same=(a,b)=>path.resolve(a)===path.resolve(b);
+const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const keyOf=(slug,name,preparation,replacement)=>crypto.createHash('sha256').update(`${slug}:${name}:${JSON.stringify([preparation??null,replacement??null])}`).digest('hex').slice(0,24);
 
 /** Freeze the workflow's actual ledger binding; the HTTP client never supplies a path or identity. */
@@ -95,7 +98,8 @@ export function writeInputCredential({binding,field,value,spawnProcess=spawn}){
 }
 
 /** This helper owns no workflow state. The kernel independently settles satisfied asks on its next tick. */
-export function createInputModel({binding,read=()=>readInputState(binding),present=presenceReader(),write=writeInputCredential,version=identitySecretVersion}){
+export function createInputModel({binding,read=()=>readInputState(binding),present=presenceReader(),write=writeInputCredential,version=identitySecretVersion,
+  enqueue=payload=>enqueueOwnerInbox({paths:{inbox:path.join(binding.dir,'inbox')}},payload)}){
   const replacementWritten=field=>!field.replacement||credentialVersionChanged(field.replacement.baseline,
     version({workRoot:binding.workRoot,slug:field.slug,name:field.name}));
   let writes=Promise.resolve();
@@ -105,8 +109,12 @@ export function createInputModel({binding,read=()=>readInputState(binding),prese
     const {fields,unresolved}=credentialFields(state);
     return {workflow:binding.id,phase:state.finished?'finished':unresolved.length&&!fields.some(field=>field.pending)?'preparing':fields.some(field=>field.pending)?'waiting':'running',
       fields:fields.map(({replacement,...field})=>({...field,replacementReason:replacement?.reason??null,
-        status:!field.pending?'complete':replacementWritten({...field,replacement})&&present({workRoot:binding.workRoot,slug:field.slug,name:field.name})?'saved':'pending'})),unresolved};
+        status:!field.pending?'complete':replacementWritten({...field,replacement})&&present({workRoot:binding.workRoot,slug:field.slug,name:field.name})?'saved':'pending'})),
+      ownerRequests:deriveOwnerRequests(state).filter(request=>request.kind!=='credential'),unresolved};
   };
+  const queueAction=(state,request,action,actor)=>enqueue({schema:'starci/owner-action@1',action:{...action,
+    workflowId:request.workflowId,opId:request.opId,attempt:request.attempt,generation:request.generation,jobId:request.jobId,
+    requestId:request.id,revision:request.revision,actor}});
   const submit=body=>{
     // Refuse an entire malformed or foreign batch before the first write; never echo submitted strings.
     if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(key=>key!=='entries')
@@ -137,11 +145,33 @@ export function createInputModel({binding,read=()=>readInputState(binding),prese
         const ok=Boolean(result?.ok)&&replacementWritten(field)&&present({workRoot:binding.workRoot,slug:field.slug,name:field.name},true);
         results.push({id:entry.id,ok,code:ok?'saved':'storage-unavailable'});
       }
-      return {ok:results.every(result=>result.ok),results};
+      const queued=[];
+      if(results.every(result=>result.ok)){
+        state=read();const requests=deriveOwnerRequests(state).filter(request=>request.kind==='credential');
+        for(const request of requests){
+          const ask=state.ops.find(item=>item.id===request.opId),variables=ask?.credential?.variables??[],custody=request.credential?.custody,
+            slug=String(custody??'').replace(/^identity:/,'');
+          if(!variables.length||!variables.every(name=>present({workRoot:binding.workRoot,slug,name},true)))continue;
+          const versions=Object.fromEntries(variables.map(name=>[name,version({workRoot:binding.workRoot,slug,name})]));
+          const receipt=crypto.randomBytes(16).toString('hex'),result=queueAction(state,request,{type:'credential-saved',
+            storageReceipt:{status:'present',custody,variables,versions}}, {type:'owner',receiptId:receipt,channel:'orca-input'});
+          queued.push({requestId:request.id,ok:Boolean(result?.ok),code:result?.code??'inbox-unavailable'});
+        }
+      }
+      return {ok:results.every(result=>result.ok)&&queued.every(result=>result.ok),results,queued};
     };
     const result=writes.then(perform);
     writes=result.catch(()=>{});
     return result.finally(()=>{for(const entry of entries)entry.value='';});
   };
-  return {snapshot,submit};
+  const submitOwnerAction=body=>{
+    if(!plain(body)||Object.keys(body).some(key=>!['requestId','revision','type','value'].includes(key))||typeof body.requestId!=='string'
+      ||!Number.isInteger(body.revision)||!['answer','choose','confirm'].includes(body.type))return {ok:false,code:'invalid-request'};
+    const state=read();if(!state||state.finished)return {ok:false,code:'workflow-unavailable'};
+    const request=deriveOwnerRequests(state).find(item=>item.id===body.requestId&&item.kind!=='credential');
+    if(!request||request.revision!==body.revision)return {ok:false,code:'request-changed'};
+    const result=queueAction(state,request,{type:body.type,value:body.value},{type:'owner',receiptId:crypto.randomBytes(16).toString('hex'),channel:'orca-input'});
+    return result?.ok?{ok:true,code:'queued'}:{ok:false,code:result?.code??'inbox-unavailable'};
+  };
+  return {snapshot,submit,submitOwnerAction};
 }

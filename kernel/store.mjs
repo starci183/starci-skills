@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {readReports as readReportFiles,repositoryRoot} from './reports.mjs';
+import crypto from 'node:crypto';
 
 /**
  * Runtime state of a 5.0 workflow. One workflow owns exactly one directory under
@@ -37,6 +38,9 @@ function lastSeq(file){
   return 0;
 }
 function readText(file){try{return fs.readFileSync(file,'utf8');}catch{return '';}}
+const digest=value=>crypto.createHash('sha256').update(JSON.stringify(value??null)).digest('hex');
+export const stateGoalIdentity=state=>String(state?.goalDigest??state?.approval?.goalDigest??state?.approvalDigest??state?.goal?.digest??digest({job:state?.job??null,inputs:state?.inputs??state?.goal?.inputs??null,scope:state?.scope??state?.goal?.scope??null,definitionOfDone:state?.definitionOfDone??state?.goal?.definitionOfDone??null,ledgerMode:state?.ledgerMode??state?.goal?.ledgerMode??null}));
+function assertNoRawSecrets(value,path=[]){if(!value||typeof value!=='object')return;for(const [key,item] of Object.entries(value)){const at=[...path,key];if(/^(plaintext|rawSecret|secretValue|credentialValue|passwordValue)$/i.test(key)&&item!==null&&item!==undefined&&item!=='')throw Error(`Workflow state contains raw secret field ${at.join('.')}`);assertNoRawSecrets(item,at);}}
 
 /** Open (creating if needed) the single directory that holds a workflow's runtime state. */
 export function createStore({repoRoot,id}){
@@ -51,11 +55,13 @@ export function createStore({repoRoot,id}){
   };
   for(const directory of [dir,paths.reports,paths.contracts,paths.checks,paths.inbox])fs.mkdirSync(directory,{recursive:true});
   let seq=null;
+  let durable=null;
   const nextSeq=()=>{
     if(seq===null)seq=lastSeq(paths.events);
     seq+=1;return seq;
   };
-  return {
+  const project=state=>{const tmp=`${paths.state}.${process.pid}.tmp`;fs.writeFileSync(tmp,`${JSON.stringify(state,null,2)}\n`);fs.renameSync(tmp,paths.state);return state;};
+  const api={
     schema:WORKFLOW_STATE,id:workflowId,dir,paths,
     /** Append one audit line. The log is never rewritten, so a reader can replay a workflow from seq 0. */
     appendEvent(event){
@@ -72,17 +78,20 @@ export function createStore({repoRoot,id}){
     /** Atomic: write a sibling tmp file, then rename over state.json, so no reader ever sees a partial state. */
     saveState(state){
       need(plain(state)&&state.schema===WORKFLOW_STATE,`State must carry schema ${WORKFLOW_STATE}`);
-      const tmp=`${paths.state}.${process.pid}.tmp`;
-      fs.writeFileSync(tmp,`${JSON.stringify(state,null,2)}\n`);
-      fs.renameSync(tmp,paths.state);
-      return state;
+      if(!durable)return project(state);
+      assertNoRawSecrets(state);const goal=stateGoalIdentity(state);need(goal===durable.goalIdentity,'Workflow goal identity changed across the durable binding');
+      const checkpoint=`save:${workflowId}:${durable.generation}:${digest(state)}`;
+      durable.journal.transaction(db=>db.prepare('INSERT OR IGNORE INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at) VALUES(?,?,?,?,?,?)').run(checkpoint,workflowId,durable.generation,goal,JSON.stringify(state),Date.now()));
+      return project(state);
     },
-    loadState(){return readJson(paths.state,null);},
+    loadState(){if(!durable)return readJson(paths.state,null);const row=durable.journal.db.prepare('SELECT state_json FROM state_snapshots WHERE workflow_id=? AND generation=? AND goal_identity=? ORDER BY snapshot_id DESC LIMIT 1').get(workflowId,durable.generation,durable.goalIdentity);return row?JSON.parse(row.state_json):null;},
+    bindJournal(journal,generation,{goalIdentity=null,state=null}={}){need(journal?.transaction,'bindJournal needs an operational journal');need(Number.isInteger(generation)&&generation>0,'bindJournal needs a positive generation');const seed=state??readJson(paths.state,null);durable={journal,generation,goalIdentity:goalIdentity??stateGoalIdentity(seed)};const any=journal.db.prepare('SELECT goal_identity FROM state_snapshots WHERE workflow_id=? AND generation=? ORDER BY snapshot_id DESC LIMIT 1').get(workflowId,generation);need(!any||any.goal_identity===durable.goalIdentity,'Durable workflow snapshot belongs to a different approved goal');const found=journal.db.prepare('SELECT 1 FROM state_snapshots WHERE workflow_id=? AND generation=? AND goal_identity=? LIMIT 1').get(workflowId,generation,durable.goalIdentity);if(!found&&plain(seed)){assertNoRawSecrets(seed);journal.transaction(db=>db.prepare('INSERT OR IGNORE INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at) VALUES(?,?,?,?,?,?)').run(`bind:${workflowId}:${generation}:${digest(seed)}`,workflowId,generation,durable.goalIdentity,JSON.stringify(seed),Date.now()));}return api;},
+    transition(state,{transitionId,event,apply,projectState=true}={}){need(durable,'transition needs a bound journal');need(typeof transitionId==='string'&&transitionId,'transition needs a stable id');need(typeof apply==='function','transition needs an apply function');const checkpoint=`transition:${workflowId}:${durable.generation}:${transitionId}`;const existing=durable.journal.db.prepare('SELECT 1 FROM state_snapshots WHERE checkpoint_id=?').get(checkpoint);if(existing){const latest=durable.journal.db.prepare('SELECT state_json FROM state_snapshots WHERE workflow_id=? AND generation=? AND goal_identity=? ORDER BY snapshot_id DESC LIMIT 1').get(workflowId,durable.generation,durable.goalIdentity);return JSON.parse(latest.state_json);}const next=structuredClone(state);apply(next);assertNoRawSecrets(next);need(stateGoalIdentity(next)===durable.goalIdentity,'Transition changed the workflow goal identity');durable.journal.transaction(db=>{db.prepare('INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at) VALUES(?,?,?,?,?,?)').run(checkpoint,workflowId,durable.generation,durable.goalIdentity,JSON.stringify(next),Date.now());if(event)db.prepare('INSERT OR IGNORE INTO events(event_id,workflow_id,entity_type,entity_id,generation,kind,payload_json,created_at) VALUES(?,?,?,?,?,?,?,?)').run(`transition:${transitionId}`,workflowId,'workflow',workflowId,durable.generation,event.kind??'state-transition',JSON.stringify(event.payload??event),Date.now());});if(projectState)project(next);return next;},
     reportPath(dispatchOrKey){return path.join(paths.reports,`${required(dispatchOrKey,'dispatch id')}.json`);},
     readReports(){return readReportFiles(paths.reports).filter(report=>report?.error!==UNREADABLE);},
     contractPath(opId){return path.join(paths.contracts,`${required(opId,'operation id')}.md`);},
     checksPath(opId){return path.join(paths.checks,`${required(opId,'operation id')}.json`);}
-  };
+  };return api;
 }
 function readLine(line){try{return JSON.parse(line);}catch{return null;}}
 

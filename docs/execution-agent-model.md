@@ -1,5 +1,8 @@
 # Execution agent model
 
+For explicitly enrolled 6.0 workflows, [the v6 contract](runtime-v6.md) replaces the 5-plus scheduling,
+acceptance and provisional-decision details below. The kernel and supervisor remain programs.
+
 StarCi 5-plus has three kinds of participant, and only one of them is an agent.
 
 1. **Kernel (code).** One ordinary process owns the whole control loop: it freezes the approved goal,

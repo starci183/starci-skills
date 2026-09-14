@@ -397,6 +397,17 @@ test('HTTP rejects foreign origins, bad capabilities and oversized bodies; statu
   const page=await request('GET','/inputs/test');assert.equal(page.status,200);assert.match(page.headers['content-security-policy'],/frame-ancestors 'none'/);
 });
 
+test('the same Orca input page queues noncredential owner actions with a server-created receipt',async t=>{
+  const f=fixture(t),queued=[];f.state.ops=[{id:'ask-policy',kind:'decision.prepare',status:'running',attempt:1,
+    question:{kind:'business-decision',subject:'Choose the retention policy',text:'Choose one policy',options:[{id:'short',label:'30 days'},{id:'long',label:'1 year'}]}}];
+  const model=createInputModel({binding:f.binding,read:()=>f.state,enqueue:payload=>{queued.push(payload);return {ok:true,code:'queued'};}});
+  assert.equal(model.snapshot().ownerRequests.length,1);const request=model.snapshot().ownerRequests[0];
+  const result=model.submitOwnerAction({requestId:request.id,revision:request.revision,type:'choose',value:'short'});
+  assert.equal(result.ok,true);assert.equal(queued[0].action.actor.type,'owner');assert.equal(queued[0].action.actor.channel,'orca-input');assert.ok(queued[0].action.actor.receiptId.length>=32);
+  assert.deepEqual([queued[0].action.workflowId,queued[0].action.opId,queued[0].action.attempt,queued[0].action.generation],[f.state.id,'ask-policy',1,Number(f.state.generation??0)]);
+  assert.equal(model.submitOwnerAction({requestId:request.id,revision:0,type:'choose',value:'short',actor:{type:'model'}}).code,'invalid-request');
+});
+
 test('presence probe removes ambient secrets and quotes for the actual SOPS shell',t=>{
   const f=fixture(t),bin=path.join(f.repo,'bin');fs.mkdirSync(bin);fs.writeFileSync(path.join(bin,process.platform==='win32'?'sops.exe':'sops'),'fake');
   const file=path.join(f.root,'_resources/identity/service/secrets.enc.yaml');fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,'encrypted');

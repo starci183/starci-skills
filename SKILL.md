@@ -3,6 +3,15 @@ name: starci
 description: Plans end-to-end project delivery and executes bounded, evidence-backed workflows when a user requests tracked business, architecture, UI, implementation, verification, or explicitly authorized runtime maintenance.
 ---
 
+The 6.0 execution engine is an explicit opt-in alpha described in [runtime v6](docs/runtime-v6.md).
+For an enrolled workflow (`state.engine.major = 6`), that document takes precedence over the 5-plus execution
+details below: all managed model calls and operation workers share atomic admission; required validation is
+fail closed; owner choices require an authenticated owner receipt; execution uses a sealed runtime pin.
+The existing Orca native adapter provides detection-only write isolation and serializes native writers.
+Do not describe its allowlists as an OS sandbox or this alpha as proven unattended end-to-end delivery.
+Updating the package alone does not enroll or migrate an existing product workflow. Follow
+[the upgrade note](upgrades/6.0.0-alpha.1.md) for the deliberate retry boundary.
+
 Before implementation or code review, read [coding reference](.dist/knowledge/coding-reference.json) and the applicable pattern topics (stable public names like `knowledge/coding-reference.json` resolve from `.dist` after build; authored sources are the matching `knowledge/**/*.yaml`). Backend follows `starci-academy-backend`; frontend follows `starci-academy-fe`. Verify actual reference source and installed APIs. Target-project legacy code and passing tests do not replace this standard. Knowledge is maintained in English only.
 
 Before designing or configuring any external API, service or SDK integration, read its current official documentation for the intended use. Record the primary sources and actual read date, supported authentication/account/scope/lifecycle constraints, applicable callback or webhook setup, owner-only versus workflow-owned prerequisites, and a real verification plan in the owning integration declaration. Missing research returns to the owning operation; it never becomes an unsupported credential request. The workflow prepares what its authority permits, presents researched owner input through its own Orca GUI, then verifies the provider separately from credential presence. See [.dist/docs/workflow-kernel.md](.dist/docs/workflow-kernel.md).

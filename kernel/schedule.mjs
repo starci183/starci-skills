@@ -138,7 +138,7 @@ export function sequentialRuntimes(runtimes){
   for(const pool of Object.values(plain(copy.runtimes)?copy.runtimes:{}))if(plain(pool))pool.maxParallel=Math.min(1,Math.max(0,finite(pool.maxParallel,1)));
   return copy;
 }
-export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null,quota=null,shared=null,budget=null,sequential=false}={}){
+export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null,quota=null,shared=null,budget=null,sequential=false,eligibility=null}={}){
   runtimes=applyQuota(runtimes,quota);
   // The cap is applied after the quota on purpose: a quota widens slots, and a sequential host never lets it.
   if(sequential)runtimes=sequentialRuntimes(runtimes);
@@ -214,7 +214,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
   const remainingOf=id=>({ops:orNull(opsLeft(id)),tokens:orNull(tokensLeft(id))});
 
   /** Rank every pool for one kind: ready candidates in allocation order plus why each other was skipped. */
-  const review=(kind,{avoid=[],restrictTo=null,difficulty=null}={})=>{
+  const review=(kind,{avoid=[],restrictTo=null,difficulty=null,job=null}={})=>{
     rollDay();
     const role=roleFor(kind),ready=[],blocked=[],order=preferenceOf(role,difficulty),tier=tierFor(difficulty,role);
     const view=outside();
@@ -226,10 +226,13 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     const verdictOf=id=>probed?budgetVerdict(pools[id],probed,{now:now()}):{known:false,exhausted:false,until:null,remaining:null,windows:[]};
     for(const id of ids){
       const pool=pools[id],cool=cooling(id),parked=sharedCooling(id),held=elsewhere(id),free=slots(id)-load(id)-held,window=verdictOf(id);
+      let qualification=null;
+      if(typeof eligibility==='function')try{qualification=eligibility(job??{kind,role,difficulty},{id,...pool,model:pool.model??pool.target??id});}catch(error){qualification={eligible:false,reasons:[error?.message??'model eligibility unavailable']};}
       const reason=!Array.isArray(pool?.roles)||!pool.roles.includes(role)?`no ${role} role`
         :tier&&tier.length&&!tier.includes(id)?`outside the ${difficulty} tier`
         :avoid.includes(id)?'avoided'
         :Array.isArray(restrictTo)&&!restrictTo.includes(id)?'not launchable for this operation'
+        :qualification&&!qualification.eligible?`model ineligible: ${(qualification.reasons??['model eligibility unavailable']).join('; ')}`
         :cool?`cooling after ${cool.kind} until ${new Date(cool.until).toISOString()}`
         :parked?`cooling after a shared ${parked.kind??'provider limit'} until ${new Date(parked.until).toISOString()}, seen by ${parked.workflow??'another workflow'}`
         :window.exhausted?`provider window exhausted until ${new Date(window.until??now()).toISOString()}`
@@ -239,7 +242,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
         :null;
       // The shared detail travels beside the reason, never inside it: the kernel reads these reasons by shape.
       if(reason){blocked.push({runtime:id,reason,...(held?{sharedLoad:held}:{}),...(parked&&!cool?{shared:true,from:parked.workflow??null}:{}),...(window.exhausted?{budget:{remaining:window.remaining,until:window.until}}:{})});continue;}
-      ready.push({runtime:id,target:pool.target??id,load:load(id),free,slots:slots(id),ratio:load(id)/slots(id),opsLeft:opsLeft(id),tokensLeft:tokensLeft(id),rotation:rotation(id),preference:order?rank(order,id):null,sharedLoad:held,remainingShare:window.remaining,band:budgetBand(window.remaining)});
+      ready.push({runtime:id,target:pool.target??id,load:load(id),free,slots:slots(id),ratio:load(id)/slots(id),opsLeft:opsLeft(id),tokensLeft:tokensLeft(id),rotation:rotation(id),preference:order?rank(order,id):null,sharedLoad:held,remainingShare:window.remaining,band:budgetBand(window.remaining),eligibility:qualification});
     }
     // prefer-then-overflow: the first eligible runtime of the role's order wins, so a saturated or cooling
     // preference simply is not in `ready` and the next one takes the operation without any special case.
@@ -275,8 +278,8 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     roleFor,
     review,
     /** Pick the runtime for one operation; `avoid` is absolute, `restrictTo` limits the pools to launchable targets. */
-    allocate(kind,{avoid=[],restrictTo=null,difficulty=null}={}){
-      const {role,ready,blocked,preference:order,localRanked,withoutBudget,budget:budgetView,shared:sharedView}=review(kind,{avoid,restrictTo,difficulty});
+    allocate(kind,{avoid=[],restrictTo=null,difficulty=null,job=null}={}){
+      const {role,ready,blocked,preference:order,localRanked,withoutBudget,budget:budgetView,shared:sharedView}=review(kind,{avoid,restrictTo,difficulty,job});
       if(inFlight()>=maxParallelOps)return {ok:false,kind,role,avoid,blocked,reason:`maxParallelOps ${maxParallelOps} is already in flight; release a slot before allocating ${kind}`};
       if(!ready.length)return {ok:false,kind,role,avoid,blocked,reason:`no runtime with the ${role} role, a free slot and budget for ${kind}: ${blocked.map(item=>`${item.runtime} (${item.reason})`).join(', ')||'no pool declares that role'}`};
       const chosen=ready[0];
@@ -292,14 +295,14 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
       const sparedOver=withoutBudget?withoutBudget.slice(0,Math.max(0,withoutBudget.indexOf(chosen.runtime))):[];
       return {ok:true,kind,role,runtime:chosen.runtime,target:chosen.target,load:chosen.load+1,slots:chosen.slots,
         remaining:remainingOf(chosen.runtime),alternatives:ready.slice(1).map(item=>item.runtime),blocked,at:now(),
-        policy,preference:order,overflowed:Boolean(order)&&chosen.preference>0,
+        policy,preference:order,overflowed:Boolean(order)&&chosen.preference>0,eligibility:chosen.eligibility??null,
         ...(budgetView?{budget:budgetView,sparedOver}:{}),
         ...(ledger?{shared:{workflow,loads:sharedView?.loads??{}},sharedLoad,preferredOver}:{})};
     },
     /** Independent review: the implement runtime is excluded while `verifyAvoidsImplementRuntime` holds. */
-    allocateVerify(kind,{implementRuntime=null,avoid=[],restrictTo=null,difficulty=null}={}){
+    allocateVerify(kind,{implementRuntime=null,avoid=[],restrictTo=null,difficulty=null,job=null}={}){
       const strict=allocation.verifyAvoidsImplementRuntime!==false;
-      return this.allocate(kind,{avoid:strict&&implementRuntime?[...avoid,implementRuntime]:avoid,restrictTo,difficulty});
+      return this.allocate(kind,{avoid:strict&&implementRuntime?[...avoid,implementRuntime]:avoid,restrictTo,difficulty,job});
     },
     /** An operation the kernel actually launched: the shared ledger carries it until it is released or fails. */
     launched(runtime,{op=null}={}){

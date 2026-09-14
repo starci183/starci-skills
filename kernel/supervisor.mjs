@@ -3,6 +3,7 @@ import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {listWorkflows,repositoryRoot,workflowsRoot} from './store.mjs';
 import {DEFAULT_PROBE_MS,probeRuntimeBudget,writeRuntimeBudget} from './budget.mjs';
+import {verifyRuntimePin} from './runtime-pin.mjs';
 
 /**
  * The process supervisor for workflow kernels: one kernel per approved, unfinished workflow; a kernel that
@@ -31,7 +32,7 @@ export function inspectWorkflow(entry,{now=Date.now}={}){
   const stopRequested=fs.existsSync(path.join(entry.dir,'stop.flag'));
   return {id:entry.id,dir:entry.dir,approved,finished,stopRequested,alive,ledgerRoot:state?.ledgerRoot??null,ledgerSource:state?.ledgerSource??null,pid:lock?.pid??null,lastAt,lastEvent,silentMs:lastAt?now()-lastAt:null,worktree:state?.worktree??null,host:state?.host??null,
     // The host the last kernel of this workflow ran on: the next one is started on the same host, or it would bind a new Orca run over a headless table.
-    hostAdapter:typeof state?.hostAdapter==='string'&&state.hostAdapter?state.hostAdapter:null};
+    hostAdapter:typeof state?.hostAdapter==='string'&&state.hostAdapter?state.hostAdapter:null,engine:state?.engine??null};
 }
 
 /** Decide, for one workflow, what the supervisor does this round. */
@@ -45,6 +46,11 @@ export function supervisorAction(info,{healthMs=DEFAULT_HEALTH_MS}={}){
 /** Start one kernel process detached; its lock file is the only thing that keeps a second one out. */
 export function startKernel(info,{launcher,spawnFn=spawn,log=()=>{}}){
   if(!info.worktree)return {ok:false,reason:'the workflow state names no worktree'};
+  if(info.engine?.major===6){
+    const checked=verifyRuntimePin(info.engine.runtimePin);
+    if(!checked.ok){log({event:'runtime-pin-rejected',id:info.id,reason:checked.reason});return {ok:false,reason:checked.reason};}
+    launcher=checked.launcher;
+  }
   // A workflow whose tree was named explicitly at goal time is reached the same way: its store follows that tree.
   const named=info.ledgerSource==='option'&&info.ledgerRoot?['--ledger-root',info.ledgerRoot]:[];
   const adapter=info.hostAdapter?['--host-adapter',info.hostAdapter]:[];
@@ -67,7 +73,7 @@ export function stopKernel(info,{killFn=pid=>process.kill(pid),log=()=>{}}={}){
 }
 
 /** One supervision round over every workflow of a repository. */
-export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEALTH_MS,now=Date.now,spawnFn,killFn,log=()=>{},only=null}){
+export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEALTH_MS,now=Date.now,spawnFn,killFn,aliveFn=pid=>{try{process.kill(pid,0);return true;}catch{return false;}},log=()=>{},only=null}){
   const rounds=[];
   // Every store root this supervisor covers: the repository's own and, when it runs from a worktree, that worktree's (a shared ledger puts a workflow's store beside the tree it was named with).
   const stores=[...new Set((roots??[repoRoot]).map(root=>path.resolve(root)))];
@@ -78,7 +84,11 @@ export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEA
     const info=inspectWorkflow(entry,{now});
     const decision=supervisorAction(info,{healthMs});
     let outcome=null;
-    if(decision.action==='restart'){stopKernel(info,{killFn,log});try{fs.rmSync(path.join(info.dir,'kernel.lock'),{force:true});}catch{}outcome=startKernel(info,{launcher,spawnFn,log});}
+    if(decision.action==='restart'){
+      const stopped=stopKernel(info,{killFn,log});
+      if(info.engine?.major===6&&(!stopped.ok||aliveFn(info.pid))){outcome={ok:false,reason:'prior kernel termination is not confirmed; retain lock and defer restart'};log({event:'kernel-restart-deferred',id:info.id,pid:info.pid,reason:outcome.reason});}
+      else {try{fs.rmSync(path.join(info.dir,'kernel.lock'),{force:true});}catch{}outcome=startKernel(info,{launcher,spawnFn,log});}
+    }
     else if(decision.action==='start'){try{fs.rmSync(path.join(info.dir,'kernel.lock'),{force:true});}catch{}outcome=startKernel(info,{launcher,spawnFn,log});}
     rounds.push({id:info.id,...decision,approved:info.approved,finished:info.finished,stopRequested:info.stopRequested,alive:info.alive,silentMs:info.silentMs,outcome});
   }

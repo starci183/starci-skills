@@ -14,6 +14,8 @@ import {spawnSync} from 'node:child_process';
  * temporary linked worktree that is removed in a `finally`.
  */
 export const VERIFY_PROOF='starci/verify-proof@1';
+export const VERIFY_PROOF_V6='starci/verify-proof@2';
+export const PROOF_V6_VERDICTS=['pass','fail','inconclusive','unavailable'];
 /** What a proof is worth per operation kind. `fail-before` demands the contrast; `checks-only` accepts the re-run. */
 export const PROOF_POLICY={'backend.implement':'fail-before','interface.implement':'fail-before',default:'checks-only'};
 /** A spec/test file in any of the suites this runtime drives (unit, e2e, container). */
@@ -73,7 +75,8 @@ const runOne=(exec,command,{cwd,timeoutMs})=>{
   const result=exec(command,{cwd,shell:true,encoding:'utf8',windowsHide:true,timeout:timeoutMs,timeoutMs,maxBuffer:64*1024*1024});
   const timedOut=result?.error?.code==='ETIMEDOUT'||(!Number.isInteger(result?.status)&&Boolean(result?.signal));
   return {exitCode:Number.isInteger(result?.status)?result.status:1,
-    tail:tail(`${result?.stdout??''}${result?.stderr??''}`||(result?.error?.message??'')),timedOut};
+    tail:tail(`${result?.stdout??''}${result?.stderr??''}`||(result?.error?.message??'')),timedOut,
+    unavailable:Boolean(result?.error)&&!timedOut};
 };
 
 const runAll=(exec,commands,cwd,timeoutMs)=>commands.map(entry=>({name:entry.name??entry.command,command:entry.command,...runOne(exec,entry.command,{cwd,timeoutMs})}));
@@ -143,4 +146,67 @@ export function proofFinding(result){
   return specs.length>1
     ?`the added specs ${named} also pass at base ${short(result.base?.head)}: they do not prove the change`
     :`the added spec ${named} also passes at base ${short(result.base?.head)}: it does not prove the change`;
+}
+
+/**
+ * Build a v6 proof plan exclusively from a pre-sealed, verifier-owned oracle manifest. Tests written in the
+ * candidate are supplemental and cannot become the oracle merely because the implementer reported them.
+ */
+export function planProtectedProof(op,{oracleManifest,candidateChanges=[],policy=null}={}){
+  const manifest=plainOracleManifest(oracleManifest);
+  const changed=new Set(candidateChanges.map(item=>normalize(typeof item==='string'?item:item?.path)).filter(Boolean));
+  const errors=[];
+  if(!manifest)errors.push('missing or malformed protected oracle manifest');
+  const oracles=listOfOracle(manifest?.oracles).filter(oracle=>{
+    const valid=typeof oracle.id==='string'&&oracle.id&&typeof oracle.command==='string'&&oracle.command&&
+      typeof oracle.sha256==='string'&&/^[a-f0-9]{64}$/.test(oracle.sha256)&&Array.isArray(oracle.assertionIds)&&oracle.assertionIds.length&&
+      typeof oracle.ownerAttemptId==='string'&&oracle.ownerAttemptId&&oracle.ownerAttemptId!==op?.id;
+    if(!valid)errors.push(`malformed or non-independent oracle ${oracle?.id??'(unknown)'}`);
+    if(changed.has(normalize(oracle.path)))errors.push(`candidate changed protected oracle ${oracle.path}`);
+    return valid;
+  });
+  const selected=oracles.filter(oracle=>!Array.isArray(oracle.kinds)||oracle.kinds.includes(op?.kind));
+  if(!selected.length)errors.push(`no protected oracle covers ${op?.kind??'operation'}`);
+  const mode=policy??(op?.proofPolicy==='equivalence'?'equivalence':'fail-before');
+  if(!['fail-before','equivalence'].includes(mode))errors.push(`unsupported v6 proof policy ${mode}`);
+  return {schema:VERIFY_PROOF_V6,mode,opId:op?.id??null,kind:op?.kind??null,manifestDigest:manifest?.digest??null,
+    oracles:selected.map(oracle=>({...oracle,path:normalize(oracle.path)})),errors,ready:errors.length===0};
+}
+
+const plainOracleManifest=value=>value&&typeof value==='object'&&!Array.isArray(value)&&value.schema==='starci/oracle-manifest@1'&&
+  typeof value.digest==='string'&&/^[a-f0-9]{64}$/.test(value.digest)?value:null;
+const listOfOracle=value=>Array.isArray(value)?value.filter(item=>item&&typeof item==='object'&&!Array.isArray(item)):[];
+const classifyBase=(result,oracle)=>{
+  if(result.timedOut)return {outcome:'inconclusive',reason:'base oracle timed out'};
+  if(result.unavailable)return {outcome:'unavailable',reason:result.tail||'base oracle unavailable'};
+  if(result.exitCode===0)return {outcome:'fail',reason:'oracle also passes at base'};
+  if(!oracle.expectedBaseFailure)return {outcome:'inconclusive',reason:'base failed without a declared expected failure signature'};
+  try{return new RegExp(oracle.expectedBaseFailure).test(result.tail)?{outcome:'pass'}:
+    {outcome:'inconclusive',reason:'base failed for a different reason than the declared behavior assertion'};}
+  catch{return {outcome:'inconclusive',reason:'oracle expectedBaseFailure is not a valid regular expression'};}
+};
+
+/** Run protected commands against immutable base/candidate roots. Only a discriminating, candidate-green result passes. */
+export function runProtectedProof({plan,baseRoot,candidateRoot,oracleRoot,exec=spawnSync,timeoutMs=PROOF_TIMEOUT_MS}={}){
+  if(plan?.schema!==VERIFY_PROOF_V6||!plan.ready)return {schema:VERIFY_PROOF_V6,verdict:'inconclusive',results:[],errors:plan?.errors??['proof plan is not ready']};
+  if(!baseRoot||!candidateRoot||!oracleRoot)return {schema:VERIFY_PROOF_V6,verdict:'unavailable',results:[],errors:['proof roots are unavailable']};
+  const results=[];
+  for(const oracle of plan.oracles){
+    const baseResult=runOne(exec,oracle.command,{cwd:baseRoot,timeoutMs});
+    const candidateResult=runOne(exec,oracle.command,{cwd:candidateRoot,timeoutMs});
+    const baseVerdict=plan.mode==='equivalence'?(baseResult.exitCode===0?{outcome:'pass'}:{outcome:baseResult.timedOut?'inconclusive':'unavailable',reason:'equivalence baseline did not run cleanly'})
+      :classifyBase(baseResult,oracle);
+    const outcome=candidateResult.timedOut?'inconclusive':candidateResult.exitCode!==0?'fail':baseVerdict.outcome;
+    results.push({oracleId:oracle.id,assertionIds:oracle.assertionIds,base:baseResult,candidate:candidateResult,outcome,reason:candidateResult.exitCode!==0?'candidate oracle failed':baseVerdict.reason??null});
+  }
+  const order=['fail','inconclusive','unavailable'];
+  const verdict=order.find(value=>results.some(result=>result.outcome===value))??'pass';
+  return {schema:VERIFY_PROOF_V6,mode:plan.mode,manifestDigest:plan.manifestDigest,verdict,results};
+}
+
+export function protectedProofFinding(result){
+  if(result?.verdict==='pass')return null;
+  const first=(result?.results??[]).find(item=>item.outcome!=='pass');
+  return first?`protected oracle ${first.oracleId} is ${first.outcome}: ${first.reason??'no conclusive proof'}`:
+    `protected proof is ${result?.verdict??'inconclusive'}: ${(result?.errors??[]).join('; ')}`;
 }

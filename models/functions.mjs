@@ -1,6 +1,7 @@
 import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import {normalizeResolvedReferences} from './validator-transport.mjs';
 
 /**
  * Model calls as functions: a fixed prompt frame, a required JSON schema, a headless provider command,
@@ -450,17 +451,21 @@ const normalizeFile=value=>String(value??'').replaceAll('\\','/').replace(/^\.\/
 /** A reject must carry a finding, otherwise there is nothing for the operation to fix. */
 const validationRules=answer=>({errors:answer.verdict==='reject'&&!(Array.isArray(answer.findings)&&answer.findings.length)?['a reject must carry at least one finding']:[]});
 
-export function validateOp({op,node=null,diff,checks=[],references=[],brand=null,io=null,memory='',providers=DEFAULT_VALIDATOR_RUNTIMES,skip=[],cwd,runHeadless:run}){
+export function validateOp({op,node=null,diff,checks=[],references=[],resolvedReferences=[],resolvedReferencesTruncated=false,freshContext=false,authorAttemptId=null,brand=null,io=null,memory='',providers=DEFAULT_VALIDATOR_RUNTIMES,skip=[],cwd,runHeadless:run}){
   need(plain(op)&&typeof op.id==='string','validateOp needs the operation');
   const files=unique((diff?.files??[]).map(normalizeFile).filter(Boolean));
   // A provider the allocator reports as cooling is skipped, not tried: a rate limit parks it for every caller.
   const chain=providers.filter(provider=>!skip.includes(provider));
   if(!chain.length)return {ok:false,verdict:'unavailable',reason:`every validator provider is unavailable (${providers.join(', ')})`,attempts:[],usage:null,findings:[],dropped:[]};
+  const resolved=normalizeResolvedReferences(resolvedReferences);
   const payload={
     op:{id:op.id,kind:op.kind,goal:op.goal,attempt:op.attempt??1,acceptance:op.acceptance??[],allowlist:op.allowlist??[]},
     ...(node?{node:{id:node.id??op.nodeId??null,description:node.description??null,assertions:node.assertions??[],deferred:node.deferred??[]}}:{}),
     checks:checks.map(check=>({name:check.name,command:check.command,exitCode:check.exitCode,evidence:check.evidence??null})),
     references,
+    resolvedReferences:resolved.entries,
+    resolvedReferencesTruncated:Boolean(resolvedReferencesTruncated||resolved.truncated),
+    freshContext:Boolean(freshContext),authorAttemptId,
     // The brand of the product, when the tree has one: the colour tokens with their roles, the mascot and logo
     // assets, what is forbidden and the rules an imagery prompt must carry. It is the rule set a surface is
     // judged against, so it travels as data beside the diff, never as prose in the role line.

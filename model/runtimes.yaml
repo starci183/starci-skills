@@ -71,6 +71,7 @@ runtimes:
     maxParallel: 1
   qwen3.8-flash:
     target: qwen3.8-flash
+    provider: qwen
     roles: [implement, verify, write]
     maxParallel: 2
 roleOfKind:

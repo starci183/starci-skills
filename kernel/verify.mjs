@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as llm from '../models/functions.mjs';
 import {KERNEL_CHECK,RETRY_LIMIT,VALIDATOR_DIFF_BYTES,VALIDATOR_MEMORY_BYTES,VALIDATOR_MEMORY_LINES,VALIDATOR_UNAVAILABLE_LIMIT,
-  CHECK_TIMEOUT_MS,firstLine,inside,ledgerAccess,normalize,oneLine,plain,routeOf,rulingsText,slash,tail,unique,workValidateCommand} from './common.mjs';
+  CHECK_TIMEOUT_MS,firstLine,inside,ledgerAccess,normalize,oneLine,parseRef,plain,routeOf,rulingsText,slash,tail,unique,workValidateCommand} from './common.mjs';
 import {ioPayload} from './io.mjs';
 
 /**
@@ -312,34 +312,51 @@ export function treeForVerdict(ctx,files){
   try{const loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});ctx.work.loaded=loaded;return loaded;}catch{return ctx.work.loaded??null;}
 }
 export function validateAccepted(store,state,op,ctx,{files,verified,produced=null}){
+  const strict=Boolean(ctx.v6?.requiredValidation);
   if(ctx.validateOp===null||ctx.validateOp===undefined){
     if(!state.validatorSkipped){state.validatorSkipped=true;store.appendEvent({event:'validator-skipped',reason:'no validator function was given to this kernel'});}
-    return {verdict:'skipped'};
+    return strict?{verdict:'unavailable',reason:'required validator is not configured'}:{verdict:'skipped'};
   }
   // The validator judges what the operation claimed and git confirms (`produced`, see `attributedFiles`): two
   // decision drafts share one `policy-decisions/**` allowlist, and the second ask was rejected twice for the first
   // ask's record that was dirty beside its own. An operation that claimed nothing is judged on everything it could
   // have changed, as before - a report that hides its files buys it nothing.
-  const judged=(produced??[]).length?produced:files;
+  const judged=strict?files:((produced??[]).length?produced:files);
   const left=files.filter(file=>!judged.includes(file));
   if(left.length)store.appendEvent({event:'validator-scope-attributed',op:op.id,judged,left:left.slice(0,12)});
+  const verificationKind=['integration.verify','review.verify','e2e.verify','uat.verify'].includes(op.kind);
+  const reproducedNoDiffEvidence=strict&&verificationKind&&(op.checks??[]).length>0&&verified.checks.length>=(op.checks??[]).length&&
+    verified.checks.every(check=>check.exitCode===0&&typeof check.command==='string'&&check.command.trim()&&typeof check.evidence==='string'&&check.evidence.trim());
   // A review or a no-op slice changed nothing: there is no diff to judge, and a call on nothing could only misjudge.
-  if(!judged.length){store.appendEvent({event:'validator-skipped',op:op.id,reason:'the operation changed nothing inside its allowlist, so there is no diff to judge'});return {verdict:'skipped'};}
+  if(!judged.length&&!reproducedNoDiffEvidence){store.appendEvent({event:'validator-skipped',op:op.id,reason:'the operation changed nothing inside its allowlist, so there is no diff to judge'});return strict
+    ?{verdict:'inconclusive',reason:'required validation has no observed candidate files'}:{verdict:'skipped'};}
   const providers=ctx.validator??llm.DEFAULT_VALIDATOR_RUNTIMES;
-  const diff=opDiff(state,op,judged,ctx);
+  const diff=strict&&ctx.v6Candidate?.packet?frozenCandidateDiff(ctx.v6Candidate,judged):opDiff(state,op,judged,ctx);
+  if(strict&&diff.truncated){
+    store.appendEvent({event:'validator-inconclusive',op:op.id,reason:'the complete candidate diff exceeds the validator transport bound',diffFiles:files});
+    return {verdict:'inconclusive',reason:'required validator did not receive the complete candidate diff'};
+  }
+  const resolvedReferences=strict?resolveValidatorReferences(state,op,ctx.v6Candidate?.snapshot?.workerRoot):null;
+  if(strict&&!resolvedReferences.ok){
+    store.appendEvent({event:'validator-inconclusive',op:op.id,reason:resolvedReferences.errors.join('; ')});
+    return {verdict:'inconclusive',reason:resolvedReferences.errors.join('; ')};
+  }
   let result;
   // The kernel's own check (`work-valid`) is proven by the kernel, not by the agent: it goes to the validator with the
   // re-run checks, so an acceptance statement naming it is never rejected as unproven (repair-5 was, four times).
   const proven=[...verified.checks,...kernelProof(ctx,op.nodeId??op.ledgerIds?.[0]??null,op)];
   try{result=ctx.validateOp({op,node:validatorNode(ctx,op),diff,checks:proven,references:op.references,
+    ...(strict?{resolvedReferences:resolvedReferences.entries,freshContext:true,
+      authorAttemptId:ctx.v6Candidate?.packet?Object.fromEntries(['workflowId','opId','attempt','generation','jobId'].map(field=>[field,ctx.v6Candidate.packet[field]])):
+        (typeof ctx.v6?.identity==='function'?ctx.v6.identity(op):{opId:op.id,attempt:op.attempt})}:{}),
     // What the kind declares it reads and produces travels with the verdict: a record cited outside `reads` or
     // written outside `writes` is a defect the validator can only name if it was told the declaration.
     io:ioPayloadOf(op.kind),
     // The brand travels with every verdict: a colour, a font, an icon or an artwork slot outside it is a defect,
     // and the validator can only say so if it was given the record the operation was supposed to read.
     brand:brandPayload(treeForVerdict(ctx,files)),
-    memory:readValidatorMemory(store),providers,skip:coolingRuntimes(ctx.allocator),cwd:ctx.cwd});}
-  catch(error){result={ok:false,verdict:'unavailable',reason:error.message};}
+    memory:strict?'':readValidatorMemory(store),providers,skip:coolingRuntimes(ctx.allocator),cwd:ctx.cwd});}
+  catch(error){if(error?.code==='STARCI_JOB_PENDING')throw error;result={ok:false,verdict:'unavailable',reason:error.message};}
   const verdict=llm.VALIDATOR_VERDICTS.includes(result?.verdict)?result.verdict:'unavailable';
   const summary=oneLine(result?.summary),provider=result?.provider??null,reason=oneLine(result?.reason)||null;
   const findings=(Array.isArray(result?.findings)?result.findings:[]).filter(item=>item&&typeof item.file==='string');
@@ -355,9 +372,43 @@ export function validateAccepted(store,state,op,ctx,{files,verified,produced=nul
     return {verdict};
   }
   state.validatorUnavailable=0;
-  if(verdict==='accept'){store.appendEvent({event:'validated',op:op.id,summary,provider,usage:result?.usage??null});return {verdict};}
+  if(verdict==='accept'&&strict&&(result?.complete!==true||result?.independentFromAttempt!==true||result?.freshContext!==true||!result?.reviewerAttemptId||result.reviewerAttemptId===op.id)){
+    const missing='required validator result lacks complete, independent, fresh-context reviewer attestation';
+    store.appendEvent({event:'validator-inconclusive',op:op.id,reason:missing,provider});
+    return {verdict:'inconclusive',reason:missing};
+  }
+  if(verdict==='accept'){store.appendEvent({event:'validated',op:op.id,summary,provider,usage:result?.usage??null});return {verdict,provider,
+    complete:result?.complete===true,independentFromAttempt:result?.independentFromAttempt===true,freshContext:result?.freshContext===true,
+    reviewerAttemptId:result?.reviewerAttemptId??null};}
   store.appendEvent({event:'validator-rejected',op:op.id,summary,provider,findings:findings.slice(0,5).map(findingText),usage:result?.usage??null});
   return {verdict,findings:findings.map(findingText)};
+}
+function frozenCandidateDiff(candidate,files){
+  const packet=candidate.packet,snapshot=candidate.snapshot,selected=new Set(files),chunks=[];
+  for(const change of packet.changes.filter(item=>selected.has(item.path))){
+    const read=(root,file)=>{try{const bytes=fs.readFileSync(path.join(root,file));return {encoding:'base64',bytes:bytes.length,content:bytes.toString('base64')};}catch{return null;}};
+    chunks.push(JSON.stringify({path:change.path,beforeSha256:change.beforeSha256,afterSha256:change.afterSha256,
+      before:read(snapshot.baseRoot,change.path),after:read(snapshot.workerRoot,change.path)}));
+  }
+  const text=chunks.join('\n'),truncated=Buffer.byteLength(text)>VALIDATOR_DIFF_BYTES;
+  return {files,base:packet.acceptedHead,text,truncated};
+}
+function resolveValidatorReferences(state,op,rootOverride=null){
+  const errors=[],entries=[],root=fs.realpathSync(rootOverride??state.worktree);
+  for(const given of unique(op.v6ResolvedReferences??op.references??[])){
+    let parsed,relative,fragment;
+    try{parsed=parseRef(given);const literal=slash(parsed.ref),hash=literal.indexOf('#');relative=normalize(hash<0?literal:literal.slice(0,hash));fragment=hash<0?null:literal.slice(hash+1);}
+    catch(error){errors.push(`validator reference is invalid: ${String(given)} (${error.message})`);continue;}
+    if(!relative||path.isAbsolute(relative)||/^[A-Za-z]:\//.test(relative)||relative==='..'||relative.startsWith('../')||relative.includes('/../')){errors.push(`validator reference escapes the candidate root: ${String(parsed.ref)}`);continue;}
+    let target=path.resolve(root,relative);
+    try{
+      if(fs.lstatSync(target).isDirectory()){const index=['index.yaml','index.yml','index.json','index.md'].find(name=>fs.existsSync(path.join(target,name)));if(!index)throw Object.assign(new Error('directory has no canonical index'),{code:'EISDIR'});relative=`${relative.replace(/\/$/,'')}/${index}`;target=path.join(target,index);}
+      const stat=fs.lstatSync(target),real=fs.realpathSync(target),back=path.relative(root,real);
+      if(stat.isSymbolicLink()||!stat.isFile()||back.startsWith('..')||path.isAbsolute(back)){errors.push(`validator reference is not a contained regular file: ${given}`);continue;}
+      entries.push({kind:parsed.kind,path:relative,fragment,ref:parsed.ref,bytes:fs.readFileSync(real)});
+    }catch(error){errors.push(`validator reference is unreadable: ${given} (${error.code??error.message})`);}
+  }
+  return {ok:errors.length===0,entries,errors};
 }
 /** A kind the io module cannot read (a plan-ledger kind the catalog never declared) simply declares nothing. */
 const ioPayloadOf=kind=>{try{return ioPayload(kind);}catch{return {reads:[],writes:[]};}};

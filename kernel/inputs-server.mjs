@@ -36,7 +36,7 @@ export async function startInputServer({token,model,language='vi',port=0,session
     if(request.method==='GET'&&request.url==='/status'){
       try{return send(200,model.snapshot());}catch{return send(503,{ok:false,code:'workflow-unavailable'});}
     }
-    if(request.method!=='POST'||request.url!=='/credentials')return send(405,{ok:false,code:'method-not-allowed'});
+    if(request.method!=='POST'||!['/credentials','/owner-actions'].includes(request.url))return send(405,{ok:false,code:'method-not-allowed'});
     if(request.headers.origin!==origin||request.headers['content-type']?.split(';')[0]!=='application/json')return send(403,{ok:false,code:'forbidden'});
     if(Number(request.headers['content-length'])>INPUT_BODY_LIMIT)return send(413,{ok:false,code:'request-too-large'});
     let body='',size=0;
@@ -44,7 +44,7 @@ export async function startInputServer({token,model,language='vi',port=0,session
       request.setEncoding('utf8');
       for await(const chunk of request){size+=Buffer.byteLength(chunk);if(size>INPUT_BODY_LIMIT){send(413,{ok:false,code:'request-too-large'});return;}body+=chunk;}
       let input;try{input=JSON.parse(body);}catch{return send(400,{ok:false,code:'invalid-request'});}finally{body='';}
-      const result=await model.submit(input);
+      const result=request.url==='/owner-actions'?await model.submitOwnerAction(input):await model.submit(input);
       send(result.code==='invalid-request'?400:result.code==='request-changed'?409:200,result);
     }catch{send(503,{ok:false,code:'storage-unavailable'});}
   });

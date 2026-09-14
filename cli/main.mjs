@@ -17,6 +17,7 @@ Usage:
   starci workflow-approve --id <id> [--allocation <runtime>=<slots>,...] [--allow-dynamic N] [--accept-critique "<reason>"]
   starci workflow-answer --id <id> --op <ask op> [--choice <n>] [--note "<answer>"]
   starci workflow-run --id <id> [--host-adapter orca|headless] [--max-iterations N]
+  starci workflow-retry --id <id> --engine 6 --runtime-pin <file>
   starci workflow-status --id <id> [--json true]
   starci workflow-list [--json true]
   starci workflow-stop --id <id>

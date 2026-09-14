@@ -118,7 +118,7 @@ test('--help names every command of the one entry, the forwarded kernel commands
   // `bin/starci.mjs` forwards these to the kernel launcher before this module is loaded, so nothing here
   // answers them - but the one command line a person types is `starci <command>`, and a help page that names
   // only half of it teaches the wrong entry. One line each, so a reader can copy the one they need.
-  const forwarded = ['workflow-goal', 'workflow-approve', 'workflow-answer', 'workflow-run', 'workflow-status',
+  const forwarded = ['workflow-goal', 'workflow-approve', 'workflow-answer', 'workflow-run', 'workflow-retry', 'workflow-status',
     'workflow-list', 'workflow-stop', 'workflow-lane-close', 'workflow-supervise', 'workflow-inputs',
     'start-op', 'settle', 'sweep', 'notify', 'report', 'wait', 'verify'];
   const lines = help.stdout.split('\n').map(line => line.trim());

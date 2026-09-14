@@ -618,6 +618,9 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
     --accept-critique is the owner overriding a goal critique that answered refuse: the reason is recorded and
     the kernel never asks for it again.
   node bin/starci.mjs workflow-run --id <workflow-id> [--from <own-terminal> --run <run>] [--launch-file <file>] [--allocation <runtime=slots,...>] [--max-iterations N] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node bin/starci.mjs workflow-retry --id <workflow-id> --engine 6 --runtime-pin <pin-record.json> [--host <path-to-.claude>] [--worktree <relative-path>]
+    After the kernel is paused, settle native dispatches and retry unfinished active operations with fresh
+    contexts on the sealed v6 alpha. Preserve accepted Work, goal authority and owner inputs.
     runs the kernel loop: up to 10 operation agents in one worktree, machine-verified acceptance, gates, final report.
     On the Work ledger every accepted slice is written back into its node (state, completion, evidence) and
     committed with a "Work: <node id>" trailer - in the repository that owns the tree, which is this one
@@ -644,7 +647,7 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
   capability the headless host lacks (interface.asset needs design-tool, which model/hosts.yaml declares only
   for the Orca host) is refused as host-unsupported.`;}
 
-const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-status','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs'];
+const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs'];
 /** Read-only views of the workflow store: they open no kernel, call no Orca and never write. */
 const VIEW_COMMANDS=['workflow-list'];
 

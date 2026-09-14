@@ -1,5 +1,9 @@
 # The workflow kernel (StarCi 5-plus)
 
+This page describes the compatible 5-plus execution path. Enrolled `engine.major = 6` workflows follow
+[runtime v6](runtime-v6.md), including its strict acceptance, owner receipts, durable jobs and native-host
+isolation limits. See [the deliberate upgrade boundary](../upgrades/6.0.0-alpha.1.md).
+
 The `kernel/` folder is the whole control plane of a job. One process per workflow: no Plan Coordinator, no
 per-module Monitor, no provider chain. A **job** is any piece of work ("implement backend feature A",
 "backend for three modules with the existing SRS/SDS", "write an SRS"); its **inputs** are typed refs

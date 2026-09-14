@@ -7,6 +7,7 @@ import {GOAL_RECORD,REF_KINDS,plain} from './common.mjs';
 import {fillWaitingAsks} from './fill.mjs';
 import {inputBinding} from './inputs-model.mjs';
 import {inputFiles,privateJson,processAlive} from './inputs-server.mjs';
+import {deriveOwnerRequests} from './owner-requests.mjs';
 
 const read=file=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}};
 const OK=result=>result?.outcome==='ok';
@@ -59,13 +60,14 @@ export function recoverWorkflowInputReferences(store,state){
 const runtimeVersion=()=>crypto.createHash('sha256').update(fs.readFileSync(new URL('./inputs-server.mjs',import.meta.url)))
   .update(fs.readFileSync(new URL('./inputs-model.mjs',import.meta.url))).update(fs.readFileSync(new URL('./inputs-ui.mjs',import.meta.url)))
   .update(fs.readFileSync(new URL('./inputs-readiness.mjs',import.meta.url)))
-  .update(fs.readFileSync(new URL('./inputs-replacement.mjs',import.meta.url)))
+  .update(fs.readFileSync(new URL('./inputs-replacement.mjs',import.meta.url))).update(fs.readFileSync(new URL('./owner-requests.mjs',import.meta.url)))
+  .update(fs.readFileSync(new URL('./owner-inbox.mjs',import.meta.url)))
   .update(fs.readFileSync(new URL('../core/identity.mjs',import.meta.url))).digest('hex');
 
 /** Reconcile before the kernel blocks: save current asks, own one helper, and own one embedded Orca tab. */
 export function reconcileWorkflowInputs(orca,store,state,{host=orca?.host,now=Date.now,spawnProcess=spawn,alive=processAlive}={}){
   if(host?.name!=='orca')return {phase:'headless'};
-  const waiting=fillWaitingAsks(state);
+  const waiting=[...new Set([...fillWaitingAsks(state),...deriveOwnerRequests(state).filter(request=>['waiting-owner','needs-correction'].includes(request.status)).map(request=>state.ops.find(op=>op.id===request.opId)).filter(Boolean)])];
   if(!waiting.length&&!state.ownerInputs)return {phase:'idle'};
   // The helper reads this snapshot independently while the kernel uses synchronous waits.
   store.saveState(state);

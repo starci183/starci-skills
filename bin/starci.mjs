@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
  * `hosts/orca/launch.mjs`; this entry forwards argv to it unchanged so a host never has to name a
  * module path, and the launcher's own direct-run entry keeps working exactly as before.
  */
-const LAUNCHER_COMMANDS=['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-status',
+const LAUNCHER_COMMANDS=['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status',
   'workflow-list','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs',
   'start-op','settle','sweep','notify','report','wait','verify'];
 
@@ -24,6 +24,7 @@ workflow kernel (forwarded to the launcher; add --host <skill root> to reach a W
   workflow-approve     approve that goal, or re-admit what a blocked finish left open
   workflow-answer      give the owner's answer to a question or a reconciliation conflict
   workflow-run         run the approved workflow: allocate, launch, verify, commit, gate, report
+  workflow-retry       --id <id> --engine 6 --runtime-pin <file>: retry a paused workflow with fresh agents
   workflow-status      print what one workflow is doing now, from its own files
   workflow-list        one line per workflow of this repository
   workflow-stop        pause a running workflow at its next tick

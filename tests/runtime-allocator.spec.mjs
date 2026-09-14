@@ -497,3 +497,11 @@ test('fan-out is bounded per cut group: the seam runs alone and one parent never
   assert.equal(allocator.roleFor('implementation.plan'),'plan');
   assert.equal(profile.roleOfKind['implementation.plan'],'plan');
 });
+
+test('model eligibility is filtered before provider budget ranking and returns its receipt',()=>{
+  const decisions=[];const allocator=createAllocator({runtimes:profile,now:()=>0,eligibility:(job,runtime)=>{decisions.push([job.kind,runtime.id]);return runtime.id==='gpt-5.6-sol'?{eligible:false,reasons:['quality floor high is not met']}:{eligible:true,mode:'qualified',reasons:[]};}});
+  const review=allocator.review('backend.implement',{job:{kind:'backend.implement',role:'implement',qualityFloor:'high'}});
+  assert.equal(review.ready.some(item=>item.runtime==='gpt-5.6-sol'),false);assert.match(review.blocked.find(item=>item.runtime==='gpt-5.6-sol').reason,/model ineligible/);
+  const picked=allocator.allocate('backend.implement',{job:{kind:'backend.implement',role:'implement',qualityFloor:'high'}});
+  assert.equal(picked.ok,true);assert.notEqual(picked.runtime,'gpt-5.6-sol');assert.equal(picked.eligibility.mode,'qualified');assert.ok(decisions.length>=profile.maxParallelOps);
+});

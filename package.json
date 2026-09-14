@@ -1,11 +1,11 @@
 {
   "name": "starci",
-  "version": "5.0.0-plus",
+  "version": "6.0.0-alpha.1",
   "description": "StarCi: one skill, bounded workflow matrices, complete operators and verified direct tasks.",
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13.0"
   },
   "bin": {
     "starci": "bin/starci.mjs"

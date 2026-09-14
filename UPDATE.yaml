@@ -1,5 +1,17 @@
 schema: starci/document@1
 sections:
+  - title: 6.0 opt-in execution
+    blocks:
+      - The 6.0 alpha is an explicit workflow engine enrollment, not a silent upgrade of existing Work.
+        Read docs/runtime-v6.md and upgrades/6.0.0-alpha.1.md. Build and test privately before sealing a
+        runtime pin; incomplete builds must not replace a live .dist. Follow the existing approval scope
+        for push and retry. A version edit alone does not authorize publication.
+      - Runtime helpers that execute in detached children must be listed in scripts/runtime-modules.txt.
+        Test their relocated installed paths, durable result replay, lost process reconciliation, owner
+        action continuation and actual validator transport. Pure helper tests do not prove kernel wiring.
+      - Keep alpha limitations explicit. A resumed workflow trial is not a fresh end-to-end trial; a
+        container mount probe is not an attested Orca worker sandbox. Preserve old tags and explain the
+        independent engine identity when historical package versions compare higher.
   - title: Maintaining StarCi 3.0
     blocks:
       - Read the current entry, selected code/contract and its consumers before editing. The user's
