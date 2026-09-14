@@ -974,6 +974,32 @@ test('workflow-goal --migrate plans one migrate-mode intake per feature and no n
  * A mechanical line about an op that has since moved on is stale and would finish the workflow blocked over
  * nothing: the kernel drops it every tick. A line about an op still blocked without a refusal stays.
  */
+/**
+ * A record author an older rule split by allowlist entry was marked done with verdict `split` and never accepted:
+ * its children are withdrawn and it runs again as one operation, so its records reach the tree properly.
+ */
+test('a record author an older rule split is run again as one operation, and its split children are withdrawn',()=>{
+  const harness=setupWork({scope:['collab']});
+  try{
+    const store=harness.store,state=harness.state;
+    const intake=state.ops.find(op=>op.intake);
+    intake.status='done';intake.verdict='split';
+    state.ops.push({...structuredClone(intake),id:'repair-1',origin:'repair',status:'ready',verdict:null,intake:null,goal:`${intake.goal.split('\n')[0]} - only \`.starciwork/features/collab/index.yaml\``,allowlist:['.starciwork/features/collab/index.yaml']});
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    const before=store.readEvents().length;
+    const state2=harness.run({maxIterations:1});
+    const log=store.readEvents().slice(before);
+    assert.deepEqual(log.filter(event=>event.event==='split-withdrawn').map(event=>event.op),['repair-1']);
+    assert.deepEqual(log.filter(event=>event.event==='split-parent-readmitted').map(event=>event.op),[intake.id]);
+    const again=state2.ops.find(op=>op.id===intake.id);
+    assert.notEqual(again.status,'done');
+    assert.equal(again.verdict,null);
+    assert.match(again.findings.at(-1),/run again as one operation over the whole allowlist/);
+    assert.equal(state2.ops.find(op=>op.id==='repair-1').refusal,'superseded');
+  }finally{harness.cleanup();}
+});
+
 test('a mechanical line about an op that moved on is dropped from the owner\'s list every tick',()=>{
   const harness=setupWork();
   try{
