@@ -18,6 +18,7 @@ import {resolveLedgerRoot} from '../kernel/routing.mjs';
 import * as work from '../kernel/ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../kernel/graph.mjs';
 import {machineVerify} from '../kernel/kernel.mjs';
+import {attributedFiles} from '../kernel/verify.mjs';
 import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
@@ -2788,6 +2789,17 @@ test('a record that is still incomplete after its author op asks the user once a
     assert.equal(harness.read(REFUND).state,'todo');
     assert.equal(state.finished.outcome,'blocked');
   }finally{harness.cleanup();}
+});
+
+test('changedFiles asks git for every untracked file by name, so a new record in a new folder is attributable',()=>{
+  const record='.starciwork/features/chatbot/business/srs/business-rules/policy-decisions/d-x/index.yaml';
+  const seen=[];
+  const git=(executable,args)=>{seen.push(args);return {status:0,stdout:`?? ${record}\n`,stderr:''};};
+  const op={allowlist:['.starciwork/features/chatbot/business/srs/business-rules/policy-decisions/**'],reports:[{files:[record]}]};
+  const files=changedFiles({worktree:cwd},op,{git});
+  assert.deepEqual(files,[record]);
+  assert.ok(seen[0].includes('--untracked-files=all'),'without it git shows the new folder, which no report names');
+  assert.deepEqual(attributedFiles(op,files),[record]);
 });
 
 test('changedFiles never carries a kernel-owned path, even when the allowlist is the whole feature folder',()=>{
