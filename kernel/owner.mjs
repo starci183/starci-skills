@@ -95,24 +95,42 @@ export function irreversibleEffect(detail){
   return IRREVERSIBLE_RULES.some(pattern=>pattern.test(text));
 }
 /**
- * The stop reason of a question, or null when the question is one the runtime may take provisionally. The
- * detail decides first, because an operation's own label for its question is a guess and the words it used are
- * evidence; a kind an operation declares outright is honoured only for the unambiguous ones - `authority` is
- * also the kernel's own generic blocker kind, so that word alone never stops the work.
+ * The kinds an operation may declare outright and be believed. `authority` is not among them: it is also the
+ * kernel's own generic blocker kind, so that word alone never stops the work.
  */
-export function stopReasonFor(question){
+const DECLARED_STOPS=['credential','account','dataset','irreversible'];
+/**
+ * What the operation SAID, when it said anything at all. A report that names its blocker kind - or a question
+ * that carries one of the four - knows better than any sentence: it is the op standing in front of the thing.
+ * The words are only consulted when nothing was declared, because a keyword in a sentence is a hint about the
+ * tab to open, never a ruling about what the question is.
+ */
+export function declaredStopOf(question,report=null){
+  if(question?.prepared===true)return null;
+  for(const candidate of [report?.blocker?.kind,question?.kind]){
+    const value=String(candidate??'').toLowerCase();
+    if(DECLARED_STOPS.includes(value))return value;
+  }
+  return null;
+}
+/**
+ * The stop reason of a question, or null when the question is one the runtime may take provisionally. What the
+ * operation declared decides first; only when it declared nothing unambiguous are the words of the question
+ * read. The other order cost an hour: "which Telegram bot token does the chatbot use, and where does the owner
+ * provide it" is a DESIGN decision - where a value lives - and the word "token" alone made it a provision.
+ */
+export function stopReasonFor(question,report=null){
   // A question the kernel PREPARED itself (`prepared: true` - the critic's decisive hidden decision, planned before
   // the feature's work) is one it decided to take provisionally. Its sentence names money or customers because that
   // is what the decision is ABOUT, not because an operation is about to charge or message anyone, so the words are
-  // not read as a stop there - or every decision about a refund rule would halt the workflow. An operation's own
-  // question is still read by its words first: its label is a guess, and what it says it would do is evidence.
+  // not read as a stop there - or every decision about a refund rule would halt the workflow.
   if(question?.prepared===true)return null;
+  const declared=declaredStopOf(question,report);
+  if(declared)return declared;
   const text=`${question?.text??''}\n${question?.detail??''}`;
   if(irreversibleEffect(text))return 'irreversible';
   const provision=ownerProvisionNeed(text);
-  if(provision)return provision.kind;
-  const declared=String(question?.kind??'').toLowerCase();
-  return ['credential','account','dataset','irreversible'].includes(declared)?declared:null;
+  return provision?provision.kind:null;
 }
 
 /**
@@ -174,7 +192,10 @@ export function openOwnerAsk(store,state,op,question,ctx,report=null){
     store.appendEvent({event:'owner-question',ask:op.id,record:null,options:0,requesters:[...(op.requesters??[])],reason:'the ask op itself blocked'});
     return 'owner-question';
   }
-  const stop=stopReasonFor(question);
+  // The shape of the tab is a HINT, not a ruling: whichever of the two forms is opened, the ask op may come back
+  // with either answer and the kernel takes it by what the report says (`settleOwnerAsk`).
+  const stop=stopReasonFor(question,report);
+  const by=stop?(declaredStopOf(question,report)?'declared':'words'):'none';
   const kind=stop??(question.kind&&QUESTION_KINDS.includes(String(question.kind))?question.kind:'decision');
   const same=state.ops.find(item=>isAsk(item.kind)&&liveStatus.includes(item.status)&&item.question?.text===question.text);
   const allowlist=decisionAllowlistFor(state,op,ctx);
@@ -195,7 +216,7 @@ export function openOwnerAsk(store,state,op,question,ctx,report=null){
   // recommendation exists - and the kernel resumes it with that recommendation as a provisional answer. An op
   // that is already finished is not restarted by a question raised on its behalf: it only carries the decision.
   else{op.dependsOn=unique([...(op.dependsOn??[]),ask.id]);if(liveStatus.includes(op.status)){op.status='pending';op.waitingFor=null;}}
-  store.appendEvent({event:'owner-ask-opened',op:op.id,ask:ask.id,kind,stop:stop??null,provisional:!stop,question:firstLine(question.text)});
+  store.appendEvent({event:'owner-ask-opened',op:op.id,ask:ask.id,kind,stop:stop??null,by,provisional:!stop,question:firstLine(question.text)});
   return 'owner-ask';
 }
 
@@ -223,7 +244,7 @@ export function openConflictDecision(store,state,intake,conflict,ctx){
     ledgerIds:[],allowlist:folder?[`.starciwork/${folder}/**`]:decisionAllowlistFor(state,intake,ctx),references:unique([...(recordPath?[recordPath]:[]),...(intake.references??[]).slice(0,8)]),
     checks:[],acceptance:[`the summary begins \`decision: ${record}\` with \`recommended: <n>\` and the numbered options, and no file changed`],
     origin:'ask',requesters:[]},`conflict of ${intake.id} taken provisionally`);
-  if(ask)store.appendEvent({event:'owner-ask-opened',op:intake.id,ask:ask.id,kind:'decision',stop:null,provisional:true,record,question:firstLine(conflict.detail??record)});
+  if(ask)store.appendEvent({event:'owner-ask-opened',op:intake.id,ask:ask.id,kind:'decision',stop:null,by:'none',provisional:true,record,question:firstLine(conflict.detail??record)});
   return ask;
 }
 
@@ -245,6 +266,16 @@ const numberedOptions=summary=>{
 };
 const optionsOf=(ask,summary)=>ask.question?.options?.length?[...ask.question.options]:numberedOptions(summary);
 const requestersOf=(state,ask)=>state.ops.filter(item=>(ask.requesters??[]).includes(item.id));
+/**
+ * The question was not what the keyword that opened the tab said it was. The op's own question is corrected -
+ * a provision that turned out to be a decision carries no stop any more, a decision that turned out to be a
+ * provision carries one - and the change is on the record, because the requester's status moves with it.
+ */
+function reclassify(store,state,ask,from,to){
+  const stop=to==='provision'?(ask.question?.kind&&PROVISION_KINDS.includes(String(ask.question.kind))?ask.question.kind:'credential'):null;
+  ask.question={...(ask.question??{}),kind:to==='provision'?(stop??'credential'):'decision',stop};
+  store.appendEvent({event:'ask-reclassified',ask:ask.id,from,to});
+}
 
 /**
  * The ask op reported. Five shapes, and the first line of the summary says which:
@@ -253,13 +284,19 @@ const requestersOf=(state,ask)=>state.ops.filter(item=>(ask.requesters??[]).incl
  * - `answered-by-owner: <n>` - the owner typed the number in the op's own terminal; exactly `workflow-answer`.
  * - `credential: <VAR> present` / `provided: <what>` - the owner provided the thing and the op checked ONLY
  *   that it is there. The value never reaches the kernel, so it can never reach a file.
- * - `decision: <id>` on a STOP question - the owner's item on the list, the requester still paused.
- * - `decision: <id>` on any other question - the recommendation becomes a provisional answer, the requesters
+ * - `decision: <id>` with nothing else - the recommendation becomes a provisional answer, the requesters
  *   carry on, and the decision is listed under `state.provisional` until the owner confirms or overturns it.
+ * - `blocked`, or a stop question that came back with no decision at all - the owner's item on the list.
+ *
+ * WHICH of them applies is read out of the report, never out of the op's kind. The shape of the tab was chosen
+ * by a keyword before the op had read anything; the op read the records, and either form may end any of the
+ * three ways. A `provision.ask` that found a design decision lifts its own stop (`ask-reclassified`), and a
+ * `decision.prepare` that found a credential resumes its requester on the presence the owner provided.
  */
 export function settleOwnerAsk(store,state,ask,report){
   const summary=redactSecrets(String(report.summary??''));
   const requesters=requestersOf(state,ask);
+  const stop=ask.question?.stop??stopReasonFor(ask.question??{});
   const fromRecord=marker(summary,'answered-from');
   if(fromRecord){
     const [record,...rest]=fromRecord.split(/\s+/);
@@ -280,14 +317,20 @@ export function settleOwnerAsk(store,state,ask,report){
   if(credential||provided){
     const what=credential?`${credential[1]}${credential[2]?` in ${credential[2]}`:''}`:String(provided).slice(0,120).trim();
     const answer=`The owner provided ${what}; the operation confirmed only that it is present and never read its value. Read it from its custody at the moment of use and never copy it into a file, a log or a report.`;
+    // The tab was opened as a decision and the question turned out to be a provision after all. The requester is
+    // `pending` on this ask rather than paused, and the presence the owner provided is its answer just the same.
+    if(!stop)reclassify(store,state,ask,'decision','provision');
     for(const requester of requesters)resumeWithAnswer(store,state,requester,answer);
     store.appendEvent({event:'credential-present',ask:ask.id,provided:what,requesters:requesters.map(item=>item.id)});
     return;
   }
   const record=(String(marker(summary,'decision')??'').match(/^\S+/)??[])[0]??null;
   const options=optionsOf(ask,summary);
-  const stop=ask.question?.stop??stopReasonFor(ask.question??{});
-  if(stop){
+  // A stop question that came back with a DECISION is not a provision: the keyword that opened the provision tab
+  // was a hint and the op read the records. The stop is lifted here - nothing is left for the owner to provide -
+  // and the recommendation is taken provisionally exactly as a prepared decision is, so the requester resumes.
+  if(stop&&record)reclassify(store,state,ask,'provision','decision');
+  else if(stop){
     state.needUser.push({op:ask.id,kind:'decision',detail:`${ask.question?.text??ask.goal} - answer with workflow-answer --id ${state.id} --op ${ask.id} --choice <n> [--note "..."]${record?` (decision record ${record})`:''}`,record,options,requesters:requesters.map(item=>item.id)});
     store.appendEvent({event:'owner-question',ask:ask.id,record,options:options.length,stop,requesters:requesters.map(item=>item.id)});
     return;
