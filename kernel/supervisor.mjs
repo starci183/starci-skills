@@ -112,14 +112,23 @@ export function superviseForever({repoRoot,roots=null,launcher,pollMs=DEFAULT_PO
     // A probe that fails leaves the last good budget in place and says so.
     if(lastProbe===null||now()-lastProbe>=probeMs){
       lastProbe=now();
-      const probed=probe({at:lastProbe});
+      // A probe that THROWS is a broken `orca` on the PATH, not a reason to stop supervising anything.
+      let probed=null;
+      try{probed=probe({at:lastProbe});}
+      catch(error){probed={ok:false,reason:String(error?.message??error).slice(0,300)};}
       if(probed?.ok){
         for(const store of stores){try{writeRuntimeBudget(store,probed.budget);}catch(error){log({event:'budget-write-failed',store,reason:String(error?.message??error)});}}
         log({event:'budget-probed',providers:Object.fromEntries(Object.entries(probed.budget.providers).map(([provider,entry])=>[provider,Object.fromEntries(Object.entries(entry.windows).map(([name,win])=>[name,win.usedPercent]))]))});
       }else log({event:'budget-probe-failed',reason:probed?.reason??'unknown'});
     }
-    const result=superviseOnce({repoRoot,roots,launcher,healthMs,log,now});
+    // One bad round - a state file read mid-write, a launch that threw - is logged and survived: the supervisor
+    // is the one process that must outlive every fault it meets, or nothing restarts anything.
+    let result;
+    try{result=superviseOnce({repoRoot,roots,launcher,healthMs,log,now});}
+    catch(error){log({event:'supervisor-round-failed',round,reason:String(error?.stack??error?.message??error).slice(0,600)});sleep(pollMs);round+=1;continue;}
     log({event:'supervisor-round',round,rounds:result.rounds.map(item=>`${item.id}:${item.action}`)});
+    // The pulse a kernel reads to know its supervisor lives (`reviveSupervisor`): pid and time, beside each store.
+    for(const store of stores){try{fs.mkdirSync(store,{recursive:true});fs.writeFileSync(path.join(store,'supervisor.lock'),JSON.stringify({pid:process.pid,at:now(),round}));}catch{}}
     // The supervisor lives as long as any approved workflow is unfinished: a stop flag pauses a kernel, it does not
     // end supervision, because the flag is removed when the kernel may run again.
     const active=result.rounds.filter(item=>item.approved&&!item.finished);

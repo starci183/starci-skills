@@ -38,8 +38,11 @@ export const custodyIn=text=>(String(text??'').match(CUSTODY_TOKEN)??[])[1]??nul
  * and the words of the question are read otherwise. Neither is invented: a question that names no variable and
  * a tree that declares no custody produce nulls, and the owner is told exactly that instead of a guess.
  */
-export function credentialAsked(ask,{declared=[]}={}){
-  const text=`${ask?.question?.text??''}\n${ask?.question?.detail??''}\n${ask?.goal??''}`;
+export function credentialAsked(ask,{declared=[],requesters=[]}={}){
+  // The custody slug is wherever it was said: the question, the ask op's own reports (an agent that could not
+  // prepare still named "identity:<slug>" in its blocker), and what the requesters reported before asking.
+  const said=op=>(op?.reports??[]).map(report=>`${report?.summary??''}\n${report?.blocker?.detail??''}`).join('\n');
+  const text=`${ask?.question?.text??''}\n${ask?.question?.detail??''}\n${ask?.goal??''}\n${said(ask)}\n${requesters.map(said).join('\n')}`;
   const named=variablesIn(text);
   const rows=declared.filter(entry=>entry?.credential?.name);
   const matched=rows.filter(entry=>named.includes(entry.credential.name));

@@ -561,6 +561,16 @@ test('the same option confirms a provisional decision; a different one overturns
  * door. A provision is never asked for as a value: presence is the only thing that is ever checked, and no
  * value can travel because the op never reports one.
  */
+test('the custody of a credential is read from what the ask and its requesters reported, not only from the question',async()=>{
+  const {credentialAsked}=await import('../kernel/fill.mjs');
+  const ask={question:{text:'Which existing repository command proves ZALO_BOT_TOKEN authentication against zalo-bot-api?'},goal:'',
+    reports:[{outcome:'blocked',summary:'Owner provisioning prompt timed out.',blocker:{kind:'authority',detail:'ZALO_BOT_TOKEN for zalo-bot-api in identity:chatbot-zalo-bot'}}]};
+  assert.deepEqual(credentialAsked(ask),{variables:['ZALO_BOT_TOKEN'],custody:'identity:chatbot-zalo-bot',provider:null});
+  const bare={question:{text:'PAY_API_KEY is not provided'},goal:'',reports:[]};
+  assert.deepEqual(credentialAsked(bare,{requesters:[{reports:[{summary:'blocked',blocker:{detail:'PAY_API_KEY lives in identity:payments'}}]}]}).custody,'identity:payments');
+  assert.equal(credentialAsked(bare).custody,null,'nothing named a custody: nothing is invented');
+});
+
 test('the owner answers in the op\'s own terminal, and a credential reports only that it is present',()=>{
   const dir=tmp();
   try{

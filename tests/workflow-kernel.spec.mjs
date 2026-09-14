@@ -20,7 +20,7 @@ import * as work from '../kernel/ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../kernel/graph.mjs';
 import {machineVerify} from '../kernel/kernel.mjs';
 import {attributedFiles} from '../kernel/verify.mjs';
-import {relocateLauncher} from '../kernel/kernel.mjs';
+import {relocateLauncher,reviveSupervisor} from '../kernel/kernel.mjs';
 import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
@@ -3029,6 +3029,28 @@ test('a blocked credential ask from an older build is taken over by the kernel a
     assert.ok(events(store).some(event=>event.event==='provision-fill-readmitted'&&event.ask==='ask-3'&&event.was==='blocked'));
     assert.ok(events(store).some(event=>event.event==='provision-fill-waiting'&&event.ask==='ask-3'));
     assert.equal(after.ops.find(op=>op.id==='op-send').status,'paused','the requester still waits, now on the custody');
+  }finally{harness.cleanup();}
+});
+
+/** A kernel that finds its supervisor's pulse stale and its pid gone starts one, once per window; a fresh pulse or no pulse means nothing. */
+test('a kernel revives a dead supervisor from its stale pulse, once per window, and leaves a live or absent one alone',()=>{
+  const harness=setupWork({});
+  try{
+    const store=harness.store,state=harness.state;state.host=path.resolve('.');
+    const file=path.join(path.dirname(store.dir),'supervisor.lock');
+    const spawned=[];const spawn=(executable,args,options)=>{spawned.push({executable,args,cwd:options.cwd});return 777;};
+    let clock=10*60*1000;const now=()=>clock;
+    assert.equal(reviveSupervisor(store,state,{},{now,spawn,alive:()=>false}),null,'no pulse was ever written: a kernel run by hand has no supervisor to miss');
+    fs.writeFileSync(file,JSON.stringify({pid:4242,at:clock-60*1000}));
+    assert.equal(reviveSupervisor(store,state,{},{now,spawn,alive:()=>false}),null,'a pulse one minute old is a live supervisor');
+    fs.writeFileSync(file,JSON.stringify({pid:4242,at:clock-6*60*1000}));
+    assert.equal(reviveSupervisor(store,state,{},{now,spawn,alive:()=>true}),null,'stale pulse but the pid still answers: it is only slow');
+    assert.equal(reviveSupervisor(store,state,{},{now,spawn,alive:()=>false}),777,'stale pulse and no process: revived');
+    assert.deepEqual(spawned[0].args.slice(1),['workflow-supervise','--host',state.host]);
+    assert.match(spawned[0].args[0],/bin[\\/]starci\.mjs$/);
+    assert.equal(reviveSupervisor(store,state,{},{now,spawn,alive:()=>false}),null,'not twice inside the window');
+    const revived=events(store).filter(event=>event.event==='supervisor-revived');
+    assert.deepEqual(revived.map(event=>[event.pid,event.lastPid]),[[777,4242]]);
   }finally{harness.cleanup();}
 });
 
