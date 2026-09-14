@@ -5,7 +5,8 @@ import {skillRoot} from '../core/runtime-root.mjs';
 import {getPath} from '../hosts/orca/calls.mjs';
 import {waitTick} from '../hosts/orca/protocol.mjs';
 import {buildOperationLaunch,notifyTerminal,settleDispatch,startOperation,sweepWorktree} from '../hosts/orca/launch.mjs';
-import {validateReport} from './reports.mjs';
+import {buildReport,validateReport} from './reports.mjs';
+import {TAB_READ_LIMIT,classifyTab} from './tab.mjs';
 import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot,workflowsRoot} from './store.mjs';
 import {grammarRepository,resolveLedgerRoot,sharedLedgerStatus} from './routing.mjs';
 import {createAllocator,loadRuntimes} from './schedule.mjs';
@@ -30,10 +31,10 @@ import {readDistJson} from '../core/runtime-root.mjs';
 import {recordDigests,reconcileIntake} from './reconciliation.mjs';
 import {renderChecksFor} from '../checks/render.mjs';
 import {laneOwnerOf,laneNameOf,laneRowTitle,laneView,openLane,settleLane,laneBranchRef} from './lanes.mjs';
-import {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTerminals,ownKernelTerminal,rebindRunIfNeeded,
+import {INFRA_RESTART_LIMIT,RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTerminals,ownKernelTerminal,rebindRunIfNeeded,
   recoverCoordinatorTab,reconcileWithOrca,releaseKernelTab,siblingKernelGone,sweepStaleTerminals} from './terminals.mjs';
 import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,isAsk,openConflictDecision,answerCommand,answerOrEscalate,answerOwnerQuestion,dedupeNeedUser,inheritProvisional,
-  openOwnerAsk,provisionalLines,settleOwnerAsk,stopReasonFor,
+  openOwnerAsk,provisionalLines,redactSecrets,settleOwnerAsk,stopReasonFor,
   mechanicalOwnerLine,noteOwnerList,ownerItems,ownerLines,waitsForOwner} from './owner.mjs';
 import {BRAND_PAYLOAD,attributedFiles,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
   kernelProof,machineVerify,noteBrand,opDiff,provenChecks,readValidatorMemory,recordVerdict,renderValidatorMemory,
@@ -74,6 +75,7 @@ export {WORKFLOW_KERNEL,FINAL_REPORT,GOAL_RECORD,LEDGER_MODES,WORK_LEDGER,WORK_O
   currentBranch,detectLedgerMode,ledgerBinding,dynamicBudget,hostDescriptorOf,hostMissing,parseQuota,
   reportAllowlist,workOpId,workModule,grammarReferences};
 export {laneRowTitle,LANE_NAME,laneNameOf,laneOwnerOf,openLane,laneView} from './lanes.mjs';
+export {TAB_READ_LIMIT,TAB_VERDICTS,TAB_WINDOW,classifyTab,contractTrace} from './tab.mjs';
 export {INFRA_RESTART_LIMIT,RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,infrastructureCause,recoverCoordinatorTab,reconcileWithOrca,rebindRunIfNeeded,
   sweepStaleTerminals} from './terminals.mjs';
 export {ASK_KINDS,DECISION_PREPARE,PROVISION_ASK,isAsk,PROVISION_KINDS,QUESTION_KINDS,STOP_KINDS,answerCommand,answerOwnerQuestion,credentialNeed,
@@ -311,6 +313,8 @@ function launchOp(orca,store,state,op,allocated,ctx){
   const contract=renderContract({template:ctx.template,op,state,store,guards:ctx.guards,protectedPaths:op.kernelOwned});
   fs.writeFileSync(store.contractPath(op.id),contract);
   op.contractFile=store.contractPath(op.id);
+  // How much the agent is told to read before it may do anything: the grace before the first stall verdict.
+  op.contractBytes=Buffer.byteLength(contract,'utf8');
   const relative=path.relative(process.cwd(),state.worktree)||'.';
   // A launch that throws - Orca unreachable, a spec the command line cannot carry - is a failed launch, never the
   // end of the kernel: the op records it, avoids the runtime, and the loop goes on.
@@ -1752,6 +1756,107 @@ function noteSilence(store,state,op,ctx){
  */
 export const OP_DEADLINE_MS={verify:3*60*60*1000,default:8*60*60*1000};
 export const opDeadlineFor=op=>Number.isFinite(op?.timeoutMs)&&op.timeoutMs>0?op.timeoutMs:kindRole(op?.kind)==='verify'?OP_DEADLINE_MS.verify:OP_DEADLINE_MS.default;
+
+/* ------------------------------------------------------------------ the tab before the verdict */
+
+/**
+ * The first minutes of an attempt are not evidence of anything. An agent handed a long contract is told to read
+ * it from a file before it does anything else, and reading twelve thousand characters looks exactly like an idle
+ * prompt to a probe that only knows whether output moved. `telegram-bot-author` was called idle thirty-nine
+ * seconds after its launch and cooled two attempts later without ever having been given the time to start.
+ *
+ * So an operation whose contract is long, or whose kind authors a record rather than working from one
+ * (`work.author`, `implementation.plan`, an intake, the two ask kinds), is owed `LONG_CONTRACT_GRACE_MS` of
+ * quiet after `launched` before any stall verdict is taken about it: no nudge, no settle, no tab read.
+ */
+export const LONG_CONTRACT_GRACE_MS=3*60*1000;
+/** A contract past this is "long": the operator contracts that author records run three to thirteen kilobytes. */
+export const LONG_CONTRACT_BYTES=8*1024;
+/** Relaunches the kernel pays for itself (`prompt-missing`) before it starts charging them to the operation. */
+/** The two liveness words that are a guess about a screen, and so the two the kernel checks the screen for. */
+const TAB_READ_LIVENESS=['stalled-idle','stalled-silent'];
+const graceMsFor=op=>authorsRecord(op?.kind)||isAsk(op?.kind)||plain(op?.intake)||Number(op?.contractBytes??0)>=LONG_CONTRACT_BYTES
+  ?LONG_CONTRACT_GRACE_MS:0;
+/** Whether this operation is still inside its grace. An attempt with no launch time has no grace to be inside. */
+export function withinStallGrace(op,now){
+  const grace=graceMsFor(op);
+  return grace>0&&Number.isFinite(op?.launchedAt)&&now-op.launchedAt<grace;
+}
+
+/** The tab's last lines through the seam the kernel already reads terminals with; null when there is no reading. */
+function readOpTab(orca,state,op){
+  if(!op.terminal)return null;
+  try{
+    const read=orca.invoke('terminal-read',{terminal:op.terminal,limit:TAB_READ_LIMIT,screen:true},{cwd:state.worktree});
+    if(read.outcome!=='ok')return null;
+    const tail=getPath(read.receipt,'result.terminal.tail');
+    return Array.isArray(tail)?tail.map(line=>String(line??'')):null;
+  }catch{return null;}
+}
+
+/** One reading per operation per liveness round: the round is the iteration the tick belongs to. */
+function tabVerdict(orca,state,op){
+  if(op.tabReadAt===state.iterations)return op.tabRead??null;
+  const tail=readOpTab(orca,state,op);
+  op.tabReadAt=state.iterations;
+  op.tabRead=tail?classifyTab({lines:tail,op}):null;
+  return op.tabRead;
+}
+
+/** What the tab said, as the report the operation would have written had it got that far. */
+function tabReport(state,op,read,text){
+  const base={run:state.run??state.id,task:op.task??op.id,dispatch:op.dispatch,from:op.terminal??op.id};
+  try{
+    const report=read.verdict==='asked'
+      ?buildReport({...base,outcome:'ask',summary:`${op.id} is waiting on a question it never reported`,
+        question:{text:text||`${op.id} asked a question in its tab`,options:[],...(read.kind?{kind:read.kind}:{})}})
+      :buildReport({...base,outcome:'failed',files:[],checks:[],
+        summary:text||`${op.id} ended its turn without writing a report`});
+    return {...report,via:'tab-read'};
+  }catch{return null;}
+}
+
+/**
+ * The kernel reads the tab before it calls an operation stalled, and answers what it finds there.
+ *
+ * Returns the verdict it acted on, or `null` when the ordinary nudge-and-settle path should judge this
+ * operation after all - because there is no tab to read, because the reading is `idle`, or because the kernel
+ * has already paid for this operation's launches `INFRA_RESTART_LIMIT` times and a relaunch it does not charge
+ * would loop for ever.
+ */
+function settleFromTab(orca,store,state,op,ctx,observed){
+  const read=tabVerdict(orca,state,op);
+  if(!read||read.verdict==='idle')return null;
+  if(read.verdict==='prompt-missing'&&(op.infraRestarts??0)>=INFRA_RESTART_LIMIT)return null;
+  const text=redactSecrets(String(read.text??'')).slice(0,600);
+  store.appendEvent({event:'tab-read',op:op.id,verdict:read.verdict,liveness:observed.liveness,...(text?{text}:{})});
+  // Still drawing a turn: the probe was early. The wait is extended, nothing is nudged and nothing is charged.
+  if(read.verdict==='working')return 'working';
+  // The prompt never reached the agent, so there is nothing the agent did wrong and nothing to hold against it:
+  // the attempt is relaunched, on the same runtime if the allocator offers it, and `op.restarts` does not move.
+  if(read.verdict==='prompt-missing'){
+    settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:'prompt-missing',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
+    ctx.allocator.release(op.runtime,{op:op.id});
+    op.infraRestarts=(op.infraRestarts??0)+1;
+    store.appendEvent({event:'op-relaunched',op:op.id,runtime:op.runtime,reason:'prompt-missing',
+      infraRestarts:op.infraRestarts,restarts:op.restarts});
+    op.status='ready';op.dispatch=null;op.terminal=null;op.nudged=false;op.launchedAt=null;
+    return 'prompt-missing';
+  }
+  const report=tabReport(state,op,read,text);
+  if(!report)return null;
+  const dispatch=op.dispatch,runtime=op.runtime,terminal=op.terminal;
+  try{fs.writeFileSync(store.reportPath(dispatch),JSON.stringify(report,null,2));}catch{}
+  applyOpReport(orca,store,state,op,report,{...ctx,orca});
+  // Exactly what an accepted report releases - unless the kernel answered the question, in which case the tab
+  // is still the only place that answer can be typed.
+  if(op.status!=='answering'){
+    settleDispatch(orca,dispatch,{cwd:state.worktree,reason:`tab-read:${read.verdict}`,terminalHandle:terminal,closeTerminal:true,wait:ctx.wait});
+    ctx.allocator.release(runtime,{op:op.id});
+  }
+  return read.verdict;
+}
+
 export function settleStalled(orca,store,state,ctx,tick){
   const now=clockOf(ctx);
   // An op that waits for the OWNER is exempt from the deadline: it is not slow, it is waiting, and the wait is
@@ -1772,6 +1877,16 @@ export function settleStalled(orca,store,state,ctx,tick){
     // A provision.ask is waiting for the owner in its tab by design: its idleness is the wait, not a stall.
     // A decision.prepare never waits, so its idleness is a stall like any other op's.
     if(op.kind===PROVISION_ASK&&observed.liveness==='stalled-idle')continue;
+    if(TAB_READ_LIVENESS.includes(observed.liveness)){
+      // A long contract is read before anything else happens, and reading it looks exactly like an idle prompt.
+      if(withinStallGrace(op,now)){
+        store.appendEvent({event:'stall-grace',op:op.id,kind:op.kind,liveness:observed.liveness,
+          sinceLaunchMs:now-op.launchedAt,graceMs:LONG_CONTRACT_GRACE_MS});
+        continue;
+      }
+      // The screen is the evidence. Only an `idle` reading - or no reading at all - reaches the nudge below.
+      if(settleFromTab(orca,store,state,op,ctx,observed))continue;
+    }
     if(observed.liveness==='stalled-idle'&&!op.nudged){
       notifyTerminal(orca,{cwd:state.worktree,terminal:op.terminal,wait:ctx.wait,
         text:'Continue; when you are finished report exactly once with the report command in your contract'});

@@ -22,13 +22,21 @@ const flag=(args,name)=>{const index=args.indexOf(`--${name}`);return index<0?nu
 export function scriptedOrca({reportsDir,scripts,worktree,run='run_wf',worktrees=null}){
   const terminals=new Map(),dispatches=new Map(),tasks=new Map(),live=new Map();
   const taken=new Map();let counter=0;const sends=[];
+  /**
+   * What one tab shows, for the kernel's own `terminal-read`. A test that cares sets it with `setScreen`; the
+   * default is a tab the contract reached and that is sitting at its prompt - what `stalled-idle` is supposed
+   * to mean - so a test that does not care keeps the nudge-and-settle path it had before the tab was read.
+   */
+  const screens=new Map();
+  const IDLE_TAB=['=== TASK ===','Task id: task_fake','● I have read the contract and started.','','❯'];
   // Every `worktree …` call the kernel makes, in order: a lane is created, named, status-set and removed through these.
   const worktreeCalls=[];
   const opOf=spec=>(String(spec??'').match(/op `([^`]+)`/)??[null,'unknown'])[1];
   const newHandle=()=>`term_${++counter}`;
   const screenOf=handle=>{
+    if(screens.has(handle))return screens.get(handle);
     const terminal=terminals.get(handle);
-    if(!terminal)return [];
+    if(!terminal)return IDLE_TAB;
     return terminal.sent
       ?['∵ Thinking… 1s','⠼ working (12s · esc to cancel)','qwen3.8-flash (Token Plan Singapore)']
       :['>_ Qwen Code (v0.23.3)','>   Type your message or @path/to/file','qwen3.8-flash (Token Plan Singapore)'];
@@ -156,7 +164,8 @@ export function scriptedOrca({reportsDir,scripts,worktree,run='run_wf',worktrees
     live.set(dispatch,dispatches.get(dispatch));
     return {ok:true,task:{id:task},dispatchId:dispatch,terminal:handle,selection:{target:'qwen3.8-flash'}};
   };
-  return {orca:createOrcaCalls({executable:'orca-fake',calls,spawn,now:()=>0}),terminals,dispatches,live,sends,worktreeCalls,register};
+  const setScreen=(handle,lines)=>{screens.set(handle,[...lines]);return handle;};
+  return {orca:createOrcaCalls({executable:'orca-fake',calls,spawn,now:()=>0}),terminals,dispatches,live,sends,worktreeCalls,register,screens,setScreen,IDLE_TAB};
 }
 
 /** Pools instead of a chain: least-index-free runtime per role, honouring `avoid`. */

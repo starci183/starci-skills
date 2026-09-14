@@ -1465,6 +1465,12 @@ load moved the pick; `allocation-budgeted` the provider window moved it; `schedu
 kind needs a capability this host does not offer; `op-out-of-repository` the node names another repository;
 `op-blocked` / `op-paused` / `op-resumed` / `op-reopened` / `op-done` the op's transitions; `op-added` a lane
 step or a newly schedulable node became an op; `accepted-early` a report arrived before the kernel asked;
+`tab-read {op, verdict, liveness, text?}` the kernel read the operation's tab before calling it stalled, and
+what it found there (`prompt-missing`, `asked`, `finished-unreported`, `working`; an `idle` reading is the
+ordinary path and is not written); `stall-grace {op, kind, sinceLaunchMs, graceMs}` an operation whose contract
+is long, or whose kind authors a record, was still inside `LONG_CONTRACT_GRACE_MS` of its launch, so no stall
+verdict was taken about it at all; `op-relaunched {op, reason: prompt-missing, infraRestarts}` a launch whose
+prompt never reached the tab was tried again without a restart being charged to the operation;
 `nudged` a silent operation was prompted; `stalled` the tick classified an operation as stalled or dead;
 `settled` a dispatch was released; `answered` an answer was typed into an operation's terminal;
 `report` a report was read; `report-rejected` it failed `validateReport` and the op comes back; `retry` /
@@ -1487,6 +1493,28 @@ minutes were read as a quota refusal; `rate-limit-readmitted` the cooldown passe
 `validator-only-block {from, to}` a report that failed or was blocked only on the whole-tree validator is read as done (partial when it carries open items) and judged by the kernel's scoped verdict; an `authority` line that parked an op for spending its retries on that validator is migrated to a cooldown with its retries cleared;
 `launch-cooling {migrated: true}` an environment line an older build or the terminal reconciliation parked (a lost agent, an idle restart, a launch nobody could take) was migrated to a cooldown by `readmitCooled`;
 an ask op holding a provision or an irreversible effect (`STOP_KINDS`) is waiting for the owner in its tab by design and is never nudged or restarted as `stalled-idle`; an ask op on any other question reports `decision` at once and never waits;
+
+**The kernel reads the tab before it calls an operation stalled.** `stalled-idle` is one word for four
+different situations, and "nudge once, settle, relaunch, four times, then cool" is the right answer to none of
+them. Before the nudge and before the settle, for `stalled-idle` and `stalled-silent` alike, `settleStalled`
+reads the operation's own tab through the seam it already reads terminals with
+(`terminal-read --screen --limit`) and classifies the last `TAB_WINDOW` (40) lines with `kernel/tab.mjs`:
+
+| verdict | what the frame shows | what the kernel does |
+| --- | --- | --- |
+| `prompt-missing` | nothing at all, or the agent's banner and prompt with no trace of the contract (no `=== TASK ===`, no Task, no Dispatch, not the op's own id) | the launch never delivered the prompt: the dispatch is settled and the operation goes back to `ready` on the same runtime, which is **not** avoided. `op.restarts` does not move; `op.infraRestarts` does, and past `INFRA_RESTART_LIMIT` (3) the ordinary settle judges it after all, so a tab Orca keeps refusing cannot loop for ever |
+| `asked` | the last thing the agent said ends in a question, or a permission/approval prompt is on screen (`Do you want to`, `❯ 1. Yes`, `(y/n)`, `Yes, and don't ask again`) | the reading is written as the report the operation never wrote - `{outcome:'ask', question:{text}}`, marked `via:'tab-read'`, at `store.reportPath(op.dispatch)`, redacted through `redactSecrets` - and routed through `applyOpReport` exactly as a reported `ask` is. A permission prompt carries `kind:'mechanical'`, so `answerOrEscalate` lets the kernel answer it through `ctx.decide` and escalates only what it cannot; every other question opens the owner's `decision.prepare` as usual. **Today the kernel does not press the key itself**: the allow-once keystroke is the supervisor's, sent by `waitTick` when the probe reads the same screen as `stalled-prompt` (`hosts/orca/protocol.mjs`), and a prompt that survives it reaches this path as a mechanical ask |
+| `finished-unreported` | a turn that ended - a summary, a `done` line with its clock time, a final message, or the report command erroring in front of it - and no report file | written as `{outcome:'failed', summary:<the last words>, files:[], checks:[]}` with the same marker and judged by the ordinary path, so the next attempt is given the last words as its finding instead of starting blind |
+| `working` | a spinner (`⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ ✳ ◐`), `Cogitating`, `Read N files` in the last lines | not stalled: the wait is extended, nothing is nudged, nothing is charged |
+| `idle` | anything else | the nudge-and-settle path above, unchanged |
+
+One reading per operation per liveness round, and a read that fails or finds no tab is no reading at all: the
+ordinary path judges the liveness, exactly as before. **Grace.** An operation whose contract is at least
+`LONG_CONTRACT_BYTES` (8 KiB), or whose kind authors a record rather than working from one (`work.author`,
+`implementation.plan`, an intake, the two ask kinds), is owed `LONG_CONTRACT_GRACE_MS` (3 minutes) of quiet
+after `launched` before **any** stall verdict is taken about it - no nudge, no settle, not even a tab read
+(`stall-grace`). An agent told to read a twelve-thousand-character contract from a file before it does anything
+else looks exactly like an idle prompt to a probe that only knows whether output moved.
 A decision record has one shape in the whole runtime: a business record at `features/<f>/business/srs/business-rules/policy-decisions/<slug>/index.yaml` with the `starci/srs-policy-decision@1` section (`decisionStatus: open` while `state: todo`), `refs: []` - the shape an decision.prepare writes, the reconciliation checker accepts (`isPolicyDecision`), the record catalog names and the validator's SRS layout allows. It names the records it concerns by id in its text, never as a graph edge into another feature.
 `shared-change-refused {reason: record-authoring op}` an intake, a migration or a node author asked for a shared change: a record author writes records under its allowlist and delegates no code change, so it is told the rule in its next attempt; `shared-op-withdrawn` a shared op an older rule opened on such an op's behalf was withdrawn on kernel start and its requester runs again with the rule;
 `owner-ask-marker-honoured` an ask op wrote `answered-from`, `answered-by-owner`, `credential` or `provided` beside an outcome other than `done`: the marker is the ruling and the ask is settled on it;

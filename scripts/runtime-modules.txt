@@ -42,6 +42,7 @@ kernel/sync.mjs
 kernel/owner.mjs
 kernel/lanes.mjs
 kernel/terminals.mjs
+kernel/tab.mjs
 kernel/verify.mjs
 kernel/contract.mjs
 kernel/view.mjs
