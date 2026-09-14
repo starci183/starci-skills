@@ -6,7 +6,7 @@ import {getPath} from '../hosts/orca/calls.mjs';
 import {waitTick} from '../hosts/orca/protocol.mjs';
 import {buildOperationLaunch,notifyTerminal,settleDispatch,startOperation,sweepWorktree} from '../hosts/orca/launch.mjs';
 import {buildReport,validateReport} from './reports.mjs';
-import {TAB_READ_LIMIT,TAB_VERDICTS,TAB_WINDOW,classifyTab} from './tab.mjs';
+import {TAB_READ_LIMIT,classifyTab} from './tab.mjs';
 import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot,workflowsRoot} from './store.mjs';
 import {grammarRepository,resolveLedgerRoot,sharedLedgerStatus} from './routing.mjs';
 import {createAllocator,loadRuntimes} from './schedule.mjs';
