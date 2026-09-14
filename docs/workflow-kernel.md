@@ -248,7 +248,7 @@ to each question, and the kernel asks for it in four places:
 | where | what `kernel/io.mjs` answers |
 | --- | --- |
 | the contract | `ioBlock(kind)` prints `## Reads` and `## Produces` under the goal, each record kind with the catalog's own one-line purpose, so an operation knows what it may cite and produce before it reads its allowlist |
-| an accepted `done` | `undeclaredWrites(kind, files)` maps every changed file to a record kind (`recordKindOfPath`) and returns the ones the kind never declared. A non-empty answer downgrades the report to `failed` with the finding `produced a <record> record it does not declare: <file>`, appends `io-undeclared-write` and retries the op. No model is asked; this runs before the validator |
+| an accepted `done` | `undeclaredWrites(kind, files)` maps each file the op is answerable for to a record kind (`recordKindOfPath`) and returns the ones the kind never declared. `files` here is the attributed set, not the whole diff: the changed files the op itself reported, over every attempt (see **What is machine-verified**), so a record another workflow left dirty in the shared tree is never a finding against it. A non-empty answer downgrades the report to `failed` with the finding `produced a <record> record it does not declare: <file>`, appends `io-undeclared-write` and retries the op. No model is asked; this runs before the validator |
 | the validator | `ioPayload(kind)` travels as `io:{reads,writes}` beside the diff, with the one rule that makes it binding: a record cited outside `reads` or written outside `writes` is a defect, whatever else the diff gets right |
 | the brand payload | `kindsReadingBrand()` is which kinds receive the `## Brand` block and the brand rules - the kinds whose declaration says they read `brand`, not a list the kernel remembers |
 
@@ -359,6 +359,24 @@ op's contract** in the worktree (`spawnSync`, shell, 30 min default), computes t
 `git status --porcelain` filtered to the op's allowlist, and commits them as `feat(<opId>): <goal>`.
 A check the kernel cannot reproduce downgrades the report to `failed` with the failing check as the
 finding, and the op comes back. The job **gates** are run the same way, by the kernel, never by an agent.
+
+A project has one Work tree and the backend repository owns it, so a frontend workflow writes its records
+into the backend's worktree, beside whatever the backend is building at that moment. A file dirty in that
+worktree is therefore not evidence of who wrote it, and an allowlist that happens to cover it is not evidence
+either: a gate repair that once carried the union of every op's allowlist was blamed for a `ui/index.yaml` a
+frontend lane was still writing. So the two are separated. `changedFiles` is unchanged - computed from
+`git status --porcelain`, never from the report - and stays what is committed, what the validator judges and
+what the proof plan reads. **Attribution** narrows it: the `undeclaredWrites` check is applied only to the
+files the operation itself claimed, across every attempt it made (`attributedFiles` over the `files` of each
+of its reports, intersected with what git shows), so a record it never claimed and never could write is not a
+finding against it, while its own uncommitted work from an earlier attempt still counts because that attempt
+reported it.
+
+One step earlier, `buildScope` keeps the Work tree out of a scope composed from *other* operations' allowlists
+- a gate repair, a review escalation - so a drawing op in the group never hands a code builder the records
+another lane is writing. That filter is not blanket: a composed scope keeps its Work-tree paths when the new
+op's own kind declares it writes a record other than `code` (`writesWorkRecords`), because a redraw or a
+decision is sent back to change exactly those records.
 
 The model is asked for forms only, never for control flow:
 
@@ -832,7 +850,7 @@ the validator and writes `validator-skipped` once; tests inject a stub the same 
 | --- | --- | --- |
 | `done`, checks reproduce | commit the allowlisted changes, ledger item `implemented` (`verified` for a review) with evidence `{opId, head}`, release the runtime | - |
 | `done`, a check fails for the kernel | downgrade to `failed`, retry the same op with the failing check as the finding | retry bound |
-| `done`, a changed file maps to a record kind the op's `writes` does not declare | downgrade to `failed`, `io-undeclared-write`, retry with one finding per file (`produced a <record> record it does not declare`). No model is asked and this runs before the validator | retry bound |
+| `done`, a changed file the op itself reported maps to a record kind the op's `writes` does not declare | downgrade to `failed`, `io-undeclared-write`, retry with one finding per file (`produced a <record> record it does not declare`). No model is asked and this runs before the validator | retry bound |
 | `done` from an intake whose reconciliation table does not hold | downgrade to `failed`, `reconciliation-rejected`, retry with the named findings; a checker that threw is `reconciliation-failed` and the intake settles as before the rule | retry bound |
 | `done` from an intake whose table holds | `reconciled {reference, conflict, new}`; every `conflict` row becomes a `needUser` `decision` item (`reconciliation-conflict`) answered by `workflow-answer --op <intake op>`; the workflow finishes `blocked` on an unanswered one | - |
 | `done` from an `interface.draw` whose render checks fail | downgrade to `failed`, `render-check-failed`, retry with one finding per failing check; a passing run is `render-checked`, a hook that threw is `render-check-unavailable` and the drawing is judged as before the rules | retry bound |
