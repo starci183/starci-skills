@@ -60,12 +60,13 @@ test('prefer-then-overflow fills the preferred runtime before it offers the next
   // A freed preferred slot takes the next operation straight back from the overflow runtime.
   allocator.release('gpt-5.6-sol');
   assert.equal(allocator.allocate('backend.implement').runtime,'gpt-5.6-sol');
-  const counts=tally([...picked,'gpt-5.6-sol']);
   const snapshot=allocator.snapshot();
   assert.equal(snapshot.policy,PREFER_THEN_OVERFLOW);
   assert.deepEqual(snapshot.preference.verify,['gpt-5.6-sol','claude-fable-5.1','gpt-6-astra','claude-opus','qwen3.8-flash']);
   assert.equal(snapshot.inFlight,6);
-  assert.equal(snapshot.runtimes['claude-opus'].remaining.ops,profile.runtimes['claude-opus'].budget.opsPerDay-counts['claude-opus']);
+  // No pool declares a daily budget any more - the probed provider window is the only one - so nothing is left to count.
+  assert.equal(profile.runtimes['claude-opus'].budget,undefined);
+  assert.equal(snapshot.runtimes['claude-opus'].remaining.ops,null);
   assert.equal(snapshot.runtimes['qwen3.8-flash'].remaining.tokens,null);
   assert.deepEqual(snapshot.cooling,[]);
   for(let index=0;index<4;index+=1)assert.equal(allocator.allocate('backend.implement').ok,true);
@@ -290,9 +291,9 @@ test('a runtime another kernel is already on is not the first choice: the next c
   shared.write({'claude-fable-5.1':liveOn(other,'op-decide')});
   assert.equal(loadsFileFor(path.join(shared.root,other)),shared.file);
   const allocator=createAllocator({runtimes:profile,now:()=>Date.UTC(2026,8,12,9),shared:{path:shared.file,workflow:mine}});
-  // Left to itself this kernel would take fable first: the role's preference is [fable, astra, opus], and of
-  // those only fable and astra carry the decide role at all.
-  assert.deepEqual(allocator.review('architecture.decide').localRanked,['claude-fable-5.1','gpt-6-astra']);
+  // Left to itself this kernel would take fable first: the role's preference is [fable, astra, opus, sol], and
+  // every one of them carries the decide role now - Opus is Fable's downgrade and Sol the last tier.
+  assert.deepEqual(allocator.review('architecture.decide').localRanked,['claude-fable-5.1','gpt-6-astra','claude-opus','gpt-5.6-sol']);
   // Fable carries the other workflow's op, so astra - equally capable and free - takes this one.
   const decided=allocator.allocate('architecture.decide');
   assert.equal(decided.runtime,'gpt-6-astra');
@@ -366,11 +367,12 @@ test('the probed provider budget blocks an exhausted window until its reset and 
   // Fable's own week is nearly gone while Codex has most of its week: astra takes the decide even though the chain says fable first.
   const spare=createAllocator({runtimes:profile,now:()=>at,budget:budgetAt(40,20,{fable:70})});
   const review=spare.review('architecture.decide');
-  assert.deepEqual(review.ready.map(item=>[item.runtime,item.remainingShare,item.band]),[['gpt-6-astra',80,3],['claude-fable-5.1',30,1]]);
+  // The downgrade runtimes are candidates too and rank by their own window: Sol beside Astra, Opus above Fable.
+  assert.deepEqual(review.ready.map(item=>[item.runtime,item.remainingShare,item.band]),[['gpt-6-astra',80,3],['gpt-5.6-sol',80,3],['claude-opus',60,2],['claude-fable-5.1',30,1]]);
   const decided=spare.allocate('architecture.decide');
   assert.equal(decided.runtime,'gpt-6-astra');
   assert.deepEqual(decided.sparedOver,['claude-fable-5.1']);
-  assert.deepEqual(decided.budget,{'gpt-6-astra':80,'claude-fable-5.1':30});
+  assert.deepEqual(decided.budget,{'gpt-6-astra':80,'gpt-5.6-sol':80,'claude-opus':60,'claude-fable-5.1':30});
   // Inside one band the role's own order stands: a few points never reorder the chain.
   const close=createAllocator({runtimes:profile,now:()=>at,budget:budgetAt(40,45)});
   assert.equal(close.allocate('architecture.decide').runtime,'claude-fable-5.1');
@@ -387,6 +389,55 @@ test('the probed provider budget blocks an exhausted window until its reset and 
   assert.equal(budgetBand(null),4);assert.equal(budgetBand(100),4);assert.equal(budgetBand(99),3);assert.equal(budgetBand(0),0);
   const blind=createAllocator({runtimes:profile,now:()=>at,budget:{path:path.join(os.tmpdir(),'no-such-starci-budget-dir')}});
   assert.equal(blind.review('architecture.decide').budget,null);
+});
+
+/**
+ * Every tier has a downgrade under it. The top tier is still preferred whenever it has a free slot; only a full,
+ * cooling or exhausted top tier moves the operation down - Fable to Opus, Astra to Sol - instead of stalling it.
+ */
+test('a decide operation downgrades to Opus and then to Sol when the reasoning runtimes are out, and returns to Fable the moment a slot frees',()=>{
+  const at=Date.UTC(2026,8,14,9);
+  const allocator=createAllocator({runtimes:profile,now:()=>at});
+  // A free Fable slot is chosen first, every time: the downgrade is an overflow, never a replacement.
+  assert.equal(allocator.allocate('decision.prepare').runtime,'claude-fable-5.1');
+  assert.equal(allocator.allocate('decision.prepare').runtime,'claude-fable-5.1');
+  // Fable's two slots and Astra's one are full now, so the operation goes down one tier, to Opus.
+  assert.equal(allocator.allocate('decision.prepare').runtime,'gpt-6-astra');
+  assert.equal(allocator.allocate('decision.prepare').runtime,'claude-opus');
+  const downgraded=allocator.allocate('decision.prepare');
+  assert.equal(downgraded.runtime,'claude-opus');
+  assert.equal(downgraded.overflowed,true);
+  assert.deepEqual(downgraded.preference,['claude-fable-5.1','gpt-6-astra','claude-opus','gpt-5.6-sol']);
+  // Opus is full too: the last tier of the chain takes it rather than nobody.
+  assert.equal(allocator.allocate('decision.prepare').runtime,'claude-opus');
+  assert.equal(allocator.allocate('decision.prepare').runtime,'gpt-5.6-sol');
+  // A freed Fable slot takes the next one straight back from the downgrade.
+  allocator.release('claude-fable-5.1');
+  assert.equal(allocator.allocate('decision.prepare').runtime,'claude-fable-5.1');
+});
+
+test('a decide operation whose reasoning windows are exhausted downgrades on the probed budget alone, and a hard one is no longer outside the tier',()=>{
+  const at=Date.UTC(2026,8,14,9);
+  // Claude's week and Codex's week are both spent, so Fable, Astra and Opus are all out of window; only Sol's
+  // provider is still readable here, which is exactly the case that used to leave a decide operation with nobody.
+  const spent={schema:'starci/runtime-budget@1',at,providers:{
+    claude:{status:'ok',windows:{weekly:{usedPercent:97,resetsAt:at+86_400_000,minutes:10080}}},
+    codex:{status:'ok',windows:{weekly:{usedPercent:20,resetsAt:at+86_400_000,minutes:10080}}}}};
+  const allocator=createAllocator({runtimes:profile,now:()=>at,budget:spent});
+  const decided=allocator.allocate('decision.prepare');
+  // Astra first - its own window is fine - and Opus and Fable are blocked by the window, not by a cap of ours.
+  assert.equal(decided.runtime,'gpt-6-astra');
+  assert.deepEqual(decided.blocked.filter(item=>item.budget).map(item=>item.runtime),['claude-opus','claude-fable-5.1']);
+  const next=allocator.allocate('decision.prepare');
+  assert.equal(next.runtime,'gpt-5.6-sol',"Astra's one slot is taken and Claude is out of window: Sol carries it");
+  // A hard decide operation reads the hard tier's own decide order, so it is never "outside the hard tier" again.
+  const hard=createAllocator({runtimes:profile,now:()=>at});
+  assert.deepEqual(hard.review('decision.prepare',{difficulty:'hard'}).preference,['claude-fable-5.1','gpt-6-astra','claude-opus','gpt-5.6-sol']);
+  assert.equal(hard.review('decision.prepare',{difficulty:'hard'}).blocked.some(item=>/outside the hard tier/.test(item.reason)),false);
+  assert.equal(hard.allocate('decision.prepare',{difficulty:'hard'}).runtime,'claude-fable-5.1');
+  // The coding roles keep the order they always had inside that same tier.
+  assert.deepEqual(hard.review('backend.implement',{difficulty:'hard'}).preference,['gpt-5.6-sol','claude-opus']);
+  assert.equal(hard.allocate('backend.implement',{difficulty:'easy'}).runtime,'qwen3.8-flash');
 });
 
 test('two kernels write the one ledger under a lock and both their launches survive',t=>{

@@ -91,7 +91,12 @@ export function applyQuota(runtimes,quota){
       // Tags name the difficulty levels a runtime accepts; an untagged runtime in the order accepts every level.
       copy.allocation.tiers=Object.fromEntries(['easy','medium','hard'].map(level=>[level,order.filter(id=>!tags[id]||tags[id].includes(level))]));
       copy.allocation.tierFill='ratio';
-    }else copy.allocation.tiers=plain(copy.allocation.tiers)?Object.fromEntries(Object.entries(copy.allocation.tiers).map(([level,list])=>[level,list.filter(id=>order.includes(id)).concat(order.filter(id=>!list.includes(id)))])):copy.allocation.tiers;
+    }else{
+      // The quota's order is laid over every tier, and over each role's own list inside a tier that has them.
+      const relist=list=>list.filter(id=>order.includes(id)).concat(order.filter(id=>!list.includes(id)));
+      const retier=entry=>Array.isArray(entry)?relist(entry):plain(entry)?Object.fromEntries(Object.entries(entry).map(([role,list])=>[role,Array.isArray(list)?relist(list):list])):entry;
+      copy.allocation.tiers=plain(copy.allocation.tiers)?Object.fromEntries(Object.entries(copy.allocation.tiers).map(([level,entry])=>[level,retier(entry)])):copy.allocation.tiers;
+    }
   }
   return copy;
 }
@@ -183,10 +188,23 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
   const roleFor=kind=>graphRole(kind)??runtimes.roleOfKind?.[kind]??'implement';
   /** The role's preference order, or null when the role declares none: then least-loaded ranks the pools. */
   const tiers=plain(allocation.tiers)?allocation.tiers:{};
+  /**
+   * The runtimes one difficulty admits for one role. A tier is a plain list, or a map that orders the tier per
+   * role (`{default:[...], decide:[...]}`): the reasoning roles name their own runtimes and their downgrade
+   * without disturbing the order the coding roles have inside the same tier.
+   */
+  const tierFor=(difficulty,role)=>{
+    const entry=difficulty?tiers[difficulty]:null;
+    if(Array.isArray(entry))return entry;
+    if(!plain(entry))return null;
+    const list=Array.isArray(entry[role])?entry[role]:Array.isArray(entry.default)?entry.default:null;
+    return list;
+  };
   /** The order for one allocation: the difficulty tier when declared, else the role's preference, else least-loaded. */
   const preferenceOf=(role,difficulty=null)=>{
     if(policy!==PREFER_THEN_OVERFLOW)return null;
-    const tier=difficulty&&Array.isArray(tiers[difficulty])?tiers[difficulty].filter(id=>(pools[id]?.roles??[]).includes(role)):null;
+    const named=tierFor(difficulty,role);
+    const tier=named?named.filter(id=>(pools[id]?.roles??[]).includes(role)):null;
     const list=tier&&tier.length?tier:preference[role];
     return Array.isArray(list)&&list.length?list.filter(id=>typeof id==='string'):null;
   };
@@ -198,7 +216,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
   /** Rank every pool for one kind: ready candidates in allocation order plus why each other was skipped. */
   const review=(kind,{avoid=[],restrictTo=null,difficulty=null}={})=>{
     rollDay();
-    const role=roleFor(kind),ready=[],blocked=[],order=preferenceOf(role,difficulty);
+    const role=roleFor(kind),ready=[],blocked=[],order=preferenceOf(role,difficulty),tier=tierFor(difficulty,role);
     const view=outside();
     // Another kernel's live operations are load here too, so `maxParallel` is the runtime's cap across the
     // whole repository and not per workflow; a cooldown it recorded parks the runtime for this kernel as well.
@@ -208,7 +226,6 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     const verdictOf=id=>probed?budgetVerdict(pools[id],probed,{now:now()}):{known:false,exhausted:false,until:null,remaining:null,windows:[]};
     for(const id of ids){
       const pool=pools[id],cool=cooling(id),parked=sharedCooling(id),held=elsewhere(id),free=slots(id)-load(id)-held,window=verdictOf(id);
-      const tier=difficulty&&Array.isArray(tiers[difficulty])?tiers[difficulty]:null;
       const reason=!Array.isArray(pool?.roles)||!pool.roles.includes(role)?`no ${role} role`
         :tier&&tier.length&&!tier.includes(id)?`outside the ${difficulty} tier`
         :avoid.includes(id)?'avoided'
@@ -228,7 +245,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     // preference simply is not in `ready` and the next one takes the operation without any special case.
     // A difficulty tier with ratio fill spreads its operations in proportion to the slots (4:1), then keeps the order;
     // otherwise the order itself is the fill (prefer, then overflow).
-    const tierRatio=difficulty&&allocation.tierFill==='ratio'&&Array.isArray(tiers[difficulty]);
+    const tierRatio=allocation.tierFill==='ratio'&&Boolean(tier);
     const locally=order&&tierRatio?(a,b)=>cmp(a.ratio,b.ratio)||cmp(a.preference,b.preference)||cmp(b.free,a.free)||cmp(a.rotation,b.rotation)
       :order?(a,b)=>cmp(a.preference,b.preference)||cmp(a.ratio,b.ratio)||cmp(b.free,a.free)||cmp(a.rotation,b.rotation)
       :(a,b)=>cmp(a.ratio,b.ratio)||cmp(b.free,a.free)||cmp(b.opsLeft,a.opsLeft)||cmp(a.rotation,b.rotation);

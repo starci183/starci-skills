@@ -1,23 +1,37 @@
 schema: starci/runtimes@1
 purpose: |-
-  Runtime allocation replaces provider chains. Every runtime is a pool with parallel slots, a daily budget
-  and a cooldown. The workflow kernel never spreads work evenly: each role has a preference order and every
-  ready operation takes the first preferred runtime that still has the role, a free slot, budget and no
-  cooldown, overflowing to the next only when the earlier ones are saturated or cooling, and returning to a
-  preferred runtime as soon as one of its slots frees. A runtime that fails is classified and parked for the
+  Runtime allocation replaces provider chains. Every runtime is a pool with parallel slots and a cooldown.
+  There is no daily cap here: the only budget is the provider's own window, which the supervisor probes and
+  writes beside the workflow stores (`runtime-budget.json`); a window at 95% is exhausted and its runtimes are
+  skipped until it resets. A cap of our own on top of that once stalled a migration at midnight while the
+  provider still had half its week. The workflow kernel never spreads work evenly: each role has a preference
+  order and every ready operation takes the first preferred runtime that still has the role, a free slot and
+  no cooldown, overflowing to the next only when the earlier ones are saturated, cooling or exhausted, and
+  returning to a preferred runtime as soon as one of its slots frees. Every tier has a downgrade under it, so
+  a full top tier moves work down instead of stalling. A runtime that fails is classified and parked for the
   cooldown of that failure kind, doubling per repeat.
 maxParallelOps: 10
 allocation:
   policy: prefer-then-overflow
+  # A tier may order its runtimes per role. The coding roles keep the tier they always had; decide and plan -
+  # the roles Fable and Astra carry - name the reasoning runtimes first and their downgrade after them, so a
+  # hard decide or plan operation is no longer "outside the hard tier" and never lands on the cheap pool.
   tiers:
-    hard: [gpt-5.6-sol, claude-opus]
-    medium: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
+    hard:
+      default: [gpt-5.6-sol, claude-opus]
+      decide: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
+      plan: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
+    medium:
+      default: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
+      decide: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
+      plan: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
     easy: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
   preference:
     implement: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
     verify: [gpt-5.6-sol, claude-fable-5.1, gpt-6-astra, claude-opus, qwen3.8-flash]
-    decide: [claude-fable-5.1, gpt-6-astra, claude-opus]
-    plan: [claude-opus, claude-fable-5.1]
+    # Fable overflows to Opus, Astra to Sol: the reasoning roles end on the coding runtimes instead of stalling.
+    decide: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
+    plan: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
     write: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
   # Heavy work fans out: a big node is cut into children with disjoint write scopes, the seam every other child
   # would touch is built first and alone, then the rest run at once - bounded here so one parent never takes
@@ -30,18 +44,19 @@ allocation:
   backoffFactor: 2
   maxCooldownMs: 3600000
 runtimes:
+  # No pool declares a budget: the probed provider window is the whole of it.
   gpt-5.6-sol:
     target: gpt-5.6-sol
     provider: codex
-    roles: [implement, verify, write]
+    # The last tier of the reasoning roles as well: when Fable, Astra and Opus are all out, Sol decides and plans.
+    roles: [implement, verify, write, decide, plan]
     maxParallel: 5
-    budget: {opsPerDay: 60, tokensPerDay: 12000000}
   claude-opus:
     target: claude-opus
     provider: claude
-    roles: [implement, verify, write, plan]
+    # Opus is Fable's downgrade, so it carries decide beside the plan role it always had.
+    roles: [implement, verify, write, plan, decide]
     maxParallel: 3
-    budget: {opsPerDay: 60, tokensPerDay: 20000000}
   claude-fable-5.1:
     target: claude-fable-5.1
     provider: claude
@@ -49,18 +64,15 @@ runtimes:
     budgetWindow: fableWeekly
     roles: [verify, decide, plan, write]
     maxParallel: 2
-    budget: {opsPerDay: 40, tokensPerDay: 8000000}
   gpt-6-astra:
     target: gpt-6-astra
     provider: codex
     roles: [decide, verify, plan]
     maxParallel: 1
-    budget: {opsPerDay: 20, tokensPerDay: 4000000}
   qwen3.8-flash:
     target: qwen3.8-flash
     roles: [implement, verify, write]
     maxParallel: 2
-    budget: {opsPerDay: 120}
 roleOfKind:
   backend.implement: implement
   frontend.implement: implement
