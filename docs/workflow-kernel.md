@@ -1130,7 +1130,7 @@ what it said at approval.
 A workflow has no monitor agent. Three layers keep it running on their own:
 
 - **Supervisor (process, `workflow-supervise`)**: one long-running program per repository. Every poll it reads `_local/workflows/*/state.json`, `events.jsonl` and `kernel.lock`; an approved, unfinished workflow with no live kernel is started (`workflow-run` detached), a kernel whose log stays silent past the health window (default 25 min, one wait tick plus slack) is killed and started again. Finished, stopped (`stop.flag`) or unapproved workflows are left alone. Log: `_local/workflows/supervisor.log`.
-- **Reconcile (kernel, start + every 10 ticks)**: the kernel compares Orca's `worker-list` of its Run with `state.ops`; a live Dispatch no operation names is an orphan and is settled (`reconciled-orphans` event). This is what a restarted kernel needs to trust its own state again.
+- **Reconcile (kernel, start + every 10 ticks)**: the kernel compares Orca's `worker-list` of its Run with `state.ops`; a live Dispatch no operation names is an orphan and is settled (`reconciled-orphans` event). This is what a restarted kernel needs to trust its own state again. In the other direction, an operation the kernel believes is running whose Dispatch Orca no longer lists is asked what it said last before it is called dead: a `worker_report` in its `last_failure` is taken as the operation's own report, an infrastructure failure is charged to `infraRestarts` instead of `restarts`, and only silence is `reconciled-dead`.
 - **Triage (LLM, closed options)**: the policy table handles known outcomes (done/failed/question/shared-change/stall/rate-limit). When the same anomaly signature repeats `TRIAGE_AFTER` (3) times, the kernel asks the `decide` function once, offering only `resume-ops | park-runtime | settle-op | restart-kernel | needUser`; the pick is applied, recorded (`triage` event) and never asked again for that signature in the workflow. Without a decider (tests, `--functions` off) triage is a no-op and the anomaly stays a counter.
 
 ```
@@ -1529,7 +1529,20 @@ kernel's own tab; `op-terminal-closed` an op's tab when nobody reads it any more
 periodic sweep, with the reason per tab; `coordinator-tab-lost` / `coordinator-tab-recovered` a coordinator
 whose pane died and the fresh tab the Run was re-bound to; `run-rebound` the Run was bound to this kernel's
 own tab, fencing the old tab's dispatches; `reconciled-orphans` a live dispatch no operation names;
-`reconciled-dead` a dispatch whose process is gone.
+`reconciled-dead` a dispatch whose process is gone, each entry naming its `cause`
+(`no-worker-no-terminal` | `infrastructure` | `worker-report`) and, when the Dispatch said anything,
+`lastWords {subject, body}` (the first 200 characters of the body);
+`dispatch-last-words {op, dispatch, outcome, subject}` the Dispatch was failed but its `last_failure`
+carried the agent's own `worker_report`, so those words were written as the op's report
+(`via: 'orca-worker-report'`, `files: []`, `checks: []`, the subject and body as the summary) and the
+ordinary acceptance path judges them - a `failed` goes back to the op with the body as its finding. The op
+is charged no restart for it, and keeps its dispatch and its runtime until the report is accepted.
+
+A restart nothing about the operation caused - the report command missing (`MODULE_NOT_FOUND`, or `ENOENT`
+on the launcher path), a task Orca never delivered (`agent_prompt_stalled`, `session_not_reported`), a
+terminal Orca closed - increments `op.infraRestarts`, never `op.restarts`: `RESTART_LIMIT` and the launch
+cooling count only what the operation itself did. `INFRA_RESTART_LIMIT` (12) is the separate, higher cap,
+and past it the op is `blocked` with a `needUser` `environment` item naming the last cause.
 
 **The preflight and the guards** - `preflight` the worktree preflight ran, with what it fixed;
 `preflight-blocked` a problem it could not fix, which becomes a `needUser` item;

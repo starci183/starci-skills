@@ -15,12 +15,13 @@ import {createStore} from '../kernel/store.mjs';
 import {createAllocator} from '../kernel/schedule.mjs';
 import {loadsFileFor} from '../kernel/loads.mjs';
 import {resolveLedgerRoot} from '../kernel/routing.mjs';
+import {RESTART_LIMIT} from '../kernel/common.mjs';
 import * as work from '../kernel/ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../kernel/graph.mjs';
 import {machineVerify} from '../kernel/kernel.mjs';
 import {attributedFiles} from '../kernel/verify.mjs';
 import {relocateLauncher} from '../kernel/kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -40,7 +41,7 @@ const indexOfEvent=(list,predicate)=>list.findIndex(predicate);
  * operation by writing the next report scripted for its operation id.
  */
 function scriptedOrca({reportsDir,scripts,run='run_wf'}){
-  const terminals=new Map(),dispatches=new Map(),tasks=new Map(),live=new Map();
+  const terminals=new Map(),dispatches=new Map(),tasks=new Map(),live=new Map(),shows=new Map();
   const taken=new Map();let counter=0;const sends=[];
   const opOf=spec=>(String(spec??'').match(/op `([^`]+)`/)??[null,'unknown'])[1];
   const newHandle=()=>`term_${++counter}`;
@@ -98,10 +99,15 @@ function scriptedOrca({reportsDir,scripts,run='run_wf'}){
         effects:[{kind:'terminal',role:'agent',id:handle},{kind:'dispatch_input',state:'accepted'}]}});
     },
     'worker-show':args=>{
-      const found=dispatches.get(flag(args,'dispatch'));
+      const id=flag(args,'dispatch');
+      // What Orca knows about a Dispatch no operation launched through this fake: a test that wants a failed
+      // Dispatch with its `last_failure` puts the record in `shows`, and worker-show answers with it.
+      const shown=shows.get(id);
+      const found=dispatches.get(id);
+      if(!found&&shown)return json(0,{ok:true,result:{dispatch:{id,...shown},worker:{state:'failed'},observation:{exactWorker:false,status:'exited'},terminal:null}});
       if(!found)return json(1,{ok:false,error:{message:'unknown dispatch'}});
       const terminal=terminals.get(found.handle);
-      return json(0,{ok:true,result:{dispatch:{id:found.id,task_id:found.task,status:'dispatched'},
+      return json(0,{ok:true,result:{dispatch:{id:found.id,task_id:found.task,status:'dispatched',...(shown??{})},
         worker:{state:'ready',agent_terminal_handle:found.handle,startOptions:{launch:{effective:{agent:found.agent,model:found.model}}},
           effects:[{kind:'dispatch_input',state:'accepted'}]},
         observation:{exactWorker:true,status:'running'},
@@ -137,7 +143,7 @@ function scriptedOrca({reportsDir,scripts,run='run_wf'}){
     if(!handler)throw Error(`Unexpected fake Orca call: ${args.join(' ')}`);
     return handler(args);
   };
-  return {orca:createOrcaCalls({executable:'orca-fake',calls,spawn,now:()=>0}),terminals,dispatches,live,sends};
+  return {orca:createOrcaCalls({executable:'orca-fake',calls,spawn,now:()=>0}),terminals,dispatches,live,shows,sends};
 }
 
 /** Pools instead of a chain: least-index-free runtime per role, honouring `avoid`. */
@@ -3360,6 +3366,94 @@ test('reconcile settles a live dispatch no operation names, and a repeated anoma
     assert.equal(triaged.option,'park-runtime');
     assert.equal(triageAnomaly(harness.store,harness.state,'missing',{}),null,'no decider or no entry is a no-op');
   }finally{harness.cleanup();}
+});
+
+/**
+ * The defect this rule answers: a dozen Codex operations finished their work, told Orca they could not run the
+ * kernel's report command (the launcher was not on disk), and were recorded as "dead: no worker and no
+ * terminal" - charged a restart each and launched again from scratch. The last words are read first now.
+ */
+const lastFailure=value=>JSON.stringify(value);
+const reportBody='I removed the unrelated helper and wrote the decision record. The prescribed tree validator passed, '
+  +'but the contract report command failed with MODULE_NOT_FOUND for D:/repo/.dist/execution/orca-supervised-launch.mjs';
+
+test('a dispatch that left last words is not dead: the worker report becomes the op\'s own report, and the body comes back as its finding',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const op=running(harness.state,'op-intake','ctx_words');
+    op.terminal='term_words';op.task='task_words';
+    harness.fake.shows.set('ctx_words',{status:'failed',last_failure:lastFailure({provenance:'worker_report',outcome:'failed',
+      subject:'Decision prepared; contract reporter missing',body:reportBody})});
+    const released=[];
+    const reconciled=reconcileWithOrca(harness.fake.orca,harness.store,harness.state,{cwd,wait:noWait,allocator:{release:runtime=>released.push(runtime)}});
+
+    assert.deepEqual(reconciled.dead.map(item=>[item.op,item.cause,item.restarts]),[['op-intake','worker-report',0]],
+      'the op keeps its restart count: the report command failed, the operation did not');
+    assert.equal(reconciled.dead[0].lastWords.subject,'Decision prepared; contract reporter missing');
+    assert.equal(reconciled.dead[0].lastWords.body,reportBody.slice(0,200),'the event carries the head of the body, not the whole of it');
+    assert.deepEqual(released,[],'the runtime stays taken: the op is still running, and acceptReports releases it with the report');
+    assert.equal(op.status,'running');assert.equal(op.dispatch,'ctx_words');
+    const spoke=events(harness.store).find(event=>event.event==='dispatch-last-words');
+    assert.deepEqual([spoke.op,spoke.dispatch,spoke.outcome,spoke.subject],
+      ['op-intake','ctx_words','failed','Decision prepared; contract reporter missing']);
+
+    // The report file is a report like any other: the ordinary acceptance path reads it on the next tick.
+    const written=JSON.parse(fs.readFileSync(harness.store.reportPath('ctx_words'),'utf8'));
+    assert.equal(written.schema,'starci/op-report@1');
+    assert.equal(written.outcome,'failed');
+    assert.equal(written.via,'orca-worker-report');
+    assert.deepEqual([written.files,written.checks],[[],[]]);
+    assert.match(written.summary,/Decision prepared; contract reporter missing - I removed the unrelated helper/);
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,exec:()=>({status:0,stdout:'',stderr:''}),
+      now:()=>0,work:null,wait:noWait,decide:()=>{throw Error('last words are not a decision');},validateOp:acceptAll};
+    assert.equal(applyOpReport(harness.fake.orca,harness.store,harness.state,op,written,ctx),'retry');
+    const retry=events(harness.store).findLast(event=>event.event==='retry');
+    assert.match(retry.findings.join(' '),/contract report command failed with MODULE_NOT_FOUND/);
+  }finally{harness.cleanup();}
+});
+
+test('a restart the environment caused is charged to the environment: infraRestarts counts it, the op is never cooled, and only its own cap reaches the owner',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    harness.fake.shows.set('ctx_stalled',{status:'failed',last_failure:lastFailure({provenance:'orca',reason:'agent_prompt_stalled'})});
+    const op=harness.state.ops[0];
+    const owner=harness.state.needUser.length;
+    for(let round=1;round<=RESTART_LIMIT+2;round+=1){
+      Object.assign(op,{status:'running',dispatch:'ctx_stalled',runtime:'qwen3.8-flash',terminal:'term_stalled'});
+      const reconciled=reconcileWithOrca(harness.fake.orca,harness.store,harness.state,{cwd,wait:noWait});
+      assert.deepEqual(reconciled.dead.map(item=>[item.cause,item.restarts,item.infraRestarts]),[['infrastructure',0,round]]);
+      assert.equal(op.status,'ready',`round ${round}: a prompt Orca never delivered never blocks the op`);
+      assert.equal(op.refusal,null,'an infrastructure restart never cools the op');
+      assert.equal(op.restarts,0,'the op is charged nothing it did not do');
+    }
+    assert.equal(harness.state.needUser.length,owner,'past the ordinary restart limit the op is still running, not on the owner\'s list');
+    assert.match(op.infraCause,/agent_prompt_stalled/);
+
+    // A truly broken environment still surfaces - under its own, higher cap, and naming the last cause.
+    op.infraRestarts=INFRA_RESTART_LIMIT;
+    Object.assign(op,{status:'running',dispatch:'ctx_stalled',runtime:'qwen3.8-flash',terminal:'term_stalled'});
+    reconcileWithOrca(harness.fake.orca,harness.store,harness.state,{cwd,wait:noWait});
+    assert.equal(op.status,'blocked');
+    assert.equal(harness.state.needUser.length,owner+1);
+    assert.equal(harness.state.needUser.at(-1).kind,'environment');
+    assert.match(harness.state.needUser.at(-1).detail,/never to its own work: the task was never delivered to the agent/);
+  }finally{harness.cleanup();}
+});
+
+test('the infrastructure causes are the ones the runtime owns; a failure of the work itself is the op\'s',()=>{
+  assert.match(infrastructureCause('Error [ERR_MODULE_NOT_FOUND]: Cannot find module'),/MODULE_NOT_FOUND/);
+  assert.match(infrastructureCause('worker-start failed: agent_prompt_stalled'),/never delivered/);
+  assert.match(infrastructureCause('session_not_reported'),/never reported/);
+  assert.match(infrastructureCause('the agent terminal was closed by Orca'),/closed the terminal/);
+  assert.match(infrastructureCause('spawn ENOENT D:/repo/.dist/execution/orca-supervised-launch.mjs'),/not on disk/);
+  assert.match(infrastructureCause('ENOENT L.mjs',{launcher:'D:/repo/L.mjs'}),/not on disk \(ENOENT L\.mjs\)/);
+  assert.equal(infrastructureCause('npx vitest run sales exited 1'),null);
+  assert.equal(infrastructureCause('ENOENT ./fixtures/orders.json'),null,'a file the operation\'s own work is missing is the operation\'s');
+  assert.equal(infrastructureCause(null),null);
 });
 
 /* ------------------------------------------------------------------ the validator */
