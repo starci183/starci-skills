@@ -64,6 +64,20 @@ writes:
         runtime resources those checks need. Preserve every other authored line, including the node's
         description, refs, dependsOn, required flag and state. Never write completion, never write the kernel's
         own extension block, never write anything under the node's evidence folder, and never edit another node."
+  - id: integration
+    path: .starciwork/features/<feature>/integration/<integration-id>/index.yaml
+    fields:
+      - schema
+      - id
+      - kind
+      - required
+      - state
+      - description
+      - assertions
+    content:
+      en: One todo integration node per integration the feature declares (kind integration, state todo, required
+        true), naming the outside system and the credential by variable name only; the node the tree owes for the
+        declaration, whose live proof is another operation's. Never a credential value.
   - id: parts
     path: .starciwork/<node-dir>/<part>/index.yaml
     fields:
@@ -151,6 +165,16 @@ steps:
         Build nothing and change no product source; the kernel launches the node's own work afterwards.
   - reads:
       - target
+    writes:
+      - integration
+    action:
+      en: >-
+        Intake and migrate modes. For every integration the feature declares at extensions.work3.integrations, author
+        one todo integration node at features/<feature>/integration/<integration-id>/index.yaml when none exists:
+        kind integration, state todo, required true, a description naming the outside system and the credential
+        by variable name, and one assertion per behaviour a live proof must show. Never a value.
+  - reads:
+      - target
       - specification
       - source
     writes:
@@ -226,5 +250,7 @@ blockers:
         exact question - which module wiring, which contract, which migration is shared - never a cut that leaves
         two children writing the same file."
 placeholders:
+  feature: Feature folder of the intake or migration, inside the operation allowlist
+  integration-id: Stable id of one declared integration, the folder its node is named after
   node-dir: Tree-relative directory of the cut Work node, inside the operation allowlist
   part: Stable slug of one child node under that directory
