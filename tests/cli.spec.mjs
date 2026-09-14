@@ -361,6 +361,17 @@ function fakeSops(t, { encryptStatus = 0 } = {}) {
 }
 const SYNTHETIC = 'SYNTHETIC-NOT-A-REAL-KEY-0123456789';
 
+test('sops runs with the host\'s master age identity when nothing names a key file', async () => {
+  const {sopsEnv}=await import('../core/identity.mjs');
+  const home=fs.mkdtempSync(path.join(os.tmpdir(),'starci-age-'));
+  try{
+    assert.equal(sopsEnv({USERPROFILE:home}).SOPS_AGE_KEY_FILE,undefined,'no key file on this host: nothing is invented');
+    fs.mkdirSync(path.join(home,'.starci'),{recursive:true});fs.writeFileSync(path.join(home,'.starci','master.identity'),'# AGE-SECRET-KEY placeholder for the test\n');
+    assert.equal(sopsEnv({USERPROFILE:home}).SOPS_AGE_KEY_FILE,path.join(home,'.starci','master.identity'));
+    assert.equal(sopsEnv({USERPROFILE:home,SOPS_AGE_KEY_FILE:'C:/elsewhere/key.txt'}).SOPS_AGE_KEY_FILE,'C:/elsewhere/key.txt','a named key file is never overridden');
+  }finally{fs.rmSync(home,{recursive:true,force:true});}
+});
+
 test('identity set puts a value into the tree\'s encrypted custody from stdin alone, and echoes it nowhere', t => {
   const parent = temporary(t);
   const root = path.join(parent, '.starciwork');

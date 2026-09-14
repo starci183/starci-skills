@@ -56,6 +56,22 @@ export function findWorkRoot(from=process.cwd(),given=null){
  * we will not run a shell, because a shell is one more place an argument could be logged. So the executable is
  * found here, explicitly, and spawned by its absolute path.
  */
+/**
+ * The environment sops runs with. The tree's `.sops.yaml` names the master age recipient; the private half lives
+ * on this host at `~/.starci/master.identity` (Windows: `%USERPROFILE%\\.starci\\master.identity`) and sops finds it
+ * only through `SOPS_AGE_KEY_FILE`. A kernel started by the supervisor, or an op in a fresh terminal, has no such
+ * variable: the kernel's own presence check then fails to open a custody the owner had just filled, and an
+ * agent reports the key "unavailable". When nothing names a key file and that file exists, it is named here.
+ */
+export function sopsEnv(env=process.env){
+  if(env?.SOPS_AGE_KEY_FILE)return env;
+  const home=env?.USERPROFILE??env?.HOME??'';
+  if(!home)return env;
+  const file=path.join(home,'.starci','master.identity');
+  return fs.existsSync(file)?{...env,SOPS_AGE_KEY_FILE:file}:env;
+}
+export const MASTER_IDENTITY_HINT='<home>/.starci/master.identity';
+
 export function resolveExecutable(name,{env=process.env}={}){
   const separator=process.platform==='win32'?';':':';
   const extensions=process.platform==='win32'
@@ -111,6 +127,7 @@ const refuse=reason=>({ok:false,reason});
 export function setIdentitySecret({workRoot,slug,name,value,env=process.env,run=spawnSync,now=()=>new Date().toISOString()}){
   need(VARIABLE.test(String(name??'')),`A credential variable is a name like STRIPE_SECRET_KEY (got ${name})`);
   need(typeof value==='string'&&value.trim(),'The credential value is read from stdin and must not be empty');
+  env=sopsEnv(env);
   const paths=identityPaths(workRoot,slug);
   const sops=resolveExecutable('sops',{env});
   if(!sops)return refuse('sops is not on PATH; install sops (https://github.com/getsops/sops) and run this again. No value was read from stdin into any file.');
@@ -245,6 +262,7 @@ function readLine(stream){
  */
 export function identitySecretPresent({workRoot,slug,name,env=process.env,run=spawnSync}){
   need(VARIABLE.test(String(name??'')),`A credential variable is a name like STRIPE_SECRET_KEY (got ${name})`);
+  env=sopsEnv(env);
   const paths=identityPaths(workRoot,slug);
   if(!fs.existsSync(paths.secrets))return refuse(`identity:${slug} holds nothing yet - ${slash(paths.secrets)} does not exist.`);
   const sops=resolveExecutable('sops',{env});
