@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {AUTHOR_KIND,addOp,firstLine,liveStatus,locateSharedTreePaths,need,slash,unique,validateCommandAt} from './common.mjs';
 import {closeOpTerminal,keepsAskTab} from './terminals.mjs';
+import {settleCredentialPresence} from './fill.mjs';
 
 /**
  * The owner loop, in one file, because it is one rule: the runtime prepares a decision and the owner takes it.
@@ -475,6 +476,17 @@ export function answerOwnerQuestion(store,state,{op:askId,choice=null,note=null}
   const options=item?.options??raiser?.question?.options??pending?.options??[];
   const picked=choice!==null&&choice!==undefined&&String(choice).trim()?options[Number(choice)-1]??String(choice):null;
   need(picked||String(note??'').trim(),'workflow-answer needs --choice <n> or --note "<answer>"');
+  // The owner says they have filled the credential in. The word is not the answer: the presence of every
+  // variable is checked exactly as the kernel's own tick checks it, and only that settles the ask - `set` over
+  // a credential nobody put anywhere is a refusal that names what is missing, never a `done`.
+  if(ask?.kind===PROVISION_ASK&&ask.question?.stop==='credential'&&/^set$/i.test(String(note??'').trim())){
+    const asked=ask.credential??{};
+    const settled=settleCredentialPresence(store,state,ask,{variables:asked.variables??[],custody:asked.custody??null,
+      via:'command',...(ctx?.work?.at?.workRoot?{workRoot:ctx.work.at.workRoot}:{}),
+      ...(ctx?.verifyPresence?{verifyPresence:ctx.verifyPresence}:{})});
+    need(settled.ok,`${ask.id} is not settled: ${settled.reason}. Run \`${ask.fillCommand??'starci identity fill <slug> --name <VAR>'}\` and answer it.`);
+    return {ask:ask.id,answer:settled.summary};
+  }
   if(ask)return settleChoice(store,state,ask,{choice,note,options,via:'command',ctx});
   const question=item?.detail??raiser?.goal??pending?.decision??askId;
   const answer=`The owner decided on "${firstLine(question)}": ${picked?`option ${choice} - ${picked}`:''}${picked&&note?'; ':''}${note??''}`.trim();

@@ -149,6 +149,114 @@ export function setIdentitySecret({workRoot,slug,name,value,env=process.env,run=
     next:`Declare it on the integration record as \`credential: {name: ${name}, providedBy: owner, custody: identity:${slug}}\`. The value is readable only through \`sops exec-env ${slash(paths.secrets)} '<command>'\`.`};
 }
 
+/**
+ * The owner's own hands, asked one variable at a time. `identity fill <slug> --name A --name B` prints
+ * `Fill A:`, reads one answer with the echo OFF, puts it straight into the custody, says `A: present in
+ * identity:<slug>`, and asks the next one. It exists because a question for the owner has to be a question:
+ * the alternative was an agent in a tab printing a command for them to type, which nobody read as being asked
+ * anything at all.
+ *
+ * Three rules make the loop safe and are all visible here. The prompt goes to stderr, so what a reader pipes
+ * is the result and never the question. The answer is never echoed: a TTY is put in raw mode and the
+ * characters are consumed one by one, and a stream that is not a TTY (a test, a pipe) is read a line at a time
+ * with nothing printed either way. And an empty answer is a SKIP, never an empty credential - a variable the
+ * owner did not fill stays unfilled and is reported as such.
+ */
+export async function fillIdentitySecrets({workRoot,slug,names,input=process.stdin,output=process.stderr,
+  prompt=askHidden,set=setIdentitySecret,env=process.env,run=spawnSync}){
+  need(Array.isArray(names)&&names.length,'identity fill needs at least one --name <VAR>');
+  for(const name of names)need(VARIABLE.test(String(name??'')),`A credential variable is a name like STRIPE_SECRET_KEY (got ${name})`);
+  const filled=[];
+  for(const name of names){
+    const value=(await prompt(`Fill ${name}: `,{input,output})).replace(/\r?\n$/,'').trim();
+    if(!value){filled.push({name,ok:false,reason:'skipped: nothing was entered'});
+      output.write(`${name}: skipped - nothing was entered\n`);continue;}
+    let written=null;
+    try{written=set({workRoot,slug,name,value,env,run});}
+    catch(error){written={ok:false,reason:String(error?.message??error)};}
+    filled.push(written?.ok?{name,ok:true,custody:`identity:${slug}`}:{name,ok:false,reason:written?.reason??'nothing was written'});
+    output.write(written?.ok?`${name}: present in identity:${slug}\n`:`${name}: refused - ${written?.reason??'nothing was written'}\n`);
+  }
+  return {ok:filled.every(entry=>entry.ok),schema:'starci/identity-fill@1',custody:`identity:${slug}`,
+    workRoot:slash(workRoot),filled:filled.map(({name,ok,reason})=>({name,ok,...(reason?{reason}:{})}))};
+}
+
+/**
+ * One answer, read and never shown. A real terminal goes into raw mode so not even a bullet is printed and the
+ * value never reaches the scrollback; anything else - a pipe, a test, a CI log - is read as one plain line,
+ * because there is no echo to turn off there and pretending otherwise would only hide that fact.
+ */
+export function askHidden(question,{input=process.stdin,output=process.stderr}={}){
+  output.write(question);
+  if(!input.isTTY||typeof input.setRawMode!=='function')return readLine(input).then(line=>{output.write('\n');return line;});
+  return new Promise((resolve,reject)=>{
+    let value='';
+    const wasRaw=input.isRaw===true;
+    const done=answer=>{
+      input.removeListener('data',onData);
+      try{input.setRawMode(wasRaw);}catch{/* the terminal is gone */}
+      input.pause();
+      output.write('\n');
+      resolve(answer);
+    };
+    const onData=chunk=>{
+      for(const byte of chunk){
+        if(byte===3){done('');reject(Error('cancelled'));return;}      // ctrl-c: nothing was entered
+        if(byte===13||byte===10){done(value);return;}                   // enter: this answer is complete
+        if(byte===127||byte===8){value=value.slice(0,-1);continue;}     // backspace: and still nothing printed
+        value+=String.fromCharCode(byte);
+      }
+    };
+    try{input.setRawMode(true);}catch(error){reject(error);return;}
+    input.resume();
+    input.on('data',onData);
+  });
+}
+
+/** One line from a stream that is not a terminal, without consuming what the next variable's answer needs. */
+function readLine(stream){
+  return new Promise(resolve=>{
+    let buffer='';
+    stream.setEncoding?.('utf8');
+    const onData=chunk=>{
+      buffer+=chunk;
+      const at=buffer.indexOf('\n');
+      if(at===-1)return;
+      const line=buffer.slice(0,at);
+      stream.removeListener('data',onData);
+      stream.unshift?.(buffer.slice(at+1));
+      stream.pause();
+      resolve(line);
+    };
+    const onEnd=()=>{stream.removeListener('data',onData);resolve(buffer);};
+    stream.on('data',onData);
+    stream.once('end',onEnd);
+    stream.resume?.();
+  });
+}
+
+/**
+ * Presence, and only presence. The contract's own check is
+ * `sops exec-env <secrets> 'node -e "process.exit(process.env.<VAR>?0:1)"'`, and this is that same run made from
+ * inside the runtime, so whoever asked the owner for a credential can answer them in the same breath: sops
+ * decrypts into the environment of one short-lived process, that process exits 0 when the variable is there, and
+ * no value is returned, printed or kept. A sops that is not installed, a key this host does not have and a
+ * variable the custody does not hold are three different answers, because they are three different things to fix.
+ */
+export function identitySecretPresent({workRoot,slug,name,env=process.env,run=spawnSync}){
+  need(VARIABLE.test(String(name??'')),`A credential variable is a name like STRIPE_SECRET_KEY (got ${name})`);
+  const paths=identityPaths(workRoot,slug);
+  if(!fs.existsSync(paths.secrets))return refuse(`identity:${slug} holds nothing yet - ${slash(paths.secrets)} does not exist.`);
+  const sops=resolveExecutable('sops',{env});
+  if(!sops)return refuse('sops is not on PATH; install sops (https://github.com/getsops/sops) and try again.');
+  const probe=runExecutable(run,sops,['exec-env',paths.secrets,`node -e "process.exit(process.env.${name}?0:1)"`],
+    {encoding:'utf8',env,windowsHide:true});
+  if(probe?.error)return refuse(`sops could not run against ${slash(paths.secrets)} (${tail(probe)}).`);
+  if(probe.status===0)return {ok:true,custody:`identity:${slug}`,name,secrets:slash(paths.secrets)};
+  if(probe.status===1)return refuse(`identity:${slug} does not hold ${name}.`);
+  return refuse(`sops could not read ${slash(paths.secrets)} - the key it was encrypted for is not available to this host (${tail(probe)}).`);
+}
+
 /** The readable half of a custody: who the identity is, what it may do and which variables it holds - no value. */
 function writeIdentityResource(paths,{slug,name,now}){
   let record=null;

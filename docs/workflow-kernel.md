@@ -691,10 +691,46 @@ run or finished.
 **Answer, in the op or by command.** After writing the record the ask op prints the question and the numbered
 options in its own terminal and says the owner may answer there with the number or later with
 `workflow-answer`. An answer typed there comes back as `answered-by-owner: <n>` and is handled exactly as the
-command (`owner-answered {via: 'terminal'}`). A provision is never asked for as a value: the owner puts a
-credential into custody and replies `set`, the op checks only presence and reports
-`credential: <VAR> present in identity:<slug>` (or `provided: <what>` for an account, a dataset or an
-authority), and `redactSecrets` masks anything key-shaped that reaches an answer, an event or a report.
+command (`owner-answered {via: 'terminal'}`). A provision is never asked for as a value: for an account, a
+dataset or an authority the op asks in its tab and reports `provided: <what>`, and `redactSecrets` masks
+anything key-shaped that reaches an answer, an event or a report.
+
+### A credential is a prompt to fill
+
+A question for the owner has to be a question. An agent in a tab printing `node <skill root>/bin/starci.mjs
+identity set <slug> --name <VAR>` for the owner to compose, and then polling them for the word `set`, was not
+one - the owner read that tab and asked whether it was asking them anything at all. So a `provision.ask` whose
+`question.stop` is `credential` is **never dispatched to a runtime** (`kernel/fill.mjs`, the `fillWaiting` skip
+in `scheduleOps`). It stays `running` with `dispatch: null`, `fill: true`, no runtime, no parallel slot and no
+deadline - it is exempt from both the `op-overrun` and the `stalled-idle` settlements, because the owner takes
+as long as the owner takes.
+
+What the owner gets is one line, printed once into the kernel's own tab and carried by `## Owner` in
+`workflow-status`, in the status view and in the final report:
+
+```
+Fill ZALO_OA_ACCESS_TOKEN, ZALO_OA_SECRET for identity:zalo-oa: copy and run  node <skill root>/bin/starci.mjs identity fill zalo-oa --name ZALO_OA_ACCESS_TOKEN --name ZALO_OA_SECRET --work-root <tree>/.starciwork
+```
+
+`starci identity fill <slug> --name <VAR> [--name <VAR>]` asks, in order, `Fill <VAR>:` - on a TTY with the
+echo off through raw mode, on a pipe as one plain line - and calls `setIdentitySecret` for each answer, so the
+value goes from the keystroke into the encrypted custody and nowhere else. It prints `<VAR>: present in
+identity:<slug>` or `<VAR>: refused - <reason>` per variable, an empty answer is a **skip** rather than a blank
+credential, and it exits 0 only when every variable is present.
+
+The variable names and the slug come from the tree's own declaration when it has one - the integration
+record's `credential: {name, providedBy: owner, custody: identity:<slug>}` - and from the words of the question
+otherwise (`credentialAsked`); neither is invented, and an ask that can name neither says exactly that instead
+of guessing. The whole exchange is recorded as `provision-fill-waiting {ask, variables, custody, command}`.
+
+**The kernel settles it, by presence.** Every tick it looks at `secrets.enc.yaml` for each waiting ask; while
+that file is absent or unchanged nothing runs at all, and when it changes the kernel runs the contract's own
+check per variable - `sops exec-env <secrets.enc.yaml> 'node -e "process.exit(process.env.<VAR>?0:1)"'`
+(`identitySecretPresent`) - and, when every one of them is present, settles the ask exactly as the report
+`credential: <VAR> present in identity:<slug>` would have (`settleOwnerAsk` per variable, then
+`provision-filled {ask, variables, custody, via}`). The requesters resume; the value was never read, only its
+presence. `workflow-answer --op <ask> --note set` runs the same check immediately and refuses with what is
+missing when the custody is still empty - a word is never taken for a credential.
 
 **The report decides what the question was.** `settleOwnerAsk` reads the markers, never the op's kind, so
 either form may end any of the three ways. A `provision.ask` that comes back with `decision: <id>` had a
@@ -727,8 +763,9 @@ reconciliation the owner just settled.
 is gone on the next machine, and the tree cannot say who set it. It lives in an encrypted identity resource of
 the Work tree - `_resources/identity/<slug>/resource.yaml` (alias, provider subject, role, the variable NAMES)
 beside `secrets.enc.yaml` (sops, the host's own age or GPG key) - which the integration declaration names as
-`custody: identity:<slug>`. The owner fills it with `starci identity set <slug> --name <VAR>` (the value on
-stdin, never an argument, never printed), and every operation reads it through `sops exec-env` at the moment
+`custody: identity:<slug>`. The owner fills it with `starci identity fill <slug> --name <VAR> [--name <VAR>]`,
+which asks for each variable in turn with the echo off, or with `starci identity set <slug> --name <VAR>` (one
+variable, the value on stdin) - never an argument, never printed - and every operation reads it through `sops exec-env` at the moment
 of use, so the value exists in one process and is copied into no file, log, report or contract. A missing
 sops, a key this host lacks or a custody without that variable is `blocked` `environment` naming the slug and
 the variable - never invented, stubbed, defaulted or silently skipped.
@@ -1444,8 +1481,13 @@ recommendation taken provisionally) or a decision that reported a presence the o
 `owner-ask-answered-from-record` a decided record settled it; `owner-question` a
 stop question's drafted decision was listed for the owner; `owner-question-provisional` /
 `owner-answer-provisional` the runtime took its own recommendation so the work could continue, and one
-requester carries it; `credential-present` the owner provided something and the op confirmed only that it is
-there; `owner-answered` the owner's pick arrived (`via: 'command'` or `'terminal'`); `decision-confirmed` the
+requester carries it; `credential-present` the owner provided something and only its presence was confirmed;
+`provision-fill-waiting {ask, variables, custody, command}` (`kernel/fill.mjs`) a credential ask was NOT
+launched - the owner was given one line with the exact `identity fill` command and it waits with no runtime,
+no slot and no deadline; `provision-filled {ask, variables, custody, via}` every variable it named is present
+in the custody and the kernel settled the ask itself (`via: 'fill'` at a tick, `'command'` for
+`workflow-answer --note set`); `provision-fill-incomplete {ask, reason}` the custody changed but does not hold
+them all yet; `owner-answered` the owner's pick arrived (`via: 'command'` or `'terminal'`); `decision-confirmed` the
 owner chose what the runtime had chosen; `decision-overturned` they chose otherwise and the nodes built on it
 were reopened; `owner-answer-delivered` an answer reached one requester; `need-user-deduplicated` the owner's
 list was collapsed to one item per question; `owner-list {items:[{kind,op}]}` what waits on the owner
