@@ -292,9 +292,12 @@ export function syncLedgerOps(store,state,ctx){
         store.appendEvent({event:'op-readmitted',op:op.id,reason:`the ${verdict.foreign.length} error(s) of the tree are outside this operation`});
       }
     }
-    return [];
+    // A red corner does not stop the rest of the tree. The validator marks the nodes its errors touch, and their
+    // dependents, ineligible; every node it still calls eligible is a trustworthy TODO and is derived as usual.
+    // Returning here once meant that six missing drawings of a frontend node held every backend integration proof
+    // - and the owner's provision tabs behind them - for a whole night.
   }
-  if(state.ledgerInvalid||quarantined){
+  if(loaded.ok&&(state.ledgerInvalid||quarantined)){
     state.ledgerInvalid=null;store.appendEvent({event:'ledger-valid-again',...(quarantined?{after:'quarantine'}:{})});
     // Ops the validator exhausted only because the whole-tree check was red are judged again now that it is green.
     for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal&&state.needUser.some(entry=>entry.op===item.id&&entry.kind==='validator'&&/work-valid/.test(String(entry.detail??''))))){
