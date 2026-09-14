@@ -75,7 +75,8 @@ test('agent-route exposes the first ready external worker for Orca without execu
   const exhausted=run('agent-route','starci','business.decide','qwen');
   assert.equal(exhausted.status,0,exhausted.stderr);
   assert.equal(JSON.parse(exhausted.stdout).selected,null);
-  assert.equal(JSON.parse(exhausted.stdout).skipped.length,3);
+  // A decide chain is four links now - Fable, Astra and the downgrade under them - and Qwen is in none of them.
+  assert.equal(JSON.parse(exhausted.stdout).skipped.length,4);
 });
 
 test('legacy audit inventories credentials without echoing values and does not execute scripts', t => {

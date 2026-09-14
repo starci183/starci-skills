@@ -92,7 +92,8 @@ test('operation request carries the whole chain with its launch kinds and owns t
   assert.equal(planned.taskParams['display-name'],opName);
   assert.throws(()=>buildOperationLaunch({...input,worktree:'current'}),/filesystem-relative path/);
   assert.throws(()=>buildOperationLaunch({...input,worktree:worktreePath}),/must be relative/);
-  assert.deepEqual(buildOperationLaunch(reasonInput).candidates.map(candidate=>[candidate.selection.target,candidate.launch]),[['claude-fable-5.1','managed-agent'],['gpt-6-astra','managed-agent'],['claude-opus','managed-agent']]);
+  // The reasoning chain carries its downgrade now: Opus under Fable, Sol under Astra, all four managed agents.
+  assert.deepEqual(buildOperationLaunch(reasonInput).candidates.map(candidate=>[candidate.selection.target,candidate.launch]),[['claude-fable-5.1','managed-agent'],['gpt-6-astra','managed-agent'],['claude-opus','managed-agent'],['gpt-5.6-sol','managed-agent']]);
 });
 
 test('a supervisor chain resolves from the registry with its model and effort, never from a hardcoded provider',()=>{

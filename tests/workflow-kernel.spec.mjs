@@ -1348,11 +1348,14 @@ test('approving a workflow that finished blocked resumes it, and questions whose
 test('the quota proposal gives every role the plan needs a runtime with a slot',()=>{
   const harness=setupWork({scope:['collab']});
   try{
-    // The one op is a work.author (plan role); the strongest runtime has no plan role, so the proposal must not stop there.
+    // The one op is a work.author (plan role). Sol carries plan now - it is the last tier of the downgrade - so the
+    // strongest runtime covers the role; the head of the chain, Fable, is what no implement order ever names.
     const proposal=harness.state.quotaProposal;
-    const opus=proposal.rows.find(row=>row.runtime==='claude-opus');
-    assert.ok(opus&&opus.slots>=1,`a runtime with the plan role has a slot: ${proposal.text}`);
-    assert.match(opus.why,/plan role/);
+    const sol=proposal.rows.find(row=>row.runtime==='gpt-5.6-sol');
+    assert.ok(sol&&sol.slots>=1,`a runtime with the plan role has a slot: ${proposal.text}`);
+    const fable=proposal.rows.find(row=>row.runtime==='claude-fable-5.1');
+    assert.ok(fable&&fable.slots>=1,`the preferred plan runtime has a slot: ${proposal.text}`);
+    assert.match(fable.why,/launch chain of work\.author/);
   }finally{harness.cleanup();}
 });
 
