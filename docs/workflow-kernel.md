@@ -633,10 +633,14 @@ for what it must not do, and there are exactly two of those.
   payment, charge, transfer or refund of real money, a deletion, drop or purge of production or customer data,
   a publish, deploy or release to production.
 
-`stopReasonFor(question)` reads the sentence first and an unambiguously declared kind second; `authority`
-alone is never a stop, because it is also the kernel's own generic blocker kind. A stop question pauses the op
-that asked (`owner-ask-opened {op, ask, kind, stop}`) and is listed for the owner once the ask op has prepared
-it (`needUser` kind `decision`, `owner-question`).
+`stopReasonFor(question, report)` reads what the operation DECLARED first - `report.blocker.kind` or
+`question.kind`, honoured only for the unambiguous `credential | account | dataset | irreversible` - and the
+words of the sentence only when nothing was declared; `authority` alone is never a stop, because it is also
+the kernel's own generic blocker kind. A stop question pauses the op that asked
+(`owner-ask-opened {op, ask, kind, stop, by}`, `by` being `declared | words | none`) and is listed for the
+owner once the ask op has prepared it (`needUser` kind `decision`, `owner-question`). The keyword heuristic
+decides which TAB to open, never what the question is: whichever form was opened, the ask op may end any of
+the three ways and the kernel takes its report by the report's content (`ask-reclassified`, below).
 
 **Open.** Every other question - a business rule, a design choice, a reconciliation conflict, a
 `hidden-decision` a review found - opens the same `decision.prepare` (or `provision.ask` for a provision) op and does **not** pause the requester: it only
@@ -672,6 +676,22 @@ command (`owner-answered {via: 'terminal'}`). A provision is never asked for as 
 credential into custody and replies `set`, the op checks only presence and reports
 `credential: <VAR> present in identity:<slug>` (or `provided: <what>` for an account, a dataset or an
 authority), and `redactSecrets` masks anything key-shaped that reaches an answer, an event or a report.
+
+**The report decides what the question was.** `settleOwnerAsk` reads the markers, never the op's kind, so
+either form may end any of the three ways. A `provision.ask` that comes back with `decision: <id>` had a
+design question after all - where a value lives, which of two designs holds - and its stop is LIFTED: the
+recommendation is taken provisionally exactly as a prepared decision is, the paused requester resumes on it,
+and the kernel writes `ask-reclassified {ask, from: 'provision', to: 'decision'}`. A `decision.prepare` that
+comes back with `credential: <VAR> present in identity:<slug>` or `provided: <what>` had a provision: its
+requester - `pending` on the ask rather than paused - resumes with the presence, and the event is
+`ask-reclassified {ask, from: 'decision', to: 'provision'}`. `answered-from` settles either kind. Both keep
+the same allowlist - the feature's policy-decision folder - because both may end up writing one record there.
+
+**Two asks never queue behind each other.** In `scheduleOps` an ask (`isAsk(op.kind)`) is never
+`schedule-deferred` for the allowlist another ASK holds: they share the feature's policy-decisions folder by
+construction, each writes at most one new slug folder of its own, and the whole-tree validator is what catches
+a duplicate. A non-ask on that folder - a `work.author` completing a record in it - still waits, because it
+edits what is there. The parallelism ceiling and the resource locks are untouched.
 
 `workflow-answer --id <wf> --op <op> --choice <n> [--note "..."]`, queued to a live kernel's inbox, records the
 owner's pick and delivers it to every live requester (`owner-answered`, then `owner-answer-delivered` each).
@@ -1397,8 +1417,12 @@ findings; `reconciliation-conflict` one conflict row became the owner's question
 `ledger-sync-failed` the tree could not be re-read and the last loaded one stands.
 
 **The owner loop** (`kernel/owner.mjs`) - `owner-ask-opened` a question opened an ask, carrying `stop` when it
-is one of the two stop reasons (the requester is paused) and `provisional: true` when it is not (the requester
-only depends on the ask); `owner-ask-answered-from-record` a decided record settled it; `owner-question` a
+is one of the two stop reasons (the requester is paused), `provisional: true` when it is not (the requester
+only depends on the ask), and `by: 'declared' | 'words' | 'none'` saying whether the operation's own declared
+blocker kind decided the shape or the sentence did; `ask-reclassified {ask, from, to}` the ask op's report
+said the question was the other thing - a provision that reported a decision (its stop lifted, the
+recommendation taken provisionally) or a decision that reported a presence the owner provided;
+`owner-ask-answered-from-record` a decided record settled it; `owner-question` a
 stop question's drafted decision was listed for the owner; `owner-question-provisional` /
 `owner-answer-provisional` the runtime took its own recommendation so the work could continue, and one
 requester carries it; `credential-present` the owner provided something and the op confirmed only that it is
@@ -1433,7 +1457,7 @@ an operation was moved off it; `rate-limit-inferred` two silent settlements of o
 minutes were read as a quota refusal; `rate-limit-readmitted` the cooldown passed; `launch-cooling` /
 `need-user-stale-dropped` a mechanical line (triage, environment, shared-change, ledger-path, shared-depth, validator) about an op that has since moved on was dropped from the owner's list - every tick, so a stale line never finishes a workflow `blocked` over nothing;
 `parked-rejudged` the owner's list was judged again under the current rule on kernel start, once per rule (its `routed` names every item and where it went);
-`ask-resettled {ask, requesters, reason}` an ask that reported a provision present while an older build masked the variable's name is settled again from its report at start (a variable name - upper case, digits, underscores - is never redacted); `launcher-relocated {from, to}` a workflow whose persisted launcher (the report path in every contract) no longer exists in this build is given the one the build has, at start; `validator-scope-attributed {op, judged, left}` the validator is given only the files the op itself reported and git confirms (`attributedFiles`); the files left out are a neighbour's work under the same allowlist; `validator-readmitted {op, files}` an op the validator blocked over files it never claimed runs again at the next start, told to leave them alone; `gate-scope-narrowed {gates, files}` a gate repair holds only the files the failing gate's evidence names (inside the job's allowlists, existing in the worktree) and the whole job's allowlist only when it names none, so the rest of the job runs beside it; a red tree no longer stops derivation: `ledger-invalid` is still reported once per error set, but every node the validator still calls eligible is derived as usual, and only the nodes its errors touch (and their dependents) wait; `environment-retried {op, build}` an environment blocker an op itself reported is retried once per build, because a new build is what changes the environment it saw; `finish-withdrawn {because: settled}` a finish declared blocked over the owner's list is withdrawn on start once that list is empty and work remains;
+`ask-resettled {ask, requesters, reason}` an ask that reported a provision present while an older build masked the variable's name is settled again from its report at start (a variable name - upper case, digits, underscores - is never redacted); `launcher-relocated {from, to}` a workflow whose persisted launcher (the report path in every contract) no longer exists in this build is given the one the build has, at start; `validator-scope-attributed {op, judged, left}` the validator is given only the files the op itself reported and git confirms (`attributedFiles`); the files left out are a neighbour's work under the same allowlist; `validator-readmitted {op, files}` an op the validator blocked over files it never claimed runs again at the next start, told to leave them alone; `gate-scope-narrowed {gates, files}` a gate repair holds only the files the failing gate's evidence names (inside the job's allowlists, existing in the worktree) and the whole job's allowlist only when it names none, so the rest of the job runs beside it; `ask-reclassified {ask, from, to}` an ask op's report said the question was the other thing - the kernel takes an ask by what it reports, not by the kind a keyword opened it under - and an ask is never `schedule-deferred` for the decision folder another ask holds (they share it by construction and each writes at most one new slug folder of its own), while a non-ask on that folder still waits; a red tree no longer stops derivation: `ledger-invalid` is still reported once per error set, but every node the validator still calls eligible is derived as usual, and only the nodes its errors touch (and their dependents) wait; `environment-retried {op, build}` an environment blocker an op itself reported is retried once per build, because a new build is what changes the environment it saw; `finish-withdrawn {because: settled}` a finish declared blocked over the owner's list is withdrawn on start once that list is empty and work remains;
 `op-overrun {op, runtime, ranMs, deadlineMs}` an attempt ran past its deadline (`OP_DEADLINE_MS`: a review three hours, a build eight, or the op's own `timeoutMs`) and was settled and relaunched elsewhere whatever the liveness probe said; `dependency-alive` an op an older rule blocked as "can never start" waits for its dependency again, because a dependency blocked without a refusal is alive; a `validator` line ("rejected by the validator N times") keeps its bound - one more round per fresh kernel start (`validatorReset`), never a cooldown;
 `budget-wait {ops, since, reason}` nothing launched because every runtime that could take the ready ops is out of its daily op budget, cooling or full - a bound time lifts, so the kernel waits (one line per half hour) and never finishes over it; `finish-withdrawn` a finish an older rule declared over such a stall is withdrawn when its kernel is started again (workflow-run), never by the supervisor on its own - a workflow that finished blocked stays finished until someone runs it;
 `reconciliation-conflict {ask, provisional: true}` a conflict an intake recorded is taken provisionally through one detached `decision.prepare` that reads the decision record the intake wrote and reports its recommendation - the workflow never finishes blocked over it; `conflict-taken-provisionally` the same for a conflict an older rule had parked for the owner, on kernel start; `split-withdrawn` a split an older rule made of a record author was withdrawn - only a build is ever split; `split-parent-readmitted` the record author that split was made of, marked done with verdict `split` and never accepted, runs again as one operation;
