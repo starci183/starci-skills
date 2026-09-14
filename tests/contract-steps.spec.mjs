@@ -673,8 +673,13 @@ test('decision.prepare prepares a decision in the policy-decision shape, prints 
   assert.match(rendered,/by id in the text, never as a graph edge/);
   assert.match(rendered,/`\.starciwork\/features\/sales\/business\/srs\/business-rules\/policy-decisions\/\*\*`/);
   assert.match(done(rendered).join('\n'),/nothing waited for the owner/);
-  // A provision is not this sequence's business at all.
-  assert.doesNotMatch(rendered,/identity set <slug> --name <VAR>/);
+  // The kind of the op was chosen by a keyword before anything was read: if the question turns out to be
+  // something the owner must PROVIDE, this same op asks for it here and reports the presence instead.
+  assert.match(rendered,/the question turns out to be something the owner must PROVIDE/);
+  assert.match(rendered,/identity set <slug> --name <VAR>/);
+  assert.match(rendered,/`credential: <VAR> present in identity:<slug>` or `provided: <what>`/);
+  assert.match(rendered,/The kernel accepts this operation by what your report says, never by the name it was opened under/);
+  // It still never drafts a record for a provision, and the waiting sentence belongs to the other sequence.
   assert.doesNotMatch(rendered,/WAIT for the answer/);
 });
 
@@ -701,7 +706,12 @@ test('provision.ask names the one thing only the owner can give, asks in its own
   // No answer is a blocked report naming the provision, never a guess and never a record.
   assert.match(rendered,/report `blocked` exactly once with the blocker kind `authority` and the exact name of the provision/);
   assert.match(done(rendered).join('\n'),/no value of any credential or secret appears anywhere/);
-  assert.doesNotMatch(rendered,/policy-decision record draft/);
+  // And the other way round: a "token" question that turns out to be a choice about where a value lives is a
+  // decision, drafted and recommended here, and nothing waits for it.
+  assert.match(rendered,/turns out not to be a provision at all but a choice only the owner makes/);
+  assert.match(rendered,/write ONE policy-decision record draft at the path the allowlist names/);
+  assert.match(rendered,/first line exactly `decision: <record id>` and a line `recommended: <n>`/);
+  assert.match(rendered,/Nothing waits for that: the kernel takes your recommendation provisionally/);
 });
 
 /**

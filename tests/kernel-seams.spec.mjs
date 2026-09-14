@@ -599,6 +599,120 @@ test('the owner answers in the op\'s own terminal, and a credential reports only
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
+/**
+ * The kind of the ask op is chosen by a keyword before the op has read a single record, so it is a hint about
+ * the tab to open and never a ruling about what the question is. Either form may end any of the three ways, and
+ * the kernel takes the report by its content: a provision that turned out to be a design decision lifts its own
+ * stop, and a decision that turned out to be a provision answers its requester with the presence.
+ */
+test('either ask kind may end either way: a provision that reports a decision lifts the stop, and a decision that reports a credential answers its requester',()=>{
+  const dir=tmp();
+  try{
+    // "Which Telegram bot token does the chatbot use, and WHERE does the owner provide it" is a design decision -
+    // the word "token" opened a provision tab and paused the requester. The op read the records and said so.
+    const store=stubStore(dir);
+    const requester=toOp({id:'op-chat',kind:'backend.implement',goal:'Wire the chatbot',allowlist:['src/chatbot.ts']},0);
+    requester.status='paused';requester.waitingFor='ask-1';
+    const ask=toOp({id:'ask-1',kind:'provision.ask',goal:'Prepare the token question',
+      allowlist:['.starciwork/features/chatbot/business/srs/business-rules/policy-decisions/**'],
+      question:{kind:'credential',stop:'credential',text:'Which Telegram bot token does the chatbot use, and where does the owner provide it?',options:[]},
+      requesters:['op-chat']},1);
+    const state=stubState(store,[requester,ask]);
+    state.provisional=[];
+    settleOwnerAsk(store,state,ask,{summary:'decision: demo.chatbot.business.srs.policy-decision.d-token-custody recommended: 1 1. a stack secret named TELEGRAM_BOT_TOKEN 2. an environment variable on the host'});
+    assert.deepEqual(store.events.filter(item=>item.event==='ask-reclassified').map(item=>[item.ask,item.from,item.to]),
+      [['ask-1','provision','decision']]);
+    assert.equal(state.needUser.length,0,'the stop is lifted: nothing is left for the owner to provide');
+    assert.deepEqual(state.provisional.map(entry=>[entry.decision,entry.recommended]),
+      [['demo.chatbot.business.srs.policy-decision.d-token-custody',1]]);
+    assert.deepEqual([requester.status,requester.waitingFor],['ready',null],'the paused requester carries on');
+    assert.match(requester.answer,/^provisional: option 1 - a stack secret named TELEGRAM_BOT_TOKEN/);
+    assert.deepEqual(requester.provisional,['demo.chatbot.business.srs.policy-decision.d-token-custody']);
+    assert.equal(ask.question.stop,null,'the op no longer carries a stop it disproved');
+
+    // And the other way: a decision tab whose question turned out to be a credential the owner had to put in
+    // custody. The requester is `pending` on the ask rather than paused, and the presence is its answer.
+    const store2=stubStore(dir);
+    const pending=toOp({id:'op-send',kind:'integration.verify',goal:'Prove the delivery',allowlist:['src/live.spec.ts']},0);
+    pending.status='pending';pending.dependsOn=['ask-1'];
+    const draft=toOp({id:'ask-1',kind:'decision.prepare',goal:'Prepare the delivery question',
+      allowlist:['.starciwork/features/chatbot/business/srs/business-rules/policy-decisions/**'],
+      question:{kind:'decision',stop:null,text:'Which mailbox does the reminder go out through?',options:[]},
+      requesters:['op-send']},1);
+    const state2=stubState(store2,[pending,draft]);
+    state2.provisional=[];
+    settleOwnerAsk(store2,state2,draft,{summary:'credential: MAIL_API_KEY present in identity:mail'});
+    assert.deepEqual(store2.events.filter(item=>item.event==='ask-reclassified').map(item=>[item.ask,item.from,item.to]),
+      [['ask-1','decision','provision']]);
+    assert.equal(store2.events.find(item=>item.event==='credential-present').provided,'MAIL_API_KEY in identity:mail');
+    assert.equal(pending.status,'ready','a pending requester that depends on the ask resumes on the presence');
+    assert.match(pending.answer,/The owner provided MAIL_API_KEY in identity:mail/);
+    assert.equal(state2.provisional.length,0,'a presence is not a provisional decision');
+    assert.equal(draft.question.stop,'credential','the op carries the stop it found');
+
+    // `answered-from` is the same door for both kinds: a decided record settles it and nobody waits.
+    const store3=stubStore(dir);
+    const waiting=toOp({id:'op-send',kind:'integration.verify',goal:'Prove the delivery',allowlist:['src/live.spec.ts']},0);
+    waiting.status='paused';waiting.waitingFor='ask-1';
+    const settled=toOp({id:'ask-1',kind:'provision.ask',goal:'Prepare the question',allowlist:['.starciwork/decisions/**'],
+      question:{kind:'credential',stop:'credential',text:'Which key?',options:[]},requesters:['op-send']},1);
+    const state3=stubState(store3,[waiting,settled]);
+    state3.provisional=[];
+    settleOwnerAsk(store3,state3,settled,{summary:'answered-from: demo.chatbot.architecture.sds.integration.mail the record names the custody already'});
+    assert.equal(waiting.status,'ready');
+    assert.match(waiting.answer,/Answered from the decided record demo\.chatbot\.architecture\.sds\.integration\.mail/);
+    assert.equal(state3.needUser.length,0);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+/**
+ * The keyword heuristic is the last word, not the first. An operation standing in front of the thing knows what
+ * it is; the sentence is only read when nothing was declared, and the event says which of the two decided.
+ */
+test('a blocker kind the op declared beats the words of its sentence, and the ask op records which decided it',()=>{
+  const dir=tmp();
+  try{
+    // Declared: the report says `dataset`, and the sentence - which reads like a plain design question - does not overrule it.
+    assert.equal(stopReasonFor({kind:'decision',text:'which of the two reconciliation shapes holds?'},{blocker:{kind:'dataset'}}),'dataset');
+    // Declared on the question itself, the same rule.
+    assert.equal(stopReasonFor({kind:'account',text:'which of the two reconciliation shapes holds?'}),'account');
+    // `authority` is the kernel's own generic blocker kind: declaring it decides nothing, and the words are read.
+    assert.equal(stopReasonFor({kind:'authority',text:'the design does not say whether a supervisor may approve their own request'}),null);
+    assert.equal(stopReasonFor({kind:'authority',text:'this step charges the customer card for the outstanding balance'}),'irreversible');
+    // A question the kernel prepared itself is never a stop, whatever anybody declared.
+    assert.equal(stopReasonFor({kind:'credential',prepared:true,text:'anything'},{blocker:{kind:'credential'}}),null);
+
+    const store=stubStore(dir);
+    const requester=toOp({id:'op-recon',kind:'backend.implement',goal:'Build the reconciliation',allowlist:['src/recon.ts']},0);
+    requester.status='running';
+    const state=stubState(store,[requester]);
+    state.provisional=[];
+    openOwnerAsk(store,state,requester,{kind:'decision',text:'which of the two reconciliation shapes holds?',options:[]},null,{blocker:{kind:'dataset'}});
+    const declared=store.events.find(item=>item.event==='owner-ask-opened');
+    assert.deepEqual([declared.kind,declared.stop,declared.by],['dataset','dataset','declared']);
+
+    // Nothing declared: the words are the fallback, exactly as they were, and the event says so.
+    const store2=stubStore(dir);
+    const asking=toOp({id:'op-pay',kind:'backend.implement',goal:'Build the payout',allowlist:['src/payout.ts']},0);
+    asking.status='running';
+    const state2=stubState(store2,[asking]);
+    state2.provisional=[];
+    openOwnerAsk(store2,state2,asking,{kind:'environment',text:'PAY_API_KEY is not provided; src/payout.ts reads it at boot',options:[]},null);
+    const byWords=store2.events.find(item=>item.event==='owner-ask-opened');
+    assert.deepEqual([byWords.kind,byWords.stop,byWords.by],['credential','credential','words']);
+
+    // A question neither declared nor worded as a stop is a decision, and nothing decided a stop at all.
+    const store3=stubStore(dir);
+    const open=toOp({id:'op-rule',kind:'backend.implement',goal:'Build the rule',allowlist:['src/rule.ts']},0);
+    open.status='running';
+    const state3=stubState(store3,[open]);
+    state3.provisional=[];
+    openOwnerAsk(store3,state3,open,{kind:'decision',text:'Should a refund reopen the order or close it?',options:[]},null);
+    const none=store3.events.find(item=>item.event==='owner-ask-opened');
+    assert.deepEqual([none.kind,none.stop,none.by],['decision',null,'none']);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
 /** One item per question: a kernel that ran for a day pushed the same line on every iteration. */
 test('the owner\'s list carries one item per question, not one per iteration',()=>{
   const dir=tmp();

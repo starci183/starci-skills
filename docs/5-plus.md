@@ -499,6 +499,11 @@ and replies `set`; the op then checks **only presence** - `sops exec-env <secret
 (`credential-present`). For an account, a dataset or an authority it reports `provided: <what>`. No value ever
 reaches a file, an event or a report, and `redactSecrets` masks anything key-shaped on the way through.
 
+Which of the two ops opened is a guess made from the sentence before anything was read, so it is a hint about
+the tab and never a ruling: the kernel accepts an ask by what the report says, so a `provision.ask` that found
+a design decision reports `decision: <id>` and its stop is lifted, a `decision.prepare` that found a credential
+reports the presence and its requester resumes on it, and both write `ask-reclassified {ask, from, to}`.
+
 ### Custody: a credential is never an environment variable
 
 An environment variable is nobody's: it belongs to whichever terminal exported it, it is gone on the next
