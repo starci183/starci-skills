@@ -20,7 +20,7 @@ import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGra
 import {machineVerify} from '../kernel/kernel.mjs';
 import {attributedFiles} from '../kernel/verify.mjs';
 import {relocateLauncher} from '../kernel/kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,readValidatorMemory,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -510,6 +510,90 @@ test('a spent review bound escalates inside the runtime: one more repair on an u
     assert.equal(final.outcome,'done');
     assert.match(final.provisionalReport,/^## Provisional decisions \(1\)/);
     assert.match(final.provisionalReport,/workflow-answer --id .* --op ask-1 --choice <n>/);
+    // The same question, in the one section every page the owner reads carries: what waits, and what to type.
+    assert.match(final.ownerReport,/^## Owner \(\d+\)\n/);
+    assert.ok(final.owner.some(entry=>entry.kind==='decision'&&entry.op==='ask-1'),'the provisional decision is on the owner\'s list');
+    assert.match(final.ownerReport,/- decision ask-1 \(tab [^)]+\): demo\.sales\.business\.srs\.policy-decision\.d-receipt: the runtime took option 2[^\n]*\n {2}how: starci workflow-answer --id [^\n]*--op ask-1 --choice <n>/);
+    // The masker cannot tell a long workflow id from a key: `how` is built from ids and must never be run through it.
+    assert.equal(final.ownerReport.includes('[redacted]'),false,'the command the owner types names the workflow, not a mask');
+    assert.ok(final.ownerReport.includes(`--id ${final.id} --op ask-1`));
+  }finally{harness.cleanup();}
+});
+
+/**
+ * A record a `work.author` op is writing right now is not a question for the owner: they can do nothing with it
+ * but wait for the kernel. The line goes while the author op is on it, and comes back the moment that op blocks -
+ * because then the record really is nobody's job but theirs.
+ */
+test('a ledger line an author op is on is dropped from the owner\'s list, and comes back when that op blocks',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    const state=harness.state;
+    const author=state.ops[0];
+    Object.assign(author,{id:'n-four-author',kind:'work.author',nodeId:'demo.sales.four',status:'running',refusal:null});
+    const line={node:'demo.sales.four',kind:'ledger',detail:'ledger incomplete: demo.sales.four declares no write scope'};
+    state.needUser=[line];
+    assert.deepEqual(sweepStaleLines(harness.store,state).length,0,'the drop is not one of the stale mechanical lines');
+    assert.deepEqual(state.needUser,[],'an author op is on it, so it is not the owner\'s');
+    const dropped=events(harness.store).at(-1);
+    assert.deepEqual([dropped.event,dropped.node,dropped.reason],['owner-line-dropped','demo.sales.four','an author op is on it']);
+
+    state.needUser=[line];
+    author.status='blocked';author.refusal='shared-change';
+    sweepStaleLines(harness.store,state);
+    assert.deepEqual(state.needUser,[line],'the author op blocked: the record is the owner\'s again');
+    assert.deepEqual(ownerItems(state).map(entry=>[entry.kind,entry.op]),[['ledger','demo.sales.four']]);
+  }finally{harness.cleanup();}
+});
+
+/**
+ * The deadline exists for a runtime that went away, not for a person who went to lunch. A `provision.ask` sits in
+ * its tab waiting for the owner to put a credential into custody, and `op-overrun` killing that tab - the one
+ * place the question is printed - is exactly the failure the owner's list was written against.
+ */
+test('an op waiting for the owner never overruns, however long the owner takes',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    let clock=0;
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>clock,work:null};
+    const ask=running(harness.state,'op-intake','ctx_ask');
+    ask.kind='provision.ask';ask.origin='ask';ask.launchedAt=0;
+    ask.question={kind:'credential',text:'PAYMENTS_API_TOKEN into identity:payments',options:[],from:'op-x'};
+    clock=OP_DEADLINE_MS.default+60*60*1000;
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[]});
+    assert.equal(ask.status,'running','the wait for the owner has no deadline');
+    assert.equal(events(harness.store).some(event=>event.event==='op-overrun'),false);
+    assert.equal(ask.restarts,0);
+    // The same op on any other kind is over: the deadline is not gone, only the wait for a person is exempt.
+    ask.kind='backend.implement';ask.question=null;
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[]});
+    assert.equal(events(harness.store).find(event=>event.event==='op-overrun').op,'op-intake');
+  }finally{harness.cleanup();}
+});
+
+/** And the tab itself survives every sweep while the op is on it: `TAB_STATUSES` is what "somebody reads it" means. */
+test('the sweep keeps the tab a provision.ask is asking the owner in, and closes it once the op is not on it',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const ask=harness.state.ops[0];
+    Object.assign(ask,{id:'ask-cred',kind:'provision.ask',status:'paused',terminal:'term_ask_cred',dispatch:null,nodeId:null});
+    harness.fake.terminals.set('term_ask_cred',{handle:'term_ask_cred',title:'[Op] provision.ask - ask-cred',status:'running',sent:true,worktreePath:cwd});
+    for(const status of TAB_STATUSES){
+      ask.status=status;
+      const closed=sweepStaleTerminals(harness.fake.orca,harness.store,harness.state,{cwd,now:()=>0});
+      assert.equal(closed.some(item=>item.terminal==='term_ask_cred'),false,`the owner is being asked in that tab and the op is ${status}`);
+      assert.ok(harness.fake.terminals.has('term_ask_cred'));
+    }
+    // Failed: nobody is on the tab any more, and it is swept like every other tab of a finished attempt.
+    ask.status='failed';
+    assert.deepEqual(sweepStaleTerminals(harness.fake.orca,harness.store,harness.state,{cwd,now:()=>0})
+      .filter(item=>item.terminal==='term_ask_cred').map(item=>item.op),['ask-cred']);
+    assert.equal(harness.fake.terminals.has('term_ask_cred'),false);
   }finally{harness.cleanup();}
 });
 

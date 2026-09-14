@@ -33,7 +33,8 @@ import {laneOwnerOf,laneNameOf,laneRowTitle,laneView,openLane,settleLane,laneBra
 import {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTerminals,ownKernelTerminal,rebindRunIfNeeded,
   recoverCoordinatorTab,reconcileWithOrca,releaseKernelTab,siblingKernelGone,sweepStaleTerminals} from './terminals.mjs';
 import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,isAsk,openConflictDecision,answerCommand,answerOrEscalate,answerOwnerQuestion,dedupeNeedUser,inheritProvisional,
-  openOwnerAsk,provisionalLines,settleOwnerAsk,stopReasonFor} from './owner.mjs';
+  openOwnerAsk,provisionalLines,settleOwnerAsk,stopReasonFor,
+  mechanicalOwnerLine,noteOwnerList,ownerItems,ownerLines,waitsForOwner} from './owner.mjs';
 import {BRAND_PAYLOAD,attributedFiles,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
   kernelProof,machineVerify,noteBrand,opDiff,provenChecks,readValidatorMemory,recordVerdict,renderValidatorMemory,
   rereadBrand,sharedCheckCommand,treeForVerdict,treeVerdictFor,validateAccepted,validatorRejectLimit} from './verify.mjs';
@@ -77,7 +78,8 @@ export {RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,recoverCoordinatorTab,reconcileWit
   sweepStaleTerminals} from './terminals.mjs';
 export {ASK_KINDS,DECISION_PREPARE,PROVISION_ASK,isAsk,PROVISION_KINDS,QUESTION_KINDS,STOP_KINDS,answerCommand,answerOwnerQuestion,credentialNeed,
   decisionAllowlistFor,dedupeNeedUser,inheritProvisional,irreversibleEffect,openOwnerAsk,ownerProvisionNeed,
-  provisionalLines,redactSecrets,stopReasonFor} from './owner.mjs';
+  provisionalLines,redactSecrets,stopReasonFor,
+  IDENTITY_SET_COMMAND,OWNER_LINE_KINDS,mechanicalOwnerLine,noteOwnerList,ownerDigest,ownerItems,ownerLines,ownerSection,waitsForOwner} from './owner.mjs';
 export {BRAND_PAYLOAD,attributedFiles,brandFields,brandPayload,brandSummary,changedFiles,machineVerify,opDiff,readValidatorMemory,
   renderValidatorMemory,sharedCheckCommand,treeForVerdict,treeVerdictFor,validatorRejectLimit} from './verify.mjs';
 export {LANE_LAYOUTS,KERNEL_PLANNED_KINDS,nodeLayout,laneOf,lanePredicates,designRecord,deriveWorkOp,syncLedgerOps,
@@ -1705,6 +1707,9 @@ function finish(store,state,outcome,reason=null,ctx=null){
     gates:state.gateResults.map(result=>({name:result.name,command:result.command,status:result.status,exitCode:result.exitCode})),
     needUser:state.needUser,
     provisional,provisionalReport:provisionalLines(state).join('\n'),
+    // The same list the status page prints, in the report that outlives the run: a finished workflow still owes
+    // the owner every question on it, and the report is where they read what to type.
+    owner:ownerItems(state),ownerReport:ownerLines(state).join('\n'),
     ops:state.ops.map(op=>({id:op.id,kind:op.kind,node:op.nodeId,origin:op.origin,status:op.status,runtime:op.runtime,attempt:op.attempt,
       allowlist:op.allowlist,ledgerIds:op.ledgerIds,head:op.head,ledgerCommit:op.ledgerCommit??null,verdict:op.verdict,validation:op.validation??null,
       provisional:[...(op.provisional??[])],files:op.files})),
@@ -1744,7 +1749,9 @@ export const OP_DEADLINE_MS={verify:3*60*60*1000,default:8*60*60*1000};
 export const opDeadlineFor=op=>Number.isFinite(op?.timeoutMs)&&op.timeoutMs>0?op.timeoutMs:kindRole(op?.kind)==='verify'?OP_DEADLINE_MS.verify:OP_DEADLINE_MS.default;
 export function settleStalled(orca,store,state,ctx,tick){
   const now=clockOf(ctx);
-  for(const op of state.ops.filter(item=>item.status==='running'&&Number.isFinite(item.launchedAt)&&now-item.launchedAt>opDeadlineFor(item))){
+  // An op that waits for the OWNER is exempt from the deadline: it is not slow, it is waiting, and the wait is
+  // the owner's to end. `op-overrun` once killed the tab that was asking for a credential over a long lunch.
+  for(const op of state.ops.filter(item=>item.status==='running'&&!waitsForOwner(state,item)&&Number.isFinite(item.launchedAt)&&now-item.launchedAt>opDeadlineFor(item))){
     // Past its deadline: settled as an overrun and relaunched elsewhere, like a stall the probe cannot see.
     settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:'overrun',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
     ctx.allocator.release(op.runtime,{op:op.id});
@@ -1913,8 +1920,17 @@ const MECHANICAL_LINES=['shared-depth','ledger-path','environment','shared-chang
  * would finish the workflow `blocked` over nothing. Every tick, such lines go; a line about an op still blocked
  * without a refusal stays until the rule that re-admits it runs.
  */
-function sweepStaleLines(store,state){
+export function sweepStaleLines(store,state){
   const dropped=[];
+  // A line the runtime has already taken in hand is never the owner's: a record a `work.author` op is writing
+  // right now, an environment an op has since run in. The owner was handed those and could do nothing with
+  // them but wait for the kernel - which is the opposite of a list that says what to type.
+  state.needUser=state.needUser.filter(item=>{
+    const mechanical=mechanicalOwnerLine(state,item);
+    if(!mechanical)return true;
+    store.appendEvent({event:'owner-line-dropped',node:mechanical.node??null,op:mechanical.op??null,kind:item.kind,reason:mechanical.reason});
+    return false;
+  });
   state.needUser=state.needUser.filter(item=>{
     if(!MECHANICAL_LINES.includes(item.kind))return true;
     // A triage line carries its op inside the signature (`settled:<op>:<liveness>`) rather than as a field.
@@ -2393,6 +2409,9 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     sweepStaleLines(store,state);
     const merged=dedupeNeedUser(state);
     if(merged)store.appendEvent({event:'need-user-deduplicated',dropped:merged,items:state.needUser.length});
+    // What the owner would read now, recorded when - and only when - it differs from what they would have read
+    // last tick. The event is the trail of the question, not a heartbeat of the list.
+    noteOwnerList(store,state);
     if(guardedStage(store,state,ctx,'sync',()=>{syncLedgerOps(store,state,ctx);planVerifyOps(store,state,ctx);})==='stop')break;
     if(guardedStage(store,state,ctx,'schedule',()=>scheduleOps(orca,store,state,ctx))==='stop')break;
     state.allocation=typeof allocator.serialize==='function'?allocator.serialize():allocator.snapshot?.()??null;
@@ -2675,7 +2694,10 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
         [node,{lane:laneText(laneWalked(entry)),done:[...(entry.done??[])],skipped:[...(entry.skipped??[])],progress:laneProgress(entry)}])),
       workNodes:state.ops.filter(op=>op.nodeId).map(op=>({op:op.id,node:op.nodeId,status:op.status,kind:op.kind,
         lane:laneText(laneWalked(state.lanes?.[op.nodeId]))||null,progress:laneProgress(state.lanes?.[op.nodeId])})),
-      gates:state.gateResults,needUser:state.needUser,provisional:state.provisional??[],finished:state.finished,
+      gates:state.gateResults,needUser:state.needUser,provisional:state.provisional??[],
+      // The three owner-facing places in one list, so a machine reading this record asks the same question the
+      // page asks: what is waiting on the owner, and what do they type for it.
+      owner:ownerItems(state),ownerReport:ownerLines(state).join('\n'),finished:state.finished,
       events:store.readEvents().slice(-20),final:readJson(store.paths.final,null)};
   }
   if(command==='workflow-run'){
