@@ -250,6 +250,34 @@ calls:
     kind: read
     flags: []
     receipt: [result.worktree]
+  tab-create:
+    command: tab create
+    kind: mutation
+    replay: none
+    flags: [url, worktree]
+    required: [url, worktree]
+    receipt: [result.browserPageId]
+    note: Kernel-owned workflow credential page. Unknown effects are reconciled by tab-list with the exact session URL before any replacement.
+  tab-list:
+    command: tab list
+    kind: read
+    flags: [worktree]
+    required: [worktree]
+    receipt: [result.tabs]
+  tab-show:
+    command: tab show
+    kind: read
+    flags: [page, worktree]
+    required: [page, worktree]
+    receipt: [result.tab]
+  tab-goto:
+    command: goto
+    kind: mutation
+    replay: none
+    flags: [url, page, worktree]
+    required: [url, page, worktree]
+    receipt: [result]
+    note: Rebind only the workflow's persisted input page after helper restart. Never navigate an unrelated owner tab.
   terminal-create:
     command: terminal create
     kind: mutation

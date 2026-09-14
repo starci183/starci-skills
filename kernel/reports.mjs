@@ -32,7 +32,7 @@ export function signalFor(outcome){
 }
 
 /** Build and validate one report; throws on a contract violation so an invalid report is never written or sent. */
-export function buildReport({kind='op',outcome,run,task,dispatch,from,summary,files=[],checks=[],open=[],question=null,blocker=null,branch=null,head=null,gates=[],observations=[],reportedAt=Date.now()}){
+export function buildReport({kind='op',outcome,run,task,dispatch,from,summary,files=[],checks=[],open=[],question=null,blocker=null,credentialRequest=null,branch=null,head=null,gates=[],observations=[],reportedAt=Date.now()}){
   need(['op','workflow'].includes(kind),`Unsupported report kind: ${kind}`);
   const report={
     schema:kind==='op'?OP_REPORT:WORKFLOW_REPORT,kind,outcome:text(outcome,'outcome'),
@@ -47,6 +47,7 @@ export function buildReport({kind='op',outcome,run,task,dispatch,from,summary,fi
       // `mechanical` (which runtime, retry, a format) is the kernel's to answer; anything else is the owner's.
       ...(typeof question.kind==='string'&&question.kind.trim()?{kind:question.kind.trim()}:{})}:null,
     blocker:blocker?{kind:text(blocker.kind,'blocker kind'),detail:text(blocker.detail,'blocker detail')}:null,
+    ...(credentialRequest!==null?{credentialRequest}:{}),
     branch:branch?text(branch,'branch'):null,head:head?text(head,'head'):null,gates:gates.map(gate=>{need(plain(gate)&&typeof gate.name==='string'&&typeof gate.status==='string','Each gate needs name and status');return {name:gate.name,status:gate.status};}),
     observations:list(observations,'observations'),reportedAt,signal:signalFor(outcome),sent:null
   };
@@ -60,6 +61,18 @@ export function validateReport(report,{allowlist=null}={}){
   const errors=[];
   if(!plain(report)||![OP_REPORT,WORKFLOW_REPORT].includes(report.schema))return {ok:false,errors:['Unsupported report schema']};
   if(!OUTCOMES.includes(report.outcome))errors.push(`Unsupported outcome ${report.outcome}`);
+  if(report.credentialRequest!==undefined){
+    const request=report.credentialRequest;
+    if(!plain(request)||Object.keys(request).some(key=>!['reason','variables','check'].includes(key))
+      ||!['invalid','expired'].includes(request.reason)||typeof request.check!=='string'||!request.check.trim()||request.check.length>100
+      ||!Array.isArray(request.variables)||!request.variables.length||request.variables.length>16
+      ||request.variables.some(name=>typeof name!=='string'||!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))
+      ||new Set(request.variables).size!==request.variables.length)
+      errors.push('Invalid typed credential replacement request; use reason, variables and check only.');
+    else if(report.outcome!=='blocked'||report.blocker?.kind!=='environment'
+      ||!Array.isArray(report.checks)||!report.checks.some(check=>check.name===request.check&&Number.isInteger(check.exitCode)&&check.exitCode!==0&&typeof check.evidence==='string'&&check.evidence.trim()))
+      errors.push('Credential replacement requires blocked/environment and the named failing check with safe observed evidence.');
+  }
   if(report.outcome==='done'){
     if(!Array.isArray(report.checks)||report.checks.length===0)errors.push('done requires at least one check that was actually run');
     if(Array.isArray(report.checks)&&report.checks.some(check=>check.exitCode!==0))errors.push('done cannot carry a failing check; report failed or partial');

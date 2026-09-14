@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
  * module path, and the launcher's own direct-run entry keeps working exactly as before.
  */
 const LAUNCHER_COMMANDS=['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-status',
-  'workflow-list','workflow-stop','workflow-lane-close','workflow-supervise',
+  'workflow-list','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs',
   'start-op','settle','sweep','notify','report','wait','verify'];
 
 /**
@@ -29,6 +29,7 @@ workflow kernel (forwarded to the launcher; add --host <skill root> to reach a W
   workflow-stop        pause a running workflow at its next tick
   workflow-lane-close  remove a merged workflow's worktree, keeping its branch
   workflow-supervise   start and restart the kernel of every approved, unfinished workflow
+  workflow-inputs      serve the kernel-owned credential form in its workflow's Orca browser
   start-op settle sweep notify report wait verify   the host calls an operation makes
 
 machine checks (read-only; they judge bytes, not claims):
@@ -43,7 +44,7 @@ if (LAUNCHER_COMMANDS.includes(command)) {
   const {main}=await import('../.dist/hosts/orca/launch.mjs');
   try {
     // A text view prints as text; everything else is the record it always was.
-    const output=main(args);
+    const output=await main(args);
     process.stdout.write(typeof output?.print==='string'?output.print.endsWith('\n')?output.print:`${output.print}\n`:`${JSON.stringify(output,null,2)}\n`);
     if(output?.ok===false)process.exitCode=1;
   } catch(error) {

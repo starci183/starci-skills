@@ -478,8 +478,8 @@ rendered `## Provisional decisions (n)` block, and `workflow-status` prints the 
 | the same as `recommended` | `decision-confirmed`; nothing that was built on it moves |
 | a different option | `decision-overturned {decision, choice, reopened}`: every done node whose kernel block lists that decision is `markReopened`, its work is planned again with the owner's answer as a finding, and a requester still alive gets the new answer |
 
-A credential or irreversible ask keeps the old behaviour exactly: a `needUser` `decision` item, the requester
-paused, and `workflow-answer` releases it.
+An irreversible ask keeps its authority boundary and paused requester until the owner answers. A credential
+uses the researched workflow input surface described below and resumes through canonical custody checks.
 
 ### The owner answers in the op
 
@@ -496,18 +496,19 @@ six tabs and found the question in none of them.
 A provision is never asked for as a value. For an account, a dataset or an authority the op asks in its tab and
 reports `provided: <what>` once the owner replies. **A credential is not asked in a tab at all**: a question for
 the owner has to be a question, and an agent printing a command for them to compose was not one. The kernel
-never launches that ask (`provision-fill-waiting`); it prints one line - the variables, the custody and the
-exact command - and the owner runs `starci identity fill <slug> --name <VAR> ...`, which asks `Fill <VAR>:`
-with the echo off, one variable at a time, and puts each answer straight into custody. The kernel settles the
-ask itself, by **presence only** - `sops exec-env <secrets.enc.yaml> 'node -e
-"process.exit(process.env.<VAR>?0:1)"'` - as `credential: <VAR> present in identity:<slug>`
-(`credential-present`, `provision-filled`). No value ever reaches a file, an event or a report, and
+never launches that ask (`provision-fill-waiting`). Orca receives one workflow-owned form with researched
+instructions and hidden fields; headless hosts retain `starci identity fill <slug> --name <VAR> ...` with
+echo off. Each value goes through canonical `identity set` stdin into encrypted custody. The kernel settles
+the ask through its platform-aware presence verifier (`credential-present`, `provision-filled`); an explicit
+invalid/expired replacement also requires a new canonical write for that exact variable. Saved presence
+permits a new provider verification attempt and proves no provider validity. No value reaches a plaintext
+file, an event or a report, and
 `redactSecrets` masks anything key-shaped on the way through.
 
 Which of the two ops opened is a guess made from the sentence before anything was read, so it is a hint about
 the tab and never a ruling: the kernel accepts an ask by what the report says, so a `provision.ask` that found
-a design decision reports `decision: <id>` and its stop is lifted, a `decision.prepare` that found a credential
-reports the presence and its requester resumes on it, and both write `ask-reclassified {ask, from, to}`.
+a design decision reports `decision: <id>` and its stop is lifted. A `decision.prepare` that found a credential
+returns the exact requirement to the kernel's researched input flow instead of asking for its value.
 
 The one environment variable the custody itself needs is `SOPS_AGE_KEY_FILE`: the kernel and the CLI name the
 host's `~/.starci/master.identity` themselves when nothing names a key file (`sopsEnv`), and every contract
@@ -942,3 +943,17 @@ than left to be discovered:
   "the overlaps the critic finds are the three cases: a conflict is listed for the owner on the goal page, a
   reference is a record to cite, and the intake contract carries both"; the status section by
   `tests/workflow-view.spec.mjs` "workflow-status prints the reconciliation of every intake".
+
+
+### Integration preparation and workflow input
+
+Every external API/service/SDK integration reads current official documentation before design, configuration
+or credential choices. The owning declaration keeps actual source observations, read dates, authentication
+and lifecycle constraints, applicable endpoint setup, an ordered owner/machine prerequisite plan and live
+verification. Research completeness precedes dependent work; owner input additionally requires executable
+machine preparation. Missing research is an owning-operation repair, not a secret question.
+
+Orca credential forms are created and reconciled by the kernel's detached input helper, never by the observer
+or an ask agent. They display researched human guidance, group duplicate fields, write only encrypted
+custody and let the kernel resume satisfied requests. See `docs/workflow-kernel.md` for the lifecycle and
+`tests/workflow-inputs.spec.mjs` for security, deduplication, restart and preparation regression coverage.

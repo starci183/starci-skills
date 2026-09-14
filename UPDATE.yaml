@@ -33,8 +33,8 @@ sections:
         ownership sets; do not sweep unrelated user edits into a commit. Preserve failed evidence
         and describe any unrun verification.
       - Do not hand-edit generated op documents; edit ops/<op>/operator.yaml and its applicable
-        specification/secondary YAML, then regenerate through ops/generate.mjs and check
-        reproducible generation. Removed V2 source/docs/tests are recoverable through Git, not an
+        specification/secondary YAML, then regenerate the runtime payload through npm run build and
+        verify reproducibility with npm run build:check. Source-tree generation is retired. Removed V2 source/docs/tests are recoverable through Git, not an
         executable fallback. Verify installed references and package contents without old
         directories. Preserve domain knowledge while removing obsolete session/routing instructions.
   - title: Release and migration

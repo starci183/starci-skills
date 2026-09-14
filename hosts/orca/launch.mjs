@@ -11,6 +11,7 @@ import {attestOperationWorker,formatOrcaDisplayName,planOperationAgentLaunch} fr
 import {protocolMain} from './protocol.mjs';
 import {kernelMain} from '../../kernel/kernel.mjs';
 import {supervisorMain} from '../../kernel/supervisor.mjs';
+import {serveWorkflowInputs} from '../../kernel/inputs-server.mjs';
 import {WORKFLOW_LIST,buildList,buildView,renderList,renderView} from '../../kernel/view.mjs';
 import {repositoryRoot} from '../../kernel/store.mjs';
 
@@ -594,7 +595,7 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
   node bin/starci.mjs settle --dispatch <dispatch> [--worktree <relative-path>] [--terminal <own-agent-terminal>] [--close true]
   node bin/starci.mjs sweep --worktree <relative-path> --from <monitor-terminal> [--keep <handle,handle>]
   node bin/starci.mjs notify --terminal <monitor-terminal> (--file <message-file> | --text <text>) [--worktree <relative-path>]
-  node bin/starci.mjs report --run <run> --from <own-terminal> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--reports-dir <dir>] [--capability <dcap>] [--worktree <relative-path>]
+  node bin/starci.mjs report --run <run> --from <own-terminal> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--credential-request-file <safe JSON>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--reports-dir <dir>] [--capability <dcap>] [--worktree <relative-path>]
   node bin/starci.mjs wait --run <run> --from <own-terminal> [--timeout-ms 900000] [--tick-ms 120000] [--reports-dir <dir>] [--stalled-after-ms <ms>] [--worktree <relative-path>]
   node bin/starci.mjs workflow-goal --job <text> [--id <workflow-id>] [--lane [<name>]] [--inputs a,b] [--gates a,b] [--ledger work|plan] [--scope feature1,feature2] [--reintake feature] [--migrate feature1,feature2|all] [--ledger-root <path>] [--allocation gpt-5.6-sol=5,claude-opus=3,qwen3.8-flash=2] [--host <path-to-.claude>] [--worktree <relative-path>]
     --lane gives the workflow a worktree of its own: an Orca worktree of this repository on a new branch cut
@@ -634,6 +635,8 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
     removes the merged lane worktree from Orca and from git and keeps its branch. Refused while the kernel is
     alive (workflow-stop first) and while the lane has not been merged into its base branch.
   node bin/starci.mjs workflow-supervise --host <path-to-.claude> [--once true] [--id <workflow-id>] [--poll-ms 60000] [--health-ms 1500000] [--worktree <repo>]
+  node bin/starci.mjs workflow-inputs --session <kernel-owned-session-file>
+    the independent credential helper; the kernel creates and reconciles its session and browser page.
   node bin/starci.mjs verify
   Every command accepts --host-adapter orca|headless (default orca; headless when STARCI_HOST=headless). The
   headless host runs the same kernel without Orca: operations are one-at-a-time claude -p / codex exec
@@ -641,7 +644,7 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
   capability the headless host lacks (interface.asset needs design-tool, which model/hosts.yaml declares only
   for the Orca host) is refused as host-unsupported.`;}
 
-const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-status','workflow-stop','workflow-lane-close','workflow-supervise'];
+const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-status','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs'];
 /** Read-only views of the workflow store: they open no kernel, call no Orca and never write. */
 const VIEW_COMMANDS=['workflow-list'];
 
@@ -654,6 +657,11 @@ const printed=(schema,command,print,rest={})=>({schema,command,...rest,print});
 export function main(argv=process.argv.slice(2),{orca,wait,env=process.env}={}){
   const {command,options}=parseArgs(argv);
   need(['start-op','settle','sweep','verify','notify','report','wait',...KERNEL_COMMANDS,...VIEW_COMMANDS].includes(command),usage());
+  if(command==='workflow-inputs'){
+    need(Object.keys(options).length===1&&typeof options.session==='string'&&options.session.trim(),
+      'Use starci workflow-inputs --session <kernel-owned-session-file>. The kernel owns this helper.');
+    return serveWorkflowInputs(path.resolve(options.session));
+  }
   if(VIEW_COMMANDS.includes(command)){
     // Reading a workflow needs no Orca runner at all, so a status page works where Orca is not even installed.
     const workflows=buildList({repoRoot:repositoryRoot(options.worktree?exactWorktree(options.worktree).path:process.cwd())});
@@ -689,7 +697,7 @@ export function main(argv=process.argv.slice(2),{orca,wait,env=process.env}={}){
 const direct=process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url);
 if(direct){
   try{
-    const output=main();
+    const output=await main();
     // A text view prints as text; everything else is the record it always was.
     process.stdout.write(typeof output?.print==='string'?output.print.endsWith('\n')?output.print:`${output.print}\n`:`${JSON.stringify(output,null,2)}\n`);
     if(output?.ok===false)process.exitCode=1;

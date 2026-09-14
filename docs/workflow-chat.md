@@ -67,12 +67,12 @@ verification.
 
    The owner can also answer **in the operation's own terminal**, by typing the option number there while the
    `decision.prepare` (or `provision.ask` for a provision) op is still open; the kernel treats that exactly as the command. A credential is
-   not asked in a tab at all: the kernel prints one line under `## Owner` - the variables, the custody and the
-   exact `starci identity fill <slug> --name <VAR> ...` command - and that command asks the owner `Fill <VAR>:`
-   with the echo off and puts each answer straight into the tree's encrypted custody; the kernel settles the
-   ask itself once the custody holds every variable. Relay that line verbatim, so the owner copies it. Never
-   ask the owner for a credential value in the chat, never accept one if it is pasted, and never write one
-   anywhere.
+   provided in the workflow's own researched Orca form; the kernel opens it, groups duplicate requests,
+   checks encrypted custody presence and resumes satisfied requesters. On a headless host the fallback is
+   the exact hidden `identity fill` command. The observer never opens substitute credential terminals and
+   never accepts values in chat. Missing official-documentation research is repaired by the owning
+   operation before the workflow asks for credentials. For runtime feedback, update the runtime and restart
+   the workflow for a blind test from its canonical goal and Work; do not inject observer context or hints.
 
    A `host` item is different again: the operation's kind needs a capability this host does not offer, as
    `model/hosts.yaml` declares it. There is nothing to arrange locally - the same workflow resumes in Orca.

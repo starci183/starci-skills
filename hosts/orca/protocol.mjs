@@ -28,14 +28,16 @@ function readJson(file,fallback){try{return JSON.parse(fs.readFileSync(file,'utf
 function writeJson(file,value){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,`${JSON.stringify(value,null,2)}\n`);}
 
 /** One typed outcome: validate, write the file, send the matching Orca signal once, record the send. */
-export function reportOutcome(orca,{cwd,kind='op',run,from,task,dispatch,outcome,summary,files=[],checksFile=null,checks=[],open=[],question=null,blocker=null,branch=null,head=null,gates=[],observations=[],reportsDir=null,capability=null,fileKey=null,now=Date.now}){
+export function reportOutcome(orca,{cwd,kind='op',run,from,task,dispatch,outcome,summary,files=[],checksFile=null,checks=[],open=[],question=null,blocker=null,credentialRequest=null,credentialRequestFile=null,branch=null,head=null,gates=[],observations=[],reportsDir=null,capability=null,fileKey=null,now=Date.now}){
   const directory=reportsDirectory(cwd,required(run,'run id'),reportsDir);
   const file=reportPath(directory,fileKey??required(dispatch,'dispatch id'));
   const existing=readJson(file,null);
   if(existing?.sent)return {schema:REPORT_RESULT,ok:false,file,reason:'already-reported',existing:{outcome:existing.outcome,sent:existing.sent}};
   const loadedChecks=checksFile?readJson(path.resolve(cwd,checksFile),null):checks;
   need(Array.isArray(loadedChecks),`Checks file is not a JSON array: ${checksFile}`);
-  const report=buildReport({kind,outcome,run,task,dispatch,from,summary,files,checks:loadedChecks,open,question,blocker,branch,head,gates,observations,reportedAt:now()});
+  const request=credentialRequestFile?readJson(path.resolve(cwd,credentialRequestFile),null):credentialRequest;
+  need(!credentialRequestFile||request!==null,'Credential request file is missing or invalid JSON.');
+  const report=buildReport({kind,outcome,run,task,dispatch,from,summary,files,checks:loadedChecks,open,question,blocker,credentialRequest:request,branch,head,gates,observations,reportedAt:now()});
   writeJson(file,report);
   const {type,orcaOutcome}=report.signal;
   const params={run,from,type,subject:`${report.outcome}: ${report.summary.slice(0,120)}`,body:reportBody(report,path.relative(cwd,file)),'task-id':task,'dispatch-id':dispatch,'report-path':path.relative(cwd,file).replaceAll('\\','/')};
@@ -159,6 +161,7 @@ export function protocolMain(command,options,{orca,cwd}){
       outcome:required(options.outcome,'outcome'),summary:required(options.summary,'summary'),files:csv(options.files),checksFile:options['checks-file']??null,open:csv(options.open),
       question:options.question?{text:options.question,options:csv(options.options)}:null,
       blocker:options.blocker?{kind:options.blocker.split(':')[0],detail:options.blocker.split(':').slice(1).join(':').trim()}:null,
+      credentialRequestFile:options['credential-request-file']??null,
       branch:options.branch??null,head:options.head??null,gates:options.gates?csv(options.gates).map(gate=>{const [name,status]=gate.split('=');return {name,status:status??'passed'};}):[],
       observations:options.observations?[options.observations]:[],reportsDir:options['reports-dir']??null,capability:options.capability??null});
   }

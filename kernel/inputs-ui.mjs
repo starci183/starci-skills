@@ -1,0 +1,72 @@
+/** Self-contained owner UI: no remote assets, analytics, storage or secret-bearing URLs. */
+export function inputPage({nonce,language='vi'}={}){
+  const vi=language.toLowerCase().startsWith('vi');
+  const words=vi?{
+    title:'Kết nối để tiếp tục',eyebrow:'STARCI · WORKFLOW',intro:'Điền thông tin truy cập mà workflow đang cần. Khi lưu đủ, các tác vụ liên quan sẽ tự tiếp tục.',
+    waiting:'Đang chờ thông tin',preparing:'Workflow đang chuẩn bị',running:'Workflow đang tiếp tục',finished:'Workflow đã kết thúc',unavailable:'Workflow tạm không khả dụng',technical:'Chi tiết kỹ thuật',
+    encrypted:'Lưu vào kho mã hóa',private:'Giá trị được ẩn và gửi thẳng vào kho mã hóa của workflow.',
+    guidance:'Lấy thông tin từ trang quản trị của dịch vụ tương ứng, rồi dán vào đúng ô bên dưới.',
+    pending:'Chưa nhập',saved:'Đã lưu · chờ workflow xác nhận',complete:'Đã xác nhận',tasks:'Tác vụ đang chờ',save:'Lưu thông tin đã nhập',saving:'Đang lưu…',
+    invalidCredential:'Dịch vụ đã từ chối thông tin hiện tại. Hãy nhập thông tin thay thế theo hướng dẫn bên dưới; workflow sẽ kiểm tra lại.',expiredCredential:'Thông tin hiện tại đã hết hạn. Hãy cấp lại theo hướng dẫn bên dưới rồi nhập giá trị mới; workflow sẽ kiểm tra lại.',
+    empty:'Ô trống được giữ lại để nhập sau.',success:'Đã lưu. Workflow sẽ kiểm tra và tự tiếp tục khi đủ thông tin.',
+    error:'Chưa lưu được. Kho mã hóa hoặc khóa giải mã chưa sẵn sàng. Thông tin vẫn đang được chờ; hãy thử lại khi kho sẵn sàng.',
+    changed:'Yêu cầu đã thay đổi. Trang sẽ cập nhật các ô còn cần nhập.',invalid:'Yêu cầu không hợp lệ. Hãy tải lại trang nhập thông tin trong Orca.',
+    disconnected:'Đang kết nối lại với workflow…',missing:'Workflow đang kiểm tra tài liệu chính thức và chuẩn bị các bước kết nối. Các ô nhập sẽ xuất hiện khi đã xác định rõ thông tin bạn cần cung cấp.',
+    savedNote:'Đã có đủ thông tin đang được yêu cầu. Workflow sẽ tiếp tục tự động.',finishNote:'Bạn có thể đóng trang này. Xem kết quả đầy đủ tại workflow trong Orca.',
+    verify:'Lưu thành công xác nhận thông tin đã có trong kho. Workflow vẫn phải kiểm tra kết nối với dịch vụ.',show:'Hiện',hide:'Ẩn',placeholder:'Dán giá trị tại đây',
+    session:'Phiên nhập không hợp lệ. Mở trang Thông tin truy cập của workflow trong Orca.'
+  }:{
+    title:'Connect to continue',eyebrow:'STARCI · WORKFLOW',intro:'Enter the credentials this workflow needs. Related tasks continue automatically once their required fields are saved.',
+    waiting:'Waiting for credentials',preparing:'Workflow is preparing',running:'Workflow is continuing',finished:'Workflow finished',unavailable:'Workflow temporarily unavailable',technical:'Technical details',
+    encrypted:'Save to encrypted custody',private:'Values stay hidden and go directly to this workflow’s encrypted custody.',
+    guidance:'Copy the credential from the service’s administration page and paste it into the matching field below.',
+    pending:'Not entered',saved:'Saved · awaiting workflow confirmation',complete:'Confirmed',tasks:'Waiting tasks',save:'Save entered credentials',saving:'Saving…',
+    invalidCredential:'The service rejected the current credential. Enter its replacement using the guidance below; the workflow will verify it again.',expiredCredential:'The current credential expired. Renew it using the guidance below and enter the new value; the workflow will verify it again.',
+    empty:'Empty fields remain waiting for later.',success:'Saved. The workflow checks presence and continues when its required fields are available.',
+    error:'Unable to save. Encrypted storage or its decryption key is unavailable. These fields remain waiting; retry when storage is ready.',
+    changed:'The request changed. The page will refresh the fields still needed.',invalid:'Invalid request. Reload the workflow input page in Orca.',
+    disconnected:'Reconnecting to the workflow…',missing:'The workflow is checking official documentation and preparing the connection. Input fields appear once the information you need to provide is established.',
+    savedNote:'All currently requested credentials are stored. The workflow will continue automatically.',finishNote:'You can close this page. See the complete result in the Orca workflow.',
+    verify:'Saved confirms presence in custody. The workflow still has to verify the connection with the provider.',show:'Show',hide:'Hide',placeholder:'Paste the value here',
+    session:'This input session is invalid. Open the workflow’s Credentials page in Orca.'
+  };
+  return `<!doctype html><html lang="${vi?'vi':'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${vi?'Thông tin truy cập':'Credentials'} · StarCi</title>
+<style nonce="${nonce}">
+:root{color-scheme:light;font-family:Segoe UI,Arial,sans-serif;color:#24362e;background:#f5f5ef;font-synthesis:none}*{box-sizing:border-box}body{margin:0}main{max-width:940px;margin:0 auto;padding:48px 30px 72px}.brand{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;letter-spacing:2px;color:#536f62}.mark{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#274e3e;color:white;font-size:18px}header{margin:32px 0}h1{font-size:38px;letter-spacing:-1.2px;margin:0 0 12px;font-weight:600;line-height:1.2}.intro{font-size:16px;line-height:1.65;max-width:690px;color:#627167;margin:0}.context{margin:24px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px}.pill{background:#e9eadf;border:1px solid #dedfd3;border-radius:30px;padding:7px 12px;font-weight:600}.workflow{color:#637469;overflow-wrap:anywhere}.card{background:#fff;border:1px solid #e0e5dc;border-radius:18px;margin:18px 0;overflow:hidden;box-shadow:0 4px 12px #183c2110}.cardhead{padding:24px 28px 20px;border-bottom:1px solid #edf0e9;display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.provider{font-size:20px;margin:0 0 8px;font-weight:600}.custody{font-size:12px;color:#79867b;margin:0}.guide{font-size:13px;line-height:1.55;color:#748076;margin:12px 0 0;max-width:620px}.fields{padding:6px 28px 8px}.field{padding:22px 0}.field+.field{border-top:1px solid #eef1eb}.labelrow{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap;margin-bottom:11px}label{font-size:13px;font-family:Consolas,monospace;font-weight:600;overflow-wrap:anywhere}.status{font-size:11px;color:#847143}.status[data-status=saved],.status[data-status=complete]{color:#3b7959}.inputrow{display:flex;border:1px solid #ccd5c8;border-radius:10px;background:#fbfcf9;overflow:hidden}.inputrow:focus-within{outline:3px solid #dbe9df;border-color:#5a8067}input{flex:1;min-width:0;border:0;padding:14px 16px;background:transparent;outline:0;color:#253e30;font-size:15px}input:disabled{background:#f1f5ee}.reveal{border:0;border-left:1px solid #e3e7df;background:transparent;color:#627467;min-width:64px;font-size:12px}.tasks{font-size:11px;line-height:1.6;color:#748075;margin:10px 0 0;overflow-wrap:anywhere}.actions{padding:18px 28px 24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}.save{border:0;border-radius:9px;padding:13px 19px;background:#284f3d;color:white;font-size:13px;font-weight:600;cursor:pointer}.save:disabled{opacity:.5;cursor:default}.small{font-size:11px;line-height:1.5;color:#7b867b;max-width:290px}.feedback{padding:0 28px 22px;font-size:13px;line-height:1.6;margin:0}.feedback:empty{display:none}.feedback.error{color:#a54c33}.notice{padding:20px 24px;border-radius:12px;background:#eaf0e4;color:#48644e;font-size:14px;line-height:1.65;margin:18px 0}.notice:empty{display:none}footer{margin-top:28px;display:flex;gap:12px;align-items:flex-start;color:#7b887c;font-size:12px;line-height:1.65}.lock{font-size:20px;color:#608567}button:focus-visible{outline:3px solid #aac4b2;outline-offset:3px}button{cursor:pointer}@media(max-width:600px){main{padding:28px 18px 50px}h1{font-size:30px}.cardhead,.actions{padding-left:20px;padding-right:20px}.fields{padding-left:20px;padding-right:20px}.feedback{padding-left:20px;padding-right:20px}.provider{font-size:18px}.actions{gap:10px}.save{width:100%}}
+</style></head><body><main><div class="brand"><span class="mark">S</span>${words.eyebrow}</div><header><h1>${words.title}</h1><p class="intro">${words.intro}</p></header><div class="context"><span class="pill" id="phase">${words.waiting}</span><span class="workflow" id="workflow"></span></div><div id="notice" class="notice" role="status" aria-live="polite"></div><div id="cards"></div><footer><span class="lock" aria-hidden="true">◇</span><span>${words.private}<br>${words.verify}</span></footer></main>
+<script nonce="${nonce}">
+const words=${JSON.stringify(words)},token=location.hash.slice(1),cards=new Map();let stopped=false,busy=false;
+const el=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text)node.textContent=text;return node;};
+const message=code=>code==='empty'?words.empty:code==='request-changed'?words.changed:code==='invalid-request'?words.invalid:words.error;
+const headers=()=>({'Authorization':'Bearer '+token,'Content-Type':'application/json'});
+function makeCard(field){
+ const card=el('form','card'),head=el('div','cardhead'),info=el('div'),provider=el('h2','provider',field.provider);
+ info.append(provider);head.append(info);const fields=el('div','fields'),actions=el('div','actions'),button=el('button','save',words.save),note=el('span','small',words.empty),feedback=el('p','feedback');feedback.setAttribute('role','status');feedback.setAttribute('aria-live','polite');button.type='submit';actions.append(button,note);card.append(head,fields,actions,feedback);document.querySelector('#cards').append(card);
+ const group={card,fields,button,feedback,items:new Map()};
+ card.addEventListener('submit',async event=>{event.preventDefault();if(busy)return;const entries=[];
+  for(const [id,item] of group.items){if(!item.input.disabled&&item.input.value)entries.push({id,value:item.input.value});item.input.value='';item.input.type='password';item.reveal.textContent=words.show;}
+  if(!entries.length){feedback.textContent=words.empty;return;}busy=true;button.disabled=true;button.textContent=words.saving;feedback.textContent='';
+  try{const response=await fetch('/credentials',{method:'POST',headers:headers(),body:JSON.stringify({entries}),cache:'no-store'});for(const entry of entries)entry.value='';const result=await response.json();feedback.className='feedback'+(result.ok?'':' error');feedback.textContent=result.ok?words.success:result.code?message(result.code):[...new Set((result.results||[]).filter(item=>!item.ok).map(item=>message(item.code)))].join(' ');}
+  catch{feedback.className='feedback error';feedback.textContent=words.disconnected;}finally{for(const entry of entries)entry.value='';busy=false;button.textContent=words.save;await refresh();}
+ });return group;
+}
+function render(data){
+ document.querySelector('#workflow').textContent=data.workflow;document.querySelector('#phase').textContent=words[data.phase]||words.waiting;
+ document.title=(data.phase==='waiting'?'● ':'')+'${vi?'Thông tin truy cập':'Credentials'} · '+data.workflow;
+ const notice=document.querySelector('#notice');notice.textContent=data.unresolved?.length?words.missing:data.phase==='finished'?words.finishNote:data.phase==='unavailable'?words.disconnected:data.phase==='running'?words.savedNote:'';
+ const seen=new Set();for(const field of data.fields){seen.add(field.id);let group=cards.get(field.slug);if(!group){group=makeCard(field);cards.set(field.slug,group);}let item=group.items.get(field.id);
+  if(!item){const wrapper=el('div','field'),row=el('div','labelrow'),label=el('label','',field.label||field.name),status=el('span','status'),inputrow=el('div','inputrow'),input=el('input'),reveal=el('button','reveal',words.show),tasks=el('p','tasks'),guidance=el('p','guide',[field.meaning,field.obtain].filter(Boolean).join(' ')),details=el('details','tasks');details.append(el('summary','',words.technical),el('p','',field.name+' · identity:'+field.slug));
+   for(const source of field.sources||[]){try{const url=new URL(source.url);if(url.protocol!=='https:'||url.username||url.password)continue;const link=el('a','guide',source.title);link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';guidance.append(el('br'),link);}catch{}}
+   for(const step of field.ownerSteps||[])guidance.append(el('p','guide',step.action+' '+step.reason));
+   if(field.replacementReason)guidance.prepend(el('p','notice',field.replacementReason==='expired'?words.expiredCredential:words.invalidCredential));
+   input.id='field-'+field.id;label.htmlFor=input.id;input.type='password';input.autocomplete='new-password';input.spellcheck=false;input.placeholder=words.placeholder;input.maxLength=16384;reveal.type='button';reveal.setAttribute('aria-label',words.show+' '+(field.label||field.name));reveal.addEventListener('click',()=>{input.type=input.type==='password'?'text':'password';reveal.textContent=input.type==='password'?words.show:words.hide;});row.append(label,status);inputrow.append(input,reveal);wrapper.append(row,inputrow,guidance,tasks,details);group.fields.append(wrapper);item={wrapper,input,reveal,status,tasks};group.items.set(field.id,item);}
+  item.status.textContent=words[field.status];item.status.dataset.status=field.status;item.input.disabled=field.status!=='pending'||data.phase==='finished';item.reveal.disabled=item.input.disabled;if(item.input.disabled)item.input.value='';item.tasks.textContent=words.tasks+': '+field.tasks.map(task=>task.label).join(', ');
+ }
+ for(const [slug,group] of cards){for(const [id,item] of group.items){if(!seen.has(id)){item.input.value='';item.wrapper.remove();group.items.delete(id);}}if(!group.items.size){group.card.remove();cards.delete(slug);}else group.button.disabled=busy||![...group.items.values()].some(item=>!item.input.disabled);}
+ if(data.phase==='finished')stopped=true;
+}
+async function refresh(){if(!token){document.querySelector('#notice').textContent=words.session;stopped=true;return;}try{const response=await fetch('/status',{headers:headers(),cache:'no-store'});if(!response.ok)throw Error('unavailable');render(await response.json());}catch{document.querySelector('#notice').textContent=words.disconnected;}}
+async function poll(){await refresh();if(!stopped)setTimeout(poll,2500);}poll();
+window.addEventListener('pagehide',()=>{for(const input of document.querySelectorAll('input'))input.value='';});
+</script></body></html>`;
+}

@@ -22,18 +22,19 @@ Usage:
   starci workflow-stop --id <id>
   starci workflow-lane-close --id <id>
   starci workflow-supervise --host <skill root> [--once true] [--poll-ms 60000]
+  starci workflow-inputs --session <kernel-owned-session-file>
   starci start-op --run <run> --workflow-task <task> --from <terminal> --worktree <path> --operation <op> --scope <scope> --spec-file <file>
   starci settle --dispatch <dispatch> [--terminal <terminal>] [--close true]
   starci sweep --worktree <path> --from <monitor terminal> [--keep <handle,handle>]
   starci notify --terminal <monitor terminal> (--file <message-file> | --text <text>)
-  starci report --run <run> --from <own terminal> --task <task> --dispatch <dispatch> --outcome <outcome> --summary <text>
+  starci report --run <run> --from <own terminal> --task <task> --dispatch <dispatch> --outcome <outcome> --summary <text> [--credential-request-file <safe JSON>]
   starci wait --run <run> --from <own terminal> [--timeout-ms 900000] [--tick-ms 120000]
   starci verify
   starci workspace init <work-root> --id <workspace-id>
   starci storage <backend-root>
   starci source-layout <backend-root> <frontend-root>
   starci validate <work-root>
-  starci identity set <slug> --name <VAR> [--work-root <path>]   (the value is read from stdin, never printed)
+  starci identity set <slug> --name <VAR> [--work-root <path>] [--expected-write-revision <revision|none>]   (the value is read from stdin, never printed)
   starci identity fill <slug> --name <VAR> [--name <VAR>] [--work-root <path>]   (it asks for each one here, with the echo off)
   starci brand check <work-root> [--source <repository-root>] [--json]
   starci render check <ui-node-dir> --brand <work-root> [--family <id>] [--json]
@@ -277,7 +278,8 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
         emit(filled);
         return filled.ok?0:1;
       }
-      const name=option('name'),given=option('work-root');
+      const name=option('name'),given=option('work-root'),expected=option('expected-write-revision');
+      if(expected!==null&&expected!=='none'&&!/^[a-f0-9-]{36}$/.test(expected))throw Error('Invalid expected credential write revision.');
       if(!name)throw Error('--name needs the exact variable the code reads, for example STRIPE_SECRET_KEY.');
       // Exactly one positional, and it is the slug: a second word on this command line could only be a value,
       // and a value on a command line is the thing this whole custody exists to prevent.
@@ -285,7 +287,7 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       const {findWorkRoot,readStdin,setIdentitySecret}=await import('../core/identity.mjs');
       const workRoot=findWorkRoot(process.cwd(),given);
       const value=(await readStdin(io.in??process.stdin)).replace(/\r?\n$/,'');
-      const result=setIdentitySecret({workRoot,slug:rest[0],name,value});
+      const result=setIdentitySecret({workRoot,slug:rest[0],name,value,...(expected!==null?{expectedWriteRevision:expected==='none'?null:expected}:{})});
       // `result` carries paths, variable names and a next step - never the value, and never a part of it.
       emit(result);
       return result.ok?0:1;
