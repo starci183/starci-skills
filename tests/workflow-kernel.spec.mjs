@@ -1121,6 +1121,24 @@ test('a stall over a spent daily budget is a wait, and a finish declared over on
   }finally{harness.cleanup();}
 });
 
+/** A dependency in a cooldown is alive: what depends on it waits, and nothing is put to the owner. */
+test('a dependency in a cooldown is alive, so its dependant waits instead of being blocked as never starting',()=>{
+  const harness=setupWork();
+  try{
+    const store=harness.store,state=harness.state;
+    const base=state.ops[0];
+    const cooling={...structuredClone(base),id:'shared-c',origin:'shared',nodeId:null,ledgerIds:[],status:'blocked',refusal:'launch-cooling',coolUntil:Date.now()+60*60*1000,dispatch:null,terminal:null,requesters:['req-c']};
+    const waiting={...structuredClone(base),id:'req-c',origin:'repair',nodeId:null,ledgerIds:[],status:'pending',dependsOn:['shared-c'],dispatch:null,terminal:null};
+    state.ops.push(cooling,waiting);
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    const state2=harness.run({maxIterations:1});
+    const req=state2.ops.find(op=>op.id==='req-c');
+    assert.notEqual(req.status,'blocked','a cooling dependency is not a dead one');
+    assert.equal(state2.needUser.some(item=>/can never start/.test(item.detail??'')),false);
+  }finally{harness.cleanup();}
+});
+
 test('an op that lost its agent past the restart limit cools down and comes back, and the owner is not asked',()=>{
   const harness=setupWork();
   try{

@@ -460,13 +460,20 @@ function deferForBrand(store,state,op,ctx){
   return true;
 }
 
+/**
+ * A dependency is dead when it failed, or when the kernel refused it for good. A refusal time lifts - a cooldown
+ * (`launch-cooling`) or a provider limit (`rate-limited`) - is not one: the op is re-admitted when the clock says so,
+ * and whatever waits for it simply waits.
+ */
+const TIME_BOUND_REFUSALS=['launch-cooling','rate-limited'];
+export const deadOp=op=>Boolean(op)&&(op.status==='failed'||(op.status==='blocked'&&Boolean(op.refusal)&&!TIME_BOUND_REFUSALS.includes(op.refusal)));
 function scheduleOps(orca,store,state,ctx){
   for(const op of state.ops){
     if(op.status!=='pending')continue;
     const dependencies=op.dependsOn.map(id=>byId(state,id));
     // Only a dependency that failed, or that the kernel refused for good, is dead; one blocked without a refusal is
     // cooling, re-admitted or authored, and the op simply waits for it.
-    if(dependencies.some(dependency=>dependency&&(dependency.status==='failed'||(dependency.status==='blocked'&&dependency.refusal)))){
+    if(dependencies.some(deadOp)){
       op.status='blocked';
       state.needUser.push({op:op.id,kind:'authority',detail:`${op.id} can never start: it depends on ${op.dependsOn.join(', ')}`});
       store.appendEvent({event:'op-blocked',op:op.id,reason:'dependency blocked'});
@@ -1021,7 +1028,7 @@ export function resumePaused(store,state){
     }
     // A shared op blocked without a refusal is still alive - the kernel cools, re-admits or authors it - so its
     // requester keeps waiting; only a refused or failed shared change blocks the requester behind it.
-    if(shared.status==='failed'||(shared.status==='blocked'&&shared.refusal)){
+    if(deadOp(shared)){
       op.status='blocked';op.waitingFor=null;
       state.needUser.push({op:op.id,kind:'shared-change',detail:`${op.id} waits for the shared change ${shared.id}, which is ${shared.status}`});
       store.appendEvent({event:'shared-change-blocked',op:op.id,shared:shared.id});
@@ -1962,14 +1969,14 @@ export function rejudgeParked(store,state,ctx){
       route='launch-cooling';
     }
     else if(item.kind==='shared-change'&&stuck){
-      const shared=(op.dependsOn??[]).map(id=>byId(state,id)).find(dep=>dep&&dep.status!=='done'&&dep.status!=='failed'&&!(dep.status==='blocked'&&dep.refusal));
+      const shared=(op.dependsOn??[]).map(id=>byId(state,id)).find(dep=>dep&&dep.status!=='done'&&!deadOp(dep));
       if(shared){drop(item);op.status='paused';op.waitingFor=shared.id;op.dispatch=null;op.terminal=null;op.nudged=false;route=`waits-for:${shared.id}`;}
     }
     if(route)routed.push({kind:item.kind,op:op?.id??null,route});
   }
   // A requester an older rule blocked behind a blocked shared change and then lost the line for (deduplicated,
   // or dropped with the shared op's own item) waits for that change too; one whose changes are all done runs again.
-  const alive=dep=>dep&&dep.status!=='done'&&dep.status!=='failed'&&!(dep.status==='blocked'&&dep.refusal);
+  const alive=dep=>dep&&dep.status!=='done'&&!deadOp(dep);
   for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal&&(item.dependsOn??[]).length&&!state.needUser.some(entry=>entry.op===item.id))){
     const deps=op.dependsOn.map(id=>byId(state,id)).filter(Boolean);
     const shared=deps.find(alive);
@@ -2002,7 +2009,7 @@ function readmitCooled(store,state,ctx){
     // "Can never start" over a dependency that is alive after all: the op waits for it again.
     if(item.kind==='authority'&&/can never start: it depends on/.test(detail)){
       const deps=(op.dependsOn??[]).map(id=>byId(state,id)).filter(Boolean);
-      if(!deps.some(dep=>dep.status==='failed'||(dep.status==='blocked'&&dep.refusal))){
+      if(!deps.some(deadOp)){
         state.needUser=state.needUser.filter(entry=>entry!==item);
         op.status='pending';
         store.appendEvent({event:'dependency-alive',op:op.id,dependsOn:op.dependsOn});
