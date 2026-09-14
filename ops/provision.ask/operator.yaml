@@ -3,8 +3,9 @@ goal:
   en: >-
     Ask the owner for the one thing only they can give - a credential, an account on an outside system, a
     dataset, a legal authority, or the go-ahead for an irreversible effect - exactly named, in this operation's
-    own terminal, and wait for it. A value is never asked for: the owner puts a credential into the tree's
-    encrypted identity custody with one command, and this operation verifies only that it is present.
+    own workflow, and wait for it. Credential input belongs to the kernel's Orca GUI after official-documentation
+    preparation; no model agent asks for a value. Headless hosts retain the hidden identity fill prompt.
+    This operation verifies only that the provision is present.
 nodeKinds:
   - business
 completionProfile: business
@@ -47,10 +48,11 @@ steps:
     writes: []
     action:
       en: >-
-        Ask in this terminal and wait: print what the owner provides and how. For a credential, print the one
-        command that puts the value into custody - node <skill root>/bin/starci.mjs identity set <slug>
-        --name <VAR>, which reads the value from stdin and never prints it - and ask them to reply "set". For
-        anything else, ask them to reply "provided" once it exists. Wait as long as the contract lets you.
+        For a credential, return the exact declared requirement to the kernel; do not open an input terminal,
+        ask the owner to compose a command, or wait for a "set" reply. The workflow owns the researched form
+        in Orca and resumes its satisfied requesters automatically; a headless host uses identity fill, which
+        reads hidden stdin and never prints it. For anything else, ask in this terminal and wait for the owner
+        to reply "provided" once it exists. Wait as long as the contract lets you.
   - reads:
       - question
       - environment
@@ -58,10 +60,10 @@ steps:
       - report
     action:
       en: >-
-        When the owner replies, verify PRESENCE alone: for a credential run sops exec-env
-        <work tree>/_resources/identity/<slug>/secrets.enc.yaml 'node -e "process.exit(process.env.<VAR>?0:1)"'
-        and report done with the first line exactly "credential: <VAR> present in identity:<slug>" when it exits
-        0; for anything else report done with "provided: <what the owner provided, in a few words>". If the wait
+        For a credential the kernel verifies encrypted-custody presence through the canonical verifier and
+        settles the waiting ask itself; this operation runs no credential probe and reports no credential
+        success. Stored presence does not establish provider validity. For anything else, when the owner
+        replies verify PRESENCE alone and report done with "provided: <what the owner provided, in a few words>". If the wait
         ends with no answer, report blocked with blocker kind authority naming the provision; the kernel keeps it
         on the owner's list and nothing else waits for it.
 proofs:
@@ -69,13 +71,14 @@ proofs:
     requirement:
       en: The provision is named exactly - the variable, the system, the custody - and nothing was invented,
         stubbed, defaulted or skipped in its place.
-  - id: asked-in-the-terminal
+  - id: asked-in-the-workflow
     requirement:
-      en: What the owner provides and how was printed in this operation's own terminal before any report.
+      en: The workflow provided a researched credential form in Orca (hidden fill prompt when headless), or
+        asked for the non-credential provision in this operation's terminal before any report.
   - id: no-secret
     requirement:
       en: No value of any credential or secret appears in the report, the terminal or anywhere else; a
-        credential is put into the tree's encrypted identity custody by the owner's own command and this
+        credential is put into the tree's encrypted identity custody by the workflow's input service and this
         operation verifies only that it is present.
 blockers:
   - code: QUESTION_UNCLEAR

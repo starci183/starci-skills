@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {AUTHOR_KIND,addOp,firstLine,liveStatus,locateSharedTreePaths,need,slash,unique,validateCommandAt} from './common.mjs';
 import {closeOpTerminal,keepsAskTab} from './terminals.mjs';
-import {settleCredentialPresence} from './fill.mjs';
+import {settleCredentialPresence,askFillLine} from './fill.mjs';
 
 /**
  * The owner loop, in one file, because it is one rule: the runtime prepares a decision and the owner takes it.
@@ -204,7 +204,7 @@ export function openOwnerAsk(store,state,op,question,ctx,report=null){
   const stop=stopReasonFor(question,report);
   const by=stop?(declaredStopOf(question,report)?'declared':'words'):'none';
   const kind=stop??(question.kind&&QUESTION_KINDS.includes(String(question.kind))?question.kind:'decision');
-  const same=state.ops.find(item=>isAsk(item.kind)&&liveStatus.includes(item.status)&&item.question?.text===question.text);
+  const same=state.ops.find(item=>isAsk(item.kind)&&liveStatus.includes(item.status)&&item.question?.text===question.text&&item.question?.inputRevision===question.inputRevision);
   const allowlist=decisionAllowlistFor(state,op,ctx);
   const ask=same??addOp(store,state,{kind:stop?PROVISION_ASK:DECISION_PREPARE,nodeId:null,
     goal:`Prepare the owner's decision on the question ${op.id} asked: ${firstLine(question.text)}`,
@@ -537,19 +537,8 @@ export const OWNER_LINE_KINDS=['validator','authority','environment','decision',
 export const IDENTITY_SET_COMMAND='node <skill root>/bin/starci.mjs identity set <slug> --name <VAR>';
 const OWNER_ITEM_KIND={ledger:'ledger',decision:'decision'};
 const clipTo=(value,max=220)=>{const text=String(value??'').replace(/\s+/g,' ').trim();return text.length>max?`${text.slice(0,max)}...`:text;};
-/**
- * The `identity set` command the ask op already printed for the owner, taken verbatim from its own question, so
- * the list repeats what the tab says instead of inventing a second spelling. The pattern stops at the variable
- * NAME, so nothing else of the question can be carried out by it - and a value is not in the question to begin
- * with: the ask op tells the owner to put the value in with this command and then checks presence only.
- */
-const identitySetIn=op=>{
-  const text=`${op?.question?.text??''}\n${op?.goal??''}`;
-  const found=text.match(/(?:node\s+\S+\s+|starci\s+)identity set\s+\S+\s+--name\s+[A-Za-z_][A-Za-z0-9_]*/);
-  return found?found[0]:IDENTITY_SET_COMMAND;
-};
-/** Whether the provision an ask op waits for is a credential - the only kind that is put into custody by a command. */
-const asksForCredential=op=>String(op?.question?.kind??'')==='credential'||credentialNeed(`${op?.question?.text??''}\n${op?.goal??''}`);
+/** Typed credential asks use the workflow's input surface; legacy questions retain classification by their words. */
+const asksForCredential=op=>Boolean(op?.credential)||op?.question?.stop==='credential'||String(op?.question?.kind??'')==='credential'||credentialNeed(`${op?.question?.text??''}\n${op?.goal??''}`);
 
 /**
  * A line on the owner's list that is really a mechanical state of the runtime, and the reason it is one. Two
@@ -596,10 +585,11 @@ export function ownerItems(state){
   const items=[];
   for(const op of ops.filter(item=>item.kind===PROVISION_ASK&&liveStatus.includes(item.status))){
     const credential=asksForCredential(op);
+    if(credential&&!op.credential?.ready)continue;
     items.push({kind:'provision',op:op.id,
       what:redactSecrets(clipTo(op.question?.text??op.goal??'')),
       how:credential
-        ?`reply \`set\` in tab ${op.terminal??'(no tab yet)'} after running \`${identitySetIn(op)}\``
+        ?askFillLine(op)
         :`reply \`provided\` in tab ${op.terminal??'(no tab yet)'} once it exists`,
       terminal:op.terminal??null,since:Number.isFinite(op.launchedAt)?op.launchedAt:null});
   }

@@ -695,42 +695,79 @@ command (`owner-answered {via: 'terminal'}`). A provision is never asked for as 
 dataset or an authority the op asks in its tab and reports `provided: <what>`, and `redactSecrets` masks
 anything key-shaped that reaches an answer, an event or a report.
 
-### A credential is a prompt to fill
+### Workflow-owned integration preparation and credential input
 
-A question for the owner has to be a question. An agent in a tab printing `node <skill root>/bin/starci.mjs
-identity set <slug> --name <VAR>` for the owner to compose, and then polling them for the word `set`, was not
-one - the owner read that tab and asked whether it was asking them anything at all. So a `provision.ask` whose
-`question.stop` is `credential` is **never dispatched to a runtime** (`kernel/fill.mjs`, the `fillWaiting` skip
-in `scheduleOps`). It stays `running` with `dispatch: null`, `fill: true`, no runtime, no parallel slot and no
-deadline - it is exempt from both the `op-overrun` and the `stalled-idle` settlements, because the owner takes
-as long as the owner takes.
+Before deciding any external API, service or SDK integration, the owning operation reads the current
+provider's official documentation for the intended use. `preparation` on the canonical integration
+declaration records primary sources, actual read dates and observed support for credential meaning,
+authentication/account/scopes/lifecycle, conditional callback/webhook needs, ordered prerequisites and
+live verification. The field shape and checks live in `kernel/inputs-readiness.mjs`; it is provider-neutral.
+A source URL or structural validation alone never proves official provenance or a correct interpretation:
+the operation and its independent reviewer read the sources and check the claims.
 
-What the owner gets is one line, printed once into the kernel's own tab and carried by `## Owner` in
-`workflow-status`, in the status view and in the final report:
+Research completeness and readiness for owner input are separate. Research may leave honestly pending
+machine setup in an ordered plan; the existing requester executes authorized setup and sends updated
+observations through the owning record route. Before owner input, every currently executable machine step
+has evidence. A step that needs owner consent or a credential may wait on that explicit owner prerequisite.
+No universal webhook requirement or arbitrary research expiry is imposed. Missing/inaccessible research
+returns to the owning operation, never to the owner as an unsupported secret request.
 
-```
-Fill ZALO_OA_ACCESS_TOKEN, ZALO_OA_SECRET for identity:zalo-oa: copy and run  node <skill root>/bin/starci.mjs identity fill zalo-oa --name ZALO_OA_ACCESS_TOKEN --name ZALO_OA_SECRET --work-root <tree>/.starciwork
-```
+The kernel gates related design/implementation/verification work on research and creates one bounded
+`work.author` repair for its owning declaration when the existing binding and scope permit it. That repair
+may change only preparation; a fingerprint protects every surrounding product claim. An unavailable
+write binding is an actual authority boundary, not permission to widen a record allowlist. On restart,
+existing variable-only credential asks are re-evaluated; unsupported fields are hidden and their paused
+requesters receive a fresh operation attempt behind the owning research repair. Unrelated completed Work
+and accepted approvals are preserved.
 
-`starci identity fill <slug> --name <VAR> [--name <VAR>]` asks, in order, `Fill <VAR>:` - on a TTY with the
-echo off through raw mode, on a pipe as one plain line - and calls `setIdentitySecret` for each answer, so the
-value goes from the keystroke into the encrypted custody and nowhere else. It prints `<VAR>: present in
-identity:<slug>` or `<VAR>: refused - <reason>` per variable, an empty answer is a **skip** rather than a blank
-credential, and it exits 0 only when every variable is present.
+A credential `provision.ask` never occupies a model runtime, slot or terminal. In Orca the kernel
+reconciles one embedded Credentials page for the workflow on startup and before blocking. Its detached
+public helper is `node <skill root>/bin/starci.mjs workflow-inputs --session <private session file>`;
+only the kernel launches it. The helper independently reads the frozen workflow/ledger binding and fresh
+pending asks, presents human labels, why/how to obtain each value and official links, groups identical
+custody/variable requests, and hides input values. Exact variable/custody names remain in collapsed
+technical details. Unprepared asks show workflow preparation status without editable fields.
 
-The variable names and the slug come from the tree's own declaration when it has one - the integration
-record's `credential: {name, providedBy: owner, custody: identity:<slug>}` - and from the words of the question
-otherwise (`credentialAsked`); neither is invented, and an ask that can name neither says exactly that instead
-of guessing. The whole exchange is recorded as `provision-fill-waiting {ask, variables, custody, command}`.
+The loopback helper binds only `127.0.0.1`, requires a per-session capability and exact Host/Origin,
+accepts credential writes only by bounded POST, serves no third-party resources, and never echoes values.
+Values go through stdin to the public canonical identity writer; SOPS encrypt reads stdin, so no plaintext
+staging file exists. Per-custody writes are locked, and inherited environment values cannot pass presence
+checks. The private session sidecar holds a local capability, never external credentials; state/events and
+browser status contain no external values. The helper writes neither state.json nor workflow events.
 
-**The kernel settles it, by presence.** Every tick it looks at `secrets.enc.yaml` for each waiting ask; while
-that file is absent or unchanged nothing runs at all, and when it changes the kernel runs the contract's own
-check per variable - `sops exec-env <secrets.enc.yaml> 'node -e "process.exit(process.env.<VAR>?0:1)"'`
-(`identitySecretPresent`) - and, when every one of them is present, settles the ask exactly as the report
-`credential: <VAR> present in identity:<slug>` would have (`settleOwnerAsk` per variable, then
-`provision-filled {ask, variables, custody, via}`). The requesters resume; the value was never read, only its
-presence. `workflow-answer --op <ask> --note set` runs the same check immediately and refuses with what is
-missing when the custody is still empty - a word is never taken for a credential.
+Each ask is settled by the kernel only after all its researched variables are present in its bound encrypted
+custody. Empty/refused entries keep waiting, selected fields may be saved independently, and duplicate
+requests resume only when their own requirements are satisfied. Stored presence never proves provider
+validity: the integration operation still performs its real verification plan. Credential waits return to
+the kernel within a five-second wait slice, subject to host call latency.
+
+Kernel/helper/browser restarts reconcile ownership receipts and exact page identities; unknown tab-create
+effects are read back, never blindly repeated. An existing page is reused without repeated focus requests.
+A created page is only opening until its title/load state is observed. A runtime change retires the old
+helper and reuses the page with a fresh capability. After workflow completion or loss of its kernel owner,
+the helper allows a two-minute completion/restart grace, then stops serving. The page retains its completion
+message; the runtime does not close owner-created tabs. An unavailable browser is reported as such.
+
+An explicitly invalid or expired credential is a replacement request, not another presence check. Only
+`integration.verify` may submit `--credential-request-file <JSON>` on a blocked/environment report. The
+operation contract names a permitted nonsecret JSON artifact beside that operation's checks file. It
+contains `{reason: "invalid" | "expired", variables: ["DECLARED_NAME"], check: "declared-failed-check"}`;
+the named declared command must have failed with safe observed evidence. The kernel captured the tested
+credential version before launching that verifier. A changed version causes fresh verification, and a
+request outside the declared integration is refused. Arbitrary error text never enables overwrite.
+
+The form offers replacement while the exact-name canonical write revision remains the rejected one, even
+when the value is present. `identity set` changes `resource.yaml`'s nonsecret `details.writeRevisions[name]`
+only after its encrypted write, under the custody lock; the GUI's expected revision prevents racing writes.
+Settlement requires both a changed revision for that name and changed encrypted bytes, followed by presence.
+Writing another name cannot discharge the request. No plaintext value or hash enters state. This survives
+helper/kernel restart and also recognizes a canonical headless fill; the requester still has to verify the
+new value against the provider. Repeated form submission does not overwrite a replacement already saved.
+
+Headless workflows retain `identity fill <slug> --name <VAR> [--name <VAR>] --work-root <bound tree>` with
+hidden input. The observer does not open substitute terminals or fill in missing workflow steps. After a
+runtime improvement, restart and blind-test the workflow from its canonical goal and Work without passing
+chat context, manual GUI openings or hints to its product operations.
 
 **The report decides what the question was.** `settleOwnerAsk` reads the markers, never the op's kind, so
 either form may end any of the three ways. A `provision.ask` that comes back with `decision: <id>` had a

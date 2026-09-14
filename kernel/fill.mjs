@@ -1,25 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {findWorkRoot,identityPaths,identitySecretPresent} from '../core/identity.mjs';
+import {findWorkRoot,identityPaths,identitySecretPresent,identitySecretVersion} from '../core/identity.mjs';
+import {credentialVersionChanged} from './inputs-replacement.mjs';
 import {liveStatus,slash,unique} from './common.mjs';
 import {isAsk,settleOwnerAsk} from './owner.mjs';
 
 /**
- * How the owner is asked for a credential: one command they copy, paste and answer.
- *
- * It used to be an agent in a terminal tab. It printed a wall of text with a command to type, then polled the
- * owner for the word `set`, and the owner looked at that tab and asked whether it was even asking them
- * anything. The ruling was: a question for the owner is a question with fields to fill. So there is one
- * command - `starci identity fill <slug> --name VAR_A --name VAR_B` - and it asks, in order, `Fill VAR_A:`
- * with the echo off, puts each answer straight into the tree's encrypted custody, and says `present` or
- * `refused`. Nothing to click, no browser, no word to reply.
- *
- * The kernel's side is two rules and no agent. A `provision.ask` for a credential is never launched: it waits
- * while the kernel prints that one line - the variables, the custody, the exact command - into its own tab and
- * onto every page that shows this workflow. And the kernel settles it itself, by PRESENCE: each tick it runs
- * the contract's own check (`sops exec-env <secrets> 'node -e "process.exit(process.env.<VAR>?0:1)"'`) and,
- * when every variable is there, the ask is done and its requesters carry on. No value ever reaches this file,
- * this state, an event, a report or a log - the check reads an exit code and nothing else.
+ * Credential questions belong to the workflow. Orca receives one kernel-owned input page (inputs.mjs),
+ * while a headless host retains identity fill. No model agent handles either path. The kernel settles asks
+ * by encrypted-custody presence alone; values never enter state, events, reports or this module.
  */
 /** An environment variable name as the code reads it: upper case words joined by underscores. */
 export const VARIABLE_TOKEN=/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g;
@@ -51,7 +40,7 @@ export function credentialAsked(ask,{declared=[],requesters=[]}={}){
     ??(custodyIn(text)?`identity:${custodyIn(text)}`:null)
     ??rows.map(entry=>entry.credential.custody).find(Boolean)??null;
   const provider=matched.map(entry=>entry.provider).find(Boolean)??matched.map(entry=>entry.id).find(Boolean)??null;
-  return {variables,custody,provider};
+  return {variables,custody,provider,...(ask.credential?.replacements?{replacements:ask.credential.replacements}:{})};
 }
 
 /**
@@ -74,14 +63,19 @@ export function workRootOf(state){
 /** Every credential ask waiting for the owner to run the command. Nothing else in the workflow waits for them. */
 export const fillWaitingAsks=state=>(state?.ops??[])
   .filter(op=>isAsk(op.kind)&&op.fill===true&&liveStatus.includes(op.status)&&!op.answer);
+export const inputReadyAsks=state=>fillWaitingAsks(state).filter(ask=>ask.credential?.ready===true);
 
 /**
  * The one line the owner reads, wherever this workflow is printed: what to fill, where it lives, and the
  * command that does it. Never an instruction to invent a value, and never a value.
  */
 export function askFillLine(ask){
+  if(!ask?.credential?.ready)return 'The workflow is researching the integration and preparing its input requirements. No credential input is needed yet.';
   const names=[...(ask?.credential?.variables??[])];
   const custody=ask?.credential?.custody??null;
+  if(ask?.inputMode==='gui')return names.length&&custody
+    ?`Open this workflow's Credentials page in Orca to fill ${names.join(', ')} for ${custody}. Saved fields resume their waiting tasks automatically.`
+    :`Credential request ${ask.id} needs an exact variable and identity custody declaration before its workflow form can accept input.`;
   if(!names.length||!custody)return `Fill the credential ${ask?.id} asks for: its question names no variable`
     +`${custody?'':' and no `custody: identity:<slug>` is declared for it'} - declare it on the integration record,`
     +` or answer with \`starci workflow-answer --op ${ask?.id} --note "<what you provided>"\`.`;
@@ -89,7 +83,7 @@ export function askFillLine(ask){
 }
 /** The `## Owner` section of a status page or a goal: one line per credential the owner still owes. */
 export function ownerFillLines(state){
-  const waiting=fillWaitingAsks(state);
+  const waiting=inputReadyAsks(state);
   if(!waiting.length)return [];
   return [`## Owner (${waiting.length})`,...waiting.map(ask=>`- ${askFillLine(ask)}`)];
 }
@@ -104,13 +98,18 @@ const secretsOf=(workRoot,slug)=>{try{return identityPaths(workRoot,slug).secret
  * would have settled it. Nothing here has ever seen a value; the check reads an exit code.
  */
 export function settleCredentialPresence(store,state,ask,{variables,custody,via='fill',workRoot=null,
-  verifyPresence=identitySecretPresent}={}){
+  verifyPresence=identitySecretPresent,version=identitySecretVersion}={}){
+  if(ask.credential?.preparationRequired&&!ask.credential.ready)return {ok:false,ask:ask.id,checked:[],reason:'official integration preparation is incomplete'};
   const slug=String(custody??'').replace(/^identity:/,'');
   const names=unique((variables??[]).filter(Boolean));
   if(!names.length)return {ok:false,ask:ask?.id??null,checked:[],reason:'the question names no credential variable'};
   if(!SLUG.test(slug))return {ok:false,ask:ask.id,checked:[],reason:`no custody \`identity:<slug>\` is declared for ${names.join(', ')}`};
   const root=workRoot??workRootOf(state);
   if(!root)return {ok:false,ask:ask.id,checked:[],reason:'this workflow has no Work tree to hold a custody'};
+  for(const replacement of ask.credential?.replacements??[]){
+    if(!names.includes(replacement.name)||!credentialVersionChanged(replacement.baseline,version({workRoot:root,slug,name:replacement.name})))
+      return {ok:false,ask:ask.id,checked:[],reason:'The rejected credential still needs a new canonical write for that exact variable.'};
+  }
   const checked=names.map(name=>{
     try{const answer=verifyPresence({workRoot:root,slug,name});return {name,ok:Boolean(answer?.ok),reason:answer?.reason??null};}
     catch(error){return {name,ok:false,reason:String(error?.message??error).slice(0,200)};}
@@ -139,17 +138,19 @@ export function settleFilledAsks(store,state,ctx=null){
   const root=ctx?.work?.at?.workRoot??workRootOf(state);
   if(!root)return settled;
   for(const ask of fillWaitingAsks(state)){
+    if(ask.credential?.preparationRequired&&!ask.credential.ready)continue;
     const slug=String(ask.credential?.custody??'').replace(/^identity:/,'');
     if(!SLUG.test(slug)||!(ask.credential?.variables??[]).length)continue;
     const secrets=secretsOf(root,slug);
     // Nothing filled in yet, or nothing has changed since the last look: no sops run, no event, no noise.
     let stamp=null;
     try{stamp=secrets?fs.statSync(secrets).mtimeMs:null;}catch{stamp=null;}
+    if(stamp!==null&&ask.credential?.replacements?.length)stamp=JSON.stringify([stamp,...ask.credential.replacements.map(item=>(ctx?.credentialVersion??identitySecretVersion)({workRoot:root,slug,name:item.name}))]);
     if(stamp===null||ask.fillCheckedAt===stamp)continue;
     ask.fillCheckedAt=stamp;
     const answer=settleCredentialPresence(store,state,ask,{variables:ask.credential.variables,
       custody:ask.credential.custody,via:'fill',workRoot:root,
-      ...(ctx?.verifyPresence?{verifyPresence:ctx.verifyPresence}:{})});
+      ...(ctx?.verifyPresence?{verifyPresence:ctx.verifyPresence}:{}),...(ctx?.credentialVersion?{version:ctx.credentialVersion}:{})});
     if(answer.ok)settled.push(ask.id);
     else store.appendEvent({event:'provision-fill-incomplete',ask:ask.id,reason:answer.reason});
   }

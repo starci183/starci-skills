@@ -243,19 +243,21 @@ test('the decision.prepare operator prepares the decision, prints it in its own 
   assert.ok(contract.proofs.some(proof=>proof.id==='asked-in-the-terminal'),'printing in the tab is a proof, not a hope');
 });
 
-test('the provision.ask operator names the provision exactly, waits in its own terminal and never asks for a credential value',()=>{
+test('the provision.ask operator delegates credentials to the workflow form and waits in its terminal only for other provisions',()=>{
   const document=fs.readFileSync(path.join(root,'provision.ask','operator.yaml'),'utf8');
   const contract=catalogue.ops.find(op=>op.id==='provision.ask').contract;
   assert.deepEqual(contract.writes.map(write=>write.path),['E/manifest.yaml'],'the only write is the report of the attempt, never the tree');
   for(const text of [document,JSON.stringify(contract)]){
     assert.match(text,/Never invent, stub, default or skip it/);
-    assert.match(text,/Ask in this terminal and wait/);
-    assert.match(text,/identity set <slug>\s*\n?\s*--name <VAR>/);
+    assert.match(text,/For anything else, ask in this terminal and wait/);
+    assert.match(text,/workflow owns the researched form/);
+    assert.match(text,/kernel verifies encrypted-custody presence through the canonical verifier/);
+    assert.doesNotMatch(text,/identity set <slug>|sops exec-env/);
     assert.match(text,/never prints it/);
-    assert.match(text,/credential: <VAR> present in identity:<slug>/);
+    assert.match(text,/Stored presence does not establish provider validity/);
     assert.match(text,/provided: <what the owner provided, in a few words>/);
   }
-  assert.ok(contract.proofs.some(proof=>proof.id==='asked-in-the-terminal'),'asking in the tab is a proof, not a hope');
+  assert.ok(contract.proofs.some(proof=>proof.id==='asked-in-the-workflow'),'the workflow input surface is part of the proof contract');
   assert.match(contract.proofs.find(proof=>proof.id==='no-secret').requirement.en,/verifies only that it is present/);
 });
 

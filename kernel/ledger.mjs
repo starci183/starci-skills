@@ -173,7 +173,7 @@ export function readNode(repoRoot,node){
 // ---------------------------------------------------------------------------- candidate selection
 
 const scopeList=scope=>scope===null||scope===undefined?null:(Array.isArray(scope)?scope:[scope]).map(slash).filter(Boolean);
-const inScope=(node,scopes)=>{
+export const inScope=(node,scopes)=>{
   if(!scopes)return true;
   const id=String(node.id??''),nodePath=slash(node.path??'');
   return scopes.some(entry=>{
@@ -780,7 +780,8 @@ export function declaredIntegrations(ledger){
         `integration ${id} names no credential custody; declare \`custody: identity:<slug>\` - the encrypted identity resource of this tree that holds ${name}${where?` (it still carries the retired \`where: ${where}\`, which names a place, not a custody)`:''}`);
       else if(custody&&!IDENTITY_CUSTODY.test(custody))fault(node.id,id,'credential-custody-missing',
         `integration ${id} declares custody ${custody}; the only custody a credential has is \`identity:<slug>\` of this tree`);
-      list.push({id,provider,declaredBy:node.id,
+      list.push({id,provider,declaredBy:node.id,declaredPath:node.path,
+        ...(plain(entry.preparation)?{preparation:entry.preparation}:{}),
         credential:{name,providedBy:providedBy??null,custody,
           slug:custody&&IDENTITY_CUSTODY.test(custody)?custody.slice('identity:'.length):null,where},
         ...(typeof entry.sandbox==='string'&&entry.sandbox.trim()?{sandbox:entry.sandbox.trim()}:{})});

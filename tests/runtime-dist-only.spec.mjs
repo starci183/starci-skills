@@ -24,6 +24,12 @@ test('relocated runtime uses only .dist and bootstrap, never authored code or da
   run(['bin/starci.mjs','validate',work]);
   assert.equal(JSON.parse(run(['bin/starci.mjs','workflows'])).workflows.length,16);
   run(['bin/starci.mjs','op','backend.implement']);
+  for(const name of ['inputs','inputs-server','inputs-model','inputs-ui','inputs-readiness','inputs-replacement'])
+    assert.ok(fs.existsSync(path.join(base,'.dist/kernel',name+'.mjs')),'credential helper missing from payload: '+name);
+  const helper=spawnSync(process.execPath,['bin/starci.mjs','workflow-inputs'],{cwd:base,encoding:'utf8',timeout:10000,windowsHide:true});
+  assert.equal(helper.status,1);
+  assert.match(helper.stderr,/kernel-owned-session-file/,'public helper command resolves through the relocated launcher');
+  assert.doesNotMatch(helper.stderr,/ERR_MODULE_NOT_FOUND|Unknown command/);
   run(['--input-type=module','-e',`import {resolveProjectSkillPath} from './.dist/workflows/lifecycle.mjs';
     import {selectProfile} from './.dist/kernel/chains.mjs';
     import {selectWorkflow} from './.dist/workflows/select.mjs';

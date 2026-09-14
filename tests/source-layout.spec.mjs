@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 import {parseYaml} from '../core/yaml.mjs';
 import {skillRoot} from '../core/runtime-root.mjs';
 import {validateSourceLayout} from '../workflows/source-layout.mjs';
-import {main} from '../cli/main.mjs';
 
 const contract=parseYaml(fs.readFileSync(new URL('../schemas/source-layout.yaml',import.meta.url),'utf8'));
 function fixture(t,{hostIsBackend=false}={}){
@@ -32,6 +32,15 @@ test('project metadata names and deployment stacks do not impersonate host ident
 test('a routed backend cannot duplicate the external runtime or route-registry identity',t=>{const f=fixture(t);makeIdentity(f.be);const result=validateSourceLayout({...f,workRoot:path.join(f.be,'.starciwork')},contract);assert.equal(result.ok,false);assert.ok(result.errors.some(e=>e.role==='be'&&e.code==='DUPLICATE_IDENTITY'&&e.path.includes('.claude/SKILL.md')));assert.ok(result.errors.some(e=>e.role==='be'&&e.code==='DUPLICATE_IDENTITY'&&e.path.includes('.workspaces/projects')));});
 test('duplicate frontend runtime identity or Work and a wrong Work owner are rejected',t=>{const f=fixture(t);const skill=path.join(f.fe,'.claude','SKILL.md');fs.mkdirSync(path.dirname(skill),{recursive:true});fs.writeFileSync(skill,'Duplicate synthetic runtime.');fs.mkdirSync(path.join(f.fe,'.starciwork'));const result=validateSourceLayout({...f,workRoot:path.join(f.fe,'.starciwork')},contract);assert.equal(result.ok,false);assert.ok(result.errors.some(e=>e.role==='fe'&&e.code==='DUPLICATE_IDENTITY'&&e.path.includes('.claude/SKILL.md')));assert.ok(result.errors.some(e=>e.role==='fe'&&e.path==='.starciwork'));assert.ok(result.errors.some(e=>e.code==='WORK_OWNER'));});
 test('malformed manifests and retired host versions are rejected',t=>{const f=fixture(t);fs.writeFileSync(path.join(f.be,'package.json'),'{');fs.mkdirSync(path.join(f.host,'.claude_legacy'));const result=validateSourceLayout({...f,workRoot:path.join(f.be,'.starciwork')},contract);assert.ok(result.errors.some(e=>e.code==='JSON'));assert.ok(result.errors.some(e=>e.role==='host'&&e.path==='.claude_legacy'));});
-test('CLI resolves the host outside .claude even when executed through compiled runtime',async t=>{const f=fixture(t),chunks=[];const code=await main(['source-layout',f.be,f.fe],{out:value=>chunks.push(value),err:value=>chunks.push(value)});const result=JSON.parse(chunks.join(''));assert.equal(code,0,JSON.stringify(result.errors));assert.equal(result.roots.host,fs.realpathSync(path.dirname(skillRoot)));});
+test('CLI resolves the host outside .claude even when executed through compiled runtime',async t=>{
+ const f=fixture(t),chunks=[],runtime=path.join(f.host,'.claude');
+ // Use an actual installed layout; a maintenance checkout's parent is not necessarily a host.
+ fs.cpSync(path.join(skillRoot,'.dist'),path.join(runtime,'.dist'),{recursive:true});
+ const {main}=await import(pathToFileURL(path.join(runtime,'.dist/cli/main.mjs')).href);
+ const code=await main(['source-layout',f.be,f.fe],{out:value=>chunks.push(value),err:value=>chunks.push(value)});
+ const result=JSON.parse(chunks.join(''));
+ assert.equal(code,0,JSON.stringify(result.errors));
+ assert.equal(result.roots.host,fs.realpathSync(f.host));
+});
 
 function makeIdentity(root){const skill=path.join(root,'.claude','SKILL.md'),projects=path.join(root,'.workspaces','projects');fs.mkdirSync(path.dirname(skill),{recursive:true});fs.writeFileSync(skill,'Duplicate synthetic runtime.');fs.mkdirSync(projects,{recursive:true});}

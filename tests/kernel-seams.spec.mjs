@@ -7,6 +7,7 @@ import {parseYaml} from '../core/yaml.mjs';
 import {buildReport} from '../kernel/reports.mjs';
 import {markDone,markInProgress,readNode} from '../kernel/ledger.mjs';
 import {toOp} from '../kernel/common.mjs';
+import {inputAsk} from './helpers/input-fixture.mjs';
 import {applyOpReport,renderContract} from '../kernel/kernel.mjs';
 import {validateAccepted} from '../kernel/verify.mjs';
 import {settleIntake} from '../kernel/intake.mjs';
@@ -766,6 +767,7 @@ test('ownerItems is the one list: every ask tab, every provisional decision, eve
       allowlist:[],question:{kind:'credential',from:'op-pay',options:[],
         text:`Put PAYMENTS_API_TOKEN into custody: run \`${command}\` - the value ${value} must never be typed here.`}},0);
     ask.status='running';ask.terminal='term_ask';ask.launchedAt=1700;
+    ask.inputMode='gui';ask.credential=inputAsk('prepared',['PAYMENTS_API_TOKEN'],{slug:'payments'}).credential;
     const author=toOp({id:'n-four-author',kind:'work.author',nodeId:'prod.alpha.four',
       goal:'Complete the Work record of prod.alpha.four',allowlist:['.starciwork/features/alpha/four/index.yaml']},1);
     author.status='running';
@@ -785,7 +787,7 @@ test('ownerItems is the one list: every ask tab, every provisional decision, eve
       [['provision','ask-cred'],['decision','ask-refund'],['blocked','op-verify']],
       'the mechanical ledger line has an author op on it and is not the owner\'s');
     assert.deepEqual(items.map(entry=>entry.how),[
-      'reply `set` in tab term_ask after running `node /skills/bin/starci.mjs identity set payments --name PAYMENTS_API_TOKEN`',
+      "Open this workflow's Credentials page in Orca to fill PAYMENTS_API_TOKEN for identity:payments. Saved fields resume their waiting tasks automatically.",
       'starci workflow-answer --id 20260101-093000-deliver-the-sales-intake --op ask-refund --choice <n> [--note "..."]',
       'settle what `op-verify` names, then `starci workflow-approve --id 20260101-093000-deliver-the-sales-intake` to re-admit it'
     ]);

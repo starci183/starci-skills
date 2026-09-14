@@ -655,6 +655,7 @@ test('a declared integration is data: a credential nobody owns or a nameless ent
     assert.deepEqual(list.map(item=>item.id),['telegram','zalo','viber']);
     // Custody, not a place: the declaration names the encrypted identity resource that holds the value.
     assert.deepEqual(list[0],{id:'telegram',provider:'telegram-bot-api',declaredBy:'demo.sales.business.srs.fr.delivery',
+      declaredPath:'features/sales/business/srs/delivery/index.yaml',
       credential:{name:'TELEGRAM_BOT_TOKEN',providedBy:'owner',custody:'identity:telegram-delivery',slug:'telegram-delivery',where:null},
       sandbox:'https://sandbox.invalid/telegram'});
     assert.equal(list[1].credential.name,null);

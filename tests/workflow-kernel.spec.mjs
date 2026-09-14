@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {parseYaml} from '../core/yaml.mjs';
+import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
+import {EventEmitter} from 'node:events';
+import {preparedEntry,inputAsk} from './helpers/input-fixture.mjs';
+import {refreshCredentialPreparation,deferForIntegrationPreparation} from '../kernel/kernel.mjs';
+import {reconcileWorkflowInputs} from '../kernel/inputs.mjs';
+import {credentialFields} from '../kernel/inputs-model.mjs';
+import {inputFiles,privateJson} from '../kernel/inputs-server.mjs';
 import {resolveExecutionChain} from '../kernel/chains.mjs';
 import {ORCA_HOST,createOrcaCalls} from '../hosts/orca/calls.mjs';
 import {HEADLESS_HOST,createHeadlessHost} from '../hosts/headless/host.mjs';
@@ -256,6 +262,7 @@ function setup({job='Implement the sales slice',plan,scripts,dirty=[],exec,alloc
   const git=fakeGit(dirty);
   const runs=[];
   const run=(options={})=>runLoop(fake.orca,store,state,{cwd,allocator,template,wait:noWait,
+    reconcileInputs:()=>{},refreshPreparation:()=>{},deferPreparation:()=>false,
     exec:exec??((command)=>{runs.push(command);return {status:0,stdout:`${command} ok`,stderr:''};}),
     git:git.git,planOp:()=>{throw Error('planOp must not be called on this path');},
     decide:()=>{throw Error('decide must not be called on a policy-covered path');},
@@ -872,6 +879,7 @@ function setupWork({nodes=WORK_NODES,scope=[],reintake=[],migrate=[],scripts={},
   const git=fakeGit(dirty);
   const commits=[];
   const run=(options={})=>runLoop(fake.orca,store,state,{cwd,allocator,template,wait:noWait,validate:tree.validate,
+    reconcileInputs:()=>{},refreshPreparation:()=>{},deferPreparation:()=>false,
     ...(api?{ledgerApi:api}:{}),
     exec:exec??(command=>({status:0,stdout:`${command} ok`,stderr:''})),
     git:(executable,args)=>{if(args[0]==='commit')commits.push(args[args.indexOf('-m')+1]);return git.git(executable,args);},
@@ -1860,6 +1868,47 @@ test('an environment blocker that names a credential is the question of the owne
   }finally{open.cleanup();}
 });
 
+test('kernel startup discovers existing credential waits before the first tick, repairs ungrounded asks, and owns the helper and page',()=>{
+  const harness=setupWork({scope:['sales']});
+  try{
+    const {store,state}=harness;
+    approve(store,state);state.run='run_wf';state.from='term_kernel';
+    harness.run({maxIterations:0});
+    const requester=state.ops.find(op=>op.nodeId==='demo.sales.implementation.backend.intake');
+    assert.ok(requester);
+    const originalAttempt=requester.attempt,originalAllowlist=[...requester.allowlist];
+    const ask=inputAsk('synthetic-existing-ask',['SERVICE_TOKEN'],{requesters:[requester.id]});
+    requester.status='paused';requester.waitingFor=ask.id;requester.dependsOn.push(ask.id);state.ops.push(ask);
+    const owner='demo.sales.architecture.sds.intake',file=harness.node(owner),record=parseYaml(fs.readFileSync(file,'utf8')),entry=preparedEntry();
+    delete entry.preparation;record.extensions??={};record.extensions.work3??={};record.extensions.work3.integrations=[entry];fs.writeFileSync(file,stringifyYaml(record));
+    const files=inputFiles(store.dir),browserCalls=[];let launches=0;
+    const browser={verify:()=>({ok:true}),invoke:(name,params)=>{
+      browserCalls.push({name,params});
+      if(name==='tab-list')return {outcome:'ok',receipt:{result:{tabs:[]}}};
+      if(name==='tab-create')return {outcome:'ok',effectState:'committed',receipt:{result:{browserPageId:'synthetic-input-page'}}};
+      throw Error('Unexpected browser call '+name);
+    }};
+    const options={maxIterations:0,refreshPreparation:refreshCredentialPreparation,deferPreparation:deferForIntegrationPreparation,
+      reconcileInputs:(_orca,currentStore,currentState,ctx)=>reconcileWorkflowInputs(browser,currentStore,currentState,{...ctx,
+        alive:pid=>pid===101,spawnProcess:()=>{launches++;const child=new EventEmitter();child.pid=101;child.unref=()=>{};return child;}})};
+    harness.run(options);
+    assert.equal(ask.credential.ready,false);assert.equal(credentialFields(state).fields.length,0);
+    assert.equal(ask.inputMode,'gui');assert.equal(requester.status,'pending');
+    assert.equal(requester.attempt,originalAttempt+1);
+    assert.ok(state.ops.some(op=>op.integrationPreparation?.owner===owner),'existing owning-record repair is admitted on startup');
+    assert.deepEqual(requester.allowlist,originalAllowlist,'requester authority is preserved');
+    assert.equal(launches,1);assert.equal(state.inputs.phase,'starting');
+    const session=JSON.parse(fs.readFileSync(files.session,'utf8'));
+    assert.equal(session.binding.workRoot,path.join(harness.repo,'.starciwork'));
+    privateJson(files.lock,{pid:101,session:session.id});privateJson(files.server,{pid:101,session:session.id,port:32123});
+    harness.run(options);
+    assert.equal(launches,1);assert.equal(state.inputs.page,'synthetic-input-page');
+    assert.equal(browserCalls.filter(call=>call.name==='tab-create').length,1);
+    assert.equal(browserCalls.find(call=>call.name==='tab-create').params.worktree,`path:${state.worktree.replaceAll('\\','/')}`);
+    assert.equal(state.approved,true);assert.equal(state.iterations,0,'startup did not need a scheduling tick or model launch');
+  }finally{harness.cleanup();}
+});
+
 /**
  * The owner's ruling of 2026-09-14, as the kernel keeps it. A credential used to be asked for by an agent in a
  * terminal tab: it printed a wall of text with a command for the owner to compose and then polled them for the
@@ -1887,6 +1936,8 @@ test('a credential provision is never launched: the kernel prints one command, w
     let after=harness.run({maxIterations:3,verifyPresence:holds([])});
     const ask=after.ops.find(op=>op.kind==='provision.ask');
     assert.ok(ask,'the credential need is still the owner\'s question');
+    // This legacy presence test injects researched synthetic requirements; the startup test above exercises admission itself.
+    Object.assign(ask.credential,inputAsk('synthetic-prepared',VARIABLES,{slug:'chatbot-telegram'}).credential);
     // Waiting, and waiting for nothing that runs: no dispatch, no runtime, no terminal, no launch deadline.
     assert.deepEqual([ask.status,ask.fill,ask.dispatch,ask.terminal,ask.runtime,ask.launchedAt],
       ['running',true,null,null,null,null]);
@@ -1902,7 +1953,9 @@ test('a credential provision is never launched: the kernel prints one command, w
     assert.equal(log.some(event=>event.event==='allocation-deferred'&&event.op===ask.id),false,'and it holds no slot while it waits');
     // The same line is what every page of this workflow shows.
     assert.deepEqual(ownerFillLines(after),[`## Owner (1)`,`- ${askFillLine(ask)}`]);
-    assert.match(askFillLine(ask),/^Fill TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID for identity:chatbot-telegram: copy and run  node /);
+    assert.match(askFillLine(ask),/Credentials page in Orca/);
+    assert.doesNotMatch(askFillLine(ask),/copy and run/);
+    assert.match(askFillLine({...ask,inputMode:'cli'}),/^Fill TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID for identity:chatbot-telegram: copy and run  node /);
     // An op waiting for the owner is never a stall and never an overrun: it waits as long as the owner takes.
     ask.launchedAt=1;
     settleStalled(harness.fake.orca,store,after,{allocator:harness.allocator,now:()=>Date.now(),wait:noWait},

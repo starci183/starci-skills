@@ -18,6 +18,14 @@ graphPolicy:
   prerequisiteState: done
   dispatch: never
 reads:
+  - id: official-docs
+    path: current provider official documentation + owning integration declaration preparation
+    purpose:
+      en: Read the official sources before deciding authentication, account, scopes, lifecycle, configuration
+        or owner prerequisites. Keep actual read dates and supported observations in the owning preparation;
+        callbacks and webhooks are assessed for this intended use, never assumed universal. Missing research
+        returns to the owning operation before credential input. Research completeness, executable setup,
+        owner input and successful live verification are distinct states.
   - id: target
     path: N/index.yaml
     purpose:
@@ -139,6 +147,16 @@ writes:
         null, and a blocked one names the exact missing credential variable.
 steps:
   - reads:
+      - official-docs
+      - integration
+    writes: []
+    action:
+      en: Validate the declaration's documentation-backed preparation before any credential request or live
+        effect. Read the primary sources and check each interpretation independently; a URL alone is not
+        research evidence. Complete authorized machine-owned setup before asking for owner-only actions;
+        setup that depends on those actions follows them in the recorded order. Report inaccessible docs
+        as a research failure and a missing preparation as an owning-record gap, never as a missing secret.
+  - reads:
       - target
       - integration
       - architecture
@@ -222,7 +240,12 @@ steps:
         `environment` and the observed failure. Never report done on an unrun, skipped or faked exchange, and
         never claim a proof from an earlier run. Keep the repair of any defect found here as a separate
         operation, and stop; never self-advance. For workflow execution submit the exact response to the
-        coordinator gate."
+        coordinator gate. If the declared live check explicitly identifies an invalid or expired credential,
+        report blocked/environment with --credential-request-file naming a JSON file containing exactly
+        reason (invalid or expired), variables (the declared names), and check (the declared failing check
+        name). Keep its nonzero exit and safe observed evidence in checks. Include no value, custody path or
+        baseline: the kernel binds replacement to the tested custody version and owns the input form.
+        Generic provider errors, scope/configuration defects and outages do not authorize credential replacement."
 proofs:
   - id: binding
     requirement:
@@ -265,11 +288,14 @@ blockers:
         custody from source.
   - code: CREDENTIAL_MISSING
     condition:
-      en: sops is not installed, the key this tree's custody was encrypted for is not available, or the
-        declared identity custody holds no value under the exact variable the declaration names. Report
-        blocked with reason environment, the slug and that variable name so the owner can provide it with
-        `starci identity set <slug> --name <VAR>`; never invent, default, substitute or skip a key, never
-        fall back to an environment variable, and never replace the provider with a stand-in to proceed.
+      en: >-
+        The declared identity custody holds no value under the exact variable the declaration names.
+        After official research and executable setup, report blocked with reason environment, the slug
+        and that variable name so the kernel presents its workflow-owned form in Orca or hidden fill
+        prompt on a headless host. Missing sops or a host decryption key is a setup failure: repair it
+        within authority or report its actual environment/authority boundary, never ask for another
+        provider credential to fix it. Never invent, default, substitute or skip a key, fall back to an
+        environment variable, or replace the provider with a stand-in to proceed.
   - code: PROVIDER_UNREACHABLE
     condition:
       en: The declared provider's sandbox cannot be reached in this environment - no network egress, a

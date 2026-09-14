@@ -59,7 +59,8 @@ test('every sequence renders a numbered working order and a definition of done, 
   for(const [key,[operation,node]] of Object.entries(samples)){
     assert.equal(sequenceFor(operation,{node}),key,`sequence of ${key}`);
     const text=stepsFor(operation,{node});
-    assert.ok(text.startsWith(STEPS_HEADING),`${key} starts with the heading`);
+    assert.ok(text.startsWith('External integrations in this operation\'s scope have a precondition:'),`${key} states its integration precondition first`);
+    assert.ok(text.includes(`${STEPS_HEADING}\nSequence \`${key}\`.`),`${key} keeps its sequence immediately after the working-order heading`);
     assert.match(text,new RegExp(`Sequence \`${key.replace('.','\\.')}\``));
     // A working order stays readable: five steps at the least, eight at the most. The three frontend design
     // and build sequences sit at the top of that range because each of them carries the artwork slots too.
@@ -618,7 +619,7 @@ test('work.intake determines every side, then reconciles it as three typed cases
   assert.match(listed.at(-1),/the reconciliation table with its count per case/);
   // The two withdrawn rulings are gone from the whole sequence: no old vocabulary, no formula, no sds-gap.
   assert.doesNotMatch(text,/fit, a change or a conflict|fit, change or conflict/);
-  assert.doesNotMatch(text,/sds-gap/);
+  assert.doesNotMatch(listed.join('\n'),/sds-gap/,'intake still owns its own reconciliation; the common integration precondition may route an out-of-scope record repair');
   assert.doesNotMatch(text,/A'|A, B \+ C/);
 });
 
@@ -676,14 +677,15 @@ test('decision.prepare prepares a decision in the policy-decision shape, prints 
   // The kind of the op was chosen by a keyword before anything was read: if the question turns out to be
   // something the owner must PROVIDE, this same op asks for it here and reports the presence instead.
   assert.match(rendered,/the question turns out to be something the owner must PROVIDE/);
-  assert.match(rendered,/identity set <slug> --name <VAR>/);
+  assert.match(rendered,/report the exact declared requirement as `blocked` `environment` so the kernel owns its researched input form/);
+  assert.doesNotMatch(rendered,/identity set <slug> --name <VAR>/);
   assert.match(rendered,/`credential: <VAR> present in identity:<slug>` or `provided: <what>`/);
   assert.match(rendered,/The kernel accepts this operation by what your report says, never by the name it was opened under/);
   // It still never drafts a record for a provision, and the waiting sentence belongs to the other sequence.
   assert.doesNotMatch(rendered,/WAIT for the answer/);
 });
 
-test('provision.ask names the one thing only the owner can give, asks in its own terminal and waits, and a credential is put into custody by the owner, never handed over',()=>{
+test('provision.ask delegates credentials to the researched workflow form and waits in its terminal only for non-credential provisions',()=>{
   const ask=op({kind:'provision.ask',origin:'ask',checks:[],
     question:{kind:'credential',text:'Which key does the payment client use?',options:[],from:'op-intake'},
     allowlist:[],references:['features/sales/business/overview/index.yaml'],
@@ -692,14 +694,14 @@ test('provision.ask names the one thing only the owner can give, asks in its own
   assert.equal(sequenceFor(ask),'provision.ask');
   assert.match(rendered,/Never invent, stub, default or skip it, and never ask for a value/);
   // The question is put in this terminal and waited for: the one operation that waits for the owner.
-  assert.match(rendered,/ASK IN THIS TERMINAL, before you report/);
-  assert.match(rendered,/WAIT for the answer as long as your contract lets you wait/);
-  assert.match(rendered,/this is the one operation of the runtime that waits for the owner/);
+  assert.match(rendered,/For a non-credential provision, ASK IN THIS TERMINAL/);
+  assert.match(rendered,/then wait for the reply `provided` as long as the contract allows/);
   // Custody, not a value: the owner's own command, presence only, and nothing printed.
-  assert.match(rendered,/identity set <slug> --name <VAR>/);
-  assert.match(rendered,/reads the value from stdin, never from the command line, and never prints it/);
+  assert.match(rendered,/the kernel owns the researched form in Orca and the hidden `identity fill` prompt on headless hosts/);
+  assert.match(rendered,/Missing official documentation is a research failure/);
+  assert.doesNotMatch(rendered,/identity set|sops exec-env/);
   assert.match(rendered,/verify only PRESENCE and never the value/);
-  assert.match(rendered,/`credential: <VAR> present in identity:<slug>`/);
+  assert.match(rendered,/the kernel checks encrypted custody through its canonical presence verifier and settles the waiting ask itself/);
   assert.match(rendered,/`provided: <what the owner provided, in a few words>`/);
   assert.match(rendered,/An environment variable is not custody/);
   assert.match(rendered,/Never print, echo, log, copy or paste the value/);

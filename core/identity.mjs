@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {createHash,randomUUID} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {parseYaml,stringifyYaml} from './yaml.mjs';
 
@@ -120,11 +121,10 @@ const refuse=reason=>({ok:false,reason});
  *
  * `sops --set` would take the value as a command-line argument, which is exactly what this command exists to
  * avoid, so an existing file is decrypted, the key is set in memory, and the whole file is encrypted again.
- * The plaintext hand-off to sops is a file because sops reads a file: it is written inside the custody folder
- * with owner-only permissions, overwritten with zeros and removed before this function returns, whatever
- * happens - and it is the only moment a value is on disk unencrypted.
+ * SOPS encrypt receives plaintext on stdin with the custody filename as its configuration selector. No
+ * plaintext staging file exists. An exclusive per-custody lock prevents two workflow forms losing keys.
  */
-export function setIdentitySecret({workRoot,slug,name,value,env=process.env,run=spawnSync,now=()=>new Date().toISOString()}){
+export function setIdentitySecret({workRoot,slug,name,value,expectedWriteRevision=undefined,env=process.env,run=spawnSync,now=()=>new Date().toISOString()}){
   need(VARIABLE.test(String(name??'')),`A credential variable is a name like STRIPE_SECRET_KEY (got ${name})`);
   need(typeof value==='string'&&value.trim(),'The credential value is read from stdin and must not be empty');
   env=sopsEnv(env);
@@ -134,36 +134,40 @@ export function setIdentitySecret({workRoot,slug,name,value,env=process.env,run=
   const version=runExecutable(run,sops,['--version'],{encoding:'utf8',env,windowsHide:true});
   if(version?.error||version?.status!==0)return refuse(`sops is on PATH at ${slash(sops)} but does not run (${tail(version)}); no value was written.`);
   fs.mkdirSync(paths.folder,{recursive:true});
+  const lock=path.join(paths.folder,'.write.lock');
+  try{
+    let owner=null;try{owner=JSON.parse(fs.readFileSync(lock,'utf8'));}catch{}
+    if(owner?.pid){let alive=true;try{process.kill(owner.pid,0);}catch(error){alive=error.code==='EPERM';}
+      if(!alive)fs.rmSync(lock,{force:true});}
+    const fd=fs.openSync(lock,'wx',0o600);fs.writeFileSync(fd,JSON.stringify({pid:process.pid}));fs.closeSync(fd);
+  }catch{return refuse('Another credential write is in progress for this custody; retry shortly.');}
+  try{
+  if(expectedWriteRevision!==undefined&&(identitySecretVersion({workRoot,slug,name})?.writeRevision??null)!==expectedWriteRevision)
+    return refuse('The credential changed while this input request was open; refresh the workflow form. Nothing was written.');
   const existing=fs.existsSync(paths.secrets);
   let secrets={};
   if(existing){
     const decrypted=runExecutable(run,sops,['--decrypt','--input-type','yaml','--output-type','yaml',paths.secrets],{encoding:'utf8',env,windowsHide:true});
     if(decrypted?.error||decrypted?.status!==0)
-      return refuse(`sops cannot decrypt ${slash(paths.secrets)} - the key this file was encrypted for is not available to this host (${tail(decrypted)}). Nothing was written.`);
+      return refuse(`sops cannot decrypt ${slash(paths.secrets)} - the key this file was encrypted for is not available to this host. Nothing was written.`);
     try{const parsed=parseYaml(String(decrypted.stdout??''));secrets=plain(parsed)?parsed:{};}
     catch{return refuse(`${slash(paths.secrets)} does not decrypt to a mapping of variable names; nothing was written.`);}
   }
   secrets[name]=value;
-  const staging=path.join(paths.folder,`.${name}.staging.yaml`);
-  let written=null;
-  try{
-    fs.writeFileSync(staging,stringifyYaml(secrets),{mode:0o600});
-    const encrypted=runExecutable(run,sops,['--encrypt','--input-type','yaml','--output-type','yaml',staging],{encoding:'utf8',env,windowsHide:true});
-    if(encrypted?.error||encrypted?.status!==0)
-      return refuse(`sops cannot encrypt for this tree - no age or GPG key is configured for it (${tail(encrypted)}). Check .sops.yaml and the host key; nothing was written.`);
-    written=String(encrypted.stdout??'');
-    if(!written.trim())return refuse('sops produced no encrypted output; nothing was written.');
-  }finally{
-    // The one moment a value is on disk unencrypted ends here, whatever happened above.
-    try{const size=fs.statSync(staging).size;fs.writeFileSync(staging,Buffer.alloc(size,0));}catch{/* never existed */}
-    try{fs.rmSync(staging,{force:true});}catch{/* nothing to remove */}
-  }
-  fs.writeFileSync(paths.secrets,written);
+  const encrypted=runExecutable(run,sops,['encrypt','--input-type','yaml','--output-type','yaml','--filename-override',paths.secrets],
+    {input:stringifyYaml(secrets),cwd:workRoot,encoding:'utf8',env,windowsHide:true});
+  if(encrypted?.error||encrypted?.status!==0)
+    return refuse('sops cannot encrypt for this tree - no age or GPG key is configured for it. Check .sops.yaml and the host key; nothing was written.');
+  const written=String(encrypted.stdout??'');
+  if(!written.trim())return refuse('sops produced no encrypted output; nothing was written.');
+  const temporary=`${paths.secrets}.${process.pid}.tmp`;
+  fs.writeFileSync(temporary,written,{mode:0o600});fs.renameSync(temporary,paths.secrets);
   const resource=writeIdentityResource(paths,{slug,name,now});
   return {ok:true,schema:'starci/identity-custody@1',custody:`identity:${slug}`,
     resource:slash(paths.resource),secrets:slash(paths.secrets),
     variables:[...resource.details.variables],created:!existing,
     next:`Declare it on the integration record as \`credential: {name: ${name}, providedBy: owner, custody: identity:${slug}}\`. The value is readable only through \`sops exec-env ${slash(paths.secrets)} '<command>'\`.`};
+  }finally{fs.rmSync(lock,{force:true});}
 }
 
 /**
@@ -260,19 +264,38 @@ function readLine(stream){
  * no value is returned, printed or kept. A sops that is not installed, a key this host does not have and a
  * variable the custody does not hold are three different answers, because they are three different things to fix.
  */
-export function identitySecretPresent({workRoot,slug,name,env=process.env,run=spawnSync}){
+export function identitySecretPresent({workRoot,slug,name,env=process.env,run=spawnSync,platform=process.platform}){
   need(VARIABLE.test(String(name??'')),`A credential variable is a name like STRIPE_SECRET_KEY (got ${name})`);
   env=sopsEnv(env);
+  // Ambient variables are not custody. Windows environment names are case-insensitive.
+  env=Object.fromEntries(Object.entries(env).filter(([key])=>platform==='win32'?key.toUpperCase()!==name.toUpperCase():key!==name));
   const paths=identityPaths(workRoot,slug);
   if(!fs.existsSync(paths.secrets))return refuse(`identity:${slug} holds nothing yet - ${slash(paths.secrets)} does not exist.`);
   const sops=resolveExecutable('sops',{env});
   if(!sops)return refuse('sops is not on PATH; install sops (https://github.com/getsops/sops) and try again.');
-  const probe=runExecutable(run,sops,['exec-env',paths.secrets,`node -e "process.exit(process.env.${name}?0:1)"`],
+  // SOPS Windows exec-env uses cmd /C: quotes around the JS expression become a string literal/no-op.
+  // The validated variable name makes the unquoted expression safe on that shell.
+  const expression=`process.exit(process.env.${name}?0:1)`;
+  const command=platform==='win32'?`node -e ${expression}`:`node -e "${expression}"`;
+  const probe=runExecutable(run,sops,['exec-env',paths.secrets,command],
     {encoding:'utf8',env,windowsHide:true});
-  if(probe?.error)return refuse(`sops could not run against ${slash(paths.secrets)} (${tail(probe)}).`);
+  if(probe?.error)return refuse(`sops could not run against ${slash(paths.secrets)}.`);
   if(probe.status===0)return {ok:true,custody:`identity:${slug}`,name,secrets:slash(paths.secrets)};
   if(probe.status===1)return refuse(`identity:${slug} does not hold ${name}.`);
-  return refuse(`sops could not read ${slash(paths.secrets)} - the key it was encrypted for is not available to this host (${tail(probe)}).`);
+  return refuse(`sops could not read ${slash(paths.secrets)} - the key it was encrypted for is not available to this host.`);
+}
+
+/** Version only encrypted bytes and canonical exact-name writes. Never decrypt or hash a credential value. */
+export function identitySecretVersion({workRoot,slug,name}){
+  if(!VARIABLE.test(String(name??'')))return null;
+  try{
+    const paths=identityPaths(workRoot,slug),bytes=fs.readFileSync(paths.secrets),encrypted=parseYaml(bytes.toString('utf8'));
+    if(!String(encrypted?.sops?.mac??'').startsWith('ENC[')||!String(encrypted?.[name]??'').startsWith('ENC['))return null;
+    let resource=null;try{resource=parseYaml(fs.readFileSync(paths.resource,'utf8'));}catch{}
+    const revision=resource?.details?.writeRevisions?.[name];
+    return {ciphertextDigest:createHash('sha256').update(bytes).digest('hex'),
+      writeRevision:typeof revision==='string'&&/^[a-f0-9-]{36}$/.test(revision)?revision:null};
+  }catch{return null;}
 }
 
 /** The readable half of a custody: who the identity is, what it may do and which variables it holds - no value. */
@@ -289,8 +312,11 @@ function writeIdentityResource(paths,{slug,name,now}){
       subject:details.subject??'(who this identity is on that system - the account, the sender, the merchant)',
       role:details.role??'(what this identity is allowed to do)',
       variables:[...new Set([...existing,name])].sort(),
+      writeRevisions:{...(plain(details.writeRevisions)?details.writeRevisions:{}),[name]:randomUUID()},
       secrets:IDENTITY_SECRETS}};
-  fs.writeFileSync(paths.resource,stringifyYaml(resource));
+  const temporary=`${paths.resource}.${process.pid}.tmp`;
+  try{fs.writeFileSync(temporary,stringifyYaml(resource),{mode:0o600});fs.renameSync(temporary,paths.resource);}
+  finally{if(fs.existsSync(temporary))fs.rmSync(temporary,{force:true});}
   return resource;
 }
 

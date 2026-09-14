@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, {after} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -11,8 +11,16 @@ import {ensureAgentTrust} from '../hosts/orca/launch.mjs';
 import {dispatchLastWords,parseLastFailure,workerLastWords} from '../hosts/orca/launch.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
-const worktree='fixtures/orca/agentos-r14-sales';
-const worktreePath=path.resolve(worktree);
+// Fake launch writes must not race installers copying the packaged fixtures.
+// Keep this relative-path fixture on the current drive, outside every payload root.
+const suiteRoot=fs.mkdtempSync(path.join(process.cwd(),'.orca-launch-test-'));
+const worktree=path.relative(process.cwd(),suiteRoot);
+const worktreePath=fs.realpathSync(suiteRoot);
+after(()=>{
+  assert.equal(path.dirname(suiteRoot),process.cwd());
+  assert.ok(path.basename(suiteRoot).startsWith('.orca-launch-test-'));
+  fs.rmSync(suiteRoot,{recursive:true,force:true});
+});
 const noWait=()=>{};
 // Execution op: qwen command terminal first, then Claude Opus, then Codex Sol.
 const opName='[Op] backend.implement - Sales';

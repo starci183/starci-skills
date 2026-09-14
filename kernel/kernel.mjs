@@ -36,7 +36,10 @@ import {INFRA_RESTART_LIMIT,RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeO
 import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,isAsk,openConflictDecision,answerCommand,answerOrEscalate,answerOwnerQuestion,dedupeNeedUser,inheritProvisional,
   openOwnerAsk,provisionalLines,redactSecrets,settleOwnerAsk,stopReasonFor,
   mechanicalOwnerLine,noteOwnerList,ownerItems,ownerLines,waitsForOwner} from './owner.mjs';
-import {askFillLine,credentialAsked,fillCommand,fillWaitingAsks,ownerFillLines,settleFilledAsks} from './fill.mjs';
+import {askFillLine,credentialAsked,fillCommand,fillWaitingAsks,inputReadyAsks,ownerFillLines,settleFilledAsks} from './fill.mjs';
+import {reconcileWorkflowInputs} from './inputs.mjs';
+import {INTEGRATION_RESEARCH_ORDER,integrationReadiness,prepareCredentialAsk,preparationFingerprint,relatedIntegrations} from './inputs-readiness.mjs';
+import {snapshotCredentialVersions,credentialReplacementFor} from './inputs-replacement.mjs';
 import {BRAND_PAYLOAD,attributedFiles,brandAware,brandFields,brandOf,brandPayload,brandReferencesOf,brandSummary,changedFiles,
   kernelProof,machineVerify,noteBrand,opDiff,provenChecks,readValidatorMemory,recordVerdict,renderValidatorMemory,
   rereadBrand,sharedCheckCommand,treeForVerdict,treeVerdictFor,validateAccepted,validatorRejectLimit} from './verify.mjs';
@@ -219,6 +222,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
   const cook=`## Cook until done${afterCook.split('## Never')[0]}`.replace(/\s+$/,'');
   const never=`## Never${text.split('## Never')[1]}`.replace(/\s+$/,'');
   const checksFile=slash(store.checksPath(op.id));
+  const credentialRequestFile=checksFile.replace(/\.json$/,'.credential-request.json');
   const reportsDir=slash(store.paths.reports);
   const items=(op.ledgerIds??[]).map(id=>{const item=ledgerItem(state,id);return `- \`${id}\` ${item?.title??'(unknown goal item)'}${item?.inputRef?` - ${item.inputRef}`:''}`;});
   const locks=guards.resourceLocks(op);
@@ -266,8 +270,9 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     `The kernel re-runs these exact commands itself after your report and computes your changed files from git: a \`done\` the machine cannot reproduce is downgraded to \`failed\` and comes back to you.`,
     `An error the whole-tree validator reports under a path outside your allowlist is not yours: name it in your summary and report as if that check passed for your files. The kernel judges the tree by what you could have caused, never by a red corner another workflow owns.`,``,
     `## Report (exactly once, at the end)`,
-    `\`node ${launcher} report --run ${run} --from <your terminal> --task <op task> --dispatch <your dispatch> --reports-dir ${reportsDir} --outcome done|partial|failed|ask|blocked --summary "<what you did, what the checks showed, what is left>" --files <comma-separated changed paths> --checks-file ${checksFile} [--open "<item>,<item>"] [--question "<text>" --options "a,b"] [--blocker shared-change|srs-gap|sds-gap|interface-gap|brand-gap|grammar-gap|environment|authority:<detail>]\``,
+    `\`node ${launcher} report --run ${run} --from <your terminal> --task <op task> --dispatch <your dispatch> --reports-dir ${reportsDir} --outcome done|partial|failed|ask|blocked --summary "<what you did, what the checks showed, what is left>" --files <comma-separated changed paths> --checks-file ${checksFile} [--open "<item>,<item>"] [--question "<text>" --options "a,b"] [--blocker shared-change|srs-gap|sds-gap|interface-gap|brand-gap|grammar-gap|environment|authority:<detail>] [--credential-request-file <safe JSON>]\``,
     `- \`done\` needs every check exiting 0 and no open item; otherwise report \`partial\` (with \`--open\`) or \`failed\`.`,
+    `- Only an \`integration.verify\` whose declared live check explicitly rejected a credential as invalid or expired may report \`blocked\` \`environment\` with \`--credential-request-file ${credentialRequestFile}\`. Writing this nonsecret report artifact beside your checks file is permitted. The file is exactly \`{"reason":"invalid|expired","variables":["DECLARED_VARIABLE"],"check":"declared-failed-check"}\`, using one actual reason. The named check must have a nonzero exit and safe observed evidence, with its declared command. Never include values, custody paths or a baseline; the kernel binds the request to the exact tested custody version. Other provider failures keep their actual failure path.`,
     `- \`ask\` pauses you until the kernel answers in this terminal; then continue and report again.`,
     `- The command must print \`ok:true\`. Never report twice; never exit without reporting.`,``,
     never
@@ -304,6 +309,7 @@ export function launchWithCandidate(orca,{cwd,run,workflowTask,from,worktree,ope
 
 function launchOp(orca,store,state,op,allocated,ctx){
   if(op.needsReplan)replanOp(store,state,op,ctx);
+  if(op.kind==='integration.verify')op.credentialVersions=snapshotCredentialVersions(op,ctx);
   // A design operation derived before the brand was decided gets the record now: its references are the material
   // it must read, and by launch time that material exists.
   if(kindsReadingBrand().includes(op.kind)){
@@ -370,6 +376,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
   // An author op holds the whole record, so the file cannot be fingerprinted as a unit: the blocks inside it
   // that stay the kernel's are snapshotted instead, after the same in-progress write.
   if(authorsRecord(op.kind))op.recordBlocks=recordBlocks(ctx,op.nodeId);
+  if(op.integrationPreparation)try{op.preparationBefore=preparationFingerprint(ctx.work.api.readNode(ctx.work.at,ctx.work.node(op.nodeId)));}catch{op.preparationBefore=null;}
   return {ok:true};
 }
 
@@ -486,6 +493,7 @@ export const deadOp=op=>Boolean(op)&&(op.status==='failed'||(op.status==='blocke
  */
 function fillWaiting(orca,store,state,op,ctx){
   if(op.kind!==PROVISION_ASK||op.question?.stop!=='credential')return false;
+  op.inputMode=ctx.host?.name==='orca'?'gui':'cli';
   if(!op.fill||!op.credential?.custody||!op.credential?.variables?.length){
     let declared=[];
     try{declared=ctx.work?work.declaredIntegrations(ctx.work.loaded).list:[];}catch{declared=[];}
@@ -518,6 +526,68 @@ function fillWaiting(orca,store,state,op,ctx){
   op.status='running';op.dispatch=null;op.terminal=null;op.nudged=false;op.launchedAt=null;
   return true;
 }
+
+/** Missing provider research is an owning record operation, never an owner's credential problem. */
+export function deferForIntegrationPreparation(store,state,op,ctx,{entries=null}={}){
+  if(!ctx.work||authorsRecord(op.kind)||isAsk(op.kind)||op.integrationPreparation)return false;
+  const declared=entries??work.declaredIntegrations(ctx.work.loaded).list;
+  const related=entries??relatedIntegrations(op,declared,ctx.work.loaded.list);
+  const missing=related.filter(entry=>!integrationReadiness(entry,{now:clockOf(ctx)}).ok);
+  if(!missing.length)return false;
+  for(const owner of unique(missing.map(entry=>entry.declaredBy))){
+    const node=ctx.work.node(owner),record=node&&!ctx.work.shared?recordPath(state,ctx,node):null;
+    const scoped=node&&work.inScope(node,state.scope.length?state.scope:null);
+    if(!record||!scoped){
+      op.status='blocked';
+      const detail=`Official integration documentation needs research in ${owner}; its preparation record is outside this workflow's writable binding or approved scope.`;
+      if(!state.needUser.some(item=>item.op===op.id&&item.kind==='authority'&&item.detail===detail))state.needUser.push({op:op.id,kind:'authority',detail});
+      store.appendEvent({event:'integration-preparation-authority',op:op.id,owner});continue;
+    }
+    let author=state.ops.find(item=>item.integrationPreparation?.owner===owner);
+    if(!author){
+      author=addOp(store,state,{kind:AUTHOR_KIND,nodeId:owner,ledgerIds:[],allowlist:[record],references:unique([node.path,...(node.refs??[])]),
+        goal:`Research the official documentation for the external integrations declared by ${owner}. Repair ONLY extensions.work3.integrations[].preparation in this owning record. ${INTEGRATION_RESEARCH_ORDER}`,
+        checks:[{name:'work-valid',command:workValidateCommand(ctx)}],acceptance:['Every declared integration has current official documentation evidence, resolved credential semantics and a complete preparation and live verification plan.','All content outside preparation is unchanged.'],origin:'ledger'},
+      `official integration preparation missing for ${op.id}`);
+      author.integrationPreparation={owner};author.difficulty='hard';
+    }
+    // A prior finished author gets a fresh attempt only for this specific missing preparation, never a stale conversation.
+    if(author.status==='done'){author.status='ready';author.attempt+=1;author.dispatch=null;author.terminal=null;author.preparationBefore=null;}
+    op.dependsOn=unique([...(op.dependsOn??[]),author.id]);
+    if(op.status!=='blocked')op.status='pending';
+    op.findings=unique([...(op.findings??[]),`Read the official-documentation preparation produced by ${author.id} before design, implementation, credentials or live verification.`]);
+  }
+  return true;
+}
+
+/** Re-evaluate old waits on restart; unsupported variable-only asks are hidden and their requester is re-admitted. */
+export function refreshCredentialPreparation(store,state,ctx){
+  if(!ctx.work){for(const ask of fillWaitingAsks(state))prepareCredentialAsk(ask,[],{now:clockOf(ctx)});return;}
+  const entries=work.declaredIntegrations(ctx.work.loaded).list;
+  for(const ask of fillWaitingAsks(state)){
+    if(prepareCredentialAsk(ask,entries,{now:clockOf(ctx)}))continue;
+    for(const id of ask.requesters??[]){
+      const requester=byId(state,id);
+      if(!requester||requester.status!=='paused'||requester.waitingFor!==ask.id)continue;
+      if(requester.dispatch||requester.terminal){
+        if(!ctx.orca)continue;
+        let closed=false;
+        try{
+          if(requester.dispatch)closed=settleDispatch(ctx.orca,requester.dispatch,{cwd:state.worktree,
+            reason:'fresh integration research attempt',terminalHandle:requester.terminal,closeTerminal:Boolean(requester.terminal),wait:ctx.wait}).effectState==='none';
+          else closed=ctx.orca.invoke('terminal-close',{terminal:requester.terminal},{cwd:state.worktree}).outcome==='ok';
+        }catch{}
+        if(!closed){store.appendEvent({event:'credential-research-settlement-pending',op:requester.id});continue;}
+        store.appendEvent({event:'credential-research-terminal-settled',op:requester.id,terminal:requester.terminal});
+      }
+      requester.status='ready';requester.waitingFor=null;requester.dispatch=null;requester.terminal=null;requester.attempt+=1;
+      requester.dependsOn=(requester.dependsOn??[]).filter(dependency=>dependency!==ask.id);
+      requester.findings=unique([...(requester.findings??[]),INTEGRATION_RESEARCH_ORDER]);
+      deferForIntegrationPreparation(store,state,requester,ctx,{entries:entries.filter(entry=>ask.credential?.variables?.includes(entry.credential?.name)&&entry.credential.custody===ask.credential?.custody)});
+      store.appendEvent({event:'credential-research-readmitted',ask:ask.id,op:requester.id});
+    }
+  }
+}
 function scheduleOps(orca,store,state,ctx){
   for(const op of state.ops){
     if(op.status!=='pending')continue;
@@ -537,6 +607,7 @@ function scheduleOps(orca,store,state,ctx){
     // A credential is asked by one command the owner runs, so its ask is never dispatched to a runtime at all:
     // it waits here, holding no runtime and no slot, until the custody holds every variable it named.
     if(fillWaiting(orca,store,state,op,ctx))continue;
+    if((ctx.deferPreparation??deferForIntegrationPreparation)(store,state,op,ctx))continue;
     // An operation waiting on the owner occupies no parallel slot: the owner takes as long as the owner takes.
     const busy=state.ops.filter(item=>['running','answering'].includes(item.status)&&!item.fill);
     if(busy.length>=ctx.allocator.maxParallelOps)break;
@@ -1099,6 +1170,16 @@ export function resumePaused(store,state){
 
 function handleBlocked(store,state,op,report,ctx){
   const blocker=report.blocker??{kind:'environment',detail:report.summary};
+  if(report.credentialRequest){
+    const replacement=credentialReplacementFor(op,report,ctx);
+    if(!replacement.ok)return retryOp(store,state,op,[replacement.reason],ctx,'credential-replacement-refused');
+    const {custody,variables,replacements}=replacement;
+    const text=`Replace the ${report.credentialRequest.reason} credential ${variables.join(', ')} in ${custody}; its declared live verification check rejected the tested version.`;
+    const result=openOwnerAsk(store,state,op,{kind:'credential',text,options:[],inputRevision:JSON.stringify(replacements)},ctx,report);
+    const ask=byId(state,op.waitingFor);
+    if(ask)ask.credential={...(ask.credential??{}),custody,variables,replacements};
+    return result;
+  }
   if(blocker.kind==='shared-change'){
     // A record-authoring op (an intake, a migration, a node author) writes records under its allowlist and nothing
     // else: it has no code to change and nobody to delegate one to. One migration asked for the identity resource
@@ -1186,6 +1267,7 @@ function handleBlocked(store,state,op,report,ctx){
  * no completion, no evidence manifest - only the kernel's own `in-progress` receipt from the launch.
  */
 function settleAuthoredRecord(store,state,op,ctx){
+  if(op.integrationPreparation){store.appendEvent({event:'integration-preparation-authored',op:op.id,owner:op.integrationPreparation.owner});return 'integration-preparation-authored';}
   if(isAsk(op.kind)){settleOwnerAsk(store,state,op,op.reports.at(-1)??{});return 'owner-ask-settled';}
   // A node authored for a shared change closes nothing and completes no existing record: the tree is re-read so
   // the next sync sees the new node, and the requester is released by `resumePaused` like any other shared op.
@@ -1237,7 +1319,8 @@ export function applyOpReport(orca,store,state,op,report,ctx){
   }
   const checked=validateReport(report,{allowlist:reportAllowlist(op,ctx)});
   op.reports.push({attempt:op.attempt,runtime:op.runtime,outcome:report.outcome,summary:report.summary,
-    files:report.files,open:report.open,checks:report.checks,blocker:report.blocker,question:report.question,valid:checked.ok});
+    files:report.files,open:report.open,checks:report.checks,blocker:report.blocker,question:report.question,
+    ...(checked.ok&&report.credentialRequest?{credentialRequest:report.credentialRequest}:{}),valid:checked.ok});
   if(!checked.ok){
     store.appendEvent({event:'report-rejected',op:op.id,errors:checked.errors});
     return retryOp(store,state,op,checked.errors.map(error=>`your previous report was rejected: ${error}`),ctx,'report-rejected');
@@ -1268,6 +1351,14 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     return 'owner-ask-settled';
   }
   if(report.outcome==='done'){
+    if(op.integrationPreparation){
+      let fingerprint=null;try{fingerprint=preparationFingerprint(ctx.work.api.readNode(ctx.work.at,ctx.work.node(op.nodeId)));}catch{}
+      const prepared=work.declaredIntegrations(ctx.work.loaded).list.filter(entry=>entry.declaredBy===op.integrationPreparation.owner);
+      const errors=prepared.flatMap(entry=>integrationReadiness(entry,{now:clockOf(ctx)}).errors);
+      if(!prepared.length||errors.length||!fingerprint||fingerprint!==op.preparationBefore)
+        return retryOp(store,state,op,[...errors,...(!prepared.length?['The owning integration declaration is missing.']:[]),
+          ...(!fingerprint||fingerprint!==op.preparationBefore?['The research repair changed content outside preparation or has no valid launch baseline.']:[])],ctx,'integration-preparation-invalid');
+    }
     const verified=machineVerify(state,op,ctx);
     // `work-valid` is the kernel's own check and is stripped from every operation's list, so an op that edits the
     // tree is held to it here: the record it wrote must leave a tree that still validates, before anything is committed.
@@ -2351,7 +2442,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   wait=sleepSync,exec=runCommand,git=spawnSync,launch=launchWithCandidate,maxIterations=Infinity,guards=kernelGuards,
   ledgerApi=work,validate=validateWorkTree,ledgerRoot=null,resolveLedger=resolveLedgerRoot,
   reconcile=reconcileIntakeSeam,renderChecks=renderChecksFor,contractDigest=contractDigestFor,kindsProfile=null,
-  verifyPresence=null,
+  verifyPresence=null,reconcileInputs=reconcileWorkflowInputs,refreshPreparation=refreshCredentialPreparation,deferPreparation=deferForIntegrationPreparation,
   waitTimeoutMs=900000,tickMs=120000,pollMs=POLL_MS,now=Date.now,host=hostDescriptorOf(orca)}={}){
   need(state.approved,`Workflow ${state.id} is not approved; run workflow-approve --id ${state.id}`);
   need(plain(allocator),'A runtime allocator is required');
@@ -2359,7 +2450,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   required(state.run,'Orca run id');required(state.from,'own terminal handle');
   // `validateOp:null` is an explicit choice to run without the validator; it is recorded once as `validator-skipped`.
   const ctx={cwd,allocator,planOp,decide,validateOp,template,wait,exec,git,launch,now,guards,work:null,orca,host:hostDescriptorOf({host}),
-    reconcile,renderChecks,contractDigest,kindsProfile,...(verifyPresence?{verifyPresence}:{}),
+    reconcile,renderChecks,contractDigest,kindsProfile,deferPreparation,...(verifyPresence?{verifyPresence}:{}),
     supervisor:supervisor??supervisorRuntimes(state.host??''),validator:validator??validatorRuntimes(state.host??'')};
   // Which host runs this workflow is a fact of the run: a sequential host names itself so the log says why one op ran at a time.
   store.appendEvent({event:'host',name:ctx.host.name,capabilities:ctx.host.capabilities,sequential:ctx.host.sequential,maxParallelOps:allocator.maxParallelOps??null});
@@ -2580,6 +2671,10 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     store.appendEvent({event:'finish-withdrawn',outcome:state.finished.outcome,reason:state.finished.reason,because:'every item on the owner\'s list has been settled and work remains'});
     state.finished=null;state.phase='run';state.stalls=0;state.stalledSince=null;
   }
+  // Existing fill waits need their GUI immediately on resume, including a kernel restarted into old state.
+  refreshPreparation(store,state,ctx);
+  for(const ask of fillWaitingAsks(state))ask.inputMode=ctx.host.name==='orca'?'gui':'cli';
+  reconcileInputs(orca,store,state,ctx);
   for(let iteration=0;iteration<maxIterations&&!state.finished;iteration+=1){
     if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator});sweepTreeStrays(store,state,ctx);}
     if((iteration>0&&iteration%RECONCILE_EVERY===0)||now()-(state.lastSweepAt??0)>=SWEEP_MS){sweepStaleTerminals(orca,store,state,{cwd,now});reviveSupervisor(store,state,ctx,{now});}
@@ -2613,7 +2708,10 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
       fillWaiting(orca,store,state,ask,ctx);
     // Has the owner run the fill command yet? Answered by the custody file and nothing else (`provision-filled`),
     // after scheduling, because a credential ask becomes the owner's exactly by not being scheduled.
+    refreshPreparation(store,state,ctx);
     settleFilledAsks(store,state,ctx);
+    reconcileInputs(orca,store,state,ctx);
+    store.saveState(state);
     state.allocation=typeof allocator.serialize==='function'?allocator.serialize():allocator.snapshot?.()??null;
     // A provider limit another kernel ran into is this kernel's limit too; it is recorded once, when it is learned.
     for(const notice of allocator.takeSharedNotices?.()??[])
@@ -2624,7 +2722,9 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     if(guardedStage(store,state,ctx,'accept',()=>{early=acceptReports(orca,store,state,ctx);})==='stop')break;
     if(Array.isArray(early)&&early.length){store.appendEvent({event:'accepted-early',ops:early.map(item=>item.op)});store.saveState(state);continue;}
     if(running.length){
-      const tick=waitTick(orca,{cwd:state.worktree,run:state.run,from:state.from,timeoutMs:waitTimeoutMs,tickMs,
+      const inputWait=fillWaitingAsks(state).length>0;
+      const tick=waitTick(orca,{cwd:state.worktree,run:state.run,from:state.from,
+        timeoutMs:inputWait?Math.min(waitTimeoutMs,5000):waitTimeoutMs,tickMs:inputWait?Math.min(tickMs,5000):tickMs,
         reportsDir:store.paths.reports,now,wait,wake:()=>inboxPending(store)||stopRequested(store)});
       if(tick.event==='check-failed'){noteAnomaly(store,state,`check-failed:${tick.check?.reason??'unknown'}`,{reason:tick.check?.reason??null});triageAnomaly(store,state,`check-failed:${tick.check?.reason??'unknown'}`,{...ctx,orca});}
     store.appendEvent({event:'wait',result:tick.event,ticks:tick.ticks,
@@ -2930,7 +3030,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       // The three owner-facing places in one list, so a machine reading this record asks the same question the
       // page asks: what is waiting on the owner, and what do they type for it - the credentials to fill included.
       owner:ownerItems(state),ownerReport:[...ownerLines(state),...ownerFillLines(state)].join('\n'),
-      ownerFill:fillWaitingAsks(state).map(ask=>({op:ask.id,variables:[...(ask.credential?.variables??[])],
+      inputPreparation:fillWaitingAsks(state).filter(ask=>!ask.credential?.ready).length,
+      ownerFill:inputReadyAsks(state).map(ask=>({op:ask.id,variables:[...(ask.credential?.variables??[])],
         custody:ask.credential?.custody??null,command:ask.fillCommand??null,requesters:[...(ask.requesters??[])]})),
       finished:state.finished,
       events:store.readEvents().slice(-20),final:readJson(store.paths.final,null)};

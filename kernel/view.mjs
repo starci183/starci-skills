@@ -3,7 +3,7 @@ import path from 'node:path';
 import {listWorkflows,workflowsRoot} from './store.mjs';
 import {integrationProofStatus,readLedgerTree} from './ledger.mjs';
 import {ownerItems,ownerSection} from './owner.mjs';
-import {askFillLine,fillWaitingAsks} from './fill.mjs';
+import {askFillLine,fillWaitingAsks,inputReadyAsks} from './fill.mjs';
 
 /**
  * One truthful status view of a workflow. This is what replaces "go and watch the agents": every number
@@ -284,7 +284,9 @@ export function buildView({repoRoot,id,now=Date.now(),dir:given=null}){
     validator:readValidator(dir,events),
     // What the owner has to fill in: one credential per line, each with the exact command that does it. Every
     // other question is asked in its own tab or taken provisionally, so this list is short by design.
-    ownerFill:fillWaitingAsks(state).map(ask=>({op:ask.id,variables:[...(ask.credential?.variables??[])],
+    inputs:state.inputs??null,
+    inputPreparation:fillWaitingAsks(state).filter(ask=>!ask.credential?.ready).length,
+    ownerFill:inputReadyAsks(state).map(ask=>({op:ask.id,variables:[...(ask.credential?.variables??[])],
       custody:ask.credential?.custody??null,command:ask.fillCommand??null,line:askFillLine(ask)})),
     needUser:Array.isArray(state.needUser)?state.needUser:[],
     // The one place the owner looks: every ask tab, every provisional decision and every line that is really
@@ -383,6 +385,7 @@ export function renderView(view){
   // is the exact line to copy, and the kernel settles the ask itself once the custody holds every variable.
   if(view.ownerFill?.length)lines.push('',`## Owner (${view.ownerFill.length})`,
     ...view.ownerFill.map(entry=>`- ${entry.line}`));
+  if(view.inputPreparation)lines.push('',`The workflow is researching and preparing ${view.inputPreparation} integration input request(s); no owner input is needed for those yet.`);
   lines.push('',`## Needs you (${view.needUser.length})`);
   lines.push(view.needUser.length?view.needUser.map(item=>`- ${item.kind??'item'}${item.node?` ${item.node}`:item.op?` ${item.op}`:''}: ${clip(item.detail??'',200)}`).join('\n'):'nothing is waiting on you');
   // Separate from "needs you" on purpose: nothing waits on these, and a workflow that finished done may still

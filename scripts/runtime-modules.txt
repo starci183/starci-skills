@@ -41,6 +41,12 @@ kernel/intake.mjs
 kernel/sync.mjs
 kernel/owner.mjs
 kernel/fill.mjs
+kernel/inputs.mjs
+kernel/inputs-model.mjs
+kernel/inputs-server.mjs
+kernel/inputs-ui.mjs
+kernel/inputs-readiness.mjs
+kernel/inputs-replacement.mjs
 kernel/lanes.mjs
 kernel/terminals.mjs
 kernel/tab.mjs
