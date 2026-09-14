@@ -2264,6 +2264,16 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     op.findings=[`the validator's earlier findings named only files you never reported as yours (${named.join(', ')}): they are another operation's work beside yours and are not judged against you any more. Leave them exactly as they are and report only the files you write.`];
     store.appendEvent({event:'validator-readmitted',op:op.id,files:named});
   }
+  // An ask that reported a provision present while an older build masked the variable's name: the owner's item it
+  // became is not the owner's, and its requesters are still paused on a provision already made. Settled again
+  // from the report it gave, exactly as the report would have been settled then.
+  for(const ask of state.ops.filter(item=>isAsk(item.kind)&&item.status==='done'&&!item.answer&&/^\s*credential:\s*[A-Z][A-Z0-9_]*\s+present/m.test(String(item.reports?.at?.(-1)?.summary??'')))){
+    const paused=state.ops.filter(item=>item.status==='paused'&&item.waitingFor===ask.id);
+    if(!paused.length)continue;
+    state.needUser=state.needUser.filter(line=>!(line.op===ask.id&&line.kind==='decision'));
+    settleOwnerAsk(store,state,ask,ask.reports.at(-1));
+    store.appendEvent({event:'ask-resettled',ask:ask.id,requesters:paused.map(item=>item.id),reason:'the variable name in its report was masked by an older build'});
+  }
   // Split children an older rule made of a record author are withdrawn: half an intake is not an operation.
   for(const op of state.ops.filter(item=>item.origin==='repair'&&authorsRecord(item.kind)&&!item.nodeId&&/ - only \`/.test(String(item.goal??''))&&['pending','ready','blocked'].includes(item.status)&&item.refusal!=='superseded')){
     op.status='blocked';op.refusal='superseded';op.dispatch=null;op.terminal=null;
