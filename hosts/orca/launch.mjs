@@ -571,9 +571,9 @@ export function startOperation(input,{orca=createOrcaCalls(),wait,candidates=nul
   need(run.outcome==='ok',`Nested workflow Run attestation failed: ${run.reason}`);
   const observedRun=resultOf(run.receipt)?.run;
   need(observedRun?.id===request.runId,'Nested workflow Run attestation failed');
-  need(observedRun?.coordinator_handle===request.from,'Operation can be launched only by the exact Workflow Monitor bound as nested Run coordinator');
+  if(observedRun?.coordinator_handle!==request.from){const error=Error('Operation can be launched only by the exact Workflow Monitor bound as nested Run coordinator');error.code='ORCA_COORDINATOR_MISMATCH';error.effectState='none';error.observedCoordinator=observedRun?.coordinator_handle??null;throw error;}
   const created=orca.invoke('task-create',request.taskParams,{cwd});
-  need(created.outcome==='ok',`Operation Task creation failed (${created.effectState}): ${created.reason}`);
+  if(created.outcome!=='ok'){const error=Error(`Operation Task creation failed (${created.effectState}): ${created.reason}`);error.code='ORCA_TASK_CREATE_FAILED';error.effectState=created.effectState??'unknown';throw error;}
   const task=taskFromReceipt(created.receipt);
   need(task.display_name===request.displayName,`Created Task name mismatch: ${task.display_name??'unknown'}`);
   const attest=(selection,{workerShow,phase})=>attestOperationWorker({taskId:task.id,operation:request.operation,scope:request.scope,selection,taskRecord:task,workerShow,phase});

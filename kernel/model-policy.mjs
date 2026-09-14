@@ -96,6 +96,20 @@ export function workloadFor(op={},state={}){
 const localProbationAllowed=job=>job?.approved===true&&job?.scope==='local'&&job?.noExternalEffects===true
   &&job?.strictMachineGates===true&&job?.freshIndependentReview===true&&job?.probationEligible===true&&!HIGH_KINDS.includes(job?.kind);
 
+function probationUnavailableReasons(job,scope,budget){
+  const reasons=[];
+  if((scope?.remaining??2)<1)reasons.push('probation attempts are exhausted for this operation workload');
+  if(Number(budget?.remaining??0)<1)reasons.push('workflow probation budget is exhausted');
+  if(job?.approved!==true)reasons.push('probation requires an approved workflow');
+  if(job?.scope!=='local')reasons.push('probation requires local scope');
+  if(job?.noExternalEffects!==true)reasons.push('probation forbids external effects');
+  if(job?.strictMachineGates!==true)reasons.push('probation requires declared machine gates');
+  if(job?.freshIndependentReview!==true)reasons.push('probation requires fresh independent review');
+  if(HIGH_KINDS.includes(job?.kind)||['high','critical'].includes(job?.risk)||['high','critical'].includes(job?.qualityFloor))
+    reasons.push('probation cannot satisfy elevated quality or risk');
+  return unique(reasons);
+}
+
 /** Bind the profile and workflow once; the returned callback is directly injectable into scheduler/engine. */
 export function createWorkflowModelEligibility({runtimes,state,policyFile,qualificationsFile,probationsFile=null,root,now=Date.now}={}){
   if(!plain(runtimes?.runtimes)||!plain(state)||!clean(state.id))throw Error('Workflow model eligibility binding is incomplete');
@@ -118,7 +132,14 @@ export function createWorkflowModelEligibility({runtimes,state,policyFile,qualif
         workloads:[clean(actual.kind)],strictMachineGates:true,independentReview:true,noExternalEffects:true,remainingAttempts:scope.remaining,createdAt:now()};
       state.modelEligibility.probations[key]=probation;
     }
-    return evaluateModelEligibility({runtime,evidence:loaded.evidenceByRuntime[id],probation,workload:actual,role:actual.role,now:now()});
+    const evidence=loaded.evidenceByRuntime[id],decision=evaluateModelEligibility({runtime,evidence,probation,workload:actual,role:actual.role,now:now()});
+    if(evidence||decision.eligible)return decision;
+    const detail=probation?.status==='exhausted'
+      ?probationUnavailableReasons(actual,scope,state.modelEligibility.probationBudget)
+      :probation
+        ?decision.reasons
+      :probationUnavailableReasons(actual,scope,state.modelEligibility.probationBudget);
+    return {...decision,reasons:['model qualification evidence is missing',...detail]};
   };
   // Execution chains are keyed by target/model IDs. Qualified targets may fall through; probation admits exactly
   // one target for one durable job so an internal fallback can never execute an unconsumed probation candidate.

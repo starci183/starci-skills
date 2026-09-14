@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {inspectWorkflow,superviseForever,superviseOnce,supervisorAction} from '../kernel/supervisor.mjs';
+import {inspectWorkflow,startKernel,superviseForever,superviseOnce,supervisorAction} from '../kernel/supervisor.mjs';
+
+test('Orca supervisor starts the kernel inside its owned coordinator terminal',()=>{
+  const calls=[],orca={invoke:(name,params)=>{calls.push([name,params]);return name==='terminal-create'?{outcome:'ok',receipt:{result:{terminal:{handle:'term_monitor'}}}}:{outcome:'ok',receipt:{result:{}}};}};
+  let spawned=false;const result=startKernel({id:'wf',dir:'D:/state',worktree:'D:/repo',host:'D:/host',hostAdapter:'orca',run:'run_wf'},{launcher:'D:/host/launch.mjs',orca,spawnFn:()=>{spawned=true;}});
+  assert.equal(result.ok,true);assert.equal(result.terminal,'term_monitor');assert.equal(spawned,false);assert.deepEqual(calls.map(([name])=>name),['terminal-create','terminal-read','terminal-send']);assert.match(calls[2][1].text,/workflow-run/);assert.match(calls[2][1].text,/--from.*term_monitor/);assert.match(calls[2][1].text,/--run.*run_wf/);
+});
 
 const tmp=()=>{const dir=path.join(os.tmpdir(),'starci-supervisor-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);fs.mkdirSync(path.join(dir,'.starciwork','_local','workflows'),{recursive:true});return dir;};
 function workflow(root,id,{approved=true,finished=null,lastAt,pid=null,stop=false,worktree=root,lane=null}={}){

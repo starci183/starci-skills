@@ -30,7 +30,7 @@ export function inspectWorkflow(entry,{now=Date.now}={}){
   const finished=Boolean(state?.finished);
   const approved=Boolean(state?.approved);
   const stopRequested=fs.existsSync(path.join(entry.dir,'stop.flag'));
-  return {id:entry.id,dir:entry.dir,approved,finished,stopRequested,alive,ledgerRoot:state?.ledgerRoot??null,ledgerSource:state?.ledgerSource??null,pid:lock?.pid??null,lastAt,lastEvent,silentMs:lastAt?now()-lastAt:null,worktree:state?.worktree??null,host:state?.host??null,
+  return {id:entry.id,dir:entry.dir,approved,finished,stopRequested,alive,ledgerRoot:state?.ledgerRoot??null,ledgerSource:state?.ledgerSource??null,pid:lock?.pid??null,lastAt,lastEvent,silentMs:lastAt?now()-lastAt:null,worktree:state?.worktree??null,host:state?.host??null,run:state?.run??null,workflowTask:state?.workflowTask??null,
     // The host the last kernel of this workflow ran on: the next one is started on the same host, or it would bind a new Orca run over a headless table.
     hostAdapter:typeof state?.hostAdapter==='string'&&state.hostAdapter?state.hostAdapter:null,engine:state?.engine??null};
 }
@@ -44,7 +44,8 @@ export function supervisorAction(info,{healthMs=DEFAULT_HEALTH_MS}={}){
 }
 
 /** Start one kernel process detached; its lock file is the only thing that keeps a second one out. */
-export function startKernel(info,{launcher,spawnFn=spawn,log=()=>{}}){
+const shellQuote=value=>`'${String(value).replaceAll("'","''")}'`;
+export function startKernel(info,{launcher,spawnFn=spawn,orca=null,log=()=>{}}){
   if(!info.worktree)return {ok:false,reason:'the workflow state names no worktree'};
   if(info.engine?.major===6){
     const checked=verifyRuntimePin(info.engine.runtimePin);
@@ -55,6 +56,25 @@ export function startKernel(info,{launcher,spawnFn=spawn,log=()=>{}}){
   const named=info.ledgerSource==='option'&&info.ledgerRoot?['--ledger-root',info.ledgerRoot]:[];
   const adapter=info.hostAdapter?['--host-adapter',info.hostAdapter]:[];
   const args=[launcher,'workflow-run','--id',info.id,'--worktree','.','--host',info.host??'',...named,...adapter].filter(Boolean);
+  if(info.hostAdapter==='orca'&&orca?.invoke){
+    const created=orca.invoke('terminal-create',{worktree:`path:${path.resolve(info.worktree)}`,title:`[Kernel] ${info.id}`,command:process.platform==='win32'?'powershell -NoLogo':'bash'},{cwd:info.worktree});
+    const terminal=created.outcome==='ok'?created.receipt?.result?.terminal?.handle:null;
+    if(!terminal)return {ok:false,reason:`kernel coordinator terminal creation failed: ${created.reason??'missing terminal handle'}`,effectState:created.effectState??'unknown'};
+    const ready=orca.invoke('terminal-read',{terminal},{cwd:info.worktree});
+    if(ready.outcome!=='ok'){
+      if(ready.effectState==='none')orca.invoke('terminal-close',{terminal},{cwd:info.worktree});
+      return {ok:false,reason:`kernel coordinator terminal readiness failed: ${ready.reason??'unknown'}`,effectState:ready.effectState??'unknown',terminal};
+    }
+    const bound=[...args,'--from',terminal,...(info.run?['--run',info.run]:[])];
+    const command=process.platform==='win32'?`& ${[process.execPath,...bound].map(shellQuote).join(' ')}`:[process.execPath,...bound].map(value=>`'${String(value).replaceAll("'","'\\''")}'`).join(' ');
+    const sent=orca.invoke('terminal-send',{terminal,text:command,enter:true},{cwd:info.worktree});
+    if(sent.outcome!=='ok'){
+      if(sent.effectState==='none')orca.invoke('terminal-close',{terminal},{cwd:info.worktree});
+      return {ok:false,reason:`kernel coordinator command delivery failed: ${sent.reason??'unknown'}`,effectState:sent.effectState??'unknown',terminal};
+    }
+    log({event:'kernel-started-in-coordinator',id:info.id,terminal,run:info.run??null});
+    return {ok:true,pid:null,terminal,run:info.run??null};
+  }
   // A kernel that dies must leave its last words: its stdout and stderr are appended to the workflow's own
   // kernel.log, so a crash after a gate round or a launch is readable the next morning instead of inferred.
   let out=null;
@@ -73,7 +93,7 @@ export function stopKernel(info,{killFn=pid=>process.kill(pid),log=()=>{}}={}){
 }
 
 /** One supervision round over every workflow of a repository. */
-export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEALTH_MS,now=Date.now,spawnFn,killFn,aliveFn=pid=>{try{process.kill(pid,0);return true;}catch{return false;}},log=()=>{},only=null}){
+export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEALTH_MS,now=Date.now,spawnFn,killFn,orca=null,aliveFn=pid=>{try{process.kill(pid,0);return true;}catch{return false;}},log=()=>{},only=null}){
   const rounds=[];
   // Every store root this supervisor covers: the repository's own and, when it runs from a worktree, that worktree's (a shared ledger puts a workflow's store beside the tree it was named with).
   const stores=[...new Set((roots??[repoRoot]).map(root=>path.resolve(root)))];
@@ -87,9 +107,9 @@ export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEA
     if(decision.action==='restart'){
       const stopped=stopKernel(info,{killFn,log});
       if(info.engine?.major===6&&(!stopped.ok||aliveFn(info.pid))){outcome={ok:false,reason:'prior kernel termination is not confirmed; retain lock and defer restart'};log({event:'kernel-restart-deferred',id:info.id,pid:info.pid,reason:outcome.reason});}
-      else {try{fs.rmSync(path.join(info.dir,'kernel.lock'),{force:true});}catch{}outcome=startKernel(info,{launcher,spawnFn,log});}
+      else {try{fs.rmSync(path.join(info.dir,'kernel.lock'),{force:true});}catch{}outcome=startKernel(info,{launcher,spawnFn,orca,log});}
     }
-    else if(decision.action==='start'){try{fs.rmSync(path.join(info.dir,'kernel.lock'),{force:true});}catch{}outcome=startKernel(info,{launcher,spawnFn,log});}
+    else if(decision.action==='start'){try{fs.rmSync(path.join(info.dir,'kernel.lock'),{force:true});}catch{}outcome=startKernel(info,{launcher,spawnFn,orca,log});}
     rounds.push({id:info.id,...decision,approved:info.approved,finished:info.finished,stopRequested:info.stopRequested,alive:info.alive,silentMs:info.silentMs,outcome});
   }
   return {schema:SUPERVISOR,at:now(),rounds};
@@ -104,7 +124,7 @@ export function respawnSelf({spawnFn=spawn,cwd=process.cwd()}={}){
   child.unref?.();
   return child.pid??null;
 }
-export function superviseForever({repoRoot,roots=null,launcher,pollMs=DEFAULT_POLL_MS,healthMs,log=()=>{},maxRounds=Infinity,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms),
+export function superviseForever({repoRoot,roots=null,launcher,pollMs=DEFAULT_POLL_MS,healthMs,log=()=>{},orca=null,maxRounds=Infinity,sleep=ms=>Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms),
   probe=probeRuntimeBudget,probeMs=DEFAULT_PROBE_MS,now=Date.now,stamp=()=>launcherStamp(launcher),respawn=null}){
   let round=0,lastProbe=null;
   const stores=[...new Set((roots??[repoRoot]).map(root=>workflowsRoot(root)))];
@@ -134,7 +154,7 @@ export function superviseForever({repoRoot,roots=null,launcher,pollMs=DEFAULT_PO
     // One bad round - a state file read mid-write, a launch that threw - is logged and survived: the supervisor
     // is the one process that must outlive every fault it meets, or nothing restarts anything.
     let result;
-    try{result=superviseOnce({repoRoot,roots,launcher,healthMs,log,now});}
+    try{result=superviseOnce({repoRoot,roots,launcher,healthMs,log,now,orca});}
     catch(error){log({event:'supervisor-round-failed',round,reason:String(error?.stack??error?.message??error).slice(0,600)});sleep(pollMs);round+=1;continue;}
     log({event:'supervisor-round',round,rounds:result.rounds.map(item=>`${item.id}:${item.action}`)});
     // The pulse a kernel reads to know its supervisor lives (`reviveSupervisor`): pid and time, beside each store.
@@ -162,7 +182,7 @@ export function supervisorMain(options,{cwd,runner=null}){
   const logFiles=[...new Set(roots.map(root=>path.join(workflowsRoot(root),'supervisor.log')))];
   const log=event=>{const line=`${JSON.stringify({at:Date.now(),...event})}
 `;for(const file of logFiles){try{fs.mkdirSync(path.dirname(file),{recursive:true});fs.appendFileSync(file,line);}catch{}}};
-  if(options.once==='true')return superviseOnce({repoRoot,roots,launcher,log,only:options.id?[options.id]:null});
+  if(options.once==='true')return superviseOnce({repoRoot,roots,launcher,log,orca:runner,only:options.id?[options.id]:null});
   const probe=typeof runner?.probeBudget==='function'?()=>runner.probeBudget():probeRuntimeBudget;
-  return superviseForever({repoRoot,roots,launcher,log,probe,pollMs:Number(options['poll-ms']??DEFAULT_POLL_MS),healthMs:Number(options['health-ms']??DEFAULT_HEALTH_MS),probeMs:Number(options['probe-ms']??DEFAULT_PROBE_MS)});
+  return superviseForever({repoRoot,roots,launcher,log,orca:runner,probe,pollMs:Number(options['poll-ms']??DEFAULT_POLL_MS),healthMs:Number(options['health-ms']??DEFAULT_HEALTH_MS),probeMs:Number(options['probe-ms']??DEFAULT_PROBE_MS)});
 }

@@ -156,7 +156,7 @@ const componentKey=ledgerIds=>[...ledgerIds].sort().join('+')||'-';
 const groupKey=(state,ledgerIds)=>{
   return componentKey(ledgerIds);
 };
-const implementsLedger=op=>op.kind!=='review.verify'&&(op.ledgerIds??[]).length>0;
+const implementsLedger=op=>op.kind!=='review.verify'&&op.refusal!=='superseded'&&(op.ledgerIds??[]).length>0;
 
 /* ------------------------------------------------------------------ contract */
 
@@ -332,6 +332,63 @@ export function candidateReferences(op,state,ctx){
     return {kind:parsed.kind,ref:`${relative}${fragment}`,sourceRef:literal};});
 }
 
+export function resetReviewEpoch(store,state,priorGeneration=state.engine?.generation??0){
+  const superseded=[];
+  const historical={generation:priorGeneration,rounds:structuredClone(state.verifyRounds??{}),findings:structuredClone(state.verifyFindings??{}),escalations:structuredClone(state.verifyEscalations??{})};
+  state.reviewEpochs=[...(state.reviewEpochs??[]),historical];
+  for(const repair of state.ops.filter(item=>item.origin==='repair'&&item.status==='paused'&&item.waitingFor&&!item.reports?.length&&!item.dispatch&&!item.terminal)){
+    const ask=byId(state,repair.waitingFor);
+    const key=componentKey(repair.ledgerIds??[]),legacyBound=repair.reviewGeneration===undefined&&repair.contractBytes===0&&
+      JSON.stringify(repair.findings??[])===JSON.stringify(state.verifyFindings?.[key]??[]);
+    const referenced=state.ops.some(item=>item.id!==repair.id&&item.id!==ask?.id&&((item.dependsOn??[]).includes(ask?.id)||item.waitingFor===ask?.id));
+    const ownerEvidence=repair.answer!==undefined||ask?.answer!==undefined||ask?.ownerAnswer!==undefined||ask?.ownerContinuationReceipt!==undefined||
+      (repair.ownerContinuationReceipts??[]).length>0||(ask?.ownerContinuationReceipts??[]).length>0;
+    if(!(repair.reviewGeneration===priorGeneration||legacyBound)||!ask||!['pending','ready'].includes(ask.status)||ask.reports?.length||ask.dispatch||ask.terminal||
+      ask.question?.from!==repair.id||ask.question?.prepared!==true||referenced||ownerEvidence)continue;
+    repair.status='blocked';repair.refusal='superseded';repair.waitingFor=null;ask.status='blocked';ask.refusal='superseded';superseded.push({repair:repair.id,ask:ask.id});
+    state.needUser=(state.needUser??[]).filter(item=>item.op!==repair.id&&item.op!==ask.id);
+    state.provisional=(state.provisional??[]).filter(item=>item.op!==ask.id||item.answered);
+    store.appendEvent({event:'review-epoch-superseded',generation:priorGeneration,repair:repair.id,ask:ask.id,
+      proof:'derived review repair and prepared owner question were unlaunched, unanswered, and bound to the retired review epoch'});
+  }
+  const unfinished=key=>key.split('+').filter(Boolean).some(id=>(state.ledger??[]).find(item=>item.id===id)?.status!=='verified');
+  state.verifyRounds=Object.fromEntries(Object.entries(state.verifyRounds??{}).filter(([key])=>!unfinished(key)));
+  state.verifyFindings=Object.fromEntries(Object.entries(state.verifyFindings??{}).filter(([key])=>!unfinished(key)));
+  state.verifyEscalations=Object.fromEntries(Object.entries(state.verifyEscalations??{}).filter(([key])=>!unfinished(key)));
+  store.appendEvent({event:'review-epoch-reset',generation:priorGeneration,proof:'review counters and findings are generation-local; accepted operations and owner answers are preserved'});
+  return superseded;
+}
+export function settleSkippedGenerationLeases(state,{settle=settleGenerationLeases,journalFile=state.engine?.journalFile}={}){
+  const skipped=state.ops.filter(op=>op.v6Lease&&!retryableV6Operation(op));
+  for(const op of skipped)need(op.v6WorkerSettled===true,`Skipped operation ${op.id} retains an unsettled durable lease`);
+  if(!skipped.length)return [];
+  const results=settle({journalFile,leases:skipped.map(op=>op.v6Lease),reason:'generation retry after confirmed stop of skipped operation'});
+  for(let index=0;index<skipped.length;index++){need(results[index]?.ok,`Durable lease ${skipped[index].v6Lease.jobId} could not be settled before retry: ${results[index]?.reason??'unknown'}`);delete skipped[index].v6Lease;}
+  return skipped.map(op=>op.id);
+}
+const LEGACY_COORDINATOR_ERROR='Operation can be launched only by the exact Workflow Monitor bound as nested Run coordinator';
+const REVIEWED_LEGACY_COORDINATOR_LAUNCH_SHA256='34c167c6fb5150b552992350ff43f22c36e935af03b93b91e661cf4e62479801';
+/** Migrate one closed legacy receipt whose pinned launcher proves the rejection happened before task creation. */
+export function reconcileLegacyCoordinatorLease(state,op,{orca,store,verifyPin=verifyRuntimePin,settle=settleGenerationLeases,readFile=file=>fs.readFileSync(file),hashSource=bytes=>crypto.createHash('sha256').update(bytes).digest('hex')}={}){
+  if(!op?.v6Lease||op.dispatch||op.terminal||op.launch?.task||op.launch?.dispatch)return {ok:false,reason:'operation has launch-effect identity'};
+  if(op.launch?.stopReason!==LEGACY_COORDINATOR_ERROR)return {ok:false,reason:'unrecognized legacy launch rejection'};
+  if(op.v6Lease.workflowId!==state.id||op.v6Lease.opId!==op.id||op.v6Lease.generation!==state.engine?.generation)return {ok:false,reason:'durable lease identity does not match workflow operation generation'};
+  const checked=verifyPin(state.engine?.runtimePin);if(!checked.ok)return {ok:false,reason:`runtime pin rejected: ${checked.reason}`};
+  let source;try{source=readFile(path.join(state.engine.runtimePin.root,'.dist','hosts','orca','launch.mjs'));}catch(error){return {ok:false,reason:`pinned launcher source unavailable: ${error.message}`};}
+  const sourceHash=hashSource(source);if(sourceHash!==REVIEWED_LEGACY_COORDINATOR_LAUNCH_SHA256)return {ok:false,reason:`pinned launcher hash ${sourceHash} is not the reviewed legacy no-effect module`};
+  let shown;try{shown=orca.invoke('run-show',{id:state.run},{cwd:state.worktree});}catch(error){return {ok:false,reason:`run attestation unavailable: ${error.message}`};}
+  const observedRun=shown?.outcome==='ok'?getPath(shown.receipt,'result.run'):null,coordinator=observedRun?.coordinator_handle??null;
+  if(observedRun?.id!==state.run)return {ok:false,reason:'run attestation does not match the recorded Run'};
+  if(!coordinator)return {ok:false,reason:'run coordinator is missing or ambiguous'};
+  if(coordinator===state.from)return {ok:false,reason:'recorded monitor still matches the Run coordinator'};
+  const released=settle({journalFile:state.engine.journalFile,leases:[op.v6Lease],reason:'legacy pinned coordinator attestation rejected before task creation'})[0];
+  if(!released?.ok)return {ok:false,reason:`durable lease settlement failed: ${released?.reason??'unknown'}`};
+  const lease=op.v6Lease;op.v6WorkerSettled=true;op.refusal='runtime-reconciliation';
+  store.appendEvent({event:'legacy-coordinator-no-effect-proved',op:op.id,jobId:lease.jobId,generation:lease.generation,pin:state.engine.runtimePin.digest,recordedFrom:state.from,observedCoordinator:coordinator,
+    proof:`verified runtime pin contains reviewed legacy launcher ${sourceHash}; its coordinator rejection precedes every task-create, and operation/launch carry no task, dispatch or terminal identity`});
+  return {ok:true,jobId:lease.jobId,coordinator};
+}
+
 function launchOp(orca,store,state,op,allocated,ctx){
   if(op.needsReplan)replanOp(store,state,op,ctx);
   if(ctx.v6){delete op.v6WorkerSettled;delete op.v6Pending;op.v6ReviewRound=0;}
@@ -365,7 +422,9 @@ function launchOp(orca,store,state,op,allocated,ctx){
     launched=ctx.launch(orca,{cwd:state.worktree,run:state.run,workflowTask:state.workflowTask??state.id,from:state.from,
       worktree:relative,operation:launchOperator(op.kind),kind:op.kind,scope:op.id,spec:operationSpec(op,contract),candidate:allocated.candidate,runtime:allocated.runtime,wait:ctx.wait});
   }catch(error){
-    launched={ok:false,effectState:workerEffectStarted?'unknown':'none',stopReason:String(error?.message??error).slice(0,300),attempts:[{target:allocated.target,stage:'launch',effectState:workerEffectStarted?'unknown':'none',reason:String(error?.message??error).slice(0,240)}]};
+    const typedNoEffect=['ORCA_COORDINATOR_MISMATCH','ORCA_TASK_CREATE_FAILED'].includes(error?.code)&&error?.effectState==='none';
+    const effectState=typedNoEffect?'none':workerEffectStarted?'unknown':'none';
+    launched={ok:false,effectState,stopReason:String(error?.message??error).slice(0,300),attempts:[{target:allocated.target,stage:'launch',effectState,reason:String(error?.message??error).slice(0,240)}]};
   }
   op.launch={ok:Boolean(launched?.ok),target:launched?.selection?.target??allocated.target,
     task:launched?.task?.id??null,dispatch:launched?.dispatchId??null,stopReason:launched?.stopReason??null,
@@ -1711,7 +1770,7 @@ function escalateVerify(store,state,ctx,{key,ledgerIds,findings,op}){
       acceptance:unique(implementers.flatMap(item=>item.acceptance??[])),
       findings:[...findings],avoidRuntimes:used,origin:'repair'},`review escalation of ${key}`):null;
     if(repair){
-      repair.difficulty='hard';
+      repair.difficulty='hard';repair.reviewGeneration=state.engine?.generation??0;
       for(const id of ledgerIds){const item=ledgerItem(state,id);if(item&&item.status==='verified')item.status='implemented';}
       state.verifyEscalations={...(plain(state.verifyEscalations)?state.verifyEscalations:{}),[key]:{day,count:count+1}};
       store.appendEvent({event:'verify-escalated',group:key,component:key,round:count+1,cap:escalationCap(),
@@ -1725,6 +1784,7 @@ function escalateVerify(store,state,ctx,{key,ledgerIds,findings,op}){
         openOwnerAsk(store,state,repair,{kind:'hidden-decision',prepared:true,
           text:`The review of ${key} keeps failing and its findings cite no decided record: ${findings[0]??'no finding text'}. Which rule should hold here? State the numbered options and recommend one; the runtime takes the recommendation and carries on, and the owner may answer differently later.`,
           options:[]},ctx);
+        const ask=byId(state,repair.waitingFor);if(ask)ask.reviewGeneration=repair.reviewGeneration;
       }
       return 'verify-escalated';
     }
@@ -3257,6 +3317,11 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const retryJobs=state.engine?.major===6?prepareGenerationRetry({journalFile:state.engine.journalFile,workflowId:state.id,generation:state.engine.generation}):{cancelled:[],unsettled:[]};
     if(retryJobs.cancelled.length)store.appendEvent({event:'retry-queued-jobs-cancelled',generation:state.engine.generation,jobs:retryJobs.cancelled,proof:'queued, unleased, and no job-spawned receipt'});
     need(!retryJobs.unsettled.length,`Current-generation durable model/check jobs must settle before retry: ${retryJobs.unsettled.join(', ')}`);
+    for(const op of state.ops.filter(item=>item.v6Lease&&!retryableV6Operation(item)&&item.launch?.stopReason===LEGACY_COORDINATOR_ERROR)){
+      const reconciled=reconcileLegacyCoordinatorLease(state,op,{orca,store});need(reconciled.ok,`Legacy coordinator lease ${op.v6Lease?.jobId??op.id} cannot be proved no-effect: ${reconciled.reason}`);
+    }
+    settleSkippedGenerationLeases(state);
+    const priorGeneration=state.engine?.generation??0;
     const retry=[];
     for(const op of state.ops){
       if(!retryableV6Operation(op))continue;
@@ -3283,6 +3348,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       retry.push(op.id);
       store.saveState(state);
     }
+    resetReviewEpoch(store,state,priorGeneration);
     const engine=enrollV6(store,state,{runtimePin:pin,journalFile:options['journal-file']??state.engine?.journalFile});state.launcher=checked.launcher;
     store.appendEvent({event:'workflow-retried',engine:6,generation:engine.generation,ops:retry,context:'fresh agents from canonical approved inputs and Work'});
     store.saveState(state);

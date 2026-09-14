@@ -257,7 +257,7 @@ test('an exhausted chain is a typed failure, never a thrown string',()=>{
 
 test('a terminal that is not the nested Run Monitor cannot create an operation Task',()=>{
   const fake=fakeOrca({'run-show':()=>json(0,{ok:true,result:{run:{id:'run_sales',coordinator_handle:'term_other_monitor'}}})});
-  assert.throws(()=>startOperation(input,{orca:fake.orca}),/exact Workflow Monitor/);
+  assert.throws(()=>startOperation(input,{orca:fake.orca}),error=>error.code==='ORCA_COORDINATOR_MISMATCH'&&error.effectState==='none');
   assert.deepEqual(fake.names(),['orchestration run-show']);
 });
 
