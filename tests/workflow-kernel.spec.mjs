@@ -1412,6 +1412,10 @@ test('an accepted op closes its terminal, and the reconcile sweep closes stale k
     const blocked={...harness.state.ops[0],id:'shared-9',kind:'e2e.verify',status:'blocked',terminal:'term_blocked_op',dispatch:null,requesters:['x']};harness.state.ops.push(blocked);
     // Its rename never landed: the tab carries the agent's default title and is matched by the handle the op holds.
     harness.fake.terminals.set('term_blocked_op',{handle:'term_blocked_op',title:'Qwen - agentos',status:'running',sent:true,worktreePath:cwd});
+    // A prepared decision the owner has not answered: its tab is where they see the question, so it stays.
+    const asked={...harness.state.ops[0],id:'ask-7',kind:'decision.prepare',status:'done',terminal:'term_ask_open',dispatch:null,requesters:['x'],nodeId:null,
+      reports:[{outcome:'done',summary:'decision: demo.sales.business.srs.decision.d-demo\nrecommended: 1\n1. keep\n2. drop',files:[],checks:[]}]};harness.state.ops.push(asked);
+    harness.fake.terminals.set('term_ask_open',{handle:'term_ask_open',title:'[Op] decision.prepare - ask-7',status:'running',sent:true,worktreePath:cwd});
     // A sibling workflow of this store root that finished, and its kernel tab left behind.
     const siblingDir=path.join(path.dirname(harness.store.dir),'sibling-done');fs.mkdirSync(siblingDir,{recursive:true});
     fs.writeFileSync(path.join(siblingDir,'state.json'),JSON.stringify({id:'sibling-done',finished:{outcome:'done'}}));
@@ -1432,6 +1436,12 @@ test('an accepted op closes its terminal, and the reconcile sweep closes stale k
     assert.ok(harness.fake.terminals.has('term_other'),'another workflow\'s kernel tab is never touched');
     assert.ok(harness.fake.terminals.has('term_foreign_op'),'another workflow\'s op tab is never touched');
     assert.equal(harness.fake.terminals.has('term_stale_kernel'),false);
+    assert.ok(harness.fake.terminals.has('term_ask_open'),'the tab of an unanswered prepared decision stays open for the owner');
+    assert.ok(log.some(event=>event.event==='ask-tab-kept'&&event.op==='ask-7'));
+    // Answered, the question has no reader: the next sweep closes the tab.
+    state.ops.find(item=>item.id==='ask-7').answer={choice:'1',note:null,at:1,via:'command'};
+    harness.run({maxIterations:1});
+    assert.equal(harness.fake.terminals.has('term_ask_open'),false,'an answered decision\'s tab is swept');
   }finally{harness.cleanup();}
 });
 

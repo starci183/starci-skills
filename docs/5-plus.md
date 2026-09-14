@@ -487,7 +487,11 @@ The owner is at a keyboard, in front of the op's own tab; making them leave it t
 one-word answer waited a day. So after writing the decision record the ask op prints the question and the
 numbered options **in its own terminal** and says *the owner may answer here with the number, or later with
 `workflow-answer`*. If the owner answers there first, the op reports `answered-by-owner: <n>`, which
-`settleOwnerAsk` handles exactly as `--choice n` (`owner-answered {via: 'terminal'}`).
+`settleOwnerAsk` handles exactly as `--choice n` (`owner-answered {via: 'terminal'}`). The tab does not
+close with the report: a `decision.prepare` tab that reported `decision:` is kept (`ask-tab-kept`) until the
+owner answers or the workflow finishes, and the op stays in it - a number typed there after the report is
+relayed by the op through `workflow-answer` itself. The report closed the tab once, and the owner opened
+six tabs and found the question in none of them.
 
 A provision is never asked for as a value. For a credential the owner puts it into custody with one command
 and replies `set`; the op then checks **only presence** - `sops exec-env <secrets.enc.yaml> 'node -e

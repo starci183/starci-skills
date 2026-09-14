@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import {addOp,firstLine,liveStatus,locateSharedTreePaths,need,slash,unique,validateCommandAt} from './common.mjs';
+import {closeOpTerminal} from './terminals.mjs';
 
 /**
  * The owner loop, in one file, because it is one rule: the runtime prepares a decision and the owner takes it.
@@ -365,6 +366,8 @@ function settleChoice(store,state,ask,{choice,note,options,via,ctx=null}){
   }
   store.appendEvent({event:'owner-answered',ask:ask.id,choice:picked?String(choice):null,note:note??null,via,
     requesters:requesters.map(item=>item.id)});
+  // The question has its answer: the tab that showed it has no reader any more.
+  if(ctx?.orca&&ask.terminal&&ask.status==='done')closeOpTerminal(ctx.orca,store,state,ask);
   return {ask:ask.id,answer};
 }
 

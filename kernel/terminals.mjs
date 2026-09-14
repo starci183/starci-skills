@@ -68,9 +68,28 @@ export function ownKernelTerminal(orca,store,state,worktree){
  */
 export function closeOpTerminal(orca,store,state,op){
   if(!op?.terminal)return;
+  if(keepAskTab(store,state,op))return;
   const handle=op.terminal;
   if(closeTerminal(orca,state.worktree,handle))store.appendEvent({event:'op-terminal-closed',op:op.id,terminal:handle});
   op.terminal=null;
+}
+/**
+ * A prepared decision is shown where the owner sits: the `decision.prepare` op printed the question and the
+ * numbered options in its own tab, then reported so the work could continue on its recommendation. That tab is
+ * the only place the owner sees the question, so it stays open - after the report, past every sweep - until the
+ * owner answers (in the tab, or with `workflow-answer`) or the workflow finishes. Closing it with the report, as
+ * every other op's tab is closed, is how the owner looked at six tabs and found no question in any of them.
+ */
+export function keepsAskTab(state,op){
+  if(op?.kind!=='decision.prepare'||op.status!=='done'||op.answer||state?.finished)return false;
+  const last=[...(op.reports??[])].reverse().find(report=>report?.outcome==='done')??null;
+  return /^\s*decision:/.test(String(last?.summary??''));
+}
+/** Keeps the tab of an unanswered prepared decision and says so once (`ask-tab-kept`); false when it is not one. */
+function keepAskTab(store,state,op){
+  if(!keepsAskTab(state,op))return false;
+  if(!op.tabKept){op.tabKept=true;store.appendEvent({event:'ask-tab-kept',op:op.id,terminal:op.terminal});}
+  return true;
 }
 /** An op tab has a reader only while its op is on it: running, answering a question, or paused to resume there. */
 export const TAB_STATUSES=['running','answering','paused'];
@@ -101,7 +120,7 @@ export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Dat
     const op=(opId?ours.get(opId):null)??byHandle.get(item.handle)??null;
     if(!op)continue;
     const inUse=op.terminal===item.handle&&TAB_STATUSES.includes(op.status);
-    if(inUse)continue;
+    if(inUse||(op.terminal===item.handle&&keepAskTab(store,state,op)))continue;
     if(closeTerminal(orca,cwd,item.handle)){closed.push({terminal:item.handle,op:op.id,reason:op.status==='done'?'op done':`op ${op.status}`});if(op.terminal===item.handle)op.terminal=null;}
   }
   state.lastSweepAt=now();

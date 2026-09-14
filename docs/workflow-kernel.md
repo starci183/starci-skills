@@ -1501,7 +1501,7 @@ record or as a whole path; `record-authored` a `work.author` op made its node sc
 branch kept; `lane-status-failed` the host would not set the row's display state.
 
 **Terminals and the run** (`kernel/terminals.mjs`) - `kernel-terminal` / `kernel-terminal-closed` the
-kernel's own tab; `op-terminal-closed` an op's tab when nobody reads it any more; `terminals-swept` the
+kernel's own tab; `op-terminal-closed` an op's tab when nobody reads it any more; `ask-tab-kept {op, terminal}` the tab of a `decision.prepare` op that reported `decision:` is kept open after the report and past every sweep until the owner answers or the workflow finishes, because it is where the question is shown; `terminals-swept` the
 periodic sweep, with the reason per tab; `coordinator-tab-lost` / `coordinator-tab-recovered` a coordinator
 whose pane died and the fresh tab the Run was re-bound to; `run-rebound` the Run was bound to this kernel's
 own tab, fencing the old tab's dispatches; `reconciled-orphans` a live dispatch no operation names;
