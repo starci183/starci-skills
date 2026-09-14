@@ -120,7 +120,10 @@ export function stopReasonFor(question){
  * kernel writes it into an answer, an event, a report or a record.
  */
 export function redactSecrets(text){
-  return String(text??'').replace(/\b[A-Za-z0-9_\-]{24,}\b/g,'[redacted]');
+  // A slug of hyphenated lowercase words - a record id segment such as `d-sales-shared-public-route-contract` - is a
+  // name, not a key: masking it once turned a provisional decision's record into "[redacted]", which the owner could
+  // then never overturn. A key has digits and mixed case, or no word breaks at all.
+  return String(text??'').replace(/\b[A-Za-z0-9_\-]{24,}\b/g,token=>/^[a-z]+(?:-[a-z0-9]+)+$/.test(token)&&(token.match(/\d/g)??[]).length<4?token:'[redacted]');
 }
 
 /** The feature folder of an op, in the TREE's own spelling - never the id segment, which is not a path. */

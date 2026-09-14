@@ -212,6 +212,17 @@ test('a reconciliation the kernel refuses comes back as findings and the intake 
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
+/** A record id is a name, never a key: the redactor masks keys and leaves the slugs of the tree alone. */
+test('the secret redactor masks a key and leaves a record id slug alone',()=>{
+  const id='nivo.sales.business.srs.decision.d-sales-shared-public-route-contract';
+  assert.equal(redactSecrets(`decision: ${id} recommended: 1`),`decision: ${id} recommended: 1`);
+  assert.equal(redactSecrets('the shell-api-authentication-and-session-restoration question'),'the shell-api-authentication-and-session-restoration question');
+  const key=['sk','live',['4eC39HqLyjWDarjtT1zdp7dc','9QzQ'].join('')].join('_');
+  assert.equal(redactSecrets(`token ${key} present`),'token [redacted] present');
+  assert.equal(redactSecrets('AKIAIOSFODNN7EXAMPLE1234ABCD'),'[redacted]');
+  assert.equal(redactSecrets('a1b2c3d4e5f6a7b8c9d0e1f2a3b4'),'[redacted]');
+});
+
 test('a valid table is counted, and every conflict row is taken provisionally through one detached decision.prepare that reads the record the intake wrote',()=>{
   const dir=tmp();
   try{

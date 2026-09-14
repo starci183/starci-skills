@@ -2159,6 +2159,16 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     state.finished=null;state.phase='run';state.stalls=0;state.stalledSince=null;
     state.needUser=state.needUser.filter(item=>!(item.kind==='environment'&&!item.op&&/^no runtime accepted an operation/.test(String(item.detail??''))));
   }
+  // A provisional decision whose record an older redactor masked is repaired from the ask that took it: the ask's
+  // question still names the record, and a decision nobody can name is one nobody can overturn.
+  for(const entry of (state.provisional??[]).filter(item=>/\[redacted\]/.test(String(item.decision??'')))){
+    const ask=byId(state,entry.op);
+    const record=ask?.question?.record??null;
+    if(!record)continue;
+    store.appendEvent({event:'provisional-record-repaired',ask:entry.op,from:entry.decision,to:record});
+    for(const op of state.ops)if(Array.isArray(op.provisional))op.provisional=op.provisional.map(id=>id===entry.decision?record:id);
+    entry.decision=record;
+  }
   // Split children an older rule made of a record author are withdrawn: half an intake is not an operation.
   for(const op of state.ops.filter(item=>item.origin==='repair'&&authorsRecord(item.kind)&&!item.nodeId&&/ - only \`/.test(String(item.goal??''))&&['pending','ready','blocked'].includes(item.status)&&item.refusal!=='superseded')){
     op.status='blocked';op.refusal='superseded';op.dispatch=null;op.terminal=null;
