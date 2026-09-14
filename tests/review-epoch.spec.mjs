@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {reconcileLegacyCoordinatorLease,resetReviewEpoch,settleSkippedGenerationLeases} from '../kernel/kernel.mjs';
+import {reconcileFailedLaunchLease,reconcileLegacyCoordinatorLease,refundLegacyCoordinatorProbations,resetReviewEpoch,settleSkippedGenerationLeases} from '../kernel/kernel.mjs';
 
 test('generation retry supersedes only unanswered derived review questions and clears stale review counters',()=>{
   const events=[],store={appendEvent:event=>events.push(event)},accepted={id:'accepted-review',kind:'review.verify',status:'done',reports:[{outcome:'done'}]};
@@ -59,4 +59,17 @@ test('legacy coordinator reconciliation requires sealed pre-task control flow an
   assert.match(reconcileLegacyCoordinatorLease(state,{...structuredClone(baseOp),launch:{task:null,dispatch:null,stopReason:'some failure'}},{orca:mismatch,store,verifyPin:()=>({ok:true}),readFile:()=>source,hashSource:reviewed,settle}).reason,/unrecognized/);
   assert.match(reconcileLegacyCoordinatorLease(state,{...structuredClone(baseOp),dispatch:'dispatch-1'},{orca:mismatch,store,verifyPin:()=>({ok:true}),readFile:()=>source,hashSource:reviewed,settle}).reason,/launch-effect identity/);
   const matching={invoke:()=>({outcome:'ok',receipt:{result:{run:{id:'run',coordinator_handle:'old'}}}})};assert.match(reconcileLegacyCoordinatorLease(state,structuredClone(baseOp),{orca:matching,store,verifyPin:()=>({ok:true}),readFile:()=>source,hashSource:reviewed,settle}).reason,/still matches/);
+});
+
+test('failed launch reconciliation requires exact stopped worker and released owned terminal',()=>{
+  const lease={jobId:'lease',generation:4},op={id:'verify',status:'blocked',v6Lease:lease,launch:{task:'task',dispatch:null}},events=[],state={run:'run',worktree:'D:/repo',engine:{journalFile:'journal'}},receipt={dispatch:{id:'ctx',task_id:'task',run_id:'run',assignee_handle:'term',status:'failed',last_failure:'agent_prompt_stalled'},worker:{dispatch_id:'ctx',state:'failed',stage:'dispatch_input'},terminal:{handle:'term',connected:false},observation:{exactWorker:true,status:'exited'},terminalResource:{originDispatchId:'ctx',ownerDispatchId:'ctx',ownershipState:'released',releaseState:'released'}};
+  const orca={invoke:name=>name==='dispatch-show'?{outcome:'ok',receipt:{result:{dispatch:receipt.dispatch}}}:{outcome:'ok',receipt:{result:receipt}}},store={appendEvent:event=>events.push(event)},settle=()=>[{ok:true}];
+  assert.equal(reconcileFailedLaunchLease(state,op,{orca,store,settle}).ok,true);assert.equal(op.v6WorkerSettled,true);assert.equal(op.launch.dispatch,'ctx');assert.equal(events[0].event,'failed-launch-stopped-proved');
+  const unknown={...structuredClone(op),v6Lease:lease,launch:{task:'task',dispatch:null}};delete unknown.v6WorkerSettled;receipt.terminalResource.releaseState='retained';assert.match(reconcileFailedLaunchLease(state,unknown,{orca,store,settle}).reason,/not proven exited/);assert.equal(unknown.v6WorkerSettled,undefined);
+});
+
+test('public retry refund binds historical runtime to the cancelled durable operation job',()=>{
+  const op={id:'verify',kind:'review.verify'},state={id:'wf',ops:[op]},store={readEvents:()=>[{event:'legacy-coordinator-no-effect-proved',op:'verify',jobId:'old',generation:3,pin:'pin'}]},seen=[];
+  const runtime={journal:{getJob:()=>({job_id:'old',workflow_id:'wf',op_id:'verify',attempt:1,generation:3,kind:'operation',role:'verify',status:'cancelled',payload:{runtime:'gpt-6-astra'}})},refundUnbegunProbation:(actual,proof,identity)=>{seen.push({actual,proof,identity});return {ok:true,code:'probation-refunded'};}};
+  assert.deepEqual(refundLegacyCoordinatorProbations(store,state,runtime),[{jobId:'old',code:'probation-refunded'}]);assert.equal(seen[0].proof.runtimeId,'gpt-6-astra');assert.equal(seen[0].identity.probationRuntime,'gpt-6-astra');assert.equal(seen[0].identity.generation,3);
 });

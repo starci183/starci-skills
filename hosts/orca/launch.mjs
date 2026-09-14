@@ -580,7 +580,8 @@ export function startOperation(input,{orca=createOrcaCalls(),wait,candidates=nul
   const chain=runChain(orca,{cwd,request,candidates:request.candidates,taskId:task.id,taskRecord:task,attest,expectedPath:cwd,wait});
   const attempts=[...request.skipped,...chain.attempts];
   if(chain.ok)return {schema:OP_LAUNCH,ok:true,task,dispatchId:chain.result.dispatchId,terminal:chain.result.terminal,selection:chain.candidate.selection,launch:chain.candidate.launch,attestation:chain.result.attestation,titleDrift:chain.result.titleDrift??false,attempts};
-  return {schema:OP_LAUNCH,ok:false,task,exhausted:chain.exhausted,stopReason:chain.stopReason,attempts,
+  const effectState=chain.exhausted&&attempts.length>0&&attempts.every(attempt=>attempt.effectState==='none')?'none':'unknown';
+  return {schema:OP_LAUNCH,ok:false,task,exhausted:chain.exhausted,effectState,stopReason:chain.stopReason,attempts,
     recovery:chain.exhausted?'report-workflow-boundary-worker_failed':'reconcile-residual-resources-before-retry'};
 }
 

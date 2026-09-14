@@ -388,6 +388,39 @@ export function reconcileLegacyCoordinatorLease(state,op,{orca,store,verifyPin=v
     proof:`verified runtime pin contains reviewed legacy launcher ${sourceHash}; its coordinator rejection precedes every task-create, and operation/launch carry no task, dispatch or terminal identity`});
   return {ok:true,jobId:lease.jobId,coordinator};
 }
+/** Re-read an exact failed launch and release its lease only when Orca proves the worker and resource are stopped. */
+export function reconcileFailedLaunchLease(state,op,{orca,store,settle=settleGenerationLeases}={}){
+  const taskId=op?.launch?.task;if(!op?.v6Lease||!taskId||op.dispatch||op.terminal)return {ok:false,reason:'failed launch identity is incomplete or already active'};
+  let shown;try{shown=orca.invoke('dispatch-show',{task:taskId},{cwd:state.worktree});}catch(error){return {ok:false,reason:`dispatch lookup unavailable: ${error.message}`};}
+  const dispatch=shown?.outcome==='ok'?getPath(shown.receipt,'result.dispatch'):null;
+  if(!dispatch?.id||dispatch.task_id!==taskId||dispatch.run_id!==state.run)return {ok:false,reason:'dispatch is missing or does not match the recorded Run and Task'};
+  if(dispatch.status!=='failed'||dispatch.last_failure!=='agent_prompt_stalled')return {ok:false,reason:'dispatch failure is not the closed prompt-delivery failure'};
+  let inspected;try{inspected=orca.invoke('worker-show',{dispatch:dispatch.id},{cwd:state.worktree});}catch(error){return {ok:false,reason:`worker settlement unavailable: ${error.message}`};}
+  const result=inspected?.outcome==='ok'?getPath(inspected.receipt,'result'):null,worker=result?.worker,observed=result?.dispatch,observation=result?.observation,resource=result?.terminalResource,terminal=result?.terminal;
+  const exact=observed?.id===dispatch.id&&observed?.task_id===taskId&&observed?.run_id===state.run&&worker?.dispatch_id===dispatch.id&&worker?.state==='failed'&&worker?.stage==='dispatch_input'
+    &&observation?.exactWorker===true&&observation?.status==='exited'&&terminal?.handle===dispatch.assignee_handle&&terminal?.connected===false
+    &&resource?.originDispatchId===dispatch.id&&resource?.ownerDispatchId===dispatch.id&&resource?.ownershipState==='released'&&resource?.releaseState==='released';
+  if(!exact)return {ok:false,reason:`worker ${dispatch.id} is not proven exited with its exact terminal resource released`};
+  const released=settle({journalFile:state.engine.journalFile,leases:[op.v6Lease],reason:'Orca proved failed dispatch-input worker exited and released its terminal resource'})[0];
+  if(!released?.ok)return {ok:false,reason:`durable lease settlement failed: ${released?.reason??'unknown'}`};
+  const lease=op.v6Lease;op.v6WorkerSettled=true;op.refusal='runtime-reconciliation';op.launch.dispatch=dispatch.id;
+  store.appendEvent({event:'failed-launch-stopped-proved',op:op.id,jobId:lease.jobId,generation:lease.generation,run:state.run,task:taskId,dispatch:dispatch.id,terminal:terminal.handle,
+    proof:'dispatch failed at dispatch_input; exact worker exited; its exact terminal resource ownership and release states are released; candidate reconciliation still accounts for any late filesystem effects'});
+  return {ok:true,jobId:lease.jobId,dispatch:dispatch.id};
+}
+export function refundLegacyCoordinatorProbations(store,state,runtime){
+  const events=store.readEvents(),refunded=[];
+  for(const proofEvent of events.filter(event=>event.event==='legacy-coordinator-no-effect-proved')){
+    const op=byId(state,proofEvent.op),job=runtime.journal.getJob(proofEvent.jobId);if(!op||!job)continue;
+    need(job.status==='cancelled'&&job.workflow_id===state.id&&job.op_id===op.id&&job.generation===proofEvent.generation&&job.kind==='operation',`Legacy probation job ${proofEvent.jobId} does not match its settled operation receipt`);
+    const runtimeId=job.payload?.runtime,identity={workflowId:job.workflow_id,opId:job.op_id,attempt:job.attempt,generation:job.generation,jobId:job.job_id,probationRuntime:runtimeId,probationRole:job.role};
+    const result=runtime.refundUnbegunProbation(op,{code:'native-execution-never-began',effectState:'none',taskCreated:false,inputAccepted:false,
+      attestationId:`legacy-coordinator:${proofEvent.pin}:${job.job_id}`,legacyNoEffectEventId:`${state.id}:event:${proofEvent.seq??proofEvent.jobId}`,
+      jobId:job.job_id,generation:job.generation,workflowId:job.workflow_id,opId:job.op_id,runtimeId,role:job.role},identity);
+    need(result.ok,`Legacy probation ${job.job_id} could not be refunded: ${result.code}`);refunded.push({jobId:job.job_id,code:result.code});
+  }
+  return refunded;
+}
 
 function launchOp(orca,store,state,op,allocated,ctx){
   if(op.needsReplan)replanOp(store,state,op,ctx);
@@ -426,9 +459,12 @@ function launchOp(orca,store,state,op,allocated,ctx){
     const effectState=typedNoEffect?'none':workerEffectStarted?'unknown':'none';
     launched={ok:false,effectState,stopReason:String(error?.message??error).slice(0,300),attempts:[{target:allocated.target,stage:'launch',effectState,reason:String(error?.message??error).slice(0,240)}]};
   }
+  const persistedAttempts=(launched?.attempts??[]).slice(0,8).map(attempt=>({target:attempt.target??null,agent:attempt.agent??null,model:attempt.model??null,dispatchId:attempt.dispatchId??null,effectState:attempt.effectState??'unknown',stage:attempt.stage??null,reason:String(attempt.reason??'').slice(0,300),
+    ...(attempt.settlement?{settlement:{schema:attempt.settlement.schema??null,dispatchId:attempt.settlement.dispatchId??attempt.dispatchId??null,effectState:attempt.settlement.effectState??'unknown',residualTerminal:attempt.settlement.residualTerminal??null,abandoned:Boolean(attempt.settlement.abandoned),closedTerminal:attempt.settlement.closedTerminal?{handle:attempt.settlement.closedTerminal.handle??null,outcome:attempt.settlement.closedTerminal.outcome??null}:null}}:{}),
+    ...(attempt.recovery?{recovery:{ok:Boolean(attempt.recovery.ok),action:attempt.recovery.action??null,reason:String(attempt.recovery.reason??'').slice(0,200)}}:{})}));
   op.launch={ok:Boolean(launched?.ok),target:launched?.selection?.target??allocated.target,
     task:launched?.task?.id??null,dispatch:launched?.dispatchId??null,stopReason:launched?.stopReason??null,
-    effectState:launched?.effectState??(launched?.ok?'partial':'unknown')};
+    effectState:launched?.effectState??(launched?.ok?'partial':'unknown'),attempts:persistedAttempts};
   // Orca refuses every launch from a coordinator tab whose pane is gone ("no stable pane identity"): that is the
   // kernel's tab to replace, not the runtime's failure to count - a new tab is opened, the Run re-bound, the op
   // stays ready for the next tick. Once per attempt, so a tab Orca keeps refusing does not loop for ever.
@@ -3314,9 +3350,18 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     need(options.engine==='6','workflow-retry currently requires --engine 6');
     const pin=options['runtime-pin']?readJson(path.resolve(options['runtime-pin']),null):state.engine?.runtimePin;
     const checked=verifyRuntimePin(pin);need(checked.ok,`A verified runtime pin is required: ${checked.reason??''}`);
+    if(state.engine?.major===6&&store.readEvents().some(event=>event.event==='legacy-coordinator-no-effect-proved')){
+      const runtimeRoot=path.dirname(state.engine.journalFile),runtimeProfile=loadRuntimes(),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
+        policyFile:path.join(skillRoot,'.dist','model','capabilities.json'),qualificationsFile:path.join(runtimeRoot,'model-qualifications.json'),probationsFile:path.join(runtimeRoot,'model-probations.json'),root:runtimeRoot});
+      const refundRuntime=createV6Runtime({store,state,modelPolicy:policy,eligibility:()=>({eligible:false,reasons:['refund-only runtime']} )});
+      try{refundLegacyCoordinatorProbations(store,state,refundRuntime);}finally{refundRuntime.close();}
+    }
     const retryJobs=state.engine?.major===6?prepareGenerationRetry({journalFile:state.engine.journalFile,workflowId:state.id,generation:state.engine.generation}):{cancelled:[],unsettled:[]};
     if(retryJobs.cancelled.length)store.appendEvent({event:'retry-queued-jobs-cancelled',generation:state.engine.generation,jobs:retryJobs.cancelled,proof:'queued, unleased, and no job-spawned receipt'});
     need(!retryJobs.unsettled.length,`Current-generation durable model/check jobs must settle before retry: ${retryJobs.unsettled.join(', ')}`);
+    for(const op of state.ops.filter(item=>item.v6Lease&&!retryableV6Operation(item)&&item.launch?.task&&!item.dispatch&&!item.terminal)){
+      const reconciled=reconcileFailedLaunchLease(state,op,{orca,store});need(reconciled.ok,`Failed launch lease ${op.v6Lease?.jobId??op.id} cannot be proved stopped: ${reconciled.reason}`);
+    }
     for(const op of state.ops.filter(item=>item.v6Lease&&!retryableV6Operation(item)&&item.launch?.stopReason===LEGACY_COORDINATOR_ERROR)){
       const reconciled=reconcileLegacyCoordinatorLease(state,op,{orca,store});need(reconciled.ok,`Legacy coordinator lease ${op.v6Lease?.jobId??op.id} cannot be proved no-effect: ${reconciled.reason}`);
     }

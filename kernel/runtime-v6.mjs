@@ -111,8 +111,19 @@ export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolic
       const machineResources=declareMachineResources(op),resources=[{key:'ai/global',units:1},...((op.allowlist??[]).length?[writer]:[]),...machineResources];
       const result=admission.reserve({...bound,resources,ttlMs:10*60*1000});
       if(result.ok&&decision.mode==='probation'){const consumed=modelPolicy?.consumeProbation?.(probationJob,{id:allocated.runtime,...pool,model:pool.target??allocated.target});if(!consumed?.ok){admission.release({...bound,leaseToken:result.leaseToken});journal.db.prepare("UPDATE jobs SET status='cancelled',result_json=?,updated_at=? WHERE job_id=?").run(JSON.stringify({reason:consumed?.code??'probation-unavailable'}),now(),bound.jobId);return {ok:false,reasons:[consumed?.code??'probation-unavailable'],...bound};}store.saveState(state);}
-      if(result.ok)op.v6Lease={...bound,leaseToken:result.leaseToken,machineResources:machineResources.map(item=>item.key)};
+      if(result.ok)op.v6Lease={...bound,leaseToken:result.leaseToken,machineResources:machineResources.map(item=>item.key),probationRuntime:allocated.runtime,probationRole:effectiveRole};
       return {...result,...bound};
+    },
+    refundUnbegunProbation(op,proof,identity=op.v6Lease){
+      if(!identity)return {ok:false,code:'probation-refund-job-identity-required'};
+      const durable=journal.getJob(identity.jobId),payload=durable?.payload??{},runtimeId=payload.runtime??identity.probationRuntime??op.runtime,pool=runtimeProfile.runtimes?.[runtimeId]??{};
+      const role=durable?.role??identity.probationRole??kindRole(op.kind),job={...identity,kind:op.kind,role,input:{op}};
+      const journalBinding=durable?{source:'durable-journal',jobId:durable.job_id,workflowId:durable.workflow_id,opId:durable.op_id,generation:durable.generation,
+        runtimeId:payload.runtime,role:durable.role,status:durable.status}:null,boundProof={...proof,runtimeId,role,...(journalBinding?{journalBinding}:{})};
+      const result=modelPolicy?.refundProbation?.(job,{id:runtimeId,...pool,model:pool.target??op.target},boundProof)??{ok:false,code:'probation-refund-unavailable'};
+      if(result.ok){store.saveState(state);journal.appendEvent({eventId:`${identity.jobId}:probation-refund:${proof.attestationId}`,workflowId:identity.workflowId,
+        entityType:'job',entityId:identity.jobId,generation:identity.generation,kind:'probation-refunded',payload:{opId:identity.opId,runtimeId,attestationId:proof.attestationId,code:result.code}});}
+      return result;
     },
     launched(op){
       if(!op.v6Lease)return;

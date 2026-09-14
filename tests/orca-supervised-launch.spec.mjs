@@ -249,6 +249,7 @@ test('an exhausted chain is a typed failure, never a thrown string',()=>{
   const result=startOperation(input,{orca:fake.orca,wait:noWait});
   assert.equal(result.ok,false);
   assert.equal(result.exhausted,true);
+  assert.equal(result.effectState,'none');
   assert.equal(result.stopReason,'chain-exhausted');
   assert.deepEqual(result.attempts.map(attempt=>attempt.target),['qwen3.8-flash','claude-opus','gpt-5.6-sol']);
   assert.ok(result.attempts.every(attempt=>attempt.effectState==='none'));

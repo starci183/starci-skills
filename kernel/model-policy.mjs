@@ -157,11 +157,31 @@ export function createWorkflowModelEligibility({runtimes,state,policyFile,qualif
     if(!jobId)return {ok:false,code:'probation-job-id-required'};
     if(scope?.consumedJobs?.includes(jobId))return {ok:true,code:'probation-consumed-cached',scopeId,remainingAttempts:scope.remaining};
     if(!entry||entry.scopeId!==scopeId||entry.status!=='active'||!scope||scope.remaining<1||state.modelEligibility.probationBudget.remaining<1)return {ok:false,code:'probation-unavailable'};
-    scope.remaining-=1;scope.consumedJobs=[...(scope.consumedJobs??[]),jobId];state.modelEligibility.probationBudget.remaining-=1;
+    scope.remaining-=1;scope.consumedJobs=[...(scope.consumedJobs??[]),jobId];scope.consumedReceipts=[...(scope.consumedReceipts??[]),
+      {jobId,runtimeId:clean(runtime?.id),workflowId:clean(job?.workflowId),opId:clean(job?.opId),generation:job?.generation??null,at:now()}];state.modelEligibility.probationBudget.remaining-=1;
     for(const [key,item] of Object.entries(state.modelEligibility.probations))if(key.endsWith(`:${scopeId}`)){item.remainingAttempts=scope.remaining;if(scope.remaining===0)item.status='exhausted';}
     return {ok:true,code:'probation-consumed',scopeId,remainingAttempts:scope.remaining};
   };
-  return {...loaded,eligibility:callback,providerFilter,consumeProbation};
+  const refundProbation=(job,runtimeValue,proof={})=>{
+    const runtime=runtimeOf(runtimeValue),actual=workloadFor(job,state),scopeId=scopeOf(job,actual),scope=state.modelEligibility.probationScopes[scopeId],jobId=clean(job?.jobId);
+    const valid=proof?.code==='native-execution-never-began'&&proof.effectState==='none'&&proof.taskCreated===false&&proof.inputAccepted===false&&clean(proof.attestationId)&&
+      clean(proof.jobId)===jobId&&String(proof.generation)===String(job?.generation)&&clean(proof.workflowId)===clean(job?.workflowId)&&clean(proof.opId)===clean(job?.opId)&&clean(proof.runtimeId)===clean(runtime?.id);
+    if(!valid)return {ok:false,code:'probation-refund-proof-invalid'};
+    if(!scope?.consumedJobs?.includes(jobId))return {ok:false,code:'probation-job-not-consumed'};
+    const consumed=scope.consumedReceipts?.find(item=>item.jobId===jobId),binding=proof?.journalBinding;
+    const legacyBound=binding?.source==='durable-journal'&&binding.status==='cancelled'&&clean(binding.jobId)===jobId&&clean(binding.workflowId)===clean(job?.workflowId)&&
+      clean(binding.opId)===clean(job?.opId)&&String(binding.generation)===String(job?.generation)&&clean(binding.runtimeId)===clean(runtime?.id)&&clean(binding.role)===clean(job?.role)&&clean(proof.legacyNoEffectEventId);
+    if(consumed?(consumed.runtimeId!==clean(runtime?.id)||consumed.workflowId!==clean(job?.workflowId)||consumed.opId!==clean(job?.opId)||String(consumed.generation)!==String(job?.generation)):
+      !legacyBound)return {ok:false,code:'probation-consumption-identity-mismatch'};
+    scope.refundedJobs=Array.isArray(scope.refundedJobs)?scope.refundedJobs:[];
+    if(scope.refundedJobs.some(item=>item.jobId===jobId))return {ok:true,code:'probation-refund-cached',scopeId,remainingAttempts:scope.remaining};
+    scope.refundedJobs.push({jobId,attestationId:proof.attestationId,generation:job.generation,runtimeId:runtime.id,at:now()});
+    scope.remaining=Math.min(scope.initial,scope.remaining+1);
+    const budget=state.modelEligibility.probationBudget;budget.remaining=Math.min(budget.initial,budget.remaining+1);
+    for(const [key,item] of Object.entries(state.modelEligibility.probations))if(key.endsWith(`:${scopeId}`)){item.remainingAttempts=scope.remaining;if(scope.remaining>0&&item.status==='exhausted')item.status='active';}
+    return {ok:true,code:'probation-refunded',scopeId,remainingAttempts:scope.remaining,attestationId:proof.attestationId};
+  };
+  return {...loaded,eligibility:callback,providerFilter,consumeProbation,refundProbation};
 }
 
 export function eligibleCandidates({candidates=[],evidenceByRuntime={},probationByRuntime={},workload,role,now=Date.now()}={}){
