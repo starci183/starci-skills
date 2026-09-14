@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {getPath} from '../hosts/orca/calls.mjs';
-import {settleDispatch} from '../hosts/orca/launch.mjs';
+import {dispatchLastWords,settleDispatch} from '../hosts/orca/launch.mjs';
 import {RESTART_LIMIT,firstLine,need,plain,sleepSync} from './common.mjs';
+import {buildReport} from './reports.mjs';
+import {redactSecrets} from './owner.mjs';
 
 /**
  * Tabs and the Run they hang from. The rule is one sentence - a tab exists only while somebody reads it - and
@@ -143,6 +145,58 @@ export function releaseKernelTab(orca,store,state,{cwd,reason}){
   store.appendEvent({event:'kernel-terminal-closed',terminal:state.from,reason});
   state.from=null;state.kernelTerminalOwned=false;
 }
+/**
+ * How many times one operation may be restarted for a failure that was never its own before the environment
+ * itself becomes the owner's question. It sits far above `RESTART_LIMIT` on purpose: a report command this
+ * build no longer has, or a prompt Orca never delivered, costs time, not judgement, and the operation that
+ * paid for it did nothing wrong. `RESTART_LIMIT` and the launch cooling keep counting `op.restarts` alone.
+ */
+export const INFRA_RESTART_LIMIT=12;
+/**
+ * Whose fault a dead Dispatch was. The report command missing (the launcher this build relocated), a task Orca
+ * never delivered to the agent, a terminal Orca closed under a live worker: none of these is the operation's,
+ * and charging it a restart for them is how a dozen finished operations were launched again from scratch.
+ */
+const INFRASTRUCTURE=[
+  [/MODULE_NOT_FOUND|ERR_MODULE_NOT_FOUND|Cannot find module/i,'the report command could not be loaded (MODULE_NOT_FOUND)'],
+  [/agent_prompt_stalled/i,'the task was never delivered to the agent (agent_prompt_stalled)'],
+  [/session_not_reported/i,'the agent session was never reported (session_not_reported)'],
+  [/terminal[_ -]?(?:was[_ -]?)?(?:closed|gone)|terminal[_ -]?not[_ -]?found|no such terminal/i,'Orca closed the terminal the agent ran in']
+];
+/** The infrastructure cause a failure text names, or null when the failure is the operation's own. */
+export function infrastructureCause(text,{launcher=null}={}){
+  const value=String(text??'');
+  for(const [pattern,cause] of INFRASTRUCTURE)if(pattern.test(value))return cause;
+  const name=launcher?path.basename(String(launcher)):null;
+  if(/ENOENT/i.test(value)&&(/orca-supervised-launch|\.dist[\\/]/i.test(value)||(name&&value.includes(name))))
+    return `the report command is not on disk (ENOENT ${name??'launcher'})`;
+  return null;
+}
+/** The subject and the head of the body, redacted, for the event that records why a Dispatch ended. */
+function lastWordsOf(words){
+  const subject=redactSecrets(String(words?.report?.subject??words?.failure?.subject??'').trim());
+  const body=redactSecrets(String(words?.report?.body??words?.failure?.body??'').trim());
+  return subject||body?{subject:subject||null,body:body.slice(0,200)}:null;
+}
+/**
+ * The last words of a Dispatch, written where the kernel already looks for an operation's report. The agent
+ * finished its work and said so; only the command it was told to report through was gone. Taking the words as
+ * the report is what lets the ordinary acceptance path judge them - a `failed` goes straight back to the op with
+ * the body as its finding - instead of the kernel calling the op dead and paying for the same work twice.
+ */
+export function writeLastWordsReport(store,state,op,words){
+  const summary=redactSecrets([words.subject,words.body].filter(Boolean).join(' - '));
+  const base={kind:'op',run:state.run,task:op.task??op.id,dispatch:op.dispatch,
+    from:op.terminal??state.from??'kernel',summary,files:[],checks:[]};
+  let report=null;
+  // A stated outcome is honoured only when the words carry what the contract makes that outcome owe - open items,
+  // a blocker, a question. `done` is never honoured: it owes checks, and no lost worker ran any the kernel saw.
+  if(words.outcome!=='done')try{report=buildReport({...base,outcome:words.outcome,open:words.open??[],blocker:words.blocker??null,question:words.question??null});}catch{report=null;}
+  if(!report)report=buildReport({...base,outcome:'failed'});
+  report.via='orca-worker-report';
+  fs.writeFileSync(store.reportPath(op.dispatch),`${JSON.stringify(report)}\n`);
+  return report;
+}
 export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=sleepSync,allocator=null}={}){
   const listed=orca.invoke('worker-list',{run:state.run},{cwd});
   if(listed.outcome!=='ok')return {orphans:[],dead:[],reason:listed.reason};
@@ -157,7 +211,9 @@ export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=slee
   if(orphans.length)store.appendEvent({event:'reconciled-orphans',orphans});
   // The other direction: an op the kernel believes is running, whose Dispatch Orca no longer lists and whose
   // terminal is gone, has no agent behind it. Nothing would ever observe it, so it is settled and queued again
-  // here; a report file it left is not touched - acceptReports consumes that first.
+  // here; a report file it left is not touched - acceptReports consumes that first. Before any of that the
+  // Dispatch is asked what it said last: a worker report is the op's own report, an infrastructure failure is
+  // the runtime's to pay for, and only silence is death.
   const terminals=orca.invoke('terminal-list',{},{cwd});
   const handles=new Set((getPath(terminals.receipt,'result.terminals')??[]).map(item=>item.handle).filter(Boolean));
   const liveDispatches=new Set(live.map(worker=>worker.dispatchId));
@@ -165,10 +221,38 @@ export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=slee
   if(terminals.outcome==='ok')for(const op of state.ops.filter(item=>item.status==='running'&&item.dispatch)){
     if(liveDispatches.has(op.dispatch)||(op.terminal&&handles.has(op.terminal)))continue;
     if(fs.existsSync(path.join(store.paths.reports,`${op.dispatch}.json`)))continue;
-    const settlement=settleDispatch(orca,op.dispatch,{cwd,reason:'dead: no worker and no terminal',terminalHandle:op.terminal,closeTerminal:false,wait});
+    // What the Dispatch said last is read BEFORE it is called dead. A worker that finished its work and could
+    // not reach the kernel's report command is not a lost agent, and it is never charged for that.
+    const words=dispatchLastWords(orca,op.dispatch,{cwd});
+    const spoke=Boolean(words.report);
+    const settlement=settleDispatch(orca,op.dispatch,{cwd,reason:spoke?'the worker reported its last words through Orca':'dead: no worker and no terminal',
+      terminalHandle:op.terminal,closeTerminal:false,wait});
+    const entry={op:op.id,dispatch:op.dispatch,terminal:op.terminal,runtime:op.runtime,effectState:settlement.effectState};
+    const heard=lastWordsOf(words);
+    if(heard)entry.lastWords=heard;
+    if(spoke){
+      // The op keeps its dispatch and its runtime: the report is now on disk and `acceptReports` judges it
+      // on the next tick exactly as it judges a report the agent wrote itself.
+      const report=writeLastWordsReport(store,state,op,words.report);
+      store.appendEvent({event:'dispatch-last-words',op:op.id,dispatch:op.dispatch,outcome:report.outcome,subject:heard?.subject??null});
+      dead.push({...entry,cause:'worker-report',restarts:op.restarts});
+      continue;
+    }
     if(allocator&&op.runtime)allocator.release(op.runtime,{op:op.id});
+    const infrastructure=infrastructureCause(words.text,{launcher:state.launcher});
+    if(infrastructure){
+      op.infraRestarts=(op.infraRestarts??0)+1;op.infraCause=infrastructure;
+      dead.push({...entry,cause:'infrastructure',detail:infrastructure,restarts:op.restarts,infraRestarts:op.infraRestarts});
+      if(op.infraRestarts>INFRA_RESTART_LIMIT){
+        op.status='blocked';op.dispatch=null;op.terminal=null;
+        state.needUser.push({op:op.id,kind:'environment',detail:`${op.id} lost its agent ${op.infraRestarts} times to the environment and never to its own work: ${infrastructure}`});
+        continue;
+      }
+      op.status='ready';op.dispatch=null;op.terminal=null;op.nudged=false;
+      continue;
+    }
     op.restarts+=1;
-    dead.push({op:op.id,dispatch:op.dispatch,terminal:op.terminal,runtime:op.runtime,effectState:settlement.effectState,restarts:op.restarts});
+    dead.push({...entry,cause:'no-worker-no-terminal',restarts:op.restarts});
     if(op.restarts>RESTART_LIMIT){
       op.status='blocked';op.dispatch=null;op.terminal=null;
       state.needUser.push({op:op.id,kind:'environment',detail:`${op.id} lost its agent ${op.restarts} times; the last terminal ${op.terminal??'?'} no longer exists`});

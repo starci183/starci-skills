@@ -195,6 +195,52 @@ function reconcileUnknownStop(orca,dispatchId,{cwd,wait=sleepSync}){
   return {settled:false,observed};
 }
 
+/**
+ * `last_failure` as this Orca prints it: a JSON string on 1.4.x, an object on some builds, a double-encoded
+ * string on others, and prose when the failure came from the runner itself. Parsed defensively - anything that
+ * is not an object is no last words at all - because the alternative is a throw inside the reconcile loop.
+ */
+export function parseLastFailure(value){
+  if(plain(value))return value;
+  if(typeof value!=='string'||!value.trim())return null;
+  let parsed=null;
+  try{parsed=JSON.parse(value);}catch{return null;}
+  if(typeof parsed==='string'){try{parsed=JSON.parse(parsed);}catch{return null;}}
+  return plain(parsed)?parsed:null;
+}
+/** The outcomes a worker may state in its own report; anything else is read as `failed`. */
+export const WORKER_REPORT_OUTCOMES=Object.freeze(['done','partial','failed','blocked','ask']);
+/**
+ * What a Dispatch said last. A worker whose run ended before it could report through the kernel's own command
+ * still tells Orca why: `last_failure` carries `provenance:"worker_report"` with the agent's subject and body -
+ * the work it finished and the reason the report never landed. Those are the operation's last words, and
+ * reading them is the difference between judging a finished piece of work and restarting it from scratch.
+ * `text` is every failure string the receipt carries, for a caller that must decide whose fault the failure was.
+ */
+export function workerLastWords(dispatch,worker=null){
+  const raw=dispatch?.last_failure??dispatch?.lastFailure??null;
+  const failure=parseLastFailure(raw);
+  const text=[typeof raw==='string'?raw:raw?JSON.stringify(raw):'',
+    worker?.last_error,worker?.lastError,dispatch?.reason,dispatch?.status]
+    .filter(value=>typeof value==='string'&&value.trim()).join(' | ');
+  const subject=typeof failure?.subject==='string'?failure.subject.trim():'';
+  const body=typeof failure?.body==='string'?failure.body.trim():'';
+  if(failure?.provenance!=='worker_report'||!(subject||body))return {failure,text,report:null};
+  return {failure,text,report:{
+    outcome:WORKER_REPORT_OUTCOMES.includes(failure.outcome)?failure.outcome:'failed',subject,body,
+    open:Array.isArray(failure.open)?failure.open.filter(item=>typeof item==='string'&&item.trim()):[],
+    blocker:plain(failure.blocker)?failure.blocker:null,question:plain(failure.question)?failure.question:null}};
+}
+/** Ask Orca for one Dispatch and read its last words; an unreachable Orca simply has none. */
+export function dispatchLastWords(orca,dispatchId,{cwd}={}){
+  let shown=null;
+  try{shown=orca.invoke('worker-show',{dispatch:dispatchId},{cwd});}catch(error){return {ok:false,status:null,failure:null,text:String(error?.message??error),report:null};}
+  if(shown?.outcome!=='ok')return {ok:false,status:null,failure:null,text:String(shown?.reason??''),report:null};
+  const result=resultOf(shown.receipt);
+  const dispatch=plain(result?.dispatch)?result.dispatch:null;
+  return {ok:true,status:dispatch?.status??null,...workerLastWords(dispatch,plain(result?.worker)?result.worker:null)};
+}
+
 export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt',wait,terminalHandle=null,closeTerminal=false}={}){
   let stop=orca.invoke('worker-stop',{dispatch:dispatchId},{cwd}),reconciliation=null,closedTerminal=null;
   if(closeTerminal&&terminalHandle){

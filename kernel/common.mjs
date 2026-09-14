@@ -264,7 +264,9 @@ export function toOp(raw,index){
     checks:(raw.checks??[]).map(check=>({name:required(check?.name,'check name'),command:required(check?.command,'check command')})),
     acceptance:[...(raw.acceptance??[])],dependsOn:[...(raw.dependsOn??[])],timeoutMs:raw.timeoutMs??null,
     resources:[...(raw.resources??[])],requesters:[...(raw.requesters??[])],
-    status:'pending',origin:raw.origin??'plan',attempt:1,resumes:0,repairs:0,restarts:0,launchFailures:0,
+    // `restarts` is what the operation itself is charged; `infraRestarts` is what the environment cost it - a
+    // report command that was not on disk, a prompt Orca never delivered - and no bound of the op reads it.
+    status:'pending',origin:raw.origin??'plan',attempt:1,resumes:0,repairs:0,restarts:0,infraRestarts:0,infraCause:null,launchFailures:0,
     priorOpen:[...(raw.priorOpen??[])],findings:[...(raw.findings??[])],avoidRuntimes:[...(raw.avoidRuntimes??[])],
     runtime:null,target:null,task:null,dispatch:null,terminal:null,contractFile:null,nudged:false,
     kernelOwned:[],kernelOwnedAt:null,waitingFor:null,refusal:null,createdIteration:0,question:plain(raw.question)?{...raw.question}:null,

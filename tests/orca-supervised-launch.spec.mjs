@@ -8,6 +8,7 @@ import {createOrcaCalls} from '../hosts/orca/calls.mjs';
 import {resolveExecutionChain} from '../kernel/chains.mjs';
 import {buildOperationLaunch,defaultOrcaExecutable,main,notifyTerminal,parseSkip,promptDelivery,qwenLaunchMode,resolveSupervisorChain,settleDispatch,startOperation,sweepWorktree} from '../hosts/orca/launch.mjs';
 import {ensureAgentTrust} from '../hosts/orca/launch.mjs';
+import {dispatchLastWords,parseLastFailure,workerLastWords} from '../hosts/orca/launch.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const worktree='fixtures/orca/agentos-r14-sales';
@@ -394,6 +395,40 @@ test('a Dispatch Orca cannot move out of stop_unknown is abandoned only after it
   }).orca});
   assert.equal(cli.effectState,'none');
   assert.equal(cli.closedTerminal.handle,'term_9');
+});
+
+/**
+ * `last_failure` is a JSON string on 1.4.x, an object on some builds, double-encoded on others and plain prose
+ * when the failure came from the runner. Everything that is not an object is simply no last words: the reconcile
+ * loop reads this on every dead Dispatch and a throw there would stop the whole kernel.
+ */
+test('a dispatch\'s last words are parsed out of whatever shape last_failure has, and garbage is silence',()=>{
+  const words={provenance:'worker_report',outcome:'failed',subject:'Decision prepared; contract reporter missing',
+    body:'the contract report command failed with MODULE_NOT_FOUND'};
+  assert.deepEqual(parseLastFailure(JSON.stringify(words)),words,'the string JSON Orca prints');
+  assert.deepEqual(parseLastFailure(words),words,'an object is already parsed');
+  assert.deepEqual(parseLastFailure(JSON.stringify(JSON.stringify(words))),words,'a double-encoded string is opened once more');
+  for(const garbage of [null,undefined,'','   ','worker exited 1','{"unclosed":',42,['a'],'"just a string"','null'])
+    assert.equal(parseLastFailure(garbage),null,`no last words in ${JSON.stringify(garbage)}`);
+
+  const spoke=workerLastWords({id:'ctx_1',status:'failed',last_failure:JSON.stringify(words)});
+  assert.deepEqual([spoke.report.outcome,spoke.report.subject],['failed','Decision prepared; contract reporter missing']);
+  assert.match(spoke.text,/MODULE_NOT_FOUND/,'the failure text carries what the reader classifies the cause from');
+  assert.equal(workerLastWords({id:'ctx_2',status:'failed',last_failure:JSON.stringify({provenance:'orca',reason:'agent_prompt_stalled'})}).report,null,
+    'a failure Orca itself recorded is not the worker\'s report');
+  assert.equal(workerLastWords({id:'ctx_3',status:'failed',last_failure:JSON.stringify({provenance:'worker_report',body:'   '})}).report,null,
+    'a worker report with neither subject nor body says nothing');
+  assert.equal(workerLastWords({id:'ctx_4',status:'failed',last_failure:JSON.stringify({provenance:'worker_report',outcome:'exploded',subject:'s'})}).report.outcome,'failed',
+    'an outcome outside the report vocabulary is read as failed');
+  assert.match(workerLastWords({id:'ctx_5',status:'failed'},{last_error:'agent_prompt_stalled'}).text,/agent_prompt_stalled/);
+  assert.deepEqual(workerLastWords(null),{failure:null,text:'',report:null});
+
+  const fake=fakeOrca({'worker-show':()=>json(0,{ok:true,result:{dispatch:{id:'ctx_1',status:'failed',last_failure:JSON.stringify(words)},worker:{state:'failed'}}})});
+  const read=dispatchLastWords(fake.orca,'ctx_1',{cwd:'.'});
+  assert.deepEqual([read.ok,read.status,read.report.subject],[true,'failed','Decision prepared; contract reporter missing']);
+  const unreachable=dispatchLastWords(fakeOrca({'worker-show':()=>json(1,{ok:false,error:{message:'unknown dispatch'}})}).orca,'ctx_x',{cwd:'.'});
+  assert.deepEqual([unreachable.ok,unreachable.report],[false,null]);
+  assert.deepEqual([dispatchLastWords({invoke:()=>{throw Error('orca is gone');}},'ctx_x',{cwd:'.'}).ok],[false]);
 });
 
 test('a Task that cannot be re-readied after a settled attempt stops the chain with a typed reason',()=>{
