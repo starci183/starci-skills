@@ -2,10 +2,12 @@
 
 In runtime 5-plus the kernel no longer walks an ordered list of providers. Every
 runtime is a pool declared in `model/runtimes.yaml` with the roles it may
-take, how many operations it can run at once and what it may spend in a day.
-For each ready operation the kernel calls `allocate(kind, {avoid})` and receives
-one eligible pool — one that has the role, a free slot, budget left and no
-cooldown — plus the role the worker will play. `maxParallelOps: 10` caps the
+take and how many operations it can run at once. No pool declares a daily cap:
+the only budget is the provider's own window, probed and read from
+`runtime-budget.json`. For each ready operation the kernel calls
+`allocate(kind, {avoid})` and receives one eligible pool — one that has the
+role, a free slot, an unexhausted provider window and no cooldown — plus the
+role the worker will play. `maxParallelOps: 10` caps the
 whole workflow, so ten ready operations can be in flight across Codex, Claude
 and Qwen at the same time instead of queueing behind one provider.
 
@@ -43,8 +45,8 @@ allocation:
   preference:
     implement: [claude-opus, gpt-5.6-sol, qwen3.8-flash]
     verify: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol, qwen3.8-flash]
-    decide: [claude-fable-5.1, gpt-6-astra, claude-opus]
-    plan: [claude-opus, claude-fable-5.1]
+    decide: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
+    plan: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
     write: [claude-opus, gpt-5.6-sol, qwen3.8-flash]
 ```
 
@@ -72,15 +74,23 @@ the pool.
 No runtime available is not an error: the kernel keeps the operation queued and
 waits for a slot.
 
-## Budgets
+## The budget is the provider's window
 
-`budget: {opsPerDay, tokensPerDay?}` is per runtime and per UTC day. `usedToday`
-and the token counter roll over when the day changes, so a pool that burned its
-ops by 23:00 is allocatable again at 00:00. When either budget reaches zero the
-pool is refused with `daily op budget exhausted` or `daily token budget
-exhausted`; `snapshot()` prints `remaining.ops` and `remaining.tokens` per pool
-(`null` means unlimited) so the kernel can show the day's headroom before it
-schedules the next wave.
+The shipped pools declare no budget of their own. What bounds them is the window
+the provider actually keeps — Claude's session and week, Fable's own week,
+Codex's week — probed by the supervisor and written beside the stores as
+`runtime-budget.json`. A window at or past 95% is exhausted: its runtimes are
+skipped with `provider window exhausted until <reset>` and come back by
+themselves at the reset. Among the ready ones, more window left comes first, in
+bands of 25 points. A cap of our own on top of that is what once stalled a
+migration just before midnight while the provider still had half its week.
+
+The daily counters remain in the allocator for a profile that does declare
+`budget: {opsPerDay, tokensPerDay?}` — a host profile with a metered key, say —
+and a pool that spends one is refused with `daily op budget exhausted` or
+`daily token budget exhausted` until the UTC day rolls over. `snapshot()` prints
+`remaining.ops` and `remaining.tokens` per pool; with the shipped profile both
+are `null`, which is what unlimited looks like.
 
 ## Cooldowns instead of fallback
 
