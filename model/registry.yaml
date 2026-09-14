@@ -174,10 +174,12 @@ supervisors:
 operators:
   architecture.decide:
     skill: starci
-    chain: [claude-fable-5.1, gpt-6-astra, claude-opus]
+    # Fable first, then its downgrade: Astra, Opus, and Sol last, so a full or exhausted top tier moves the
+    # decision down instead of stalling it.
+    chain: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
     environments:
       - {environment: claude, profiles: [claude-fable-5.1, claude-opus]}
-      - {environment: codex, profiles: [gpt-6-astra]}
+      - {environment: codex, profiles: [gpt-6-astra, gpt-5.6-sol]}
   backend.implement:
     skill: starci
     chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
@@ -197,24 +199,27 @@ operators:
       - {environment: claude, profiles: [claude-opus]}
   decision.prepare:
     skill: starci
-    # Preparing the owner's decision is a reasoning task; Astra first to spare Fable's week, Fable when Astra is out.
-    chain: [gpt-6-astra, claude-fable-5.1, claude-opus]
+    # Preparing the owner's decision is a reasoning task; Astra first to spare Fable's week, Fable when Astra is
+    # out, and the downgrade under both of them: Opus, then Sol.
+    chain: [gpt-6-astra, claude-fable-5.1, claude-opus, gpt-5.6-sol]
     environments:
-      - {environment: codex, profiles: [gpt-6-astra]}
+      - {environment: codex, profiles: [gpt-6-astra, gpt-5.6-sol]}
       - {environment: claude, profiles: [claude-fable-5.1, claude-opus]}
   provision.ask:
     skill: starci
-    # Asking for a provision is naming it exactly and waiting; the same reasoning runtimes, the same order.
-    chain: [gpt-6-astra, claude-fable-5.1, claude-opus]
+    # Asking for a provision is naming it exactly and waiting; the same reasoning runtimes, the same order,
+    # the same downgrade.
+    chain: [gpt-6-astra, claude-fable-5.1, claude-opus, gpt-5.6-sol]
     environments:
-      - {environment: codex, profiles: [gpt-6-astra]}
+      - {environment: codex, profiles: [gpt-6-astra, gpt-5.6-sol]}
       - {environment: claude, profiles: [claude-fable-5.1, claude-opus]}
   business.decide:
     skill: starci
-    chain: [claude-fable-5.1, gpt-6-astra, claude-opus]
+    # The same downgrade the architecture decision takes: Fable, Astra, Opus, Sol.
+    chain: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
     environments:
       - {environment: claude, profiles: [claude-fable-5.1, claude-opus]}
-      - {environment: codex, profiles: [gpt-6-astra]}
+      - {environment: codex, profiles: [gpt-6-astra, gpt-5.6-sol]}
   content.generate:
     skill: starci
     chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
@@ -321,11 +326,12 @@ operators:
   work.author:
     skill: starci
     # Authoring the Work records - a node's scope and checks, a whole feature's drafts - is the work that every
-    # later operation is measured against: it runs on the strongest reasoning runtimes only, never a cheap one.
-    chain: [claude-fable-5.1, gpt-6-astra]
+    # later operation is measured against: it runs on the strongest reasoning runtimes first and never on the
+    # cheap pool, and it downgrades to Opus and then Sol rather than waiting for a week to reset.
+    chain: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
     environments:
-      - {environment: claude, profiles: [claude-fable-5.1]}
-      - {environment: codex, profiles: [gpt-6-astra]}
+      - {environment: claude, profiles: [claude-fable-5.1, claude-opus]}
+      - {environment: codex, profiles: [gpt-6-astra, gpt-5.6-sol]}
   workspace.manage:
     skill: starci
     chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]

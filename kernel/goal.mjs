@@ -673,7 +673,14 @@ export function proposeQuota(state,{runtimes=null,shared=undefined}={}){
   // only Sol, Opus and Qwen, whatever their roles. The first runtime of the chain gets a slot.
   for(const kind of unique(ops.map(op=>op.kind).filter(Boolean))){
     const targets=chainTargets(kind);
-    if(!targets.length||rows.some(row=>row.slots>0&&targets.includes(row.runtime)))continue;
+    if(!targets.length)continue;
+    // The head of a chain is the runtime that kind prefers and the rest of it is only the downgrade under it.
+    // A head the proposed order never names - the reasoning runtimes, which no implement preference carries -
+    // is proposed here, or every decide and plan operation would be proposed on the last tier of its own chain.
+    const role=kindRole(kind);
+    const head=targets.find(id=>profile?.runtimes?.[id]&&(!role||rolesOf(id).includes(role)));
+    if(head&&!rows.some(item=>item.runtime===head)){rows.push({runtime:head,slots:1,tags:'hard+medium',why:`first of the launch chain of ${kind}`});continue;}
+    if(rows.some(row=>row.slots>0&&targets.includes(row.runtime)))continue;
     const row=rows.find(item=>targets.includes(item.runtime));
     if(row){row.slots=Math.max(1,row.slots);row.why=`${row.why}; in the launch chain of ${kind}`;continue;}
     rows.push({runtime:targets[0],slots:1,tags:'hard+medium',why:`first of the launch chain of ${kind}`});
