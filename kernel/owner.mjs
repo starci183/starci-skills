@@ -1,6 +1,7 @@
 import fs from 'node:fs';
-import {addOp,firstLine,liveStatus,locateSharedTreePaths,need,slash,unique,validateCommandAt} from './common.mjs';
-import {closeOpTerminal} from './terminals.mjs';
+import {createHash} from 'node:crypto';
+import {AUTHOR_KIND,addOp,firstLine,liveStatus,locateSharedTreePaths,need,slash,unique,validateCommandAt} from './common.mjs';
+import {closeOpTerminal,keepsAskTab} from './terminals.mjs';
 
 /**
  * The owner loop, in one file, because it is one rule: the runtime prepares a decision and the owner takes it.
@@ -504,6 +505,157 @@ export function provisionalLines(state){
     ...open.map(entry=>`- ${entry.decision}: the runtime took option ${entry.recommended}`
       +`${entry.options?.[entry.recommended-1]?` - ${entry.options[entry.recommended-1]}`:''}`
       +` and carried on. Answer with \`${answerCommand(state,entry.op)}\`; a different option reopens what was built on it.`)];
+}
+
+/* ------------------------------------------------------------- what waits on the owner, in one place */
+
+/**
+ * The owner's state lived in three places at once - the ask ops waiting in their tabs, `state.provisional`, and
+ * `state.needUser` - and no page put the three together. The owner opened the IDE, read six tabs, and asked
+ * "where does it ask me?": every one of those places was honest on its own and none of them was an answer.
+ *
+ * `ownerItems` is that answer: one list, in the order the owner should act on it, where every entry says WHAT is
+ * waiting and HOW to settle it - the exact command or the exact tab. It is derived, never stored: it reads the
+ * state as it stands and writes nothing, so the status page, the goal page and the final report cannot disagree
+ * about what the owner still owes.
+ */
+/** The `needUser` kinds that are genuinely a person's to settle; every other kind is a mechanical state of an op. */
+export const OWNER_LINE_KINDS=['validator','authority','environment','decision','credential','ledger'];
+/** The one command that puts a credential into custody, when the ask op's own question does not spell it out. */
+export const IDENTITY_SET_COMMAND='node <skill root>/bin/starci.mjs identity set <slug> --name <VAR>';
+const OWNER_ITEM_KIND={ledger:'ledger',decision:'decision'};
+const clipTo=(value,max=220)=>{const text=String(value??'').replace(/\s+/g,' ').trim();return text.length>max?`${text.slice(0,max)}...`:text;};
+/**
+ * The `identity set` command the ask op already printed for the owner, taken verbatim from its own question, so
+ * the list repeats what the tab says instead of inventing a second spelling. The pattern stops at the variable
+ * NAME, so nothing else of the question can be carried out by it - and a value is not in the question to begin
+ * with: the ask op tells the owner to put the value in with this command and then checks presence only.
+ */
+const identitySetIn=op=>{
+  const text=`${op?.question?.text??''}\n${op?.goal??''}`;
+  const found=text.match(/(?:node\s+\S+\s+|starci\s+)identity set\s+\S+\s+--name\s+[A-Za-z_][A-Za-z0-9_]*/);
+  return found?found[0]:IDENTITY_SET_COMMAND;
+};
+/** Whether the provision an ask op waits for is a credential - the only kind that is put into custody by a command. */
+const asksForCredential=op=>String(op?.question?.kind??'')==='credential'||credentialNeed(`${op?.question?.text??''}\n${op?.goal??''}`);
+
+/**
+ * A line on the owner's list that is really a mechanical state of the runtime, and the reason it is one. Two
+ * shapes, because these are the two the owner was handed work for that the kernel had already taken:
+ *
+ * - `ledger incomplete: <node> declares no write scope` while a `work.author` op is authoring that very record.
+ *   The record is being completed right now; the owner is asked only when that author op blocks.
+ * - an `environment` line about an op that has since started running or finished. The environment it named is
+ *   evidently there.
+ *
+ * A superseded author op is no op at all: the line is the owner's again.
+ */
+export function mechanicalOwnerLine(state,item){
+  const ops=Array.isArray(state?.ops)?state.ops:[];
+  if(item?.kind==='ledger'&&item.node){
+    const author=ops.find(op=>op.kind===AUTHOR_KIND&&op.nodeId===item.node&&op.refusal!=='superseded')??null;
+    return author&&author.status!=='blocked'?{node:item.node,op:author.id,reason:'an author op is on it'}:null;
+  }
+  if(item?.kind==='environment'&&item.op){
+    const op=ops.find(entry=>entry.id===item.op)??null;
+    return op&&['running','done'].includes(op.status)?{node:op.nodeId??null,op:op.id,reason:`its op is ${op.status}`}:null;
+  }
+  return null;
+}
+
+/**
+ * Everything waiting on the owner, in one list. Three sources, one shape - `{kind, op, what, how, terminal, since}`:
+ *
+ * - a live `provision.ask`: it is sitting in its own tab waiting for a word, so `how` names that tab and the one
+ *   command that puts the thing into custody. Never a value: the op checks presence only.
+ * - an unanswered `state.provisional` entry: the runtime took its own recommendation and carried on, so `how` is
+ *   the exact `workflow-answer` command that confirms or overturns it.
+ * - a `needUser` line that is genuinely a person's (`OWNER_LINE_KINDS`), minus the mechanical ones.
+ *
+ * `what` is free text and always goes through `redactSecrets`. `how` never does, and must not: it is built from
+ * ids and a command shape, and the masker - which cannot tell a long id from a key - turned `--id <workflow>`
+ * into `--id [redacted]`, handing the owner a command they could not run. Nothing that could carry a value ever
+ * reaches it: the identity command is matched off the question by a pattern that stops at the variable name, and
+ * the ask op reports presence only, so a value is not in the question in the first place.
+ */
+export function ownerItems(state){
+  const ops=Array.isArray(state?.ops)?state.ops:[];
+  const byId=id=>ops.find(op=>op.id===id)??null;
+  const items=[];
+  for(const op of ops.filter(item=>item.kind===PROVISION_ASK&&liveStatus.includes(item.status))){
+    const credential=asksForCredential(op);
+    items.push({kind:'provision',op:op.id,
+      what:redactSecrets(clipTo(op.question?.text??op.goal??'')),
+      how:credential
+        ?`reply \`set\` in tab ${op.terminal??'(no tab yet)'} after running \`${identitySetIn(op)}\``
+        :`reply \`provided\` in tab ${op.terminal??'(no tab yet)'} once it exists`,
+      terminal:op.terminal??null,since:Number.isFinite(op.launchedAt)?op.launchedAt:null});
+  }
+  for(const entry of (state?.provisional??[]).filter(item=>!item.answered)){
+    const chosen=entry.options?.[entry.recommended-1]??null;
+    const ask=byId(entry.op);
+    items.push({kind:'decision',op:entry.op,
+      what:redactSecrets(clipTo(`${entry.decision}: the runtime took option ${entry.recommended}${chosen?` - ${chosen}`:''} and carried on`)),
+      how:answerCommand(state,entry.op),
+      terminal:ask?.terminal??null,since:Number.isFinite(entry.at)?entry.at:null});
+  }
+  const seen=new Set(items.map(item=>`${item.kind}|${item.op??''}`));
+  for(const line of state?.needUser??[]){
+    if(!OWNER_LINE_KINDS.includes(line?.kind))continue;
+    if(mechanicalOwnerLine(state,line))continue;
+    const kind=OWNER_ITEM_KIND[line.kind]??'blocked';
+    const key=`${kind}|${line.op??line.node??''}`;
+    if(seen.has(key))continue;
+    seen.add(key);
+    const op=line.op?byId(line.op):null;
+    items.push({kind,op:line.op??line.node??null,
+      what:redactSecrets(clipTo(line.detail??line.kind)),
+      how:line.kind==='decision'&&line.op?answerCommand(state,line.op)
+        :line.node?`complete the Work record of ${line.node}, then \`starci workflow-approve --id ${state?.id}\``
+        :line.op?`settle what \`${line.op}\` names, then \`starci workflow-approve --id ${state?.id}\` to re-admit it`
+        :`nothing in the runtime settles this one: \`starci workflow-status --id ${state?.id}\` prints the whole line`,
+      terminal:op?.terminal??null,since:Number.isFinite(line.at)?line.at:null});
+  }
+  return items;
+}
+
+/** The list as a page section, for every page the owner reads. Empty is said out loud, never left out. */
+export function ownerSection(items){
+  const list=Array.isArray(items)?items:[];
+  if(!list.length)return ['## Owner (0)','nothing is waiting on you'];
+  return [`## Owner (${list.length})`,
+    ...list.flatMap(item=>[`- ${item.kind} ${item.op??'-'}${item.terminal?` (tab ${item.terminal})`:''}: ${item.what}`,
+      `  how: ${item.how}`])];
+}
+export const ownerLines=state=>ownerSection(ownerItems(state));
+/**
+ * What the owner is waiting on, as one short stable string: the event fires when this changes, never every tick.
+ * Hashed rather than kept whole, because it is saved on the state at every tick and the list itself can be pages.
+ */
+export const ownerDigest=items=>createHash('sha1')
+  .update((Array.isArray(items)?items:[]).map(item=>`${item.kind}|${item.op??''}|${item.what}`).join('\n')).digest('hex').slice(0,16);
+/**
+ * `owner-list` is appended when - and only when - the list the owner would read changes. A kernel that ran for a
+ * day once wrote the same six lines on every iteration; the digest is what keeps the log a record of changes.
+ */
+export function noteOwnerList(store,state){
+  const items=ownerItems(state);
+  // An empty list is `null`, not the hash of nothing: a workflow that has never owed the owner anything writes
+  // no `owner-list` at all, and the first one that does is the news. Emptying a list that had items still is.
+  const digest=items.length?ownerDigest(items):null;
+  if(digest===(state.ownerDigest??null))return null;
+  state.ownerDigest=digest;
+  store.appendEvent({event:'owner-list',items:items.map(item=>({kind:item.kind,op:item.op}))});
+  return items;
+}
+/**
+ * An operation that is waiting for the OWNER has no deadline: a `provision.ask` waits in its tab as long as the
+ * owner takes, and a `decision.prepare` whose tab is kept is showing the question to nobody's schedule but the
+ * owner's. `op-overrun` exists for a runtime that went away, and killing the one tab that asks the owner for a
+ * credential because they went to lunch is exactly the failure this whole list was written against.
+ */
+export function waitsForOwner(state,op){
+  return op?.kind===PROVISION_ASK||keepsAskTab(state,op);
 }
 
 /**

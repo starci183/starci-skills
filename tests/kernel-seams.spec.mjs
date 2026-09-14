@@ -12,7 +12,8 @@ import {validateAccepted} from '../kernel/verify.mjs';
 import {settleIntake} from '../kernel/intake.mjs';
 import {recordDone,syncLedgerOps} from '../kernel/sync.mjs';
 import {STOP_KINDS,answerOwnerQuestion,dedupeNeedUser,inheritProvisional,irreversibleEffect,openOwnerAsk,
-  ownerProvisionNeed,provisionalLines,redactSecrets,settleOwnerAsk,stopReasonFor} from '../kernel/owner.mjs';
+  ownerProvisionNeed,provisionalLines,redactSecrets,settleOwnerAsk,stopReasonFor,
+  noteOwnerList,ownerItems,ownerLines} from '../kernel/owner.mjs';
 import {ioPayload} from '../kernel/io.mjs';
 
 /**
@@ -729,5 +730,88 @@ test('the owner\'s list carries one item per question, not one per iteration',()
     assert.equal(dedupeNeedUser(state),2);
     assert.deepEqual(state.needUser.map(entry=>[entry.kind,entry.op??entry.node]),
       [['environment','op-1'],['environment','op-2'],['ledger','n1']]);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+/**
+ * The owner opened the IDE, read six tabs and asked "where does it ask me?". Three places were honest on their
+ * own - the ask ops waiting in their tabs, `state.provisional`, `state.needUser` - and none of them was an
+ * answer. `ownerItems` is the answer: one list, and every entry says what waits and what to type for it.
+ *
+ * The two rules that make it readable are here too. A value never travels: the whole list goes through
+ * `redactSecrets`, so a question that quotes a token prints its NAME and not one character of its value. And a
+ * line the runtime has already taken in hand - a record a `work.author` op is writing right now - is not the
+ * owner's and never reaches the list.
+ */
+test('ownerItems is the one list: every ask tab, every provisional decision, every line that is truly the owner\'s',()=>{
+  const dir=tmp();
+  try{
+    const store=stubStore(dir);
+    // A fake value that must never be echoed. The variable name carries the word TOKEN; the value beside it does not travel.
+    // Key-SHAPED and nobody's: long, mixed case, digits - what `redactSecrets` masks - and no vendor prefix, so
+    // a scanner reading this file finds a fixture and not a revoked credential to warn somebody about.
+    const value='zzFIXTURE0000aaaaBBBB1111cccc2222';
+    const command='node /skills/bin/starci.mjs identity set payments --name PAYMENTS_API_TOKEN';
+    const ask=toOp({id:'ask-cred',kind:'provision.ask',goal:'Ask the owner for the payments credential',
+      allowlist:[],question:{kind:'credential',from:'op-pay',options:[],
+        text:`Put PAYMENTS_API_TOKEN into custody: run \`${command}\` - the value ${value} must never be typed here.`}},0);
+    ask.status='running';ask.terminal='term_ask';ask.launchedAt=1700;
+    const author=toOp({id:'n-four-author',kind:'work.author',nodeId:'prod.alpha.four',
+      goal:'Complete the Work record of prod.alpha.four',allowlist:['.starciwork/features/alpha/four/index.yaml']},1);
+    author.status='running';
+    const state=stubState(store,[ask,author]);
+    // A real workflow id: long, and it starts with digits. The secret masker cannot tell one from a key, so it
+    // must never be run over a command the owner has to type - it once handed them `--id [redacted]`.
+    state.id='20260101-093000-deliver-the-sales-intake';
+    state.provisional=[{decision:'prod.alpha.business.srs.policy-decision.d-refund',op:'ask-refund',recommended:2,
+      options:['reopen the order','close it and issue a credit note'],at:1600,answered:null}];
+    state.needUser=[
+      {op:'op-verify',kind:'validator',detail:'the Work validator is not installed in this worktree'},
+      {node:'prod.alpha.four',kind:'ledger',detail:'ledger incomplete: prod.alpha.four declares no write scope'}
+    ];
+
+    const items=ownerItems(state);
+    assert.deepEqual(items.map(entry=>[entry.kind,entry.op]),
+      [['provision','ask-cred'],['decision','ask-refund'],['blocked','op-verify']],
+      'the mechanical ledger line has an author op on it and is not the owner\'s');
+    assert.deepEqual(items.map(entry=>entry.how),[
+      'reply `set` in tab term_ask after running `node /skills/bin/starci.mjs identity set payments --name PAYMENTS_API_TOKEN`',
+      'starci workflow-answer --id 20260101-093000-deliver-the-sales-intake --op ask-refund --choice <n> [--note "..."]',
+      'settle what `op-verify` names, then `starci workflow-approve --id 20260101-093000-deliver-the-sales-intake` to re-admit it'
+    ]);
+    for(const entry of items)assert.equal(entry.how.includes('[redacted]'),false,'a command the owner types is never masked');
+    assert.deepEqual(items.map(entry=>[entry.terminal,entry.since]),[['term_ask',1700],[null,1600],[null,null]]);
+    assert.equal(items[0].what,
+      'Put PAYMENTS_API_TOKEN into custody: run `node /skills/bin/starci.mjs identity set payments --name PAYMENTS_API_TOKEN` - the value [redacted] must never be typed here.');
+    assert.match(items[1].what,/^prod\.alpha\.business\.srs\.policy-decision\.d-refund: the runtime took option 2 - close it and issue a credit note and carried on$/);
+
+    // No value of anything, anywhere: not in an item, not in the rendered section, not in the event.
+    const page=ownerLines(state).join('\n');
+    for(const text of [...items.map(entry=>`${entry.what} ${entry.how}`),page])assert.equal(text.includes(value),false,'a value never travels');
+    assert.match(page,/^## Owner \(3\)\n- provision ask-cred \(tab term_ask\): /);
+
+    // The event fires when the list changes and never on a tick that changed nothing.
+    assert.deepEqual(noteOwnerList(store,state).length,3);
+    assert.deepEqual(store.events.at(-1),{event:'owner-list',
+      items:[{kind:'provision',op:'ask-cred'},{kind:'decision',op:'ask-refund'},{kind:'blocked',op:'op-verify'}]});
+    const written=store.events.length;
+    assert.equal(noteOwnerList(store,state),null);
+    assert.equal(store.events.length,written,'an unchanged list writes no second event');
+
+    // The author op blocks: the record is nobody's job again, so the line is the owner's and comes back.
+    author.status='blocked';author.refusal='shared-change';
+    assert.deepEqual(ownerItems(state).map(entry=>[entry.kind,entry.op]),
+      [['provision','ask-cred'],['decision','ask-refund'],['blocked','op-verify'],['ledger','prod.alpha.four']]);
+    assert.equal(ownerItems(state).at(-1).how,
+      'complete the Work record of prod.alpha.four, then `starci workflow-approve --id 20260101-093000-deliver-the-sales-intake`');
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+/** Nothing waiting is said out loud: "where does it ask me?" is answered even when the answer is "nowhere". */
+test('the owner section says so when nothing is waiting, instead of leaving itself out',()=>{
+  const dir=tmp();
+  try{
+    const store=stubStore(dir);
+    assert.deepEqual(ownerLines(stubState(store,[])),['## Owner (0)','nothing is waiting on you']);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {listWorkflows,workflowsRoot} from './store.mjs';
 import {integrationProofStatus,readLedgerTree} from './ledger.mjs';
+import {ownerItems,ownerSection} from './owner.mjs';
 
 /**
  * One truthful status view of a workflow. This is what replaces "go and watch the agents": every number
@@ -281,6 +282,9 @@ export function buildView({repoRoot,id,now=Date.now(),dir:given=null}){
       findings:Array.isArray(state.reviewFindings)?state.reviewFindings.length:0},
     validator:readValidator(dir,events),
     needUser:Array.isArray(state.needUser)?state.needUser:[],
+    // The one place the owner looks: every ask tab, every provisional decision and every line that is really
+    // theirs, in one list, each with the command or the tab that settles it. Derived, never stored.
+    owner:ownerItems(state),
     // Decisions the runtime took on its own recommendation so the work could continue. They are not in "needs
     // you": nothing is blocked on them, and the workflow may have finished done over them - but the owner is
     // still owed the question, and a different answer reopens what was built on it.
@@ -325,6 +329,12 @@ export function renderView(view){
     +(view.lane.merged?`, merged ${String(view.lane.merged.commit??'').slice(0,12)} into ${view.lane.merged.into}`
       :view.lane.conflict?`, NOT merged: conflicts in ${view.lane.conflict.files.join(', ')}`:', not merged yet')
     +(view.lane.closed?', worktree closed':''));
+
+  // First of every section, because it is the answer to "where does it ask me?": what is waiting on the owner
+  // and what to type for each one. The sections below still say more about each kind of item - a `needUser`
+  // line in full, the decision record behind a provisional answer - but a page that had only them is how six
+  // open tabs held a question the owner could not find.
+  lines.push('',...ownerSection(view.owner??[]));
 
   if(view.runtimes.length){
     lines.push('','## Runtimes',table(['runtime','running','max','used today','cooling'],
