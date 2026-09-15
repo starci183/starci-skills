@@ -37,6 +37,23 @@ const worktree='fixtures/orca/agentos-r14-sales';
 const cwd=path.resolve(worktree);
 const json=(status,value)=>({status,stdout:JSON.stringify(value),stderr:''});
 const noWait=()=>{};
+/**
+ * A real `runLoop`/`waitTick` cycle paces itself against wall-clock `now()`, so `wait:noWait` alone (no real
+ * sleep) still burns real seconds: `waitTick`'s hot path (nothing running, nothing to report) never calls the
+ * injected `wait` at all - it only ever compares `now()-started` against a timeout - so with a frozen clock that
+ * comparison would never cross the threshold and the loop would spin forever. A real clock only terminated it by
+ * genuinely burning wall time between calls. This clock keeps that same "every read moves the clock forward"
+ * guarantee without the real delay: `now()` advances by a tiny epsilon on every read (so a bare polling loop
+ * still converges, just after CPU-speed reads instead of real milliseconds) and `wait(ms)` advances it by the
+ * full requested amount (so an explicit sleep still counts as what it says). Every deadline the kernel computes
+ * from `now()` still resolves after the same number of logical steps - none of the real delay.
+ */
+// 200ms of epsilon per read is far below every real threshold this runtime compares against (the smallest,
+// waitTimeoutMs/tickMs, are already seconds; heartbeat/stall grace windows are 10-20 minutes), so it cannot
+// change which branch a scenario takes - it only bounds how many synchronous reads a bare polling loop needs
+// before its own timeout math notices the (virtual) time has passed, instead of spinning on real fs/CPU work.
+const CLOCK_EPSILON_MS=200;
+const fakeClock=(start=Date.now())=>{let t=start;return {now:()=>{const value=t;t+=CLOCK_EPSILON_MS;return value;},wait:ms=>{t+=Math.max(0,Number(ms)||0);}};};
 const tmp=()=>{const dir=path.join(os.tmpdir(),'starci-workflow-kernel-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);fs.mkdirSync(dir,{recursive:true});return dir;};
 const flag=(args,name)=>{const index=args.indexOf(`--${name}`);return index<0?null:args[index+1];};
 const events=store=>store.readEvents();
@@ -262,14 +279,15 @@ function setup({job='Implement the sales slice',plan,scripts,dirty=[],exec,alloc
   const fake=orca?orca({store,scripts}):scriptedOrca({reportsDir:store.paths.reports,scripts});
   const git=fakeGit(dirty);
   const runs=[];
-  const run=(options={})=>runLoop(fake.orca,store,state,{cwd,allocator,template,wait:noWait,
+  const clock=fakeClock();
+  const run=(options={})=>runLoop(fake.orca,store,state,{cwd,allocator,template,wait:clock.wait,now:clock.now,
     reconcileInputs:()=>{},refreshPreparation:()=>{},deferPreparation:()=>false,
     exec:exec??((command)=>{runs.push(command);return {status:0,stdout:`${command} ok`,stderr:''};}),
     git:git.git,planOp:()=>{throw Error('planOp must not be called on this path');},
     decide:()=>{throw Error('decide must not be called on a policy-covered path');},
     validateOp:acceptAll,
     waitTimeoutMs:2000,tickMs:1000,maxIterations:12,...options});
-  return {repo,store,state,goal,fake,git,run,runs,allocator,
+  return {repo,store,state,goal,fake,git,run,runs,allocator,clock,
     cleanup:()=>fs.rmSync(path.dirname(repo),{recursive:true,force:true})};
 }
 
@@ -482,7 +500,8 @@ test('the loop is resumable: a run that stops after one iteration continues from
     const saved=harness.store.loadState();
     assert.equal(saved.ops[0].status,'done');
     assert.equal(saved.run,'run_wf');assert.equal(saved.approved,true);
-    const resumed=runLoop(harness.fake.orca,harness.store,saved,{cwd,allocator:fakeAllocator(),template,wait:noWait,validateOp:acceptAll,
+    const resumeClock=fakeClock();
+    const resumed=runLoop(harness.fake.orca,harness.store,saved,{cwd,allocator:fakeAllocator(),template,wait:resumeClock.wait,now:resumeClock.now,validateOp:acceptAll,
       exec:command=>({status:0,stdout:`${command} ok`,stderr:''}),git:harness.git.git,waitTimeoutMs:2000,tickMs:1000,maxIterations:8});
     assert.equal(resumed.finished.outcome,'done');
     // The second run continues the same counter and the same event log instead of starting over.
@@ -1009,7 +1028,8 @@ function setupWork({nodes=WORK_NODES,scope=[],reintake=[],migrate=[],scripts={},
   const fake=scriptedOrca({reportsDir:store.paths.reports,scripts});
   const git=fakeGit(dirty);
   const commits=[];
-  const run=(options={})=>runLoop(fake.orca,store,state,{cwd,allocator,template,wait:noWait,validate:tree.validate,
+  const clock=fakeClock();
+  const run=(options={})=>runLoop(fake.orca,store,state,{cwd,allocator,template,wait:clock.wait,now:clock.now,validate:tree.validate,
     reconcileInputs:()=>{},refreshPreparation:()=>{},deferPreparation:()=>false,
     ...(api?{ledgerApi:api}:{}),
     exec:exec??(command=>({status:0,stdout:`${command} ok`,stderr:''})),
@@ -1018,7 +1038,7 @@ function setupWork({nodes=WORK_NODES,scope=[],reintake=[],migrate=[],scripts={},
     validateOp,
     ...(binding?{resolveLedger:bindingRoles(binding)}:{}),
     waitTimeoutMs:2000,tickMs:1000,maxIterations:12,...options});
-  return {...tree,api,store,state,goal,fake,git,run,commits,allocator,cleanup:()=>fs.rmSync(path.dirname(tree.repo),{recursive:true,force:true})};
+  return {...tree,api,store,state,goal,fake,git,run,commits,allocator,clock,cleanup:()=>fs.rmSync(path.dirname(tree.repo),{recursive:true,force:true})};
 }
 
 /**
@@ -3048,7 +3068,8 @@ test('the kernel-owned ledger paths are protected: the contract forbids them, ch
       if(name==='check'&&!forged){forged=true;fs.appendFileSync(nodeFile,forgery);}
       return result;
     }};
-    const state=runLoop(orca,harness.store,harness.state,{cwd,allocator:harness.allocator,template,wait:noWait,validateOp:acceptAll,
+    const forgeClock=fakeClock();
+    const state=runLoop(orca,harness.store,harness.state,{cwd,allocator:harness.allocator,template,wait:forgeClock.wait,now:forgeClock.now,validateOp:acceptAll,
       validate:harness.validate,guards,exec:command=>({status:0,stdout:`${command} ok`,stderr:''}),
       git:harness.git.git,waitTimeoutMs:2000,tickMs:1000,maxIterations:12});
     const op=state.ops.find(item=>item.id===nodeId);
@@ -3098,7 +3119,7 @@ function runAuthoring({scripts,whileRunning=()=>{},guards=null,maxIterations=12}
     return result;
   }};
   const commits=[];
-  const state=runLoop(orca,harness.store,harness.state,{cwd,allocator:harness.allocator,template,wait:noWait,
+  const state=runLoop(orca,harness.store,harness.state,{cwd,allocator:harness.allocator,template,wait:harness.clock.wait,now:harness.clock.now,
     validateOp:acceptAll,validate:harness.validate,...(guards?{guards:guards(nodeFile)}:{}),
     exec:command=>({status:0,stdout:`${command} ok`,stderr:''}),
     git:(executable,args)=>{if(args[0]==='commit')commits.push(args[args.indexOf('-m')+1]);return harness.git.git(executable,args);},
@@ -4828,7 +4849,7 @@ function runCut({scripts,cut=true,maxIterations=24,allocator=fakeAllocator({maxP
     if(name==='check')tick();
     return result;
   }};
-  const state=runLoop(orca,harness.store,harness.state,{cwd,allocator:harness.allocator,template,wait:noWait,
+  const state=runLoop(orca,harness.store,harness.state,{cwd,allocator:harness.allocator,template,wait:harness.clock.wait,now:harness.clock.now,
     // The projection is answered from the array as it stands: every re-read of the tree sees what the operations
     // have written by then, which is what makes a child authored mid-run a schedulable node on the next tick.
     validateOp:acceptAll,validate:(...args)=>{tick();return harness.validate(...args);},
