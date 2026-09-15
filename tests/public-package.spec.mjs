@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, {before, after} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,6 +12,15 @@ const runtime=fileURLToPath(new URL('../',import.meta.url));
 const cli=path.join(runtime,'bin/starci.mjs');
 const invoke=(...args)=>spawnSync(process.execPath,[cli,...args],{encoding:'utf8',timeout:30000});
 function temp(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-package-'));t.after(()=>{assert.equal(path.dirname(root),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(root).startsWith('starci-package-'));fs.rmSync(root,{recursive:true,force:true});});return root;}
+// init() spawns two real build/verify child processes every call. Tests below that call it only to
+// reach "an already-installed host" before exercising update() copy that once-built install instead.
+let golden;
+before(()=>{golden=fs.mkdtempSync(path.join(os.tmpdir(),'starci-package-golden-'));init({dir:golden,force:false,bootstrap:true,upgradeMajor:false},()=>{});});
+after(()=>fs.rmSync(golden,{recursive:true,force:true}));
+function installFromGolden(host){
+  fs.cpSync(path.join(golden,'.claude'),path.join(host,'.claude'),{recursive:true});
+  for(const name of ['AGENTS.md','CLAUDE.md','.gitignore'])if(fs.existsSync(path.join(golden,name)))fs.cpSync(path.join(golden,name),path.join(host,name));
+}
 
 test('public starci CLI installs the host separately from project metadata and refuses overwrites',t=>{
  const root=temp(t),host=path.join(root,'host'),be=path.join(root,'backend'),fe=path.join(root,'frontend');
@@ -43,7 +52,7 @@ test('storage reports legacy and mixed names read-only and init cannot create pa
 
 test('retired temp destination is refused and split-storage bootstraps upgrade without losing user text',t=>{
  const host=temp(t),opts={dir:host,force:false,bootstrap:true,upgradeMajor:false};
- init(opts,()=>{});
+ installFromGolden(host);
  const split=fs.readFileSync(path.join(runtime,'init/AGENTS.md'),'utf8').replace("The project's backend owns shared `.starciwork`; Plan/run state lives inside `.starciwork/_local/plans` for both backend and frontend.","The project's backend owns the shared `.starciwork` and sibling `.starcitemp` for both backend and frontend.");
  for(const name of ['AGENTS.md','CLAUDE.md'])fs.writeFileSync(path.join(host,name),split+'\nCustom rule stays.\n');
  update(opts,()=>{});
@@ -85,7 +94,7 @@ test('state follows the explicit root, never the presence of a competing tree or
 
 test('update migrates known pre-rename bootstraps and preserves custom instructions and product bytes',t=>{
  const host=temp(t),opts={dir:host,force:false,bootstrap:true,upgradeMajor:false};
- init(opts,()=>{});
+ installFromGolden(host);
  const split=fs.readFileSync(path.join(runtime,'init/AGENTS.md'),'utf8').replace("The project's backend owns shared `.starciwork`; Plan/run state lives inside `.starciwork/_local/plans` for both backend and frontend.","The project's backend owns the shared `.starciwork` and sibling `.starcitemp` for both backend and frontend.");
  const old=split.replaceAll('.starciwork','.work').replaceAll('.starcitemp','.starci');
  for(const name of ['AGENTS.md','CLAUDE.md'])fs.writeFileSync(path.join(host,name),old+'\nCustom: keep project rules.\n');
