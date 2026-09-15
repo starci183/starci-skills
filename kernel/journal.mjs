@@ -16,6 +16,26 @@ export function sqliteAtLeast(actual,minimum){
   return true;
 }
 export const newToken=()=>crypto.randomBytes(24).toString('hex');
+/** Bodies kept per bound (workflow, generation, goal): the latest is the recovery state, the rest a short margin. */
+export const SNAPSHOT_BODIES_KEPT=3;
+/**
+ * Retire snapshot bodies the runtime can never read again. A bound generation reads only its latest body; an
+ * older generation is never read. The checkpoint rows themselves stay, with their ids, so a replayed transition
+ * is still recognised; only the state text is let go. Returns the number of bodies retired.
+ */
+export function compactSnapshots(db,{workflowId=null,generation=null,goalIdentity=null,keep=SNAPSHOT_BODIES_KEPT}={}){
+  const scope=workflowId?' AND workflow_id=?':'',args=workflowId?[workflowId]:[];
+  const bound=generation!==null&&goalIdentity!==null;
+  // The bound generation - or, unbound, the newest generation of each workflow - keeps its latest few bodies.
+  const current=bound
+    ?db.prepare(`UPDATE state_snapshots SET state_json='' WHERE workflow_id=? AND generation=? AND goal_identity=? AND state_json<>'' AND snapshot_id NOT IN (SELECT snapshot_id FROM state_snapshots WHERE workflow_id=? AND generation=? AND goal_identity=? ORDER BY snapshot_id DESC LIMIT ?)`).run(workflowId,generation,goalIdentity,workflowId,generation,goalIdentity,keep).changes
+    :db.prepare(`UPDATE state_snapshots SET state_json='' WHERE state_json<>''${scope} AND generation=(SELECT max(generation) FROM state_snapshots m WHERE m.workflow_id=state_snapshots.workflow_id) AND snapshot_id NOT IN (SELECT snapshot_id FROM state_snapshots s WHERE s.workflow_id=state_snapshots.workflow_id AND s.generation=state_snapshots.generation AND s.goal_identity=state_snapshots.goal_identity ORDER BY s.snapshot_id DESC LIMIT ?)`).run(...args,keep).changes;
+  // An older generation keeps exactly one body as evidence.
+  const older=bound
+    ?db.prepare(`UPDATE state_snapshots SET state_json='' WHERE workflow_id=? AND generation<? AND state_json<>'' AND snapshot_id NOT IN (SELECT max(snapshot_id) FROM state_snapshots WHERE workflow_id=? AND generation<? GROUP BY generation,goal_identity)`).run(workflowId,generation,workflowId,generation).changes
+    :db.prepare(`UPDATE state_snapshots SET state_json='' WHERE state_json<>''${scope} AND generation<(SELECT max(generation) FROM state_snapshots m WHERE m.workflow_id=state_snapshots.workflow_id) AND snapshot_id NOT IN (SELECT max(snapshot_id) FROM state_snapshots GROUP BY workflow_id,generation,goal_identity)`).run(...args).changes;
+  return current+older;
+}
 
 function migrate(db){
   const version=Number(db.prepare('PRAGMA user_version').get().user_version);
@@ -54,6 +74,7 @@ export function openJournal({file,now=Date.now,busyTimeoutMs=5000,journalMode='D
   const actual=String(db.prepare(`PRAGMA journal_mode=${requested}`).get().journal_mode).toUpperCase();
   need(actual===requested,`SQLite selected journal mode ${actual}, expected ${requested}`);
   migrate(db);
+  compactSnapshots(db);
   const transaction=fn=>{db.exec('BEGIN IMMEDIATE');try{const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}};
   return {
     schema:JOURNAL_SCHEMA,file,path:path.resolve(file),sqliteVersion,journalMode:actual,db,now,transaction,
