@@ -69,3 +69,12 @@ test('a start also closes the coordinator terminals the supervisor log remembers
   assert.equal(started.terminal,'term_new_1');assert.deepEqual(closed.sort(),['term_old_a','term_old_b'],'both logged terminals of this workflow are closed, the other workflow untouched');
   assert.deepEqual(readCoordinatorTerminals(dir),['term_new_1']);
 });
+
+test('a running kernel sweep also seeds the record from the supervisor log, so tabs opened before the record existed are closed',t=>{
+  const root=tmp(t),dir=path.join(root,'wf');fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(root,'supervisor.log'),JSON.stringify({at:1,event:'kernel-started-in-coordinator',id:'wf',terminal:'term_before_record',run:'run_wf'})+String.fromCharCode(10));
+  const events=[],store={dir,appendEvent:event=>events.push(event)},state={id:'wf',worktree:'D:/repo',from:'term_live',ops:[]},closes=[];
+  const orca={invoke:(name,params)=>{if(name==='terminal-list')return {outcome:'ok',receipt:{result:{terminals:[{handle:'term_before_record',title:'powershell.exe'},{handle:'term_live',title:'[Kernel] wf'}]}}};if(name==='terminal-close'){closes.push(params.terminal);return {outcome:'ok'};}throw Error(name);}};
+  sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now:()=>5});
+  assert.deepEqual(closes,['term_before_record']);assert.deepEqual(readCoordinatorTerminals(dir),[],'the closed tab leaves the record; the kernel never recorded its own');
+});

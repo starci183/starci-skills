@@ -47,3 +47,18 @@ export function closeStaleCoordinatorTerminals(dir,{keep=null,close,known=null}=
   dropCoordinatorTerminals(dir,closed.map(item=>item.terminal));
   return {closed,kept};
 }
+
+/**
+ * Every coordinator terminal the supervisor log beside the store says was opened for this workflow, added to the
+ * record: tabs opened before the record existed are closed like the rest. Returns how many were new.
+ */
+export function seedCoordinatorTerminalsFromLog(dir,workflowId){
+  let lines;try{lines=fs.readFileSync(path.join(path.dirname(dir),'supervisor.log'),'utf8').split(String.fromCharCode(10));}catch{return 0;}
+  const known=new Set(readCoordinatorTerminals(dir));let added=0;
+  for(const line of lines){
+    if(!line.includes('"kernel-started-in-coordinator"'))continue;
+    let event;try{event=JSON.parse(line);}catch{continue;}
+    if(event.event==='kernel-started-in-coordinator'&&event.id===workflowId&&typeof event.terminal==='string'&&!known.has(event.terminal)&&recordCoordinatorTerminal(dir,event.terminal)){known.add(event.terminal);added+=1;}
+  }
+  return added;
+}

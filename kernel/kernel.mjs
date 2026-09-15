@@ -229,8 +229,21 @@ function overlapBlock(critique,op){
 /** A kind the kinds profile does not carry (a plan-ledger kind) declares no input and no output; it prints none. */
 const ioLines=kind=>{try{const block=ioBlock(kind);return block?[...String(block).split(String.fromCharCode(10)),'']:[];}catch{return [];}};
 
+/**
+ * The language the owner reads the tab in, from the host's config.json. It reaches the worker as one section of
+ * its contract and changes nothing else: records, paths, identifiers, commit messages, check names and report
+ * fields stay as the tree spells them, in English, so every line can be matched back to a record.
+ */
+const LANGUAGE_NAMES={vi:'Vietnamese (tiếng Việt)',en:'English',ja:'Japanese',ko:'Korean',zh:'Chinese',fr:'French',de:'German',es:'Spanish'};
+export function languageBlock(language){
+  const code=String(language??'en').toLowerCase().split('-')[0];
+  if(!code||code==='en')return [];
+  const name=LANGUAGE_NAMES[code]??code;
+  return [`## Language`,`Speak to the owner in ${name}: the progress notes you print in this terminal, your questions, and your closing summary. Every record, file, path, identifier, commit message, check name and report field stays in English, exactly as the tree spells it - the language is for the person reading this tab, never for the files.`,``];
+}
+const configuredLanguage=state=>{try{return loadConfig(state.host).language;}catch{return 'en';}};
 export function renderContract({template,op,state,store,launcher=state.launcher,run=state.run,
-  guards=kernelGuards,protectedPaths=null,brand=state.brand??null,critique=state.critique??null}){
+  guards=kernelGuards,protectedPaths=null,brand=state.brand??null,critique=state.critique??null,language=null}){
   const text=String(template??'');
   for(const heading of ['## Cook until done','## Ping (mandatory)','## Never'])
     need(text.includes(heading),`The operation template has no "${heading}" section`);
@@ -247,6 +260,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     `# Operation contract - \`${op.kind}\` - op \`${op.id}\` - attempt ${op.attempt}`,``,
     `Runtime StarCi ${isEnrolled(state)?state.engine.version:'5.0'}. One worktree \`${slash(state.worktree)}\` on branch \`${state.branch}\`. ${isEnrolled(state)?'The kernel serializes native writers and independently verifies a frozen copy of your observed changes. This host detects write drift but does not enforce an OS sandbox.':'Other operations are running beside you in this same worktree:'} Never touch a path outside your allowlist, never commit, never switch branches. Your Task id, Dispatch id and terminal handle are in the dispatch preamble.`,``,
     ...(laneLine(state,op)?[laneLine(state,op),``]:[]),
+    ...languageBlock(language??configuredLanguage(state)),
     `## Goal`,op.goal,``,
     ...critiqueBlock(critique),
     ...overlapBlock(critique,op),
@@ -2565,7 +2579,7 @@ function settleFromTab(orca,store,state,op,ctx,observed){
 function reconcileStoppedNativeAttempt(store,state,op,ctx,settlement,reason){
   if(!ctx.engine)return true;
   const reconciled=ctx.engine.settleStoppedOperation(op,{dispatch:op.dispatch,settlement,reason});
-  if(!reconciled.ok){quarantineCandidate(store,state,op,{kind:'native-stop-reconciliation',effectState:reconciled.effectState??'unknown',reasons:[reconciled.reason??'native attempt could not be reconciled']});return false;}
+  if(!reconciled.ok){quarantineCandidate(store,state,op,{kind:'native-stop-reconciliation',effectState:reconciled.effectState??'unknown',reasons:[reconciled.reason??'native attempt could not be reconciled',...(Array.isArray(reconciled.pending?.reasons)?reconciled.pending.reasons.map(String):[])]});return false;}
   const prior={attempt:op.attempt,dispatch:op.dispatch,candidateDigest:reconciled.candidateDigest??null,observedFiles:[...(reconciled.observedFiles??[])]};
   op.priorStoppedAttempt=prior;op.attempt=(op.attempt??1)+1;
   delete op.workerSettled;delete op.retryReconciled;

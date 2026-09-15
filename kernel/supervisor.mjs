@@ -4,7 +4,7 @@ import {spawn,spawnSync} from 'node:child_process';
 import {listWorkflows,repositoryRoot,workflowsRoot} from './store.mjs';
 import {DEFAULT_PROBE_MS,probeRuntimeBudget,writeRuntimeBudget} from './budget.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
-import {closeStaleCoordinatorTerminals,recordCoordinatorTerminal} from './coordinator-terminals.mjs';
+import {closeStaleCoordinatorTerminals,recordCoordinatorTerminal,seedCoordinatorTerminalsFromLog} from './coordinator-terminals.mjs';
 import {LAUNCH_WINDOW_MS,bindStartupProcess,bindStartupTerminal,inspectStartup,reserveStartup,releaseLaunchingStartup,releaseStartup,startupRowHolds} from './startup-lock.mjs';
 import {sealedRuntimeOf} from './common.mjs';
 import {measureHeadroom} from './disk.mjs';
@@ -56,17 +56,6 @@ export function supervisorAction(info,{healthMs=DEFAULT_HEALTH_MS}={}){
   return {action:'start',reason:'no kernel process'};
 }
 
-/** Every coordinator terminal the supervisor log says was opened for this workflow, added to the record. */
-function seedCoordinatorTerminals(info){
-  let lines;try{lines=fs.readFileSync(path.join(path.dirname(info.dir),'supervisor.log'),'utf8').split('\n');}catch{return 0;}
-  let added=0;
-  for(const line of lines){
-    if(!line.includes('"kernel-started-in-coordinator"'))continue;
-    let event;try{event=JSON.parse(line);}catch{continue;}
-    if(event.event==='kernel-started-in-coordinator'&&event.id===info.id&&typeof event.terminal==='string'&&recordCoordinatorTerminal(info.dir,event.terminal))added+=1;
-  }
-  return added;
-}
 /** Start one kernel process detached; its lock file is the only thing that keeps a second one out. */
 const shellQuote=value=>`'${String(value).replaceAll("'","''")}'`;
 export function startKernel(info,{launcher,spawnFn=spawn,orca=null,log=()=>{},startupToken=null,now=Date.now}){
@@ -86,7 +75,7 @@ export function startKernel(info,{launcher,spawnFn=spawn,orca=null,log=()=>{},st
     // sweep would find it again. What cannot be closed stays recorded for the next start.
     // The record is seeded from the supervisor's own log: every coordinator terminal a supervisor ever opened for this
     // workflow is on it, including those opened before the record existed.
-    seedCoordinatorTerminals(info);
+    seedCoordinatorTerminalsFromLog(info.dir,info.id);
     const stale=closeStaleCoordinatorTerminals(info.dir,{close:handle=>{try{return orca.invoke('terminal-close',{terminal:handle},{cwd:info.worktree}).outcome==='ok';}catch{return false;}}});
     if(stale.closed.length)log({event:'stale-kernel-terminals-closed',id:info.id,closed:stale.closed,kept:stale.kept});
     const created=orca.invoke('terminal-create',{worktree:`path:${path.resolve(info.worktree)}`,title:`[Kernel] ${info.id}`,command:process.platform==='win32'?'powershell -NoLogo':'bash'},{cwd:info.worktree});

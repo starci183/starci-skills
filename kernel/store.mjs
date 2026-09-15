@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {readReports as readReportFiles,repositoryRoot} from './reports.mjs';
 import crypto from 'node:crypto';
-import {createProgressReporter} from './progress.mjs';
+import {configuredProgressLanguage,createProgressReporter} from './progress.mjs';
 import {compactSnapshots} from './journal.mjs';
 
 /**
@@ -82,7 +82,8 @@ export function createStore({repoRoot,id}){
   for(const directory of [dir,paths.reports,paths.contracts,paths.checks,paths.inbox])fs.mkdirSync(directory,{recursive:true});
   let seq=null;
   let durable=null;
-  const reportProgress=createProgressReporter();
+  // The tab speaks the host's configured language; the events it renders stay as recorded.
+  const reportProgress=createProgressReporter({language:configuredProgressLanguage()});
   const nextSeq=()=>{
     if(seq===null)seq=lastSeq(paths.events,dir);
     seq+=1;return seq;

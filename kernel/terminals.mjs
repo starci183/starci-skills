@@ -5,7 +5,7 @@ import {dispatchLastWords,settleDispatch} from '../hosts/orca/launch.mjs';
 import {RESTART_LIMIT,firstLine,need,plain,sleepSync} from './common.mjs';
 import {buildReport} from './reports.mjs';
 import {redactSecrets} from './owner.mjs';
-import {closeStaleCoordinatorTerminals} from './coordinator-terminals.mjs';
+import {closeStaleCoordinatorTerminals,seedCoordinatorTerminalsFromLog} from './coordinator-terminals.mjs';
 
 /**
  * Tabs and the Run they hang from. The rule is one sentence - a tab exists only while somebody reads it - and
@@ -113,6 +113,7 @@ export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Dat
   const listed=listTerminals(orca,cwd);
   // The coordinator terminals earlier kernels of this workflow ran in, by handle: Orca re-titles an exited kernel's
   // tab to its shell, so the title match below never sees them; the record beside the store does.
+  seedCoordinatorTerminalsFromLog(store.dir,state.id);
   const recorded=closeStaleCoordinatorTerminals(store.dir,{keep:state.from??null,known:listed.map(item=>item.handle),close:handle=>closeTerminal(orca,cwd,handle)});
   for(const item of recorded.closed)if(item.reason!=='coordinator terminal already gone')closed.push({terminal:item.terminal,reason:'stale kernel tab'});
   const closedHandles=new Set(closed.map(item=>item.terminal));

@@ -77,6 +77,20 @@ test('the contract prints what the kind reads and produces, under the goal and a
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
+test('the contract tells the worker which language the owner reads the tab in, and that the files stay English',()=>{
+  const dir=tmp();
+  try{
+    const store=stubStore(dir);
+    const op=toOp({id:'draw-1',kind:'interface.draw',goal:'Draw the sales screens.',allowlist:['.starciwork/features/sales/ui/**']},0);
+    const state=stubState(store,[op]);
+    const vi=renderContract({template,op,state,store,launcher:'L.mjs',run:'run_seam',language:'vi'});
+    assert.match(vi,/## Language\nSpeak to the owner in Vietnamese \(tiếng Việt\)[\s\S]*stays in English[\s\S]*## Goal/,'the language section precedes the goal');
+    const en=renderContract({template,op,state,store,launcher:'L.mjs',run:'run_seam',language:'en'});
+    assert.doesNotMatch(en,/## Language/,'English is the default of the record and needs no section');
+    assert.match(renderContract({template,op,state,store,launcher:'L.mjs',run:'run_seam',language:'vi-VN'}),/## Language/);
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
 test('the validator is handed the declaration of the kind it judges',()=>{
   const dir=tmp();
   try{

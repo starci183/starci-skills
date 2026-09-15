@@ -1,3 +1,4 @@
+import {loadConfig} from '../scripts/config.mjs';
 const clip=(value,max=220)=>String(value??'').replace(/\s+/g,' ').replace(/(bearer\s+)[^\s]+/ig,'$1[redacted]')
   .replace(/\b([A-Za-z0-9_]*(?:TOKEN|PASSWORD|SECRET|CREDENTIAL|API_KEY|ACCESS_KEY)[A-Za-z0-9_]*)\b["']?\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^,;]+)/ig,'$1=[redacted]').slice(0,max);
 
@@ -5,26 +6,46 @@ const WAIT_EVENTS=new Set(['manager-pending','manager-quota-wait','manager-unava
   'admission-deferred','allocation-deferred','schedule-deferred','launch-cooling','launch-cap-reached','candidate-reconciliation-required',
   'launch-reconciliation-required','job-reconciliation-required','preflight-blocked','op-blocked','shared-change-blocked']);
 
+/**
+ * The words of the terminal lines, per language of the host's config.json. Only these words change: the event
+ * kinds, operation ids, runtimes and the reasons quoted from the record stay as the record spells them (English),
+ * so a line can always be matched back to its event.
+ */
+export const PROGRESS_MESSAGES={
+  en:{manager:'manager',noAction:'no action',launched:'launched',on:'on',accepted:'accepted',reconciled:'native attempt reconciled',
+    quarantined:'quarantined',drift:'canonical drift requires review',stopped:'stopped',finished:'finished',complete:'complete',waiting:'waiting'},
+  vi:{manager:'điều phối',noAction:'không có hành động',launched:'đã khởi chạy',on:'trên',accepted:'đã chấp nhận',reconciled:'đã đối soát lượt native',
+    quarantined:'đã cách ly',drift:'lệch so với bản chuẩn, cần rà soát',stopped:'đã dừng',finished:'hoàn tất',complete:'xong',waiting:'đang chờ'}};
+export const progressLanguage=language=>Object.hasOwn(PROGRESS_MESSAGES,String(language??'').toLowerCase().split('-')[0])?String(language).toLowerCase().split('-')[0]:'en';
+
 /** A bounded terminal observer. It receives already-persisted audit events and never reads prompts or state. */
-export function progressLine(event){
+export function progressLine(event,{language='en'}={}){
+  const t=PROGRESS_MESSAGES[progressLanguage(language)];
   const kind=event?.event,op=typeof event?.op==='string'?` ${event.op}`:'';
-  if(kind==='manager-applied')return `[Kernel] manager: ${Array.isArray(event.actions)&&event.actions.length?event.actions.slice(0,8).join(', '):'no action'}${event.rationale?` — ${clip(event.rationale)}`:''}`;
-  if(kind==='launched'||kind==='op-relaunched')return `[Kernel]${op}: launched${event.runtime?` on ${clip(event.runtime,80)}`:''}`;
-  if(kind==='op-done'||kind==='accepted-early')return `[Kernel]${op}: accepted`;
-  if(kind==='native-attempt-reconciled'||kind==='failed-launch-stopped-proved')return `[Kernel]${op}: native attempt reconciled`;
-  if(kind==='candidate-quarantined'||kind==='record-blocks-quarantined')return `[Kernel]${op}: quarantined — ${clip(event.reason??event.detail??'canonical drift requires review')}`;
-  if(kind==='stopped')return '[Kernel] stopped';
-  if(kind==='finished')return `[Kernel] finished: ${clip(event.outcome??event.reason??'complete')}`;
-  if(WAIT_EVENTS.has(kind))return `[Kernel] waiting${op}: ${clip(event.reason??event.detail??event.code??kind)}`;
+  if(kind==='manager-applied')return `[Kernel] ${t.manager}: ${Array.isArray(event.actions)&&event.actions.length?event.actions.slice(0,8).join(', '):t.noAction}${event.rationale?` — ${clip(event.rationale)}`:''}`;
+  if(kind==='launched'||kind==='op-relaunched')return `[Kernel]${op}: ${t.launched}${event.runtime?` ${t.on} ${clip(event.runtime,80)}`:''}`;
+  if(kind==='op-done'||kind==='accepted-early')return `[Kernel]${op}: ${t.accepted}`;
+  if(kind==='native-attempt-reconciled'||kind==='failed-launch-stopped-proved')return `[Kernel]${op}: ${t.reconciled}`;
+  if(kind==='candidate-quarantined'||kind==='record-blocks-quarantined')return `[Kernel]${op}: ${t.quarantined} — ${clip(event.reason??event.detail??t.drift)}`;
+  if(kind==='stopped')return `[Kernel] ${t.stopped}`;
+  if(kind==='finished')return `[Kernel] ${t.finished}: ${clip(event.outcome??event.reason??t.complete)}`;
+  if(WAIT_EVENTS.has(kind))return `[Kernel] ${t.waiting}${op}: ${clip(event.reason??event.detail??event.code??kind)}`;
   return null;
 }
 
-export function createProgressReporter({enabled=process.env.STARCI_PROGRESS==='1'||process.stderr.isTTY,write=value=>process.stderr.write(value)}={}){
+/** The language of config.json, read once; a config that cannot be read speaks English. */
+export function configuredProgressLanguage(load=()=>loadConfig()){
+  try{return progressLanguage(load()?.language);}catch{return 'en';}
+}
+
+export function createProgressReporter({enabled=process.env.STARCI_PROGRESS==='1'||process.stderr.isTTY,write=value=>process.stderr.write(value),language=null}={}){
   const waits=new Set(),order=[];
+  const spoken=language??'en';
   return event=>{
     if(!enabled)return false;
-    const line=progressLine(event);if(!line)return false;
-    const waiting=line.startsWith('[Kernel] waiting');
+    const line=progressLine(event,{language:spoken});if(!line)return false;
+    // A wait is deduplicated by what it is, never by its words, so the rule holds in every language.
+    const waiting=WAIT_EVENTS.has(event?.event);
     if(waiting&&waits.has(line))return false;
     if(waiting){waits.add(line);order.push(line);if(order.length>128)waits.delete(order.shift());}
     else{waits.clear();order.length=0;}
