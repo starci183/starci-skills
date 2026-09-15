@@ -32,6 +32,23 @@ const modelInput=input=>{
 };
 /** Release old-generation leases only after the native dispatches named by the caller were proven stopped. */
 export function settleGenerationLeases({journalFile,leases=[],reason='fresh workflow generation after confirmed native stop'}={}){const journal=openJournal({file:journalFile}),admission=createAdmission({journal}),jobs=createJobs({journal,admission});try{return leases.map(lease=>jobs.complete({...lease,eventId:`${lease.jobId}:generation-settled`,status:'cancelled',result:{reason}}));}finally{journal.close();}}
+/**
+ * Whether a lease an operation still carries is a stale field rather than a live reservation: the journal holds
+ * neither the job nor a lease row for it, or holds the job in a terminal state with no lease row. The proof is the
+ * journal's own answer, and the caller records it before clearing the field. A live or unknown lease answers null.
+ */
+export function staleLeaseProof({journalFile,lease}={}){
+  if(!journalFile||!fs.existsSync(journalFile)||!lease?.jobId)return null;
+  const journal=openJournal({file:journalFile});
+  try{
+    const job=journal.getJob(lease.jobId);
+    const held=journal.transaction(db=>db.prepare('SELECT COUNT(*) AS n FROM leases WHERE job_id=?').get(lease.jobId)?.n??0);
+    if(held>0)return null;
+    if(!job)return `the journal holds neither job ${lease.jobId} nor a lease for it`;
+    if(['succeeded','failed','cancelled'].includes(job.status))return `job ${lease.jobId} is ${job.status} and holds no lease`;
+    return null;
+  }finally{journal.close();}
+}
 /** Read-only retry fence: pure model and command jobs must settle in their current generation before it advances. */
 export function unsettledGenerationJobs({journalFile,workflowId,generation}={}){
   if(!journalFile||!fs.existsSync(journalFile))return [];

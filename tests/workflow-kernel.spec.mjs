@@ -3753,6 +3753,25 @@ const stalledTab=(harness,{dispatch,lines,kind=null})=>{
   return op;
 };
 
+test('a partial report advances the attempt once, whichever side advanced it: the typed settlement or the resume',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,exec:()=>({status:0,stdout:'',stderr:''}),now:()=>0,work:null,wait:noWait,decide:()=>{throw Error('no decision');}};
+    const op=running(harness.state,'op-intake','ctx_p');
+    const report=buildReport({outcome:'partial',run:'run_wf',task:'task_p',dispatch:'ctx_p',from:'term_ctx_p',summary:'half done',open:['the rest']});
+    report.sent={messageId:'msg_p',sentAt:1,type:report.signal.type};
+    op.attempt=2;op.v6AttemptAdvanced=true;
+    assert.equal(applyOpReport(harness.fake.orca,harness.store,harness.state,op,report,ctx),'resume');
+    assert.equal(op.attempt,2,'the settlement already advanced it');
+    assert.equal(op.v6AttemptAdvanced,undefined);
+    const again=running(harness.state,'op-intake','ctx_p2');again.attempt=2;
+    assert.equal(applyOpReport(harness.fake.orca,harness.store,harness.state,again,{...report,dispatch:'ctx_p2'},ctx),'resume');
+    assert.equal(again.attempt,3,'without the settlement the resume advances it');
+  }finally{harness.cleanup();}
+});
+
 test('a tab the heuristics call idle is read once more by the perception model: working waits, idle nudges as before',()=>{
   const harness=setup({plan:salesPlan,scripts:{}});
   try{

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import {createV6Runtime,enrollV6,isV6,isJobPending,settleGenerationLeases,prepareGenerationRetry} from './runtime-v6.mjs';
+import {createV6Runtime,enrollV6,isV6,isJobPending,settleGenerationLeases,prepareGenerationRetry,staleLeaseProof} from './runtime-v6.mjs';
 import {applyOwnerInbox} from './owner-inbox.mjs';
 import {verifyAcceptedIntegrationOwnerRequests} from './owner-requests.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
@@ -1181,7 +1181,7 @@ function retryOp(store,state,op,findings,ctx,reason){
     }
   }
   if(ctx?.orca)closeOpTerminal(ctx.orca,store,state,op);
-  op.status='ready';op.attempt+=1;op.findings=findings;op.priorOpen=[];op.dispatch=null;op.terminal=null;op.nudged=false;
+  op.status='ready';if(op.v6AttemptAdvanced)delete op.v6AttemptAdvanced;else op.attempt+=1;op.findings=findings;op.priorOpen=[];op.dispatch=null;op.terminal=null;op.nudged=false;
   store.appendEvent({event:'retry',op:op.id,attempt:op.attempt,reason,findings:findings.slice(0,3)});
   return 'retry';
 }
@@ -1200,7 +1200,8 @@ function resumeOp(store,state,op,report,ctx){
     }
     op.resumes=RESUME_LIMIT;
   }
-  op.status='ready';op.attempt+=1;op.priorOpen=[...(report.open??[])];op.dispatch=null;op.terminal=null;op.nudged=false;
+  // The attempt was already advanced by the typed settlement of the reported one; advance it here only otherwise.
+  op.status='ready';if(op.v6AttemptAdvanced)delete op.v6AttemptAdvanced;else op.attempt+=1;op.priorOpen=[...(report.open??[])];op.dispatch=null;op.terminal=null;op.nudged=false;
   store.appendEvent({event:'resume',op:op.id,attempt:op.attempt,open:op.priorOpen.slice(0,3)});
   return 'resume';
 }
@@ -2165,7 +2166,7 @@ function acceptReports(orca,store,state,ctx){
   for(const op of state.ops.filter(item=>item.status==='running')){
     const report=reports.find(item=>item.dispatch===op.dispatch);
     if(!report)continue;
-    const dispatch=op.dispatch,runtime=op.runtime;
+    const dispatch=op.dispatch,runtime=op.runtime,terminal=op.terminal;
     ctx.currentOp=op;
     if(ctx.v6&&report.outcome==='done'&&!op.v6WorkerSettled){
       const settled=settleDispatch(orca,dispatch,{cwd:state.worktree,reason:'freeze candidate before independent acceptance',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
@@ -2179,6 +2180,16 @@ function acceptReports(orca,store,state,ctx){
         quarantineCandidate(store,state,op,{kind:'candidate-quarantine',reasons:frozen.reasons??['candidate could not be sealed'],observedFiles:frozen.observedFiles??[]});continue;
       }
       store.saveState(state);
+    }
+    // A partial, failed or blocked report ends this attempt: the native worker is settled and the attempt closed
+    // through the same typed path a stopped worker takes - its in-scope delta sealed as the next attempt's own
+    // baseline, its lease completed - BEFORE the report advances the operation. Applying the report first left a
+    // lease bound to the old attempt on an operation already on the next one, and retry refused to touch it.
+    if(ctx.v6&&['partial','failed','blocked'].includes(report.outcome)&&op.v6Lease&&!op.v6WorkerSettled){
+      const settled=settleDispatch(orca,dispatch,{cwd:state.worktree,reason:`settle the ${report.outcome} report before the next attempt`,terminalHandle:terminal,closeTerminal:true,wait:ctx.wait});
+      if(!reconcileStoppedNativeAttempt(store,state,op,ctx,settled,`${report.outcome}-report`))continue;
+      op.v6AttemptAdvanced=true;
+      store.appendEvent({event:'attempt-settled',op:op.id,outcome:report.outcome,attempt:op.attempt-1,nextAttempt:op.attempt});
     }
     const before=ctx.v6?structuredClone(op):null;
     let action;
@@ -2200,7 +2211,7 @@ function acceptReports(orca,store,state,ctx){
       ctx.allocator.release(runtime,{op:op.id});
       if(!ctx.v6||!op.v6WorkerSettled)orca.invoke('worker-release',{dispatch},{cwd:state.worktree});
       if(ctx.v6&&op.v6Lease&&op.status!=='running'){
-        const settled=op.v6WorkerSettled?{effectState:'none'}:settleDispatch(orca,dispatch,{cwd:state.worktree,reason:'settle reported operation',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
+        const settled=op.v6WorkerSettled?{effectState:'none'}:settleDispatch(orca,dispatch,{cwd:state.worktree,reason:'settle reported operation',terminalHandle:terminal,closeTerminal:true,wait:ctx.wait});
         if(settled.effectState==='none')ctx.v6.settled(op);
       }
       sweepWorktree(orca,{cwd:state.worktree,from:state.from});
@@ -3704,6 +3715,15 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const retryJobs=state.engine?.major===6?prepareGenerationRetry({journalFile:state.engine.journalFile,workflowId:state.id,generation:state.engine.generation}):{cancelled:[],unsettled:[]};
     if(retryJobs.cancelled.length)store.appendEvent({event:'retry-queued-jobs-cancelled',generation:state.engine.generation,jobs:retryJobs.cancelled,proof:'queued, unleased, and no job-spawned receipt'});
     need(!retryJobs.unsettled.length,`Current-generation durable model/check jobs must settle before retry: ${retryJobs.unsettled.join(', ')}`);
+    // A lease field the journal no longer backs is a stale field, not a reservation: it is cleared on the record
+    // with the journal's own proof, and the operation is retried like any other unfinished one.
+    for(const op of state.ops.filter(item=>item.v6Lease)){
+      const stale=staleLeaseProof({journalFile:state.engine?.journalFile,lease:op.v6Lease});
+      if(!stale)continue;
+      store.appendEvent({event:'stale-lease-cleared',op:op.id,jobId:op.v6Lease.jobId,attempt:op.v6Lease.attempt,generation:op.v6Lease.generation,proof:stale});
+      for(const key of ['v6Lease','v6Pending','v6WorkerSettled','v6RetryReconciled'])delete op[key];
+      if(op.status==='blocked'&&op.refusal==='runtime-reconciliation'){op.status='ready';delete op.refusal;}
+    }
     for(const op of state.ops.filter(item=>item.v6Lease&&!retryableV6Operation(item)&&item.launch?.task&&item.launch?.dispatch&&!item.dispatch&&!item.terminal&&item.v6Candidate?.bridge)){
       const reconciled=reconcileStoppedNativeRetryLease(state,op,{orca,store});
       need(reconciled.ok,`Stopped native lease ${op.v6Lease?.jobId??op.id} cannot be reconciled for retry: ${reconciled.reason}`);

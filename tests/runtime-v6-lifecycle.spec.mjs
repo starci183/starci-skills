@@ -1,4 +1,32 @@
 import test from 'node:test';
+import {staleLeaseProof as staleLeaseProofUnderTest} from '../kernel/runtime-v6.mjs';
+import {openJournal as openJournalForStale} from '../kernel/journal.mjs';
+import fsForStale from 'node:fs';
+import osForStale from 'node:os';
+import pathForStale from 'node:path';
+
+test('a lease the journal no longer backs is stale, a held one is live, an unknown journal answers nothing',()=>{
+  const dir=fsForStale.mkdtempSync(pathForStale.join(osForStale.tmpdir(),'starci-stale-lease-'));
+  try{
+    const file=pathForStale.join(dir,'journal.sqlite');
+    const journal=openJournalForStale({file});journal.close();
+    const lease={jobId:'operation-abc',attempt:1,generation:2,workflowId:'wf',opId:'op'};
+    assert.match(staleLeaseProofUnderTest({journalFile:file,lease}),/holds neither job operation-abc nor a lease/);
+    assert.equal(staleLeaseProofUnderTest({journalFile:pathForStale.join(dir,'missing.sqlite'),lease}),null);
+    assert.equal(staleLeaseProofUnderTest({journalFile:file,lease:{}}),null);
+    const held=openJournalForStale({file});
+    held.transaction(db=>{
+      db.prepare("INSERT INTO jobs (job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,priority_json,lease_token,worker_id,deadline,result_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run('operation-abc','wf','op',1,2,'operation','implement','{}','running','{}','tok',null,null,null,1,1);
+      db.prepare("INSERT INTO leases (resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)").run('ai/global','operation-abc','wf','op',1,2,'tok',1,1,9e15);
+    });
+    held.close();
+    assert.equal(staleLeaseProofUnderTest({journalFile:file,lease}),null,'a held lease row is live');
+    const done=openJournalForStale({file});
+    done.transaction(db=>{db.prepare("DELETE FROM leases WHERE job_id=?").run('operation-abc');db.prepare("UPDATE jobs SET status='failed' WHERE job_id=?").run('operation-abc');});
+    done.close();
+    assert.match(staleLeaseProofUnderTest({journalFile:file,lease}),/job operation-abc is failed and holds no lease/);
+  }finally{try{fsForStale.rmSync(dir,{recursive:true,force:true});}catch{/* Windows may still hold the just-closed journal for a moment */}}
+});
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
