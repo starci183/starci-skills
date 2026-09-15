@@ -8,8 +8,9 @@ import {buildReport} from '../kernel/reports.mjs';
 import {markDone,markInProgress,readNode} from '../kernel/ledger.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {inputAsk} from './helpers/input-fixture.mjs';
-import {PRESENTATION_RETRY_MS,presentOwnerQuestions,applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
+import {PRESENTATION_RETRY_MS,handleBlocked,presentOwnerQuestions,applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
 import {deriveOwnerRequests} from '../kernel/owner-requests.mjs';
+import {authoredDecisionOf} from '../kernel/owner.mjs';
 import {loadConfig} from '../scripts/config.mjs';
 import {validateAccepted} from '../kernel/verify.mjs';
 import {settleIntake} from '../kernel/intake.mjs';
@@ -914,4 +915,40 @@ test('every open question is presented in the configured language once, again wh
     assert.equal(presentOwnerQuestions(store,{...state,host:english,ops:[third]},{engine:waiting,now:()=>now}),null,'a page already in the record language is never presented');
     fs.rmSync(english,{recursive:true,force:true});
   }finally{fs.rmSync(host,{recursive:true,force:true});}
+});
+
+test('an ask that already wrote its decision record puts the question on the owner page with its options instead of attempting the same refusal again',()=>{
+  const summary=['decision: nivo.login.business.srs.decision.d-login-purchaser-registration recommended: 1',
+    'BLOCKED shared-change: four Login ancestry paths outside this allowlist must change first.',
+    '1. OPEN SELF-SERVICE REGISTRATION BEFORE CHECKOUT - any verified person may buy.',
+    '2. INVITATION-ONLY REGISTRATION - only an invited recipient may buy.',
+    '3. EXISTING-PRINCIPAL-ONLY PURCHASE - no registration journey exists.',
+    '4. GUEST PAYMENT, THEN ACCOUNT CLAIM - payment first, principal after.'].join(' ');
+  const authored=authoredDecisionOf(summary);
+  assert.equal(authored.record,'nivo.login.business.srs.decision.d-login-purchaser-registration');
+  assert.equal(authored.options.length,4);
+  assert.match(authored.options[0],/^OPEN SELF-SERVICE/);
+  assert.equal(authoredDecisionOf('BLOCKED shared-change: paths. 1. one 2. two'),null,'options without their record are not an authored decision');
+  assert.equal(authoredDecisionOf('decision: some.record 1. the only option'),null,'a single option is not a choice');
+
+  const events=[],store={appendEvent:event=>events.push(event),saveState(){},reportPath:()=>path.join(os.tmpdir(),'no-such-report'),dir:os.tmpdir()};
+  const ask={id:'ask-1',kind:'decision.prepare',status:'running',attempt:13,resumes:0,reports:[],dispatch:'d-1',terminal:'t-1',
+    requesters:['login-intake'],allowlist:['.starciwork/features/login/business/srs/business-rules/policy-decisions/**'],
+    question:{kind:'decision',text:'Who may register as purchaser principal?'}};
+  const state={id:'wf',host:process.cwd(),worktree:process.cwd(),engine:{schema:'starci/engine@1',generation:1},needUser:[],
+    ops:[ask,{id:'login-intake',kind:'business.intake',status:'waiting',attempt:1,reports:[]}]};
+  const report={outcome:'partial',summary,open:['four Login ancestry paths must change first'],
+    blocker:{kind:'shared-change',detail:'.starciwork/features/login/business/index.yaml and three more'}};
+  const ctx={guards:{parseSharedChangePaths:()=>['.starciwork/features/login/business/index.yaml']},cwd:process.cwd()};
+  assert.equal(handleBlocked(store,state,ask,report,ctx),'decision-published-unfinished');
+  assert.equal(ask.status,'blocked','the operation stops being dispatched');
+  assert.equal(ask.dispatch,null);
+  assert.equal(ask.ownerRequestStatus,'waiting-owner');
+  const item=state.needUser.find(entry=>entry.kind==='decision');
+  assert.equal(item.record,'nivo.login.business.srs.decision.d-login-purchaser-registration');
+  assert.equal(item.options.length,4,'the owner page receives the four options, not an empty text box');
+  assert.equal(ask.question.recommended,1);
+  assert.deepEqual(deriveOwnerRequests(state).find(request=>request.opId==='ask-1').options.map(option=>option.recommended),[true,false,false,false]);
+  assert.ok(events.some(event=>event.event==='decision-published-unfinished'));
+  assert.equal(handleBlocked(store,state,ask,report,ctx)!=='decision-published-unfinished',true,'a question already on the owner page is not published twice');
 });

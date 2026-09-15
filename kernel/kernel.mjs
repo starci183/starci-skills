@@ -48,7 +48,7 @@ import {renderChecksFor} from '../checks/render.mjs';
 import {laneOwnerOf,laneNameOf,laneRowTitle,laneView,openLane,settleLane,laneBranchRef} from './lanes.mjs';
 import {INFRA_RESTART_LIMIT,RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTerminals,ownKernelTerminal,rebindRunIfNeeded,
   recoverCoordinatorTab,reconcileWithOrca,releaseKernelTab,siblingKernelGone,sweepStaleTerminals} from './terminals.mjs';
-import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,isAsk,openConflictDecision,answerCommand,answerOrEscalate,answerOwnerQuestion,continueOwnerRequest,dedupeNeedUser,inheritProvisional,
+import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,authoredDecisionOf,isAsk,openConflictDecision,answerCommand,answerOrEscalate,answerOwnerQuestion,continueOwnerRequest,dedupeNeedUser,inheritProvisional,
   openOwnerAsk,provisionalLines,redactSecrets,settleOwnerAsk,stopReasonFor,
   mechanicalOwnerLine,noteOwnerList,ownerItems,ownerLines,waitsForOwner} from './owner.mjs';
 import {askFillLine,credentialAsked,fillCommand,fillWaitingAsks,inputReadyAsks,ownerFillLines,settleFilledAsks} from './fill.mjs';
@@ -1302,6 +1302,22 @@ function retryOp(store,state,op,findings,ctx,reason){
   return 'retry';
 }
 
+/**
+ * An ask that has already authored its decision record carries everything the owner needs: the record and its
+ * numbered options. Whatever else that operation is blocked on - a tree layout only another operation may repair,
+ * a spent retry budget - the question belongs on the owner's page with its choices, not in another attempt at the
+ * same refusal. The operation stops being dispatched and the blocker stays on the owner's list in its own right.
+ */
+function publishAuthoredDecision(store,state,op,report,reason){
+  if(!isAsk(op.kind)||op.ownerAnswer||op.ownerRequestStatus==='waiting-owner')return false;
+  const authored=authoredDecisionOf(report?.summary);
+  if(!authored)return false;
+  settleOwnerAsk(store,state,op,report);
+  op.status='blocked';op.dispatch=null;op.terminal=null;op.nudged=false;
+  store.appendEvent({event:'decision-published-unfinished',op:op.id,record:authored.record,options:authored.options.length,reason:String(reason??'').slice(0,200)});
+  return true;
+}
+
 function resumeOp(store,state,op,report,ctx){
   op.resumes+=1;
   if(op.resumes>RESUME_LIMIT){
@@ -1312,6 +1328,7 @@ function resumeOp(store,state,op,report,ctx){
     if(option!=='resume-once-more'){
       op.status='blocked';
       state.needUser.push({op:op.id,kind:'authority',detail:`${op.id} never finishes: ${report.open?.[0]??report.summary}`});
+      publishAuthoredDecision(store,state,op,report,`${op.id} never finishes`);
       return 'escalate-to-user';
     }
     op.resumes=RESUME_LIMIT;
@@ -1672,7 +1689,7 @@ export function coordinateManagedWorkflow(store,state,ctx){
   return {pending:false,dispatch};
 }
 
-function handleBlocked(store,state,op,report,ctx){
+export function handleBlocked(store,state,op,report,ctx){
   const blocker=report.blocker??{kind:'environment',detail:report.summary};
   if(report.credentialRequest){
     const replacement=credentialReplacementFor(op,report,ctx);
@@ -1685,6 +1702,9 @@ function handleBlocked(store,state,op,report,ctx){
     return result;
   }
   if(blocker.kind==='shared-change'){
+    // An ask that already wrote its decision record asks the owner now. The change it wants belongs to whoever owns
+    // that path, and no further attempt of this operation can produce a better question than the one it has.
+    if(publishAuthoredDecision(store,state,op,report,String(blocker.detail??'shared change')))return 'decision-published-unfinished';
     // A record-authoring op (an intake, a migration, a node author) writes records under its allowlist and nothing
     // else: it has no code to change and nobody to delegate one to. One migration asked for the identity resource
     // it was only meant to declare and for the code that reads the variable, and the kernel dutifully opened a

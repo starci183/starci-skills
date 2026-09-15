@@ -287,6 +287,17 @@ export const presentationOf=summary=>{
   const question=(first<0?tail:tail.slice(0,first)).trim(),options=first<0?[]:numberedOptions(tail.slice(first));
   return question||options.length?{language:match[1].toLowerCase(),text:question,options}:null;
 };
+/**
+ * What an ask has already authored for the owner: the decision record it wrote and the numbered options in it.
+ * An ask that holds both needs nothing more from its own operation to put the question on the owner's page, so the
+ * kernel may publish it whatever else that operation is blocked on.
+ */
+export const authoredDecisionOf=summary=>{
+  const text=redactSecrets(String(summary??''));
+  const record=(String(marker(text,'decision')??'').match(/^\S+/)??[])[0]??null;
+  const options=numberedOptions(stripPresentation(text));
+  return record&&options.length>1?{record,options}:null;
+};
 const optionsOf=(ask,summary)=>ask.question?.options?.length?[...ask.question.options]:numberedOptions(stripPresentation(summary));
 const requestersOf=(state,ask)=>state.ops.filter(item=>(ask.requesters??[]).includes(item.id));
 /**
