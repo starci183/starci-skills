@@ -4060,16 +4060,18 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       for(const key of ['lease','pending','workerSettled','retryReconciled'])delete op[key];
       if(op.status==='blocked'&&op.refusal==='runtime-reconciliation'){op.status='ready';delete op.refusal;}
     }
-    for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&item.launch?.task&&item.launch?.dispatch&&!item.dispatch&&!item.terminal&&item.candidate?.identity)){
+    for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&!settledOperation(item)&&item.launch?.task&&item.launch?.dispatch&&!item.dispatch&&!item.terminal&&item.candidate?.identity)){
       const reconciled=reconcileStoppedNativeRetryLease(state,op,{orca,store});
       need(reconciled.ok,`Stopped native lease ${op.lease?.jobId??op.id} cannot be reconciled for retry: ${reconciled.reason}`);
     }
-    for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&item.launch?.task&&!item.dispatch&&!item.terminal)){
+    for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&!settledOperation(item)&&item.launch?.task&&!item.dispatch&&!item.terminal)){
       const reconciled=reconcileFailedLaunchLease(state,op,{orca,store});need(reconciled.ok,`Failed launch lease ${op.lease?.jobId??op.id} cannot be proved stopped: ${reconciled.reason}`);
     }
-    for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&item.launch?.stopReason===LEGACY_COORDINATOR_ERROR)){
+    for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&!settledOperation(item)&&item.launch?.stopReason===LEGACY_COORDINATOR_ERROR)){
       const reconciled=reconcileLegacyCoordinatorLease(state,op,{orca,store});need(reconciled.ok,`Legacy coordinator lease ${op.lease?.jobId??op.id} cannot be proved no-effect: ${reconciled.reason}`);
     }
+    // A settled operation was proved by its own acceptance: none of the stop-receipt reconciliations above apply to
+    // it, and its lease is settled with the skipped ones here.
     settleSkippedGenerationLeases(state);
     const priorGeneration=state.engine?.generation??0;
     const retry=[];

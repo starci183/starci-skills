@@ -90,3 +90,14 @@ test('an accepted operation that still carries a durable lease is settled at ret
   const busy={engine:{journalFile:'journal'},ops:[{id:'done-but-live',status:'done',dispatch:'d-1',lease:lease('x')}]};
   assert.throws(()=>settleSkippedGenerationLeases(busy,{settle:()=>{throw Error('must not settle');}}),/unsettled durable lease/,'a done operation with a live dispatch is not proof of anything');
 });
+
+test('a settled operation is not sent through any stop-receipt reconciliation at retry',()=>{
+  const settledOps=[
+    {id:'a',status:'done',lease:{jobId:'j-a',leaseToken:'t'},launch:{task:'t1',dispatch:'d1'},candidate:{identity:'c'}},
+    {id:'b',status:'cancelled',lease:{jobId:'j-b',leaseToken:'t'},launch:{task:'t2'}},
+    {id:'c',status:'done',lease:{jobId:'j-c',leaseToken:'t'},launch:{stopReason:'Operation can be launched only by the exact Workflow Monitor bound as nested Run coordinator'}}];
+  for(const op of settledOps){assert.equal(retryableOperation(op),false);}
+  const state={engine:{journalFile:'journal'},ops:settledOps};
+  const released=settleSkippedGenerationLeases(state,{settle:({leases})=>leases.map(()=>({ok:true}))});
+  assert.deepEqual(released,['a','b','c'],'every settled operation is released here, and nothing else is asked to prove a stop');
+});
