@@ -1318,6 +1318,24 @@ function publishAuthoredDecision(store,state,op,report,reason){
   return true;
 }
 
+/**
+ * The same rule, for an ask that was already blocked before it existed: its decision record is written, its report
+ * still carries the numbered options, and no further attempt will ever be made. Read once per tick so a question
+ * that went quiet in an earlier generation reaches the owner page with its choices instead of an empty box.
+ */
+export function publishAuthoredDecisions(store,state){
+  for(const op of state.ops){
+    if(!isAsk(op.kind)||op.ownerAnswer||op.ownerRequestStatus||op.refusal==='superseded')continue;
+    if(!['blocked','failed'].includes(op.status))continue;
+    const report=[...(op.reports??[])].reverse().find(item=>authoredDecisionOf(item?.summary));
+    if(report&&publishAuthoredDecision(store,state,op,report,`${op.id} was blocked with its decision record already written`)){
+      store.saveState(state);
+      return {op:op.id};
+    }
+  }
+  return null;
+}
+
 function resumeOp(store,state,op,report,ctx){
   op.resumes+=1;
   if(op.resumes>RESUME_LIMIT){
@@ -3540,6 +3558,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     noteOwnerList(store,state);
     if(guardedStage(store,state,ctx,'sync',()=>{syncLedgerOps(store,state,ctx);if(state.engine?.coordination!=='agent-v1')planVerifyOps(store,state,ctx);})==='stop')break;
     let managed=state.engine?.coordination==='agent-v1'?{pending:true,dispatch:[]}:null;
+    if(isEnrolled(state)&&guardedStage(store,state,ctx,'owner-questions',()=>{publishAuthoredDecisions(store,state);})==='stop')break;
     if(isEnrolled(state)&&guardedStage(store,state,ctx,'presentation',()=>{presentOwnerQuestions(store,state,ctx);})==='stop')break;
     if(state.engine?.coordination==='agent-v1'&&guardedStage(store,state,ctx,'manager',()=>{managed=coordinateManagedWorkflow(store,state,ctx);})==='stop')break;
     if(!managed?.pending&&!managed?.incident&&guardedStage(store,state,ctx,'schedule',()=>scheduleOps(orca,store,state,ctx,{orderedOpIds:managed?managed.dispatch:null}))==='stop')break;

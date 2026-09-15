@@ -8,7 +8,7 @@ import {buildReport} from '../kernel/reports.mjs';
 import {markDone,markInProgress,readNode} from '../kernel/ledger.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {inputAsk} from './helpers/input-fixture.mjs';
-import {PRESENTATION_RETRY_MS,handleBlocked,presentOwnerQuestions,applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
+import {PRESENTATION_RETRY_MS,handleBlocked,publishAuthoredDecisions,presentOwnerQuestions,applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
 import {deriveOwnerRequests} from '../kernel/owner-requests.mjs';
 import {authoredDecisionOf} from '../kernel/owner.mjs';
 import {loadConfig} from '../scripts/config.mjs';
@@ -951,4 +951,26 @@ test('an ask that already wrote its decision record puts the question on the own
   assert.deepEqual(deriveOwnerRequests(state).find(request=>request.opId==='ask-1').options.map(option=>option.recommended),[true,false,false,false]);
   assert.ok(events.some(event=>event.event==='decision-published-unfinished'));
   assert.equal(handleBlocked(store,state,ask,report,ctx)!=='decision-published-unfinished',true,'a question already on the owner page is not published twice');
+});
+
+test('an ask that was already blocked in an earlier generation still reaches the owner page with the options its report carries',()=>{
+  const summary=['decision: nivo.login.business.srs.decision.d-login-purchaser-registration recommended: 1 BLOCKED shared-change: four paths.',
+    '1. OPEN SELF-SERVICE REGISTRATION - any verified person may buy.',
+    '2. INVITATION-ONLY REGISTRATION - only an invited recipient may buy.',
+    '3. EXISTING-PRINCIPAL-ONLY PURCHASE - no registration journey exists.',
+    '4. GUEST PAYMENT, THEN ACCOUNT CLAIM - payment first, principal after.'].join(' ');
+  const events=[],store={appendEvent:event=>events.push(event),saveState(){}};
+  const ask={id:'ask-1',kind:'decision.prepare',status:'blocked',attempt:13,requesters:['login-intake'],
+    question:{kind:'decision',text:'Who may register as purchaser principal?'},
+    reports:[{attempt:12,outcome:'partial',summary:'no decision written yet'},{attempt:13,outcome:'partial',summary,valid:true}]};
+  const quiet={id:'ask-9',kind:'decision.prepare',status:'blocked',attempt:2,question:{kind:'decision',text:'Nothing written'},reports:[{attempt:2,outcome:'blocked',summary:'BLOCKED environment: docker is down'}]};
+  const state={id:'wf',host:process.cwd(),engine:{schema:'starci/engine@1',generation:4},needUser:[],
+    ops:[ask,quiet,{id:'login-intake',kind:'business.intake',status:'waiting',attempt:1,reports:[]}]};
+  assert.deepEqual(publishAuthoredDecisions(store,state),{op:'ask-1'});
+  assert.equal(ask.ownerRequestStatus,'waiting-owner');
+  assert.equal(state.needUser.find(item=>item.kind==='decision').options.length,4);
+  assert.equal(publishAuthoredDecisions(store,state),null,'a question already on the page is not published again, and an ask with no record written is left alone');
+  assert.equal(quiet.ownerRequestStatus,undefined);
+  const answered={...ask,id:'ask-2',ownerRequestStatus:undefined,ownerAnswer:{option:'1'}};
+  assert.equal(publishAuthoredDecisions(store,{...state,ops:[answered],needUser:[]}),null,'an ask the owner already answered is not reopened');
 });
