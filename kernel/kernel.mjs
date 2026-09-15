@@ -421,7 +421,9 @@ export function reconcileFailedLaunchLease(state,op,{orca,store,settle=settleGen
 export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost=settleDispatch,createRuntime=createV6Runtime,git=spawnSync,waitFn=sleepSync}={}){
   const lease=op?.v6Lease,dispatchId=op?.launch?.dispatch,taskId=op?.launch?.task,candidate=op?.v6Candidate?.bridge?.identity;
   if(!lease||!dispatchId||!taskId||op.dispatch||op.terminal)return {ok:false,reason:'stopped native retry identity is incomplete or still active'};
-  const exactLease=lease.workflowId===state.id&&lease.opId===op.id&&lease.attempt===op.attempt&&lease.generation===state.engine?.generation&&
+  // The exact binding is lease <-> candidate identity, attempt for attempt. The operation's own counter may sit
+  // past the lease (a partial report advanced it before the attempt was settled) - never behind it.
+  const exactLease=lease.workflowId===state.id&&lease.opId===op.id&&lease.attempt<=(op.attempt??1)&&lease.generation===state.engine?.generation&&
     candidate?.workflowId===lease.workflowId&&candidate?.opId===lease.opId&&candidate?.attempt===lease.attempt&&candidate?.generation===lease.generation&&candidate?.jobId===lease.jobId;
   if(!exactLease)return {ok:false,reason:'candidate and durable lease do not bind the current workflow operation attempt'};
   let inspected;try{inspected=orca.invoke('worker-show',{dispatch:dispatchId},{cwd:state.worktree});}catch(error){return {ok:false,reason:`worker settlement unavailable: ${error.message}`};}
