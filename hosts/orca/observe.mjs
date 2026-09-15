@@ -18,8 +18,18 @@ export const SCAN_ORDER=['claude','codex','qwen'];
 /** One row per family: what its screen looks like in each phase, what accepts a dialog, how it is recognized. */
 export const SCREENS={
   claude:{
-    busy:[/esc to interrupt/i],
-    idle:[/(^|\n)\s*❯\s*$/m,/bypass permissions on/i],
+    // The hint bar of a young turn, and the status line of any turn: a spinner glyph, a verb with an ellipsis,
+    // the elapsed time, the token counter, `thinking` - `✢ Gitifying… (7m 9s · ↓ 22.9k tokens · thinking)`. Past
+    // the first minute Claude Code prints no `esc to interrupt` beside it and a Tip line replaces the hint bar,
+    // which is exactly when a working tab used to be read as idle, nudged and closed mid-turn.
+    busy:[/esc to interrupt/i,
+      /[·✢✳✶✻✽*⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]\s*\S[^\n]*…\s*\(\d+(?:h\s*\d+)?(?:m\s*\d+)?s?\b/,
+      /\(\d[^)\n]*·\s*[↓↑]\s*[\d.]+k?\s*tokens/i,
+      /·\s*thinking\)/i],
+    // The prompt box alone says idle. The footer `bypass permissions on` is on every Claude screen, working
+    // or not, and is no evidence of anything; a screen with neither a status line nor a prompt falls through
+    // to the silence rule, which is slower than a wrong idle but never closes a turn that is running.
+    idle:[/(^|\n)\s*❯\s*$/m,/(^|\n)\s*[>❯]\s*(?:Try "|Type your message)/i],
     prompt:[/Do you want to proceed\?/i,/Allow .+ once/i],
     answer:'1',
     detect:[/bypass permissions/i,/\bClaude Code\b/i],

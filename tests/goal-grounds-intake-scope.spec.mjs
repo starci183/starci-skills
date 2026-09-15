@@ -280,6 +280,20 @@ test('a plan-ledger goal whose model answered an empty definition of done is not
   }finally{tree.cleanup();}
 });
 
+test('a plan-ledger goal whose model invented an operation kind is refused before the page is written',()=>{
+  const tree=workRepo([]);
+  try{
+    const store=createStore({repoRoot:tree.repo,id:'20260915-plan-kind'});
+    const state=createWorkflowState({job:'Reinstall the stack',worktree:tree.repo,branch:'starci183/stacks',gates:[],store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'plan',scope:[],reintake:[],migrate:[],repoRoot:tree.repo});
+    const plan={definitionOfDone:['the stack is inventoried'],risks:[],questions:[],ledger:[{id:'g1',title:'inventory',status:'planned'}],
+      ops:[{id:'op1',kind:'inventory',goal:'inventory the stack',ledgerIds:['g1'],allowlist:['.stacks/**'],references:[],checks:[{name:'c',command:'true'}],acceptance:['done'],dependsOn:[]}]};
+    assert.throws(()=>goalPhase(store,state,{cwd:tree.repo,extractMaterial:()=>[],renderGoalMarkdown:null,assessGoal:()=>({ok:true,provider:'fake',value:plan}),critiqueGoal:soundCritique}),
+      /Operation op1 has the kind inventory, which no operator launches/);
+    assert.equal(state.approved,false);
+    assert.equal(fs.existsSync(store.paths.goalJson),false,'no goal record is written for a plan the kernel cannot launch');
+  }finally{tree.cleanup();}
+});
+
 test('a resumed workflow that finished blocked is approved again without the first-approval gate',()=>{
   const harness=setup({scope:['collab'],assessGoal:modelAssessed,critiqueGoal:soundCritique});
   try{

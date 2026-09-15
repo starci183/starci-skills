@@ -310,6 +310,20 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
       const recorded=op?note('launched',{runtime,op}):null;
       return {ok:true,runtime,op,shared:Boolean(recorded?.ok)};
     },
+    /**
+     * An allocation the admission deferred before anything ran (the canonical writer was busy, the global ceiling
+     * was reached): the slot and the day's count both come back, no failure is charged and nothing cools, because
+     * the runtime did nothing and was refused nothing. Releasing it as a finished run left `usedToday` counting
+     * deferrals - three per tick - as operations the runtime had carried.
+     */
+    deferred(runtime,{op=null}={}){
+      rollDay();
+      need(Object.hasOwn(pools,runtime),`Unknown runtime ${runtime}`);
+      live.loads[runtime]=Math.max(0,load(runtime)-1);
+      live.usedToday[runtime]=Math.max(0,(live.usedToday[runtime]??0)-1);
+      note('released',{runtime,op});
+      return {ok:true,runtime,load:load(runtime),remaining:remainingOf(runtime)};
+    },
     /** An operation that finished: free the slot, charge the tokens it used and clear the failure streak. */
     release(runtime,{tokens=0,op=null}={}){
       rollDay();

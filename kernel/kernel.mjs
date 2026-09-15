@@ -921,7 +921,9 @@ function scheduleOps(orca,store,state,ctx,{orderedOpIds=null}={}){
     if(ctx.v6){
       const reserved=ctx.v6.reserveOperation(op,allocated);
       if(!reserved.ok){
-        ctx.allocator.release(allocated.runtime,{op:op.id});
+        // Nothing ran: the slot AND the day's count come back (a deferral released as a run counted three
+        // deferrals per tick as operations the runtime had carried).
+        (typeof ctx.allocator.deferred==='function'?ctx.allocator.deferred:ctx.allocator.release).call(ctx.allocator,allocated.runtime,{op:op.id});
         op.deferral={reason:(reserved.reasons??['global capacity unavailable']).join('; '),at:clockOf(ctx)};
         store.appendEvent({event:'admission-deferred',op:op.id,reason:op.deferral.reason});
         continue;

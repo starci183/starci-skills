@@ -33,10 +33,14 @@ const ACTIVITY_WINDOW=8;
 const FINISHED_WINDOW=12;
 
 /** The glyphs the four agents animate while a turn runs. */
-const SPINNER=/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏◐◓◑◒✳]/;
+const SPINNER=/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏◐◓◑◒✳✢✶✻✽]/;
 /** What a running turn says in words, whatever glyph is in front of it. */
 const ACTIVITY=[/\b(cogitat|ideat|thinking|pondering|deciphering|percolat|ruminat|scheming|working)\b/i,
   /\besc to (cancel|interrupt)\b/i,
+  // Claude's status line past the first minute: `✢ Gitifying… (7m 9s · ↓ 22.9k tokens · thinking)`, any verb,
+  // any glyph, no hint bar. The elapsed time after the ellipsis and the token counter are the marks that survive.
+  /…\s*\(\d+(?:h\s*\d+)?(?:m\s*\d+)?s?\s*·/,
+  /[↓↑]\s*[\d.]+k?\s*tokens/i,
   /\bRead \d+ (file|line|director)/i,
   /\bran \d+ (shell )?commands?\b/i,
   /\blisted \d+ director/i];

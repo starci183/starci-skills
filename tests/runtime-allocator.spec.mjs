@@ -116,6 +116,24 @@ test('an exact tie rotates to the runtime after the last allocated one',()=>{
   assert.equal(allocator.allocate('x.implement').runtime,'alpha');
 });
 
+test('an allocation the admission deferred gives the slot and the day\'s count back, without cooling',()=>{
+  const time=clock(Date.UTC(2026,8,12,23,30));
+  const allocator=createAllocator({runtimes:fixture({small:{target:'small',roles:['implement'],maxParallel:3,budget:{opsPerDay:2,tokensPerDay:1000}}}),now:time.now});
+  // Three ticks of "the canonical writer is busy": before this rule each one counted as an op the runtime carried.
+  for(let tick=0;tick<3;tick+=1){
+    const allocated=allocator.allocate('x.implement',{job:{id:'op-a'}});
+    assert.equal(allocated.ok,true,allocated.reason);
+    const back=allocator.deferred('small',{op:'op-a'});
+    assert.deepEqual([back.ok,back.load],[true,0]);
+  }
+  assert.deepEqual(allocator.snapshot().runtimes.small.remaining,{ops:2,tokens:1000},'a deferral spends nothing');
+  assert.equal(allocator.snapshot().runtimes.small.usedToday,0);
+  assert.equal(allocator.snapshot().cooling.small,undefined,'a deferral is not a failure and cools nothing');
+  const real=allocator.allocate('x.implement');
+  assert.equal(real.ok,true);
+  assert.deepEqual(real.remaining,{ops:1,tokens:1000});
+});
+
 test('a pool is refused when its daily budget is spent and recovers on the next UTC day',()=>{
   const time=clock(Date.UTC(2026,8,12,23,30));
   const allocator=createAllocator({runtimes:fixture({small:{target:'small',roles:['implement'],maxParallel:3,budget:{opsPerDay:2,tokensPerDay:1000}}}),now:time.now});

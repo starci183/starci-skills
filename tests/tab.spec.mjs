@@ -18,6 +18,20 @@ const CLAUDE_WORKING=[
   '❯',
   '  ⏵⏵ bypass permissions on'];
 
+/** The frame the r2 trial's worker drew seven minutes into a turn, read by the kernel as `working` after the probe called it idle. */
+const CLAUDE_LONG_TURN=[
+  '"fenc" .starciwork/features/shared-lifecycle/ | head -20; echo "===',
+  'unknown-recovery citations in shared-lifecycle ==="; grep -rln',
+  '"DEC-ACC-UNKNOWN\\|unknown-recovery" .starciwork/features/shared-lifecycle/',
+  '✢ Gitifying… (7m 9s · ↓ 22.9k tokens · thinking)',
+  'Tip: Use /btw to ask a quick side question without interrupting Claude\'s',
+  'current work'];
+
+const CLAUDE_SHORT_TURN=[
+  '● Read(.starciwork/features/login/business/index.yaml)',
+  '✶ Combobulating… (42s · ↑ 1.2k tokens)',
+  '  ⏵⏵ bypass permissions on'];
+
 const CLAUDE_PERMISSION=[
   '● Edit(apps/agentos-controlplane/src/sales/intake.ts)',
   '',
@@ -59,6 +73,13 @@ test('a Claude tab still drawing a turn is working, whatever the liveness probe 
   const read=classifyTab({lines:CLAUDE_WORKING,op:{id:'op-intake'}});
   assert.equal(read.verdict,'working');
   assert.match(read.line,/⠧|Read 1 file/);
+});
+
+test('a Claude status line past the first minute, with no hint bar and any glyph, is still a turn being drawn',()=>{
+  for(const lines of [CLAUDE_LONG_TURN,CLAUDE_SHORT_TURN]){
+    const read=classifyTab({lines,op:{id:'shared-lifecycle-intake'}});
+    assert.equal(read.verdict,'working',lines[lines.length-2]);
+  }
 });
 
 test('a permission prompt on screen is a question, and a mechanical one',()=>{

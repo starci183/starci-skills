@@ -8,6 +8,10 @@ const at=(screen,extra={})=>observe({screen,terminal:term(extra.terminal),now:20
 // One realistic tail per family and phase: the text the provider actually renders, footer included.
 const CLAUDE={
   busy:'● Editing apps/sales/intake.ts\n  ⏵⏵ bypass permissions on · esc to interrupt',
+  // The status line of a turn past its first minute, exactly as the r2 trial's worker drew it before the probe
+  // called it idle: no hint bar, a Tip line, the footer still on screen.
+  busyLong:'"DEC-ACC-UNKNOWN\\|unknown-recovery" .starciwork/features/shared-lifecycle/\n✢ Gitifying… (7m 9s · ↓ 22.9k tokens · thinking)\nTip: Use /btw to ask a quick side question without interrupting Claude\'s\ncurrent work\n  ⏵⏵ bypass permissions on',
+  busyShort:'● Read(.starciwork/features/login/business/index.yaml)\n✶ Combobulating… (42s · ↑ 1.2k tokens)\n  ⏵⏵ bypass permissions on',
   idle:'✻ Done (1:21 PM)\n❯\n  ⏵⏵ bypass permissions on',
   prompt:'Do you want to proceed?\n❯ 1. Yes\n  2. No, tell Claude what to do differently\n  ⏵⏵ bypass permissions on'
 };
@@ -42,6 +46,18 @@ test('a family is named by its own footer, and a canonical title names it when t
   assert.equal(detectFromTitle('PowerShell - sales'),'shell');
   assert.equal(detectFromTitle('[Op] backend.implement - Sales'),null);
   assert.equal(detectFromTitle(''),null);
+});
+
+test('a Claude turn past its first minute is working, and the footer alone never makes a screen idle',()=>{
+  for(const screen of [CLAUDE.busyLong,CLAUDE.busyShort]){
+    const verdict=observe({screen,terminal:term(),now:2000,provider:'claude'});
+    assert.deepEqual([verdict.liveness,verdict.provider],['working','claude'],screen.slice(0,40));
+    assert.equal(at(screen).liveness,'working','the detector names Claude from the footer and still reads the status line');
+  }
+  // Footer with nothing else: not idle. It falls through to the silence rule, and recent output is working.
+  assert.equal(observe({screen:'● Editing apps/sales/intake.ts\n  ⏵⏵ bypass permissions on',terminal:term(),now:2000,provider:'claude'}).liveness,'working');
+  assert.equal(observe({screen:'● Editing apps/sales/intake.ts\n  ⏵⏵ bypass permissions on',terminal:term({lastOutputAt:1000}),now:1000+21*60*1000,provider:'claude'}).liveness,'stalled-silent');
+  assert.equal(observe({screen:CLAUDE.idle,terminal:term(),now:2000,provider:'claude'}).liveness,'stalled-idle','the prompt box still says idle');
 });
 
 test('every family classifies its own busy, idle and confirmation screens and accepts with its own keystroke',()=>{

@@ -33,6 +33,10 @@ test('the goal form is a contract: shape, unique ids, a real dependency order, a
   assert.match(validateGoalPlan({...base,definitionOfDone:[]}).errors.join(';'),/definitionOfDone needs at least 1/);
   assert.match(validateGoalPlan({...base,ledger:[{...base.ledger[0],status:'maybe'}],ops:[op('a')]}).errors.join(';'),/ledger\[0\]: status must be one of absent, partial, done, unknown/);
   assert.match(validateGoalPlan({...base,ops:[{...op('a'),checks:[]},op('b')]}).errors.join(';'),/ops\[0\]: checks needs at least 1/);
+  // A kind no operator launches never enters a plan: the first plan-ledger trial was assessed with `inventory` ops
+  // and every runtime answered "Unknown skill/operator route" until the workflow stalled.
+  assert.match(validateGoalPlan({...base,ops:[{...op('a'),kind:'inventory'},op('b')]}).errors.join(';'),/ops\[0\]: kind must be one of decision\.prepare, .*runtime\.operate/);
+  assert.equal(validateGoalPlan({...base,ops:[{...op('a'),kind:'runtime.operate'},op('b')]}).ok,true);
 
   // unique ids
   assert.match(validateGoalPlan({...base,ledger:ledgerOf('a'),ops:[op('a'),{...op('a'),allowlist:['apps/be/src/other']}]}).errors.join(';'),/op id a is used by 2 ops/);
@@ -101,7 +105,7 @@ test('assessGoal receives the complete nested form before its first answer and a
   for(const prompt of prompts){
     assert.match(prompt,/Complete recursive form contract:/);
     assert.match(prompt,/"ledger".*"each":\{"id":\{"type":"string"\},"title":\{"type":"string"\},"inputRef":\{"type":"string"\},"status":\{"type":"string","enum":\["absent","partial","done","unknown"\]\}\}/);
-    assert.match(prompt,/"ops".*"kind":\{"type":"string"\}.*"checks":\{"type":"object\[\]","minItems":1,"each":\{"name":\{"type":"string"\},"command":\{"type":"string"\}\}\}.*"dependsOn":\{"type":"string\[\]"\}/);
+    assert.match(prompt,/"ops".*"kind":\{"type":"string","enum":\["decision\.prepare",[^\]]*\]\}.*"checks":\{"type":"object\[\]","minItems":1,"each":\{"name":\{"type":"string"\},"command":\{"type":"string"\}\}\}.*"dependsOn":\{"type":"string\[\]"\}/);
     assert.match(prompt,/Every field is required unless its rule says optional:true/);
   }
   assert.match(prompts[1],/ledger\[0\]: missing title/);
