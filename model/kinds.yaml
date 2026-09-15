@@ -177,20 +177,20 @@ kinds:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [environment, authority]
   interface.draw:
+    # Image-first direction generation requires the host's built-in ImageGen tool. The generated visual is a
+    # design reference only; exact Grammar render and browser UAT proof belong to later lane operations.
+    needs: [design-tool]
     family: design
     role: write
     operator: interface.draw
     readOnly: false
-    # It renders the installed grammar inside the brand against the accepted requirement and design, and it
-    # reads the design record it is extending so a second drawing does not restate the first.
-    reads: [srs, sds, brand, grammar, design]
-    # Deviation from the 5-plus design table, which names `design` alone: the drawing captures one image per
-    # screen and viewport into the ui node's `assets/` (design §7) and its operator has always declared that
-    # write, so `asset` belongs here or `IO_DRIFT` refuses the shipped operator catalog.
+    # It supplies accepted requirement/design/brand/knowledge and actual Grammar anatomy as ImageGen inputs,
+    # and reads the design record it is extending so a second drawing does not restate the first.
+    reads: [srs, sds, brand, grammar, design, asset]
+    # The representative direction PNGs and their exact prompts live in the ui node's `assets/`, so `asset`
+    # belongs here or `IO_DRIFT` refuses the shipped operator catalog.
     writes: [design, asset]
-    # Drawing needs the host's design tooling; a host without it refuses the op (`host-unsupported`) and the
-    # frontend lanes behind the ui node keep waiting, which is the design gate doing its job.
-    purpose: Draw the interface before any interface code exists - screens, contracts, states, empty and error.
+    purpose: Generate a small representative image-first direction and map every remaining screen/state/component before interface code exists.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [srs-gap, sds-gap, brand-gap, grammar-gap, shared-change, authority]

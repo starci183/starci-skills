@@ -16,7 +16,7 @@ function fixture(t, execution) {
   t.after(() => { assert.equal(path.dirname(parent), os.tmpdir()); assert.ok(path.basename(parent).startsWith('starci-frontend-workflow-')); fs.rmSync(parent, { recursive: true, force: true }); });
   const root = path.join(parent, 'run');
   const input = { schema: 'starci/frontend-input@1', runId: 'synthetic-run',
-    context: { business: ['business:test'], architecture: ['architecture:test'], knowledge: ['knowledge:test'], repository: 'repository:test', environment: 'environment:test', accounts: [], fixtures: [], authorization: ['synthetic test only; no real effects'] },
+    context: { business: ['business:test'], architecture: ['architecture:test'], brand: ['brand:test'], knowledge: ['knowledge:test'], grammar: ['grammar:@starci/grammar/common#synthetic'], repository: 'repository:test', environment: 'environment:test', accounts: [], fixtures: [], authorization: ['synthetic test only; no real effects'] },
     journeys: [{ id: 'flow-1', title: 'Synthetic flow, not product acceptance', entry: '/example', actor: 'anonymous', preconditions: [], cleanup: ['No real resources in this unit fixture'],
       steps: [{ id: 'submit', action: 'Synthetic action', expected: 'Synthetic expected', uxChecks: [{ id: 'loading', question: 'Was loading observed?', expected: 'yes' }] }] }] };
   if(execution) input.context.execution=execution;
@@ -33,7 +33,7 @@ function response(req, artifacts, outputs) {
   return { schema: 'starci/response@1', workflow: req.workflow, runId: req.runId, step: req.step, slot: req.slot, op: req.op, requestId: req.requestId, requestDigest: digest(req), status: 'pass',
     criteria: req.criteria.map(id => ({ id, status: 'pass', observation: 'Synthetic gate test, no product claim', evidence: ['log'] })), outputs, artifacts: clone(artifacts) };
 }
-function draw(x) { return response(request(x.root), x.artifacts, { draws: [{ id: 'draw-1', artifact: 'image', screen: 'example', state: 'default', viewport: { width: 800, height: 600 } }] }); }
+function draw(x) { return response(request(x.root), x.artifacts, { draws: [{ id: 'draw-1', artifact: 'image', promptArtifact:'log', screen: 'example', state: 'default', viewport: { width: 800, height: 600 },provenance:{tool:'image_gen.imagegen'} }],coverage:{scale:'bounded',representativeDrawIds:['draw-1'],items:[{screen:'example',state:'default',viewport:'wide',components:['Grammar.Page'],derivation:'Representative direction from accepted inputs',directionDrawId:'draw-1'},{screen:'example',state:'error',viewport:'wide',components:['Grammar.Page','Grammar.Feedback'],derivation:'Same direction using the installed error-state anatomy',directionDrawId:null}]}}); }
 function implementation(x) {
   return response(request(x.root), x.artifacts, { assets: {reviewedDrawIds:['draw-1'],items:[]}, flows: x.input.journeys.map(f => ({ ...clone(f), sourcePaths: ['synthetic/example.tsx'] })), codeRefs: [{ repository: 'repository:test', commit: 'a'.repeat(40) }], runtime: { environment: 'environment:test', origin: 'http://localhost:3000', build: 'synthetic-build' } });
 }
@@ -54,6 +54,7 @@ test('draw outputs become FE inputs; FE flows, code and runtime become UAT input
   const x = fixture(t), d = draw(x); const next = advance(x.root, d);
   assert.equal(next.advanced, true);
   same(request(x.root).inputs.draws, d.outputs.draws);
+  same(request(x.root).inputs.drawCoverage, d.outputs.coverage);
   same(request(x.root).inputs.drawArtifacts, d.artifacts);
   const impl = implementation(x); advance(x.root, impl);
   same(request(x.root).inputs.flows, impl.outputs.flows);
@@ -67,12 +68,14 @@ test('draw outputs become FE inputs; FE flows, code and runtime become UAT input
 const same = (a, b) => assert.deepEqual(a, b);
 test('one design direction can hand off required desktop and mobile views without truncation', t => {
   const x = fixture(t), d = draw(x);
-  d.outputs.draws.push({ id: 'draw-mobile', artifact: 'mobile-image', screen: 'example', state: 'default', viewport: { width: 390, height: 844 } });
+  d.outputs.draws.push({ id: 'draw-mobile', artifact: 'mobile-image', promptArtifact:'log', screen: 'example', state: 'default', viewport: { width: 390, height: 844 },provenance:{tool:'image_gen.imagegen'} });
+  d.outputs.coverage.representativeDrawIds.push('draw-mobile');d.outputs.coverage.items.push({screen:'example',state:'default',viewport:'narrow',components:['Grammar.Page'],derivation:'Narrow representative direction from the same accepted inputs',directionDrawId:'draw-mobile'});
   const bytes = Buffer.from('Synthetic mobile view of the same direction, NOT product proof');
   fs.writeFileSync(path.join(x.root, 'synthetic-mobile.txt'), bytes);
   d.artifacts.push({ id: 'mobile-image', kind: 'image', path: 'synthetic-mobile.txt', sha256: crypto.createHash('sha256').update(bytes).digest('hex') });
   assert.equal(advance(x.root, d).advanced, true);
   same(request(x.root).inputs.draws, d.outputs.draws);
+  same(request(x.root).inputs.drawCoverage, d.outputs.coverage);
   same(request(x.root).inputs.drawArtifacts, d.artifacts);
   const impl = implementation(x);
   assert.throws(() => advance(x.root, impl));
@@ -107,6 +110,14 @@ test('evidence corruption, escape, fake references and stale upstream bytes bloc
   advance(x.root, draw(x));
   fs.appendFileSync(path.join(x.root, x.artifacts[0].path), 'changed');
   assert.throws(() => inspect(x.root), /digest/);
+});
+test('draw gate requires built-in ImageGen provenance, exact prompts and a complete representative coverage map',t=>{
+  const x=fixture(t);
+  const painted=draw(x);painted.outputs.draws[0].provenance.tool='headless-browser';assert.throws(()=>advance(x.root,painted),/binding|Invalid/);
+  const noPrompt=draw(x);noPrompt.outputs.draws[0].promptArtifact='missing';assert.throws(()=>advance(x.root,noPrompt),/evidence/);
+  const noCoverage=draw(x);noCoverage.outputs.coverage.items=[];assert.throws(()=>advance(x.root,noCoverage),/array/);
+  const invented=draw(x);invented.outputs.draws[0].provenance.observedModel='';assert.throws(()=>advance(x.root,invented),/nonempty/);
+  assert.equal(advance(x.root,draw(x)).advanced,true);
 });
 test('UAT cannot pass with wrong UX answer, missing flow steps/video or unfinished cleanup', t => {
   const x = fixture(t); advance(x.root, draw(x)); advance(x.root, implementation(x));

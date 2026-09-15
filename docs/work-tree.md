@@ -15,6 +15,10 @@ them, but cannot silently redefine them.
 ├── _local/
 │   ├── plans/
 │   └── drafts/
+├── _resources/
+│   └── identity/<slug>/
+│       ├── resource.yaml
+│       └── secrets.enc.yaml
 ├── brand/
 │   ├── index.yaml
 │   └── assets/**
@@ -77,6 +81,11 @@ This is an expansion example, not required scaffolding. Small work can use
 do not create empty folders or split every screen, requirement or concern by rote.
 Every scope folder owns one `index.yaml`. Parents aggregate required descendants;
 only leaves author state. Stable IDs survive reorganizing paths.
+
+The two root underscore directories have different contracts. `_local` is excluded runtime state;
+`_resources` is traversed and validated for typed `resource.yaml` custody plus declared opaque or encrypted
+payloads. Identity consumers use `_resources/identity/<slug>` directly. Other root underscore directories,
+nested `_local`/`_resources`, node metadata inside `_resources`, and plaintext secrets remain invalid.
 
 For a complete readable example spanning SRS, SDS, UI, backend E2E, frontend and
 browser UAT, see [Replace a knowledge document](examples/knowledge-update-delivery.md).

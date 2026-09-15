@@ -65,7 +65,7 @@ that carries it.
 | `business.revise` | repair | decide | srs, decision | srs | `business.decide` | Repair a requirement record a builder found silent, confusing or self-contradictory; bump its `rev`. |
 | `brand.decide` | design | decide | code, grammar | brand, asset | `brand.decide` | Settle the visual identity - colour tokens traced to real source files, typography, mascot, logo, imagery rules - in the one brand record. |
 | `decision.prepare` (or `provision.ask` for a provision) | design | decide | srs, sds, decision | decision | `decision.prepare` (or `provision.ask` for a provision) | Prepare one decision for the owner - question, analysis per side, options, recommendation - or answer it from the decided records. |
-| `interface.draw` | design | write | srs, sds, brand, grammar, design | design, asset | `interface.draw` | Render each screen's main state from the installed grammar in a browser (never an image model), describe every other state, and declare every artwork the candidate embeds. |
+| `interface.draw` | design | write | srs, sds, brand, grammar, design | design, asset | `interface.draw` | Generate a small representative critical-screen direction with built-in ImageGen from accepted inputs and actual Grammar anatomy, retain prompts/tool provenance, and map every remaining screen/state/component. |
 | `interface.asset` (needs `design-tool`) | design | write | design, brand | asset, design, code | `interface.asset` | Generate the artwork the design record declares as real repository assets, and bind each file back to its slot. |
 | `frontend.implement` | build | implement | srs, sds, design, asset, brand, grammar, code | code | `interface.implement` | Build the interface the drawing settled. |
 | `backend.implement` | build | implement | srs, sds, decision, code | code | `backend.implement` | Build one slice of behind-the-interface behaviour. |
@@ -258,7 +258,7 @@ unsettled, `interface-gap` means the drawing is silent, `brand-gap` means the id
 `grammar-gap` means the language itself lacks the word. Each routes to the record that owns it - the
 requirement, the drawing, the brand record, the grammar package - so nothing is answered in the place that
 merely discovered it. The grammar one is the deepest and the most bounded: only the
-two kinds that render a surface (`interface.draw`, `frontend.implement`) may raise it, and only after writing
+the design and build kinds (`interface.draw`, `frontend.implement`) may raise it, and only after writing
 down an attempt to express the shape as a composition of existing contracts, because a grammar that gains a
 unit per screen is no longer a grammar. `grammar.update` then grows it once, in the grammar's own repository,
 publishes a version, bumps the consumer and records the unit in the canon; the requester reads that canon

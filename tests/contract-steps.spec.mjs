@@ -130,36 +130,29 @@ test('interface.draw enumerates every screen state and writes the design record 
   const drawn=steps(text);
   assert.match(text,/Sequence `interface\.draw`/);
   assert.match(drawn[0],/features\/sales\/business\/srs\/intake\/index\.yaml/);
-  assert.match(drawn[1],/enumerate every state it can be in before you draw anything/);
-  for(const state of ['loading','empty','error','populated','permission-denied'])assert.ok(drawn[1].includes(state),`the state ${state} is enumerated`);
-  assert.match(text,/installed design grammar/);assert.match(text,/invent no component, token, colour or icon of your own/);assert.match(text,/design binding/);
-  assert.match(text,/interface design record at the path the allowlist names \(`features\/sales\/ui\/intake\/index\.yaml`\)/);
-  assert.match(text,/blueprint \(the regions in order\)/);assert.match(text,/contract slots/);assert.match(text,/the exact copy/);
-  // The candidate is the grammar rendering the screen's main state in a browser; other states are described, not drawn.
-  assert.match(text,/Render ONE candidate per screen and viewport \(desktop and mobile\) - the main state only - FROM THE INSTALLED GRAMMAR ITSELF/);
-  assert.match(text,/Never an image model for a surface/);assert.match(text,/never a capture of a working feature/);
-  assert.match(text,/loading, empty and error are the grammar's own state contracts and the build renders them from code/);
-  // The markup the browser rendered is kept beside the picture, so the render can be checked from its source.
-  assert.match(drawn[4],/KEEPING THE MARKUP IT RENDERED beside each PNG as `<candidate>\.html`/);
-  assert.match(drawn[4],/a candidate that is not the grammar rendering the screen is a defect, and so is one with no markup beside it/);
-  // The artwork the chosen candidate embeds is declared, so nothing of the approved picture is lost at build time.
-  assert.match(drawn[5],/List every artwork the chosen candidate embeds/);
-  for(const part of ['each illustration','each appearance of the brand mascot','each decorative image','each chart or media placeholder'])assert.ok(drawn[5].includes(part),part);
-  assert.match(drawn[5],/as an `artworkSlots` entry/);
+  assert.match(drawn[0],/Map every assertion .* to a screen\/state\/viewport before generation/);
+  assert.match(drawn[1],/complete coverage\/component\/state map for the remaining screens/);
+  assert.match(text,/actual consuming Grammar package exports, types, anatomy, state contracts and reference imagery/);
+  assert.match(text,/invent no behavior, component, token or permission/);
+  assert.match(text,/Write the UI record inside `features\/sales\/ui\/intake\/index\.yaml`/);
+  assert.match(text,/surfaces, every reachable state, responsive\/accessibility rules/);
+  // Large scopes generate a small representative set and map the remaining states to inspected Grammar anatomy.
+  assert.match(text,/For a large scope select the smallest representative set of critical screens/);
+  assert.match(text,/complete coverage\/component\/state map/);
+  assert.match(text,/Invoke built-in `image_gen\.imagegen`/);
+  assert.match(text,/retain the returned image and exact prompt/);
+  assert.match(text,/The tool does not expose model selection, so do not infer or promise a model name/);
+  assert.match(drawn[4],/an ImageGen direction is proposed visual guidance, not exact Grammar component\/render\/API proof/);
+  assert.match(drawn[4],/`frontend\.implement` must produce actual Grammar implementation captures/);
+  // The artwork the representative direction embeds is declared, so nothing is lost at build time.
+  assert.match(drawn[3],/List each illustration, mascot, decorative image, chart or media region embedded by the direction/);
+  assert.match(drawn[3],/as an `artworkSlots` entry/);
   for(const field of ['id','screen','state','region \\(the blueprint region it sits in\\)','purpose','brief \\(the prompt that reproduces it\\)','size \\{w, h, viewport\\}','format','references','crop \\{x, y, w, h\\} of the candidate it was taken from'])
-    assert.match(drawn[5],new RegExp(field),field);
-  assert.match(drawn[5],/A candidate whose embedded artwork the record does not list is an incomplete record/);
-  assert.match(drawn[6],/every artwork visible in the chosen candidate has its `artworkSlots` entry with a crop that locates it/);
-  // The self-check names the two canon rules of 2026-09-13 and the command that reads them from the bytes.
-  assert.match(drawn[6],/NO CANDIDATE PLACES A LIST OF ENTITIES INSIDE A CARD \(a collection is a page section with a heading; a card is one item\)/);
-  assert.match(drawn[6],/EVERY COLOUR THE CAPTURE IS LARGELY MADE OF IS A BRAND TOKEN and the brand's primary is present/);
-  assert.match(drawn[6],/THE MASCOT APPEARS ONLY WHERE THE BRAND RECORD ALLOWS IT/);
-  assert.match(drawn[6],/`starci render check <ui node dir> --brand <work root>`/);
-  assert.match(text,/the two canon rules hold in the candidates themselves and `starci render check` says so/);
-  assert.match(text,/with the markup it was rendered from kept beside it as `<candidate>\.html`/);
-  assert.match(text,/every artwork the chosen candidate embeds is declared as an `artworkSlots` entry with its region, purpose, brief, size, format, brand references and candidate crop; a candidate with artwork the record does not list is incomplete/);
-  assert.match(text,/every assertion \(`intake-screen-shows-every-state`\) maps to a named screen state/);
-  assert.match(text,/`blocked` with blocker `sds-gap` and the exact question, never a guess/);
+    assert.match(drawn[3],new RegExp(field),field);
+  assert.match(drawn[5],/representative images, prompt artifacts, actual tool provenance, coverage map and artwork slots/);
+  assert.match(text,/every representative image was produced by an actual `image_gen\.imagegen` invocation/);
+  assert.match(text,/coverage\/component\/state map names actual inspected Grammar components/);
+  assert.match(text,/generated direction is not exact component\/render\/API proof/);
   // A design operation writes no product code and carries no red-spec rule.
   assert.doesNotMatch(text,/MUST fail now/);assert.match(text,/no product code/);
   assert.match(text,/Lane: the feature's `ui` node is its interface design record and walks `interface\.draw` -> `interface\.asset` \(when the record declares artwork slots\); each frontend implementation node is held until that record is done, then walks `frontend\.implement` -> `uat\.verify` against it and is done only after `uat\.verify`\./);

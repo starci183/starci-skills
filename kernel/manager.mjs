@@ -24,7 +24,9 @@ export function buildManagerSnapshot({state,actions,blockers=[],contextCatalog=[
     proof:strings(op.ledgerIds,8).map(id=>{const item=state.ledger?.find(row=>row.id===id);return {id,status:item?.status??'unknown',
       receipts:(item?.evidence??[]).slice(-3).map(receipt=>({kind:receipt.kind,opId:receipt.opId,head:receipt.head}))};})}));
   const semantic={goal:{job:brief(state.job,4000),definitionOfDone:strings(state.definitionOfDone,24).map(item=>brief(item,400)),
-      approved:state.approved===true,scope:strings(state.scope,32),head:state.head??null,goalDigest:state.goalDigest??state.approval?.goalDigest??null},
+      approved:state.approved===true,scope:strings(state.scope,32),head:state.head??null,goalDigest:state.goalDigest??state.approval?.goalDigest??null,
+      amendments:(state.amendments??[]).slice(-8).map(item=>({digest:item.digest,baseGoalIdentity:item.baseGoalIdentity,
+        clarifications:strings(item.changes?.clarifications,16).map(value=>brief(value,400)),effectCeiling:item.changes?.effectCeiling??null}))},
     progress:{iterations:state.iterations??0,actionable:actions.length,running:state.ops.filter(op=>['running','answering'].includes(op.status)).length,
       ready:state.ops.filter(op=>op.status==='ready').length,blocked:state.ops.filter(op=>op.status==='blocked').length,capacity,
       omittedOps:Math.max(0,active.length-limit),omittedActions:Math.max(0,actions.length-limit)},

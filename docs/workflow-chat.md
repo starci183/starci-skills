@@ -14,7 +14,7 @@ workflow**, and the chat is the workflow's monitor, not another agent layer:
 
 | in a chat | in Orca |
 | --- | --- |
-| every command of the entry: `workflow-goal`, `workflow-approve`, `workflow-answer`, `workflow-run`, `workflow-status`, `workflow-list`, `workflow-stop`, `workflow-supervise` | the same commands |
+| every command of the entry: `workflow-goal`, `workflow-amend`, `workflow-approve`, `workflow-answer`, `workflow-run`, `workflow-status`, `workflow-list`, `workflow-stop`, `workflow-supervise` | the same commands |
 | operations run one after another as headless model processes; the kernel still verifies, commits and gates each slice itself | admitted AI work shares ten slots; operation agents use attested Orca terminals and an enrolled manager uses one slot while it runs |
 | an operation kind the headless host cannot serve is reported `host-unsupported`; its `host` needUser item names the capability the kind needs and this host does not offer, as `model/hosts.yaml` declares it, so the chat relays it as "this needs the Orca host" and the workflow carries on with everything else | every kind the profiles declare |
 | `--lane` asks the host adapter for a worktree of its own; what the adapter cannot create it refuses, and the refusal is printed as it came | an Orca worktree row `[Workflow] <id>` |
@@ -100,6 +100,7 @@ node <skill root>/bin/starci.mjs workflow-answer  --host <skill root> --id <id> 
 node <skill root>/bin/starci.mjs workflow-run     --host <skill root> --id <id> --host-adapter headless   # detached, output appended to <dir>/kernel.log
 node <skill root>/bin/starci.mjs workflow-status  --host <skill root> --id <id> [--json true]
 node <skill root>/bin/starci.mjs workflow-stop    --host <skill root> --id <id>
+node <skill root>/bin/starci.mjs workflow-amend   --host <skill root> --id <id> --amendment <record.yaml>
 node <skill root>/bin/starci.mjs workflow-list
 STARCI_HOST=headless node <skill root>/bin/starci.mjs workflow-supervise --host <skill root>   # detached; starts and restarts every approved, unfinished workflow of the repository
 ```
@@ -113,7 +114,10 @@ resolvable at all. It is not read from the entry's own location.
 that blocks on the kernel cannot relay a question, and an operation runs for minutes. The chat drives a
 live kernel only through `workflow-approve` (queued in `<dir>/inbox/`, applied at the next tick) and
 `workflow-stop` (`stop.flag`, honoured at the next tick); it never writes `state.json`, because the
-kernel holds the state in memory and saves over the file at every tick.
+kernel holds the state in memory and saves over the file at every tick. Stop also atomically exports the
+human-readable `<work root>/_local/continuations/workflows/<id>.md` brief with scope, accepted work, remaining
+operation identities, owner decisions, blockers and the next safe action. The journal/state/pin/candidate
+records remain authoritative; the Markdown is a continuation projection, not a substitute state store.
 
 ## One store, two hosts
 
@@ -126,11 +130,13 @@ workflow portable between them:
   An Orca supervisor that finds it approved, unfinished and without a live kernel starts a kernel for
   it - on the Orca host, with Orca terminals - and the kernel resumes from `state.json` and the event
   log with the same counters and the same ledger. That is also how a chat hands over an operation the
-  headless host could not serve: stop the headless kernel (`workflow-stop`, then delete `stop.flag`)
-  and let Orca run it.
+  headless host could not serve: stop the headless kernel, wait for its controller PID to exit, inspect the
+  exported continuation brief, and let Orca invoke `workflow-run`. That command acquires the single-controller
+  lock, verifies exact operation/job/lease/task/dispatch identity, and removes `stop.flag` only after the
+  boundary is consistent.
 - **Started in Orca, watched from a chat.** `workflow-status` needs no Orca runner, so a chat reads an
-  Orca workflow as it is. To take it over, stop its Orca kernel first (`workflow-stop`, then delete the
-  flag) and start `workflow-run --id <id> --host-adapter headless`; `kernel.lock` keeps a second kernel
+  Orca workflow as it is. To take it over, stop its Orca kernel first, wait for the controller PID recorded
+  in the continuation brief to exit, and start `workflow-run --id <id> --host-adapter headless`; `kernel.lock` keeps a second kernel
   out while the first one is alive, and the kernel that starts resumes from `state.json` and the event
   log, settling the operations that were live on the other host in its reconcile pass before it
   launches anything, as after any restart.

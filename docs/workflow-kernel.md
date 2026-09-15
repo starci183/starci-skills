@@ -49,6 +49,7 @@ other:
 | `kernel/verify.mjs`, `guards.mjs` | machine verification, proof by contrast, the guards | [What is machine-verified](#what-is-machine-verified-and-what-the-model-is-asked), [The guards](#the-guards-the-kernel-owes-itself) |
 | `kernel/terminals.mjs`, `supervisor.mjs` | tabs and the supervising process | [Terminals](#terminals), [Supervision](#supervision-without-an-agent) |
 | `kernel/store.mjs`, `view.mjs`, `reports.mjs`, `routing.mjs` | the store, the status page, the report vocabulary, ledger resolution | [Reading a workflow](#reading-a-workflow) |
+| `kernel/continuation.mjs`, `amendment.mjs` | stop/resume boundary audit, human brief and owner-authorized same-ID clarification overlay | [Phases](#phases) |
 | `checks/render.mjs` | the canon rules, read from the bytes a drawing left | [Render checks](#render-checks) |
 | `hosts/index.mjs` | the host model as data | [Hosts](#hosts-orca-and-headless-one-chat--one-workflow) |
 
@@ -58,6 +59,7 @@ below is `node <skill root>/bin/starci.mjs`:
 
 ```
 starci workflow-goal    --job <text> [--lane [<name>]] [--inputs a,b] [--gates name=command,...] [--ledger work|plan] [--scope f1,f2] [--id <id>]
+starci workflow-amend   --id <id> --amendment <starci/workflow-amendment@1.yaml>
 starci workflow-approve --id <id> [--allocation <runtime>=<slots>[:<tiers>],...] [--allow-dynamic N] [--accept-critique "<reason>"]
 starci workflow-answer  --id <id> --op <ask op> [--choice <n>] [--note "<the owner's words>"]
 starci workflow-run     --id <id> [--from <own terminal> --run <run>] [--launch-file <f>] [--max-iterations N]
@@ -382,9 +384,23 @@ iteration:
 7. when nothing is left to run: **gates**, then the **final report**.
 
 Every iteration appends a `tick` event and saves `state.json`, so re-running `workflow-run` continues the
-same workflow - the same counters, the same event log, the same ledger. The first binding of the Orca run is
+same workflow - the same counters, the same event log, the same ledger. `workflow-stop` also exports
+`<work root>/_local/continuations/workflows/<id>.md`, a human-readable projection of scope, accepted work,
+remaining exact identities, decisions, blockers and the next safe action. It never replaces state, journal,
+runtime pin, candidate packets or source commits. A resumed `workflow-run` first acquires the one controller
+lock and refuses an inconsistent operation/job/lease/task/dispatch boundary rather than clearing unknown
+effects. The first binding of the Orca run is
 the `run-bound` event; a kernel that already has its run (a resume, or a run handed in) appends `run-resumed`,
 because re-binding a Run would invalidate every live Dispatch on it.
+
+An explicitly authorized clarification never starts a replacement workflow. After `workflow-stop` is present
+and its controller has exited, `workflow-amend` requires a bounded `starci/workflow-amendment@1` file naming the
+same workflow and its exact frozen goal identity. The file records the real owner grant source and statement
+separately from the coordinator's technical `apply-same-id` decision, plus a concrete effect ceiling. Added
+scope requires granted paths. The command appends an idempotent amendment, adds only declared scope, definition
+of done and findings for unfinished operations, and refreshes the continuation brief; it never rewrites the
+original approval, accepted operations, decisions, evidence, receipts, jobs, leases, dispatches or candidates.
+Reusing the same owner source with different bytes is rejected. Boundary findings still block resume.
 
 An op is `pending` -> `ready` -> `running` (`answering` while the kernel types an answer into its terminal,
 `paused` while it waits for a shared change) -> `done` | `blocked`. `paused` counts as live: a job never
@@ -894,17 +910,16 @@ decision anyone can take from a terminal.
 
 ## Render checks
 
-A drawing is the installed grammar rendered in a browser, and `checks/render.mjs` checks that claim from the
-two artefacts the drawing leaves behind: the PNG the browser captured and the markup it rendered, kept beside
-each capture as `<candidate>.html`. Both are read as bytes, because both are the only things that cannot be
-argued with. Nothing there renders, installs, downloads or edits; the PNG decoder is implemented on
-`node:zlib` so a drawing is never checked by a dependency that may not be installed, and the colour
-mathematics is `checks/brand.mjs`'s - one runtime, one definition of two colours being the same.
+`interface.draw` is now image-first: built-in ImageGen produces a small representative critical-screen set
+from accepted business/SDS, brand, UI knowledge and actual Grammar anatomy/reference inputs, with exact prompts,
+actual tool provenance and a complete coverage/component/state map. Those pixels are proposed visual direction,
+not exact Grammar DOM/render/API proof. Actual implementation captures and browser UAT remain separate required
+evidence.
 
-The kernel runs it on an accepted `interface.draw` report, before the validator (`ctx.renderChecks`, default
-`renderChecksFor`). The hook finds the ui node from the operation's allowlist or the files its diff touched
-and answers **null** - not a green result - for an operation that wrote no design record, so an operation
-with nothing to do with a drawing is never reported as a drawing that passed.
+`checks/render.mjs` remains a compatibility and implementation-capture audit for UI nodes that explicitly carry
+browser-capture provenance plus kept markup. The kernel hook returns **null**, not green, for ImageGen directions;
+it never treats a generated picture as exact rendered structure. For eligible browser captures it reads PNG and
+markup bytes using the checks below.
 
 | check | reads | fails when |
 | --- | --- | --- |
@@ -914,7 +929,7 @@ with nothing to do with a drawing is never reported as a drawing that passed.
 | `mascot-slot-missing` | the design record | the brand allows the mascot on a surface whose `artworkSlots` declares no slot for it |
 
 A failing check downgrades the report to `failed` with one finding per failing check, appends
-`render-check-failed {op, checks}` and retries the op; a passing run appends `render-checked {op, checks}`.
+`render-check-failed {op, checks}` and retries the op; an eligible passing browser-capture run appends `render-checked {op, checks}`.
 A hook that throws is `render-check-unavailable {op, reason}` and the drawing is judged as it would have
 been before the rules existed.
 
@@ -1451,11 +1466,9 @@ exited: the kernel's answer is recorded as undelivered, the op is relaunched, an
 contract of that next attempt (`## Answer to the question you asked earlier`) - on every host alike.
 
 **Capabilities.** `model/kinds.yaml` may give a kind `needs: [<capability>]` from the closed vocabulary
-`capabilities` (`design-tool`; `CAPABILITIES` in `kernel/graph.mjs`, `needsOf(kind)`). `interface.asset`
-needs `design-tool` (the image model that generates the declared artwork), which only Orca declares; every other
-kind runs anywhere - `interface.draw` included, because a drawing is the installed grammar rendered in a browser
-(one candidate per screen and viewport, the main state only; loading, empty and error are described in the
-record and rendered by the build from the grammar's state contracts), never an image-model painting. At schedule time an op whose kind
+`capabilities` (`design-tool`; `CAPABILITIES` in `kernel/graph.mjs`, `needsOf(kind)`). Both `interface.draw`
+and `interface.asset` need `design-tool`, the built-in ImageGen surface only Orca declares. `interface.draw`
+records the actual tool invocation and never infers a model identity the tool did not expose. At schedule time an op whose kind
 needs what the host lacks is refused: `blocked` with `refusal: 'host-unsupported'`, one needUser item
 `{op, kind:'host', detail}`, event `op-host-unsupported {op, kind, host, missing}`, and the workflow carries on
 with everything else. On a frontend feature that means the design gate keeps holding the `frontend.implement`
@@ -1506,7 +1519,7 @@ node <skill root>/bin/starci.mjs brand check <work root> [--source <repository r
 | raise the run-time op budget or change the allocation of a running workflow | `workflow-approve --id <w> --allow-dynamic N` / `--allocation ...` | queued in `<store>/inbox/`, applied at the next tick (`inbox-applied`); a new allocation ends the loop with `stopped: restart: allocation changed` and the supervisor starts the kernel again within a minute |
 | resume a workflow that finished `blocked` after you answered its questions | `workflow-approve --id <w>` (with `--allow-dynamic` / `--allocation` as needed) | `resumed-after-block`: the finish is cleared, the supervisor starts a kernel |
 | ship a new runtime build | `npm run build` | every running kernel notices its module changed (`build-changed`), ends cleanly and is restarted by the supervisor on the new code |
-| pause a workflow | `workflow-stop --id <w>` (writes `stop.flag`) | `stopped: stop flag` at the next tick; the supervisor leaves it while the flag exists; delete the flag to let it start again |
+| pause/checkpoint a workflow | `workflow-stop --id <w>` (writes `stop.flag` and exports `_local/continuations/workflows/<w>.md`) | `stopped: stop flag` at the next tick; after the controller exits, `workflow-run` verifies the exact continuation boundary and removes the flag itself; never clear a lease merely because a PID is absent |
 | read a workflow | `workflow-status --id <w>` | read-only |
 | clean up the worktree of a workflow that merged | `workflow-lane-close --id <w>` | `orca worktree rm --force` on the lane, branch preserved (`lane-closed`); refused while the kernel is alive or the lane is unmerged |
 | merge a lane the kernel could not merge | merge it yourself in the base worktree, then `workflow-approve --id <w>` | the conflict is in `lane-merge-conflict` and in the `merge` needUser item; the kernel never force-merges into a tree it does not own |

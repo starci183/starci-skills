@@ -21,7 +21,7 @@ Job (the owner's prompt, verbatim)
               ├─ owner question   a non-mechanical ask or a missing credential pauses the op: decision.prepare
               ├─ reconciliation   a feature against decided records: reference | conflict | new, as data
               ├─ validator        the one validator, given the declared inputs and outputs, not a feeling
-              ├─ render checks    a drawing is the grammar rendered; canon rules are checked from the bytes
+              ├─ render checks    generated direction is separate from downstream Grammar/browser proof
               └─ proof digest     a completion remembers the declaration it was accepted under
 ```
 
@@ -55,12 +55,11 @@ Six statements hold the release together. Every section below is one of them mad
    money, authority or customer data is put to the owner - provisionally, on the runtime's recommendation,
    so the work is prepared rather than stopped (§4b). What the owner must PROVIDE is read from the whole
    product up front instead of one stuck operation at a time.
-6. **A drawing is the installed grammar rendered in a browser.** One candidate per screen and viewport of the
-   main state, composed from the grammar's renderers and the brand tokens, captured by headless Chrome, with
-   the markup kept beside each capture; the other states are described and rendered by the build from the
-   grammar's state contracts; the image model is for artwork only. Two canon rules are checked from those
-   bytes: a list of entities is a page section with a heading, never a card; the render's dominant colours
-   are the brand's own tokens and the mascot appears exactly where the brand names a slot.
+6. **Design delivery is image-first.** For a large FE scope, `interface.draw` selects a small representative
+   critical-screen set and invokes built-in ImageGen with accepted business/SDS, brand, UI knowledge and actual
+   Grammar anatomy/reference inputs. It retains exact prompts, images and actual tool provenance, and maps every
+   remaining screen/state/component. Generated direction is not exact component/render/API proof; actual Grammar
+   implementation captures and browser UAT remain separate required evidence.
 
 ## 2. Records: what a Work record is derived from
 
@@ -131,7 +130,7 @@ own. This is the shipped table, entry for entry:
 Five of these rows are wider than the first draft, and each one is a fact of the operator that was already
 shipping. `frontend.implement` reads `srs` because an operation may only report `srs-gap` about a requirement
 it actually had in front of it (§4b), and a build that never reads the requirement cannot say the
-requirement is unsettled. `interface.draw` writes `asset` because the drawing captures one PNG per screen and viewport into
+requirement is unsettled. `interface.draw` writes `asset` because representative images and exact prompt files live in
 the ui node's `assets/` (§7). `interface.asset` writes `code` because the generated artwork lands in the
 bound source repository at the path the design record declares - the files are asset bytes and product
 source at once. `e2e.verify` and `uat.verify` write `code` because each authors its scenario spec inside the
@@ -605,18 +604,17 @@ it. The lane (one workflow, one worktree, merge-back on done) is the Orca host's
 critique, the one human gate - is host-independent. [workflow-chat.md](workflow-chat.md) is the chat's
 instruction.
 
-## 7. A drawing is the grammar rendered
+## 7. Image-first direction, then render truth
 
-`interface.draw` composes each screen's main state from the installed grammar's own renderers and the brand
-tokens in a scratch folder outside the product, opens it in headless Chrome and captures one PNG per screen
-and viewport into the ui node's `assets/`; **the markup it rendered is kept beside each capture** as
-`<candidate>.html`, so the render can be checked from its source. Loading, empty and error states are
-described in the record and rendered by the build from the grammar's state contracts. The image model is for
-artwork only (`interface.asset`).
+`interface.draw` uses built-in `image_gen.imagegen` for a small representative critical-screen set, retaining
+each exact prompt and actual tool/input provenance. Its complete coverage/component/state map derives every
+remaining screen and state from accepted business/SDS, brand, relevant UI knowledge and actual inspected Grammar
+anatomy. The tool's model selection is not exposed and is never guessed.
 
-`checks/render.mjs` reads those two artefacts as bytes and answers the two canon rules. The kernel runs it on
-an accepted `interface.draw` report before the validator (`renderChecksFor`), and the same code is the CLI
-`starci render check <ui node dir> --brand <work root> [--family <id>] [--json]`.
+These images are direction, not exact component/render/API proof. `frontend.implement` must produce actual Grammar
+implementation captures and machine checks, then `uat.verify` observes the identified running build in a browser.
+`checks/render.mjs` continues to audit explicitly provenance-marked browser captures and kept markup; its kernel
+hook returns null for ImageGen direction assets rather than reporting them green.
 
 | rule | knowledge | checks |
 | --- | --- | --- |
@@ -797,7 +795,7 @@ mirrors the source tree.
 | the two host descriptors as frozen objects in two adapters | `model/hosts.yaml` read by `hosts/index.mjs`; the adapters keep them only as the pre-build fallback |
 | an external system proven by whatever ran | a declared `integration` record, an `integration` node, a live proof, and evidence that says what it proved against |
 | a completion bound to its record only | a completion bound to the declaration it was accepted under (`contractDigest`, `contractKind`) |
-| brand rules in prose only | render checks with named findings over the capture and the kept markup; canon rules `COLLECTION-*`, `BRAND-*` |
+| brand rules in prose only | ImageGen directions carry prompt/tool provenance; actual implementation captures retain markup for named `COLLECTION-*`, `BRAND-*` checks |
 | `profiles/`, `execution/` | `model/`, `kernel/`, `hosts/`, `models/`, `checks/` |
 | `.dist/execution/orca-supervised-launch.mjs` on every command line | `node <skill>/bin/starci.mjs <command>` |
 | the pre-release version tag | `5.0.0-plus` |
@@ -908,7 +906,7 @@ last row group.
 | a list of entities inside a card fails; one item in a card is a card | `tests/render-checks.spec.mjs` - "a list of entities inside a card fails, the same list in a section passes, and one item in a card is a card" |
 | the mascot has a slot exactly where the brand allows it | `tests/render-checks.spec.mjs` - "the mascot has a slot exactly where the brand allows it" |
 | a whole run reads every candidate, its markup and every surface | `tests/render-checks.spec.mjs` - "a run over a ui node reads every candidate, its markup and the mascot slots of every surface" |
-| the hook answers null for an operation that drew nothing | `tests/render-checks.spec.mjs` - "the kernel hook finds the ui node the operation wrote, and answers null when it wrote none"; `tests/kernel-seams.spec.mjs` - "a kind that is not a drawing never reaches the render checks" |
+| the hook answers null for generated direction or an operation with no browser capture | `tests/render-checks.spec.mjs` - ImageGen assets are excluded from exact render proof; `tests/kernel-seams.spec.mjs` - a kind outside the compatibility draw hook never reaches it |
 | a failing canon check downgrades the drawing before the validator | `tests/kernel-seams.spec.mjs` - "a drawing that fails a canon check is downgraded before the validator; a passing one is recorded" |
 | the CLI prints one line per check and exits 1 on a failure or a broken input | `tests/render-checks.spec.mjs` - "the CLI prints one line per check and exits 1 when a check fails or the input is broken" |
 | a declared integration is data; a nameless entry, a credential nobody owns, or one with no custody is a finding | `tests/work-ledger.spec.mjs` - "a declared integration is data: a credential nobody owns or a nameless entry is a finding, not a silent skip" |

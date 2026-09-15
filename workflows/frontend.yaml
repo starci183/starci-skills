@@ -21,6 +21,8 @@ criteria:
     - draws-reviewed
     - business-covered
     - knowledge-compliant
+    - imagegen-provenance-recorded
+    - coverage-map-complete
   implement:
     - draws-covered
     - knowledge-compliant

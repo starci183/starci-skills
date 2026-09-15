@@ -22,6 +22,17 @@ topics:
     question: What the running surface actually shows and does
     applicableWorkOp: Selected interface audit or UAT op
 guidance:
+  - id: image-first-direction
+    requirement: |-
+      For every large frontend task, choose the smallest representative set of critical screens that covers
+      the highest-risk journeys, layout anatomy, interactions and brand moments. Generate those visual
+      directions with built-in `image_gen.imagegen` using accepted business/SDS, the current brand and masters,
+      relevant UI rules, and actual inspected Grammar anatomy/reference inputs. Retain each exact prompt,
+      generated asset and actual tool provenance; do not assert an image-model identity the tool did not expose.
+      Map every remaining screen, state and responsive band to the representative direction and actual Grammar
+      components in an explicit coverage/component/state map. A generated direction is proposed design input,
+      not exact component/render/API proof and not a screenshot of a working product. Frontend implementation
+      must still produce real Grammar renders and code checks, and browser UAT remains a separate evidence layer.
   - id: binding-criteria
     requirement: |-
       Select applicable stable rule IDs in the chosen `.starciwork` node's acceptance assertions. Record expected owner, state, viewport and observable condition in that node's Markdown or namespaced extensions; record actual observations and captured assets in its evidence bundle. Use the [current metadata contract](../../core/README.json) for fields and completion. A markup claim, score or copied example is not proof.

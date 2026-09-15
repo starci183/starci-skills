@@ -57,7 +57,7 @@ test('a launcher usage error is reported by the launcher and the CLI keeps its o
   // named after it, one line each, and so are the two machine checks - otherwise the help teaches a command
   // line that is missing the commands a person types most.
   assert.match(help.stdout,/workflow kernel \(forwarded to the launcher/);
-  for(const command of ['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-status',
+  for(const command of ['workflow-goal','workflow-amend','workflow-approve','workflow-answer','workflow-run','workflow-status',
     'workflow-list','workflow-stop','workflow-lane-close','workflow-supervise'])
     assert.match(help.stdout,new RegExp(`^\\s{2}${command}\\s{2,}\\S`,'m'),command);
   assert.match(help.stdout,/^ {2}render check .*--brand <work root>/m);

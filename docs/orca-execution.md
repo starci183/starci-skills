@@ -96,7 +96,7 @@ The runtime functions use only these injected methods:
 
 - `createRun(input)` returns `{runId}`.
 - `createTask(input)` creates either a workflow-wrapper Task or a nested operation-subagent Task and returns `{taskId}`.
-- `dispatchWorker(input)` returns `{dispatchId, worktreeId}` for a wrapper and `{dispatchId}` for an operation. For a wrapper it creates the workflow child; for an operation it launches the selected managed agent in that existing child. A recognized provider must use its native Orca agent id; Qwen 3.8 Flash uses `qwen-code` and inherits the verified model from Qwen runtime configuration.
+- `dispatchWorker(input)` returns `{dispatchId, worktreeId}` for a wrapper and `{dispatchId}` for an operation. For a wrapper it creates the workflow child; for an operation it launches the selected managed or command-terminal agent in that existing child. Managed providers use their native Orca agent id; a declared command-terminal provider retains its exact Task/Dispatch/terminal correlation and rendered provider/model attestation.
 - `setWorktreeParent(input)` explicitly binds the new child to the exact main Coordinator worktree.
 - `showWorktree(input)` returns the exact child record used to attest `parentWorktreeId` before any operation Task is created.
 - `showWorker(input)` returns the exact Task/Dispatch/worker/provider receipt used before UI naming.
@@ -113,20 +113,21 @@ native adapter cannot represent. It starts the declared CLI in the existing work
 retains the nested Task/Dispatch/operation correlation. It must not silently convert an unsupported
 launch into success.
 
-For Qwen 3.8 Flash, the Workflow Manager creates the operation Task with display name
-`[Op] <operation> - <scope>`, then calls `worker-start --task <task-id> --worktree current --agent qwen-code`.
-It first uses `worker-show` to attest the exact Task, worker, native `qwen-code` agent and configured
-`qwen3.8-flash` model. It then reapplies the canonical title with `terminal rename` and verifies that
-title with a second `worker-show` before accepting effects. This sequence keeps one Task, one
-Dispatch, one native branded agent and one supervised worker resource. Nested provider agents remain
-forbidden by the operation contract and are verified at the boundary rather than by replacing the
-native launch with a shell command.
+For a Qwen command-terminal selection, the kernel creates one operation Task and one new terminal with
+display name `[Op] <operation> - <scope>`, obtains the exact Dispatch preamble with
+`dispatch --return-preamble`, submits it once through that terminal and verifies Task, Dispatch,
+assignee terminal and the rendered configured model before accepting the attempt. Orca may represent
+this valid form as `worker.state: unsupervised` with no `terminalResource`; that is an accounting fact,
+not permission to guess resource ownership. `worker-release` may consequently return retained
+`no_owned_resource`. The result can still carry independently proven no-effect settlement, but cleanup
+remains `cleanup.complete:false` unless the exact terminal is closed or proved absent. Nested provider
+agents remain forbidden by the executable tool fence and the operation contract.
 
-If native start reports `agent_prompt_stalled` or `session_not_reported`, fence and reconcile that
-exact attempt. Retry the same resolved target or the next declared provider only after effects are
-verified absent. Never convert the failed attempt into a command terminal, or use `dispatch --inject`,
-`dispatch --return-preamble`, `dispatch --to <terminal>`, manual prompt submission or a retained
-unsupervised terminal as a successful operation.
+If any launch reports `agent_prompt_stalled`, `session_not_reported` or unconsumed command-terminal
+input, fence and reconcile that exact attempt. Retry the same resolved target or the next declared
+provider only after `effectState:none` is proven from identity-bound receipts. A successful release is
+cleanup proof only; it cannot turn an unknown stop into a no-effect result. Never attach a task to a
+pre-existing terminal or treat missing output as proof that the attempt never started.
 
 The display contract is mandatory at creation time:
 
@@ -149,14 +150,18 @@ candidate the allocator supplied (`startOperation({candidates})`) or, when none 
 resolved chain: for each candidate it starts one fresh native worker, proves prompt delivery
 (`worker.state` ready and `dispatch_input` accepted), attests the effective agent/model/worktree,
 canonicalizes the title, and accepts. A failed candidate is classified; when a Dispatch exists it is
-settled (`worker-stop`, `worker-release` must report `released` or `already_released`). Only a proven
-`effectState: none` admits the next candidate; `partial` or `unknown` stops with a typed reconciliation
+settled with its exact identity. Effect settlement and cleanup are reported separately: `released` or
+`already_released` proves owned-resource cleanup, while retained `identity_unproven` or `no_owned_resource`
+leaves `cleanup.complete:false` unless the exact terminal was closed or proved absent. A retained cleanup
+record may still accompany independently proven `effectState:none` (for example, an already-settled failed
+worker); only that effect proof admits the next candidate. `partial` or `unknown` stops with a typed reconciliation
 request, and an exhausted chain returns `ok:false, exhausted:true, attempts[]`. A caller that has verified,
 from receipts, that a chain target cannot start on this host passes `--skip <target:reason>` (reason from the
 registry's `fallback.allowedReasons`); the skip is recorded as a no-effect attempt and the chain starts at the
 next candidate. The kernel never uses `--skip` for allocation: it names the candidate it wants, so a target
 that was never tried is never recorded as having failed. Companion commands are
-`settle --dispatch`, `sweep` (close dead terminals in the workflow worktree after settlement) and
+`settle --dispatch [--terminal <exact-handle> --close true]`, `sweep` (close only identified dead terminals in
+the workflow worktree after settlement) and
 `verify`; the workflow control loop itself is the kernel's (`workflow-goal`, `workflow-approve`,
 `workflow-run`, `workflow-status`).
 `hosts/orca/adapter.mjs` is the concrete adapter for `execution/orca.mjs` on the same runner,

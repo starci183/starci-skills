@@ -69,7 +69,7 @@ Calls in scope: `run-create`, `run-use`, `run-show`, `task-create`, `task-update
 1. attest nested Run and `coordinator_handle` (unchanged);
 2. `resolveExecutionChain` → ordered candidates; inventory from live `worker-list`/`status`;
 3. for each candidate: `task-create` (once, shared across candidates) → `worker-start` → `worker-show` attest immutable identity (dispatch, task, agent, model) → **prompt-delivery proof** (`effects[]` contains `dispatch_input: accepted` **and** worker `stage` beyond `dispatch_input` within `promptAckTimeoutMs`) → rename → verify title;
-4. on failure: classify; if `effectState: none` → `worker-stop` → `worker-release` → verify `already_released|released` → record attempt → next candidate; if `partial|unknown` → stop, emit reconciliation request;
+4. on failure: classify; fence the exact Dispatch and record effect proof separately from cleanup proof; only `effectState: none` may reach the next candidate. `released|already_released` proves owned-resource cleanup, while retained cleanup is explicit unless an exact terminal close/absence proves it; `partial|unknown` stops with a reconciliation request;
 5. exhausted chain → `ok:false, exhausted:true, attempts[]` (never a bare throw).
 
 `start-monitor`: same loop over a new `workflowManager` chain in `model/registry.yaml` (no hardcoded `codex`/`gpt-5.6-sol`).

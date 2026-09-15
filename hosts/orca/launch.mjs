@@ -289,11 +289,18 @@ const classifySettlement=(stop,release)=>{
   const stopState=getPath(stop?.receipt,'result.state')??null,releaseState=getPath(release?.receipt,'result.state')??null;
   const releaseReason=getPath(release?.receipt,'result.reason')??null,processAction=getPath(release?.receipt,'result.processAction')??null;
   let effectState='unknown',residualTerminal=null;
-  if(stop?.outcome!=='unknown'&&release?.outcome==='ok')effectState='none';
+  if(stop?.outcome==='ok'&&TERMINAL_STOP_STATES.includes(stopState)&&release?.outcome==='ok'&&['released','already_released'].includes(releaseState))effectState='none';
   else if(releaseState==='retained'&&processAction==='none'&&['failed','stopped','abandoned'].includes(stopState)){
     effectState='none';residualTerminal={state:releaseState,reason:releaseReason,processAction};
   }else if(release?.outcome==='failed'&&release.effectState==='partial')effectState='partial';
   return {effectState,residualTerminal,stopState,releaseState,releaseReason,processAction};
+};
+const cleanupProof=({releaseState=null,releaseReason=null,processAction=null,closedTerminal=null,exitedWorker=null}={})=>{
+  if(closedTerminal?.outcome==='ok')return {complete:true,proof:'exact-terminal-closed',terminal:closedTerminal.handle};
+  if(['released','already_released'].includes(releaseState))return {complete:true,proof:'owned-resource-released'};
+  if(exitedWorker?.proven&&exitedWorker.tabListed===false)return {complete:true,proof:'exact-terminal-absent',terminal:exitedWorker.terminal};
+  return {complete:false,proof:null,reason:releaseReason??(releaseState?`worker-release returned ${releaseState}`:'cleanup ownership is unproven'),
+    releaseState,processAction,residualTerminal:Boolean(releaseState==='retained'||exitedWorker?.residualTab)};
 };
 
 export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt',wait,terminalHandle=null,closeTerminal=false,now=Date.now}={}){
@@ -310,6 +317,7 @@ export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt
     const retained=classified.releaseState==='retained'&&classified.processAction==='none';
     const effectState=closed.outcome==='ok'?'none':stopped&&(released||retained)?'none':'unknown';
     return {schema:SETTLEMENT,dispatchId,reason,effectState,residualTerminal:closed.outcome==='ok'?null:classified.residualTerminal,reconciliation:null,closedTerminal,
+      cleanup:cleanupProof({...classified,closedTerminal}),
       stop:{outcome:stop.outcome,effectState:stop.effectState,state:getPath(stop.receipt,'result.state')??null,alreadySettled:getPath(stop.receipt,'result.alreadySettled')??null,reason:stop.reason},
       release:{outcome:release.outcome,effectState:release.effectState,state:getPath(release.receipt,'result.state')??null,processAction:getPath(release.receipt,'result.processAction')??null,reason:getPath(release.receipt,'result.reason')??release.reason}};
   }
@@ -334,6 +342,7 @@ export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt
       const abandoned=orca.invoke('worker-abandon',{dispatch:dispatchId},{cwd});
       if(abandoned.outcome==='ok'){
         return {schema:SETTLEMENT,dispatchId,reason,effectState:'none',residualTerminal:null,reconciliation,closedTerminal,abandoned:true,
+          cleanup:cleanupProof({closedTerminal}),
           stop:{outcome:stop.outcome,effectState:stop.effectState,state:getPath(stop.receipt,'result.state')??null,alreadySettled:null,reason:stop.reason},
           release:{outcome:'skipped',reason:'dispatch abandoned after its own terminal was closed'}};
       }
@@ -351,6 +360,7 @@ export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt
   }
   const {effectState,residualTerminal,stopState,releaseState,releaseReason,processAction}=classified;
   return {schema:SETTLEMENT,dispatchId,reason,effectState,residualTerminal,reconciliation,closedTerminal,...(exitedWorker?{exitedWorker}:{}),
+    cleanup:cleanupProof({releaseState,releaseReason,processAction,closedTerminal,exitedWorker}),
     stop:{outcome:stop.outcome,effectState:stop.effectState,state:stopState,alreadySettled:getPath(stop.receipt,'result.alreadySettled')??null,reason:stop.reason},
     release:release?{outcome:release.outcome,effectState:release.effectState,state:releaseState,processAction,reason:releaseReason??release.reason}:{outcome:'skipped',reason:'worker-stop outcome unknown'}};
 }
@@ -684,6 +694,10 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
     On the Work ledger every accepted slice is written back into its node (state, completion, evidence) and
     committed with a "Work: <node id>" trailer - in the repository that owns the tree, which is this one
     unless the product routes the Work elsewhere.
+  node bin/starci.mjs workflow-amend --id <workflow-id> --amendment <record.yaml> [--host <path-to-.claude>] [--worktree <relative-path>]
+    while workflow-stop is present and its controller has exited, bind a starci/workflow-amendment@1 owner grant
+    to this exact frozen goal identity. The grant and the coordinator application decision are separate; accepted
+    work, receipts, decisions, evidence and unknown effects are preserved. Added scope needs an explicit path ceiling.
   node bin/starci.mjs journal-prune --journal-file <journal.sqlite> [--store-root <root[,root]>] [--retire <id[,id]>] [--vacuum true] [--dry-run]
     retire the rows of every workflow the named stores prove settled (finished, bound to another journal, or named
     with --retire); a workflow with live reservations is kept by the journal itself; unknown ids are reported only.
@@ -711,7 +725,7 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
   capability the headless host lacks (interface.asset needs design-tool, which model/hosts.yaml declares only
   for the Orca host) is refused as host-unsupported.`;}
 
-const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs'];
+const KERNEL_COMMANDS=['workflow-goal','workflow-amend','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs'];
 /** Read-only views of the workflow store: they open no kernel, call no Orca and never write. */
 const VIEW_COMMANDS=['workflow-list'];
 /** Operator maintenance of a local journal: no kernel, no Orca; the store roots named on the command line are the proof. */

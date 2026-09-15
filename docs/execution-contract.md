@@ -21,6 +21,19 @@ Canonical Work remains the semantic authority. Operation dependencies and ready 
 the operational journal is execution history, reservations and checkpoints, not another product plan.
 Identity is `(workflowId, opId, attempt, generation, jobId)`. Replies, artifacts and leases must match it.
 
+`workflow-stop` preserves that identity and atomically exports a human-readable
+`<work root>/_local/continuations/workflows/<workflow>.md` brief. It lists scope, accepted work, remaining
+operation/job/task/dispatch/terminal identities, owner decisions, blockers and the next safe action. It is
+never state authority: resume acquires the single controller lock and reconciles journal/state/pin/candidate
+records before dispatch; an absent process without exact settlement proof cannot release an unknown effect.
+
+An authorized goal or input clarification stays on the same workflow identity. While the stop flag is present
+and the controller is gone, `workflow-amend` binds a `starci/workflow-amendment@1` record to the frozen goal
+identity. It preserves the original approval provenance and records the real owner grant separately from the
+coordinator's application decision; its own digest is an amendment identity, never a new approval claim.
+Accepted work, decisions, evidence and unknown effects remain intact, and added scope requires an explicit
+owner-granted effect ceiling.
+
 ## Scheduling and slow work
 
 The local SQLite journal atomically admits resource reservations and records durable jobs. The manager,
@@ -38,6 +51,14 @@ work bound to workflow, generation, decision version and snapshot digest. Pendin
 without an operation retry. Stale identity, unknown or duplicate action IDs, unlisted context requests and
 malformed output fail closed. Repeated no-progress remains a bounded, visible incident; free-form prose is
 never an executable fallback.
+
+Host settlement reports two independent facts. `effectState` answers whether the failed attempt can still
+produce effects and is the fallback gate. `cleanup.complete` answers whether its owned terminal/resource is
+proved gone: `released`/`already_released`, an exact terminal close, or exact absence can prove it. Managed
+workers retained as `identity_unproven` and command-terminal workers retained as `no_owned_resource` keep an
+explicit cleanup limitation. They may fall through only when typed evidence independently proves
+`effectState:none`; missing output or unknown effect never qualifies. Without an exact terminal handle the
+runtime reports the residual and never guesses a terminal to close.
 
 Host-local `config.json` owns three non-operation roles: `planner` for `assessGoal`/`planOp`,
 `kernelManager` for `manageWorkflow`/`decide`, and `validator` for `critiqueGoal`/`validateOp`. The manager

@@ -1,0 +1,61 @@
+schema: starci/schema@1
+id: starci/workflow-amendment@1
+title: Authorized same-workflow amendment
+description: >-
+  Binds a real owner grant and a separate coordinator application decision to an existing frozen workflow
+  identity. It supplements the approved goal without rewriting its approval digest, history, evidence or effects.
+type: object
+additionalProperties: false
+required: [schema, workflowId, baseGoalIdentity, authority, coordinator, changes]
+properties:
+  schema: {const: starci/workflow-amendment@1}
+  workflowId: {type: string, minLength: 1}
+  baseGoalIdentity: {type: string, minLength: 1}
+  authority:
+    type: object
+    additionalProperties: false
+    required: [actor, source, statement]
+    properties:
+      actor: {const: owner}
+      source: {$ref: '#/$defs/source'}
+      statement: {type: string, minLength: 1}
+  coordinator:
+    type: object
+    additionalProperties: false
+    required: [actor, source, decision, rationale]
+    properties:
+      actor: {const: coordinator}
+      source: {$ref: '#/$defs/source'}
+      decision: {const: apply-same-id}
+      rationale: {type: string, minLength: 1}
+  changes:
+    type: object
+    additionalProperties: false
+    required: [clarifications, effectCeiling]
+    properties:
+      clarifications: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}
+      addScope: {type: array, uniqueItems: true, items: {type: string, minLength: 1}}
+      addDefinitionOfDone: {type: array, uniqueItems: true, items: {type: string, minLength: 1}}
+      operationFindings:
+        type: object
+        additionalProperties: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}
+      effectCeiling:
+        type: object
+        additionalProperties: false
+        required: [paths, resources, external]
+        properties:
+          paths: {type: array, uniqueItems: true, items: {type: string, minLength: 1}}
+          resources: {type: array, uniqueItems: true, items: {type: string, minLength: 1}}
+          external: {type: array, uniqueItems: true, items: {type: string, minLength: 1}}
+$defs:
+  source:
+    type: object
+    additionalProperties: false
+    required: [threadId, messageId, messageIdAvailability, quote, assurance, at]
+    properties:
+      threadId: {type: string, minLength: 1}
+      messageId: {type: [string, 'null']}
+      messageIdAvailability: {enum: [available, not-exposed]}
+      quote: {type: string, minLength: 1}
+      assurance: {const: conversation-context-not-authenticated}
+      at: {type: string, format: date-time}

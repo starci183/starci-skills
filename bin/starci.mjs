@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
  * `hosts/orca/launch.mjs`; this entry forwards argv to it unchanged so a host never has to name a
  * module path, and the launcher's own direct-run entry keeps working exactly as before.
  */
-const LAUNCHER_COMMANDS=['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status',
+const LAUNCHER_COMMANDS=['workflow-goal','workflow-amend','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status',
   'workflow-list','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs',
   'journal-prune','journal-retire',
   'start-op','settle','sweep','notify','report','wait','verify'];
@@ -22,6 +22,7 @@ const KERNEL_HELP=`
 workflow kernel (forwarded to the launcher; add --host <skill root> to reach a Work tree):
 
   workflow-goal        turn a job into a goal page and stop for the one human approval
+  workflow-amend       bind an explicit owner grant to the same stopped workflow without rewriting its approval
   workflow-approve     approve that goal, or re-admit what a blocked finish left open
   workflow-answer      give the owner's answer to a question or a reconciliation conflict
   workflow-run         run the approved workflow: allocate, launch, verify, commit, gate, report
@@ -30,7 +31,7 @@ workflow kernel (forwarded to the launcher; add --host <skill root> to reach a W
                        --journal-file <path>: use a local journal visible to the execution host
   workflow-status      print what one workflow is doing now, from its own files
   workflow-list        one line per workflow of this repository
-  workflow-stop        pause a running workflow at its next tick
+  workflow-stop        checkpoint/pause at the next tick and export _local/continuations/workflows/<id>.md
   workflow-lane-close  remove a merged workflow's worktree, keeping its branch
   workflow-supervise   start and restart the kernel of every approved, unfinished workflow
   workflow-inputs      serve the kernel-owned credential form in its workflow's Orca browser
@@ -40,7 +41,7 @@ workflow kernel (forwarded to the launcher; add --host <skill root> to reach a W
 
 machine checks (read-only; they judge bytes, not claims):
 
-  render check <ui node dir> --brand <work root>    a drawing against its capture and kept markup
+  render check <ui node dir> --brand <work root>    a provenance-marked browser capture against its kept markup (not ImageGen direction proof)
   brand check <work root> [--source <repo root>]    a brand record against the sources it names
   stacks check <repo root> --environment dev|vps --deployment-model <rendered.yaml-or-json>    static whole-app stack conformance
 `;

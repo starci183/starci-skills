@@ -109,7 +109,7 @@ the Work node kind and layout it closes, then from its allowlist; an unknown kin
 | `implement.shared` | origin `shared` | read the requester's paths -> minimal change, no refactor -> requester's checks -> report |
 | `implement.repair` | origin `repair` | map each finding -> confirm the check fails -> fix each -> re-run -> report with a finding -> fix map |
 | `implement.gate` | origin `gate` | read the failing gate -> re-run it -> fix exactly what it names -> re-run -> report |
-| `interface.draw` | kind `interface.draw` | read SRS/SDS + assertions -> enumerate every screen and DESCRIBE every state in the record (only the main state is drawn; loading, empty and error are the grammar's own state contracts the build renders) -> read the WHOLE installed canon and the brand, compose inside them -> write the interface design record (blueprint, states with the contract that renders each, slots, copy, the grammar version and brand rev it was drawn against) -> COMPOSE one candidate per screen and viewport from the grammar package's own renderers in a scratch folder outside the product, CAPTURE it with headless Chrome into the node's `assets/`, and KEEP THE MARKUP it rendered beside each PNG as `<candidate>.html` so the render can be checked from its source -> declare every artwork the chosen candidate embeds as an `artworkSlots` entry -> run `starci render check` over the node and fix what it names, a check it could not run being unproven and never a pass -> report; a missing business rule is `blocked` `sds-gap`, a region the grammar cannot render is `blocked` `grammar-gap` |
+| `interface.draw` | kind `interface.draw` | read accepted business/SDS + assertions, brand/masters, relevant UI knowledge and actual installed Grammar exports/anatomy/references -> enumerate every screen/state/viewport and map it to actual Grammar components -> for a large FE scope choose the smallest representative critical-screen set -> build and retain one exact prompt per representative direction -> invoke built-in `image_gen.imagegen`, save/open/review the images and record actual tool/input provenance without inventing a model name -> write the complete coverage/component/state map and artwork slots -> validate/report; the visual direction is not exact component/render/API proof, and implementation captures plus browser UAT remain downstream requirements |
 | `interface.asset` | kind `interface.asset` | read the record's `artworkSlots` and locate each slot's crop in the chosen candidate (undeclared artwork is `blocked` `interface-gap`) -> read the brand record and the masters each slot references -> generate each slot with the image model from that crop and those masters as references -> write one file per slot at the allowlisted asset path only -> open every file, compare it against its slot, record `{slot -> file, sha256}` back into the record -> self-audit -> report the slot -> file table; a brief the brand rules cannot satisfy is `blocked` `brand-gap` |
 | `frontend.implement` | kind `frontend.implement`, or any implementing kind on an `implementation/frontend/**` node | read the interface design record first (a screen, state or artwork it lacks is `blocked` `interface-gap`) -> story/spec red per state -> implement with the typed components only -> wire each artwork slot's generated file into the component its region binds -> update stories and skeletons -> lint/typecheck/unit -> self-audit every slot as wired -> report |
 | `review.verify` | kind `review.verify` | read-only: run every check yourself -> compare against assertions and SDS -> findings name file+line+assertion -> never fix -> `done` with findings (empty when clean) |
@@ -138,9 +138,11 @@ is the one case that does go back to the user.
 A frontend node is not one operation. Its sequences run in order - `interface.draw` -> `interface.asset` ->
 `frontend.implement` -> `uat.verify` - and each one says so in its definition of done ("the node is done only
 after `uat.verify`"), so no single operation of the lane can report the node finished:
-- `interface.draw` is design before code: it enumerates the screens and every state (loading, empty,
-  error, populated, permission-denied) and records the blueprint, contract slots and copy. A state nobody
-  enumerated is a state nobody builds, and an implementer that has to guess one is the cost. It also declares
+- `interface.draw` is image-first design before code: it enumerates the screens and every state (loading,
+  empty, error, populated, permission-denied), maps each to actual Grammar components and generates only a
+  small representative critical-screen set for a large task through built-in ImageGen. It retains exact prompts,
+  images, actual tool provenance and a complete coverage/component/state map. Generated direction is proposed
+  visual guidance, not exact component/render/API proof or running-product evidence. It also declares
   every artwork the chosen candidate embeds - an illustration, the mascot in an empty state, a decorative
   image, a chart placeholder - as an `artworkSlots` entry carrying the region it sits in, its purpose, the
   brief that reproduces it, its size and format, the brand masters it uses and the crop of the candidate it
@@ -201,7 +203,7 @@ Why the order matters:
 ### Not yet: cutting a `ui` node
 A `ui` node can be as big as an implementation one — a feature with eight screens is one drawing operation
 today. The same `implementation.plan` shape applies to it: children at `ui/<screen>`, each one
-`interface.draw` of a single screen (one grammar render, checked by the render checks), with the artwork slots
+`interface.draw` of a single screen (one ImageGen direction with its prompt/provenance and coverage map), with the artwork slots
 gathered back at the parent so `interface.asset` still runs **once per parent** rather than once per screen.
 That is not in this build: `cutReason` measures `implementation` nodes only, so a `ui` node is never cut and
 walks its lane whole. It is the next step, and it needs one thing this build does not have — a rule for where a

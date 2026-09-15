@@ -22,14 +22,14 @@ executionModes:
   orchestrated:
     controlPlane: orca
     bootstrapHosts: [codex, claude, orca]
-    bootstrapRole: create-native-coordinator-and-handoff
-    coordinatorAgent: persistent-native-agent-in-main-worktree
-    coordinatorAuthority: owns-plan-run-and-dag
+    bootstrapRole: retain-user-designated-coordinator
+    coordinatorAgent: current-user-designated-session
+    coordinatorAuthority: owns-approved-boundaries-and-review
     workers: [codex, claude, qwen]
-    workflowWrapperAgent: persistent-native-manager-agent-in-child-worktree
-    workflowManagerAuthority: owns-operation-dag-and-boundary-loop
-    workflowManagerReportsTo: parent-coordinator
-    workflowManagerExecutionPolicy: decision-dispatch-wait-only
+    workflowWrapperAgent: deterministic-workflow-kernel
+    workflowManagerAuthority: sole-state-writer-and-operation-dag
+    workflowManagerReportsTo: active-user-designated-coordinator
+    workflowManagerExecutionPolicy: typed-kernel-loop
     higherLayerSubstitution: forbidden
     operationAgent: supervised-native-agent-in-workflow-worktree
     maxConcurrentOperationAgents: 3
@@ -38,8 +38,8 @@ executionModes:
     scheduling: dependency-dag
     fanOutWithinOperation: forbidden
 agentArchitecture:
-  levels: [plan, coordinator, workflow-wrapper, operation-wrapper-agent, concrete-operation-agent]
-  flexibleLayers: [plan, coordinator, workflow-wrapper]
+  levels: [user-coordinator, workflow-kernel, operation-agent]
+  flexibleLayers: [user-coordinator]
   isolationBoundary: operation
   wrapperResponsibilities: [resolve-dependencies, normalize-input, resolve-agent-chain, validate-output, route-output, retry-no-effect]
   operationMapping: one-operation-instance-one-agent
@@ -51,12 +51,12 @@ orchestration:
   workspaceRouting: .workspaces/projects/<project>/work.json
   approvalPolicy: approvals/policy.json
   approvalMode: accepted-brief-then-auto
-  dispatch: A bootstrap session creates a persistent native Coordinator agent in the Orca main
-    worktree and hands off the Plan Run. That Coordinator owns the DAG and creates one isolated child
-    worktree for each ready workflow and launches one persistent native Workflow Manager in that child. The
-    Workflow Manager resolves operation dependencies, launches one isolated subagent for each ready
-    operation and waits for its boundary, using the first ready external agent in that operation's chain.
-    Managers never implement, repair or test on behalf of a lower layer.
+  dispatch: The current user-designated coordinator remains the coordinator, including when it is an external
+    Codex or Claude chat driving Orca. It creates an isolated child worktree for each ready workflow and starts
+    the deterministic workflow kernel there; no replacement Coordinator or state-owning Workflow Manager agent
+    is forced. The kernel is the sole workflow-state writer and launches one isolated agent for each ready
+    operation using the first eligible target in that operation's chain. The coordinator and kernel never
+    implement, repair or test on behalf of an operation agent.
 defaults:
   codex:
     working: gpt-5.6-sol
@@ -260,13 +260,11 @@ operators:
       - {environment: codex, profiles: [gpt-5.6-sol]}
   interface.draw:
     skill: starci
-    # Drawing renders the installed grammar in a browser - node plus headless Chrome - so every runtime that
-    # implements can draw; Sol stays first because the owner judges its compositions best.
-    chain: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
+    # Drawing invokes built-in ImageGen, so it uses the one operation runtime whose host tool contract exposes
+    # that invocation. The tool does not expose model selection; this chain is agent routing, not an image-model claim.
+    chain: [gpt-5.6-sol]
     environments:
       - {environment: codex, profiles: [gpt-5.6-sol]}
-      - {environment: claude, profiles: [claude-opus]}
-      - {environment: qwen, profiles: [qwen3.8-flash]}
   interface.implement:
     skill: starci
     chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
@@ -377,9 +375,10 @@ costPolicy: |-
   5.1 and Codex gpt-6-astra, but the op also generates a placeholder mascot when the product has none and only
   Codex gpt-5.6-sol carries an image generator, so that target leads its chain as the launchable candidate and
   the decide-role runtimes follow and defer the artwork with a concrete brief.
-  interface.draw renders the grammar in a browser and needs no image model, so it keeps Codex gpt-5.6-sol
-  first for its compositions, then Claude Opus, then Qwen 3.8 Flash; interface.asset re-renders the artwork that drawing
-  approved and therefore carries the same single image-capable link, with no deferral fallback - a deferred
+  interface.draw invokes built-in ImageGen for a small representative set and therefore carries the single
+  Codex gpt-5.6-sol route whose host contract exposes that tool. This route names the operation agent, not an
+  image-model version: tool model selection is not exposed. interface.asset re-renders the artwork that drawing
+  approved and therefore carries the same single image-capable route, with no deferral fallback - a deferred
   slot is exactly what this operation exists to close. grammar.update is the opposite case: it grows the
   installed grammar as code - a typed unit with its stories, its tests, its published version and its canon
   entry - so it carries the execution `implement` role but drops the image model entirely and leads with

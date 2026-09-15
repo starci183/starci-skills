@@ -132,8 +132,11 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       // to reject symlinks; a fixture named index.yaml is not a child node.
       if(inAssets){if(ent.isDirectory())walk(p,true);continue;}
       if (ent.isDirectory()) {
-        // Only the workspace-root local state is excluded; nested underscore folders remain invalid.
+        // The two workspace-root underscore directories have distinct contracts: `_local` is excluded runtime
+        // state, while `_resources` is traversed for typed resource metadata and opaque/encrypted payloads.
+        // Every other root underscore directory, and every nested underscore directory, remains invalid.
         if(dir===absolute&&ent.name==='_local')continue;
+        if(dir===absolute&&ent.name==='_resources'){walk(p);continue;}
         if(ent.name.startsWith('_')){if(canonicalV2)reservedDirectories.push(rel(p));else if(!['_local','_workflows','_schema','_archive'].includes(ent.name))walk(p);}
         else walk(p,ent.name==='assets');
         continue;
@@ -175,7 +178,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
   if(completions)for(const id of Object.keys(completions))if(!nodes.some(n=>n.meta.id===id))issue('COMPLETION_TARGET',id,'Completion preview target does not exist.');
   const nodesByDirectory=new Map();for(const n of nodes){const items=nodesByDirectory.get(n.dir)??[];items.push(n);nodesByDirectory.set(n.dir,items);}for(const [dir,items] of nodesByDirectory)if(items.length>1)issue('NODE_FORMAT_CONFLICT',rel(dir),'A Work folder must contain exactly one node metadata file.');
   if(canonicalV2){
-    for(const p of reservedDirectories)issue('RESERVED_DIRECTORY',p,'Canonical Work v2 keeps no underscore-prefixed directories; collocate owned YAML records and assets with their node.');
+    for(const p of reservedDirectories)issue('RESERVED_DIRECTORY',p,'Canonical Work v2 permits only workspace-root _local runtime state and workspace-root _resources typed custody; collocate all other owned YAML records and assets with their node.');
     for(const p of jsonFiles)issue('JSON_ARTIFACT',rel(p),'Canonical Work records and results use YAML; JSON files are not accepted inside Work.');
   }
   const stringList = (v,p,label,required=false) => {

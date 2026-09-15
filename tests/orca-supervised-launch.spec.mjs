@@ -294,11 +294,31 @@ test('a dead worker whose terminal Orca keeps as identity_unproven settles to no
   assert.equal(settlement.effectState,'none');
   assert.equal(settlement.stop.alreadySettled,true);
   assert.deepEqual(settlement.residualTerminal,{state:'retained',reason:'identity_unproven',processAction:'none'});
+  assert.deepEqual(settlement.cleanup,{complete:false,proof:null,reason:'identity_unproven',releaseState:'retained',processAction:'none',residualTerminal:true});
   const live=fakeOrca({
     'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_1',state:'ready'}}),
     'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_1',state:'retained',reason:'active_worker',processAction:'none'}})
   });
   assert.equal(settleDispatch(live.orca,'ctx_1',{cwd:'.'}).effectState,'partial');
+  const releasedWithoutStop=fakeOrca({
+    'worker-stop':()=>json(1,{ok:false,result:{dispatchId:'ctx_2',state:'ready'}}),
+    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_2',state:'released',processAction:'none'}})
+  });
+  const unproved=settleDispatch(releasedWithoutStop.orca,'ctx_2',{cwd:'.'});
+  assert.equal(unproved.cleanup.complete,true,'resource cleanup and effect proof are different facts');
+  assert.equal(unproved.effectState,'unknown','a release receipt cannot turn an unproved active worker into no effect');
+});
+
+test('a completed command-terminal dispatch with no owned resource proves no further effect but not terminal cleanup',()=>{
+  const fake=fakeOrca({
+    'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_command',state:'failed',alreadySettled:true,processAction:'none'}}),
+    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_command',state:'retained',reason:'no_owned_resource',processAction:'none'}})
+  });
+  const settlement=settleDispatch(fake.orca,'ctx_command',{cwd:'.'});
+  assert.equal(settlement.effectState,'none','typed terminal state independently proves this dispatch will produce no later effect');
+  assert.deepEqual(settlement.cleanup,{complete:false,proof:null,reason:'no_owned_resource',releaseState:'retained',processAction:'none',residualTerminal:true});
+  assert.equal(fake.spawned.some(args=>args[0]==='terminal'&&args[1]==='close'),false,
+    'without an exact terminal handle the runtime never guesses which command terminal to close');
 });
 
 test('close retry reuses proven stopped settlement when the terminal is already closed',()=>{
@@ -334,7 +354,7 @@ test('a worker whose tab the kernel already closed settles to none only on Orca\
 assert.equal(proven.effectState,'none');assert.equal(proven.exitedWorker.proven,true);assert.equal(proven.exitedWorker.terminal,'term_gone');assert.deepEqual(proven.residualTerminal,{state:'release_unknown',reason:'The agent terminal was closed but its process could not be confirmed stopped',processAction:'closed_agent_terminal'});
   const closes=[];const closeOk=(args)=>{closes.push(args.join(' '));return json(0,{ok:true,result:{closed:true}});};
   const contained=settleDispatch(fakeOrca({'worker-stop':stopFailed,'worker-release':releaseUnknown,'worker-show':show('failed','process_exited'),'terminal-list':list(['term_gone'],[]),'terminal-close':closeOk}).orca,'ctx_gone',{cwd:'.',wait:noWait});
-  assert.equal(contained.effectState,'none','a tab still listed is closed - exactly that handle - and its disappearance is the proof');assert.equal(contained.exitedWorker.closedTab,true);assert.equal(closes.length,1);assert.match(closes[0],/term_gone/);
+  assert.equal(contained.effectState,'none','a tab still listed is closed - exactly that handle - and its disappearance is the proof');assert.equal(contained.exitedWorker.closedTab,true);assert.equal(contained.cleanup.complete,true);assert.equal(contained.cleanup.proof,'exact-terminal-absent');assert.equal(closes.length,1);assert.match(closes[0],/term_gone/);
   const T0=Date.parse('2026-09-15T11:00:00Z'),showAt=(state,stage,heartbeat)=>()=>json(0,{ok:true,result:{dispatch:{id:'ctx_gone',status:state,last_heartbeat_at:heartbeat},worker:{dispatch_id:'ctx_gone',state,stage,agent_terminal_handle:'term_gone'},observation:{status:'live'}}});
   const screen=lines=>()=>json(0,{ok:true,result:{terminal:{handle:'term_gone',tail:lines}}});
   const idleScreen=['  No commit, no branch change, nothing outside the allowlist touched.','✻ Brewed for 24m 46s · done 5:50 PM','❯','  ⏵⏵ bypass permissions on (shift+tab to cycle)'],workingScreen=['  reading files','✢ Hullaballooing… (3m 12s · ↓ 5.1k tokens · esc to interrupt)','❯'];

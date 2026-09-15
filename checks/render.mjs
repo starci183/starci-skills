@@ -5,9 +5,10 @@ import {parseYaml} from '../core/yaml.mjs';
 import {TOKEN_TOLERANCE,defaultGrammarRoot,deltaEOk,formatHex,oklabToOklch,parseColor,readBrandRecord,rgbToOklab} from './brand.mjs';
 
 /**
- * A drawing is the installed grammar rendered in a browser, and this module checks that claim from the two
- * artefacts the drawing leaves behind: the PNG the browser captured and the markup it rendered. Both are read
- * as bytes, because both are the only things that cannot be argued with. A record may say "the palette is the
+ * Exact render proof is the installed grammar rendered in a browser, and this module checks that claim from
+ * the two artefacts an implementation capture leaves behind: the PNG the browser captured and the markup it
+ * rendered. ImageGen direction assets are explicitly outside this proof boundary. Both proof artefacts are
+ * read as bytes, because both are the only things that cannot be argued with. A record may say "the palette is the
  * brand's" and a reviewer may agree with it while the capture is full of a purple no token declares; the
  * pixels settle it. The kept markup settles the other canon rule the same way: a list of entities wrapped in
  * a card is visible in the class attributes whatever the record says about sections.
@@ -483,10 +484,13 @@ const readNodeRecord=uiDir=>{
   return {file,record};
 };
 
-/** The PNG captures the record declares, with the markup kept beside each one. */
+const browserCapture=asset=>/browser|headless|playwright|chrome/i.test(String(asset?.provenance??''))&&!plainGeneration(asset?.generation);
+const plainGeneration=value=>value&&typeof value==='object'&&!Array.isArray(value);
+/** Legacy/implementation PNG browser captures the record declares, with markup kept beside each one.
+ * ImageGen direction assets are deliberately excluded: pixels cannot prove exact Grammar DOM/render anatomy. */
 function candidatesOf(uiDir,record){
   const root=path.resolve(uiDir);
-  return listOf(record?.ui?.assets).filter(asset=>typeof asset.path==='string'&&/\.png$/i.test(asset.path)).map(asset=>{
+  return listOf(record?.ui?.assets).filter(asset=>typeof asset.path==='string'&&/\.png$/i.test(asset.path)&&browserCapture(asset)).map(asset=>{
     const declared=slash(asset.path);
     const entry={path:declared,role:asset.role??null,provenance:asset.provenance??null};
     if(path.isAbsolute(declared)||declared.split('/').includes('..'))return {...entry,error:'the declared path escapes the ui node'};
@@ -541,8 +545,9 @@ export function runRenderChecks({uiDir,brandTree,family=null,grammarRoot=default
   const surfaces=listOf(record?.ui?.surfaces);
   if(surfaces.length)for(const surface of surfaces)checks.push(checkMascotSlot({record,brand:identity.brand,screen:surface}));
   else checks.push(check('mascot-slot-missing','skip','The design record names no surface, so no surface could be checked for a mascot slot.',{record:slash(path.relative(path.resolve(uiDir),file))}));
+  const generatedDirections=listOf(record?.ui?.assets).filter(asset=>plainGeneration(asset?.generation)&&asset.generation.tool==='image_gen.imagegen').length;
   return {schema:RENDER_CHECKS,ok:checks.every(result=>result.outcome!=='fail'),checks,candidates,
-    node:{record:slash(file),surfaces:surfaces.length,candidates:found.length},
+    node:{record:slash(file),surfaces:surfaces.length,candidates:found.length,generatedDirections},
     brand:{rev:identity.rev,family:grammarFamily,revSource:identity.revSource,record:slash(identity.file)},
     grammar:{family:grammarFamily,cardClasses:cards.classes,source:cards.source,...(cards.error?{note:cards.error}:{})}};
 }
@@ -575,9 +580,9 @@ export function uiDirOf({op={},files=[]}={}){
 }
 
 /**
- * The hook the kernel calls on an accepted drawing, before the validator: the two canon rules, read from the
- * bytes the operation produced. It returns `null` - not a green result - when the operation wrote no design
- * record, so an operation that has nothing to do with a drawing is never reported as a drawing that passed.
+ * Compatibility hook for a design node that still carries browser-rendered candidates. New ImageGen direction
+ * assets return `null`: their pixels are design input, not exact Grammar render/DOM proof. Actual implementation
+ * captures and browser UAT are verified by their downstream operations.
  */
 export function renderChecksFor({op={},state=null,ctx={},files=[]}={}){
   const declared=uiDirOf({op,files});
@@ -589,6 +594,7 @@ export function renderChecksFor({op={},state=null,ctx={},files=[]}={}){
   if(!fs.existsSync(path.join(uiDir,'index.yaml')))return null;
   try{
     const result=runRenderChecks({uiDir,brandTree:workRoot});
+    if(result.node.candidates===0)return null;
     return {ok:result.ok,checks:result.checks};
   }catch(error){
     // A tree with no brand record, or a node with no `ui:` spec, is a broken input rather than a failed

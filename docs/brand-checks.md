@@ -135,10 +135,11 @@ family or the host carries no DNA snapshot for it — an unreadable canon proves
 
 ## Render checks
 
-The six checks above read the record and the source. They cannot see a drawing. `checks/render.mjs` reads
-the two artefacts an `interface.draw` leaves behind — the PNG a headless browser captured and the markup it
-was rendered from, kept beside it as `<candidate>.html` — and answers the two canon rules of 2026-09-13 from
-them.
+The six checks above read the record and the source. They cannot see an actual implementation render.
+`checks/render.mjs` reads the two artefacts a downstream browser capture leaves behind — the PNG and the
+markup it was rendered from, kept beside it as `<candidate>.html` — and answers the two canon rules of
+2026-09-13 from them. It deliberately ignores `interface.draw` ImageGen direction assets: those pixels guide
+the implementation but cannot prove exact Grammar components, DOM/render anatomy or API behavior.
 
 ```
 starci render check <ui node dir> --brand <work root> [--family <id>] [--json]

@@ -41,6 +41,16 @@ test('snapshot carries the full tracked build closure while excluding secret mat
 test('settled worker delta is derived from Git and frozen independently of report.files',t=>{const f=fixture(t);fs.writeFileSync(path.join(f.root,'src','app.js'),'two\n');
   const result=freezeDetectionCandidate(f.bridge,{git,reportedFiles:[]});assert.equal(result.status,'sealed');assert.deepEqual(result.observedFiles,['src/app.js']);assert.deepEqual(result.packet.reportedFiles,[]);});
 
+test('sealed replay rejects an extra newly-created allowlisted file outside the immutable delta',t=>{
+  const f=fixture(t);fs.writeFileSync(path.join(f.root,'src','app.js'),'two\n');
+  const first=freezeDetectionCandidate(f.bridge,{git,reportedFiles:['src/app.js']});assert.equal(first.status,'sealed');
+  fs.writeFileSync(path.join(f.root,'src','late.js'),'late write after sealing\n');
+  const replay=freezeDetectionCandidate(f.bridge,{git,reportedFiles:['src/app.js']});
+  assert.equal(replay.status,'quarantine');
+  assert.ok(replay.reasons.includes('canonical-delta-added:src/late.js'));
+  assert.equal(first.packet.changes.some(change=>change.path==='src/late.js'),false,'the sealed packet is never widened on replay');
+});
+
 test('modifying pre-existing user work or writing outside allowlist quarantines without revert',t=>{const f=fixture(t);fs.writeFileSync(path.join(f.root,'keep.txt'),'worker collision\n');
   fs.writeFileSync(path.join(f.root,'escape.txt'),'escape\n');const result=freezeDetectionCandidate(f.bridge,{git});assert.equal(result.status,'quarantine');
   assert.ok(result.reasons.some(reason=>reason.startsWith('pre-existing-user-work-modified:keep.txt')));assert.ok(result.reasons.includes('outside-allowlist:escape.txt'));

@@ -135,13 +135,14 @@ moment of use), or prints, logs or commits a secret value, is a defect. A creden
 variable, an `.env`, a checked-in file or a variable of its own naming is a defect, and a diff that WRITES a
 credential value anywhere at all is a defect whatever else it gets right. And an `e2e.verify` evidence whose
 `proof.fakes` omits a provider the diff fakes
-is a defect too, because a faked outside system is allowed there but never unnamed. The **render** rules say
-what a drawing is: the markup kept beside each candidate as `<candidate>.html` is what the candidate is
-judged from, a capture with no markup beside it is a defect, and in that markup a list of entities wrapped in
-a card surface is a defect, as is a dominant colour the brand does not declare or the brand's primary present
-nowhere. An image-model painting, a script that paints boxes, a mockup-tool export, a screenshot of unstyled
-markup or grey placeholder bars are each a defect; loading, empty and error states are described in the
-record, never drawn, and a candidate per state is not required.
+is a defect too, because a faked outside system is allowed there but never unnamed. The **render** rules apply
+only to downstream browser captures of the actual Grammar implementation: the markup kept beside a capture as
+`<candidate>.html` is what it is judged from, a capture with no markup beside it is a defect, and in that
+markup a list of entities wrapped in a card surface is a defect, as is a dominant colour the brand does not
+declare or the brand's primary present nowhere. `interface.draw` instead invokes built-in ImageGen for a small
+representative set, preserves its prompts and actual tool provenance, and maps the remaining screens/states to
+real Grammar components. Those generated pixels are visual direction, never exact component/render/API proof;
+the implementation capture and browser UAT remain separate evidence.
 
 ## Providers
 

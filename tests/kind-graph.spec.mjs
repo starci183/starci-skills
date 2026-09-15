@@ -430,7 +430,7 @@ test('every kind declares what it reads and what it produces, over the one recor
   assert.deepEqual(writesOf('business.decide',{profile}),['srs','decision']);
   assert.deepEqual(writesOf('architecture.decide',{profile}),['sds','decision']);
   assert.deepEqual(readsOf('brand.decide',{profile}),['code','grammar'],'every token is read out of the real token files');
-  assert.deepEqual(readsOf('interface.draw',{profile}),['srs','sds','brand','grammar','design']);
+  assert.deepEqual(readsOf('interface.draw',{profile}),['srs','sds','brand','grammar','design','asset']);
   assert.deepEqual(readsOf('interface.asset',{profile}),['design','brand']);
   assert.deepEqual(writesOf('frontend.implement',{profile}),['code']);
   assert.deepEqual(readsOf('backend.implement',{profile}),['srs','sds','decision','code']);
@@ -505,12 +505,12 @@ test('a declared external integration is proven live on a lane of its own',()=>{
   assert.deepEqual({kind:missing.kind,needUser:missing.needUser,then:missing.then},{kind:null,needUser:true,then:'needUser'});
 });
 
-test('a kind may need a host capability from the closed vocabulary: the drawing needs the design tool and every other kind runs on any host',()=>{
+test('the image-generating design kinds need the closed design-tool host capability',()=>{
   assert.deepEqual([...CAPABILITIES],['design-tool']);
   assert.deepEqual(profile.vocabularies.capabilities,[...CAPABILITIES]);
   assert.deepEqual(needsOf('interface.asset',{profile}),['design-tool'],'the artwork needs the image model');
-  assert.deepEqual(needsOf('interface.draw',{profile}),[],'the drawing renders the grammar in a browser and runs on every host');
-  for(const kind of KINDS.filter(kind=>kind!=='interface.asset'))assert.deepEqual(needsOf(kind,{profile}),[],kind);
+  assert.deepEqual(needsOf('interface.draw',{profile}),['design-tool'],'the direction invokes built-in ImageGen');
+  for(const kind of KINDS.filter(kind=>!['interface.asset','interface.draw'].includes(kind)))assert.deepEqual(needsOf(kind,{profile}),[],kind);
   const unknown=clone();unknown.kinds['backend.implement'].needs=['orca-browser'];
   assert.deepEqual(codes(validateGraph(unknown,{runtimes,operators})),['unknown-capability']);
   const shape=clone();shape.kinds['backend.implement'].needs='design-tool';

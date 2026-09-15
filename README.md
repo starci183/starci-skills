@@ -166,7 +166,7 @@ The runtime is laid out by concept, one folder per concern:
 node /absolute/path/to/host/.claude/bin/starci.mjs --help
 ```
 
-**Two proofs it works.** A feature added to a product that already decided others is reconciled rather than appended — every decided record it touches is cited, or becomes a conflict the owner decides, or is declared as new work — and `tests/reconciliation.spec.mjs` holds each rule. A drawing is the installed design grammar rendered in a browser, checked from the pixels it captured and the markup it kept beside them — `starci render check <ui node> --brand <work root>` — and `tests/render-checks.spec.mjs` holds those.
+**Two proofs it works.** A feature added to a product that already decided others is reconciled rather than appended — every decided record it touches is cited, or becomes a conflict the owner decides, or is declared as new work — and `tests/reconciliation.spec.mjs` holds each rule. Image-first design binds a small representative critical-screen set to exact ImageGen prompts/tool provenance and a complete coverage map; actual Grammar implementation captures and browser UAT remain distinct downstream proof. `tests/frontend-workflow.spec.mjs` and `tests/render-checks.spec.mjs` hold that boundary.
 
 The design is [docs/5-plus.md](docs/5-plus.md); the kernel in detail is [docs/workflow-kernel.md](docs/workflow-kernel.md); running one from a chat is [docs/workflow-chat.md](docs/workflow-chat.md).
 

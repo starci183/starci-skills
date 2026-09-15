@@ -15,6 +15,13 @@ import {PURE_MODEL_EXECUTION,reconcilePureModelJobs} from '../kernel/job-reconci
 import {runDurableJob} from '../kernel/job-worker.mjs';
 
 const temporary=()=>fs.mkdtempSync(path.join(os.tmpdir(),'starci-journal-'));
+const removeTemporary=dir=>{
+  const resolved=path.resolve(dir),temporaryRoot=path.resolve(os.tmpdir());
+  assert.equal(path.dirname(resolved),temporaryRoot);assert.match(path.basename(resolved),/^starci-journal-/);
+  // A durable wrapper may commit its terminal row just before its detached Node process releases the last
+  // Windows handle. Retry only this verified fixture path; EPERM here is cleanup timing, not test success.
+  fs.rmSync(resolved,{recursive:true,force:true,maxRetries:20,retryDelay:25});
+};
 const identity=(n,kind='operation')=>({jobId:`job-${n}`,workflowId:`workflow-${n}`,opId:`op-${n}`,attempt:1,generation:1,kind});
 const withJournal=async fn=>{const dir=temporary(),journal=openJournal({file:path.join(dir,'journal.sqlite')});try{return await fn(journal,dir);}finally{journal.close();fs.rmSync(dir,{recursive:true,force:true});}};
 
@@ -78,7 +85,9 @@ test('detached command bridge returns pending then replays the durable result',a
 test('command bridge preserves nonzero exit as a check result',async()=>{
   const dir=temporary(),bridge=createJobBridge({journalFile:path.join(dir,'journal.sqlite')}),id={workflowId:'wf7',opId:'op7',attempt:1,generation:1};const first=replayCommandCheck(bridge,`${JSON.stringify(process.execPath)} -e "process.stderr.write('bad');process.exit(7)"`,id);
   let final;for(let i=0;i<100&&!final;i+=1){await new Promise(resolve=>setTimeout(resolve,10));const value=bridge.poll(first.identity);if(value&&!value.pending)final=value;}
-  assert.equal(final.status,'succeeded');assert.equal(final.result.status,7);assert.equal(final.result.stderr,'bad');bridge.close();fs.rmSync(dir,{recursive:true,force:true});
+  assert.equal(final.status,'succeeded');assert.equal(final.result.status,7);assert.equal(final.result.stderr,'bad');
+  let wrapperClosed=false;for(let i=0;i<100&&!wrapperClosed;i+=1){wrapperClosed=bridge.journal.events({workflowId:id.workflowId}).some(event=>event.kind==='job-wrapper-closed');if(!wrapperClosed)await new Promise(resolve=>setTimeout(resolve,10));}
+  assert.equal(wrapperClosed,true,'the detached wrapper process must close before its Windows fixture directory is removed');bridge.close();removeTemporary(dir);
 });
 
 test('a capacity-deferred queued bridge job is admitted on a later replay',()=>{

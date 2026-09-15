@@ -1549,8 +1549,9 @@ $defs:
     description: UI design specification at module/ui/index.yaml or any scoped descendant under ui/.
       Each node may describe multiple screens, states and viewports, and own any number of design
       files under its own assets/**. Assets retain their actual formats; neither two filenames nor
-      one image per screen is prescribed. Execution screenshots and UAT captures are separate
-      outputs.
+      one image per screen is prescribed. New image-first directions carry a representative visual
+      set plus a complete coverage/component/state map. Generated directions, implementation renders
+      and browser UAT captures are three separate outputs.
     type: object
     additionalProperties: false
     required:
@@ -1617,6 +1618,54 @@ $defs:
             behavior:
               $ref: "#/$defs/string"
               description: Visible behavior in this state.
+      coverage:
+        type: object
+        additionalProperties: false
+        required:
+          - scale
+          - representativeScreens
+          - map
+        description: |-
+          Image-first delivery map. Large frontend scopes generate only a small representative set of
+          critical screens; every remaining screen, state and viewport derives through this explicit
+          component/state map. This is design coverage, not component, API or running-render proof.
+        properties:
+          scale:
+            enum:
+              - bounded
+              - large
+            description: Whether the selected frontend scope is bounded or large enough to require a deliberately small representative set.
+          representativeScreens:
+            $ref: "#/$defs/stringList"
+            description: Critical surfaces selected for ImageGen. For a large scope this is a small subset, not every screen.
+          map:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              additionalProperties: false
+              required:
+                - screen
+                - state
+                - viewport
+                - components
+                - derivation
+              properties:
+                screen:
+                  $ref: "#/$defs/string"
+                state:
+                  $ref: "#/$defs/string"
+                viewport:
+                  $ref: "#/$defs/string"
+                components:
+                  $ref: "#/$defs/stringList"
+                  description: Actual installed Grammar component anatomy used as the implementation reference; never an invented export.
+                derivation:
+                  $ref: "#/$defs/string"
+                  description: How this combination follows a representative direction, accepted inputs and Grammar state contracts.
+                directionAsset:
+                  $ref: "#/$defs/string"
+                  description: Optional ui-owned generated direction path when this exact combination is in the representative set.
       accessibility:
         $ref: "#/$defs/stringList"
         description: Keyboard, semantics, contrast and assistive-technology requirements.
@@ -1627,13 +1676,10 @@ $defs:
         type: array
         description: Any number of design/reference assets under this UI node's assets/**. Explain covered
           screens, states and viewports in role; record origin in provenance. Each path also appears
-          in node.assets. Multiple images do not imply alternative design directions. A drawn candidate is
-          one PNG per screen and viewport of that screen's main state, captured by a headless browser from
-          the installed grammar's own renderers, and the markup it was rendered from is kept beside it as
-          <candidate>.html under the same assets/ folder - the picture is what a reader sees, the markup is
-          what it was rendered from, so the render can be checked from its source rather than from an
-          opinion about it. Its provenance is that capture (browser, viewport, grammar package and version,
-          brand rev), not a generation prompt.
+          in node.assets. Multiple images do not imply alternative design directions. New representative
+          directions are generated through built-in ImageGen from accepted business/SDS, brand, relevant UI
+          knowledge and actual installed Grammar anatomy/reference inputs. Keep the exact prompt as a sibling
+          asset and record the tool provenance. A direction is never exact component/render/API proof.
         items:
           type: object
           additionalProperties: false
@@ -1651,6 +1697,27 @@ $defs:
             provenance:
               $ref: "#/$defs/string"
               description: Generation or source provenance for the design asset.
+            generation:
+              type: object
+              additionalProperties: false
+              required:
+                - tool
+                - promptPath
+                - inputRefs
+              description: Actual generation provenance for an ImageGen direction. Omit for non-generated references and prompt files.
+              properties:
+                tool:
+                  const: image_gen.imagegen
+                  description: The built-in ImageGen tool actually invoked; a prose claim or substitute renderer is not sufficient.
+                promptPath:
+                  $ref: "#/$defs/string"
+                  description: UI-owned prompt file whose exact bytes produced this direction.
+                inputRefs:
+                  $ref: "#/$defs/stringList"
+                  description: Accepted business/SDS, brand, UI knowledge and actual Grammar anatomy/reference inputs supplied to the prompt.
+                observedModel:
+                  $ref: "#/$defs/string"
+                  description: Optional only when the tool itself exposes an exact model identity. Never infer or promise a model name.
       observations:
         $ref: "#/$defs/stringList"
         description: Verified facts about current UI behavior or design system.

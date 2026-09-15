@@ -360,6 +360,16 @@ test('the kernel hook finds the ui node the operation wrote, and answers null wh
   assert.deepEqual(unavailable.checks.map(entry=>[entry.id,entry.outcome]),[['render-checks-unavailable','skip']]);
 });
 
+test('ImageGen directions are not misreported as exact browser render proof',t=>{
+  const {work}=tree(t,{label:'imagegen-hook'}),node=path.join(work,'features','learning','ui','dashboard');
+  fs.mkdirSync(path.dirname(node),{recursive:true});
+  const generated=uiNode(t,{label:'imagegen-node',assets:[{path:'assets/dashboard-desktop.png',role:'Representative direction',
+    provenance:'Generated through built-in ImageGen; not a running render.',generation:{tool:'image_gen.imagegen',promptPath:'assets/dashboard.prompt.txt',inputRefs:['business','sds','brand','grammar']}}]});
+  fs.cpSync(generated,node,{recursive:true});
+  const result=runRenderChecks({uiDir:node,brandTree:work,grammarRoot});assert.equal(result.node.generatedDirections,1);assert.equal(result.node.candidates,0);
+  assert.equal(renderChecksFor({op:{id:'draw',kind:'interface.draw',allowlist:['features/learning/ui/dashboard/index.yaml']},ctx:{work:{at:{workRoot:work}}}}),null);
+});
+
 test('the CLI prints one line per check and exits 1 when a check fails or the input is broken',t=>{
   const {work}=tree(t,{label:'cli'});
   const clean=uiNode(t,{label:'cli-clean',markup:SECTION_LIST,artworkSlots:[MASCOT_SLOT]});

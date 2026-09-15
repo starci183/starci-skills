@@ -31,7 +31,7 @@ test('the workflow-chat skill names only launcher commands that exist and the fl
   // Every backticked `workflow-<x>` the skill tells a chat to run must be a command the launcher dispatches,
   // because a chat cannot recover from a usage error the way an Orca monitor could read the sidebar.
   const named=new Set([...skill.matchAll(/`(workflow-[a-z-]+)(?:[ `])/g)].map(match=>match[1]));
-  for(const command of ['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-status','workflow-stop'])assert.ok(named.has(command),`the skill names ${command}`);
+  for(const command of ['workflow-goal','workflow-amend','workflow-approve','workflow-answer','workflow-run','workflow-status','workflow-stop'])assert.ok(named.has(command),`the skill names ${command}`);
   for(const command of named)assert.ok(known.has(command),`${command} is a launcher command`);
   // A chat is told one command line and no module path: `bin/starci.mjs` forwards argv to the launcher, so
   // every command the skill names must also be one the entry forwards, or the chat's own form would fail.

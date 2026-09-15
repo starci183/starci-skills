@@ -179,6 +179,16 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],now=Date.n
   }
   const packet=sealCandidate(snapshot,{allowedWrites:candidateObserved,reportedFiles,now});
   const frozen=verifyCandidateIdentity(snapshot,packet,{canonicalRoot:repoRoot,expectedCanonicalEntries:packet.files});
+  // Replaying a sealed freeze must bind the whole canonical delta, not only the paths already present in the
+  // immutable packet. In particular, a newly-created allowlisted file is absent from packet.files, so byte
+  // verification alone cannot see it. The observed Git delta and the sealed change set must be identical.
+  const sealedChanges=new Set(packet.changes.map(change=>change.path));
+  for(const file of candidateObserved)if(!sealedChanges.has(file)){
+    frozen.ok=false;frozen.mismatches.push(`canonical-delta-added:${file}`);
+  }
+  for(const file of sealedChanges)if(!candidateObserved.includes(file)){
+    frozen.ok=false;frozen.mismatches.push(`canonical-delta-missing:${file}`);
+  }
   for(const change of packet.changes)if(change.afterSha256===null&&fileState(repoRoot,change.path).state!=='absent'){
     frozen.ok=false;frozen.mismatches.push(`canonical-deletion-drift:${change.path}`);
   }

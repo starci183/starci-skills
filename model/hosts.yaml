@@ -14,15 +14,15 @@ purpose: |-
   to do the work with. A capability is therefore a fact about tooling, never about a model or a budget.
 hosts:
   # The multi-agent IDE the runtime was built against: it supplies worktrees, attested agent terminals, a
-  # dispatch mailbox and a run coordinator. It is the only host that carries the design tooling an
-  # `interface.asset` operation draws artwork with, which is why it is the one host declaring `design-tool`,
+  # dispatch mailbox and a run coordinator. It is the only host that carries built-in ImageGen for
+  # `interface.draw` directions and `interface.asset` artwork, which is why it declares `design-tool`,
   # and it runs up to `maxParallelOps` operations at once in one worktree - so `sequential` is false.
   orca:
     capabilities: [design-tool]
     sequential: false
     purpose: >-
-      The Orca IDE. Parallel attested agent terminals in one worktree, plus the design tooling an artwork
-      operation needs.
+      The Orca IDE. Parallel attested agent terminals in one worktree, plus built-in ImageGen for representative
+      interface directions and declared artwork.
   # The chat host: the same kernel without Orca, where an operation is a `claude -p` / `codex exec` / `qwen`
   # child process and a report arrives through a file mailbox. It offers nothing beyond the worktree the
   # command was started in, so its capability list is deliberately empty - the emptiness is the contract that

@@ -59,6 +59,14 @@ writes. The chat is a monitor, never an agent layer above the kernel and never a
   words that they override it; quote their reason. A `revise` verdict needs no flag, because its
   required changes are part of what the owner just approved.
 - Never approve, override a critique or choose an allocation on your own judgement.
+- If the owner explicitly clarifies or extends an already approved goal, keep its workflow id. Run
+  `workflow-stop --id <id>` and wait for the controller to exit, then use
+  `workflow-amend --id <id> --amendment <record.yaml>` only with a `starci/workflow-amendment@1`
+  record bound to the current frozen goal identity. The record must quote the actual owner grant and its
+  honest source identity separately from this chat's `apply-same-id` coordinator decision, and must bound
+  every added effect. Never manufacture an owner receipt, call the amendment digest an approval, reopen an
+  accepted operation or clear an unknown effect. Read the refreshed continuation brief and reconcile its
+  boundary findings before resuming.
 
 ## 4. Start the kernel detached
 

@@ -54,8 +54,8 @@ same(definition.matrix, stages.map((id, i) => [{ id, op: ops[i] }]));
 
 function flows(xs, implemented) { return validateJourneys(xs, { implemented }); }
 function context(x) {
-  shape(x, ['business', 'architecture', 'knowledge', 'repository', 'environment', 'accounts', 'fixtures', 'authorization'], ['execution']);
-  for (const k of ['business', 'architecture', 'knowledge', 'authorization']) strings(x[k], 1);
+  shape(x, ['business', 'architecture', 'brand', 'knowledge', 'grammar', 'repository', 'environment', 'accounts', 'fixtures', 'authorization'], ['execution']);
+  for (const k of ['business', 'architecture', 'brand', 'knowledge', 'grammar', 'authorization']) strings(x[k], 1);
   for (const k of ['accounts', 'fixtures']) strings(x[k]);
   string(x.repository); string(x.environment);
   if(x.execution!==undefined) {
@@ -89,15 +89,28 @@ function artifactShape(x) {
 function draws(xs) {
   array(xs, 1); unique(xs.map(x => x.id));
   for (const x of xs) {
-    shape(x, ['id', 'artifact', 'screen', 'state', 'viewport']);
-    ['id', 'artifact', 'screen', 'state'].forEach(k => string(x[k]));
+    shape(x, ['id', 'artifact', 'promptArtifact', 'screen', 'state', 'viewport', 'provenance']);
+    ['id', 'artifact', 'promptArtifact', 'screen', 'state'].forEach(k => string(x[k]));
     shape(x.viewport, ['width', 'height']);
     for (const n of Object.values(x.viewport)) if (!Number.isInteger(n) || n < 1) fail('Invalid viewport');
+    shape(x.provenance,['tool'],['observedModel']);same(x.provenance.tool,'image_gen.imagegen');
+    if(x.provenance.observedModel!==undefined)string(x.provenance.observedModel);
   }
+}
+function drawCoverage(value,drawIds) {
+  shape(value,['scale','representativeDrawIds','items']);member(value.scale,['bounded','large']);
+  strings(value.representativeDrawIds,1);unique(value.representativeDrawIds);same([...value.representativeDrawIds].sort(),[...drawIds].sort());
+  array(value.items,1);
+  for(const item of value.items){
+    shape(item,['screen','state','viewport','components','derivation','directionDrawId']);
+    for(const key of ['screen','state','viewport','derivation'])string(item[key]);strings(item.components,1);unique(item.components);
+    if(item.directionDrawId!==null){string(item.directionDrawId);if(!drawIds.includes(item.directionDrawId))fail('Coverage references an unknown representative draw');}
+  }
+  for(const id of drawIds)if(!value.items.some(item=>item.directionDrawId===id))fail('Representative draw is absent from coverage map');
 }
 function expectedInputs(input, index, previous) {
   if (index === 0) return { context: input.context, journeys: input.journeys };
-  if (index === 1) return { context: input.context, journeys: input.journeys, draws: previous.outputs.draws, drawArtifacts: previous.artifacts };
+  if (index === 1) return { context: input.context, journeys: input.journeys, draws: previous.outputs.draws, drawCoverage:previous.outputs.coverage, drawArtifacts: previous.artifacts };
   return { context: input.context, flows: previous.outputs.flows, codeRefs: previous.outputs.codeRefs, runtime: previous.outputs.runtime, assets: previous.outputs.assets };
 }
 export function makeRequest(input, index, previous = null) {
@@ -117,7 +130,7 @@ function validateRequest(req) {
   if (!definition.criteria[stages[req.step - 1]].every(id => req.criteria.includes(id))) fail('Required criteria missing');
   if (req.step === 1) { shape(req.inputs, ['context', 'journeys']); context(req.inputs.context); flows(req.inputs.journeys, false); }
   if (req.step === 2) {
-    shape(req.inputs, ['context', 'journeys', 'draws', 'drawArtifacts']); context(req.inputs.context); flows(req.inputs.journeys, false); draws(req.inputs.draws);
+    shape(req.inputs, ['context', 'journeys', 'draws', 'drawCoverage', 'drawArtifacts']); context(req.inputs.context); flows(req.inputs.journeys, false); draws(req.inputs.draws);drawCoverage(req.inputs.drawCoverage,req.inputs.draws.map(draw=>draw.id));
     array(req.inputs.drawArtifacts, 1); req.inputs.drawArtifacts.forEach(artifactShape);
   }
   if (req.step === 3) { shape(req.inputs, ['context', 'flows', 'codeRefs', 'runtime','assets']); context(req.inputs.context); flows(req.inputs.flows, true); codeRefs(req.inputs.codeRefs); runtime(req.inputs.runtime); validateAssets(req.inputs.assets,assetOptions(req.inputs.context.execution)); }
@@ -163,8 +176,8 @@ export function validateFEHandoff(out, acceptedJourneys, repository, environment
 function validateOutputs(req, res) {
   const out = res.outputs, assets = res.artifacts;
   if (req.step === 1) {
-    shape(out, ['draws']); draws(out.draws);
-    out.draws.forEach(x => refs([x.artifact], assets, 'image'));
+    shape(out, ['draws','coverage']); draws(out.draws);drawCoverage(out.coverage,out.draws.map(draw=>draw.id));
+    out.draws.forEach(x => {refs([x.artifact], assets, 'image');refs([x.promptArtifact],assets,'log');});
   } else if (req.step === 2) {
     validateFEHandoff(out, req.inputs.journeys, req.inputs.context.repository, req.inputs.context.environment,{execution:req.inputs.context.execution,drawIds:req.inputs.draws.map(d=>d.id)});
     for(const asset of out.assets.items)if(asset.status!=='deferred')refs([asset.artifact],assets,'image');

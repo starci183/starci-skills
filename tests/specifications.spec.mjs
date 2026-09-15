@@ -114,7 +114,7 @@ test('six-op map is generated from the actual contracts and business journeys fe
   assert.deepEqual(map.ops.filter(o => o.secondaryCalls.length).map(o => o.id), ['interface.implement','backend.implement']);
   const spec = sample();
   const { validateInput } = await import('../workflows/frontend.mjs');
-  const input = {schema:'starci/frontend-input@1',runId:'synthetic-integration',context:{business:['business'],architecture:['architecture'],knowledge:['knowledge'],repository:'nivo-fe',environment:'synthetic',accounts:[],fixtures:[],authorization:['Synthetic validation only']},journeys:spec.journeys};
+  const input = {schema:'starci/frontend-input@1',runId:'synthetic-integration',context:{business:['business'],architecture:['architecture'],brand:['brand'],knowledge:['knowledge'],grammar:['grammar'],repository:'nivo-fe',environment:'synthetic',accounts:[],fixtures:[],authorization:['Synthetic validation only']},journeys:spec.journeys};
   assert.equal(validateInput(input), true);
   const output = {assets:{reviewedDrawIds:[],items:[]},flows:spec.journeys.map(j => ({...structuredClone(j),sourcePaths:['example/source.tsx']})),codeRefs:[{repository:'nivo-fe',commit:'a'.repeat(40)}],runtime:{environment:'synthetic',origin:'http://localhost:3000',build:'synthetic'}};
   assert.equal(validateFEHandoff(output, input.journeys, 'nivo-fe', 'synthetic'), true);

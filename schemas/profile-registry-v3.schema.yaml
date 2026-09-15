@@ -39,15 +39,15 @@ properties:
         properties:
           controlPlane: {const: orca}
           bootstrapHosts: {const: [codex, claude, orca]}
-          bootstrapRole: {const: create-native-coordinator-and-handoff}
-          coordinatorAgent: {const: persistent-native-agent-in-main-worktree}
-          coordinatorAuthority: {const: owns-plan-run-and-dag}
+          bootstrapRole: {const: retain-user-designated-coordinator}
+          coordinatorAgent: {const: current-user-designated-session}
+          coordinatorAuthority: {const: owns-approved-boundaries-and-review}
           workers:
             const: [codex, claude, qwen]
-          workflowWrapperAgent: {const: persistent-native-manager-agent-in-child-worktree}
-          workflowManagerAuthority: {const: owns-operation-dag-and-boundary-loop}
-          workflowManagerReportsTo: {const: parent-coordinator}
-          workflowManagerExecutionPolicy: {const: decision-dispatch-wait-only}
+          workflowWrapperAgent: {const: deterministic-workflow-kernel}
+          workflowManagerAuthority: {const: sole-state-writer-and-operation-dag}
+          workflowManagerReportsTo: {const: active-user-designated-coordinator}
+          workflowManagerExecutionPolicy: {const: typed-kernel-loop}
           higherLayerSubstitution: {const: forbidden}
           operationAgent: {const: supervised-native-agent-in-workflow-worktree}
           maxConcurrentOperationAgents: {const: 3}
@@ -61,9 +61,9 @@ properties:
     required: [levels, flexibleLayers, isolationBoundary, wrapperResponsibilities, operationMapping, concreteAgentBinding]
     properties:
       levels:
-        const: [plan, coordinator, workflow-wrapper, operation-wrapper-agent, concrete-operation-agent]
+        const: [user-coordinator, workflow-kernel, operation-agent]
       flexibleLayers:
-        const: [plan, coordinator, workflow-wrapper]
+        const: [user-coordinator]
       isolationBoundary: {const: operation}
       wrapperResponsibilities:
         const: [resolve-dependencies, normalize-input, resolve-agent-chain, validate-output, route-output, retry-no-effect]

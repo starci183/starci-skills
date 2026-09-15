@@ -8,7 +8,11 @@ While the Orca parent coordinates the Core/shared, Accounting, Chatbot, and Sale
 
 ## Confirmed observations
 
-### The orchestration Coordinator must run inside the Orca main worktree
+### Historical 4.x observation: the orchestration Coordinator ran inside the Orca main worktree
+
+This observation is retained as history, not current policy. Runtime 5-plus replaced the state-owning
+Coordinator/Workflow Manager layers with the deterministic workflow kernel; the current user-designated
+Codex, Claude or Orca session remains coordinator and must not be replaced against the user's instruction.
 
 - Expected: an external Codex or Claude chat bootstraps an Orca orchestration, then a persistent native Coordinator agent in the main worktree owns the Run/DAG, boundary-event loop, decisions, and dynamic operation-agent lifecycle.
 - Observed: keeping the event loop in the external bootstrap chat left the Orca main worktree as a plain shell and made the visible parent appear to have no managing agent.
@@ -56,16 +60,16 @@ While the Orca parent coordinates the Core/shared, Accounting, Chatbot, and Sale
 - Expected: every isolated operation agent has one Task, one Dispatch, one terminal identity, liveness, settlement, and a worker resource visible to the parent DAG.
 - Observed: Qwen launched through `terminal create`, then received a Dispatch using `--return-preamble` followed by `terminal send`. The Task and Dispatch were tracked, and lifecycle mail worked, but `worker-list` reported `workerState: unsupervised`, `terminalState: retained`, and no resource ownership record.
 - Impact: provider/profile routing works, but the Coordinator lacks the same resource-accounting and stop/release guarantees available for Codex or Claude workers launched through `worker-start`.
-- Resolution in StarCi: this command-terminal path is forbidden. Create a canonically named Task and launch it directly with `worker-start --agent qwen-code`; rename the returned native terminal and require `worker-show` provider/name attestation before accepting effects.
+- Resolution in StarCi 1.0.0: command-terminal is a supported typed launch form for a declared provider profile, not a managed worker impersonation. It binds a fresh terminal to the exact Task/Dispatch, verifies prompt consumption plus rendered provider/model identity, and reports cleanup separately from effect settlement. Because Orca can return retained `no_owned_resource` with no `terminalResource`, cleanup stays incomplete unless the exact terminal is closed or proved absent; independently proven no-effect settlement may still permit fallback.
 
 ### Native Qwen branding can succeed while supervised prompt delivery fails
 
 - Expected: `worker-start --agent qwen-code` creates one branded Qwen operation agent, injects its Task contract, reports a stable session identity, and owns the terminal until `worker-release`.
 - Observed: Orca runtime 1.4.188 created a branded Qwen Code 0.23.3 TUI running the configured `qwen3.8-flash`, but three fresh native launches failed at `dispatch_input` with `agent_prompt_stalled`; another attempt surfaced `session_not_reported`. The installed Orca adapter declares `promptInjectionMode: stdin-after-start`, while this Qwen CLI exposes positional one-shot input and `-i/--prompt-interactive` for an interactive startup prompt. `dispatch --inject` rejected the residual live Qwen terminal as an unrecognized agent.
 - Impact: native identity and model visibility alone do not prove Task delivery or supervised resource ownership. Blind retry creates idle duplicate Qwen terminals and failed Tasks; treating the live TUI as fully supervised makes stop/release accounting false.
-- Immediate containment: fence or abandon the failed launch Dispatch, reconcile its exact effects and retry only after no effects are verified. New Qwen attempts use direct `worker-start --agent qwen-code`; never adopt the failed TUI through manual prompt submission or a command-terminal fallback.
+- Immediate containment: fence or abandon the failed managed-launch Dispatch, reconcile its exact effects and retry only after no effects are verified. A later declared command-terminal attempt must be a fresh terminal and Dispatch created by the typed launcher; never adopt the failed TUI or manually submit its staged prompt.
 - Upgrade candidate: change the native Qwen adapter to the Qwen 0.23.3 interactive startup-prompt contract (equivalent to `-i/--prompt-interactive`), recognize the Qwen session, and return a supervised resource only after the Task contract is observed as consumed. Add Windows regressions for multiline prompts, `agent_prompt_stalled`, `session_not_reported`, exact provider/model attestation, and canonical `[Op] <operation> - <scope>` naming.
-- Runtime containment: automatic chains may contain only native managed-agent targets. After a verified no-effect Qwen startup failure, use the operation's next native managed fallback; never fall through to a Qwen/DeepSeek command terminal merely to keep work moving.
+- Runtime containment: automatic chains may contain only declared, validated managed-agent or command-terminal targets. After a verified no-effect startup failure the launcher may try the next declared target; partial or unknown effects stop the chain. A command-terminal target must use the exact fresh-terminal/returned-preamble contract and cannot be manufactured as an ad hoc fallback.
 
 ### Manual external-provider identity is not represented in the Orca agent tree
 
@@ -132,7 +136,7 @@ While the Orca parent coordinates the Core/shared, Accounting, Chatbot, and Sale
 The following observations are now handled by the runtime itself; the regression test names are the proof to rerun.
 
 - **Native Qwen branding can succeed while supervised prompt delivery fails** and **Dispatch injection cannot adopt an agent that is already working**: `start-op` proves prompt delivery from the `worker-show` receipt, classifies a stall as `effectState: none`, settles the attempt and falls through to the next managed candidate inside the same invocation (`tests/orca-supervised-launch.spec.mjs`: "a Qwen prompt stall is classified as no-effect and the launcher falls through to Claude in the same invocation"; `tests/orca-calls.spec.mjs`: "worker-start receipts classify into ok, failed-none, failed-partial and unknown"). The Orca-side prompt-injection defect remains an Orca upgrade candidate.
-- **Terminal stop and reset need observable settlement**: `settle` reports `none` only when `worker-release` returns `released` or `already_released`; `stop_unknown` and `release_unknown` stay `unknown` and block fallback (`tests/orca-supervised-launch.spec.mjs`: "settlement reports unknown when stop cannot be confirmed").
+- **Terminal stop and reset need observable settlement**: `settle` separates effect proof from cleanup proof. `released` or `already_released` proves owned-resource cleanup; an exact terminal close or absence can prove cleanup through that handle. Retained `identity_unproven` and `no_owned_resource` remain explicit `cleanup.complete:false`, even when an exact stopped/failed state independently proves `effectState:none` and therefore permits safe fallback. `stop_unknown` and unproved effects stay `unknown` and block fallback (`tests/orca-supervised-launch.spec.mjs`).
 - **Workflow Monitors ending in `process_exited` with retained `identity_unproven` terminals** (observed on `run_4f84cba16322`): `replace-monitor` proves the Monitor is not live, settles it and relaunches with `--retry-of` from the supervisor chain (`tests/orca-supervised-launch.spec.mjs`: "a dead Workflow Monitor is settled and replaced"). Monitor and Coordinator providers now come from `model/registry.yaml` `supervisors`, not from a hardcoded Codex launch.
 - **Untyped Orca failures**: every call is declared in `providers/orca/calls.yaml`, verified against the live `agent-context` (`verify`), replayed once with `--retry-request` on an unknown mutation result, and returned as `starci/orca-call-result@1` (`tests/orca-calls.spec.mjs`).
 
@@ -200,4 +204,3 @@ those failures lived in.
 - **Why the observations above are still here.** They are reproduced runtime behavior, and the OBS entries
   remain the record of what Orca actually does. What changed is the architecture that has to survive them,
   not the facts.
-

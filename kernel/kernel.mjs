@@ -45,6 +45,8 @@ import {readDistJson} from '../core/runtime-root.mjs';
 import {configuredProviderOrder,loadConfig,nonOperationModels} from '../scripts/config.mjs';
 import {recordDigests,reconcileIntake} from './reconciliation.mjs';
 import {renderChecksFor} from '../checks/render.mjs';
+import {continuationBoundary,exportContinuationBrief} from './continuation.mjs';
+import {amendmentContractLines,applyWorkflowAmendment} from './amendment.mjs';
 import {laneOwnerOf,laneNameOf,laneRowTitle,laneView,openLane,settleLane,laneBranchRef} from './lanes.mjs';
 import {INFRA_RESTART_LIMIT,RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTerminals,ownKernelTerminal,rebindRunIfNeeded,
   recoverCoordinatorTab,reconcileWithOrca,releaseKernelTab,siblingKernelGone,sweepStaleTerminals} from './terminals.mjs';
@@ -141,7 +143,7 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
     // one the kernel routes to itself, and null here means this workflow may not change the grammar.
     ledgerRoles:null,
     run:null,from:null,workflowTask:null,phase:'goal',approved:false,
-    definitionOfDone:[],risks:[],questions:[],ledger:[],ops:[],needUser:[],gateResults:[],verifyRounds:{},gateRounds:0,
+    definitionOfDone:[],amendments:[],risks:[],questions:[],ledger:[],ops:[],needUser:[],gateResults:[],verifyRounds:{},gateRounds:0,
     // Decisions the runtime took on its own recommendation so the work could continue. They are NOT `needUser`:
     // the workflow may finish `done` over them, and the owner's different answer is what reopens what rests on one.
     provisional:[],
@@ -333,6 +335,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     ...(laneLine(state,op)?[laneLine(state,op),``]:[]),
     ...languageBlock(language??configuredLanguage(state),op),
     `## Goal`,op.goal,``,
+    ...amendmentContractLines(state),
     ...critiqueBlock(critique),
     ...overlapBlock(critique,op),
     // What this kind is derived from and what it may produce, from the record catalog: an operation reads its
@@ -2102,8 +2105,9 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       store.appendEvent({event:'io-undeclared-write',op:op.id,files:undeclared.map(item=>item.file)});
       return retryOp(store,state,op,undeclared.map(item=>`produced a ${item.record} record it does not declare: ${item.file}`),ctx,'io-undeclared-write');
     }
-    // A drawing is the grammar rendered, so the canon rules are checked from the bytes it produced, before any
-    // model judges it. A kernel given no render checker behaves exactly as it did before the rules existed.
+    // Legacy UI records may still carry browser captures beside a drawing; check those exact render bytes
+    // before any model judges them. ImageGen directions return no render verdict here because they are design
+    // input, not Grammar/DOM proof; implementation captures and browser UAT remain downstream evidence.
     if(op.kind==='interface.draw'&&typeof ctx.renderChecks==='function'){
       const rendered=(()=>{try{return ctx.renderChecks({op,state,ctx,files});}catch(error){store.appendEvent({event:'render-check-unavailable',op:op.id,reason:String(error?.message??error).slice(0,240)});return null;}})();
       if(plain(rendered)&&rendered.ok===false){
@@ -2675,7 +2679,7 @@ function finish(store,state,outcome,reason=null,ctx=null){
     lane:laneView(state),
     ledgerMode:state.ledgerMode,scope:state.scope,ledgerSummary:refreshLedgerSummary(state,ctx),decisions:state.decisions,brand:state.brand??null,
     ledgerRoot:state.ledgerRoot?slash(state.ledgerRoot):null,ledgerShared:Boolean(state.ledgerShared),ledgerOwner:state.ledgerOwner??null,
-    definitionOfDone:state.definitionOfDone,
+    definitionOfDone:state.definitionOfDone,amendments:state.amendments??[],
     ledger:state.ledger.map(item=>({...item})),
     acceptedAsPreexisting:state.ledger.filter(item=>item.status==='preexisting').map(item=>item.id),
     gates:state.gateResults.map(result=>({name:result.name,command:result.command,status:result.status,exitCode:result.exitCode})),
@@ -3986,6 +3990,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     state.ledgerMode=LEDGER_MODES.includes(state.ledgerMode)?state.ledgerMode:'plan';
     state.scope=Array.isArray(state.scope)?state.scope:[];
     state.decisions=Array.isArray(state.decisions)?state.decisions:[];
+    state.amendments=Array.isArray(state.amendments)?state.amendments:[];
     // A state written before lanes existed resumes with none: its nodes keep the single-step behaviour.
     state.lanes=plain(state.lanes)?state.lanes:{};
     // Ledger root = the worktree (branch content); the store root above = the main repository (history).
@@ -4050,9 +4055,44 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       next:`the worktree is gone and branch ${state.lane.closed.preservedBranch} is preserved`};
   }
   if(command==='workflow-stop'){
-    const {store}=open(options.id);
+    const {store,state}=open(options.id);
     fs.writeFileSync(path.join(store.dir,'stop.flag'),String(Date.now()));
-    return {schema:WORKFLOW_KERNEL,command,id:options.id,dir:store.dir,stopRequested:true,next:'the running kernel exits at its next iteration (at most one wait tick); workflow-run resumes from state.json'};
+    const continuation=exportContinuationBrief(store,state);
+    store.appendEvent({event:'continuation-exported',file:slash(continuation.file),stateDigest:continuation.stateDigest,
+      boundaryFindings:continuation.boundary.findings.map(item=>item.code)});
+    return {schema:WORKFLOW_KERNEL,command,id:options.id,dir:store.dir,stopRequested:true,
+      continuation:continuation.file,boundary:continuation.boundary.findings,
+      next:'the running kernel exits at its next iteration (at most one wait tick); workflow-run resumes from the same journal/state checkpoint and exact live identities'};
+  }
+  if(command==='workflow-amend'){
+    const {store,state}=open(options.id);
+    need(fs.existsSync(path.join(store.dir,'stop.flag')),
+      `Workflow ${state.id} is not paused; run workflow-stop --id ${state.id} and wait for its controller to exit`);
+    need(!kernelAlive(store),`The kernel of ${state.id} is still running; wait for the stopped controller to exit before amending it`);
+    let amendmentJournal=null,applied;
+    try{
+      if(isEnrolled(state)){
+        amendmentJournal=openJournal({file:state.engine.journalFile});
+        store.bindJournal(amendmentJournal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
+        const durable=store.loadState();
+        need(plain(durable)&&durable.id===state.id&&durable.engine?.generation===state.engine.generation,
+          `Workflow ${state.id} has no matching durable amendment checkpoint for generation ${state.engine.generation}`);
+        Object.assign(state,durable);
+      }
+      applied=applyWorkflowAmendment(store,state,required(options.amendment,'amendment file'));
+    }finally{amendmentJournal?.close();}
+    const continuation=exportContinuationBrief(store,state);
+    if(!applied.replayed)store.appendEvent({event:'continuation-exported',file:slash(continuation.file),stateDigest:continuation.stateDigest,
+      boundaryFindings:continuation.boundary.findings.map(item=>item.code),afterAmendment:applied.amendment.digest});
+    const next=continuation.boundary.findings.length
+      ?'reconcile the exact boundary identities before any resume; the amendment did not clear unknown effects or writers'
+      :state.finished?.outcome==='blocked'
+        ?`run workflow-approve --id ${state.id} to re-admit the existing blocked continuation, then workflow-run on the same workflow id`
+        :`run workflow-run --id ${state.id} on the same workflow id and frozen goal identity`;
+    return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,ok:true,replayed:applied.replayed,
+      amendment:{digest:applied.amendment.digest,baseGoalIdentity:applied.amendment.baseGoalIdentity,
+        ownerGrant:applied.amendment.authority.source,coordinatorDecision:applied.amendment.coordinator.source},
+      continuation:continuation.file,boundary:continuation.boundary.findings,next};
   }
   if(command==='workflow-approve'){
     const {store,state}=open(options.id);
@@ -4181,6 +4221,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       engine:state.engine?{schema:state.engine.schema??null,version:state.engine.version,generation:state.engine.generation,
         assurance:state.engine.assurance,runtimeDigest:state.engine.runtimePin?.digest??null}:null,
       iterations:state.iterations,head:state.head,ledgerMode:state.ledgerMode,scope:state.scope,hostAdapter:state.hostAdapter??null,
+      amendments:state.amendments.map(item=>({digest:item.digest,baseGoalIdentity:item.baseGoalIdentity,
+        ownerGrant:item.authority?.source??null,coordinatorDecision:item.coordinator?.source??null,effectCeiling:item.changes?.effectCeiling??null})),
       worktree:slash(state.worktree),branch:state.branch,lane:laneView(state),
       ledgerRoot:state.ledgerRoot?slash(state.ledgerRoot):null,ledgerSource:state.ledgerSource??null,
       ledgerShared:Boolean(state.ledgerShared),ledgerOwner:state.ledgerOwner??null,codeSide:state.codeSide??null,
@@ -4210,6 +4252,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     need(!predatesEngineSchema(state),`Workflow ${state.id} was enrolled by an earlier build; pause it and run workflow-retry --id ${state.id} --runtime-pin <pin-record.json> to migrate its record onto this build`);
     const releaseKernel=acquireKernelLock(store,{launchToken:options['startup-token']??null});
     try{
+    const resumeBoundary=continuationBoundary(state,{controller:{alive:true,pid:process.pid,startupTokenDigest:'held-by-this-process'}});
+    need(resumeBoundary.ok,`Workflow resume boundary is inconsistent; inspect ${slash(store.paths.continuation)}: ${resumeBoundary.findings.map(item=>`${item.code}: ${item.detail}`).join('; ')}`);
     const host=hostDescriptorOf(orca);
     if(isEnrolled(state)){
       const pinned=verifyRuntimePin(state.engine.runtimePin);need(pinned.ok,`Runtime pin verification failed: ${pinned.reason??''}`);
@@ -4267,6 +4311,11 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       modelEligibility:eligibility,modelPolicy,runtimeBinding,
       ledgerRoot:options['ledger-root']??null,
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});
+    if(stopRequested(store)){
+      const continuation=exportContinuationBrief(store,state);
+      store.appendEvent({event:'continuation-exported',file:slash(continuation.file),stateDigest:continuation.stateDigest,
+        boundaryFindings:continuation.boundary.findings.map(item=>item.code),afterKernelStop:true});
+    }
     // The kernel's own tab is the Run's coordinator terminal, so it lives as long as the workflow: a pause or a
     // rebuild leaves it for the next start to reuse (a new tab would have to re-bind the Run and fence every live
     // Dispatch). A finished workflow closes it: nobody reads it any more.

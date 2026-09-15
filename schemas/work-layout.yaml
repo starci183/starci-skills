@@ -97,8 +97,9 @@ rules:
   - Source code remains in bound repositories; code/index.yaml tracks requirements, exact source
     references and completion.
   - All structured Work records and results use YAML. JSON and underscore-prefixed directories are
-    rejected in canonical records, except the workspace-root _local directory reserved for excluded
-    execution state; central schemas stay in .claude.
+    rejected in canonical records, except workspace-root _local for excluded execution state and
+    workspace-root _resources for typed resource.yaml custody plus declared opaque or encrypted payloads;
+    central schemas stay in .claude.
   - Repository and environment provenance is written directly in sourceRefs or the owning module
     record. refs and dependsOn remain stable technical node IDs for digest propagation.
   - UAT accounts.yaml uses work/disposable-accounts@1 and may contain only synthetic disposable

@@ -18,18 +18,20 @@ function validateRegistry(registry) {
     || solo?.isolation !== 'isolated-per-operation'
     || solo?.fanOutWithinOperation !== 'forbidden'
     || orchestrated?.controlPlane !== 'orca'
-    || orchestrated?.workflowWrapperAgent !== 'persistent-native-manager-agent-in-child-worktree'
+    || orchestrated?.bootstrapRole !== 'retain-user-designated-coordinator'
+    || orchestrated?.coordinatorAgent !== 'current-user-designated-session'
+    || orchestrated?.workflowWrapperAgent !== 'deterministic-workflow-kernel'
     || orchestrated?.operationAgent !== 'supervised-native-agent-in-workflow-worktree'
     || orchestrated?.maxConcurrentOperationAgents !== 3
     || orchestrated?.worktree !== 'isolated-child-per-workflow-attempt'
     || orchestrated?.isolation !== 'isolated-per-operation'
     || orchestrated?.fanOutWithinOperation !== 'forbidden') {
-    throw Error('Profile registry execution modes must keep workflow-child worktrees, per-operation subagent isolation and the Codex/Claude versus Orca host boundaries');
+    throw Error('Profile registry execution modes must keep the user-designated coordinator, deterministic workflow kernel, workflow-child worktrees and per-operation agent isolation');
   }
   if (registry.agentArchitecture?.isolationBoundary !== 'operation'
     || registry.agentArchitecture?.operationMapping !== 'one-operation-instance-one-agent'
     || registry.agentArchitecture?.concreteAgentBinding !== 'provider-profile-model') {
-    throw Error('Profile registry must preserve the five-layer operation-agent architecture');
+    throw Error('Profile registry must preserve the user-coordinator, workflow-kernel and operation-agent architecture');
   }
   if (!Array.isArray(registry.fallback.allowedReasons) || registry.fallback.requiredEffectState !== 'none') throw Error('Profile registry fallback policy is invalid');
 }

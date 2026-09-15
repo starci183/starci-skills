@@ -105,6 +105,12 @@ rules:
         when: Copy review or source props are offered as the evidence
         observe: |-
           They are not sufficient. A rendered claim is proved by the rendered output and its traced authority
+      - id: case-6
+        when: An ImageGen direction is used before implementation
+        observe: |-
+          It is labelled proposed visual direction, retains its exact prompt and actual tool/input provenance,
+          and points to a complete coverage/component/state map. Treating it as exact Grammar DOM/render/API
+          evidence or as a screenshot of the running product falsifies the claim
   - id: TRUTH-5
     title: The render-truth verdict
     governs: |-

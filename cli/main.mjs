@@ -14,13 +14,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const help = `StarCi 3.0 — bounded, local operations
 Usage:
   starci workflow-goal --job <text> [--scope f1,f2] [--lane [<name>]] [--host <skill root>]
+  starci workflow-amend --id <id> --amendment <starci/workflow-amendment@1.yaml>
   starci workflow-approve --id <id> [--allocation <runtime>=<slots>,...] [--allow-dynamic N] [--accept-critique "<reason>"]
   starci workflow-answer --id <id> --op <ask op> [--choice <n>] [--note "<answer>"]
   starci workflow-run --id <id> [--host-adapter orca|headless] [--max-iterations N]
   starci workflow-retry --id <id> --runtime-pin <file>
   starci workflow-status --id <id> [--json true]
   starci workflow-list [--json true]
-  starci workflow-stop --id <id>
+  starci workflow-stop --id <id>  # exports _local/continuations/workflows/<id>.md
   starci workflow-lane-close --id <id>
   starci workflow-supervise --host <skill root> [--once true] [--poll-ms 60000]
   starci workflow-inputs --session <kernel-owned-session-file>

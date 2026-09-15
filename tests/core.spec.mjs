@@ -318,6 +318,23 @@ test('authored suspension reason is operational, missing/blank reason fails, and
   f.node('imported',{...f.metas.get('imported'),state:'done'});assert.ok(codes(f.run()).includes('COMPLETION'));assert.equal(f.run().nodes[0].effectiveState,'invalid');
 });
 
+test('canonical v2 accepts typed encrypted identity custody at root _resources without changing payload bytes',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'work-custody-test-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const write=(file,bytes)=>{const target=path.join(root,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,bytes);};
+  write('workspace.yaml','schema: work/workspace@1\nid: custody-fixture\n');
+  write('features/index.yaml','schema: work/node@2\nid: features\nkind: business\nrequired: true\nstate: todo\nassertions:\n  - synthetic-custody-contract\ndescription: Synthetic feature catalog.\n');
+  write('_resources/identity/service/resource.yaml',
+    'schema: work/resource@1\nid: identity:service\nkind: identity\nowner: test-owner\nrevision: "1"\ndetails:\n  custody: sops\n');
+  const encrypted=Buffer.from('sops:\n  version: 3.9.0\nservice_token: ENC[AES256_GCM,data:opaque-fixture,iv:fixture,tag:fixture,type:str]\n','utf8');
+  write('_resources/identity/service/secrets.enc.yaml',encrypted);
+  const before=fs.readFileSync(path.join(root,'_resources','identity','service','secrets.enc.yaml'));
+  const result=validateWorkspace(root);
+  assert.equal(result.ok,true,JSON.stringify(result.errors));
+  assert.deepEqual(result.resources.map(item=>[item.id,item.path,item.kind]),[['identity:service','_resources/identity/service/resource.yaml','identity']]);
+  assert.deepEqual(fs.readFileSync(path.join(root,'_resources','identity','service','secrets.enc.yaml')),before);
+  assert.equal(JSON.stringify(result).includes('opaque-fixture'),false,'validation never exposes encrypted payload bytes');
+});
+
 // --------------------------------------------------------------------------- the product brand
 // One record at the tree root, decided by its owner, that every frontend-facing node binds. Synthetic
 // names only: no product brand, no real token file and no claimed design review.

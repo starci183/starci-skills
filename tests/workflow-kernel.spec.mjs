@@ -1086,7 +1086,8 @@ test('a scope entry that names nothing in the tree begins with an intake operati
     const op=again.state.ops.find(item=>item.intake);
     assert.ok(op,'a reintake plans the intake op over the existing drafts');
     assert.deepEqual([op.id,op.intake.scope,op.intake.mode,op.allowlist],['payments-intake','payments','reconcile',['.starciwork/features/payments/**']]);
-    assert.match(op.goal,/Reconcile and re-author the existing drafts of the feature payments/);
+    assert.match(op.goal,/Continue the existing Work records of the feature payments/);
+    assert.match(op.goal,/Preserve current accepted leaves, their stable IDs, substantive content and completion evidence/);
     assert.deepEqual(events(again.store).filter(event=>event.event==='intake-planned').map(event=>event.mode),['reconcile']);
   }finally{again.cleanup();}
 });
@@ -4668,7 +4669,7 @@ test('on the headless host a workflow runs end to end one operation at a time: e
   }finally{harness.cleanup();}
 });
 
-test('an interface.asset op on a host without the design tool is host-unsupported: one host item, the frontend lane behind it keeps waiting, the rest finishes, and an approval from a host that has the tool re-admits it',()=>{
+test('an image-first interface.draw op on a host without the design tool is host-unsupported: one host item, the frontend lane behind it keeps waiting, the rest finishes, and an approval from a host that has the tool re-admits it',()=>{
   const intake='demo.sales.implementation.backend.intake',file='apps/agentos-controlplane/src/sales/intake.ts';
   const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED,WORK_NODES[0],WORK_NODES[1]],dirty:[file],ledgerApi:brandLedger,
     scripts:{[intake]:[{outcome:'done',summary:'Intake implemented.',files:[file],checks:[passing('unit-tests-pass','npx vitest run intake')]}],
@@ -4677,9 +4678,7 @@ test('an interface.asset op on a host without the design tool is host-unsupporte
   try{
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
-    // The drawing renders the grammar in a browser and runs anywhere; the artwork step is the one that needs the
-    // image model. The ui node's first op is made that step here, so the capability rule is exercised on it.
-    harness.state.ops.find(op=>op.id===UI).kind='interface.asset';
+    // The first ui step invokes built-in ImageGen, so the headless host must refuse it before dispatch.
     const state=harness.run({host:HEADLESS_HOST,maxIterations:30});
     const ui=state.ops.find(op=>op.id===UI);
     assert.equal(ui.status,'blocked');
@@ -4687,7 +4686,7 @@ test('an interface.asset op on a host without the design tool is host-unsupporte
     assert.deepEqual(state.needUser.filter(item=>item.kind==='host').map(item=>[item.op,item.kind]),[[UI,'host']]);
     assert.match(state.needUser.find(item=>item.kind==='host').detail,/needs design-tool, which the headless host does not have/);
     const log=events(harness.store);
-    assert.deepEqual(log.filter(event=>event.event==='op-host-unsupported').map(event=>[event.op,event.kind,event.host,event.missing]),[[UI,'interface.asset','headless',['design-tool']]]);
+    assert.deepEqual(log.filter(event=>event.event==='op-host-unsupported').map(event=>[event.op,event.kind,event.host,event.missing]),[[UI,'interface.draw','headless',['design-tool']]]);
     // Nothing of the drawing ever reached the host; the build behind it is still held by the design gate - correctly, there is no drawing to build from.
     assert.equal([...harness.fake.dispatches.values()].some(item=>item.op===UI),false);
     assert.deepEqual(log.filter(event=>event.event==='lane-waits-design').map(event=>[event.node,event.design]),[[CART,UI]]);
@@ -4712,7 +4711,8 @@ test('an interface.asset op on a host without the design tool is host-unsupporte
     // One rule decides both the refusal and the re-admission.
     assert.deepEqual(hostMissing(HEADLESS_HOST,'interface.asset'),['design-tool']);
     assert.deepEqual(hostMissing(ORCA_HOST,'interface.asset'),[]);
-    assert.deepEqual(hostMissing(HEADLESS_HOST,'interface.draw'),[],'a drawing is the grammar rendered in a browser: every host can');
+    assert.deepEqual(hostMissing(HEADLESS_HOST,'interface.draw'),['design-tool'],'an image-first direction needs built-in ImageGen');
+    assert.deepEqual(hostMissing(ORCA_HOST,'interface.draw'),[]);
     assert.deepEqual(hostMissing(HEADLESS_HOST,'backend.implement'),[]);
     assert.deepEqual(hostDescriptorOf({}),{...ORCA_HOST,capabilities:[...ORCA_HOST.capabilities]});
     assert.deepEqual(hostDescriptorOf({host:HEADLESS_HOST}),{name:'headless',capabilities:[],sequential:true});
@@ -5024,26 +5024,26 @@ test('public retry reconciles only the exact exited native attempt before releas
   assert.match(reconcileStoppedNativeRetryLease(state,behind,{orca,store,createRuntime(){throw Error('must not');},settleHost(){throw Error('must not');}}).reason,/do not bind the current workflow operation attempt/);
 });
 
-test('a stray is quarantined when git names the file and the validator names the directory above it, which is how a reserved directory freezes a whole tree',()=>{
+test('a stray is quarantined when git names the file and the validator names the reserved directory above it',()=>{
   const harness=setupWork({dirty:['apps/agentos-controlplane/src/sales/intake.ts'],scripts:{}});
   try{
     const {store,state,repo}=harness;
     approve(store,state);
     state.run='run_wf';state.from='term_kernel';
-    // An operation stored a secret under a reserved directory. Canonical Work keeps no underscore directories,
-    // so the validator reports `_resources` while git reports the file three levels under it.
-    const stray=path.join(repo,'.starciwork','_resources','identity','recovery','secrets.enc.yaml');
+    // Root `_resources` is valid typed custody; `_archive` is not canonical Work. The validator reports the
+    // invalid parent while git reports the file three levels under it.
+    const stray=path.join(repo,'.starciwork','_archive','identity','recovery','stale.yaml');
     fs.mkdirSync(path.dirname(stray),{recursive:true});
     fs.writeFileSync(stray,'sops: {}\n');
-    const validate=()=>({ok:false,errors:[{code:'RESERVED_DIRECTORY',path:'_resources',message:'Canonical Work v2 keeps no underscore-prefixed directories.'}],warnings:[],nodes:[],resources:[]});
+    const validate=()=>({ok:false,errors:[{code:'RESERVED_DIRECTORY',path:'_archive',message:'Canonical Work v2 permits only root _local and _resources.'}],warnings:[],nodes:[],resources:[]});
     const git=(executable,args,options)=>args[0]==='status'&&args.includes('.starciwork')
-      ?{status:0,stdout:'?? .starciwork/_resources/identity/recovery/secrets.enc.yaml\n',stderr:''}
+      ?{status:0,stdout:'?? .starciwork/_archive/identity/recovery/stale.yaml\n',stderr:''}
       :harness.git.git(executable,args,options);
     harness.run({maxIterations:2,git,validate:()=>fs.existsSync(stray)?validate():harness.validate()});
     const log=events(store);
     const quarantined=log.find(event=>event.event==='stray-quarantined');
     assert.ok(quarantined,'the stray was quarantined even though the error names its parent');
-    assert.deepEqual(quarantined.strays.map(item=>item.from),['.starciwork/_resources/identity/recovery/secrets.enc.yaml']);
+    assert.deepEqual(quarantined.strays.map(item=>item.from),['.starciwork/_archive/identity/recovery/stale.yaml']);
     assert.equal(fs.existsSync(stray),false,'the stray left the tree');
     assert.ok(log.some(event=>event.event==='ledger-valid-again'),'and the tree reads clean again');
   }finally{harness.cleanup();}
