@@ -168,7 +168,10 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],now=Date.n
   const reasons=[...baselineTouched.map(file=>`pre-existing-user-work-modified:${file}`),...runtimeDrift.map(file=>`kernel-owned-write-drift:${file}`),...outside.map(file=>`outside-allowlist:${file}`)];
   if(headOf(git,repoRoot)!==bridge.acceptedHead)reasons.push('canonical-head-drift');
   if(reasons.length)return {schema:DETECTION_BRIDGE,status:'quarantine',reasons,observedFiles:observed,assurance:bridge.writer};
-  for(const file of candidateObserved){
+  const alreadySealed=fs.existsSync(path.join(snapshot.controlRoot,CANDIDATE_FILES.packet));
+  // A crash after writing candidate.json may precede the workflow-state save. Replaying that freeze must verify
+  // the existing immutable packet, never overwrite the worker bytes or remove the packet to get past EEXIST.
+  for(const file of alreadySealed?[]:candidateObserved){
     const source=path.join(repoRoot,...file.split('/')),target=path.join(snapshot.workerRoot,...file.split('/'));
     if(after.get(file)?.state==='absent'){if(fs.existsSync(target))fs.rmSync(target);continue;}
     if(after.get(file)?.state!=='file')return {schema:DETECTION_BRIDGE,status:'quarantine',reasons:[`unsupported-observed-path:${file}`],observedFiles:observed,assurance:bridge.writer};
@@ -176,6 +179,9 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],now=Date.n
   }
   const packet=sealCandidate(snapshot,{allowedWrites:candidateObserved,reportedFiles,now});
   const frozen=verifyCandidateIdentity(snapshot,packet,{canonicalRoot:repoRoot,expectedCanonicalEntries:packet.files});
+  for(const change of packet.changes)if(change.afterSha256===null&&fileState(repoRoot,change.path).state!=='absent'){
+    frozen.ok=false;frozen.mismatches.push(`canonical-deletion-drift:${change.path}`);
+  }
   return frozen.ok?{schema:DETECTION_BRIDGE,status:'sealed',packet,snapshot,observedFiles:candidateObserved,assurance:bridge.writer}:
     {schema:DETECTION_BRIDGE,status:'quarantine',reasons:frozen.mismatches,observedFiles:observed,assurance:bridge.writer};
 }

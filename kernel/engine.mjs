@@ -2,6 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import {bridgeJobId,createJobBridge,inputDigest,replayModelFunction} from './job-bridge.mjs';
+import {hasReplayableStagedResult} from './job-worker.mjs';
 import {createJobs} from './jobs.mjs';
 import {rankJobs,updateProgressBudget,progressExhausted} from './scheduler.mjs';
 import {loadRuntimes} from './schedule.mjs';
@@ -70,6 +71,38 @@ export function relocateJournal({from,to,workflowId}={}){
   for(const name of ['model-qualifications.json','model-probations.json']){const file=path.join(path.dirname(source),name),into=path.join(path.dirname(target),name);if(fs.existsSync(file)&&!fs.existsSync(into)){fs.copyFileSync(file,into);copied.push(name);}}
   return {ok:true,from:source,to:target,retired,copied};
 }
+/**
+ * Recover a positively recorded launch failure, not an inferred absence of effects. A missing result does not
+ * prove a model never ran: require a spawn-failed receipt, no spawned PID and no worker binding. Use admission's
+ * transaction to settle the job together with its leases and budget reservations. Other unknown jobs retain
+ * their fences and any staged result remains available for the normal completion replay.
+ */
+export function settleNeverStartedModelJobs({journalFile,workflowId,generation,now=Date.now}={}){
+  if(!journalFile||!fs.existsSync(journalFile))return [];
+  const journal=openJournal({file:journalFile,now});
+  try{
+    const events=journal.events({workflowId});
+    const stranded=journal.listJobs().filter(job=>job.workflow_id===workflowId&&job.generation===generation
+      &&['model','judge'].includes(job.kind)&&job.status==='effect_unknown'&&job.lease_token&&!job.worker_id
+      &&events.some(event=>event.entity_id===job.job_id&&event.generation===job.generation&&event.kind==='job-spawn-failed')
+      &&!events.some(event=>event.entity_id===job.job_id&&event.generation===job.generation
+        &&['job-spawned','job-completion-replay-spawned'].includes(event.kind)&&Number.isInteger(event.payload?.pid))
+      &&!hasReplayableStagedResult(journal.path,job));
+    if(!stranded.length)return [];
+    const admission=createAdmission({journal,now});
+    const settled=[];
+    for(const job of stranded){
+      const reason={reason:'the worker never started: spawn failed with no spawned PID, no worker binding and no staged result'};
+      const result=admission.settleUnknown({jobId:job.job_id,generation:job.generation,
+        leaseToken:job.lease_token,status:'failed',result:reason,
+        event:{eventId:`${job.job_id}:never-started-settled`,workflowId,entityType:'job',entityId:job.job_id,
+          generation,kind:'model-job-never-started',payload:reason}});
+      if(result.ok)settled.push(job.job_id);
+    }
+    return settled;
+  }finally{journal.close();}
+}
+
 /** Read-only retry fence: pure model and command jobs must settle in their current generation before it advances. */
 export function unsettledGenerationJobs({journalFile,workflowId,generation}={}){
   if(!journalFile||!fs.existsSync(journalFile))return [];
@@ -80,6 +113,7 @@ export function unsettledGenerationJobs({journalFile,workflowId,generation}={}){
 /** Cancel only never-launched queued pure jobs, then report every job whose effect still needs settlement. */
 export function prepareGenerationRetry({journalFile,workflowId,generation,now=Date.now}={}){
   if(!journalFile||!fs.existsSync(journalFile))return {cancelled:[],unsettled:[]};
+  const neverStarted=settleNeverStartedModelJobs({journalFile,workflowId,generation,now});
   const journal=openJournal({file:journalFile,now});
   try{
     const cancelled=journal.transaction(db=>{
@@ -91,7 +125,7 @@ export function prepareGenerationRetry({journalFile,workflowId,generation,now=Da
       return rows.map(row=>row.job_id);
     });
     const unsettled=journal.listJobs().filter(job=>job.workflow_id===workflowId&&job.generation===generation&&['model','judge','check'].includes(job.kind)&&!['succeeded','failed','cancelled'].includes(job.status)).map(job=>job.job_id);
-    return {cancelled,unsettled};
+    return {cancelled,unsettled,neverStarted};
   }finally{journal.close();}
 }
 const modelRole=name=>['critiqueGoal','validateOp','classifyScreen'].includes(name)?'verify':['assessGoal','planOp','presentOwnerQuestion'].includes(name)?'plan':'decide';
@@ -216,6 +250,18 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
     },
     settled(op,{status='succeeded',reason='dispatch settlement confirmed',workerOnly=false}={}){
       if(!op.lease)return {ok:true,absent:true};
+      const lease=op.lease,job=journal.getJob(lease.jobId);
+      const exact=job&&job.workflow_id===lease.workflowId&&job.op_id===lease.opId
+        &&job.attempt===lease.attempt&&job.generation===lease.generation&&job.kind==='operation';
+      if(!exact)return {ok:false,reason:'operation settlement does not bind the exact durable job'};
+      // The durable terminal transaction may have committed just before the workflow JSON save failed.
+      // Recover that completed transition without changing its accepted outcome or reopening the operation.
+      if(['succeeded','failed','cancelled'].includes(job.status)&&job.lease_token===null
+        &&journal.db.prepare('SELECT COUNT(*) AS n FROM leases WHERE job_id=?').get(lease.jobId).n===0){
+        delete op.lease;
+        return {ok:true,duplicate:true,status:job.status};
+      }
+      if(job.lease_token!==lease.leaseToken)return {ok:false,reason:'stale operation settlement fence'};
       if(workerOnly){
         const releasable=new Set(['ai/global',...(op.lease.machineResources??[])]);
         journal.transaction(db=>{const remove=db.prepare('DELETE FROM leases WHERE job_id=? AND token=? AND resource_key=?');for(const key of releasable)remove.run(op.lease.jobId,op.lease.leaseToken,key);});

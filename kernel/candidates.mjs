@@ -133,7 +133,16 @@ export function sealCandidate(snapshot,{candidatePaths,allowedWrites=[],reported
     candidateDigest:digestEntries(files),oracleDigest:snapshot.oracle.digest,environmentDigest:snapshot.environmentDigest,
     dependencyDigests:snapshot.dependencyDigests,files,changes:changes.map(item=>({path:item.path,beforeSha256:source.get(item.path)?.sha256??null,afterSha256:item.sha256})),
     assurance:snapshot.assurance,reportedFiles:[...reportedFiles],sealedAt:new Date(now()).toISOString()};
-  writeJson(path.join(snapshot.controlRoot,'candidate.json'),packet);
+  const packetFile=path.join(snapshot.controlRoot,'candidate.json');
+  try{writeJson(packetFile,packet);}
+  catch(error){
+    if(error?.code!=='EEXIST')throw error;
+    const existing=JSON.parse(fs.readFileSync(packetFile,'utf8'));
+    const binding=value=>{const {sealedAt,reportedFiles,...bound}=value;return bound;};
+    if(JSON.stringify(binding(existing))!==JSON.stringify(binding(packet)))
+      throw new Error('sealed candidate conflicts with current bytes or identity; preserve it for reconciliation');
+    return existing;
+  }
   return packet;
 }
 

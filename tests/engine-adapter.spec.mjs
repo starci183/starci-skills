@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createJobBridge} from '../kernel/job-bridge.mjs';
-import {createEngineRuntime,settleGenerationLeases,unsettledGenerationJobs,prepareGenerationRetry} from '../kernel/engine.mjs';
+import {createEngineRuntime,settleGenerationLeases,settleNeverStartedModelJobs,unsettledGenerationJobs,prepareGenerationRetry} from '../kernel/engine.mjs';
 import {attestModelResult} from '../kernel/job-attestation.mjs';
 import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
 import {validateOp} from '../models/functions.mjs';
@@ -187,4 +187,51 @@ test('a non-operation model call follows the owner provider order ahead of the r
   assert.throws(()=>overflow.manageWorkflow(snapshot('manager-codex-drained')),error=>error.code==='STARCI_JOB_PENDING');
   assert.deepEqual(overflow.journal.listJobs()[0].payload.args.providers,['claude-opus'],'a preference never starves: an exhausted window overflows to the other member');
   drainedBridge.close();
+});
+
+test('a pure model job whose worker never started settles instead of fencing the generation for good, while a command job keeps its fence',t=>{
+  const f=fixture(t),file=f.state.engine.journalFile;
+  const bridge=createJobBridge({journalFile:file,eligibility:()=>({eligible:true}),
+    spawnChild:()=>{throw Error('EPERM: the worker could not be spawned');}});
+  // The spawn fails, so the job is effect_unknown with no answer and no staged result.
+  bridge.request({workflowId:'wf',opId:'manager-1',attempt:1,generation:2,kind:'model',role:'decide',
+    input:{handler:'model-function',functionName:'manageWorkflow',args:{providers:['gpt-5.6-sol']}}});
+  const stranded=bridge.journal.listJobs().find(job=>job.op_id==='manager-1');
+  assert.equal(stranded.status,'effect_unknown','a worker that never started leaves the job effect_unknown');
+  assert.deepEqual(unsettledGenerationJobs({journalFile:file,workflowId:'wf',generation:2}),[stranded.job_id],'and it fences the generation');
+  // A command job may have touched the tree, so it is never settled on this ground.
+  bridge.journal.enqueueJob({jobId:'ran-a-command',workflowId:'wf',opId:'op',attempt:1,generation:2,kind:'check',role:'machine-check',payload:{command:'npm test'}});
+  bridge.journal.db.prepare("UPDATE jobs SET status='effect_unknown' WHERE job_id='ran-a-command'").run();
+
+  const settled=settleNeverStartedModelJobs({journalFile:file,workflowId:'wf',generation:2,now:()=>9});
+  assert.deepEqual(settled,[stranded.job_id]);
+  assert.equal(bridge.journal.getJob(stranded.job_id).status,'failed');
+  assert.match(JSON.parse(bridge.journal.getJob(stranded.job_id).result_json).reason,/never started/);
+  assert.equal(bridge.journal.getJob(stranded.job_id).lease_token,null,'settlement clears the durable lease token');
+  assert.equal(bridge.journal.db.prepare('SELECT COUNT(*) AS n FROM leases WHERE job_id=?').get(stranded.job_id).n,0,
+    'the failed spawn returns global capacity instead of merely changing job.status');
+  assert.equal(bridge.journal.getJob('ran-a-command').status,'effect_unknown','a command job keeps its fence');
+  assert.deepEqual(unsettledGenerationJobs({journalFile:file,workflowId:'wf',generation:2}),['ran-a-command']);
+  assert.deepEqual(settleNeverStartedModelJobs({journalFile:file,workflowId:'wf',generation:2,now:()=>9}),[],'settling twice changes nothing');
+  bridge.close();
+});
+
+test('missing model output is not proof of a never-started worker',t=>{
+  const f=fixture(t),file=f.state.engine.journalFile;
+  const bridge=createJobBridge({journalFile:file,eligibility:()=>({eligible:true}),
+    spawnChild:()=>({pid:process.pid,once(){},unref(){}})});
+  const request=opId=>bridge.request({workflowId:'wf',opId,attempt:1,generation:2,kind:'model',role:'decide',
+    input:{handler:'model-function',functionName:'manageWorkflow',args:{providers:['gpt-5.6-sol']}}});
+  for(const opId of ['spawned','unknown','bound'])request(opId);
+  for(const job of bridge.journal.listJobs()){
+    bridge.journal.db.prepare("UPDATE jobs SET status='effect_unknown' WHERE job_id=?").run(job.job_id);
+    if(job.op_id!=='spawned')bridge.journal.db.prepare("DELETE FROM events WHERE entity_id=? AND kind='job-spawned'").run(job.job_id);
+    if(job.op_id!=='unknown')bridge.journal.appendEvent({eventId:`${job.job_id}:spawn-failed`,workflowId:'wf',
+      entityType:'job',entityId:job.job_id,generation:2,kind:'job-spawn-failed',payload:{reason:'late error'}});
+    if(job.op_id==='bound')bridge.journal.db.prepare('UPDATE jobs SET worker_id=? WHERE job_id=?').run(`pid:${process.pid}`,job.job_id);
+  }
+  assert.deepEqual(settleNeverStartedModelJobs({journalFile:file,workflowId:'wf',generation:2}),[]);
+  assert.equal(bridge.journal.listJobs().filter(job=>job.status==='effect_unknown'&&job.lease_token).length,3,
+    'spawned, unobserved and bound jobs all retain their capacity until real reconciliation');
+  bridge.close();
 });

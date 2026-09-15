@@ -34,7 +34,21 @@ export function createAdmission({journal,now=Date.now,defaultAiCapacity=10}={}){
     assertFence({jobId,generation,leaseToken}){const row=journal.db.prepare('SELECT generation,lease_token,status,deadline FROM jobs WHERE job_id=?').get(jobId);return Boolean(row&&row.generation===generation&&row.lease_token===leaseToken&&['leased','running'].includes(row.status)&&row.deadline>now());},
     renew({jobId,generation,leaseToken,ttlMs=60000}){const deadline=now()+ttlMs;const result=journal.db.prepare(`UPDATE jobs SET deadline=?,updated_at=? WHERE job_id=? AND generation=? AND lease_token=? AND status IN (${activeStatuses})`).run(deadline,now(),jobId,generation,leaseToken);if(result.changes)journal.db.prepare('UPDATE leases SET expires_at=? WHERE job_id=? AND token=?').run(deadline,jobId,leaseToken);return result.changes===1?{ok:true,expiresAt:deadline}:{ok:false,reason:'stale fence'};},
     release({jobId,generation,leaseToken,consumeBudgets=false}){return journal.transaction(db=>{const job=db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);if(!job||job.generation!==generation||job.lease_token!==leaseToken)return {ok:false,reason:'stale fence'};for(const row of db.prepare('SELECT scope_key,units FROM budget_reservations WHERE job_id=?').all(jobId))db.prepare(`UPDATE budgets SET reserved_value=MAX(0,reserved_value-?),used_value=used_value+? WHERE scope_key=?`).run(row.units,consumeBudgets?row.units:0,row.scope_key);db.prepare('DELETE FROM budget_reservations WHERE job_id=?').run(jobId);db.prepare('DELETE FROM leases WHERE job_id=? AND token=?').run(jobId,leaseToken);db.prepare("UPDATE jobs SET lease_token=NULL,deadline=NULL,updated_at=? WHERE job_id=?").run(now(),jobId);return {ok:true};});},
-    settleUnknown({jobId,generation,leaseToken,status='failed',result=null}){need(['failed','cancelled','effect_unknown'].includes(status),'Invalid reconciliation status');return journal.transaction(db=>{const job=db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);if(!job||job.generation!==generation||job.lease_token!==leaseToken||job.status!=='effect_unknown')return {ok:false,reason:'stale or unsettled fence'};returnBudgets(db,jobId);db.prepare('DELETE FROM leases WHERE job_id=? AND token=?').run(jobId,leaseToken);db.prepare('UPDATE jobs SET status=?,result_json=?,lease_token=NULL,deadline=NULL,updated_at=? WHERE job_id=?').run(status,JSON.stringify(result),now(),jobId);return {ok:true};});},
+    settleUnknown({jobId,generation,leaseToken,status='failed',result=null,event=null}){
+      need(['failed','cancelled'].includes(status),'Reconciliation must resolve the unknown effect before releasing its fence');
+      return journal.transaction(db=>{
+        const job=db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId);
+        if(!job||job.generation!==generation||job.lease_token!==leaseToken||job.status!=='effect_unknown')return {ok:false,reason:'stale or unsettled fence'};
+        if(event)need(event.entityId===jobId&&event.workflowId===job.workflow_id&&event.generation===generation
+          &&event.entityType==='job','Reconciliation event must bind the exact durable job');
+        returnBudgets(db,jobId);
+        db.prepare('DELETE FROM leases WHERE job_id=? AND token=?').run(jobId,leaseToken);
+        db.prepare('UPDATE jobs SET status=?,result_json=?,lease_token=NULL,deadline=NULL,updated_at=? WHERE job_id=?')
+          .run(status,JSON.stringify(result),now(),jobId);
+        if(event)journal.appendEvent(event);
+        return {ok:true};
+      });
+    },
     expire(){return journal.transaction(db=>expire(db));}
   };
 }
