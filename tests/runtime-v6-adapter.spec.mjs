@@ -106,6 +106,23 @@ test('worker-only settlement releases AI and retains writer until final acceptan
   const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'op',kind:'backend.implement',attempt:1,status:'running',allowlist:['a.js']};f.state.ops=[op];const runtime=createV6Runtime({...f,bridge,eligibility:()=>({eligible:true})}),lease=runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});assert.equal(lease.ok,true);assert.equal(runtime.settled(op,{workerOnly:true}).writerRetained,true);let rows=runtime.journal.db.prepare('SELECT resource_key FROM leases WHERE job_id=?').all(lease.jobId).map(x=>x.resource_key);assert.equal(rows.includes('ai/global'),false);assert.equal(rows.some(x=>x.startsWith('canonical-writer:')),true);assert.equal(runtime.settled(op).ok,true);rows=runtime.journal.db.prepare('SELECT resource_key FROM leases WHERE job_id=?').all(lease.jobId);assert.equal(rows.length,0);bridge.close();
 });
 
+test('a stopped exact native Dispatch freezes and preserves unreported effects before releasing its writer',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'native',kind:'backend.implement',attempt:1,status:'running',allowlist:['a.js'],dispatch:'ctx-native'};f.state.ops=[op];
+  const runtime=createV6Runtime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-native',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
+  runtime.freezeCandidate=()=>{op.v6CandidateDigest='candidate-digest';return {status:'sealed',observedFiles:['a.js']};};
+  assert.equal(runtime.settleStoppedOperation(op,{dispatch:'ctx-other',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-native',effectState:'none'}}).ok,false,'a different Dispatch cannot release the fence');assert.ok(op.v6Lease);
+  const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-native',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-native',effectState:'none'},reason:'stalled-prompt'});assert.deepEqual(result.observedFiles,['a.js']);assert.equal(op.v6Lease,undefined);assert.deepEqual(op.v6OwnedBaselinePaths,['a.js']);assert.equal(op.v6RetryReconciled.dispatch,'ctx-native');assert.deepEqual(op.v6RetryReconciled.observedFiles,['a.js']);
+  const job=runtime.journal.listJobs().find(item=>item.op_id==='native');assert.equal(job.status,'failed');assert.equal(runtime.journal.db.prepare('SELECT count(*) AS n FROM leases WHERE job_id=?').get(job.job_id).n,0);assert.equal(runtime.journal.events({workflowId:'wf'}).some(event=>event.kind==='operation-stopped-effects-preserved'&&event.payload.dispatch==='ctx-native'),true);bridge.close();
+});
+
+test('a stopped native attempt with unsealable scope drift retains its writer and cannot launder paths into retry baseline',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'drift',kind:'backend.implement',attempt:1,status:'running',allowlist:['src/**'],dispatch:'ctx-drift'};f.state.ops=[op];
+  const runtime=createV6Runtime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-drift',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
+  runtime.freezeCandidate=()=>({status:'quarantined',observedFiles:['outside.txt'],reasons:['outside allowlist']});
+  const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-drift',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-drift',effectState:'none'}});assert.equal(result.ok,false);assert.equal(op.v6OwnedBaselinePaths,undefined);assert.ok(op.v6Lease,'writer fence remains attached');
+  const resources=runtime.journal.db.prepare('SELECT resource_key FROM leases WHERE job_id=?').all(op.v6Lease.jobId).map(row=>row.resource_key);assert.equal(resources.includes('ai/global'),false);assert.equal(resources.some(key=>key.startsWith('canonical-writer:')),true);assert.equal(runtime.journal.getJob(op.v6Lease.jobId).status,'running');bridge.close();
+});
+
 test('machine guard resources serialize native workers and detached checks while retaining only the writer',t=>{
   const f=fixture(t),spawned=[],bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>{spawned.push(true);return {pid:1,once(){},unref(){}};}});
   const first={id:'one',kind:'backend.implement',attempt:1,status:'running',allowlist:['a.js'],checks:[{command:'docker compose up'}]};
@@ -135,6 +152,7 @@ test('retry baseline adopts only report-attributed files and keeps other dirty p
 test('retry admits only runtime reconciliation leases and fences unresolved generation jobs',t=>{
   assert.equal(retryableV6Operation({status:'blocked',v6Lease:{jobId:'op'},refusal:'runtime-reconciliation'}),true);
   assert.equal(retryableV6Operation({status:'blocked',v6Lease:{jobId:'op'},v6WorkerSettled:true}),true);
+  assert.equal(retryableV6Operation({status:'ready',v6RetryReconciled:{jobId:'op',dispatch:'ctx'}}),true);
   assert.equal(retryableV6Operation({status:'blocked',v6Lease:{jobId:'op'},ownerRequest:{id:'ask'}}),false);
   assert.equal(retryableV6Operation({status:'blocked',v6Lease:{jobId:'op'},refusal:'business-rule'}),false);
   const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})});

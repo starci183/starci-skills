@@ -24,6 +24,7 @@ workflow kernel (forwarded to the launcher; add --host <skill root> to reach a W
   workflow-approve     approve that goal, or re-admit what a blocked finish left open
   workflow-answer      give the owner's answer to a question or a reconciliation conflict
   workflow-run         run the approved workflow: allocate, launch, verify, commit, gate, report
+                       --startup-token <token> is supplied by the supervisor's exclusive startup reservation
   workflow-retry       --id <id> --engine 6 --runtime-pin <file>: retry a paused workflow with fresh agents
                        --journal-file <path>: use a local journal visible to the execution host
   workflow-status      print what one workflow is doing now, from its own files
@@ -38,6 +39,7 @@ machine checks (read-only; they judge bytes, not claims):
 
   render check <ui node dir> --brand <work root>    a drawing against its capture and kept markup
   brand check <work root> [--source <repo root>]    a brand record against the sources it names
+  stacks check <repo root> --environment dev|vps --deployment-model <rendered.yaml-or-json>    static whole-app stack conformance
 `;
 
 const args=process.argv.slice(2);

@@ -6,7 +6,8 @@ import path from 'node:path';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import {EventEmitter} from 'node:events';
 import {preparedEntry,inputAsk} from './helpers/input-fixture.mjs';
-import {refreshCredentialPreparation,deferForIntegrationPreparation,normalizePreparationAuthority} from '../kernel/kernel.mjs';
+import {refreshCredentialPreparation,deferForIntegrationPreparation,normalizePreparationAuthority,reconcileStoppedNativeRetryLease} from '../kernel/kernel.mjs';
+import {reserveStartup} from '../kernel/startup-lock.mjs';
 import {reconcileWorkflowInputs} from '../kernel/inputs.mjs';
 import {credentialFields} from '../kernel/inputs-model.mjs';
 import {inputFiles,privateJson} from '../kernel/inputs-server.mjs';
@@ -15,7 +16,7 @@ import {ORCA_HOST,createOrcaCalls} from '../hosts/orca/calls.mjs';
 import {HEADLESS_HOST,createHeadlessHost} from '../hosts/headless/host.mjs';
 import {reportOutcome} from '../hosts/orca/protocol.mjs';
 import {buildReport} from '../kernel/reports.mjs';
-import {spawnSync} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
 import {validateGoalPlan,validateOp} from '../models/functions.mjs';
 import {createStore} from '../kernel/store.mjs';
 import {createAllocator} from '../kernel/schedule.mjs';
@@ -27,7 +28,7 @@ import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGra
 import {machineVerify} from '../kernel/kernel.mjs';
 import {attributedFiles} from '../kernel/verify.mjs';
 import {relocateLauncher,reviveSupervisor} from '../kernel/kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,prepareV6WorkGate,producedKindVerdict,restoreDurableCheckpoint,recoverSatisfiedDependencyBlocks,sweepResolvedReviewLines,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,prepareV6WorkGate,producedKindVerdict,restoreDurableCheckpoint,recoverSatisfiedDependencyBlocks,sweepResolvedReviewLines,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,nativeActivityProof,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -631,6 +632,38 @@ test('an op waiting for the owner never overruns, however long the owner takes',
     ask.kind='backend.implement';ask.question=null;
     settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[]});
     assert.equal(events(harness.store).find(event=>event.event==='op-overrun').op,'op-intake');
+  }finally{harness.cleanup();}
+});
+
+test('a stopped native overrun preserves its candidate baseline and advances to a fresh durable attempt',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);harness.state.run='run_wf';harness.state.from='term_kernel';
+    const op=running(harness.state,'op-intake','ctx_native');Object.assign(op,{kind:'backend.implement',attempt:1,launchedAt:0,v6Lease:{jobId:'job-native'},v6Candidate:{status:'running'}});
+    let call=null;const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>OP_DEADLINE_MS.default+1,work:null,
+      v6:{settleStoppedOperation(candidate,input){call={candidate,input};delete candidate.v6Lease;candidate.v6OwnedBaselinePaths=['src/preserved.ts'];return {ok:true,effectState:'none',observedFiles:['src/preserved.ts'],candidateDigest:'candidate-1'};}}};
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[]});
+    assert.equal(call.candidate,op);assert.equal(call.input.dispatch,'ctx_native');assert.equal(call.input.settlement.schema,'starci/orca-supervised-settlement@1');assert.equal(call.input.settlement.effectState,'none');assert.equal(op.status,'ready');assert.equal(op.attempt,2);assert.deepEqual(op.v6OwnedBaselinePaths,['src/preserved.ts']);assert.equal(op.v6PriorStoppedAttempt.candidateDigest,'candidate-1');assert.equal(events(harness.store).some(event=>event.event==='native-attempt-reconciled'&&event.dispatch==='ctx_native'),true);
+  }finally{harness.cleanup();}
+});
+
+test('fresh exact native heartbeat outranks a prompt-shaped screen but mismatched identity does not',()=>{
+  const now=Date.parse('2026-09-15T01:00:00Z'),state={run:'run-exact',worktree:cwd},op={dispatch:'ctx-exact',task:'task-exact'};
+  const runner=runId=>({invoke(name,args){assert.equal(name,'worker-show');assert.equal(args.dispatch,'ctx-exact');return {outcome:'ok',receipt:{result:{dispatch:{id:'ctx-exact',run_id:runId,task_id:'task-exact',last_heartbeat_at:new Date(now-30_000).toISOString()},worker:{dispatch_id:'ctx-exact'},observation:{exactWorker:true,status:'running'}}}};}});
+  assert.equal(nativeActivityProof(runner('run-exact'),state,op,now).active,true);
+  assert.equal(nativeActivityProof(runner('another-run'),state,op,now).active,false);
+  assert.equal(nativeActivityProof(runner('run-exact'),state,op,now+3*60*1000).active,false,'a stale heartbeat cannot suppress bounded settlement');
+});
+
+test('stalled-prompt does not terminate a native worker with fresh exact host activity',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);const now=Date.parse('2026-09-15T01:00:00Z');harness.state.run='run-exact';harness.state.from='term-kernel';
+    const op=running(harness.state,'op-intake','ctx-active');Object.assign(op,{task:'task-active',launchedAt:now-10*60*1000,v6Lease:{jobId:'job-active'}});
+    const base=harness.fake.orca,orca={...base,invoke(name,args,options){if(name==='worker-show')return {outcome:'ok',receipt:{result:{dispatch:{id:'ctx-active',run_id:'run-exact',task_id:'task-active',last_heartbeat_at:new Date(now-20_000).toISOString()},worker:{dispatch_id:'ctx-active'},observation:{exactWorker:true,status:'running'}}}};return base.invoke(name,args,options);}};
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>now,work:null,v6:{settleStoppedOperation(){throw Error('fresh worker must not settle');}}};
+    settleStalled(orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx-active',liveness:'stalled-prompt'}]});
+    assert.equal(op.status,'running');assert.ok(op.v6Lease);assert.equal(events(harness.store).some(event=>event.event==='native-settlement-deferred'&&event.dispatch==='ctx-active'),true);
   }finally{harness.cleanup();}
 });
 
@@ -3632,6 +3665,21 @@ test('the preflight runs once at the start, its problems become needUser items, 
 
 /* ------------------------------------------------------------------ run binding and inferred rate limits */
 
+test('a second workflow-run process is refused before run binding or terminal effects',async()=>{
+  const repo=tmp(),host=path.resolve('.'),functions={assessGoal:()=>({ok:true,provider:'fake',value:salesPlan}),critiqueGoal:soundCritique,extractMaterial:()=>[]};
+  const fake=scriptedOrca({reportsDir:path.join(repo,'reports'),scripts:{}});let child;
+  try{
+    const created=kernelMain('workflow-goal',{job:'Lock the sales slice',host},{orca:fake.orca,cwd:repo,functions});kernelMain('workflow-approve',{id:created.id},{orca:fake.orca,cwd:repo});
+    child=spawn(process.execPath,['-e','setTimeout(()=>{},30000)'],{stdio:'ignore',windowsHide:true});
+    const store=createStore({repoRoot:repo,id:created.id});const reserved=reserveStartup(store.dir,{pid:child.pid});assert.equal(reserved.ok,true);
+    const running=(await import('../kernel/startup-lock.mjs')).acquireStartup(store.dir,{launchToken:reserved.token,pid:child.pid});fs.writeFileSync(path.join(store.dir,'kernel.lock'),JSON.stringify({pid:child.pid,startedAt:Date.now(),startupToken:running.token}));
+    fake.terminals.set('term_live_worker',{handle:'term_live_worker',title:'[Op] live',status:'running',sent:true,worktreePath:repo});
+    const before=fake.terminals.size;assert.throws(()=>kernelMain('workflow-run',{id:created.id,'max-iterations':'0'},{orca:fake.orca,cwd:repo,functions}),/another kernel or unresolved launch/);
+    assert.equal(fake.terminals.size,before,'no coordinator terminal was created or native worker swept');assert.equal(fake.terminals.has('term_live_worker'),true);
+    assert.equal(store.readEvents().some(event=>['run-bound','run-resumed'].includes(event.event)),false);
+  }finally{if(child)try{child.kill();}catch{}fs.rmSync(path.dirname(repo),{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+});
+
 test('a kernel that already has its run records run-resumed; only a real bind records run-bound',()=>{
   const repo=tmp();
   spawnSync('git',['init','--quiet'],{cwd:repo,encoding:'utf8',windowsHide:true});
@@ -4836,4 +4884,18 @@ test('the fan-out cap and the seam rule are read from the allocation profile, ne
     for(const id of CHILDREN)assert.equal(state.ops.find(op=>op.id===id).status,'done',id);
     assert.deepEqual(state.ops.filter(op=>op.origin==='verify').map(op=>op.kind),['e2e.verify','review.verify']);
   }finally{harness.cleanup();}
+});
+
+test('public retry reconciles only the exact exited native attempt before releasing its candidate fence',()=>{
+  const lease={workflowId:'wf',opId:'author',attempt:3,generation:7,jobId:'operation-job',leaseToken:'token'},identity={workflowId:'wf',opId:'author',attempt:3,generation:7,jobId:'operation-job'};
+  const op={id:'author',attempt:3,status:'ready',v6Lease:lease,v6Candidate:{bridge:{identity}},launch:{task:'task-native',dispatch:'ctx-native'}};
+  const state={id:'wf',run:'run-native',worktree:'C:/repo',engine:{generation:7},ops:[op]},events=[];
+  const store={appendEvent:event=>events.push(event),saveState(){}},result={dispatch:{id:'ctx-native',task_id:'task-native',run_id:'run-native'},worker:{dispatch_id:'ctx-native',state:'failed',stage:'process_exited'},observation:{exactWorker:true,status:'exited'},terminal:{handle:'term-native',connected:false,writable:false,paneRuntimeId:-1}};
+  let settled=0,closed=0;
+  const orca={invoke:()=>({outcome:'ok',receipt:{result}})},createRuntime=()=>({settleStoppedOperation(candidate,{dispatch,settlement}){assert.equal(candidate,op);assert.equal(dispatch,'ctx-native');assert.equal(settlement.effectState,'none');settled++;delete candidate.v6Lease;candidate.v6OwnedBaselinePaths=['src/real.ts'];candidate.v6RetryReconciled={schema:'starci/native-retry-reconciliation@1',jobId:'operation-job',attempt:3,generation:7,dispatch,observedFiles:['src/real.ts'],candidateDigest:'candidate'};return {ok:true,observedFiles:['src/real.ts'],candidateDigest:'candidate'};},close(){closed++;}});
+  const recovered=reconcileStoppedNativeRetryLease(state,op,{orca,store,createRuntime,settleHost:(_host,dispatch)=>({schema:'starci/orca-supervised-settlement@1',dispatchId:dispatch,effectState:'none'})});
+  assert.equal(recovered.ok,true);assert.equal(settled,1);assert.equal(closed,1);assert.deepEqual(op.v6OwnedBaselinePaths,['src/real.ts']);assert.equal(events.at(-1).event,'retry-native-attempt-reconciled');
+  const mismatched={...op,v6Lease:lease,v6Candidate:{bridge:{identity}},launch:{task:'task-native',dispatch:'ctx-other'}};
+  const denied=reconcileStoppedNativeRetryLease(state,mismatched,{orca,store,createRuntime(){throw Error('must not create runtime');},settleHost(){throw Error('must not settle');}});
+  assert.equal(denied.ok,false);assert.match(denied.reason,/exact current Run\/Task\/Dispatch/);
 });

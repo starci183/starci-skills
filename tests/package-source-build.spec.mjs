@@ -45,7 +45,7 @@ function assertSingleLineJson(file) {
   JSON.parse(body);
 }
 
-test('npm pack → extract → install → build produces key .dist paths without checkout imports', t => {
+test('npm pack includes compiled .dist and can rebuild it without checkout imports', t => {
   assert.equal(fs.existsSync(path.join(skillRoot, 'scripts', 'compile-knowledge.mjs')), true, 'Knowledge compiler is required');
   assert.equal(
     fs.existsSync(path.join(skillRoot, 'knowledge', 'code-examples', 'backend', 'graphql-command')),
@@ -105,7 +105,12 @@ test('npm pack → extract → install → build produces key .dist paths withou
 
   const packageRoot = path.join(extractDir, 'package');
   assert.equal(fs.existsSync(path.join(packageRoot, 'package.json')), true, 'extracted package.json missing');
-  assert.equal(fs.existsSync(path.join(packageRoot, '.dist')), false, 'pack payload must not include .dist');
+  assert.equal(fs.existsSync(path.join(packageRoot, '.dist')), true, 'pack payload must include compiled .dist');
+  for (const rel of KEY_DIST_PATHS) {
+    const file = path.join(packageRoot, '.dist', rel);
+    assert.equal(fs.existsSync(file), true, `packed payload missing .dist/${rel}`);
+    assertSingleLineJson(file);
+  }
   assert.equal(
     fs.existsSync(path.join(packageRoot, 'scripts', 'compile-knowledge.mjs')),
     true,

@@ -39,11 +39,17 @@ export function compileDeclarative({ root: skillRoot = root } = {}) {
     }
   };
 
-  merge(collectDeclarativeTree(skillRoot, {
+  const workflows=collectDeclarativeTree(skillRoot, {
     dir: 'workflows',
     outPrefix: 'workflows/',
     recursive: false
-  }), 'workflows');
+  });
+  // The unified build validates and rewrites this public catalog (including
+  // its .dist-relative skill path), so it is generated-layer output rather
+  // than a byte-identical declarative projection. Collect first so duplicate
+  // YAML authorities still fail closed.
+  workflows.delete('workflows/catalog.json');
+  merge(workflows, 'workflows');
 
   merge(collectDeclarativeTree(skillRoot, {
     dir: 'model',

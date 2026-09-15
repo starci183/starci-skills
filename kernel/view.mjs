@@ -255,6 +255,26 @@ export function buildView({repoRoot,id,now=Date.now(),dir:given=null}){
   const anomalyList=Object.entries(anomalies).map(([signature,entry])=>({signature,count:entry?.count??0,
     triaged:entry?.triaged?.option??entry?.triaged??null,lastAt:entry?.lastAt??entry?.firstAt??null}))
     .sort((a,b)=>b.count-a.count);
+  const manager=plain(state.engine?.manager)?state.engine.manager:{};
+  const managerEvent=last(events,event=>['manager-applied','manager-pending','manager-refused','manager-unavailable'].includes(event.event));
+  const meaningful=last(events,event=>['goal','approved','manager-applied','launched','op-relaunched','op-done','accepted-early',
+    'native-attempt-reconciled','failed-launch-stopped-proved','candidate-quarantined','record-blocks-quarantined','op-blocked','stopped','finished'].includes(event.event));
+  const waitEvent=last(events,event=>['candidate-quarantined','record-blocks-quarantined','candidate-reconciliation-required','launch-reconciliation-required',
+    'job-reconciliation-required','op-blocked','shared-change-blocked','preflight-blocked'].includes(event.event))
+    ??last(events,event=>['admission-deferred','allocation-deferred','schedule-deferred'].includes(event.event))
+    ??last(events,event=>['manager-quota-wait','manager-pending','manager-unavailable','manager-refused','manager-no-progress'].includes(event.event));
+  const selected=unique(Object.values(plain(state.engine?.modelSelections)?state.engine.modelSelections:{})
+    .map(entry=>entry?.runtime??entry?.provider).filter(value=>typeof value==='string'));
+  const attested=last(events,event=>['model-attested','worker-attested'].includes(event.event)&&event.role==='decide');
+  const activeWait=waitEvent&&((at(waitEvent)??0)>=(at(meaningful)??0))?waitEvent:null;
+  const coordination={mode:state.engine?.coordination??null,decisionId:manager.lastDecisionId??manager.pendingDecisionId??null,
+    actions:[...(manager.lastActions??managerEvent?.actions??[])].filter(value=>typeof value==='string').slice(0,20),
+    // The accepted manager decision currently persists its bounded action list, but not model prose. Never fill
+    // this field from prompts, terminal previews, or hidden reasoning.
+    rationale:typeof manager.lastRationale==='string'?clip(manager.lastRationale,500):null,
+    wait:activeWait?.reason??activeWait?.detail??activeWait?.code??manager.incident?.reason??(manager.pendingDecisionId?'manager decision is pending':managerEvent?.reason??null),
+    schedulerSelectedModels:selected,attestedActualModel:typeof attested?.runtime==='string'?attested.runtime:typeof attested?.target==='string'?attested.target:null,
+    lastMeaningfulProgress:meaningful?{event:meaningful.event??null,at:at(meaningful),ageMin:at(meaningful)===null?null:minutes(stamp-at(meaningful)),op:meaningful.op??null}:null};
 
   return {
     schema:WORKFLOW_VIEW,id:state.id??id,dir,at:stamp,
@@ -265,6 +285,7 @@ export function buildView({repoRoot,id,now=Date.now(),dir:given=null}){
     kernel:{alive:processAlive(lock?.pid),pid:lock?.pid??null,startedAt:lock?.startedAt??null,
       lastEventAt,lastEvent:lastEvent?.event??null,silentMs:lastEventAt===null?null:stamp-lastEventAt,events:events.length},
     supervisor:readSupervisor(repoRoot,state.id??id,stamp,dir),
+    coordination,
     runtimes,
     ops:{total:ops.length,counts:opStatus,live:ops.filter(op=>LIVE_OPS.includes(op.status)).length,running,blocked},
     ledger:{total:ledger.length,counts:ledgerStatus,
@@ -331,6 +352,14 @@ export function renderView(view){
   lines.push(`ops        ${Object.entries(view.ops.counts).map(([status,n])=>`${status} ${n}`).join(', ')||'none'} (${view.ops.total} total)`);
   lines.push(`rate       ${view.rate.opsDonePerHour??'-'} ops/h, ${view.rate.nodesDonePerHour??'-'} nodes/h over ${view.rate.windowHours}h`);
   lines.push(`iterations ${view.iterations}${view.head?`, head ${String(view.head).slice(0,12)}`:''}${view.branch?` on ${view.branch}`:''}`);
+  if(view.coordination?.mode){
+    const c=view.coordination;
+    lines.push(`manager    ${c.decisionId??'no decision'}; workflow-selected models ${c.schedulerSelectedModels.join(', ')||'unknown'}; manager attested actual ${c.attestedActualModel??'unknown'}`);
+    if(c.actions.length)lines.push(`actions    ${c.actions.join(', ')}`);
+    lines.push(`rationale  ${c.rationale??'not retained; no hidden reasoning or prompt is exposed'}`);
+    if(c.wait)lines.push(`waiting    ${clip(c.wait,240)}`);
+    if(c.lastMeaningfulProgress)lines.push(`progress   ${c.lastMeaningfulProgress.event??'event'}${c.lastMeaningfulProgress.op?` op ${c.lastMeaningfulProgress.op}`:''}, ${c.lastMeaningfulProgress.ageMin??'?'}m ago`);
+  }
   if(view.lane)lines.push(`lane       ${view.lane.name} - ${view.lane.worktree??'?'} on ${view.lane.branch??'?'}`
     +`, base ${view.lane.base.branch??'?'} in ${view.lane.base.worktree??'?'}`
     +(view.lane.merged?`, merged ${String(view.lane.merged.commit??'').slice(0,12)} into ${view.lane.merged.into}`

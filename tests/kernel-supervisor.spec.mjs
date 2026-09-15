@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {EventEmitter} from 'node:events';
 import {inspectWorkflow,startKernel,superviseForever,superviseOnce,supervisorAction} from '../kernel/supervisor.mjs';
+import {acquireStartup,inspectStartup} from '../kernel/startup-lock.mjs';
 
 test('Orca supervisor starts the kernel inside its owned coordinator terminal',()=>{
   const calls=[],orca={invoke:(name,params)=>{calls.push([name,params]);return name==='terminal-create'?{outcome:'ok',receipt:{result:{terminal:{handle:'term_monitor'}}}}:{outcome:'ok',receipt:{result:{}}};}};
@@ -121,4 +123,81 @@ test('a workflow that owns a lane is listed once from the repository store and i
     assert.deepEqual(spawned[0].args.slice(0,4),['L.mjs','workflow-run','--id','laned']);
     assert.equal(spawned[0].cwd,lane,'the kernel of a lane runs in the lane, never in the base worktree');
   }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('a launch reservation admits one supervisor and suppresses a concurrent coordinator launch',()=>{
+  const root=tmp(),calls=[];try{
+    workflow(root,'race',{lastAt:1});
+    const raceDir=path.join(root,'.starciwork','_local','workflows','race'),raceState=JSON.parse(fs.readFileSync(path.join(raceDir,'state.json'),'utf8'));raceState.hostAdapter='orca';fs.writeFileSync(path.join(raceDir,'state.json'),JSON.stringify(raceState));
+    const orca={invoke:(name)=>{calls.push(name);return name==='terminal-create'?{outcome:'ok',receipt:{result:{terminal:{handle:'term_once'}}}}:{outcome:'ok',receipt:{result:{}}};}};
+    const first=superviseOnce({repoRoot:root,launcher:'L.mjs',orca,now:()=>10_000_000,log:()=>{}});
+    const second=superviseOnce({repoRoot:root,launcher:'L.mjs',orca,now:()=>10_000_001,log:()=>{}});
+    assert.equal(first.rounds[0].outcome.ok,true);
+    assert.equal(second.rounds[0].action,'leave');assert.equal(second.rounds[0].reason,'kernel launch in progress');
+    assert.equal(calls.filter(name=>name==='terminal-create').length,1,'only one native coordinator was created');
+  }finally{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,100);fs.rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+});
+
+test('failed bootstrap releases only its reservation and never removes a live kernel lock',()=>{
+  const root=tmp();try{
+    const dir=workflow(root,'failed',{lastAt:1});
+    const live={pid:process.pid,startedAt:1,owner:'existing'};fs.writeFileSync(path.join(dir,'kernel.lock'),JSON.stringify(live));
+    // A stale inspection may decide to restart, but an unconfirmed v6 stop retains the incumbent lock.
+    const state=JSON.parse(fs.readFileSync(path.join(dir,'state.json'),'utf8'));state.engine={major:6};fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify(state));
+    const held=superviseOnce({repoRoot:root,launcher:'L.mjs',now:()=>10_000_000,killFn:()=>{},aliveFn:()=>true,log:()=>{}});
+    assert.equal(held.rounds[0].outcome.ok,false);assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir,'kernel.lock'),'utf8')),live);
+    assert.equal(fs.existsSync(path.join(dir,'kernel.launch.lock')),false);
+
+    fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({...state,engine:null,hostAdapter:'orca'}));fs.writeFileSync(path.join(dir,'events.jsonl'),JSON.stringify({at:1,event:'tick'})+'\n');fs.rmSync(path.join(dir,'kernel.lock'));
+    const orca={invoke:name=>name==='terminal-create'?{outcome:'ok',receipt:{result:{terminal:{handle:'term_failed'}}}}:{outcome:'failed',effectState:'none',reason:'injected readiness failure'}};
+    const failed=superviseOnce({repoRoot:root,launcher:'L.mjs',now:()=>10_000_001,orca,log:()=>{}});
+    assert.equal(failed.rounds[0].outcome.ok,false);assert.equal(fs.existsSync(path.join(dir,'kernel.launch.lock')),false,'failed bootstrap released its own reservation');
+  }finally{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,100);fs.rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+});
+
+test('an unknown native bootstrap effect retains the reservation and blocks duplicate creation',()=>{
+  const root=tmp();try{
+    const dir=workflow(root,'unknown',{lastAt:1}),state=JSON.parse(fs.readFileSync(path.join(dir,'state.json'),'utf8'));state.hostAdapter='orca';fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify(state));
+    let creates=0;const orca={invoke:name=>{if(name==='terminal-create'){creates+=1;return {outcome:'ok',receipt:{result:{terminal:{handle:'term_uncertain'}}}};}return {outcome:'unknown',effectState:'unknown',reason:'read outcome unavailable'};}};
+    const first=superviseOnce({repoRoot:root,launcher:'L.mjs',now:()=>10_000_000,orca,log:()=>{}});assert.equal(first.rounds[0].outcome.effectState,'unknown');
+    const second=superviseOnce({repoRoot:root,launcher:'L.mjs',now:()=>10_000_001,orca,log:()=>{}});assert.equal(second.rounds[0].reason,'kernel launch in progress');assert.equal(creates,1);
+  }finally{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,100);fs.rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+});
+
+test('a confirmed local child exit releases only a still-launching exact reservation',()=>{
+  const root=tmp();try{
+    const runningDir=workflow(root,'local-running',{lastAt:1});let runningChild;
+    const runningLaunch=superviseOnce({repoRoot:root,launcher:'L.mjs',now:()=>10_000_000,spawnFn:()=>{runningChild=new EventEmitter();runningChild.pid=54321;runningChild.unref=()=>{};return runningChild;},log:()=>{},only:['local-running']});
+    assert.equal(runningLaunch.rounds[0].outcome.ok,true);const reserved=inspectStartup(runningDir);assert.equal(reserved.pid,54321);
+    const acquired=acquireStartup(runningDir,{launchToken:reserved.token,pid:54321});runningChild.emit('close',0,null);
+    assert.equal(inspectStartup(runningDir).phase,'running','a child close after acquisition cannot release running ownership');assert.equal(inspectStartup(runningDir).token,acquired.token);
+
+    const exitDir=workflow(root,'local-exit',{lastAt:1});let exitedChild;
+    const first=superviseOnce({repoRoot:root,launcher:'L.mjs',now:()=>10_000_001,spawnFn:()=>{exitedChild=new EventEmitter();exitedChild.pid=54322;exitedChild.unref=()=>{};return exitedChild;},log:()=>{},only:['local-exit']});
+    assert.equal(first.rounds[0].outcome.ok,true);assert.equal(inspectStartup(exitDir).pid,54322);
+    exitedChild.emit('close',1,null);assert.equal(inspectStartup(exitDir),null);
+    const second=superviseOnce({repoRoot:root,launcher:'L.mjs',now:()=>10_000_002,spawnFn:()=>({pid:54323,unref(){},once(){}}),log:()=>{},only:['local-exit']});
+    assert.equal(second.rounds[0].outcome.ok,true,'a confirmed pre-acquire exit permits an exact retry');
+  }finally{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,100);fs.rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+});
+
+test('unknown native terminal cleanup retains startup ownership and suppresses retry',()=>{
+  const root=tmp();try{
+    const dir=workflow(root,'cleanup-unknown',{lastAt:1}),state=JSON.parse(fs.readFileSync(path.join(dir,'state.json'),'utf8'));state.hostAdapter='orca';fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify(state));let creates=0,closes=0;
+    const orca={invoke:name=>{if(name==='terminal-create'){creates+=1;return {outcome:'ok',receipt:{result:{terminal:{handle:'term_cleanup'}}}};}if(name==='terminal-read')return {outcome:'failed',effectState:'none',reason:'not ready'};if(name==='terminal-close'){closes+=1;return {outcome:'unknown',effectState:'unknown',reason:'transport lost'};}throw Error(name);}};
+    const first=superviseOnce({repoRoot:root,launcher:'L.mjs',orca,now:()=>10_000_000,log:()=>{}});
+    assert.equal(first.rounds[0].outcome.effectState,'unknown');assert.equal(closes,1);assert.equal(inspectStartup(dir).phase,'launching');
+    const second=superviseOnce({repoRoot:root,launcher:'L.mjs',orca,now:()=>10_000_001,log:()=>{}});
+    assert.equal(second.rounds[0].reason,'kernel launch in progress');assert.equal(creates,1);
+  }finally{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,100);fs.rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+});
+
+test('the synchronous supervisor loop reclaims a confirmed exited local child without waiting for its close callback',()=>{
+  const root=tmp();try{
+    workflow(root,'real-child-exit',{lastAt:1});const launcher=path.join(root,'exit.mjs');fs.writeFileSync(launcher,'process.exit(0);\n');
+    const result=superviseForever({repoRoot:root,launcher,maxRounds:2,pollMs:250,probe:()=>({ok:false,reason:'test'}),stamp:()=>1,log:()=>{}});
+    const starts=fs.readFileSync(path.join(root,'.starciwork','_local','workflows','real-child-exit','kernel.log'),'utf8').match(/=== kernel start/g)??[];
+    assert.equal(starts.length,2,'the second synchronous round confirms the first pid exited and launches once more');
+    assert.equal(result.rounds[0].outcome.ok,true);
+  }finally{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,150);fs.rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 });

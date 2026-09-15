@@ -204,6 +204,7 @@ function frame(kind,payload,form,role=PLANNING_ROLE){
   return [
     `You are ${role}. Answer with ONE JSON object and nothing else.`,
     `Function: ${kind}. Required keys and types: ${JSON.stringify(Object.fromEntries(Object.entries(form).map(([k,v])=>[k,v.type+(v.enum?` in ${v.enum.join('|')}`:'')+(v.optional?' (optional)':'')])))}.`,
+    `Complete recursive form contract: ${JSON.stringify(form)}. Every field is required unless its rule says optional:true; each defines the complete field contract for every array item.`,
     `You decide only the content of the form. The process (provider, retries, waiting, reporting) is fixed by the runtime and is not yours to change.`,
     `Input:`,JSON.stringify(payload,null,2)
   ].join('\n');

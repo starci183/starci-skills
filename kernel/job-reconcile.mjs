@@ -17,7 +17,8 @@ export function reconcilePureModelJobs({journal,admission,workflowId=null,genera
   for(const job of jobs){const pid=spawned.get(job.job_id);
     // Native Orca workers have dispatch identities, not child PIDs in this journal. Their host adapter owns
     // liveness; absence of a detached-process event is not evidence that a running native worker died.
-    if(job.kind==='operation'&&!Number.isInteger(pid)&&job.status!=='effect_unknown'){result.live.push({jobId:job.job_id,hostOwned:true});continue;}
+    if(job.kind==='operation'){result.live.push({jobId:job.job_id,hostOwned:true,status:job.status,
+      workerId:job.worker_id??null,reason:'native operation liveness belongs to its exact host Dispatch'});continue;}
     if(Number.isInteger(pid)&&pidAlive(pid)){result.live.push({jobId:job.job_id,pid});continue;}const reason=Number.isInteger(pid)?`owned process ${pid} is gone`:'owned spawn pid is unavailable';
     if(pureModel(job)&&Number.isInteger(pid)){
       if(job.status!=='effect_unknown')journal.db.prepare("UPDATE jobs SET status='effect_unknown',deadline=NULL,updated_at=? WHERE job_id=? AND lease_token=?").run(now(),job.job_id,job.lease_token);

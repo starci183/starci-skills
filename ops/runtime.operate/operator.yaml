@@ -13,6 +13,15 @@ graphPolicy:
   prerequisiteState: done
   dispatch: never
 reads:
+  - id: application-stacks
+    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + schemas/application-stacks.schema.json
+    purpose:
+      en: When the selected scope touches application deployment, .stacks, bootstrap or recovery,
+        load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
+        credential custody, lifecycle commands and existing consumers. Run the static stacks
+        check when validating a materialized stack; bind its exact inputs and limitations.
+        Acceptance additionally requires the selected real startup, persistence, recovery and
+        application checks. This conditional read grants no extra deployment or source scope.
   - id: target
     path: N/index.yaml
     purpose:
@@ -81,6 +90,7 @@ writes:
         The selected request freezes output field schemas before execution.
 steps:
   - reads:
+      - application-stacks
       - target
       - selection
       - profile
@@ -148,6 +158,15 @@ executionModes:
       prerequisiteState: done
       dispatch: never
     reads:
+      - id: application-stacks
+        path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + schemas/application-stacks.schema.json
+        purpose:
+          en: When the selected scope touches application deployment, .stacks, bootstrap or recovery,
+            load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
+            credential custody, lifecycle commands and existing consumers. Run the static stacks
+            check when validating a materialized stack; bind its exact inputs and limitations.
+            Acceptance additionally requires the selected real startup, persistence, recovery and
+            application checks. This conditional read grants no extra deployment or source scope.
       - id: target
         path: N/index.yaml
         purpose:
@@ -238,6 +257,7 @@ executionModes:
             cannot advance. The selected request freezes output field schemas before execution.
     steps:
       - reads:
+          - application-stacks
           - target
           - repo
           - environment
@@ -331,6 +351,15 @@ executionModes:
       prerequisiteState: done
       dispatch: never
     reads:
+      - id: application-stacks
+        path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + schemas/application-stacks.schema.json
+        purpose:
+          en: When the selected scope touches application deployment, .stacks, bootstrap or recovery,
+            load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
+            credential custody, lifecycle commands and existing consumers. Run the static stacks
+            check when validating a materialized stack; bind its exact inputs and limitations.
+            Acceptance additionally requires the selected real startup, persistence, recovery and
+            application checks. This conditional read grants no extra deployment or source scope.
       - id: target
         path: N/index.yaml
         purpose:
@@ -439,6 +468,7 @@ executionModes:
             cannot advance. The selected request freezes output field schemas before execution.
     steps:
       - reads:
+          - application-stacks
           - target
           - runtime
           - environment
@@ -548,6 +578,15 @@ executionModes:
       prerequisiteState: done
       dispatch: never
     reads:
+      - id: application-stacks
+        path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + schemas/application-stacks.schema.json
+        purpose:
+          en: When the selected scope touches application deployment, .stacks, bootstrap or recovery,
+            load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
+            credential custody, lifecycle commands and existing consumers. Run the static stacks
+            check when validating a materialized stack; bind its exact inputs and limitations.
+            Acceptance additionally requires the selected real startup, persistence, recovery and
+            application checks. This conditional read grants no extra deployment or source scope.
       - id: target
         path: N/index.yaml
         purpose:
@@ -642,6 +681,7 @@ executionModes:
             cannot advance. The selected request freezes output field schemas before execution.
     steps:
       - reads:
+          - application-stacks
           - service
           - environment
           - target

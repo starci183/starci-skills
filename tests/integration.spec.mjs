@@ -496,10 +496,10 @@ test('a 300-piece multi-repository tree accepts a new unfinished domain without 
   assert.equal(result.nodes.some(node => node.effectiveState === 'done'), false);
 });
 
-test('init builds and verifies source-built .dist before recording success; failed update does not bump version', t => {
+test('init verifies the packaged compiled runtime before recording success; failed update does not bump version', t => {
   const root = host(t);
   const pkg = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
-  assert.equal(pkg.files.includes('.dist') || pkg.files.includes('.dist/'), false);
+  assert.equal(pkg.files.includes('.dist') || pkg.files.includes('.dist/'), true);
   assert.ok(pkg.files.includes('core/'));
   assert.ok(pkg.files.includes('scripts/'));
   assert.ok(pkg.files.includes('schemas/'));
@@ -517,7 +517,7 @@ test('init builds and verifies source-built .dist before recording success; fail
   const manifestPath = path.join(root, '.claude/.starci-skills.json');
   const written = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   assert.equal(written.version, pkg.version);
-  assert.equal(Object.keys(written.files).some(rel => rel === '.dist' || rel.startsWith('.dist/')), false);
+  assert.equal(Object.keys(written.files).some(rel => rel.startsWith('.dist/')), true);
   const check = spawnSync(process.execPath, [path.join(root, '.claude/scripts/build-workflows.mjs'), '--check'], {
     cwd: path.join(root, '.claude'), encoding: 'utf8', windowsHide: true,
   });

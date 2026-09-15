@@ -10,7 +10,7 @@ test('compiled dist is JSON contracts plus mirrored runtime modules; entry requi
   const modules=new Set(fs.readFileSync(path.join(root,'scripts/runtime-modules.txt'),'utf8').split(/\r?\n/).map(l=>l.trim()).filter(l=>l&&!l.startsWith('#')));
   for(const file of walk(path.join(root,'.dist'))){
     const relative=path.relative(path.join(root,'.dist'),file).replaceAll('\\','/');
-    if(relative.endsWith('.mjs')){assert.ok(modules.has(relative),relative);continue;}
+    if(relative.endsWith('.mjs')&&!relative.startsWith('examples/application-stacks/')){assert.ok(modules.has(relative),relative);continue;}
     if(/^(docs|examples)\//.test(relative)&&!relative.endsWith('.json'))continue;
     assert.ok(relative.endsWith('.json'),relative);
     JSON.parse(fs.readFileSync(file));

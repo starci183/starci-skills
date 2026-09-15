@@ -166,6 +166,25 @@ test('the view counts exactly what the files say, and the clock comes from the c
   assert.equal(JSON.parse(renderJson(view)).id,id);
 });
 
+test('manager observability shows actions and liveness without inventing rationale or model attestation',t=>{
+  const repoRoot=tmp(t),{id,dir}=richStore(repoRoot),file=path.join(dir,'state.json');
+  const state=JSON.parse(fs.readFileSync(file,'utf8'));
+  state.engine={coordination:'agent-v1',manager:{lastDecisionId:'manager-1',lastActions:['dispatch:r1'],pendingDecisionId:null},
+    modelSelections:{opaque:{runtime:'claude-opus',provider:'claude-opus'}}};
+  fs.writeFileSync(file,JSON.stringify(state));
+  fs.appendFileSync(path.join(dir,'events.jsonl'),JSON.stringify({at:NOW-30_000,seq:13,event:'manager-applied',decisionId:'manager-1',actions:['dispatch:r1']})+'\n');
+  fs.appendFileSync(path.join(dir,'events.jsonl'),JSON.stringify({at:NOW-20_000,seq:14,event:'admission-deferred',op:'r1',reason:'canonical writer busy'})+'\n');
+  const view=buildView({repoRoot,id,now:NOW}),page=renderView(view);
+  assert.deepEqual(view.coordination.actions,['dispatch:r1']);
+  assert.deepEqual(view.coordination.schedulerSelectedModels,['claude-opus']);
+  assert.equal(view.coordination.attestedActualModel,null,'selection is not attestation');
+  assert.equal(view.coordination.rationale,null,'missing persisted rationale stays missing');
+  assert.match(page,/workflow-selected models claude-opus; manager attested actual unknown/);
+  assert.match(page,/rationale  not retained; no hidden reasoning or prompt is exposed/);
+  assert.match(page,/progress   manager-applied/);
+  assert.match(page,/waiting    canonical writer busy/);
+});
+
 test('a young workflow is measured over its own life, not a three hour window that did not happen',t=>{
   const repoRoot=tmp(t);
   const {id}=richStore(repoRoot,'20260101-000001-young');

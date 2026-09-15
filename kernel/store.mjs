@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {readReports as readReportFiles,repositoryRoot} from './reports.mjs';
 import crypto from 'node:crypto';
+import {createProgressReporter} from './progress.mjs';
 
 /**
  * Runtime state of a 5.0 workflow. One workflow owns exactly one directory under
@@ -68,6 +69,7 @@ export function createStore({repoRoot,id}){
   for(const directory of [dir,paths.reports,paths.contracts,paths.checks,paths.inbox])fs.mkdirSync(directory,{recursive:true});
   let seq=null;
   let durable=null;
+  const reportProgress=createProgressReporter();
   const nextSeq=()=>{
     if(seq===null)seq=lastSeq(paths.events);
     seq+=1;return seq;
@@ -81,6 +83,7 @@ export function createStore({repoRoot,id}){
       need(event.seq===undefined,'seq is assigned by the log, never by the caller');
       const line={at:Date.now(),seq:nextSeq(),...event};
       fs.appendFileSync(paths.events,`${JSON.stringify(line)}\n`);
+      reportProgress(line);
       return line;
     },
     readEvents({since=0}={}){

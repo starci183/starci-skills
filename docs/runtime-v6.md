@@ -48,6 +48,13 @@ The functions keep separate typed inputs and independent contexts even when they
 
 ## Candidate acceptance
 
+Native operation jobs are reconciled through their exact host Dispatch, never inferred dead because the
+model-process journal has no child PID. Before retrying a stopped unreported worker, the kernel requires
+typed settlement matching its launch receipt, freezes its actual candidate under the writer fence and
+preserves only sealed in-scope changes as provenance. Unknown or out-of-scope effects retain the fence.
+A fresh exact native running heartbeat outranks a screen-only stall heuristic; it does not extend the
+operation deadline or certify that a product result is correct.
+
 The kernel collects observed bytes and Git changes; a worker's file list is diagnostic only. Candidates and
 protected oracles carry digests, accepted-head identity, dependency inputs and environment binding. Required
 gates have four states: pass, fail, inconclusive and unavailable. Only complete, independently resolved and
@@ -82,6 +89,11 @@ Saved credentials remain saved until a separately collected provider verificatio
 Wrong or expired values return a precise correction request bound to the exact requested credential revision.
 
 ## Feedback and release evidence
+
+An interactive kernel emits bounded progress and wait summaries on stderr while preserving stdout JSON.
+The manager's validated explicit rationale explains its selected actions; hidden model reasoning is not
+part of the interface. Repeated waits are deduplicated. The status view separates selected from attested
+models and distinguishes meaningful transitions from polling and repeated admission failures.
 
 After feedback, repair the runtime, test it privately, seal a new build and explicitly retry the affected
 unfinished workflow operations with fresh agent contexts. Agent-led coordination is a forward enrollment at

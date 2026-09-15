@@ -1,0 +1,107 @@
+schema: starci/schema@1
+id: starci/application-stacks@1
+title: Application stack declaration
+description: >-
+  Static, repository-owned inventory for reproducible Compose environments. It declares
+  intended topology and verification commands; it is not evidence that a stack ran.
+type: object
+additionalProperties: false
+required: [schema, components, environments, k8s]
+properties:
+  schema: {const: starci/application-stacks@1}
+  components:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, role]
+      properties:
+        id: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+        role: {enum: [frontend, backend, worker, bootstrap, stateful, gateway]}
+        purpose: {type: string}
+        required: {type: boolean}
+  environments:
+    type: object
+    required: [dev, vps]
+    additionalProperties: false
+    properties:
+      dev: {$ref: '#/$defs/environment'}
+      vps: {$ref: '#/$defs/environment'}
+  k8s:
+    type: object
+    additionalProperties: false
+    required: [status, reason]
+    properties:
+      status: {const: deferred}
+      reason: {type: string, minLength: 1}
+$defs:
+  environment:
+    type: object
+    additionalProperties: false
+    required: [status, runtime, composeFiles, components, runbook, secrets]
+    properties:
+      status: {const: supported}
+      runtime: {enum: [docker-compose, docker-swarm]}
+      composeFiles: {type: array, minItems: 1, items: {type: string}}
+      components:
+        type: object
+        minProperties: 1
+        additionalProperties:
+          type: object
+          additionalProperties: false
+          required: [ownership]
+          properties:
+            ownership: {enum: [managed, external, excluded]}
+            service: {type: string}
+            owner: {type: string}
+            failureDomain: {type: string, minLength: 1}
+            endpointRef: {type: string}
+            reason: {type: string}
+      runbook:
+        type: object
+        additionalProperties: false
+        required: [prepare, doctor, up, status, logs, down, verification]
+        properties:
+          prepare: {type: string, minLength: 1}
+          doctor: {type: string, minLength: 1}
+          up: {type: string, minLength: 1}
+          status: {type: string, minLength: 1}
+          logs: {type: string, minLength: 1}
+          down: {type: string, minLength: 1}
+          update: {type: string, minLength: 1}
+          rollback: {type: string, minLength: 1}
+          backup: {type: string, minLength: 1}
+          restore: {type: string, minLength: 1}
+          verification:
+            type: object
+            additionalProperties: false
+            required: [coldStart, restart, persistence]
+            properties:
+              coldStart: {type: string, minLength: 1}
+              restart: {type: string, minLength: 1}
+              persistence: {type: string, minLength: 1}
+      platform:
+        type: object
+        additionalProperties: false
+        properties:
+          ubuntu: {type: string, minLength: 1}
+          architectures: {type: array, minItems: 1, items: {enum: [amd64, arm64]}}
+      secrets:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [name, source, encryptedRef, recipientPolicy, keyCustody]
+          properties:
+            name: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+            source: {enum: [generated, provider-issued]}
+            sourceOwner: {type: string}
+            generationAlgorithm: {type: string}
+            formatPolicy: {type: string}
+            encryptedRef: {type: string}
+            materializedPath: {type: string}
+            runtimeName: {type: string}
+            version: {type: string}
+            recipientPolicy: {type: string, minLength: 1}
+            keyCustody: {type: string, minLength: 1}

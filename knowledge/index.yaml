@@ -23,6 +23,10 @@ guidance:
       execution authority. Product requirements, design, scope, state and verification belong
       in .starciwork. These references do not authorize the next op.
 branches:
+  - id: application-stacks
+    title: Complete application stacks
+    path: application-stacks.yaml
+    use: Whole-app dev and Ubuntu VPS Compose deployment, encrypted custody, lifecycle and verification.
   - id: code-examples
     title: Code examples
     path: code-examples/index.yaml

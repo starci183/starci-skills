@@ -189,6 +189,17 @@ test('build:check is read-only for stale files and build creates missing .dist',
   });
   assert.equal(built.status, 0, built.stderr || built.stdout);
 
+  const declarativeChecked = spawnSync(process.execPath, ['scripts/compile-declarative.mjs', '--check'], {
+    cwd: dir,
+    encoding: 'utf8',
+    timeout: 180000,
+  });
+  assert.equal(declarativeChecked.status, 0, declarativeChecked.stderr || declarativeChecked.stdout);
+  const declarativeResult=JSON.parse(declarativeChecked.stdout);
+  assert.equal(declarativeResult.ok,true);
+  assert.equal(declarativeResult.stale.includes('workflows/catalog.json'),false,
+    'standalone declarative check must not compare the unified build\'s rewritten workflow catalog as a raw projection');
+
   const target = path.join(dir, '.dist', 'workflows', 'catalog.json');
   assert.equal(fs.existsSync(target), true, 'expected .dist/workflows/catalog.json');
   const original = fs.readFileSync(target);

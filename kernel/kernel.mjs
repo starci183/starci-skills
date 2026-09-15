@@ -4,6 +4,7 @@ import {createV6Runtime,enrollV6,isV6,isJobPending,settleGenerationLeases,prepar
 import {applyOwnerInbox} from './owner-inbox.mjs';
 import {verifyAcceptedIntegrationOwnerRequests} from './owner-requests.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
+import {acquireStartup,releaseStartup} from './startup-lock.mjs';
 import {createWorkflowModelEligibility} from './model-policy.mjs';
 import {openJournal} from './journal.mjs';
 import path from 'node:path';
@@ -414,6 +415,33 @@ export function reconcileFailedLaunchLease(state,op,{orca,store,settle=settleGen
   store.appendEvent({event:'failed-launch-stopped-proved',op:op.id,jobId:lease.jobId,generation:lease.generation,run:state.run,task:taskId,dispatch:dispatch.id,terminal:terminal.handle,
     proof:'dispatch failed at dispatch_input; exact worker exited; its exact terminal resource ownership and release states are released; candidate reconciliation still accounts for any late filesystem effects'});
   return {ok:true,jobId:lease.jobId,dispatch:dispatch.id};
+}
+/** Recover a launched native lease only from the exact stopped Orca worker and its still-fenced candidate. */
+export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost=settleDispatch,createRuntime=createV6Runtime,git=spawnSync,waitFn=sleepSync}={}){
+  const lease=op?.v6Lease,dispatchId=op?.launch?.dispatch,taskId=op?.launch?.task,candidate=op?.v6Candidate?.bridge?.identity;
+  if(!lease||!dispatchId||!taskId||op.dispatch||op.terminal)return {ok:false,reason:'stopped native retry identity is incomplete or still active'};
+  const exactLease=lease.workflowId===state.id&&lease.opId===op.id&&lease.attempt===op.attempt&&lease.generation===state.engine?.generation&&
+    candidate?.workflowId===lease.workflowId&&candidate?.opId===lease.opId&&candidate?.attempt===lease.attempt&&candidate?.generation===lease.generation&&candidate?.jobId===lease.jobId;
+  if(!exactLease)return {ok:false,reason:'candidate and durable lease do not bind the current workflow operation attempt'};
+  let inspected;try{inspected=orca.invoke('worker-show',{dispatch:dispatchId},{cwd:state.worktree});}catch(error){return {ok:false,reason:`worker settlement unavailable: ${error.message}`};}
+  const result=inspected?.outcome==='ok'?getPath(inspected.receipt,'result'):null,worker=result?.worker,dispatch=result?.dispatch,observation=result?.observation,terminal=result?.terminal;
+  const stopped=['failed','stopped','succeeded'].includes(worker?.state)&&observation?.exactWorker===true&&observation?.status==='exited'&&
+    (!terminal||(terminal.connected===false&&terminal.writable===false&&(terminal.paneRuntimeId===undefined||terminal.paneRuntimeId===null||terminal.paneRuntimeId===-1)));
+  if(dispatch?.id!==dispatchId||dispatch?.task_id!==taskId||dispatch?.run_id!==state.run||worker?.dispatch_id!==dispatchId||!stopped)
+    return {ok:false,reason:'Orca does not prove the exact current Run/Task/Dispatch worker exited'};
+  let settlement;try{settlement=settleHost(orca,dispatchId,{cwd:state.worktree,reason:'workflow retry reconciles an exited native attempt',terminalHandle:terminal?.handle??null,closeTerminal:false,wait:waitFn});}
+  catch(error){return {ok:false,reason:`typed host settlement failed: ${error.message}`};}
+  if(settlement?.effectState!=='none')return {ok:false,reason:`exact native process settlement remains ${settlement?.effectState??'unknown'}`};
+  const runtime=createRuntime({store,state,eligibility:()=>({eligible:false,reasons:['retry reconciliation only']}),git});
+  try{
+    const reconciled=runtime.settleStoppedOperation(op,{dispatch:dispatchId,settlement,reason:'public workflow retry proved the exact native worker exited'});
+    if(!reconciled.ok)return reconciled;
+    store.appendEvent({event:'retry-native-attempt-reconciled',op:op.id,jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,
+      run:state.run,task:taskId,dispatch:dispatchId,candidateDigest:reconciled.candidateDigest??null,observedFiles:reconciled.observedFiles??[],
+      proof:'exact Orca worker exited; typed process settlement succeeded; candidate bytes were sealed while its writer fence remained held'});
+    store.saveState(state);
+    return {ok:true,dispatch:dispatchId,observedFiles:reconciled.observedFiles??[],candidateDigest:reconciled.candidateDigest??null};
+  }finally{runtime.close();}
 }
 export function refundLegacyCoordinatorProbations(store,state,runtime){
   const events=store.readEvents(),refunded=[];
@@ -1500,8 +1528,9 @@ export function coordinateManagedWorkflow(store,state,ctx){
     if(id.startsWith('replan:')){const op=byId(state,id.slice(7));if(op?.status==='ready'&&op.needsReplan&&!op.v6Lease&&!op.fill&&!op.ownerRequest){ctx.currentOp=op;replanOp(store,state,op,ctx);}continue;}
     if(id.startsWith('dispatch:')){const opId=id.slice(9),op=byId(state,opId);if(op?.status==='ready'&&!op.v6Lease&&!op.fill&&!op.ownerRequest)dispatch.push(opId);}
   }
-  Object.assign(manager,{lastDecisionId:requested.decisionId,lastDigest:requested.digest,lastBasisDigest:requested.basisDigest,lastActions:[...checked.orderedActionIds],lastAppliedIteration:state.iterations,lastAppliedAt:now,incident:null});
-  store.appendEvent({event:'manager-applied',decisionId:requested.decisionId,digest:requested.digest,actions:checked.orderedActionIds});store.saveState(state);
+  const rationale=String(decision.rationale).slice(0,500);
+  Object.assign(manager,{lastDecisionId:requested.decisionId,lastDigest:requested.digest,lastBasisDigest:requested.basisDigest,lastActions:[...checked.orderedActionIds],lastRationale:rationale,lastAppliedIteration:state.iterations,lastAppliedAt:now,incident:null});
+  store.appendEvent({event:'manager-applied',decisionId:requested.decisionId,digest:requested.digest,actions:checked.orderedActionIds,rationale});store.saveState(state);
   return {pending:false,dispatch};
 }
 
@@ -2379,6 +2408,8 @@ export const opDeadlineFor=op=>Number.isFinite(op?.timeoutMs)&&op.timeoutMs>0?op
  * quiet after `launched` before any stall verdict is taken about it: no nudge, no settle, no tab read.
  */
 export const LONG_CONTRACT_GRACE_MS=3*60*1000;
+/** A screen heuristic cannot stop an exact native worker while its typed host heartbeat is still fresh. */
+export const NATIVE_ACTIVITY_GRACE_MS=2*60*1000;
 /** A contract past this is "long": the operator contracts that author records run three to thirteen kilobytes. */
 export const LONG_CONTRACT_BYTES=8*1024;
 /** Relaunches the kernel pays for itself (`prompt-missing`) before it starts charging them to the operation. */
@@ -2444,7 +2475,8 @@ function settleFromTab(orca,store,state,op,ctx,observed){
   // The prompt never reached the agent, so there is nothing the agent did wrong and nothing to hold against it:
   // the attempt is relaunched, on the same runtime if the allocator offers it, and `op.restarts` does not move.
   if(read.verdict==='prompt-missing'){
-    settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:'prompt-missing',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
+    const settled=settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:'prompt-missing',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
+    if(!reconcileStoppedNativeAttempt(store,state,op,ctx,settled,'prompt-missing'))return 'native-reconciliation';
     ctx.allocator.release(op.runtime,{op:op.id});
     op.infraRestarts=(op.infraRestarts??0)+1;
     store.appendEvent({event:'op-relaunched',op:op.id,runtime:op.runtime,reason:'prompt-missing',
@@ -2466,6 +2498,37 @@ function settleFromTab(orca,store,state,op,ctx,observed){
   return read.verdict;
 }
 
+/**
+ * A native Dispatch has no child PID in the journal. Once its host settlement proves the exact process stopped,
+ * freeze its byte delta while the canonical writer fence is still held, preserve that delta as the next attempt's
+ * owned baseline, and only then release the durable job. An ambiguous stop or candidate never becomes a retry.
+ */
+function reconcileStoppedNativeAttempt(store,state,op,ctx,settlement,reason){
+  if(!ctx.v6)return true;
+  const reconciled=ctx.v6.settleStoppedOperation(op,{dispatch:op.dispatch,settlement,reason});
+  if(!reconciled.ok){quarantineCandidate(store,state,op,{kind:'native-stop-reconciliation',effectState:reconciled.effectState??'unknown',reasons:[reconciled.reason??'native attempt could not be reconciled']});return false;}
+  const prior={attempt:op.attempt,dispatch:op.dispatch,candidateDigest:reconciled.candidateDigest??null,observedFiles:[...(reconciled.observedFiles??[])]};
+  op.v6PriorStoppedAttempt=prior;op.attempt=(op.attempt??1)+1;
+  delete op.v6WorkerSettled;delete op.v6RetryReconciled;
+  store.appendEvent({event:'native-attempt-reconciled',op:op.id,attempt:prior.attempt,nextAttempt:op.attempt,dispatch:prior.dispatch,
+    candidateDigest:prior.candidateDigest,observedFiles:prior.observedFiles,historicalEffectState:prior.observedFiles.length?'partial':'none-observed'});
+  return true;
+}
+
+/** Fresh typed host activity outranks a prompt-shaped screen. Identity mismatches and stale heartbeats prove nothing. */
+export function nativeActivityProof(orca,state,op,now,{graceMs=NATIVE_ACTIVITY_GRACE_MS}={}){
+  if(!op?.dispatch||!state?.run)return {active:false,reason:'native Dispatch identity unavailable'};
+  let shown;try{shown=orca.invoke('worker-show',{dispatch:op.dispatch},{cwd:state.worktree});}catch(error){return {active:false,reason:String(error?.message??error)};}
+  if(shown?.outcome!=='ok')return {active:false,reason:shown?.reason??'worker-show failed'};
+  const result=getPath(shown.receipt,'result'),dispatch=result?.dispatch,worker=result?.worker,observation=result?.observation;
+  const heartbeat=Date.parse(dispatch?.last_heartbeat_at??dispatch?.lastHeartbeatAt??'');
+  const exact=dispatch?.id===op.dispatch&&dispatch?.run_id===state.run&&(!op.task||dispatch?.task_id===op.task)
+    &&worker?.dispatch_id===op.dispatch&&observation?.exactWorker===true&&observation?.status==='running';
+  const age=Number.isFinite(heartbeat)?Math.max(0,now-heartbeat):Infinity;
+  return {active:exact&&age<=graceMs,exact,heartbeatAt:Number.isFinite(heartbeat)?heartbeat:null,ageMs:age,
+    reason:exact?(age<=graceMs?'exact native worker heartbeat is fresh':'exact native worker heartbeat is stale'):'worker-show identity or process state differs'};
+}
+
 export function settleStalled(orca,store,state,ctx,tick){
   const now=clockOf(ctx);
   // An op that waits for the OWNER is exempt from the deadline: it is not slow, it is waiting, and the wait is
@@ -2473,7 +2536,8 @@ export function settleStalled(orca,store,state,ctx,tick){
   // op waiting for a credential to be filled in has no dispatch at all: nothing is running for it.
   for(const op of state.ops.filter(item=>item.status==='running'&&!item.fill&&!waitsForOwner(state,item)&&Number.isFinite(item.launchedAt)&&now-item.launchedAt>opDeadlineFor(item))){
     // Past its deadline: settled as an overrun and relaunched elsewhere, like a stall the probe cannot see.
-    settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:'overrun',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
+    const settled=settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:'overrun',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
+    if(!reconcileStoppedNativeAttempt(store,state,op,ctx,settled,'overrun'))continue;
     ctx.allocator.release(op.runtime,{op:op.id});
     op.restarts+=1;
     store.appendEvent({event:'op-overrun',op:op.id,runtime:op.runtime,ranMs:now-op.launchedAt,deadlineMs:opDeadlineFor(op),restarts:op.restarts});
@@ -2505,7 +2569,15 @@ export function settleStalled(orca,store,state,ctx,tick){
       continue;
     }
     if(!['stalled-prompt','stalled-silent','stalled-idle','dead','rate-limited'].includes(observed.liveness))continue;
-    settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:observed.liveness,terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
+    if(ctx.v6&&observed.liveness!=='rate-limited'){
+      const activity=nativeActivityProof(orca,state,op,now);
+      if(activity.active){
+        if(!Number.isFinite(op.nativeActivityDeferredAt)||now-op.nativeActivityDeferredAt>=NATIVE_ACTIVITY_GRACE_MS){op.nativeActivityDeferredAt=now;store.appendEvent({event:'native-settlement-deferred',op:op.id,dispatch:op.dispatch,liveness:observed.liveness,heartbeatAt:activity.heartbeatAt,ageMs:activity.ageMs});}
+        continue;
+      }
+    }
+    const settled=settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:observed.liveness,terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
+    if(!reconcileStoppedNativeAttempt(store,state,op,ctx,settled,observed.liveness))continue;
     if(observed.liveness==='rate-limited'){ctx.allocator.failed(op.runtime,{reason:`rate-limited (${observed.reason??'provider screen'})`,op:op.id});store.appendEvent({event:'rate-limit-parked',op:op.id,runtime:op.runtime});}
     else ctx.allocator.release(op.runtime,{op:op.id});
     if(observed.liveness==='stalled-silent'&&noteSilence(store,state,op,ctx))avoidRuntime(op,op.runtime,clockOf(ctx));
@@ -2834,7 +2906,7 @@ export function guardedStage(store,state,ctx,stage,fn){
  */
 export const TRIAGE_OPTIONS=['resume-ops','park-runtime','settle-op','restart-kernel','needUser'];
 export function retryOwnedBaseline(state,op,git=spawnSync){const changed=changedFiles(state,op,{git},op.allowlist,{exclude:op.kernelOwned??[]}),attributed=attributedFiles(op,changed);return {changed,attributed,unclaimed:changed.filter(file=>!attributed.includes(file))};}
-export const retryableV6Operation=op=>!op?.fill&&!op?.ownerRequest&&(['running','answering'].includes(op?.status)||(Boolean(op?.v6Lease)&&(op?.refusal==='runtime-reconciliation'||op?.v6WorkerSettled===true)));
+export const retryableV6Operation=op=>!op?.fill&&!op?.ownerRequest&&(['running','answering'].includes(op?.status)||Boolean(op?.v6RetryReconciled)||(Boolean(op?.v6Lease)&&(op?.refusal==='runtime-reconciliation'||op?.v6WorkerSettled===true)));
 export function noteAnomaly(store,state,signature,detail){
   state.anomalies=state.anomalies??{};
   const entry=state.anomalies[signature]=state.anomalies[signature]??{count:0,detail,firstAt:Date.now(),triaged:null};
@@ -3363,16 +3435,12 @@ export function relocateLauncher(store,state){
 const templateOf=host=>fs.readFileSync(path.join(host,'docs','supervision-templates','op.md'),'utf8');
 
 /** One kernel per workflow: a pid lock in the store refuses a second process; a stop flag ends the loop cleanly. */
-function acquireKernelLock(store){
+function acquireKernelLock(store,{launchToken=null}={}){
   const lock=path.join(store.dir,'kernel.lock');
-  const existing=(()=>{try{return JSON.parse(fs.readFileSync(lock,'utf8'));}catch{return null;}})();
-  if(existing?.pid&&existing.pid!==process.pid){
-    let alive=false;try{process.kill(existing.pid,0);alive=true;}catch{alive=false;}
-    need(!alive,`Another kernel (pid ${existing.pid}) already runs workflow ${store.id}; run workflow-stop first`);
-  }
-  if(existing){const current=readJson(lock,null);if(current?.pid===existing.pid)fs.rmSync(lock,{force:true});}
-  fs.writeFileSync(lock,JSON.stringify({pid:process.pid,startedAt:Date.now()}),{flag:'wx'});
-  return ()=>{try{const now=JSON.parse(fs.readFileSync(lock,'utf8'));if(now.pid===process.pid)fs.rmSync(lock);}catch{}};
+  const owner=acquireStartup(store.dir,{launchToken,pid:process.pid});
+  try{fs.writeFileSync(lock,JSON.stringify({pid:process.pid,startedAt:Date.now(),startupToken:owner.token}));}
+  catch(error){releaseStartup(store.dir,owner);throw error;}
+  return ()=>{releaseStartup(store.dir,owner);try{const now=JSON.parse(fs.readFileSync(lock,'utf8'));if(now.pid===process.pid&&now.startupToken===owner.token)fs.rmSync(lock);}catch{}};
 }
 export function stopRequested(store){return fs.existsSync(path.join(store.dir,'stop.flag'));}
 /** Whether a command waits in the inbox: the wait between ticks ends for it. */
@@ -3556,6 +3624,10 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const retryJobs=state.engine?.major===6?prepareGenerationRetry({journalFile:state.engine.journalFile,workflowId:state.id,generation:state.engine.generation}):{cancelled:[],unsettled:[]};
     if(retryJobs.cancelled.length)store.appendEvent({event:'retry-queued-jobs-cancelled',generation:state.engine.generation,jobs:retryJobs.cancelled,proof:'queued, unleased, and no job-spawned receipt'});
     need(!retryJobs.unsettled.length,`Current-generation durable model/check jobs must settle before retry: ${retryJobs.unsettled.join(', ')}`);
+    for(const op of state.ops.filter(item=>item.v6Lease&&!retryableV6Operation(item)&&item.launch?.task&&item.launch?.dispatch&&!item.dispatch&&!item.terminal&&item.v6Candidate?.bridge)){
+      const reconciled=reconcileStoppedNativeRetryLease(state,op,{orca,store});
+      need(reconciled.ok,`Stopped native lease ${op.v6Lease?.jobId??op.id} cannot be reconciled for retry: ${reconciled.reason}`);
+    }
     for(const op of state.ops.filter(item=>item.v6Lease&&!retryableV6Operation(item)&&item.launch?.task&&!item.dispatch&&!item.terminal)){
       const reconciled=reconcileFailedLaunchLease(state,op,{orca,store});need(reconciled.ok,`Failed launch lease ${op.v6Lease?.jobId??op.id} cannot be proved stopped: ${reconciled.reason}`);
     }
@@ -3577,16 +3649,21 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
         const released=settleGenerationLeases({journalFile:state.engine.journalFile,leases:[op.v6Lease],reason:'workflow retry after confirmed native dispatch stop'})[0];
         need(released?.ok,`Durable lease ${op.v6Lease.jobId} could not be settled before retry: ${released?.reason??'unknown'}`);
       }
-      const provenance=retryOwnedBaseline(state,op),dirty=provenance.changed,owned=provenance.attributed,unclaimed=provenance.unclaimed;
+      const reconciledNative=op.v6RetryReconciled;
+      const provenance=retryOwnedBaseline(state,op),dirty=provenance.changed,
+        owned=reconciledNative?[...new Set(reconciledNative.observedFiles??[])].filter(file=>provenance.changed.includes(file)):provenance.attributed,
+        unclaimed=provenance.changed.filter(file=>!owned.includes(file));
       op.v6OwnedBaselinePaths=owned;
       store.appendEvent({event:'retry-provenance',op:op.id,attempt:op.attempt,changed:dirty,attributed:owned,unclaimed,
         policy:unclaimed.length?'unclaimed dirty paths remain protected and are not adopted':'every adopted dirty path is both reported by this operation and present in Git status'});
       op.status='ready';op.attempt=(op.attempt??1)+1;op.dispatch=null;op.terminal=null;op.nudged=false;
       op.findings=[];op.priorOpen=[];op.retryFromCanonical=true;
+      if(reconciledNative)op.v6PriorStoppedAttempt={attempt:reconciledNative.attempt,dispatch:reconciledNative.dispatch,
+        candidateDigest:reconciledNative.candidateDigest??null,observedFiles:[...owned]};
       if(op.refusal==='runtime-reconciliation')delete op.refusal;
       delete op.quarantineSignature;
       state.needUser=state.needUser.filter(item=>!(item.op===op.id&&['candidate-reconciliation','runtime-reconciliation'].includes(item.code)));
-      for(const key of ['v6Lease','v6Pending','v6WorkerSettled','baseHead','kernelOwnedAt','recordBlocks'])delete op[key];
+      for(const key of ['v6Lease','v6Pending','v6WorkerSettled','v6RetryReconciled','baseHead','kernelOwnedAt','recordBlocks'])delete op[key];
       retry.push(op.id);
       store.saveState(state);
     }
@@ -3641,6 +3718,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
   if(command==='workflow-run'){
     const {store,state}=open(options.id);
     need(state.approved,`Workflow ${state.id} is not approved yet; run workflow-approve --id ${state.id}`);
+    const releaseKernel=acquireKernelLock(store,{launchToken:options['startup-token']??null});
+    try{
     const host=hostDescriptorOf(orca);
     if(isV6(state)){
       const pinned=verifyRuntimePin(state.engine.runtimePin);need(pinned.ok,`Runtime pin verification failed: ${pinned.reason??''}`);
@@ -3687,7 +3766,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
         checks:op.checks};
       return modelPolicy.eligibility(actual,runtime);
     }):null;
-    const finished=(()=>{const release=acquireKernelLock(store);try{fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});return runLoop(orca,store,state,{cwd:worktree,wait,
+    fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});
+    const finished=runLoop(orca,store,state,{cwd:worktree,wait,
       // Slots are derived from the operations that are actually running; saved loads may belong to a dead kernel.
       supervisor:supervisorRuntimes(workflowModelConfigRoot(state)),validator:validatorRuntimes(workflowModelConfigRoot(state)),
       // Every kernel of this repository shares one runtime ledger beside the workflow directories, so an
@@ -3696,7 +3776,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       allocator:createAllocator({runtimes:runtimeProfile,state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:loadsFileFor(store.dir),workflow:state.id},budget:{path:path.dirname(store.dir)},sequential:host.sequential,eligibility}),template:templateOf(isV6(state)?state.engine.runtimePin.root:state.host),host,
       modelEligibility:eligibility,modelPolicy,runtimeBinding,
       ledgerRoot:options['ledger-root']??null,
-      maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});}finally{release();}})()
+      maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});
     // The kernel's own tab is the Run's coordinator terminal, so it lives as long as the workflow: a pause or a
     // rebuild leaves it for the next start to reuse (a new tab would have to re-bind the Run and fence every live
     // Dispatch). A finished workflow closes it: nobody reads it any more.
@@ -3706,6 +3786,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       ledgerSummary:finished.ledgerSummary,needUser:finished.needUser,head:finished.head,iterations:finished.iterations,
       ledgerRoot:finished.ledgerRoot?slash(finished.ledgerRoot):null,ledgerShared:Boolean(finished.ledgerShared),
       ledgerOwner:finished.ledgerShared?(finished.ledgerOwner?.repository??slash(finished.ledgerOwner?.repoRoot??'')):null};
+    }finally{releaseKernel();}
   }
   throw Error(`Unsupported workflow kernel command: ${command}`);
 }

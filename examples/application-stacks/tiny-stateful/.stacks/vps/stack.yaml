@@ -1,0 +1,42 @@
+version: "3.9"
+services:
+  app:
+    image: starci/tiny-stateful:1.0.0
+    environment: {APP_TOKEN_FILE: /run/secrets/app_token}
+    secrets:
+      - source: app-token
+        target: app_token
+        uid: "1000"
+        gid: "1000"
+        mode: 0400
+    volumes: [app-data:/var/lib/app]
+    networks: [app-net]
+    healthcheck: {test: [CMD, node, -e, "fetch('http://127.0.0.1:8080/health').then(r=>{if(!r.ok)process.exit(1)})"], interval: 10s, timeout: 3s, retries: 6}
+    deploy:
+      replicas: 1
+      placement: {constraints: [node.role == manager]}
+      update_config: {parallelism: 1, order: stop-first, failure_action: rollback, monitor: 20s}
+      rollback_config: {parallelism: 1, order: stop-first, monitor: 20s}
+      restart_policy: {condition: on-failure, delay: 2s, max_attempts: 5}
+  gateway:
+    image: nginx:1.27.5-alpine3.21
+    configs:
+      - source: gateway-config
+        target: /etc/nginx/nginx.conf
+    ports: ["8080:8080"]
+    networks: [app-net]
+    healthcheck: {test: [CMD, wget, -qO-, http://127.0.0.1:8080/health], interval: 10s, timeout: 3s, retries: 6}
+    deploy:
+      replicas: 1
+      placement: {constraints: [node.role == manager]}
+      update_config: {parallelism: 1, order: start-first, failure_action: rollback, monitor: 20s}
+      rollback_config: {parallelism: 1, order: stop-first, monitor: 20s}
+      restart_policy: {condition: on-failure, delay: 2s, max_attempts: 5}
+networks:
+  app-net: {driver: overlay}
+volumes:
+  app-data: {}
+configs:
+  gateway-config: {file: ../../gateway/nginx.conf}
+secrets:
+  app-token: {external: true, name: tiny-stateful-app-token-v1}

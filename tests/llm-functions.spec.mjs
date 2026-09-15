@@ -91,6 +91,23 @@ test('a plan that breaks a cross-field rule is returned to the model with both o
   assert.match(prompts[1],/Your previous answer was invalid: ops a and b are independent/);
 });
 
+test('assessGoal receives the complete nested form before its first answer and again on a shape retry',()=>{
+  const incomplete={definitionOfDone:['The stack is reproducible.'],ledger:[{id:'stack'}],ops:[{id:'prepare'}]};
+  const prompts=[],answers=[JSON.stringify(incomplete),JSON.stringify(goalPlan())];
+  const result=assessGoal({job:'Prepare an application stack.',providers:['gpt-6-astra'],runHeadless:(_provider,prompt)=>{prompts.push(prompt);return answers.shift();}});
+  assert.equal(result.ok,true);
+  assert.equal(result.attempt,1);
+  assert.equal(prompts.length,2);
+  for(const prompt of prompts){
+    assert.match(prompt,/Complete recursive form contract:/);
+    assert.match(prompt,/"ledger".*"each":\{"id":\{"type":"string"\},"title":\{"type":"string"\},"inputRef":\{"type":"string"\},"status":\{"type":"string","enum":\["absent","partial","done","unknown"\]\}\}/);
+    assert.match(prompt,/"ops".*"kind":\{"type":"string"\}.*"checks":\{"type":"object\[\]","minItems":1,"each":\{"name":\{"type":"string"\},"command":\{"type":"string"\}\}\}.*"dependsOn":\{"type":"string\[\]"\}/);
+    assert.match(prompt,/Every field is required unless its rule says optional:true/);
+  }
+  assert.match(prompts[1],/ledger\[0\]: missing title/);
+  assert.match(prompts[1],/ops\[0\]: missing kind/);
+});
+
 test('the approval page is deterministic markdown: job, numbered definition of done, ledger and ops tables, risks',()=>{
   const plan={...goalPlan(),ops:[op('a'),op('b',{dependsOn:['a']})],questions:['Which gateway owns the receipt?']};
   const rendered=renderGoalMarkdown(plan,{job:'Fix the order intake bug.'});

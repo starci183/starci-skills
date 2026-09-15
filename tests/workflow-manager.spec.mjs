@@ -36,7 +36,7 @@ test('agent coordination dispatches only the selected executable action and pers
     version:snapshot.version,digest:snapshot.digest,decisionId:snapshot.decisionId,basisDigest:snapshot.basisDigest,orderedActionIds:['dispatch:b'],rationale:'choose b'})};
   const result=coordinateManagedWorkflow(store,current,ctx);
   assert.deepEqual(result.dispatch,['b']);assert.equal(current.ops[0].status,'ready');assert.equal(current.ops[1].status,'ready');
-  assert.deepEqual(current.engine.manager.lastActions,['dispatch:b']);assert.equal(events.at(-1).event,'manager-applied');
+  assert.deepEqual(current.engine.manager.lastActions,['dispatch:b']);assert.equal(current.engine.manager.lastRationale,'choose b');assert.equal(events.at(-1).event,'manager-applied');assert.equal(events.at(-1).rationale,'choose b');
 });
 
 test('invalid manager output causes an explicit incident and never falls back to dispatching every ready op',()=>{
@@ -44,7 +44,7 @@ test('invalid manager output causes an explicit incident and never falls back to
   const ctx={v6:{},manageWorkflow:snapshot=>({schema:MANAGER_DECISION,workflowId:snapshot.workflowId,generation:snapshot.generation,
     version:snapshot.version,digest:snapshot.digest,decisionId:snapshot.decisionId,basisDigest:snapshot.basisDigest,orderedActionIds:['dispatch:not-offered'],rationale:'invent'})};
   const result=coordinateManagedWorkflow(store,current,ctx);
-  assert.deepEqual(result.dispatch,[]);assert.equal(result.incident,true);assert.equal(current.engine.manager.incident.kind,'manager-invalid');
+  assert.deepEqual(result.dispatch,[]);assert.equal(result.incident,true);assert.equal(current.engine.manager.incident.kind,'manager-invalid');assert.equal(current.engine.manager.lastRationale,undefined);
 });
 
 test('a durable pending manager turn selects no work and remains replayable',()=>{

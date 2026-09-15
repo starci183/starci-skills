@@ -18,6 +18,7 @@ specifications/v2.mjs
 kernel/chains.mjs
 approvals/policy.mjs
 checks/brand.mjs
+checks/stacks.mjs
 checks/render.mjs
 execution/contracts.mjs
 execution/api.mjs
@@ -73,6 +74,7 @@ kernel/contract.mjs
 kernel/view.mjs
 kernel/guards.mjs
 kernel/supervisor.mjs
+kernel/startup-lock.mjs
 checks/proof.mjs
 kernel/schedule.mjs
 kernel/budget.mjs
@@ -81,6 +83,7 @@ kernel/graph.mjs
 kernel/io.mjs
 kernel/ledger.mjs
 kernel/manager.mjs
+kernel/progress.mjs
 kernel/decision-inputs.mjs
 models/manager-contract.mjs
 kernel/reconciliation.mjs

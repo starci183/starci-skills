@@ -52,6 +52,13 @@ selected-frontend/
 
 The frontend forbids `.starciwork` and every retired runtime or Work name, and it rejects the same runtime/registry identity markers. A repository-local `.claude` or `.workspaces` directory that contains other project metadata is not a second runtime or registry merely by name. Likewise, `.stacks` may be legitimate deployment/project knowledge in the backend, frontend or host; the topology gate does not move, delete or assign runtime authority to it. This leaves one runtime identity and one backend-owned product workspace while preserving separately owned project metadata.
 
+For application deployment work, load `knowledge/application-stacks.json` and
+`docs/application-stacks.md`. One application manifest accounts for its backend,
+frontend and dependencies even when their source repositories differ. Repository
+placement does not establish service ownership or an independent recovery failure
+domain. The topology gate preserves existing `.stacks`; the application-stack check
+and real lifecycle evidence assess deployment completeness separately.
+
 Validate a bound pair before lifecycle work:
 
 ```text

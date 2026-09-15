@@ -34,6 +34,7 @@ Usage:
   starci workspace init <work-root> --id <workspace-id>
   starci storage <backend-root>
   starci source-layout <backend-root> <frontend-root>
+  starci stacks check <repo-root> --environment dev|vps --deployment-model <rendered.yaml-or-json>
   starci validate <work-root>
   starci identity set <slug> --name <VAR> [--work-root <path>] [--expected-write-revision <revision|none>]   (the value is read from stdin, never printed)
   starci identity fill <slug> --name <VAR> [--name <VAR>] [--work-root <path>]   (it asks for each one here, with the echo off)
@@ -172,6 +173,20 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
   try {
     const [command, ...args] = argv;
     if (!command || ['--help', '-h', 'help'].includes(command)) { emit(help); return 0; }
+    if(command==='stacks'){
+      const [action,repoRoot,...rest]=args;
+      if(action!=='check'||!repoRoot||repoRoot.startsWith('--'))throw Error('Use starci stacks check <repo-root> --environment dev|vps --deployment-model <rendered.yaml-or-json>.');
+      const options={};
+      for(let index=0;index<rest.length;index+=2){
+        const key=rest[index],value=rest[index+1];
+        if(!['--environment','--deployment-model'].includes(key)||!value||value.startsWith('--')||Object.hasOwn(options,key))throw Error('Invalid stacks check options.');
+        options[key]=value;
+      }
+      if(!options['--environment']||!options['--deployment-model'])throw Error('stacks check requires --environment and --deployment-model.');
+      const {checkApplicationStacks}=await import('../checks/stacks.mjs');
+      const result=checkApplicationStacks({repoRoot,environment:options['--environment'],deploymentModelFile:options['--deployment-model']});
+      emit(result);return result.ok?0:1;
+    }
     if(command==='approval'){
       const [action,...input]=args;
       if(!['policy','decide'].includes(action))throw Error('Use starci approval policy|decide.');

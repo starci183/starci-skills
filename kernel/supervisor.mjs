@@ -4,6 +4,7 @@ import {spawn,spawnSync} from 'node:child_process';
 import {listWorkflows,repositoryRoot,workflowsRoot} from './store.mjs';
 import {DEFAULT_PROBE_MS,probeRuntimeBudget,writeRuntimeBudget} from './budget.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
+import {bindStartupProcess,inspectStartup,reserveStartup,releaseLaunchingStartup,releaseStartup} from './startup-lock.mjs';
 
 /**
  * The process supervisor for workflow kernels: one kernel per approved, unfinished workflow; a kernel that
@@ -16,7 +17,7 @@ const DEFAULT_POLL_MS=60*1000;
 const readJson=(file,fallback)=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return fallback;}};
 
 /** What the log says about a workflow: last event time and whether the kernel declared itself finished or stopped. */
-export function inspectWorkflow(entry,{now=Date.now}={}){
+export function inspectWorkflow(entry,{now=Date.now,aliveFn=pid=>{try{process.kill(pid,0);return true;}catch{return false;}}}={}){
   const state=entry.state??readJson(path.join(entry.dir,'state.json'),null);
   const events=path.join(entry.dir,'events.jsonl');
   let lastAt=0,lastEvent=null;
@@ -25,12 +26,15 @@ export function inspectWorkflow(entry,{now=Date.now}={}){
     for(let index=lines.length-1;index>=0&&index>=lines.length-3;index-=1){const event=JSON.parse(lines[index]);if(!lastAt){lastAt=event.at??0;lastEvent=event.event??null;}}
   }catch{}
   const lock=readJson(path.join(entry.dir,'kernel.lock'),null);
+  const startupFile=path.join(entry.dir,'kernel-startup.sqlite');
+  const startup=fs.existsSync(startupFile)?(()=>{try{return inspectStartup(entry.dir)}catch{return null}})():null;
+  const startupAlive=startup?.pid?aliveFn(Number(startup.pid)):false;
   let alive=false;
   if(lock?.pid){try{process.kill(lock.pid,0);alive=true;}catch{alive=false;}}
   const finished=Boolean(state?.finished);
   const approved=Boolean(state?.approved);
   const stopRequested=fs.existsSync(path.join(entry.dir,'stop.flag'));
-  return {id:entry.id,dir:entry.dir,approved,finished,stopRequested,alive,ledgerRoot:state?.ledgerRoot??null,ledgerSource:state?.ledgerSource??null,pid:lock?.pid??null,lastAt,lastEvent,silentMs:lastAt?now()-lastAt:null,worktree:state?.worktree??null,host:state?.host??null,run:state?.run??null,workflowTask:state?.workflowTask??null,
+  return {id:entry.id,dir:entry.dir,approved,finished,stopRequested,alive,launching:startup?.phase==='launching'||(startup?.phase==='launching-child'&&startupAlive),startup,ledgerRoot:state?.ledgerRoot??null,ledgerSource:state?.ledgerSource??null,pid:lock?.pid??null,lastAt,lastEvent,silentMs:lastAt?now()-lastAt:null,worktree:state?.worktree??null,host:state?.host??null,run:state?.run??null,workflowTask:state?.workflowTask??null,
     // The host the last kernel of this workflow ran on: the next one is started on the same host, or it would bind a new Orca run over a headless table.
     hostAdapter:typeof state?.hostAdapter==='string'&&state.hostAdapter?state.hostAdapter:null,engine:state?.engine??null};
 }
@@ -38,6 +42,7 @@ export function inspectWorkflow(entry,{now=Date.now}={}){
 /** Decide, for one workflow, what the supervisor does this round. */
 export function supervisorAction(info,{healthMs=DEFAULT_HEALTH_MS}={}){
   if(!info.approved||info.finished||info.stopRequested)return {action:'leave',reason:!info.approved?'not approved':info.finished?'finished':'stop requested'};
+  if(info.launching)return {action:'leave',reason:'kernel launch in progress'};
   if(info.alive&&(info.silentMs===null||info.silentMs<healthMs))return {action:'leave',reason:'healthy'};
   if(info.alive)return {action:'restart',reason:`silent for ${Math.round(info.silentMs/60000)} min`};
   return {action:'start',reason:'no kernel process'};
@@ -45,32 +50,34 @@ export function supervisorAction(info,{healthMs=DEFAULT_HEALTH_MS}={}){
 
 /** Start one kernel process detached; its lock file is the only thing that keeps a second one out. */
 const shellQuote=value=>`'${String(value).replaceAll("'","''")}'`;
-export function startKernel(info,{launcher,spawnFn=spawn,orca=null,log=()=>{}}){
-  if(!info.worktree)return {ok:false,reason:'the workflow state names no worktree'};
+export function startKernel(info,{launcher,spawnFn=spawn,orca=null,log=()=>{},startupToken=null}){
+  if(!info.worktree)return {ok:false,reason:'the workflow state names no worktree',effectState:'none'};
   if(info.engine?.major===6){
     const checked=verifyRuntimePin(info.engine.runtimePin);
-    if(!checked.ok){log({event:'runtime-pin-rejected',id:info.id,reason:checked.reason});return {ok:false,reason:checked.reason};}
+    if(!checked.ok){log({event:'runtime-pin-rejected',id:info.id,reason:checked.reason});return {ok:false,reason:checked.reason,effectState:'none'};}
     launcher=checked.launcher;
   }
   // A workflow whose tree was named explicitly at goal time is reached the same way: its store follows that tree.
   const named=info.ledgerSource==='option'&&info.ledgerRoot?['--ledger-root',info.ledgerRoot]:[];
   const adapter=info.hostAdapter?['--host-adapter',info.hostAdapter]:[];
-  const args=[launcher,'workflow-run','--id',info.id,'--worktree','.','--host',info.host??'',...named,...adapter].filter(Boolean);
+  const args=[launcher,'workflow-run','--id',info.id,'--worktree','.','--host',info.host??'',...(startupToken?['--startup-token',startupToken]:[]),...named,...adapter].filter(Boolean);
   if(info.hostAdapter==='orca'&&orca?.invoke){
     const created=orca.invoke('terminal-create',{worktree:`path:${path.resolve(info.worktree)}`,title:`[Kernel] ${info.id}`,command:process.platform==='win32'?'powershell -NoLogo':'bash'},{cwd:info.worktree});
     const terminal=created.outcome==='ok'?created.receipt?.result?.terminal?.handle:null;
     if(!terminal)return {ok:false,reason:`kernel coordinator terminal creation failed: ${created.reason??'missing terminal handle'}`,effectState:created.effectState??'unknown'};
     const ready=orca.invoke('terminal-read',{terminal},{cwd:info.worktree});
     if(ready.outcome!=='ok'){
-      if(ready.effectState==='none')orca.invoke('terminal-close',{terminal},{cwd:info.worktree});
-      return {ok:false,reason:`kernel coordinator terminal readiness failed: ${ready.reason??'unknown'}`,effectState:ready.effectState??'unknown',terminal};
+      let cleanup=null;if(ready.effectState==='none')try{cleanup=orca.invoke('terminal-close',{terminal},{cwd:info.worktree});}catch(error){cleanup={outcome:'unknown',effectState:'unknown',reason:error.message};}
+      const cleaned=cleanup?.outcome==='ok';
+      return {ok:false,reason:`kernel coordinator terminal readiness failed: ${ready.reason??'unknown'}${cleanup&&!cleaned?`; terminal cleanup unconfirmed: ${cleanup.reason??cleanup.outcome??'unknown'}`:''}`,effectState:cleaned?'none':'unknown',terminal};
     }
     const bound=[...args,'--from',terminal,...(info.run?['--run',info.run]:[])];
     const command=process.platform==='win32'?`& ${[process.execPath,...bound].map(shellQuote).join(' ')}`:[process.execPath,...bound].map(value=>`'${String(value).replaceAll("'","'\\''")}'`).join(' ');
     const sent=orca.invoke('terminal-send',{terminal,text:command,enter:true},{cwd:info.worktree});
     if(sent.outcome!=='ok'){
-      if(sent.effectState==='none')orca.invoke('terminal-close',{terminal},{cwd:info.worktree});
-      return {ok:false,reason:`kernel coordinator command delivery failed: ${sent.reason??'unknown'}`,effectState:sent.effectState??'unknown',terminal};
+      let cleanup=null;if(sent.effectState==='none')try{cleanup=orca.invoke('terminal-close',{terminal},{cwd:info.worktree});}catch(error){cleanup={outcome:'unknown',effectState:'unknown',reason:error.message};}
+      const cleaned=cleanup?.outcome==='ok';
+      return {ok:false,reason:`kernel coordinator command delivery failed: ${sent.reason??'unknown'}${cleanup&&!cleaned?`; terminal cleanup unconfirmed: ${cleanup.reason??cleanup.outcome??'unknown'}`:''}`,effectState:cleaned?'none':'unknown',terminal};
     }
     log({event:'kernel-started-in-coordinator',id:info.id,terminal,run:info.run??null});
     return {ok:true,pid:null,terminal,run:info.run??null};
@@ -79,7 +86,13 @@ export function startKernel(info,{launcher,spawnFn=spawn,orca=null,log=()=>{}}){
   // kernel.log, so a crash after a gate round or a launch is readable the next morning instead of inferred.
   let out=null;
   try{out=fs.openSync(path.join(info.dir,'kernel.log'),'a');fs.writeSync(out,`\n=== kernel start ${new Date().toISOString()} ===\n`);}catch{out=null;}
-  const child=spawnFn(process.execPath,args,{cwd:info.worktree,detached:true,stdio:out===null?'ignore':['ignore',out,out],windowsHide:true});
+  let child;
+  try{child=spawnFn(process.execPath,args,{cwd:info.worktree,detached:true,stdio:out===null?'ignore':['ignore',out,out],windowsHide:true});}
+  catch(error){if(out!==null)try{fs.closeSync(out);}catch{}return {ok:false,reason:`kernel process spawn failed: ${error.message}`,effectState:'none'};}
+  if(startupToken&&Number.isInteger(child.pid)&&child.pid>0){
+    const bound=bindStartupProcess(info.dir,{token:startupToken,pid:child.pid});
+    if(bound.ok)child.once?.('close',(status,signal)=>{const released=releaseLaunchingStartup(info.dir,bound);if(released)log({event:'kernel-launch-exited-before-acquire',id:info.id,pid:child.pid,status:Number.isInteger(status)?status:null,signal:signal??null});});
+  }
   child.unref?.();
   if(out!==null){try{fs.closeSync(out);}catch{}}
   log({event:'kernel-started',id:info.id,pid:child.pid,...(out!==null?{log:path.join(info.dir,'kernel.log')}:{})});
@@ -101,15 +114,15 @@ export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEA
   for(const entry of stores.flatMap(root=>{try{return listWorkflows(root);}catch{return [];}})){
     if(seen.has(entry.dir))continue;seen.add(entry.dir);
     if(only&&!only.includes(entry.id))continue;
-    const info=inspectWorkflow(entry,{now});
+    const info=inspectWorkflow(entry,{now,aliveFn});
     const decision=supervisorAction(info,{healthMs});
     let outcome=null;
     if(decision.action==='restart'){
       const stopped=stopKernel(info,{killFn,log});
       if(info.engine?.major===6&&(!stopped.ok||aliveFn(info.pid))){outcome={ok:false,reason:'prior kernel termination is not confirmed; retain lock and defer restart'};log({event:'kernel-restart-deferred',id:info.id,pid:info.pid,reason:outcome.reason});}
-      else {try{fs.rmSync(path.join(info.dir,'kernel.lock'),{force:true});}catch{}outcome=startKernel(info,{launcher,spawnFn,orca,log});}
+      else {const reservation=reserveStartup(info.dir,{now,alive:aliveFn});if(!reservation.ok)outcome=reservation;else {outcome=startKernel(info,{launcher,spawnFn,orca,log,startupToken:reservation.token});if(!outcome.ok&&outcome.effectState==='none')releaseStartup(info.dir,reservation);}}
     }
-    else if(decision.action==='start'){try{fs.rmSync(path.join(info.dir,'kernel.lock'),{force:true});}catch{}outcome=startKernel(info,{launcher,spawnFn,orca,log});}
+    else if(decision.action==='start'){const reservation=reserveStartup(info.dir,{now,alive:aliveFn});if(!reservation.ok)outcome=reservation;else {outcome=startKernel(info,{launcher,spawnFn,orca,log,startupToken:reservation.token});if(!outcome.ok&&outcome.effectState==='none')releaseStartup(info.dir,reservation);}}
     rounds.push({id:info.id,...decision,approved:info.approved,finished:info.finished,stopRequested:info.stopRequested,alive:info.alive,silentMs:info.silentMs,outcome});
   }
   return {schema:SUPERVISOR,at:now(),rounds};

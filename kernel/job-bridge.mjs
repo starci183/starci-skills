@@ -4,6 +4,7 @@ import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {openJournal} from './journal.mjs';
 import {createAdmission,GLOBAL_AI_RESOURCE} from './admission.mjs';
+import {hasReplayableStagedResult} from './job-worker.mjs';
 
 export const JOB_PENDING='starci/job-pending@1';
 export const isJobPending=value=>value?.schema===JOB_PENDING&&value.pending===true;
@@ -21,6 +22,11 @@ export function createJobBridge({journalFile,now=Date.now,spawnChild=spawn,worke
     if(existing){
       if(existing.workflow_id!==workflowId||existing.op_id!==opId||existing.attempt!==attempt||existing.generation!==generation||inputDigest(existing.payload)!==inputDigest(input))throw Error(`Bridge job identity collision for ${identity.jobId}`);
       if(['succeeded','failed','cancelled'].includes(existing.status))return {pending:false,identity,status:existing.status,result:existing.result};
+      if(existing.status==='effect_unknown'&&hasReplayableStagedResult(journal.path,existing)){
+        const claimed=journal.db.prepare("UPDATE jobs SET status='running',worker_id=?,updated_at=? WHERE job_id=? AND status='effect_unknown' AND lease_token=?").run('completion-replay-pending',now(),identity.jobId,existing.lease_token);
+        if(claimed.changes===1){let replay;try{replay=spawnChild(process.execPath,[workerFile,journal.path,identity.jobId,existing.lease_token],{detached:true,stdio:'ignore',windowsHide:true});}catch(error){journal.db.prepare("UPDATE jobs SET status='effect_unknown',worker_id=NULL,updated_at=? WHERE job_id=? AND lease_token=?").run(now(),identity.jobId,existing.lease_token);journal.appendEvent({eventId:`${identity.jobId}:completion-replay-spawn-failed`,workflowId,entityType:'job',entityId:identity.jobId,generation,kind:'job-completion-replay-spawn-failed',payload:{reasonDigest:inputDigest(String(error?.message??error))}});return {schema:JOB_PENDING,pending:true,identity,status:'effect_unknown'};}replay.once?.('error',()=>{try{journal.db.prepare("UPDATE jobs SET status='effect_unknown',worker_id=NULL,updated_at=? WHERE job_id=? AND lease_token=?").run(now(),identity.jobId,existing.lease_token);}catch{}});replay.unref();journal.appendEvent({eventId:`${identity.jobId}:completion-replay-spawned`,workflowId,entityType:'job',entityId:identity.jobId,generation,kind:'job-completion-replay-spawned',payload:{pid:replay.pid??null}});}
+        return {schema:JOB_PENDING,pending:true,identity,status:'running'};
+      }
       if(existing.status!=='queued')return {schema:JOB_PENDING,pending:true,identity,status:existing.status};
     }
     const ai=['model','operation','judge'].includes(kind);
@@ -32,7 +38,8 @@ export function createJobBridge({journalFile,now=Date.now,spawnChild=spawn,worke
     let child;
     try{child=spawnChild(process.execPath,[workerFile,journal.path,identity.jobId,reserved.leaseToken],{detached:true,stdio:'ignore',windowsHide:true});}
     catch(error){journal.db.prepare("UPDATE jobs SET status='effect_unknown',deadline=NULL,updated_at=? WHERE job_id=? AND lease_token=?").run(now(),identity.jobId,reserved.leaseToken);journal.appendEvent({eventId:`${identity.jobId}:spawn-failed`,workflowId,entityType:'job',entityId:identity.jobId,generation,kind:'job-spawn-failed',payload:{reason:String(error?.message??error)}});return {schema:JOB_PENDING,pending:true,identity,status:'effect_unknown'};}
-    child.once?.('error',error=>{try{journal.db.prepare("UPDATE jobs SET status='effect_unknown',deadline=NULL,updated_at=? WHERE job_id=? AND lease_token=?").run(now(),identity.jobId,reserved.leaseToken);journal.appendEvent({eventId:`${identity.jobId}:spawn-failed`,workflowId,entityType:'job',entityId:identity.jobId,generation,kind:'job-spawn-failed',payload:{reason:String(error?.message??error)}});}catch{}});child.unref();
+    child.once?.('error',error=>{try{journal.db.prepare("UPDATE jobs SET status='effect_unknown',deadline=NULL,updated_at=? WHERE job_id=? AND lease_token=?").run(now(),identity.jobId,reserved.leaseToken);journal.appendEvent({eventId:`${identity.jobId}:spawn-failed`,workflowId,entityType:'job',entityId:identity.jobId,generation,kind:'job-spawn-failed',payload:{reason:String(error?.message??error)}});}catch{}});
+    child.once?.('close',(status,signal)=>{try{journal.appendEvent({eventId:`${identity.jobId}:wrapper-closed`,workflowId,entityType:'job',entityId:identity.jobId,generation,kind:'job-wrapper-closed',payload:{pid:child.pid??null,status:Number.isInteger(status)?status:null,signal:signal??null}});}catch{}});child.unref();
     journal.appendEvent({eventId:`${identity.jobId}:spawned`,workflowId,entityType:'job',entityId:identity.jobId,generation,kind:'job-spawned',payload:{pid:child.pid}});
     return {schema:JOB_PENDING,pending:true,identity,status:'running'};
   };

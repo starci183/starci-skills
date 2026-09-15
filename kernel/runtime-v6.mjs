@@ -178,6 +178,40 @@ export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolic
       if(result.ok)delete op.v6Lease;
       return result;
     },
+    /**
+     * Close one host-owned native attempt after settleDispatch proved its exact Dispatch has no live process.
+     * Filesystem effects are not called absent: the launch candidate is frozen under the retained writer fence,
+     * and its observed byte delta becomes the only baseline a fresh attempt may inherit.
+     */
+    settleStoppedOperation(op,{dispatch=op?.dispatch,settlement=null,reason='native worker stopped without a report'}={}){
+      const lease=op?.v6Lease;if(!lease)return {ok:false,reason:'operation has no durable native lease'};
+      const effectState=settlement?.effectState??'unknown';
+      if(settlement?.schema!=='starci/orca-supervised-settlement@1'||settlement.dispatchId!==dispatch||effectState!=='none')return {ok:false,effectState,reason:'typed host settlement did not prove this exact native process stopped'};
+      const job=journal.getJob(lease.jobId),events=journal.events({workflowId:lease.workflowId});
+      const exact=job&&job.kind==='operation'&&job.workflow_id===lease.workflowId&&job.op_id===lease.opId&&job.attempt===lease.attempt
+        &&job.generation===lease.generation&&job.lease_token===lease.leaseToken&&job.worker_id===dispatch;
+      const launched=events.some(event=>event.entity_id===lease.jobId&&event.generation===lease.generation&&event.kind==='operation-launched'
+        &&event.payload?.dispatch===dispatch);
+      if(!exact||!launched||typeof dispatch!=='string'||!dispatch)return {ok:false,effectState:'unknown',reason:'host settlement is not bound to this exact durable Dispatch attempt'};
+      op.v6WorkerSettled=true;
+      const worker=this.settled(op,{workerOnly:true,reason:`${reason}; exact Dispatch ${dispatch} stopped`});
+      if(!worker.ok)return {ok:false,effectState:'unknown',reason:'worker resources could not be settled'};
+      let frozen;
+      try{frozen=this.freezeCandidate(op,{reportedFiles:[]});}
+      catch(error){return {ok:false,effectState:'unknown',reason:`candidate freeze failed after native stop: ${String(error?.message??error)}`};}
+      if(frozen.status!=='sealed')return {ok:false,effectState:'unknown',reason:'candidate effects could not be sealed',pending:frozen};
+      const observed=[...new Set(frozen.observedFiles??[])].sort();
+      op.v6OwnedBaselinePaths=observed;
+      op.v6RetryReconciled={schema:'starci/native-retry-reconciliation@1',jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,
+        dispatch,observedFiles:observed,candidateDigest:op.v6CandidateDigest??null};
+      journal.appendEvent({eventId:`${lease.jobId}:stopped-unreported-effects`,workflowId:lease.workflowId,entityType:'job',entityId:lease.jobId,
+        generation:lease.generation,kind:'operation-stopped-effects-preserved',payload:{dispatch,reason,observedFiles:observed,
+          candidateDigest:op.v6CandidateDigest??null,historicalEffectState:observed.length?'partial':'none-observed'}});
+      store.saveState(state);
+      const completed=this.settled(op,{status:'failed',reason:`${reason}; worker stopped and ${observed.length} observed path(s) preserved for a fresh attempt`});
+      if(completed.ok)store.saveState(state);
+      return completed.ok?{ok:true,effectState:'none',observedFiles:observed,candidateDigest:op.v6CandidateDigest??null}:{ok:false,effectState:'unknown',reason:completed.reason??'durable native job could not be completed'};
+    },
     beginCandidate(op,{repoRoot=state.worktree,allowlist=op.allowlist??[],references=op.references??[],inputPaths=[],oraclePaths=[],ownedDirtyPaths=[],
       dependencyDigests={},environmentDigest=null,dependencyInstall=null}={}){
       if(!git)throw Error('v6 candidate lifecycle requires the kernel Git adapter');

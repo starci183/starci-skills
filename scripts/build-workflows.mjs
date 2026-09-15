@@ -159,9 +159,19 @@ export function buildFiles(skillRoot = root) {
       for (const entry of fs.readdirSync(directory, {withFileTypes:true})) {
         const absolute=path.join(directory,entry.name);
         if(entry.isSymbolicLink())throw Error('Runtime reference cannot be a symlink: '+absolute);
+        const relative=path.relative(skillRoot,absolute).replaceAll('\\','/');
+        const stackExample=relative.startsWith('examples/application-stacks/');
+        // Only authored kit inputs ship. Generated config, ciphertext, keys and
+        // materialized runtime files must never enter the installed example.
+        if(stackExample && /\/(runtime|generated|\.runtime|node_modules)(\/|$)/.test(relative))continue;
+        if(stackExample && entry.isFile()){
+          const authored=/\.(md|mjs|sh|ps1|conf)$/.test(entry.name)||['Dockerfile','.gitignore','.dockerignore'].includes(entry.name)||
+            /\/\.stacks\/(application-stacks\.yaml|(dev|vps)\/(compose|stack)\.yaml)$/.test(relative);
+          if(!authored)continue;
+        }
         if(entry.isDirectory())visit(absolute);
-        else if(entry.isFile() && /\.(md|yaml|yml|ts|tsx|png|svg)$/.test(entry.name)) {
-          const relative=path.relative(skillRoot,absolute).replaceAll('\\','/');
+        else if(entry.isFile() && (/\.(md|yaml|yml|ts|tsx|png|svg)$/.test(entry.name) ||
+          (stackExample && (/\.(mjs|sh|ps1|conf)$/.test(entry.name) || ['Dockerfile','.gitignore','.dockerignore'].includes(entry.name))))) {
           if(folder==='examples' && path.dirname(relative)==='examples' && /\.ya?ml$/.test(entry.name))continue;
           files.set(relative,readRealFile(absolute,skillRoot).bytes);
         }

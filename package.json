@@ -11,6 +11,7 @@
     "starci": "bin/starci.mjs"
   },
   "files": [
+    ".dist/",
     "bin/",
     "init/",
     "skills/",
