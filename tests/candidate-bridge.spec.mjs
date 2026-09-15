@@ -46,6 +46,21 @@ test('only explicitly provenance-owned dirty allowlist paths may advance',t=>{
   fs.writeFileSync(path.join(root,'src','dirty.js'),'current attempt\n');assert.equal(freezeDetectionCandidate(bridge,{git}).status,'sealed');
 });
 
+test('a prior attempt\'s owned path that is clean now is dropped from ownership, not a launch failure',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owned-clean-'));t.after(()=>{try{fs.rmSync(root,{recursive:true,force:true});}catch{}});run(root,'init','--quiet','-b','main');
+  run(root,'config','user.email','bridge@starci.local');run(root,'config','user.name','Bridge');run(root,'config','commit.gpgsign','false');fs.mkdirSync(path.join(root,'src'));
+  fs.writeFileSync(path.join(root,'src','dirty.js'),'committed by the owner since\n');run(root,'add','-A');run(root,'commit','--quiet','-m','base');
+  const suffix=path.basename(root),bridge=beginDetectionCandidate({identity:{workflowId:'wf',opId:'op',attempt:3,generation:1,jobId:'job'},repoRoot:root,
+    workerRoot:path.join(path.dirname(root),`${suffix}-candidate`),controlRoot:path.join(path.dirname(root),`${suffix}-control`),allowlist:['src/**'],references:[],ownedDirtyPaths:['src/dirty.js'],git});
+  t.after(()=>{try{fs.rmSync(bridge.snapshot.workerRoot,{recursive:true,force:true});fs.rmSync(bridge.snapshot.controlRoot,{recursive:true,force:true});}catch{}});
+  assert.deepEqual(bridge.droppedOwnedPaths,['src/dirty.js']);
+  assert.deepEqual(bridge.ownedDirtyPaths,[]);
+  fs.mkdirSync(path.join(root,'docs'));fs.writeFileSync(path.join(root,'docs','outside.md'),'dirty and outside\n');
+  assert.throws(()=>beginDetectionCandidate({identity:{workflowId:'wf',opId:'op',attempt:3,generation:1,jobId:'job2'},repoRoot:root,
+    workerRoot:path.join(path.dirname(root),`${suffix}-candidate2`),controlRoot:path.join(path.dirname(root),`${suffix}-control2`),allowlist:['src/**'],references:[],ownedDirtyPaths:['docs/outside.md'],git}),
+    /must be inside the bounded allowlist/,'an owned path outside the allowlist is still refused even when clean');
+});
+
 test('typed and anchored references bind the complete contained source file and retain fragment metadata',t=>{
   assert.deepEqual(resolveCandidateReference('sds:.starciwork/design.md#section-3'),{kind:'sds',path:'.starciwork/design.md',fragment:'section-3',ref:'.starciwork/design.md#section-3'});
   assert.deepEqual(resolveCandidateReference({kind:'file',ref:'src/app.js#L1'}),{kind:'file',path:'src/app.js',fragment:'L1',ref:'src/app.js#L1'});

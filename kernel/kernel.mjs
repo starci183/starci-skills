@@ -510,12 +510,13 @@ function launchOp(orca,store,state,op,allocated,ctx){
   // end of the kernel: the op records it, avoids the runtime, and the loop goes on.
   let launched,workerEffectStarted=false;
   try{
-    if(ctx.v6){op.v6ResolvedReferences=candidateReferences(op,state,ctx);ctx.v6.beginCandidate(op,{repoRoot:state.worktree,allowlist:op.allowlist,references:op.v6ResolvedReferences,
+    if(ctx.v6){op.v6ResolvedReferences=candidateReferences(op,state,ctx);const begun=ctx.v6.beginCandidate(op,{repoRoot:state.worktree,allowlist:op.allowlist,references:op.v6ResolvedReferences,
       inputPaths:[...op.v6ResolvedReferences,...unique(op.kernelOwned??[])],ownedDirtyPaths:op.v6OwnedBaselinePaths??[],
       dependencyDigests:op.dependencyDigests??{},environmentDigest:typeof op.environmentDigest==='string'&&op.environmentDigest.trim()?op.environmentDigest:
         (typeof state.engine?.runtimePin?.digest==='string'&&state.engine.runtimePin.digest.trim()?state.engine.runtimePin.digest:
           (typeof state.engine?.runtimePinDigest==='string'&&state.engine.runtimePinDigest.trim()?state.engine.runtimePinDigest:'runtime-unpinned')),
-      dependencyInstall:op.dependencyInstall??null});}
+      dependencyInstall:op.dependencyInstall??null});
+      if(begun?.droppedOwnedPaths?.length){op.v6OwnedBaselinePaths=[...(begun.ownedDirtyPaths??[])];store.appendEvent({event:'owned-baseline-dropped',op:op.id,attempt:op.attempt,paths:begun.droppedOwnedPaths,reason:'clean since the prior attempt (committed or reverted): no longer owned'});}}
     if(ctx.v6)ctx.v6.beginLaunchIntent(op);
     workerEffectStarted=true;
     launched=ctx.launch(orca,{cwd:state.worktree,run:state.run,workflowTask:state.workflowTask??state.id,from:state.from,

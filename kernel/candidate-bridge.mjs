@@ -85,11 +85,15 @@ export function beginDetectionCandidate({identity,repoRoot,workerRoot,controlRoo
   const snapshot=createCandidateSnapshot({identity,repoRoot,workerRoot,controlRoot,sourcePaths,oraclePaths,acceptedHead,dependencyDigests,
     environmentDigest,assurance:{requested:'detection-only'},now});
   const owned=new Set(ownedDirtyPaths.map(clean));
-  const invalidOwned=[...owned].filter(file=>!dirty.includes(file)||!matches(file,allowlist));
-  if(invalidOwned.length)throw new Error(`owned dirty baseline paths must be dirty and inside the bounded allowlist: ${invalidOwned.join(', ')}`);
+  // A path a prior attempt owned that is clean now was committed or reverted since: it is no longer owned, and
+  // says so on the bridge. A path outside the allowlist was never this operation's to own.
+  const droppedOwnedPaths=[...owned].filter(file=>!dirty.includes(file)).sort();
+  for(const file of droppedOwnedPaths)owned.delete(file);
+  const invalidOwned=[...owned].filter(file=>!matches(file,allowlist));
+  if(invalidOwned.length)throw new Error(`owned dirty baseline paths must be inside the bounded allowlist: ${invalidOwned.join(', ')}`);
   const bridge={schema:DETECTION_BRIDGE,identity,snapshot,repoRoot:path.resolve(repoRoot),allowlist:[...allowlist],references:[...references],resolvedReferences,inputPaths:[...inputPaths],
     acceptedHead,sourceBaseline:states(repoRoot,sourcePaths),dirtyBaseline:states(repoRoot,dirty),dirtyBaselinePaths:dirty,
-    ownedDirtyPaths:[...owned].sort(),dependency:{mode:'isolated-artifact',command:dependencyInstall,
+    ownedDirtyPaths:[...owned].sort(),droppedOwnedPaths,dependency:{mode:'isolated-artifact',command:dependencyInstall,
       root:path.join(controlRoot,'dependencies'),externalCache:'forbidden',symlinkedDependencies:'forbidden',assurance:'detection-only',ready:dependencyInstall===null},
     writer:runtimeWriterHint({repoRoot}),beganAt:new Date(now()).toISOString()};
   fs.writeFileSync(path.join(controlRoot,'bridge.json'),`${JSON.stringify(bridge,null,2)}\n`,{flag:'wx'});
