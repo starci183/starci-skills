@@ -97,6 +97,11 @@ test('an untitled screen is scanned over the agent families, prompt before busy 
 test('a quota refusal is read off the screen before any liveness rule, so the kernel can park the runtime',()=>{
   assert.deepEqual(rateLimitSignal('API Error: 429 {"type":"rate_limit_error"}').kind,'http-429');
   assert.equal(rateLimitSignal('Error: overloaded_error, please try again').kind,'overloaded');
+  const capacity='Selected model is at capacity. Please try a different model.';
+  assert.equal(rateLimitSignal(`${capacity}\n${CODEX.idle}`).kind,'overloaded');
+  assert.equal(observe({screen:`${capacity}\n${CODEX.idle}`,terminal:term(),now:2000,provider:'codex'}).liveness,'rate-limited');
+  assert.equal(rateLimitSignal(`The prior terminal printed "${capacity}" before recovery.`),null,'quoted historical prose is not a current provider refusal');
+  assert.equal(rateLimitSignal(`${capacity}\n${CODEX.busy}`),null,'newer active provider output supersedes retained refusal scrollback');
   assert.equal(rateLimitSignal('You have exceeded your current quota').kind,'quota');
   assert.equal(rateLimitSignal('Rate limit reached for this model; retry after 60s').kind,'rate-limit');
   assert.equal(rateLimitSignal('Your credit balance is too low').kind,'quota');

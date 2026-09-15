@@ -56,6 +56,62 @@ test('modifying pre-existing user work or writing outside allowlist quarantines 
   assert.ok(result.reasons.some(reason=>reason.startsWith('pre-existing-user-work-modified:keep.txt')));assert.ok(result.reasons.includes('outside-allowlist:escape.txt'));
   assert.equal(fs.readFileSync(path.join(f.root,'keep.txt'),'utf8'),'worker collision\n');});
 
+test('only the owned continuation managed section is excluded; changing adjacent human notes is still a full-delta collision',t=>{
+  const root=cloneTemplate(t,appBase,'starci-managed-'),start='<!-- managed:start -->',end='<!-- managed:end -->';fs.mkdirSync(path.join(root,'workflows'));
+  fs.writeFileSync(path.join(root,'workflows','wf.md'),`# Human handoff\nkeep me\n\n${start}\nold runtime projection\n${end}\n`);run(root,'add','-A');run(root,'commit','--quiet','-m','continuation');
+  const make=(job)=>{const suffix=`${path.basename(root)}-${job}`;const bridge=beginDetectionCandidate({identity:{workflowId:'wf',opId:'op',attempt:1,generation:1,jobId:job},repoRoot:root,
+    workerRoot:path.join(path.dirname(root),`${suffix}-candidate`),controlRoot:path.join(path.dirname(root),`${suffix}-control`),allowlist:['src/**'],references:[],runtimeManagedFiles:[{path:'workflows/wf.md',start,end}],git,environmentDigest:'env'});
+    t.after(()=>{fs.rmSync(bridge.snapshot.workerRoot,{recursive:true,force:true});fs.rmSync(bridge.snapshot.controlRoot,{recursive:true,force:true});});return bridge;};
+  const accepted=make('managed-only');fs.writeFileSync(path.join(root,'workflows','wf.md'),`# Human handoff\nkeep me\n\n${start}\nnew runtime projection\n${end}\n`);fs.writeFileSync(path.join(root,'src','app.js'),'two\n');
+  const sealed=freezeDetectionCandidate(accepted,{git});assert.equal(sealed.status,'sealed',JSON.stringify(sealed.reasons));assert.deepEqual(sealed.observedFiles,['src/app.js']);
+  run(root,'add','-A');run(root,'commit','--quiet','-m','runtime-section');const collided=make('human-change');fs.writeFileSync(path.join(root,'workflows','wf.md'),`# Human handoff\nchanged by worker\n\n${start}\nnewer runtime projection\n${end}\n`);
+  const refused=freezeDetectionCandidate(collided,{git});assert.equal(refused.status,'quarantine');assert.ok(refused.reasons.includes('outside-allowlist:workflows/wf.md'));
+});
+
+test('managed-only public brief updates coexist with pre-existing untracked and tracked-dirty human notes',t=>{
+  const start='<!-- managed:start -->',end='<!-- managed:end -->',body=(note,value)=>`${note}\n\n${start}\n${value}\n${end}\n`;
+  for(const mode of ['untracked','tracked-dirty']){
+    const root=cloneTemplate(t,appBase,`starci-managed-${mode}-`),brief='workflows/wf.md';fs.mkdirSync(path.join(root,'workflows'));
+    fs.writeFileSync(path.join(root,brief),body('Human notes preserved','old runtime projection'));
+    if(mode==='tracked-dirty'){
+      run(root,'add','-A');run(root,'commit','--quiet','-m','public brief');
+      fs.writeFileSync(path.join(root,brief),body('Human notes locally revised before launch','old runtime projection'));
+    }
+    const suffix=`${path.basename(root)}-${mode}`,bridge=beginDetectionCandidate({identity:{workflowId:'wf',opId:'op',attempt:1,generation:1,jobId:mode},repoRoot:root,
+      workerRoot:path.join(path.dirname(root),`${suffix}-candidate`),controlRoot:path.join(path.dirname(root),`${suffix}-control`),allowlist:['src/**'],references:[],runtimeManagedFiles:[{path:brief,start,end}],git,environmentDigest:'env'});
+    t.after(()=>{fs.rmSync(bridge.snapshot.workerRoot,{recursive:true,force:true});fs.rmSync(bridge.snapshot.controlRoot,{recursive:true,force:true});});
+    const note=mode==='tracked-dirty'?'Human notes locally revised before launch':'Human notes preserved';
+    fs.writeFileSync(path.join(root,brief),body(note,'new runtime projection'));fs.writeFileSync(path.join(root,'src','app.js'),'two\n');
+    const sealed=freezeDetectionCandidate(bridge,{git});assert.equal(sealed.status,'sealed',`${mode}: ${JSON.stringify(sealed.reasons)}`);assert.deepEqual(sealed.observedFiles,['src/app.js']);
+  }
+});
+
+test('removed, duplicated or malformed managed markers remain full-file candidate collisions',t=>{
+  const start='<!-- managed:start -->',end='<!-- managed:end -->',variants=[
+    'Human notes\n\nruntime projection without markers\n',
+    `Human notes\n\n${start}\none\n${start}\ntwo\n${end}\n`,
+    `Human notes\n\n${end}\nwrong order\n${start}\n`
+  ];
+  for(const [index,body] of variants.entries()){
+    const root=cloneTemplate(t,appBase,`starci-managed-malformed-${index}-`),brief='workflows/wf.md';fs.mkdirSync(path.join(root,'workflows'));
+    fs.writeFileSync(path.join(root,brief),`Human notes\n\n${start}\nold\n${end}\n`);run(root,'add','-A');run(root,'commit','--quiet','-m','public brief');
+    const suffix=`${path.basename(root)}-${index}`,bridge=beginDetectionCandidate({identity:{workflowId:'wf',opId:'op',attempt:1,generation:1,jobId:`malformed-${index}`},repoRoot:root,
+      workerRoot:path.join(path.dirname(root),`${suffix}-candidate`),controlRoot:path.join(path.dirname(root),`${suffix}-control`),allowlist:['src/**'],references:[],runtimeManagedFiles:[{path:brief,start,end}],git,environmentDigest:'env'});
+    t.after(()=>{fs.rmSync(bridge.snapshot.workerRoot,{recursive:true,force:true});fs.rmSync(bridge.snapshot.controlRoot,{recursive:true,force:true});});
+    fs.writeFileSync(path.join(root,brief),body);const refused=freezeDetectionCandidate(bridge,{git});assert.equal(refused.status,'quarantine');assert.ok(refused.reasons.includes(`outside-allowlist:${brief}`));
+  }
+});
+
+test('a malformed baseline cannot hide a human edit behind equal missing outside digests',t=>{
+  const start='<!-- managed:start -->',end='<!-- managed:end -->',root=cloneTemplate(t,appBase,'starci-managed-malformed-baseline-'),brief='workflows/wf.md';
+  fs.mkdirSync(path.join(root,'workflows'));fs.writeFileSync(path.join(root,brief),`Human notes preserved\n\n${start}\nold runtime projection\n`);
+  const suffix=path.basename(root),bridge=beginDetectionCandidate({identity:{workflowId:'wf',opId:'op',attempt:1,generation:1,jobId:'malformed-baseline'},repoRoot:root,
+    workerRoot:path.join(path.dirname(root),`${suffix}-candidate`),controlRoot:path.join(path.dirname(root),`${suffix}-control`),allowlist:['src/**'],references:[],runtimeManagedFiles:[{path:brief,start,end}],git,environmentDigest:'env'});
+  t.after(()=>{fs.rmSync(bridge.snapshot.workerRoot,{recursive:true,force:true});fs.rmSync(bridge.snapshot.controlRoot,{recursive:true,force:true});});
+  fs.writeFileSync(path.join(root,brief),`Human notes changed without authority\n\n${start}\nnew runtime projection\n`);
+  const refused=freezeDetectionCandidate(bridge,{git});assert.equal(refused.status,'quarantine');assert.ok(refused.reasons.includes(`pre-existing-user-work-modified:${brief}`));assert.ok(refused.reasons.includes(`outside-allowlist:${brief}`));
+});
+
 test('renames include source and destination in the observed patch',t=>{const f=fixture(t);fs.renameSync(path.join(f.root,'src','app.js'),path.join(f.root,'src','renamed.js'));
   const result=freezeDetectionCandidate(f.bridge,{git});assert.equal(result.status,'sealed');assert.deepEqual(result.observedFiles,['src/app.js','src/renamed.js']);
   assert.deepEqual(result.packet.changes.map(item=>item.path),['src/app.js','src/renamed.js']);});

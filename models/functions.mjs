@@ -9,7 +9,7 @@ import {KINDS as OPERATION_KINDS,writesOf} from '../kernel/graph.mjs';
  * canonical Work, so a kind that authors or decides a Work record (decision.prepare, work.author,
  * implementation.plan, business/architecture/brand/interface) has nowhere to write and is refused by the form.
  */
-export const PLAN_OP_KINDS=Object.freeze(OPERATION_KINDS.filter(kind=>{try{return writesOf(kind).every(record=>['code','runtime','evidence'].includes(record));}catch{return false;}}));
+export const PLAN_OP_KINDS=Object.freeze(OPERATION_KINDS.filter(kind=>{try{return writesOf(kind).every(record=>['code','runtime','evidence','asset'].includes(record));}catch{return false;}}));
 import {MANAGER_SNAPSHOT,MANAGER_DECISION,MANAGER_DECISION_FORM,validateManagerSnapshot,validateManagerDecision} from './manager-contract.mjs';
 export {MANAGER_SNAPSHOT,MANAGER_DECISION,MANAGER_DECISION_FORM,validateManagerSnapshot,validateManagerDecision} from './manager-contract.mjs';
 

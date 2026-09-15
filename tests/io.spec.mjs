@@ -127,6 +127,10 @@ test('a file an operation produced that its kind never declared is a named findi
   assert.deepEqual(undeclaredWrites('review.verify',['.starciwork/_local/plans/p-1/run/index.yaml'],{profile}),[]);
   // One file is accepted as a list of one, the way a report with a single changed path arrives.
   assert.deepEqual(undeclaredWrites('backend.implement','repository:collab-api/src/share/service.ts',{profile}),[]);
+  assert.deepEqual(undeclaredWrites('frontend.implement',[
+    '.starciwork/features/collab/implementation/frontend/thread/assets/thread-resting.png',
+    '.starciwork/features/collab/implementation/frontend/thread/assets/thread-resting.html',
+  ],{profile}),[]);
   // The drawing may capture its candidates; it may not author the requirement it drew against.
   assert.deepEqual(undeclaredWrites('interface.draw',['features/collab/ui/thread/assets/desktop.png'],{profile}),[]);
   assert.deepEqual(undeclaredWrites('interface.draw',['features/collab/business/srs/index.yaml'],{profile}).map(row=>row.record),['srs']);

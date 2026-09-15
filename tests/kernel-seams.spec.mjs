@@ -182,6 +182,24 @@ test('a drawing that fails a canon check is downgraded before the validator; a p
   }
 });
 
+test('a required frontend render exception fails closed at acceptance while pass and fail verdicts retain their meaning',()=>{
+  for(const variant of ['pass','fail','throw']){
+    const dir=tmp();
+    try{
+      const store=stubStore(dir),op=toOp({id:`frontend-${variant}`,kind:'frontend.implement',goal:'Build the accepted surface.',
+        allowlist:['src/sales'],references:['.starciwork/features/sales/ui/index.yaml'],checks:[]},0);
+      op.status='running';op.dispatch='ctx_1';const state=stubState(store,[op]),files=['src/sales/page.tsx'];
+      const renderChecks=variant==='throw'?()=>{throw Error('synthetic audit unavailable');}:()=>({ok:variant==='pass',checks:[{id:'palette-off-brand',outcome:variant==='pass'?'pass':'fail',detail:'synthetic palette verdict'}]});
+      const action=applyOpReport(null,store,state,op,doneReport({files}),baseCtx(dir,{git:fakeGit(files),renderChecks}));
+      assert.equal(action,variant==='pass'?'done':'retry',variant);
+      if(variant==='throw'){
+        assert.equal(store.events.some(item=>item.event==='render-check-unavailable'),true);
+        assert.match(op.findings[0],/implementation-render-check-unavailable fail: The required implementation render audit could not run/);
+      }
+    }finally{fs.rmSync(dir,{recursive:true,force:true});}
+  }
+});
+
 test('a kind that is not a drawing never reaches the render checks',()=>{
   const dir=tmp();
   try{
@@ -1011,18 +1029,19 @@ test('a settled operation releases the canonical writer it reserved, and an oper
   const accepted={id:'ask-2',kind:'decision.prepare',status:'done',lease:lease('ask-2')};
   const live={id:'intake',kind:'work.author',status:'running',lease:lease('intake')};
   const cancelled={id:'old',kind:'work.author',status:'cancelled',lease:lease('old')};
+  const skipped={id:'not-needed',kind:'work.author',status:'skipped',lease:lease('not-needed')};
   const dispatched={id:'busy',kind:'work.author',status:'done',lease:lease('busy'),dispatch:'d-1'};
   const state={id:'wf',host:process.cwd(),engine:{schema:'starci/engine@1',generation:3,journalFile:'J'},needUser:[],
-    ops:[accepted,live,cancelled,dispatched]};
-  const status={'operation-ask-2':'effect_unknown','operation-intake':'running','operation-old':'succeeded','operation-busy':'effect_unknown'};
+    ops:[accepted,live,cancelled,skipped,dispatched]};
+  const status={'operation-ask-2':'effect_unknown','operation-intake':'running','operation-old':'succeeded','operation-not-needed':'failed','operation-busy':'effect_unknown'};
   const ctx={engine:{journal:{getJob:id=>({status:status[id]})}}};
   const settle=({leases})=>{asked.push(leases[0].opId);return [{ok:true}];};
-  assert.deepEqual(releaseSettledOperationLeases(store,state,ctx,{settle}),{released:['ask-2','old']});
-  assert.deepEqual(asked,['ask-2','old'],'only the settled operations are asked to release');
+  assert.deepEqual(releaseSettledOperationLeases(store,state,ctx,{settle}),{released:['ask-2','old','not-needed']});
+  assert.deepEqual(asked,['ask-2','old','not-needed'],'only the settled operations are asked to release');
   assert.equal(accepted.lease,undefined,'the released reservation is gone from the operation');
   assert.ok(live.lease,'an operation still running keeps its writer');
   assert.ok(dispatched.lease,'an operation with a live dispatch is left alone');
-  assert.deepEqual(events.filter(event=>event.event==='settled-lease-released').map(event=>event.op),['ask-2','old']);
+  assert.deepEqual(events.filter(event=>event.event==='settled-lease-released').map(event=>event.op),['ask-2','old','not-needed']);
   assert.equal(releaseSettledOperationLeases(store,state,ctx,{settle}),null,'nothing to release twice');
 
   // A journal that refuses says so once, and the reservation stays until it can be settled.

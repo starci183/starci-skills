@@ -6,6 +6,8 @@ import {inspectJournal} from './journal.mjs';
 import {replaceStateSnapshot,stateGoalIdentity} from './store.mjs';
 
 export const CONTINUATION_BRIEF='starci/workflow-continuation@1';
+export const CONTINUATION_SECTION_START=`<!-- ${CONTINUATION_BRIEF}:managed-start -->`;
+export const CONTINUATION_SECTION_END=`<!-- ${CONTINUATION_BRIEF}:managed-end -->`;
 const SETTLED=new Set(['succeeded','failed','cancelled']);
 const DONE=new Set(['done','skipped']);
 const slash=value=>String(value??'').replaceAll('\\','/');
@@ -31,7 +33,7 @@ function readJournal(state){
   try{
     journal=inspectJournal({file});
     const jobs=journal.db.prepare('SELECT job_id,workflow_id,op_id,attempt,generation,kind,status,worker_id,deadline,lease_token FROM jobs WHERE workflow_id=? ORDER BY created_at,job_id').all(state.id);
-    const leases=journal.db.prepare('SELECT resource_key,job_id,workflow_id,op_id,attempt,generation,expires_at FROM leases WHERE workflow_id=? ORDER BY job_id,resource_key').all(state.id);
+    const leases=journal.db.prepare('SELECT resource_key,job_id,workflow_id,op_id,attempt,generation,token,expires_at FROM leases WHERE workflow_id=? ORDER BY job_id,resource_key').all(state.id);
     const row=journal.db.prepare('SELECT checkpoint_id,generation,goal_identity,state_json,created_at FROM state_snapshots WHERE workflow_id=? ORDER BY snapshot_id DESC LIMIT 1').get(state.id);
     let snapshot=null;
     if(row?.state_json){try{snapshot={...row,state:JSON.parse(row.state_json)};}catch{snapshot={...row,state:null,error:'latest durable state body is unreadable'};}}
@@ -76,8 +78,20 @@ export function continuationBoundary(state,{journalView=readJournal(state),contr
     if(DONE.has(op.status)&&(!SETTLED.has(job.status)||held.length))
       issue('settled-operation-retains-writer','a settled operation still owns an unsettled job or durable writer reservation',identity);
   }
-  for(const lease of journalView.leases)if(!claimed.has(lease.job_id))issue('orphan-writer-reservation',`resource ${lease.resource_key} is not represented by an operation lease in state`,
-    {jobId:lease.job_id,opId:lease.op_id,attempt:lease.attempt,generation:lease.generation});
+  for(const lease of journalView.leases)if(!claimed.has(lease.job_id)){
+    const job=jobs.get(lease.job_id),identity={jobId:lease.job_id,opId:lease.op_id,attempt:lease.attempt,generation:lease.generation,kind:job?.kind??null};
+    if(!job){issue('orphan-writer-reservation',`resource ${lease.resource_key} has no durable job identity`,identity);continue;}
+    // Model, judge and command-check jobs own admission identities of their own. They are not operation writers
+    // merely because state.ops has no matching `op.lease`; their exact durable job/lease fence is the authority.
+    if(['model','judge','check'].includes(job.kind)){
+      const exact=job.workflow_id===state.id&&job.op_id===lease.op_id&&job.attempt===lease.attempt&&
+        job.generation===lease.generation&&job.lease_token===lease.token;
+      if(!exact)issue('job-reservation-identity-drift',`resource ${lease.resource_key} does not bind its model/judge/check job identity and token`,identity);
+      if(SETTLED.has(job.status))issue('settled-job-retains-reservation',`terminal ${job.kind} job ${job.job_id} still owns resource ${lease.resource_key}`,identity);
+      continue;
+    }
+    issue('orphan-writer-reservation',`operation resource ${lease.resource_key} is not represented by an exact operation lease in state`,identity);
+  }
   if(controller.alive&&(!controller.pid||!controller.startupTokenDigest))issue('controller-identity-unproven','the live controller lacks an exact PID/startup-token identity',{pid:controller.pid??null});
   if(journalView.error)issue('journal-unreadable',journalView.error,{journalFile:journalView.file});
   return {ok:findings.length===0,findings,journalView};
@@ -90,7 +104,23 @@ function headOf(root,git=spawnSync){
 const row=cells=>`| ${cells.map(text).join(' | ')} |`;
 const bullets=items=>items.length?items.map(item=>`- ${text(item)}`).join('\n'):'- None';
 
-export function continuationPath(store){return store.paths?.continuation??path.join(path.dirname(path.dirname(store.dir)),'continuations','workflows',`${store.id}.md`);}
+const storeRepoRoot=store=>path.dirname(path.dirname(path.dirname(path.dirname(store.dir))));
+export function bindContinuationPath(store,state=null){
+  const root=storeRepoRoot(store),workflows=path.join(root,'workflows'),id=String(state?.id??store.id??'');
+  const explicit=state?.continuation?.publicFile??state?.continuationFile??null;
+  if(typeof explicit==='string'&&explicit.trim()){
+    const target=path.resolve(root,explicit),relative=path.relative(workflows,target);
+    if(relative.startsWith('..')||path.isAbsolute(relative)||path.extname(target).toLowerCase()!=='.md')throw Error('Public continuation binding must be a Markdown file under workflows/');
+    store.paths.continuation=target;return target;
+  }
+  // Reviewed human briefs often predate the runtime projection and use a friendly filename. Bind the one brief
+  // that already names this exact workflow identity; ambiguity fails back to the stable ID filename.
+  let matched=[];try{matched=fs.readdirSync(workflows,{withFileTypes:true}).filter(entry=>entry.isFile()&&entry.name.toLowerCase().endsWith('.md')).map(entry=>path.join(workflows,entry.name)).filter(file=>{
+    try{const stat=fs.lstatSync(file);return !stat.isSymbolicLink()&&stat.size<=1024*1024&&fs.readFileSync(file,'utf8').includes(id);}catch{return false;}
+  });}catch{matched=[];}
+  store.paths.continuation=matched.length===1?matched[0]:path.join(workflows,`${id}.md`);return store.paths.continuation;
+}
+export function continuationPath(store,state=null){return bindContinuationPath(store,state);}
 
 export function buildContinuationBrief(store,state,{now=Date.now,git=spawnSync}={}){
   const journalView=readJournal(state),current=durableContinuationState(state,journalView),controller=readController(store);
@@ -127,9 +157,13 @@ export function buildContinuationBrief(store,state,{now=Date.now,git=spawnSync}=
     '', '## Authorized same-workflow amendments','',...(list(current.amendments).length
       ?list(current.amendments).flatMap(item=>[
         `- \`${text(item.digest)}\` on frozen goal \`${text(item.baseGoalIdentity)}\``,
-        `  - owner grant: thread \`${text(item.authority?.source?.threadId)}\`, message ${item.authority?.source?.messageIdAvailability==='available'?`\`${text(item.authority?.source?.messageId)}\``:'not exposed'} at ${text(item.authority?.source?.at)}`,
-        `  - coordinator application: thread \`${text(item.coordinator?.source?.threadId)}\`, message ${item.coordinator?.source?.messageIdAvailability==='available'?`\`${text(item.coordinator?.source?.messageId)}\``:'not exposed'} at ${text(item.coordinator?.source?.at)}`,
+        `  - owner grant: thread \`${text(item.authority?.source?.threadId)}\`, message ${item.authority?.source?.messageIdAvailability==='available'?`\`${text(item.authority?.source?.messageId)}\``:'not exposed'} at ${item.authority?.source?.at?text(item.authority.source.at):'event time not exposed'}`,
+        `  - coordinator application: thread \`${text(item.coordinator?.source?.threadId)}\`, message ${item.coordinator?.source?.messageIdAvailability==='available'?`\`${text(item.coordinator?.source?.messageId)}\``:'not exposed'} at ${item.coordinator?.source?.at?text(item.coordinator.source.at):'event time not exposed'}`,
         `  - clarifications: ${list(item.changes?.clarifications).map(text).join('; ')||'none'}`,
+        ...list(item.changes?.supersedeDefinitionOfDone).flatMap(replacement=>[
+          `  - historical criterion superseded: ${text(replacement?.from)}`,
+          `    effective criterion: ${text(replacement?.to)}`]),
+        `  - operation effect assignments: ${Object.entries(item.changes?.operationEffects??{}).map(([opId,effects])=>`${text(opId)} => paths [${list(effects?.paths).map(text).join(', ')}], resources [${list(effects?.resources).map(text).join(', ')}], external [${list(effects?.external).map(text).join(', ')}]`).join('; ')||'none'}`,
         `  - effect ceiling: paths [${list(item.changes?.effectCeiling?.paths).map(text).join(', ')}], resources [${list(item.changes?.effectCeiling?.resources).map(text).join(', ')}], external [${list(item.changes?.effectCeiling?.external).map(text).join(', ')}]`])
       :['- None; the frozen goal has no same-ID amendment.']),
     '', '## Owner decisions','',bullets(list(current.decisions).map(json)),
@@ -140,12 +174,27 @@ export function buildContinuationBrief(store,state,{now=Date.now,git=spawnSync}=
   return {schema:CONTINUATION_BRIEF,state:current,stateDigest:sha256(stateBytes),boundary,controller,head:actualHead,markdown:lines.join('\n')};
 }
 
-/** Atomically update the public local continuation path without replacing journal/state authority. */
+const managedSection=markdown=>`${CONTINUATION_SECTION_START}\n${markdown.trimEnd()}\n${CONTINUATION_SECTION_END}\n`;
+function mergeManagedSection(existing,markdown,file){
+  const start=existing.indexOf(CONTINUATION_SECTION_START),end=existing.indexOf(CONTINUATION_SECTION_END);
+  if(start<0&&end<0){
+    // The former hidden-only exporter owned a whole file beginning with the v1 marker. Preserve compatibility by
+    // converting that generated file; otherwise append beside human notes rather than replacing them.
+    if(existing.startsWith(`<!-- ${CONTINUATION_BRIEF} -->`))return managedSection(markdown);
+    return `${existing.trimEnd()}${existing.trim()?`\n\n`:''}${managedSection(markdown)}`;
+  }
+  if(start<0||end<start||existing.indexOf(CONTINUATION_SECTION_START,start+1)>=0||existing.indexOf(CONTINUATION_SECTION_END,end+1)>=0)
+    throw Error(`Refusing to update malformed StarCi continuation markers: ${slash(file)}`);
+  const after=end+CONTINUATION_SECTION_END.length;
+  return `${existing.slice(0,start)}${managedSection(markdown)}${existing.slice(after).replace(/^\r?\n/,'')}`;
+}
+
+/** Atomically update one managed section of the public continuation without replacing journal/state or human notes. */
 export function exportContinuationBrief(store,state,options={}){
-  const built=buildContinuationBrief(store,state,options),file=continuationPath(store);
+  const file=continuationPath(store,state),built=buildContinuationBrief(store,state,options);
   fs.mkdirSync(path.dirname(file),{recursive:true});
-  if(fs.existsSync(file)&&!fs.readFileSync(file,'utf8').startsWith(`<!-- ${CONTINUATION_BRIEF} -->`))
-    throw Error(`Refusing to replace a non-StarCi continuation file: ${slash(file)}`);
-  const tmp=`${file}.${process.pid}.tmp`;fs.writeFileSync(tmp,built.markdown);replaceStateSnapshot(tmp,file);
+  const existing=fs.existsSync(file)?fs.readFileSync(file,'utf8'):'';
+  const next=mergeManagedSection(existing,built.markdown,file);
+  const tmp=`${file}.${process.pid}.tmp`;fs.writeFileSync(tmp,next);replaceStateSnapshot(tmp,file);
   return {...built,file:path.resolve(file)};
 }

@@ -73,15 +73,15 @@ export function createStore({repoRoot,id}){
   const workflowId=required(id,'workflow id');
   need(!/[\\/]/.test(workflowId),`Workflow id must be one directory segment: ${workflowId}`);
   const dir=path.join(workflowsRoot(repoRoot),workflowId);
-  const localRoot=path.dirname(path.dirname(dir));
   const paths={
     state:path.join(dir,'state.json'),events:path.join(dir,'events.jsonl'),
     goal:path.join(dir,'goal.md'),goalJson:path.join(dir,'goal.json'),
     reports:path.join(dir,'reports'),contracts:path.join(dir,'contracts'),checks:path.join(dir,'checks'),inbox:path.join(dir,'inbox'),
     final:path.join(dir,'final-report.json'),launch:path.join(dir,'launch.json'),
-    // Public human-readable projection; journal/state remain authoritative. Keeping it under `_local` avoids
-    // contaminating candidate Git deltas while still exposing the stable `workflows/<workflow>.md` suffix.
-    continuation:path.join(localRoot,'continuations','workflows',`${workflowId}.md`)
+    // Public human-readable projection in the Work-owning repository. A routed source repository creates its
+    // store under the shared ledger owner, so both sides resolve this same backend-owned path. Journal/state stay
+    // authoritative; the candidate bridge excludes only this runtime-managed section, never the rest of the file.
+    continuation:path.join(path.resolve(repoRoot),'workflows',`${workflowId}.md`)
   };
   for(const directory of [dir,paths.reports,paths.contracts,paths.checks,paths.inbox])fs.mkdirSync(directory,{recursive:true});
   let seq=null;

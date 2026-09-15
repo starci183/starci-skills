@@ -612,8 +612,10 @@ remaining screen and state from accepted business/SDS, brand, relevant UI knowle
 anatomy. The tool's model selection is not exposed and is never guessed.
 
 These images are direction, not exact component/render/API proof. `frontend.implement` must produce actual Grammar
-implementation captures and machine checks, then `uat.verify` observes the identified running build in a browser.
-`checks/render.mjs` continues to audit explicitly provenance-marked browser captures and kept markup; its kernel
+implementation captures plus matching markup under its implementation node's `assets/` and machine checks, then
+`uat.verify` observes the identified running build in a browser. `checks/render.mjs` audits those implementation
+captures and, for legacy UI-declared captures, structurally distinguishes them from assets carrying a `generation`
+record; its kernel
 hook returns null for ImageGen direction assets rather than reporting them green.
 
 | rule | knowledge | checks |

@@ -484,11 +484,26 @@ const readNodeRecord=uiDir=>{
   return {file,record};
 };
 
-const browserCapture=asset=>/browser|headless|playwright|chrome/i.test(String(asset?.provenance??''))&&!plainGeneration(asset?.generation);
 const plainGeneration=value=>value&&typeof value==='object'&&!Array.isArray(value);
-/** Legacy/implementation PNG browser captures the record declares, with markup kept beside each one.
+// Generation is structural provenance: a PNG carrying a generation record is direction artwork; a PNG without
+// one is a captured implementation surface. Human prose is descriptive and cannot silently change that class.
+const browserCapture=asset=>!plainGeneration(asset?.generation);
+const implementationCandidates=directory=>{
+  const root=path.resolve(directory),assets=path.join(root,'assets'),found=[];
+  const walk=folder=>{for(const entry of fs.readdirSync(folder,{withFileTypes:true})){
+    const target=path.join(folder,entry.name);
+    if(entry.isDirectory())walk(target);
+    else if(entry.isFile()&&!entry.isSymbolicLink()&&/\.png$/i.test(entry.name))found.push(target);
+  }};
+  try{if(fs.lstatSync(assets).isDirectory())walk(assets);}catch{return [];}
+  return found.sort().map(png=>({path:slash(path.relative(root,png)),role:'running implementation capture',provenance:null,png,
+    markup:fs.existsSync(png.replace(/\.png$/i,'.html'))&&fs.lstatSync(png.replace(/\.png$/i,'.html')).isFile()?png.replace(/\.png$/i,'.html'):null}));
+};
+
+/** Implementation captures come from their implementation node; design candidates come from the ui record.
  * ImageGen direction assets are deliberately excluded: pixels cannot prove exact Grammar DOM/render anatomy. */
-function candidatesOf(uiDir,record){
+function candidatesOf(uiDir,record,{captureDir=null}={}){
+  if(captureDir)return implementationCandidates(captureDir);
   const root=path.resolve(uiDir);
   return listOf(record?.ui?.assets).filter(asset=>typeof asset.path==='string'&&/\.png$/i.test(asset.path)&&browserCapture(asset)).map(asset=>{
     const declared=slash(asset.path);
@@ -503,23 +518,25 @@ function candidatesOf(uiDir,record){
 }
 
 /**
- * Every render check of one ui node against one brand record. `uiDir` is the design node that owns the
- * captures; `brandTree` is the Work tree (or a repository root) whose brand record they were drawn against.
+ * Every render check of one ui node against one brand record. `uiDir` is the design node; `captureDir` is
+ * the implementation node that owns browser captures when this is a build. `brandTree` is the Work tree
+ * (or a repository root) whose brand record they were drawn against.
  * The result is `ok` only when no check failed - a skipped check never makes a drawing proven.
  */
-export function runRenderChecks({uiDir,brandTree,family=null,grammarRoot=defaultGrammarRoot()}={}){
+export function runRenderChecks({uiDir,captureDir=null,brandTree,family=null,grammarRoot=defaultGrammarRoot()}={}){
   if(!uiDir)throw Error('runRenderChecks needs a ui node directory.');
   if(!brandTree)throw Error('runRenderChecks needs the Work tree that owns the brand record.');
   const {file,record}=readNodeRecord(uiDir);
   const identity=readBrandRecord(brandTree);
   const grammarFamily=family??identity.family??null;
   const cards=cardClassesOf({family:grammarFamily,grammarRoot});
-  const found=candidatesOf(uiDir,record);
+  const found=candidatesOf(uiDir,record,{captureDir});
   const checks=[];
   const candidates=[];
   for(const candidate of found){
-    const at={...candidate,png:candidate.png?slash(path.relative(path.resolve(uiDir),candidate.png)):null,
-      markup:candidate.markup?slash(path.relative(path.resolve(uiDir),candidate.markup)):null};
+    const captureRoot=path.resolve(captureDir??uiDir);
+    const at={...candidate,png:candidate.png?slash(path.relative(captureRoot,candidate.png)):null,
+      markup:candidate.markup?slash(path.relative(captureRoot,candidate.markup)):null};
     if(candidate.error){
       candidates.push({...at,decoded:false});
       for(const id of ['palette-off-brand','primary-absent'])checks.push(check(id,'skip',`The candidate \`${candidate.path}\` could not be read: ${candidate.error}.`,{candidate:candidate.path}));
@@ -547,7 +564,7 @@ export function runRenderChecks({uiDir,brandTree,family=null,grammarRoot=default
   else checks.push(check('mascot-slot-missing','skip','The design record names no surface, so no surface could be checked for a mascot slot.',{record:slash(path.relative(path.resolve(uiDir),file))}));
   const generatedDirections=listOf(record?.ui?.assets).filter(asset=>plainGeneration(asset?.generation)&&asset.generation.tool==='image_gen.imagegen').length;
   return {schema:RENDER_CHECKS,ok:checks.every(result=>result.outcome!=='fail'),checks,candidates,
-    node:{record:slash(file),surfaces:surfaces.length,candidates:found.length,generatedDirections},
+    node:{record:slash(file),captureRoot:slash(path.resolve(captureDir??uiDir)),surfaces:surfaces.length,candidates:found.length,generatedDirections},
     brand:{rev:identity.rev,family:grammarFamily,revSource:identity.revSource,record:slash(identity.file)},
     grammar:{family:grammarFamily,cardClasses:cards.classes,source:cards.source,...(cards.error?{note:cards.error}:{})}};
 }
@@ -570,10 +587,12 @@ export function formatRenderChecks(result){
  * diff names the record; all three point at the same directory, which is what the checks read.
  */
 export function uiDirOf({op={},files=[]}={}){
-  const paths=[...(Array.isArray(op.allowlist)?op.allowlist:[]),...(Array.isArray(files)?files:[])].map(slash).filter(Boolean);
+  const paths=[...(Array.isArray(op.references)?op.references:[]),...(Array.isArray(op.allowlist)?op.allowlist:[]),...(Array.isArray(files)?files:[])].map(slash).filter(Boolean);
   for(const entry of paths){
     const trimmed=entry.replace(/\/\*+$/,'').replace(/\/+$/,'');
-    if(!/(^|\/)ui(\/|$)/.test(trimmed))continue;
+    // Only a canonical Work UI node is a design input. Grammar references can contain their own `ui/`
+    // segment and must never win merely because they appear earlier in an operation's reference list.
+    if(!/(^|\.starciwork\/)features\/[^/]+\/ui(\/|$)/.test(trimmed))continue;
     return /\.[A-Za-z0-9]+$/.test(trimmed)?path.posix.dirname(trimmed):trimmed;
   }
   return null;
@@ -585,20 +604,46 @@ export function uiDirOf({op={},files=[]}={}){
  * captures and browser UAT are verified by their downstream operations.
  */
 export function renderChecksFor({op={},state=null,ctx={},files=[]}={}){
+  const implementation=['frontend.implement','interface.implement'].includes(op.kind),required=implementation;
   const declared=uiDirOf({op,files});
   if(!declared)return null;
   const at=ctx?.work?.at??{};
-  const workRoot=at.workRoot?String(at.workRoot):at.repoRoot?path.join(String(at.repoRoot),'.starciwork'):null;
-  if(!workRoot)return null;
-  const uiDir=path.isAbsolute(declared)?declared:path.resolve(workRoot,declared);
-  if(!fs.existsSync(path.join(uiDir,'index.yaml')))return null;
+  const repoRoot=at.repoRoot?path.resolve(String(at.repoRoot)):null;
+  const workRoot=at.workRoot?path.resolve(String(at.workRoot)):repoRoot?path.join(repoRoot,'.starciwork'):null;
+  if(!workRoot)return required?{ok:false,checks:[check('implementation-render-proof-unavailable','fail',
+    'The frontend implementation names a UI design input but its canonical Work root is not bound.',{declared:slash(declared)})]}:null;
+  const normalized=slash(declared).replace(/^\.\//,'');
+  // Work references are normally relative to the Work root, while authored repository references retain their
+  // `.starciwork/` namespace. Both must resolve to the same node instead of nesting `.starciwork/.starciwork`.
+  const uiDir=path.isAbsolute(declared)?path.resolve(declared):normalized.startsWith('.starciwork/')
+    ?path.resolve(repoRoot??path.dirname(workRoot),...normalized.split('/'))
+    :path.resolve(workRoot,...normalized.split('/'));
+  if(!fs.existsSync(path.join(uiDir,'index.yaml')))return required?{ok:false,checks:[check('implementation-ui-input-missing','fail',
+    'The frontend implementation explicitly references a UI design input whose index.yaml is missing.',{declared:normalized,uiDir:slash(uiDir),workRoot:slash(workRoot)})]}:null;
   try{
-    const result=runRenderChecks({uiDir,brandTree:workRoot});
-    if(result.node.candidates===0)return null;
-    return {ok:result.ok,checks:result.checks};
+    const node=implementation&&op.nodeId&&typeof ctx?.work?.node==='function'?ctx.work.node(op.nodeId):null;
+    const inferred=(Array.isArray(op.allowlist)?op.allowlist:[]).map(slash).find(item=>/(^|\/)implementation\/frontend(\/|$)/.test(item)&&/(^|\/)assets(\/|$)/.test(item));
+    const captureDeclared=node?.path?path.posix.dirname(slash(node.path)):inferred?inferred.replace(/\/assets(?:\/.*)?$/,''):null;
+    if(required&&!captureDeclared)return {ok:false,checks:[check('implementation-capture-owner-unbound','fail',
+      'The frontend implementation has a UI design reference but no bound implementation node to own its running-page captures.',{uiDir:slash(uiDir),nodeId:op.nodeId??null})]};
+    const captureNormalized=slash(captureDeclared??'').replace(/^\.\//,'');
+    const captureDir=!captureDeclared?null:path.isAbsolute(captureDeclared)?path.resolve(captureDeclared):captureNormalized.startsWith('.starciwork/')
+      ?path.resolve(repoRoot??path.dirname(workRoot),...captureNormalized.split('/'))
+      :path.resolve(workRoot,...captureNormalized.split('/'));
+    const result=runRenderChecks({uiDir,captureDir,brandTree:workRoot});
+    if(result.node.candidates===0){
+      if(!required)return null;
+      return {ok:false,checks:[check('implementation-capture-missing','fail',
+        'The frontend implementation references a UI design but declares no structural implementation capture; ImageGen direction pixels are not browser/Grammar proof.',{uiDir:slash(uiDir)})]};
+    }
+    const core=new Set(['palette-off-brand','primary-absent','entity-list-in-card']);
+    const incomplete=required?result.checks.filter(entry=>core.has(entry.id)&&entry.outcome==='skip'):[];
+    if(incomplete.length)result.checks.push(check('implementation-render-proof-incomplete','fail',
+      `The implementation capture left ${incomplete.map(entry=>entry.id).join(', ')} unproven; browser pixels and matching markup are required separately from ImageGen direction.`,{uiDir:slash(uiDir)}));
+    return {ok:result.ok&&!incomplete.length,checks:result.checks};
   }catch(error){
     // A tree with no brand record, or a node with no `ui:` spec, is a broken input rather than a failed
     // drawing: it is reported as one unproven claim, never as a passing one and never as a defect.
-    return {ok:true,checks:[check('render-checks-unavailable','skip',`The render checks could not run: ${String(error.message??error)}`,{uiDir:slash(uiDir),workRoot:slash(workRoot)})]};
+    return {ok:!required,checks:[check(required?'implementation-render-proof-unavailable':'render-checks-unavailable',required?'fail':'skip',`The render checks could not run: ${String(error.message??error)}`,{uiDir:slash(uiDir),workRoot:slash(workRoot)})]};
   }
 }

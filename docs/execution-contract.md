@@ -22,7 +22,8 @@ the operational journal is execution history, reservations and checkpoints, not 
 Identity is `(workflowId, opId, attempt, generation, jobId)`. Replies, artifacts and leases must match it.
 
 `workflow-stop` preserves that identity and atomically exports a human-readable
-`<work root>/_local/continuations/workflows/<workflow>.md` brief. It lists scope, accepted work, remaining
+backend-owned `workflows/<workflow>.md` brief. StarCi updates one marked managed section and preserves human
+notes around it. It lists scope, accepted work, remaining
 operation/job/task/dispatch/terminal identities, owner decisions, blockers and the next safe action. It is
 never state authority: resume acquires the single controller lock and reconciles journal/state/pin/candidate
 records before dispatch; an absent process without exact settlement proof cannot release an unknown effect.

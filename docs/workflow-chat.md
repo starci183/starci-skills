@@ -115,7 +115,7 @@ that blocks on the kernel cannot relay a question, and an operation runs for min
 live kernel only through `workflow-approve` (queued in `<dir>/inbox/`, applied at the next tick) and
 `workflow-stop` (`stop.flag`, honoured at the next tick); it never writes `state.json`, because the
 kernel holds the state in memory and saves over the file at every tick. Stop also atomically exports the
-human-readable `<work root>/_local/continuations/workflows/<id>.md` brief with scope, accepted work, remaining
+human-readable backend-owned `workflows/<id>.md` brief with a runtime-managed section beside preserved human notes, scope, accepted work, remaining
 operation identities, owner decisions, blockers and the next safe action. The journal/state/pin/candidate
 records remain authoritative; the Markdown is a continuation projection, not a substitute state store.
 

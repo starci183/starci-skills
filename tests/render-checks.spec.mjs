@@ -6,7 +6,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {stringifyYaml} from '../core/yaml.mjs';
+import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import {encodePng,screen,crc32} from './helpers/png.mjs';
 import {
   CHECK_IDS,MIN_BUCKET_SHARE,PALETTE_TOLERANCE,RENDER_CHECKS,
@@ -342,12 +342,18 @@ test('the kernel hook finds the ui node the operation wrote, and answers null wh
   // The allowlist may be the folder, and the record may only be among the files the diff touched.
   assert.equal(renderChecksFor({op:{...op,allowlist:['features/learning/ui/dashboard/**']},ctx}).ok,false);
   assert.equal(renderChecksFor({op:{...op,allowlist:[]},ctx,files:['features/learning/ui/dashboard/index.yaml']}).ok,false);
+  assert.equal(renderChecksFor({op:{id:'implement',kind:'frontend.implement',allowlist:['apps/core/src/dashboard.tsx'],references:['features/learning/ui/dashboard/index.yaml']},ctx}).ok,false,
+    'the actual implementation follows its design reference rather than needing a UI path in its source allowlist');
   // A repository root instead of a Work root resolves the same tree.
   assert.equal(renderChecksFor({op,ctx:{work:{at:{repoRoot:path.dirname(work)}}}}).ok,false);
+  assert.equal(renderChecksFor({op:{id:'repository-ref',kind:'frontend.implement',references:['.starciwork/features/learning/ui/dashboard/index.yaml']},ctx:{work:{at:{repoRoot:path.dirname(work)}}}}).ok,false,
+    'repository-relative Work references do not resolve through a duplicate .starciwork namespace');
 
   assert.equal(renderChecksFor({op:{id:'op-2',kind:'backend.implement',allowlist:['src/orders/intake.ts']},ctx}),null);
   assert.equal(renderChecksFor({op,ctx:{}}),null);
   assert.equal(renderChecksFor({op:{...op,allowlist:['features/learning/ui/nowhere/index.yaml']},ctx}),null);
+  const missing=renderChecksFor({op:{id:'missing',kind:'frontend.implement',references:['features/learning/ui/nowhere/index.yaml']},ctx});
+  assert.equal(missing.ok,false);assert.equal(missing.checks[0].id,'implementation-ui-input-missing');
   assert.equal(renderChecksFor(),null);
   assert.deepEqual([uiDirOf({op}),uiDirOf({op:{allowlist:['features/a/ui/**']}}),uiDirOf({op:{},files:['docs/a.md']})],
     ['features/learning/ui/dashboard','features/a/ui',null]);
@@ -358,6 +364,8 @@ test('the kernel hook finds the ui node the operation wrote, and answers null wh
   const unavailable=renderChecksFor({op,ctx:{work:{at:{workRoot:orphan}}}});
   assert.equal(unavailable.ok,true);
   assert.deepEqual(unavailable.checks.map(entry=>[entry.id,entry.outcome]),[['render-checks-unavailable','skip']]);
+  const implementationUnavailable=renderChecksFor({op:{...op,id:'implementation',kind:'frontend.implement'},ctx:{work:{at:{workRoot:orphan}}}});
+  assert.equal(implementationUnavailable.ok,false);assert.deepEqual(implementationUnavailable.checks.map(entry=>entry.outcome),['fail']);
 });
 
 test('ImageGen directions are not misreported as exact browser render proof',t=>{
@@ -368,6 +376,28 @@ test('ImageGen directions are not misreported as exact browser render proof',t=>
   fs.cpSync(generated,node,{recursive:true});
   const result=runRenderChecks({uiDir:node,brandTree:work,grammarRoot});assert.equal(result.node.generatedDirections,1);assert.equal(result.node.candidates,0);
   assert.equal(renderChecksFor({op:{id:'draw',kind:'interface.draw',allowlist:['features/learning/ui/dashboard/index.yaml']},ctx:{work:{at:{workRoot:work}}}}),null);
+  const implementation=renderChecksFor({op:{id:'build',kind:'frontend.implement',references:['features/learning/ui/dashboard/index.yaml']},ctx:{work:{at:{workRoot:work}}}});
+  assert.equal(implementation.ok,false);assert.equal(implementation.checks[0].id,'implementation-capture-owner-unbound');
+});
+
+test('capture classification is structural and cannot be changed by provenance wording',t=>{
+  const {work}=tree(t,{label:'structural'}),node=uiNode(t,{label:'structural-node',assets:[{path:'assets/dashboard-desktop.png',role:'Dashboard',provenance:'artifact'}],markup:SECTION_LIST,artworkSlots:[MASCOT_SLOT]});
+  assert.equal(runRenderChecks({uiDir:node,brandTree:work,grammarRoot}).node.candidates,1);
+  const record=parseYaml(fs.readFileSync(path.join(node,'index.yaml'),'utf8'));record.ui.assets[0].generation={tool:'image_gen.imagegen',promptPath:'assets/prompt.txt',inputRefs:['brand']};fs.writeFileSync(path.join(node,'index.yaml'),stringifyYaml(record));
+  assert.equal(runRenderChecks({uiDir:node,brandTree:work,grammarRoot}).node.candidates,0);
+});
+
+test('frontend implementation audits real captures from its implementation owner while reading the referenced ui design',t=>{
+  const {work}=tree(t,{label:'implementation-owner'}),design=path.join(work,'features','learning','ui','dashboard');
+  fs.mkdirSync(path.dirname(design),{recursive:true});fs.cpSync(uiNode(t,{label:'implementation-design',markup:SECTION_LIST,artworkSlots:[MASCOT_SLOT]}),design,{recursive:true});
+  const implementation=path.join(work,'features','learning','implementation','frontend','dashboard');
+  fs.mkdirSync(path.join(implementation,'assets'),{recursive:true});
+  fs.copyFileSync(path.join(design,'assets','dashboard-desktop.png'),path.join(implementation,'assets','dashboard-desktop.png'));
+  fs.copyFileSync(path.join(design,'assets','dashboard-desktop.html'),path.join(implementation,'assets','dashboard-desktop.html'));
+  const op={id:'build',nodeId:'implementation-dashboard',kind:'frontend.implement',references:['features/learning/ui/dashboard/index.yaml'],
+    allowlist:['apps/web/dashboard.tsx','.starciwork/features/learning/implementation/frontend/dashboard/assets/**']};
+  const result=renderChecksFor({op,ctx:{work:{at:{workRoot:work},node:id=>id===op.nodeId?{path:'features/learning/implementation/frontend/dashboard/index.yaml'}:null}}});
+  assert.equal(result.ok,true,JSON.stringify(result.checks));assert.deepEqual(result.checks.filter(item=>item.outcome==='pass').map(item=>item.id).sort(),CHECK_IDS.slice().sort());
 });
 
 test('the CLI prints one line per check and exits 1 when a check fails or the input is broken',t=>{

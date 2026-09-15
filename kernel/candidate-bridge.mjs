@@ -95,6 +95,19 @@ const DEFAULT_EXCLUDED=[/(^|\/)\.git(\/|$)/,/(^|\/)node_modules(\/|$)/,/(^|\/)(d
 const safeTracked=file=>!DEFAULT_EXCLUDED.some(pattern=>pattern.test(clean(file)));
 const headOf=(git,root)=>execGit(git,root,['rev-parse','HEAD']).trim();
 const same=(a,b)=>a?.state===b?.state&&a?.sha256===b?.sha256;
+// Only two well-formed managed sections can authorize ignoring their interior bytes. Malformed states carry no
+// outside digest by design; treating two missing digests as equal would let an unrelated human edit disappear.
+const sameManagedOutside=(before,after)=>before?.state==='managed'&&after?.state==='managed'&&before.sha256===after.sha256;
+const managedOutside=(root,record)=>{
+  const file=clean(record?.path),target=path.resolve(root,...file.split('/')),relative=path.relative(path.resolve(root),target);
+  if(!file||relative.startsWith('..')||path.isAbsolute(relative))return {path:file,state:'escape'};
+  try{
+    const text=fs.readFileSync(target,'utf8'),start=text.indexOf(String(record.start)),end=text.indexOf(String(record.end));
+    if(start<0&&end<0)return {path:file,state:'unmanaged',sha256:sha256(text)};
+    if(start<0||end<start||text.indexOf(String(record.start),start+1)>=0||text.indexOf(String(record.end),end+1)>=0)return {path:file,state:'malformed'};
+    return {path:file,state:'managed',sha256:sha256(`${text.slice(0,start)}${text.slice(end+String(record.end).length)}`)};
+  }catch(error){return {path:file,state:error?.code==='ENOENT'?'absent':'unreadable'};}
+};
 
 export function candidateWriterResource(repoRoot){
   const real=fs.realpathSync(repoRoot);return {key:`canonical-writer:${sha256(slash(real).toLowerCase())}`,units:1};
@@ -106,7 +119,7 @@ export function runtimeWriterHint({host='orca-native',repoRoot}={}){
 
 /** Capture accepted head, relevant input bytes and every pre-existing dirty path before a native worker starts. */
 export function beginDetectionCandidate({identity,repoRoot,workerRoot,controlRoot,allowlist=[],references=[],inputPaths=[],oraclePaths=[],git,
-  dependencyDigests={},environmentDigest='runtime-unpinned',ownedDirtyPaths=[],dependencyInstall=null,now=Date.now}={}){
+  dependencyDigests={},environmentDigest='runtime-unpinned',ownedDirtyPaths=[],runtimeManagedFiles=[],dependencyInstall=null,now=Date.now}={}){
   const acceptedHead=headOf(git,repoRoot),dirty=statusPaths(git,repoRoot),allTracked=trackedFor(git,repoRoot,['.']);
   if(typeof environmentDigest!=='string'||!environmentDigest.trim())throw new TypeError('candidate environmentDigest must be a nonempty string');
   const resolveOnDisk=value=>{const reference=resolveCandidateReference(value),target=path.join(repoRoot,...reference.path.split('/'));
@@ -131,8 +144,11 @@ export function beginDetectionCandidate({identity,repoRoot,workerRoot,controlRoo
   for(const file of droppedOwnedPaths)owned.delete(file);
   const invalidOwned=[...owned].filter(file=>!matches(file,allowlist));
   if(invalidOwned.length)throw new Error(`owned dirty baseline paths must be inside the bounded allowlist: ${invalidOwned.join(', ')}`);
+  const managed=runtimeManagedFiles.filter(item=>item&&typeof item.path==='string'&&typeof item.start==='string'&&typeof item.end==='string')
+    .map(item=>({path:clean(item.path),start:item.start,end:item.end}));
   const bridge={schema:DETECTION_BRIDGE,identity,snapshot,repoRoot:path.resolve(repoRoot),allowlist:[...allowlist],references:[...references],resolvedReferences,inputPaths:[...inputPaths],
     acceptedHead,sourceBaseline:states(repoRoot,sourcePaths),dirtyBaseline:states(repoRoot,dirty),dirtyBaselinePaths:dirty,
+    runtimeManagedFiles:managed,runtimeManagedBaseline:managed.map(item=>managedOutside(repoRoot,item)),
     ownedDirtyPaths:[...owned].sort(),droppedOwnedPaths,dependency:{mode:'isolated-artifact',command:dependencyInstall,
       root:path.join(controlRoot,'dependencies'),externalCache:'forbidden',symlinkedDependencies:'forbidden',assurance:'detection-only',ready:dependencyInstall===null},
     writer:runtimeWriterHint({repoRoot}),beganAt:new Date(now()).toISOString()};
@@ -162,13 +178,22 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],now=Date.n
   const candidates=[...new Set([...before.keys(),...postDirty])].sort(),after=new Map(states(repoRoot,candidates).map(item=>[item.path,item]));
   const observed=candidates.filter(file=>!same(before.get(file)??{path:file,state:'absent'},after.get(file)??{path:file,state:'absent'}));
   const owned=new Set(bridge.ownedDirtyPaths??[]),dirtyAtStart=new Set(bridge.dirtyBaselinePaths??bridge.dirtyBaseline.map(item=>item.path));
-  const baselineTouched=observed.filter(file=>dirtyAtStart.has(file)&&!owned.has(file));
   const runtimeOwned=new Set(bridge.runtimeOwnedPaths??[]),runtimeDrift=observed.filter(file=>runtimeOwned.has(file));
-  const candidateObserved=observed.filter(file=>!runtimeOwned.has(file)),outside=candidateObserved.filter(file=>!matches(file,bridge.allowlist));
+  const managedByPath=new Map((bridge.runtimeManagedFiles??[]).map(item=>[clean(item.path),item])),managedBaseline=new Map((bridge.runtimeManagedBaseline??[]).map(item=>[clean(item.path),item]));
+  const managedOnly=new Set(observed.filter(file=>{const record=managedByPath.get(file);return record&&sameManagedOutside(managedBaseline.get(file),managedOutside(repoRoot,record));}));
+  // A public brief may already be tracked-dirty or untracked when an attempt starts. Prove its surrounding
+  // human bytes first, then remove that exact managed-only change from both collision checks. Missing,
+  // duplicated or malformed markers cannot enter managedOnly and remain an ordinary full-file delta.
+  const baselineTouched=observed.filter(file=>dirtyAtStart.has(file)&&!owned.has(file)&&!managedOnly.has(file));
+  const candidateObserved=observed.filter(file=>!runtimeOwned.has(file)&&!managedOnly.has(file)),outside=candidateObserved.filter(file=>!matches(file,bridge.allowlist));
   const reasons=[...baselineTouched.map(file=>`pre-existing-user-work-modified:${file}`),...runtimeDrift.map(file=>`kernel-owned-write-drift:${file}`),...outside.map(file=>`outside-allowlist:${file}`)];
   if(headOf(git,repoRoot)!==bridge.acceptedHead)reasons.push('canonical-head-drift');
   if(reasons.length)return {schema:DETECTION_BRIDGE,status:'quarantine',reasons,observedFiles:observed,assurance:bridge.writer};
   const alreadySealed=fs.existsSync(path.join(snapshot.controlRoot,CANDIDATE_FILES.packet));
+  // Runtime-managed-only bytes are rebound into both verifier views before the first seal. This is the same
+  // narrow mechanism as other kernel-owned writes, but selected only after proving the surrounding human bytes
+  // unchanged. Replays keep the immutable packet and ignore these exact paths in canonical comparison.
+  if(!alreadySealed&&managedOnly.size)bindRuntimeInputs(snapshot,{canonicalRoot:repoRoot,paths:[...managedOnly]});
   // A crash after writing candidate.json may precede the workflow-state save. Replaying that freeze must verify
   // the existing immutable packet, never overwrite the worker bytes or remove the packet to get past EEXIST.
   for(const file of alreadySealed?[]:candidateObserved){
@@ -178,7 +203,8 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],now=Date.n
     fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(source,target);
   }
   const packet=sealCandidate(snapshot,{allowedWrites:candidateObserved,reportedFiles,now});
-  const frozen=verifyCandidateIdentity(snapshot,packet,{canonicalRoot:repoRoot,expectedCanonicalEntries:packet.files});
+  const frozen=verifyCandidateIdentity(snapshot,packet,{canonicalRoot:repoRoot,
+    expectedCanonicalEntries:packet.files.filter(item=>!managedByPath.has(item.path))});
   // Replaying a sealed freeze must bind the whole canonical delta, not only the paths already present in the
   // immutable packet. In particular, a newly-created allowlisted file is absent from packet.files, so byte
   // verification alone cannot see it. The observed Git delta and the sealed change set must be identical.

@@ -408,13 +408,13 @@ export function frozenCandidateDiff(candidate,files,{git=null}={}){
       chunks.push(`${header}\nBinary file, ${before?.length??0} bytes before and ${after?.length??0} bytes after; its content is not rendered.`);
       continue;
     }
-    let body=null;
+    let body=null,gitBody=false;
     if(run){
       const shown=run(['diff','--no-index','--no-color','--',
         before?path.join(candidate.baseRoot,change.path):'/dev/null',
         after?path.join(candidate.workerRoot,change.path):'/dev/null']);
       // `git diff --no-index` exits 1 when the files differ, which is the ordinary case here.
-      if([0,1].includes(shown.status)&&typeof shown.stdout==='string')body=shown.stdout;
+      if([0,1].includes(shown.status)&&typeof shown.stdout==='string'){body=shown.stdout;gitBody=true;}
     }
     if(body===null){
       // No git seam: the reader gets the text itself, which is still readable and still bounded below.
@@ -423,7 +423,9 @@ export function frozenCandidateDiff(candidate,files,{git=null}={}){
     }
     // git names the two temporary copies it compared; the reader is told the one path that means anything.
     const drop=/^(diff --git |index |--- |\+\+\+ )/;
-    const cleaned=body.split('\n').filter(line=>!drop.test(line)).join('\n').trim();
+    // Only git's temporary path headers are noise. The no-git fallback deliberately labels its full before and
+    // after bodies, so filtering those labels used to make replacement diffs ambiguous to the validator.
+    const cleaned=(gitBody?body.split('\n').filter(line=>!drop.test(line)).join('\n'):body).trim();
     chunks.push(`${header}\n--- a/${change.path}\n+++ b/${change.path}\n${cleaned}`);
   }
   let text=chunks.join('\n');

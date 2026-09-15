@@ -77,7 +77,7 @@ export const SCREENS={
 export const RATE_LIMIT_SIGNALS=[
   ['http-429',/(?:\b|_)429\b|rate_limit_error/i],
   ['rate-limit',/rate.?limit(?:ed| reached| exceeded| hit|ing)?\b(?![^\n]*\b(?:rule|policy|design|record|feature|contract)\b)|too many requests|resource_exhausted|retry after \d/i],
-  ['overloaded',/overloaded_error|is (?:currently )?overloaded|server is busy|upstream_overloaded/i],
+  ['overloaded',/overloaded_error|is (?:currently )?overloaded|server is busy|upstream_overloaded|^\s*selected model is at capacity\.\s*please try a different model\.?\s*$/im],
   ['quota',/insufficient_quota|exceeded your (?:current )?quota|quota (?:exceeded|exhausted|reached)|out of quota|credit balance is too low|billing (?:hard )?limit|usage limit reached|you(?:'ve| have) hit your (?:usage )?limit/i]
 ];
 
@@ -106,7 +106,13 @@ export function rateLimitSignal(screen){
   const flat=flatten(screen);
   for(const [kind,pattern] of RATE_LIMIT_SIGNALS){
     const found=flat.match(pattern);
-    if(found)return {kind,text:found[0]};
+    if(found){
+      // A refusal retained in scrollback must not park a newer active turn. Idle provider chrome after a refusal
+      // is expected and keeps the signal current; an actual busy signature after it proves execution resumed.
+      const newer=flat.slice((found.index??0)+found[0].length);
+      if(PROVIDER_FAMILIES.some(family=>any(SCREENS[family].busy,newer)))continue;
+      return {kind,text:found[0].trim()};
+    }
   }
   return null;
 }

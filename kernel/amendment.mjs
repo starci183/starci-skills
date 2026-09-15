@@ -25,13 +25,35 @@ const exactKeys=(value,allowed,label)=>{
 const stable=value=>Array.isArray(value)?value.map(stable):plain(value)?Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])])):value;
 const digest=value=>crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
 const unique=value=>[...new Set(value)];
+const cleanPath=value=>String(value??'').replaceAll('\\','/').replace(/^\.\//,'').replace(/\/+$/,'');
+/** Directional containment: the owner grant covers the requested path/glob, never the reverse. */
+export function effectPathCovered(grant,requested){
+  const allowed=cleanPath(grant),wanted=cleanPath(requested);if(!allowed||!wanted)return false;
+  if(!allowed.includes('*'))return wanted===allowed||wanted.startsWith(`${allowed}/`);
+  if(allowed.endsWith('/**')){const root=allowed.slice(0,-3).replace(/\/+$/,'');return wanted===root||wanted.startsWith(`${root}/`);}
+  if(wanted.includes('*'))return wanted===allowed;
+  const escaped=allowed.replace(/[.+^${}()|[\]\\]/g,'\\$&').replaceAll('**','\0').replaceAll('*','[^/]*').replaceAll('\0','.*');
+  try{return new RegExp(`^${escaped}$`).test(wanted);}catch{return false;}
+}
+const effectBlock=(value,label)=>{
+  exactKeys(value,['paths','resources','external'],label);
+  return {paths:list(value.paths,`${label}.paths`),resources:list(value.resources,`${label}.resources`),external:list(value.external,`${label}.external`)};
+};
+const effectSubset=(given,ceiling)=>given.paths.every(item=>ceiling.paths.some(grant=>effectPathCovered(grant,item)))&&
+  given.resources.every(item=>ceiling.resources.includes(item))&&given.external.every(item=>ceiling.external.includes(item));
+const replacements=(value,label)=>{
+  if(value===undefined)return [];
+  need(Array.isArray(value),`Workflow amendment ${label} must be an array`);
+  const seen=new Set();return value.map((item,index)=>{exactKeys(item,['from','to'],`${label}[${index}]`);const from=text(item.from,`${label}[${index}].from`),to=text(item.to,`${label}[${index}].to`);need(!seen.has(from),`Workflow amendment ${label} must replace each original criterion once`);seen.add(from);return {from,to};});
+};
 
 function source(value,label){
   exactKeys(value,['threadId','messageId','messageIdAvailability','quote','assurance','at'],label);
   need(Object.hasOwn(value,'messageId'),`Workflow amendment needs ${label}.messageId (use null when the native id is not exposed)`);
+  need(Object.hasOwn(value,'at'),`Workflow amendment needs ${label}.at (use null when the native event time is not exposed)`);
   const normalized={threadId:text(value.threadId,`${label}.threadId`),messageId:value.messageId??null,
     messageIdAvailability:text(value.messageIdAvailability,`${label}.messageIdAvailability`),quote:text(value.quote,`${label}.quote`),
-    assurance:text(value.assurance,`${label}.assurance`),at:text(value.at,`${label}.at`)};
+    assurance:text(value.assurance,`${label}.assurance`),at:value.at===null?null:text(value.at,`${label}.at`)};
   need(normalized.assurance==='conversation-context-not-authenticated',
     `Workflow amendment ${label}.assurance must be conversation-context-not-authenticated`);
   need(normalized.messageIdAvailability==='available'
@@ -39,11 +61,11 @@ function source(value,label){
     :normalized.messageIdAvailability==='not-exposed'&&normalized.messageId===null,
     `Workflow amendment ${label} needs an actual native messageId or explicit not-exposed/null provenance`);
   if(typeof normalized.messageId==='string')normalized.messageId=normalized.messageId.trim();
-  need(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(normalized.at)&&Number.isFinite(Date.parse(normalized.at)),
-    `Workflow amendment ${label}.at must be an ISO date-time with a timezone`);
+  need(normalized.at===null||(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(normalized.at)&&Number.isFinite(Date.parse(normalized.at))),
+    `Workflow amendment ${label}.at must be null or an ISO date-time with a timezone`);
   return normalized;
 }
-const sourceKey=value=>`${value.threadId}:${value.messageIdAvailability==='available'?value.messageId:`not-exposed@${value.at}`}`;
+const sourceKey=value=>`${value.threadId}:${value.messageIdAvailability==='available'?value.messageId:`not-exposed:${digest({quote:value.quote,at:value.at})}`}`;
 
 /**
  * Read the bounded, explicit owner grant that overlays a frozen workflow goal. This record is not a replacement
@@ -66,21 +88,30 @@ export function readWorkflowAmendment(file){
   need(record.coordinator.decision==='apply-same-id','Workflow amendment coordinator.decision must be apply-same-id');
   const coordinator={actor:'coordinator',source:source(record.coordinator.source,'coordinator.source'),decision:'apply-same-id',
     rationale:text(record.coordinator.rationale,'coordinator.rationale')};
-  exactKeys(record.changes,['clarifications','addScope','addDefinitionOfDone','operationFindings','effectCeiling'],'changes');
+  exactKeys(record.changes,['clarifications','addScope','scopeBindings','addDefinitionOfDone','supersedeDefinitionOfDone','operationFindings','operationEffects','effectCeiling'],'changes');
   const clarifications=list(record.changes.clarifications,'changes.clarifications',{required:true});
   const addScope=list(record.changes.addScope,'changes.addScope');
   const addDefinitionOfDone=list(record.changes.addDefinitionOfDone,'changes.addDefinitionOfDone');
+  const supersedeDefinitionOfDone=replacements(record.changes.supersedeDefinitionOfDone,'changes.supersedeDefinitionOfDone');
   const operationFindings=record.changes.operationFindings??{};
   need(plain(operationFindings),'Workflow amendment changes.operationFindings must be an object keyed by operation id');
   const findings=Object.fromEntries(Object.entries(operationFindings).map(([opId,items])=>[text(opId,'operation finding id'),list(items,`changes.operationFindings.${opId}`,{required:true})]));
-  exactKeys(record.changes.effectCeiling,['paths','resources','external'],'changes.effectCeiling');
-  const effectCeiling={paths:list(record.changes.effectCeiling.paths,'changes.effectCeiling.paths'),
-    resources:list(record.changes.effectCeiling.resources,'changes.effectCeiling.resources'),
-    external:list(record.changes.effectCeiling.external,'changes.effectCeiling.external')};
+  const effectCeiling=effectBlock(record.changes.effectCeiling,'changes.effectCeiling');
+  const scopeBindings=record.changes.scopeBindings??{};
+  need(plain(scopeBindings),'Workflow amendment changes.scopeBindings must be an object keyed by added scope');
+  const boundScopes=Object.fromEntries(Object.entries(scopeBindings).map(([scope,paths])=>[text(scope,'scope binding'),list(paths,`changes.scopeBindings.${scope}`,{required:true})]));
+  need(Object.keys(boundScopes).every(scope=>addScope.includes(scope))&&addScope.every(scope=>Object.hasOwn(boundScopes,scope)),
+    'Workflow amendment changes.scopeBindings must bind every and only changes.addScope entry');
+  for(const [scope,paths] of Object.entries(boundScopes))need(paths.every(item=>effectCeiling.paths.some(grant=>effectPathCovered(grant,item))),
+    `Workflow amendment scope ${scope} exceeds changes.effectCeiling.paths`);
+  const operationEffects=record.changes.operationEffects??{};
+  need(plain(operationEffects),'Workflow amendment changes.operationEffects must be an object keyed by operation id');
+  const effects=Object.fromEntries(Object.entries(operationEffects).map(([opId,value])=>[text(opId,'operation effect id'),effectBlock(value,`changes.operationEffects.${opId}`)]));
+  for(const [opId,value] of Object.entries(effects))need(effectSubset(value,effectCeiling),`Workflow amendment operation ${opId} exceeds changes.effectCeiling`);
   need(!addScope.length||effectCeiling.paths.length,
     'Workflow amendment that adds scope must carry a nonempty changes.effectCeiling.paths owner grant');
   const normalized={schema:WORKFLOW_AMENDMENT,workflowId,baseGoalIdentity,authority,coordinator,
-    changes:{clarifications,addScope,addDefinitionOfDone,operationFindings:findings,effectCeiling}};
+    changes:{clarifications,addScope,scopeBindings:boundScopes,addDefinitionOfDone,supersedeDefinitionOfDone,operationFindings:findings,operationEffects:effects,effectCeiling}};
   return {file:resolved,record:normalized,digest:digest(normalized)};
 }
 
@@ -100,7 +131,7 @@ export function applyWorkflowAmendment(store,state,file,{now=Date.now}={}){
   const reusedGrant=state.amendments.find(item=>item.authority?.source&&sourceKey(item.authority.source)===sourceKey(parsed.record.authority.source));
   need(!reusedGrant,
     `Owner grant ${sourceKey(parsed.record.authority.source)} is already bound to amendment ${reusedGrant?.digest}`);
-  for(const opId of Object.keys(parsed.record.changes.operationFindings)){
+  for(const opId of unique([...Object.keys(parsed.record.changes.operationFindings),...Object.keys(parsed.record.changes.operationEffects)])){
     const op=(state.ops??[]).find(item=>item.id===opId);
     need(op,`Amendment finding names unknown operation ${opId}`);
     need(!SETTLED.has(op.status),`Amendment cannot reopen accepted or settled operation ${opId} (${op.status})`);
@@ -108,10 +139,26 @@ export function applyWorkflowAmendment(store,state,file,{now=Date.now}={}){
   // Freeze the original derived identity before changing scope/criteria on old state shapes that did not persist it.
   if(!state.goalDigest)state.goalDigest=baseGoalIdentity;
   state.scope=unique([...(Array.isArray(state.scope)?state.scope:[]),...parsed.record.changes.addScope]);
-  state.definitionOfDone=unique([...(Array.isArray(state.definitionOfDone)?state.definitionOfDone:[]),...parsed.record.changes.addDefinitionOfDone]);
+  const priorDefinition=[...(Array.isArray(state.definitionOfDone)?state.definitionOfDone:[])];
+  for(const replacement of parsed.record.changes.supersedeDefinitionOfDone)
+    need(priorDefinition.filter(item=>item===replacement.from).length===1,`Amendment criterion to supersede is not exactly active once: ${replacement.from}`);
+  if(parsed.record.changes.supersedeDefinitionOfDone.length){state.definitionOfDoneHistory=Array.isArray(state.definitionOfDoneHistory)?state.definitionOfDoneHistory:[];
+    state.definitionOfDoneHistory.push({amendment:parsed.digest,criteria:priorDefinition,replacements:parsed.record.changes.supersedeDefinitionOfDone});}
+  const replacementMap=new Map(parsed.record.changes.supersedeDefinitionOfDone.map(item=>[item.from,item.to]));
+  state.definitionOfDone=unique([...priorDefinition.map(item=>replacementMap.get(item)??item),...parsed.record.changes.addDefinitionOfDone]);
   for(const [opId,items] of Object.entries(parsed.record.changes.operationFindings)){
     const op=state.ops.find(item=>item.id===opId);
     op.findings=unique([...(Array.isArray(op.findings)?op.findings:[]),...items]);
+  }
+  for(const [opId,effects] of Object.entries(parsed.record.changes.operationEffects)){
+    const op=state.ops.find(item=>item.id===opId);
+    if(!Array.isArray(op.preAmendmentAllowlist))op.preAmendmentAllowlist=[...(Array.isArray(op.allowlist)?op.allowlist:[])];
+    if(!Array.isArray(op.preAmendmentResources))op.preAmendmentResources=[...(Array.isArray(op.resources)?op.resources:[])];
+    if(!Array.isArray(op.preAmendmentExternal))op.preAmendmentExternal=[...(Array.isArray(op.externalEffects)?op.externalEffects:[])];
+    op.allowlist=unique([...(Array.isArray(op.allowlist)?op.allowlist:op.preAmendmentAllowlist),...effects.paths]);
+    op.resources=unique([...(Array.isArray(op.resources)?op.resources:op.preAmendmentResources),...effects.resources]);
+    op.externalEffects=unique([...(Array.isArray(op.externalEffects)?op.externalEffects:op.preAmendmentExternal),...effects.external]);
+    op.amendmentEffects=[...(Array.isArray(op.amendmentEffects)?op.amendmentEffects:[]),{amendment:parsed.digest,...effects}];
   }
   const amendment={schema:WORKFLOW_AMENDMENT,digest:parsed.digest,baseGoalIdentity,appliedAt:typeof now==='function'?now():now,
     authority:parsed.record.authority,coordinator:parsed.record.coordinator,changes:parsed.record.changes};
@@ -124,13 +171,14 @@ export function applyWorkflowAmendment(store,state,file,{now=Date.now}={}){
       messageIdAvailability:amendment.authority.source.messageIdAvailability,at:amendment.authority.source.at},
     coordinatorDecision:{threadId:amendment.coordinator.source.threadId,messageId:amendment.coordinator.source.messageId,
       messageIdAvailability:amendment.coordinator.source.messageIdAvailability,at:amendment.coordinator.source.at},
-    addScope:amendment.changes.addScope,addDefinitionOfDone:amendment.changes.addDefinitionOfDone,
+    addScope:amendment.changes.addScope,scopeBindings:amendment.changes.scopeBindings,addDefinitionOfDone:amendment.changes.addDefinitionOfDone,
+    supersedeDefinitionOfDone:amendment.changes.supersedeDefinitionOfDone,
     operationFindings:Object.keys(amendment.changes.operationFindings),effectCeiling:amendment.changes.effectCeiling});
   return {ok:true,replayed:false,amendment,file:parsed.file};
 }
 
 /** Bounded contract context: authorization provenance and effect ceiling, never a claim of new goal approval. */
-export function amendmentContractLines(state){
+export function amendmentContractLines(state,op=null){
   const amendments=Array.isArray(state?.amendments)?state.amendments:[];
   if(!amendments.length)return [];
   const lines=['## Authorized same-workflow amendments',
@@ -138,9 +186,47 @@ export function amendmentContractLines(state){
   for(const item of amendments){
     lines.push(`- Amendment \`${item.digest}\`, owner grant \`${sourceKey(item.authority.source)}\`, coordinator decision \`${sourceKey(item.coordinator.source)}\``);
     for(const clarification of item.changes.clarifications)lines.push(`  - clarification: ${clarification}`);
+    for(const replacement of item.changes.supersedeDefinitionOfDone??[])lines.push(`  - superseded historical criterion: ${replacement.from}`,`    effective criterion: ${replacement.to}`);
     lines.push(`  - paths: ${item.changes.effectCeiling.paths.join(', ')||'none'}`,
       `  - resources: ${item.changes.effectCeiling.resources.join(', ')||'none'}`,
       `  - external effects: ${item.changes.effectCeiling.external.join(', ')||'none'}`);
+    const assigned=op?.amendmentEffects?.find(effect=>effect.amendment===item.digest);
+    if(assigned)lines.push(`  - this operation's added paths: ${assigned.paths.join(', ')||'none'}`,
+      `  - this operation's added resources: ${assigned.resources.join(', ')||'none'}`,
+      `  - this operation's added external effects: ${assigned.external.join(', ')||'none'}`);
   }
   return [...lines,''];
+}
+
+/** Bind a newly planned Work op to the scope-to-path mapping that admitted its node. */
+export function bindPlannedAmendmentEffects(state,op,node={}){
+  const nodePath=cleanPath(node.path??op.references?.[0]??'').replace(/^\.starciwork\//,''),nodeId=String(node.id??op.nodeId??'');
+  for(const amendment of state.amendments??[]){
+    const entries=Object.entries(amendment.changes?.scopeBindings??{}).filter(([scope])=>{
+      const wanted=cleanPath(scope).replace(/^\.starciwork\//,'');return wanted===nodeId||nodePath===wanted||nodePath.startsWith(`${wanted}/`)||wanted.startsWith(`${nodePath}/`);
+    });
+    if(!entries.length)continue;
+    const granted=unique(entries.flatMap(([,paths])=>paths));
+    const workPaths=(op.allowlist??[]).filter(item=>cleanPath(item).startsWith('.starciwork/'));
+    need(workPaths.every(item=>granted.some(grant=>effectPathCovered(grant,item))),`Planned operation ${op.id} exceeds the added-scope Work path binding`);
+    op.scopeAmendments=unique([...(op.scopeAmendments??[]),amendment.digest]);
+  }
+  return op;
+}
+
+/** Dispatch/verification fence for only the authority added by amendments; original op authority remains intact. */
+export function operationAmendmentVerdict(state,op,{files=[],resources=null,external=null}={}){
+  const reasons=[];
+  for(const effect of op.amendmentEffects??[]){
+    const amendment=(state.amendments??[]).find(item=>item.digest===effect.amendment),ceiling=amendment?.changes?.effectCeiling;
+    if(!ceiling||!effectSubset(effect,ceiling)){reasons.push(`amendment ${effect.amendment} effect assignment exceeds or lacks its owner ceiling`);continue;}
+    for(const path of effect.paths)if(!(op.allowlist??[]).includes(path))reasons.push(`amendment path ${path} is absent from the effective operation allowlist`);
+    for(const resource of effect.resources)if(!(op.resources??[]).includes(resource))reasons.push(`amendment resource ${resource} is absent from the effective operation resources`);
+    for(const item of effect.external)if(!(op.externalEffects??[]).includes(item))reasons.push(`amendment external effect ${item} is absent from the effective operation declaration`);
+    if(Array.isArray(resources))for(const resource of effect.resources)if(!resources.includes(resource))reasons.push(`amendment resource ${resource} is not bound by the dispatch resource guard`);
+    if(Array.isArray(external))for(const item of effect.external)if(!external.includes(item))reasons.push(`amendment external effect ${item} is not bound by the dispatch declaration`);
+  }
+  const original=op.preAmendmentAllowlist??op.allowlist??[],added=(op.amendmentEffects??[]).flatMap(item=>item.paths);
+  for(const file of files)if(!original.some(grant=>effectPathCovered(grant,file))&&!added.some(grant=>effectPathCovered(grant,file)))reasons.push(`changed path ${file} is outside original and amended operation authority`);
+  return {ok:reasons.length===0,reasons};
 }

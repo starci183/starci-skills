@@ -308,14 +308,14 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       return completed.ok?{ok:true,effectState:'none',observedFiles:observed,candidateDigest:op.candidateDigest??null}:{ok:false,effectState:'unknown',reason:completed.reason??'durable native job could not be completed'};
     },
     beginCandidate(op,{repoRoot=state.worktree,allowlist=op.allowlist??[],references=op.references??[],inputPaths=[],oraclePaths=[],ownedDirtyPaths=[],
-      dependencyDigests={},environmentDigest=null,dependencyInstall=null}={}){
+      dependencyDigests={},environmentDigest=null,runtimeManagedFiles=[],dependencyInstall=null}={}){
       if(!git)throw Error('the candidate lifecycle requires the kernel Git adapter');
       const lease=op.lease;if(!lease)throw Error(`reserve ${op.id} before beginning its candidate`);
       if(op.candidate?.identity?.jobId===lease.jobId)return this.candidateBridge(op);
       delete op.candidate;delete op.candidateDigest;delete op.oracleDigest;
       const root=path.join(candidateBase,lease.jobId),bridgeRecord=beginDetectionCandidate({identity:{workflowId:lease.workflowId,opId:lease.opId,
         attempt:lease.attempt,generation:lease.generation,jobId:lease.jobId},repoRoot,workerRoot:path.join(root,'worker'),controlRoot:path.join(root,'control'),
-        allowlist,references,inputPaths,oraclePaths,ownedDirtyPaths,dependencyDigests,environmentDigest,dependencyInstall,git,now});
+        allowlist,references,inputPaths,oraclePaths,ownedDirtyPaths,dependencyDigests,environmentDigest,runtimeManagedFiles,dependencyInstall,git,now});
       op.candidate=candidateRecord(bridgeRecord);return bridgeRecord;
     },
     /** The manifests of an operation's candidate, read from its control root: state keeps the record, not the bytes. */

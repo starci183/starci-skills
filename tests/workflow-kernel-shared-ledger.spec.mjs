@@ -126,6 +126,11 @@ const UI_PAYLOAD=`ui:
     - path: assets/receipt-resting.png
       role: candidate for receipt resting, narrow
       provenance: image model
+      generation:
+        tool: image_gen.imagegen
+        promptPath: assets/receipt-resting.prompt.txt
+        inputRefs:
+          - brand/index.yaml
   observations: []
   gaps: []
   artworkSlots: []
@@ -313,11 +318,17 @@ test('the accepted slice is recorded and committed in the owner, names the front
         fs.appendFileSync(record,UI_PAYLOAD);
         fs.mkdirSync(path.join(path.dirname(record),'assets'),{recursive:true});
         fs.writeFileSync(path.join(path.dirname(record),'assets','receipt-resting.png'),PNG_BYTES);
+        fs.writeFileSync(path.join(path.dirname(record),'assets','receipt-resting.prompt.txt'),'Synthetic ImageGen direction fixture.');
       }}],
-      [RECEIPT]:[{outcome:'done',summary:'The receipt page renders.',files:[PAGE],
+      [RECEIPT]:[{outcome:'done',summary:'The receipt page renders.',files:[PAGE,
+        `${run.owner.replaceAll('\\','/')}/.starciwork/features/sales/implementation/frontend/receipt/assets/receipt-resting.png`,
+        `${run.owner.replaceAll('\\','/')}/.starciwork/features/sales/implementation/frontend/receipt/assets/receipt-resting.html`],
       checks:[passing('unit-tests-pass','npx vitest run receipt')],
-      // The agent's work: the page is written in the frontend worktree and nowhere else, by the build step.
-      effect:()=>fs.writeFileSync(path.join(run.code,PAGE),'export default function Receipt(){return <main>Receipt</main>;}\n')}],
+      // The build writes product code in the frontend and its bounded running-page proof in the owner Work node.
+      effect:()=>{fs.writeFileSync(path.join(run.code,PAGE),'export default function Receipt(){return <main>Receipt</main>;}\n');
+        const assets=path.join(run.work,'features/sales/implementation/frontend/receipt/assets');fs.mkdirSync(assets,{recursive:true});
+        fs.writeFileSync(path.join(assets,'receipt-resting.png'),PNG_BYTES);
+        fs.writeFileSync(path.join(assets,'receipt-resting.html'),'<main><section><h2>Receipt</h2><p>Order received.</p></section></main>');}}],
       [`${RECEIPT}-verify`]:[{outcome:'done',summary:'The receipt flow passes on the surface.',files:[],
       checks:[passing('unit-tests-pass','npx vitest run receipt')]}]}});
   const ownerHead=git(run.owner,'rev-parse','HEAD');

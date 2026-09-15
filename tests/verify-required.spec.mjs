@@ -99,5 +99,7 @@ test('the frozen candidate reaches the validator as a readable diff, not as base
 
   const plain=frozenCandidateDiff(candidate,['features/a.yaml'],{});
   assert.match(plain.text,/title: new/,'without a git seam the reader still gets the text');
+  assert.match(plain.text,/--- before\nid: one/,'the fallback keeps its before-body label');
+  assert.match(plain.text,/\+\+\+ after\nid: one/,'the fallback keeps its after-body label');
   assert.equal(plain.text.includes('eyJwYXRo'),false);
 });

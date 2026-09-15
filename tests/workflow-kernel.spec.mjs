@@ -6,7 +6,9 @@ import path from 'node:path';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import {EventEmitter} from 'node:events';
 import {preparedEntry,inputAsk} from './helpers/input-fixture.mjs';
-import {refreshCredentialPreparation,deferForIntegrationPreparation,normalizePreparationAuthority,reconcileStoppedNativeRetryLease} from '../kernel/kernel.mjs';
+import {encodePng,screen} from './helpers/png.mjs';
+import {brandColours} from '../checks/render.mjs';
+import {refreshCredentialPreparation,deferForIntegrationPreparation,normalizePreparationAuthority,reconcileStoppedNativeRetryLease,persistLaunchAttempts} from '../kernel/kernel.mjs';
 import {reserveStartup} from '../kernel/startup-lock.mjs';
 import {reconcileWorkflowInputs} from '../kernel/inputs.mjs';
 import {credentialFields} from '../kernel/inputs-model.mjs';
@@ -58,6 +60,11 @@ const tmp=()=>{const dir=path.join(os.tmpdir(),'starci-workflow-kernel-spec',`${
 const flag=(args,name)=>{const index=args.indexOf(`--${name}`);return index<0?null:args[index+1];};
 const events=store=>store.readEvents();
 const indexOfEvent=(list,predicate)=>list.findIndex(predicate);
+
+test('persisted launch attempts retain bounded cleanup custody',()=>{
+  const [attempt]=persistLaunchAttempts([{target:'codex',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-1',effectState:'none',cleanup:{complete:false,reason:'terminal retained for audit'},privatePayload:'not persisted'}}]);
+  assert.deepEqual(attempt.settlement.cleanup,{complete:false,reason:'terminal retained for audit'});assert.equal(attempt.settlement.privatePayload,undefined);
+});
 
 /**
  * One scripted Orca for a whole 5.0 workflow: it launches command-terminal (qwen) and managed-agent
@@ -953,7 +960,27 @@ state: ${state}
 description: The brand of the product - identity, colour tokens, mascot.
 assertions:
   - brand-tokens-declared
-${rev===null?'':`extensions:
+${rev===null?'':`rev: ${rev}
+brand:
+  rev: ${rev}
+  identity:
+    name: Aurora
+    family: starci
+    owner: Product owner
+  color:
+    tokens:
+      - token: --starci-core-accent
+        value: "oklch(0.72 0.15 35)"
+        role: primary
+  typography:
+    family: system-ui
+  iconography:
+    set: []
+  imagery:
+    style: []
+  forbidden: []
+  sources: []
+extensions:
   work3:
     kernel:
       rev: ${rev}
@@ -986,7 +1013,13 @@ const brandLedger=tree=>({...work,
 /** A ledger that knows about brands and whose tree carries no brand node at all. */
 const brandlessLedger=()=>({...work,loadLedger:where=>({...work.loadLedger(where),brand:null}),brandReferences:()=>[]});
 const brandDone=summary=>({outcome:'done',summary,files:[],
-  checks:[passing('work-tree-validates','node starci.mjs validate .starciwork')]});
+  checks:[passing('work-tree-validates','node starci.mjs validate .starciwork')],effect:()=>{
+    const file=path.join(activeRepo,'.starciwork/brand/index.yaml'),record=parseYaml(fs.readFileSync(file,'utf8'));
+    record.rev=1;record.brand={rev:1,identity:{name:'Aurora',family:'starci',owner:'Product owner'},
+      color:{tokens:[{token:'--starci-core-accent',value:'oklch(0.72 0.15 35)',role:'primary'}]},
+      typography:{family:'system-ui'},iconography:{set:[]},imagery:{style:[]},forbidden:[],sources:[]};
+    fs.writeFileSync(file,stringifyYaml(record));
+  }});
 /**
  * `ops/registry.yaml` does not carry a brand operator yet - the kinds catalog is the sibling's to extend - so
  * here the launchable chain of a brand decision is the architecture decision's, which has the same role.
@@ -2552,7 +2585,16 @@ test('a decisive hidden decision is planned as an owner question before the work
 
 const CART='demo.sales.implementation.frontend.cart';
 const cartFile='apps/web/src/cart/index.tsx';
-const cartDone=summary=>({outcome:'done',summary,files:[cartFile],checks:[passing('cart-renders','npx vitest run cart')]});
+const CART_CAPTURE='.starciwork/features/sales/implementation/frontend/cart/assets/cart-resting.png';
+const CART_MARKUP='.starciwork/features/sales/implementation/frontend/cart/assets/cart-resting.html';
+const captureCart=()=>{
+  const colour=brandColours({color:{tokens:[{token:'--brand-accent',value:'oklch(0.72 0.15 35)',role:'primary'}]}})[0].hex;
+  const capture=path.join(activeRepo,CART_CAPTURE),markup=path.join(activeRepo,CART_MARKUP);fs.mkdirSync(path.dirname(capture),{recursive:true});
+  fs.writeFileSync(capture,encodePng(screen({width:24,height:24,bands:[{hex:colour,rows:12}]})));
+  fs.writeFileSync(markup,'<main><section><h2>Cart</h2><ul><li>One</li><li>Two</li><li>Three</li></ul></section></main>');
+};
+const cartDone=summary=>({outcome:'done',summary,files:[cartFile,CART_CAPTURE,CART_MARKUP],checks:[passing('cart-renders','npx vitest run cart')],effect:captureCart});
+const uatDone=summary=>({outcome:'done',summary,files:[cartFile],checks:[passing('cart-renders','npx vitest run cart')]});
 const cartRed=summary=>({outcome:'failed',summary,files:[],
   checks:[{name:'cart-renders',command:'npx vitest run cart',exitCode:1,evidence:'1 failed spec: the total is empty'}]});
 /**
@@ -2593,6 +2635,11 @@ const UI_PAYLOAD=(slots='[]')=>`ui:
     - path: assets/cart-resting.png
       role: candidate for cart resting, narrow
       provenance: image model
+      generation:
+        tool: image_gen.imagegen
+        promptPath: assets/cart-resting.prompt.txt
+        inputRefs:
+          - brand/index.yaml
   observations: []
   gaps: []
   artworkSlots: ${slots}
@@ -2607,6 +2654,7 @@ const drawn=(report,slots='[]')=>({...report,effect:()=>{
   fs.appendFileSync(file,UI_PAYLOAD(slots));
   fs.mkdirSync(path.join(path.dirname(file),'assets'),{recursive:true});
   fs.writeFileSync(path.join(path.dirname(file),'assets','cart-resting.png'),PNG_BYTES);
+  fs.writeFileSync(path.join(path.dirname(file),'assets','cart-resting.prompt.txt'),'Synthetic ImageGen direction fixture.');
 }});
 const uiDone=summary=>({outcome:'done',summary,files:[UI_FILE],checks:[passing('sales-surfaces-drawn','node starci.mjs validate .starciwork')]});
 
@@ -2635,10 +2683,10 @@ test('the kind graph is the lane and route authority: it validates, and the kern
 });
 
 test('a frontend Work node travels its lane: interface.draw, then frontend.implement, then uat.verify, and the node is recorded done only after the UAT step',()=>{
-  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE],ledgerApi:brandLedger,
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE,CART_CAPTURE,CART_MARKUP],ledgerApi:brandLedger,
     scripts:{[UI]:[drawn(uiDone('The cart surface is drawn.'))],
       [CART]:[cartDone('The cart is built from the accepted design.')],
-      [`${CART}-verify`]:[cartDone('The cart flow passes end to end.')]}});
+      [`${CART}-verify`]:[uatDone('The cart flow passes end to end.')]}});
   try{
     // The lane is in goal.md before anything launches: the user approves a template, not a pile of ops.
     const markdown=fs.readFileSync(harness.store.paths.goal,'utf8');
@@ -2653,11 +2701,13 @@ test('a frontend Work node travels its lane: interface.draw, then frontend.imple
     const state=harness.run({maxIterations:20});
     // One step at a time, each one its own operation on the node's own allowlist.
     assert.deepEqual(state.ops.map(op=>[op.id,op.kind,op.status,op.nodeId]),
-      [[UI,'interface.draw','done',UI],[CART,'frontend.implement','done',CART],[`${CART}-verify`,'uat.verify','done',CART]]);
+      [[UI,'interface.draw','done',UI],[CART,'frontend.implement','done',CART],[`${CART}-verify`,'uat.verify','done',CART]],
+      JSON.stringify({ops:state.ops.map(op=>({id:op.id,status:op.status,attempt:op.attempt,findings:op.findings,reports:op.reports})),events:events(harness.store).slice(-20)}));
     assert.deepEqual(state.lanes[UI].done,['interface.draw']);
     assert.deepEqual(state.lanes[CART].done,['frontend.implement','uat.verify']);
     // The build read the drawing: the ui record is a reference of every op built or walked against it.
     assert.ok(state.ops.find(op=>op.id===CART).references.includes('features/sales/ui/index.yaml'));
+    assert.ok(state.ops.find(op=>op.id===CART).allowlist.includes('.starciwork/features/sales/implementation/frontend/cart/assets/**'));
     const log=events(harness.store);
     // The drawing's record declares no artwork slot, so the asset step is retired and the ui lane is walked as one.
     assert.deepEqual(log.filter(event=>event.event==='lane-step').map(event=>[event.kind,event.step,event.skipped,event.next]),
@@ -2671,6 +2721,8 @@ test('a frontend Work node travels its lane: interface.draw, then frontend.imple
     assert.equal(node.state,'done');
     assert.deepEqual(node.completion.evidence,[`${CART}-verify-evidence`]);
     assert.deepEqual(node.extensions.work3.kernel.checks.map(check=>[check.assertion,check.exitCode]),[['cart-renders',0]]);
+    const evidence=parseYaml(fs.readFileSync(path.join(harness.repo,'.starciwork/features/sales/implementation/frontend/cart/evidence',`${CART}-verify-evidence`,'manifest.yaml'),'utf8'));
+    assert.deepEqual(evidence.assets.map(asset=>asset.path),['assets/cart-resting.html','assets/cart-resting.png'],'the completion hashes the implementation-owned capture and matching markup');
     // A frontend lane proves itself with its own UAT step: no kernel review is planned for it.
     assert.equal(state.ops.some(op=>op.kind==='review.verify'),false);
     assert.deepEqual(state.ledger.map(item=>[item.id,item.status]),[[UI,'verified'],[CART,'verified']]);
@@ -2689,9 +2741,9 @@ test('a frontend Work node travels its lane: interface.draw, then frontend.imple
 });
 
 test('a red UAT run routes to a repair of the lane build step and reopens the run behind it, bounded by the review rounds',()=>{
-  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE],ledgerApi:brandLedger,
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE,CART_CAPTURE,CART_MARKUP],ledgerApi:brandLedger,
     scripts:{[UI]:[drawn(uiDone('Drawn.'))],[CART]:[cartDone('Built.')],
-      [`${CART}-verify`]:[cartRed('The cart total stays empty.'),cartDone('The flow passes now.')],
+      [`${CART}-verify`]:[cartRed('The cart total stays empty.'),uatDone('The flow passes now.')],
       'repair-1':[cartDone('The total is summed.')]}});
   try{
     approve(harness.store,harness.state);
@@ -2723,11 +2775,11 @@ test('a red UAT run routes to a repair of the lane build step and reopens the ru
  */
 test('a design operation carries the brand record and its assets, prints the Brand block in its contract, and the validator is given the brand as rules',()=>{
   const judged=[];
-  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE],ledgerApi:brandLedger,
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE,CART_CAPTURE,CART_MARKUP],ledgerApi:brandLedger,
     validateOp:payload=>{judged.push(payload);return acceptAll();},
     scripts:{[UI]:[drawn(uiDone('The cart surface is drawn.'))],
       [CART]:[cartDone('The cart is built from the accepted design.')],
-      [`${CART}-verify`]:[cartDone('The cart flow passes end to end.')]}});
+      [`${CART}-verify`]:[uatDone('The cart flow passes end to end.')]}});
   try{
     // The brand of the tree is what the user approves, and it is on the state before any op is launched.
     assert.deepEqual(harness.state.brand,{node:'demo.brand',file:'brand/index.yaml',name:'Aurora',family:'aurora',rev:3,mascotAssets:[MASCOT]});
@@ -2781,11 +2833,11 @@ test('a design operation carries the brand record and its assets, prints the Bra
  * `brand.decide` operation from the brand node the tree already carries and the design op waits behind it.
  */
 test('a design operation on a tree with no brand record is deferred and waits for the brand.decide op the kernel creates from the todo brand node',()=>{
-  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_TODO],dirty:[cartFile,UI_FILE],ledgerApi:brandLedger,allocator:brandAllocator(),
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_TODO],dirty:[cartFile,UI_FILE,CART_CAPTURE,CART_MARKUP],ledgerApi:brandLedger,allocator:brandAllocator(),
     scripts:{'brand-1':[brandDone('The brand is decided: tokens, mascot, forbidden list.')],
       [UI]:[drawn(uiDone('Drawn inside the decided brand.'))],
       [CART]:[cartDone('Built from the drawing and the brand assets.')],
-      [`${CART}-verify`]:[cartDone('The flow passes end to end.')]}});
+      [`${CART}-verify`]:[uatDone('The flow passes end to end.')]}});
   try{
     // No record yet: the brand is a decision in the goal, the drawing op is the only operation, and it carries
     // no brand reference because there is nothing to reference.
@@ -2927,11 +2979,11 @@ test('the lane predicates read the ui record: declared artwork slots keep the as
 test('a frontend implementation that reports an interface gap routes to interface.draw and reopens the requester',()=>{
   const gap={outcome:'blocked',summary:'The accepted design never drew the empty cart.',files:[],checks:[],
     blocker:{kind:'interface-gap',detail:'the accepted design has no empty state for apps/web/src/cart/index.tsx'}};
-  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE],ledgerApi:brandLedger,
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE,CART_CAPTURE,CART_MARKUP],ledgerApi:brandLedger,
     scripts:{[UI]:[drawn(uiDone('Drawn.'))],
       [CART]:[gap,cartDone('Built from the completed design.')],
       'draw-1':[uiDone('The empty state is drawn.')],
-      [`${CART}-verify`]:[cartDone('The flow passes.')]}});
+      [`${CART}-verify`]:[uatDone('The flow passes.')]}});
   try{
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
@@ -2973,13 +3025,13 @@ const grammarGap={outcome:'blocked',summary:'The accepted design needs a stepped
   files:[],checks:[],blocker:{kind:'grammar-gap',detail:'no contract renders a stepped progress rail for the cart checkout'}};
 
 test('a frontend build that reports a grammar gap routes to grammar.update in the bound grammar repository and reopens the requester',()=>{
-  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE],ledgerApi:brandLedger,
+  const harness=setupWork({nodes:[UI_NODE,FRONTEND_NODE,BRAND_DECIDED],dirty:[cartFile,UI_FILE,CART_CAPTURE,CART_MARKUP],ledgerApi:brandLedger,
     allocator:grammarAllocator(),binding:grammarBinding,
     scripts:{[UI]:[drawn(uiDone('Drawn.'))],
       [CART]:[grammarGap,cartDone('Built with the grown grammar unit.')],
       'grammar-1':[{outcome:'done',summary:'ProgressRail published at 0.5.0; the canon names it.',files:[],
         checks:[passing('cart-renders','npx vitest run cart')]}],
-      [`${CART}-verify`]:[cartDone('The flow passes.')]}});
+      [`${CART}-verify`]:[uatDone('The flow passes.')]}});
   try{
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';

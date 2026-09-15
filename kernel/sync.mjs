@@ -10,6 +10,7 @@ import {AUTHOR_KIND,PLAN_KIND,authorsRecord,BRAND_DECIDE,KERNEL_CHECK,RECORD_OWN
 import {kindsReadingBrand} from './io.mjs';
 import {brandReferencesOf,kernelProof,noteBrand,provenChecks,rereadBrand,treeVerdictFor} from './verify.mjs';
 import {retemplateIntakeOps} from './intake.mjs';
+import {bindPlannedAmendmentEffects} from './amendment.mjs';
 
 /**
  * The Work tree, read and written. One concern, two directions.
@@ -185,11 +186,21 @@ export function designGate(store,state,access,node,entry){
  * are exactly that. Read and hashed here, so the evidence binds the bytes the record was accepted with.
  */
 function designEvidenceAssets(access,node){
-  if(!plain(node)||node.kind!==UI_KIND)return [];
-  const record=designRecord(access,node);
+  if(!plain(node)||![UI_KIND,'implementation'].includes(node.kind))return [];
   const root=workRootOf(access?.at);
-  if(!record||!root)return [];
+  if(!root)return [];
   const directory=path.join(root,path.dirname(String(node.path??'')));
+  if(node.kind==='implementation'&&nodeLayout(node)==='frontend'){
+    const assetsRoot=path.join(directory,'assets'),files=[];
+    const walk=folder=>{for(const entry of fs.readdirSync(folder,{withFileTypes:true})){
+      const target=path.join(folder,entry.name);
+      if(entry.isDirectory())walk(target);else if(entry.isFile()&&!entry.isSymbolicLink())files.push(target);
+    }};
+    try{if(fs.lstatSync(assetsRoot).isDirectory())walk(assetsRoot);}catch{return [];}
+    return files.sort().map(file=>({path:slash(path.relative(directory,file)),scope:'node',sha256:crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')}));
+  }
+  const record=designRecord(access,node);
+  if(!record)return [];
   const assets=[];
   for(const entry of Array.isArray(record.assets)?record.assets:[]){
     const relative=slash(String(entry?.path??'')).replace(/^\.\//,'');
@@ -223,9 +234,13 @@ export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0,la
   // and the candidates and artwork under its assets - so the exact record path is granted, the way a decision
   // is granted its own record; every other kind is kept off the record the kernel owns.
   const ownRecord=node.kind===UI_KIND&&design?[`.starciwork/${slash(node.path)}`]:[];
+  // The implementation contract owns running-page captures under the implementation node, not inside the UI
+  // design record. Grant only this assets subtree; index.yaml and evidence remain kernel-owned.
+  const ownCapture=node.kind==='implementation'&&nodeLayout(node)==='frontend'&&['frontend.implement','interface.implement'].includes(step)
+    ?[`.starciwork/${slash(path.posix.dirname(node.path))}/assets/**`]:[];
   return toOp({id,nodeId:node.id,
     kind:step??WORK_OPERATION[node.kind]??'task.execute',goal:describeNode(api,repoRoot,node),
-    ledgerIds:[node.id],allowlist:unique([...node.allowlist,...ownRecord]),
+    ledgerIds:[node.id],allowlist:unique([...node.allowlist,...ownRecord,...ownCapture]),
     // A design-family step reads two bodies of material it may never invent: the installed grammar and the
     // product's own brand record with its assets.
     references:unique([node.path,...(node.refs??[]),...(design?grammarReferences():[]),...(design?brandReferencesOf(api,loaded):[]),...designReferenceOf(access,node)]),
@@ -372,6 +387,7 @@ export function syncLedgerOps(store,state,ctx){
     if(!next||KERNEL_PLANNED_KINDS.includes(next)||cutChildDefers(state,node.id,next)||mine.some(op=>op.kind===next))continue;
     const id=laneOpId(node.id,next,!laneOps.length,taken);opOfNode.set(node.id,id);
     const op=deriveWorkOp(ctx.work.api,ctx.work.at,node,{id,opOfNode,index:state.ops.length,lane:entry.lane,done:entry.done,loaded});
+    bindPlannedAmendmentEffects(state,op,node);
     locateSharedTreePaths(op,ctx);
     op.difficulty=op.difficulty??'medium';
     op.createdIteration=state.iterations;

@@ -138,7 +138,8 @@ family or the host carries no DNA snapshot for it — an unreadable canon proves
 The six checks above read the record and the source. They cannot see an actual implementation render.
 `checks/render.mjs` reads the two artefacts a downstream browser capture leaves behind — the PNG and the
 markup it was rendered from, kept beside it as `<candidate>.html` — and answers the two canon rules of
-2026-09-13 from them. It deliberately ignores `interface.draw` ImageGen direction assets: those pixels guide
+2026-09-13 from them. Capture identity is structural: assets carrying `generation` are generated direction,
+while PNG assets without `generation` are implementation captures regardless of prose provenance. It deliberately ignores `interface.draw` ImageGen direction assets: those pixels guide
 the implementation but cannot prove exact Grammar components, DOM/render anatomy or API behavior.
 
 ```
@@ -190,9 +191,12 @@ mascot, a surface the brand does not allow the mascot on. A `skip` never makes a
 makes it green either, because an unproven claim must not read as a proven one.
 
 `renderChecksFor({op, state, ctx, files})` is the kernel's hook: it finds the ui node from the operation's
-allowlist or the files its diff touched, runs the same checks, and returns **null** — not a green result —
-for an operation that wrote no design record, so an operation that drew nothing is never reported as a
-drawing that passed. When the run cannot start at all — a tree with no brand record, a node with no `ui:`
+design references, allowlist or changed files. For `frontend.implement`/`interface.implement`, it reads PNG and
+matching markup recursively from the bound implementation node's `assets/`; a referenced UI node with no
+capture, undecodable pixels, missing markup or unavailable brand audit is a failing missing proof. Non-UI
+implementations still return null. For legacy drawing compatibility, the hook may read structurally classified
+captures declared by the UI record; it returns **null** — not green — when that drawing carries only ImageGen
+directions, so a generated picture is never reported as exact render proof. When the run cannot start at all — a tree with no brand record, a node with no `ui:`
 spec — the hook answers a single check, `render-checks-unavailable`, as a `skip` carrying the reason: a
 broken input is one unproven claim, never a failed drawing and never a passing one. The kernel records that
 as `render-check-unavailable` and judges the drawing as it would have before these rules existed. The

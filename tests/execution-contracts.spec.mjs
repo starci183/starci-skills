@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml} from '../core/yaml.mjs';
 import {
@@ -26,10 +27,28 @@ const workflow = () => ({
 });
 
 test('execution request and receipt schemas compile in strict draft-2020 mode', () => {
-  const ajv = new Ajv2020({strict: true});
-  for (const name of ['execution-request.schema.yaml', 'execution-receipt.schema.yaml', 'profile-registry-v3.schema.yaml', 'orca-call.schema.yaml']) {
+  const ajv = new Ajv2020({strict: true,formats:{'date-time':true}});
+  for (const name of ['execution-request.schema.yaml', 'execution-receipt.schema.yaml', 'profile-registry-v3.schema.yaml', 'orca-call.schema.yaml', 'workflow-amendment.schema.yaml']) {
     assert.doesNotThrow(() => ajv.compile(parseYaml(fs.readFileSync(new URL(`../schemas/${name}`, import.meta.url), 'utf8'))));
   }
+});
+
+test('workflow amendment schema and runtime validator accept the same bounded overlay shape', async t => {
+  const dir=fs.mkdtempSync(path.join(process.cwd(),'.amendment-schema-test-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const schema=parseYaml(fs.readFileSync(new URL('../schemas/workflow-amendment.schema.yaml',import.meta.url),'utf8'));
+  const validate=new Ajv2020({strict:true,formats:{'date-time':true}}).compile(schema);
+  const record={schema:'starci/workflow-amendment@1',workflowId:'wf',baseGoalIdentity:'goal',
+    authority:{actor:'owner',source:{threadId:'owner',messageId:null,messageIdAvailability:'not-exposed',quote:'repair',assurance:'conversation-context-not-authenticated',at:null},statement:'repair'},
+    coordinator:{actor:'coordinator',source:{threadId:'run',messageId:'m1',messageIdAvailability:'available',quote:'apply',assurance:'conversation-context-not-authenticated',at:'2026-09-16T00:01:00Z'},decision:'apply-same-id',rationale:'bounded'},
+    changes:{clarifications:['repair the selected index'],addScope:['features/login/index.yaml'],scopeBindings:{'features/login/index.yaml':['.starciwork/features/login/index.yaml']},addDefinitionOfDone:[],
+      supersedeDefinitionOfDone:[{from:'No index writes',to:'Only the owned login index may be repaired'}],operationFindings:{login:['repair']},
+      operationEffects:{login:{paths:['.starciwork/features/login/index.yaml'],resources:[],external:[]}},effectCeiling:{paths:['.starciwork/features/login/index.yaml'],resources:[],external:[]}}};
+  assert.equal(validate(record),true,JSON.stringify(validate.errors));
+  const {stringifyYaml}=await import('../core/yaml.mjs'),{readWorkflowAmendment}=await import('../kernel/amendment.mjs');const file=path.join(dir,'valid.yaml');fs.writeFileSync(file,stringifyYaml(record));
+  assert.equal(readWorkflowAmendment(file).record.changes.operationEffects.login.paths[0],'.starciwork/features/login/index.yaml');
+  const invalid=structuredClone(record);invalid.changes.operationEffects.login.paths=['.starciwork/features/outside/index.yaml'];
+  assert.equal(validate(invalid),true,'JSON Schema validates shape; the runtime enforces directional cross-field ceilings');fs.writeFileSync(file,stringifyYaml(invalid));
+  assert.throws(()=>readWorkflowAmendment(file),/exceeds changes.effectCeiling/);
 });
 
 test('profile registry keeps the user coordinator, deterministic kernel and operation-agent boundary', () => {

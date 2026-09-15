@@ -220,7 +220,10 @@ kinds:
     # the reason is the blocker: an operation may only report `srs-gap` about a requirement it actually had in
     # front of it, and a build that never reads the requirement cannot say the requirement is unsettled.
     reads: [srs, sds, design, asset, brand, grammar, code]
-    writes: [code]
+    # A frontend build also owns the browser capture and markup evidence kept under its implementation
+    # node's `assets/`. The operation's exact allowlist confines these asset records to that node; design
+    # directions and generated artwork remain owned by the separate `ui` lane.
+    writes: [code, asset]
     purpose: Build the interface the drawing settled, against that drawing and nothing invented beside it.
     reports:
       outcomes: [done, partial, failed, ask, blocked]

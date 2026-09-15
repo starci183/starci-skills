@@ -45,8 +45,8 @@ import {readDistJson} from '../core/runtime-root.mjs';
 import {configuredProviderOrder,loadConfig,nonOperationModels} from '../scripts/config.mjs';
 import {recordDigests,reconcileIntake} from './reconciliation.mjs';
 import {renderChecksFor} from '../checks/render.mjs';
-import {continuationBoundary,exportContinuationBrief} from './continuation.mjs';
-import {amendmentContractLines,applyWorkflowAmendment} from './amendment.mjs';
+import {CONTINUATION_SECTION_END,CONTINUATION_SECTION_START,bindContinuationPath,continuationBoundary,exportContinuationBrief} from './continuation.mjs';
+import {amendmentContractLines,applyWorkflowAmendment,operationAmendmentVerdict} from './amendment.mjs';
 import {laneOwnerOf,laneNameOf,laneRowTitle,laneView,openLane,settleLane,laneBranchRef} from './lanes.mjs';
 import {INFRA_RESTART_LIMIT,RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTerminals,ownKernelTerminal,rebindRunIfNeeded,
   recoverCoordinatorTab,reconcileWithOrca,releaseKernelTab,siblingKernelGone,sweepStaleTerminals} from './terminals.mjs';
@@ -335,7 +335,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     ...(laneLine(state,op)?[laneLine(state,op),``]:[]),
     ...languageBlock(language??configuredLanguage(state),op),
     `## Goal`,op.goal,``,
-    ...amendmentContractLines(state),
+    ...amendmentContractLines(state,op),
     ...critiqueBlock(critique),
     ...overlapBlock(critique,op),
     // What this kind is derived from and what it may produce, from the record catalog: an operation reads its
@@ -579,6 +579,14 @@ export function refundLegacyCoordinatorProbations(store,state,runtime){
   return refunded;
 }
 
+/** Persist the bounded supervised-attempt receipt, including cleanup custody, without raw host payloads. */
+export function persistLaunchAttempts(attempts=[]){
+  return attempts.slice(0,8).map(attempt=>({target:attempt.target??null,agent:attempt.agent??null,model:attempt.model??null,dispatchId:attempt.dispatchId??null,effectState:attempt.effectState??'unknown',stage:attempt.stage??null,reason:String(attempt.reason??'').slice(0,300),
+    ...(attempt.settlement?{settlement:{schema:attempt.settlement.schema??null,dispatchId:attempt.settlement.dispatchId??attempt.dispatchId??null,effectState:attempt.settlement.effectState??'unknown',residualTerminal:attempt.settlement.residualTerminal??null,abandoned:Boolean(attempt.settlement.abandoned),closedTerminal:attempt.settlement.closedTerminal?{handle:attempt.settlement.closedTerminal.handle??null,outcome:attempt.settlement.closedTerminal.outcome??null}:null,
+      cleanup:attempt.settlement.cleanup?{complete:Boolean(attempt.settlement.cleanup.complete),reason:attempt.settlement.cleanup.reason===null?null:String(attempt.settlement.cleanup.reason??'').slice(0,200)}:null}}:{}),
+    ...(attempt.recovery?{recovery:{ok:Boolean(attempt.recovery.ok),action:attempt.recovery.action??null,reason:String(attempt.recovery.reason??'').slice(0,200)}}:{})}));
+}
+
 function launchOp(orca,store,state,op,allocated,ctx){
   if(op.needsReplan)replanOp(store,state,op,ctx);
   if(ctx.engine){delete op.workerSettled;delete op.pending;op.reviewRound=0;}
@@ -602,12 +610,15 @@ function launchOp(orca,store,state,op,allocated,ctx){
   // end of the kernel: the op records it, avoids the runtime, and the loop goes on.
   let launched,workerEffectStarted=false;
   try{
-    if(ctx.engine){op.resolvedReferences=candidateReferences(op,state,ctx);const begun=ctx.engine.beginCandidate(op,{repoRoot:state.worktree,allowlist:op.allowlist,references:op.resolvedReferences,
+    if(ctx.engine){op.resolvedReferences=candidateReferences(op,state,ctx);const continuationRelative=slash(path.relative(state.worktree,store.paths.continuation));
+      const runtimeManagedFiles=continuationRelative&&!continuationRelative.startsWith('..')&&!path.isAbsolute(continuationRelative)
+        ?[{path:continuationRelative,start:CONTINUATION_SECTION_START,end:CONTINUATION_SECTION_END}]:[];
+      const begun=ctx.engine.beginCandidate(op,{repoRoot:state.worktree,allowlist:op.allowlist,references:op.resolvedReferences,
       inputPaths:[...op.resolvedReferences,...unique(op.kernelOwned??[])],ownedDirtyPaths:op.ownedBaselinePaths??[],
       dependencyDigests:op.dependencyDigests??{},environmentDigest:typeof op.environmentDigest==='string'&&op.environmentDigest.trim()?op.environmentDigest:
         (typeof state.engine?.runtimePin?.digest==='string'&&state.engine.runtimePin.digest.trim()?state.engine.runtimePin.digest:
           (typeof state.engine?.runtimePinDigest==='string'&&state.engine.runtimePinDigest.trim()?state.engine.runtimePinDigest:'runtime-unpinned')),
-      dependencyInstall:op.dependencyInstall??null});
+      runtimeManagedFiles,dependencyInstall:op.dependencyInstall??null});
       if(begun?.droppedOwnedPaths?.length){op.ownedBaselinePaths=[...(begun.ownedDirtyPaths??[])];store.appendEvent({event:'owned-baseline-dropped',op:op.id,attempt:op.attempt,paths:begun.droppedOwnedPaths,reason:'clean since the prior attempt (committed or reverted): no longer owned'});}}
     if(ctx.engine)ctx.engine.beginLaunchIntent(op);
     workerEffectStarted=true;
@@ -618,9 +629,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
     const effectState=error?.effectState==='unknown'?'unknown':typedNoEffect?'none':workerEffectStarted?'unknown':'none';
     launched={ok:false,effectState,stopReason:String(error?.message??error).slice(0,300),attempts:[{target:allocated.target,stage:'launch',effectState,reason:String(error?.message??error).slice(0,240)}]};
   }
-  const persistedAttempts=(launched?.attempts??[]).slice(0,8).map(attempt=>({target:attempt.target??null,agent:attempt.agent??null,model:attempt.model??null,dispatchId:attempt.dispatchId??null,effectState:attempt.effectState??'unknown',stage:attempt.stage??null,reason:String(attempt.reason??'').slice(0,300),
-    ...(attempt.settlement?{settlement:{schema:attempt.settlement.schema??null,dispatchId:attempt.settlement.dispatchId??attempt.dispatchId??null,effectState:attempt.settlement.effectState??'unknown',residualTerminal:attempt.settlement.residualTerminal??null,abandoned:Boolean(attempt.settlement.abandoned),closedTerminal:attempt.settlement.closedTerminal?{handle:attempt.settlement.closedTerminal.handle??null,outcome:attempt.settlement.closedTerminal.outcome??null}:null}}:{}),
-    ...(attempt.recovery?{recovery:{ok:Boolean(attempt.recovery.ok),action:attempt.recovery.action??null,reason:String(attempt.recovery.reason??'').slice(0,200)}}:{})}));
+  const persistedAttempts=persistLaunchAttempts(launched?.attempts??[]);
   op.launch={ok:Boolean(launched?.ok),target:launched?.selection?.target??allocated.target,
     task:launched?.task?.id??null,dispatch:launched?.dispatchId??null,stopReason:launched?.stopReason??null,
     effectState:launched?.effectState??(launched?.ok?'partial':'unknown'),attempts:persistedAttempts};
@@ -952,6 +961,13 @@ function scheduleOps(orca,store,state,ctx,{orderedOpIds=null}={}){
   const selected=orderedOpIds?orderedOpIds.map(id=>ready.find(op=>op.id===id)).filter(Boolean):ranked;
   for(const op of selected){
     ctx.currentOp=op;
+    const amendmentGate=operationAmendmentVerdict(state,op,{resources:ctx.guards.resourceLocks(op),external:op.externalEffects??[]});
+    if(!amendmentGate.ok){
+      op.status='blocked';op.refusal='amendment-effect-ceiling';
+      const detail=`${op.id} exceeds its effective same-workflow amendment authority: ${amendmentGate.reasons.join('; ')}`;
+      if(!state.needUser.some(item=>item.op===op.id&&item.code==='amendment-effect-ceiling'))state.needUser.push({op:op.id,kind:'authority',code:'amendment-effect-ceiling',detail});
+      store.appendEvent({event:'launch-refused',op:op.id,reason:'amendment-effect-ceiling',findings:amendmentGate.reasons});continue;
+    }
     if(ctx.engine&&op.integrationPreparation){
       try{if(normalizePreparationAuthority(store,state,op,ctx))store.saveState(state);}
       catch(error){op.status='blocked';op.refusal='runtime-gate-binding';const detail=`${op.id} cannot bind its integration preparation to one approved declaration: ${String(error?.message??error)}`;op.pending={kind:'runtime-gate-binding',detail};store.appendEvent({event:'integration-preparation-authority-refused',op:op.id,reason:detail});continue;}
@@ -1343,7 +1359,7 @@ export function releaseSettledOperationLeases(store,state,ctx,{settle=settleGene
   const released=[];
   for(const op of state.ops){
     if(!plain(op.lease)||!op.lease.jobId||op.dispatch||op.terminal)continue;
-    if(!['done','cancelled'].includes(op.status))continue;
+    if(!['done','skipped','cancelled'].includes(op.status))continue;
     let status=null;
     try{status=ctx?.engine?.journal?.getJob?.(op.lease.jobId)?.status??null;}catch{status=null;}
     if(status!==null&&!RELEASABLE_JOB_STATUS.includes(status))continue;
@@ -1365,6 +1381,28 @@ export function releaseSettledOperationLeases(store,state,ctx,{settle=settleGene
   }
   if(released.length)store.saveState(state);
   return released.length?{released}:null;
+}
+
+/**
+ * Recovery-only continuation pass under the controller startup lock. It adopts only exact durable operation
+ * identities, expires admission deadlines transactionally, performs the pure-model reconciliation rules, and
+ * releases only already accepted operation residue. No planner, model, check or native operation is admitted.
+ */
+export function reconcileContinuationPreflight(store,state,{now=Date.now}={}){
+  if(!isEnrolled(state))return {recovered:false,boundary:continuationBoundary(state,{controller:{alive:true,pid:process.pid,startupTokenDigest:'held-by-this-process'}})};
+  const runtime=createEngineRuntime({store,state,now});
+  try{
+    store.bindJournal?.(runtime.journal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
+    const durable=store.loadState();
+    need(plain(durable)&&durable.id===state.id&&durable.engine?.generation===state.engine.generation,
+      `Workflow ${state.id} has no matching durable continuation checkpoint for generation ${state.engine.generation}`);
+    Object.assign(state,durable);
+    runtime.pulse();
+    const released=releaseSettledOperationLeases(store,state,{engine:runtime});
+    store.saveState(state);
+    const boundary=continuationBoundary(state,{controller:{alive:true,pid:process.pid,startupTokenDigest:'held-by-this-process'}});
+    return {recovered:true,released:released?.released??[],boundary};
+  }finally{runtime.close();}
 }
 
 /**
@@ -2086,6 +2124,11 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       return retryOp(store,state,op,verified.failed.map(check=>`the kernel re-ran ${check.name} (\`${check.command}\`) and it exited ${check.exitCode}: ${check.evidence}`),ctx,'machine-verify-failed');
     }
     const files=ctx.engine?[...(op.candidate?.observedFiles??[])]:changedFiles(state,op,ctx,op.allowlist,{exclude:op.kernelOwned??[]});
+    const amendmentValidation=operationAmendmentVerdict(state,op,{files,resources:ctx.guards.resourceLocks(op),external:op.externalEffects??[]});
+    if(!amendmentValidation.ok){
+      op.reports.at(-1).downgradedTo='failed';store.appendEvent({event:'amendment-effect-validation-failed',op:op.id,findings:amendmentValidation.reasons});
+      return retryOp(store,state,op,amendmentValidation.reasons,ctx,'amendment-effect-validation-failed');
+    }
     // Every changed file this op is answerable for is mapped to a record kind, and a file whose kind this op does
     // not declare in `writes` is a defect the machine can name on its own: no model is asked, and the report goes
     // back with the finding. Answerable means claimed: a project's repositories share one Work tree, so a record
@@ -2105,11 +2148,13 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       store.appendEvent({event:'io-undeclared-write',op:op.id,files:undeclared.map(item=>item.file)});
       return retryOp(store,state,op,undeclared.map(item=>`produced a ${item.record} record it does not declare: ${item.file}`),ctx,'io-undeclared-write');
     }
-    // Legacy UI records may still carry browser captures beside a drawing; check those exact render bytes
-    // before any model judges them. ImageGen directions return no render verdict here because they are design
-    // input, not Grammar/DOM proof; implementation captures and browser UAT remain downstream evidence.
-    if(op.kind==='interface.draw'&&typeof ctx.renderChecks==='function'){
-      const rendered=(()=>{try{return ctx.renderChecks({op,state,ctx,files});}catch(error){store.appendEvent({event:'render-check-unavailable',op:op.id,reason:String(error?.message??error).slice(0,240)});return null;}})();
+    // Legacy drawings and frontend implementations are checked against exact captured bytes before any model
+    // judges them. ImageGen directions remain design input; an implementation must provide separate capture,
+    // Grammar/DOM and later API/browser-UAT proof through the UI record it references.
+    if(['interface.draw','frontend.implement','interface.implement'].includes(op.kind)&&typeof ctx.renderChecks==='function'){
+      const required=['frontend.implement','interface.implement'].includes(op.kind);
+      const rendered=(()=>{try{return ctx.renderChecks({op,state,ctx,files});}catch(error){const reason=String(error?.message??error).slice(0,240);store.appendEvent({event:'render-check-unavailable',op:op.id,reason});
+        return required?{ok:false,checks:[{id:'implementation-render-check-unavailable',outcome:'fail',detail:`The required implementation render audit could not run: ${reason}`}]}:null;}})();
       if(plain(rendered)&&rendered.ok===false){
         const failed=(Array.isArray(rendered.checks)?rendered.checks:[]).filter(check=>plain(check)&&check.outcome!=='pass');
         op.reports.at(-1).downgradedTo='failed';
@@ -2202,7 +2247,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       if(!resolved.ok){op.pending={kind:'required-acceptance',blocking:resolved.errors};return 'acceptance-pending';}
       acceptedOwnerEvidence=resolved.packet;acceptedOwnerAcceptance=acceptance;
       const prepared=prepareCandidateIntegration(ctx.engine.candidateSnapshot(op),candidate,{canonicalRoot:state.worktree,git:ctx.git,
-        ignoreCanonicalPaths:[],mode:'detection-canonical'});
+        ignoreCanonicalPaths:(ctx.engine.candidateBridge(op).runtimeManagedFiles??[]).map(item=>item.path),mode:'detection-canonical'});
       if(prepared.status!=='ready'){op.pending={kind:'integration-quarantine',reasons:prepared.reasons};return 'acceptance-pending';}
     }
     const commit=ctx.guards.gitQueue(()=>commitOp(state,op,files,ctx));
@@ -2418,12 +2463,16 @@ function repairFromUat(store,state,op,findings,ctx){
   // A frontend group is walked once at the parent, so a red step is repaired where it lives: the child whose
   // write scope holds every file the findings name. A step that names files of several children stays the group's.
   const target=repairTarget(state,op,findings);
-  const scoped=target?named.filter(file=>inside(file,target.allowlist)):named;
-  const repair=addOp(store,state,{kind:routeKind(route,state,op)??'frontend.implement',nodeId:target?.nodeId??op.nodeId,
+  // An ordinary (uncut) UAT op has the node's product-code allowlist, while its build predecessor additionally
+  // owns bounded implementation captures. A repair is another build and must inherit that complete build
+  // contract, not the proving step's narrower output contract.
+  const buildOwner=target??state.ops.filter(item=>item.nodeId===op.nodeId&&kindRole(item.kind)==='implement').at(-1)??null;
+  const scoped=buildOwner?named.filter(file=>inside(file,buildOwner.allowlist)):named;
+  const repair=addOp(store,state,{kind:routeKind(route,state,op)??'frontend.implement',nodeId:buildOwner?.nodeId??op.nodeId,
     goal:`Fix what the UAT run ${op.id} found red: ${firstLine(findings[0]??'the flow does not pass')}`,
-    ledgerIds:target?target.ledgerIds:op.ledgerIds,
-    allowlist:scoped.length?scoped:(target?target.allowlist:op.allowlist),references:op.references,
-    checks:target?target.checks:op.checks,acceptance:op.acceptance,findings,origin:route.origin??'repair'},`uat findings of ${op.id}`);
+    ledgerIds:buildOwner?buildOwner.ledgerIds:op.ledgerIds,
+    allowlist:scoped.length?scoped:(buildOwner?buildOwner.allowlist:op.allowlist),references:buildOwner?.references??op.references,
+    checks:buildOwner?buildOwner.checks:op.checks,acceptance:op.acceptance,findings,origin:route.origin??'repair'},`uat findings of ${op.id}`);
   reopenRequester(store,state,op,findings,repair,`the UAT repair ${repair.id} lands first; then run the flow again`);
   store.appendEvent({event:'uat-findings',op:op.id,component:key,round:state.verifyRounds[key],findings:findings.length,
     ...(target?{child:target.nodeId}:{})});
@@ -3991,6 +4040,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     state.scope=Array.isArray(state.scope)?state.scope:[];
     state.decisions=Array.isArray(state.decisions)?state.decisions:[];
     state.amendments=Array.isArray(state.amendments)?state.amendments:[];
+    bindContinuationPath(store,state);
     // A state written before lanes existed resumes with none: its nodes keep the single-step behaviour.
     state.lanes=plain(state.lanes)?state.lanes:{};
     // Ledger root = the worktree (branch content); the store root above = the main repository (history).
@@ -4069,8 +4119,13 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     need(fs.existsSync(path.join(store.dir,'stop.flag')),
       `Workflow ${state.id} is not paused; run workflow-stop --id ${state.id} and wait for its controller to exit`);
     need(!kernelAlive(store),`The kernel of ${state.id} is still running; wait for the stopped controller to exit before amending it`);
-    let amendmentJournal=null,applied;
+    // The startup ownership row is the same exact fence workflow-run takes. Holding it across durable reload,
+    // validation, apply, save and continuation export prevents a controller or second amendment from observing
+    // and overwriting a stale projection.
+    const releaseAmendment=acquireKernelLock(store);
+    let amendmentJournal=null,applied,continuation;
     try{
+      need(fs.existsSync(path.join(store.dir,'stop.flag')),`Workflow ${state.id} ceased to be paused before its amendment lock was acquired`);
       if(isEnrolled(state)){
         amendmentJournal=openJournal({file:state.engine.journalFile});
         store.bindJournal(amendmentJournal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
@@ -4080,10 +4135,10 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
         Object.assign(state,durable);
       }
       applied=applyWorkflowAmendment(store,state,required(options.amendment,'amendment file'));
-    }finally{amendmentJournal?.close();}
-    const continuation=exportContinuationBrief(store,state);
-    if(!applied.replayed)store.appendEvent({event:'continuation-exported',file:slash(continuation.file),stateDigest:continuation.stateDigest,
-      boundaryFindings:continuation.boundary.findings.map(item=>item.code),afterAmendment:applied.amendment.digest});
+      continuation=exportContinuationBrief(store,state);
+      if(!applied.replayed)store.appendEvent({event:'continuation-exported',file:slash(continuation.file),stateDigest:continuation.stateDigest,
+        boundaryFindings:continuation.boundary.findings.map(item=>item.code),afterAmendment:applied.amendment.digest});
+    }finally{amendmentJournal?.close();releaseAmendment();}
     const next=continuation.boundary.findings.length
       ?'reconcile the exact boundary identities before any resume; the amendment did not clear unknown effects or writers'
       :state.finished?.outcome==='blocked'
@@ -4252,7 +4307,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     need(!predatesEngineSchema(state),`Workflow ${state.id} was enrolled by an earlier build; pause it and run workflow-retry --id ${state.id} --runtime-pin <pin-record.json> to migrate its record onto this build`);
     const releaseKernel=acquireKernelLock(store,{launchToken:options['startup-token']??null});
     try{
-    const resumeBoundary=continuationBoundary(state,{controller:{alive:true,pid:process.pid,startupTokenDigest:'held-by-this-process'}});
+    const recovered=reconcileContinuationPreflight(store,state);
+    const resumeBoundary=recovered.boundary;
     need(resumeBoundary.ok,`Workflow resume boundary is inconsistent; inspect ${slash(store.paths.continuation)}: ${resumeBoundary.findings.map(item=>`${item.code}: ${item.detail}`).join('; ')}`);
     const host=hostDescriptorOf(orca);
     if(isEnrolled(state)){

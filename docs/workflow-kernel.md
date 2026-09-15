@@ -385,7 +385,7 @@ iteration:
 
 Every iteration appends a `tick` event and saves `state.json`, so re-running `workflow-run` continues the
 same workflow - the same counters, the same event log, the same ledger. `workflow-stop` also exports
-`<work root>/_local/continuations/workflows/<id>.md`, a human-readable projection of scope, accepted work,
+`<project backend>/workflows/<id>.md`, a human-readable projection of scope, accepted work,
 remaining exact identities, decisions, blockers and the next safe action. It never replaces state, journal,
 runtime pin, candidate packets or source commits. A resumed `workflow-run` first acquires the one controller
 lock and refuses an inconsistent operation/job/lease/task/dispatch boundary rather than clearing unknown
@@ -397,8 +397,9 @@ An explicitly authorized clarification never starts a replacement workflow. Afte
 and its controller has exited, `workflow-amend` requires a bounded `starci/workflow-amendment@1` file naming the
 same workflow and its exact frozen goal identity. The file records the real owner grant source and statement
 separately from the coordinator's technical `apply-same-id` decision, plus a concrete effect ceiling. Added
-scope requires granted paths. The command appends an idempotent amendment, adds only declared scope, definition
-of done and findings for unfinished operations, and refreshes the continuation brief; it never rewrites the
+scope requires an exact scope-to-path binding. The command appends an idempotent amendment, replaces an active
+criterion only through an exact `from`/`to` supersession (retaining the prior wording as history), assigns added
+paths/resources/external effects to named unfinished operations inside the owner ceiling, and refreshes the continuation brief; it never rewrites the
 original approval, accepted operations, decisions, evidence, receipts, jobs, leases, dispatches or candidates.
 Reusing the same owner source with different bytes is rejected. Boundary findings still block resume.
 
@@ -916,8 +917,10 @@ actual tool provenance and a complete coverage/component/state map. Those pixels
 not exact Grammar DOM/render/API proof. Actual implementation captures and browser UAT remain separate required
 evidence.
 
-`checks/render.mjs` remains a compatibility and implementation-capture audit for UI nodes that explicitly carry
-browser-capture provenance plus kept markup. The kernel hook returns **null**, not green, for ImageGen directions;
+`checks/render.mjs` remains a compatibility and implementation-capture audit. Design directions stay in the
+UI node; running-page PNG and matching markup proof belong to the frontend implementation node's `assets/`.
+For legacy UI-declared candidates, classification is structural: a PNG with a `generation` record is generated
+direction and a PNG without it is a browser capture. The kernel hook returns **null**, not green, for ImageGen-only directions;
 it never treats a generated picture as exact rendered structure. For eligible browser captures it reads PNG and
 markup bytes using the checks below.
 
@@ -1519,7 +1522,7 @@ node <skill root>/bin/starci.mjs brand check <work root> [--source <repository r
 | raise the run-time op budget or change the allocation of a running workflow | `workflow-approve --id <w> --allow-dynamic N` / `--allocation ...` | queued in `<store>/inbox/`, applied at the next tick (`inbox-applied`); a new allocation ends the loop with `stopped: restart: allocation changed` and the supervisor starts the kernel again within a minute |
 | resume a workflow that finished `blocked` after you answered its questions | `workflow-approve --id <w>` (with `--allow-dynamic` / `--allocation` as needed) | `resumed-after-block`: the finish is cleared, the supervisor starts a kernel |
 | ship a new runtime build | `npm run build` | every running kernel notices its module changed (`build-changed`), ends cleanly and is restarted by the supervisor on the new code |
-| pause/checkpoint a workflow | `workflow-stop --id <w>` (writes `stop.flag` and exports `_local/continuations/workflows/<w>.md`) | `stopped: stop flag` at the next tick; after the controller exits, `workflow-run` verifies the exact continuation boundary and removes the flag itself; never clear a lease merely because a PID is absent |
+| pause/checkpoint a workflow | `workflow-stop --id <w>` (writes `stop.flag` and updates a managed section in backend-owned `workflows/<w>.md`) | `stopped: stop flag` at the next tick; after the controller exits, `workflow-run` first adopts/reconciles exact durable identities under the controller lock, then verifies the continuation boundary and removes the flag; never clear a lease merely because a PID is absent |
 | read a workflow | `workflow-status --id <w>` | read-only |
 | clean up the worktree of a workflow that merged | `workflow-lane-close --id <w>` | `orca worktree rm --force` on the lane, branch preserved (`lane-closed`); refused while the kernel is alive or the lane is unmerged |
 | merge a lane the kernel could not merge | merge it yourself in the base worktree, then `workflow-approve --id <w>` | the conflict is in `lane-merge-conflict` and in the `merge` needUser item; the kernel never force-merges into a tree it does not own |

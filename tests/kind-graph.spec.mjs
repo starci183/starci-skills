@@ -80,9 +80,9 @@ test('the shipped catalog validates against the allocator profile and the operat
   assert.deepEqual(writesOf('brand.decide',{profile}),['brand','asset']);
   assert.deepEqual(kindsWriting('brand',{profile}),['brand.decide'],'one identity, one record, one kind that settles it');
   assert.deepEqual(reportsOf('brand.decide',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['environment','authority']});
-  // Asset bytes come from the identity (a placeholder mascot), from the capture the drawing took, or from the
-  // artwork step that re-renders the slots that capture declared - nowhere else.
-  assert.deepEqual(kindsWriting('asset',{profile}),['brand.decide','interface.draw','interface.asset']);
+  // Asset bytes come from the identity, ImageGen design directions/artwork, or bounded browser captures owned
+  // by the frontend implementation node - nowhere else.
+  assert.deepEqual(kindsWriting('asset',{profile}),['brand.decide','interface.draw','interface.asset','frontend.implement']);
   // The node's own authored fields are written by the two kinds that stand before every lane: one completes the
   // record a node needs to be launchable at all, the other cuts a node too big for one operation into children.
   assert.deepEqual(kindsWriting('record',{profile}),['work.author','implementation.plan']);
@@ -432,7 +432,7 @@ test('every kind declares what it reads and what it produces, over the one recor
   assert.deepEqual(readsOf('brand.decide',{profile}),['code','grammar'],'every token is read out of the real token files');
   assert.deepEqual(readsOf('interface.draw',{profile}),['srs','sds','brand','grammar','design','asset']);
   assert.deepEqual(readsOf('interface.asset',{profile}),['design','brand']);
-  assert.deepEqual(writesOf('frontend.implement',{profile}),['code']);
+  assert.deepEqual(writesOf('frontend.implement',{profile}),['code','asset']);
   assert.deepEqual(readsOf('backend.implement',{profile}),['srs','sds','decision','code']);
   assert.deepEqual(writesOf('runtime.operate',{profile}),['runtime','code']);
   assert.deepEqual(readsOf('grammar.update',{profile}),['design','grammar','brand']);
