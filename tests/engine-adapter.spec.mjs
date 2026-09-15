@@ -215,7 +215,6 @@ test('a pure model job whose worker never started settles instead of fencing the
   assert.deepEqual(settleNeverStartedModelJobs({journalFile:file,workflowId:'wf',generation:2,now:()=>9}),[],'settling twice changes nothing');
   bridge.close();
 });
-
 test('missing model output is not proof of a never-started worker',t=>{
   const f=fixture(t),file=f.state.engine.journalFile;
   const bridge=createJobBridge({journalFile:file,eligibility:()=>({eligible:true}),

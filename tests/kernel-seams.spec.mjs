@@ -8,7 +8,7 @@ import {buildReport} from '../kernel/reports.mjs';
 import {markDone,markInProgress,readNode} from '../kernel/ledger.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {inputAsk} from './helpers/input-fixture.mjs';
-import {PRESENTATION_RETRY_MS,decisionRecordOptions,releaseSettledOperationLeases,handleBlocked,publishAuthoredDecisions,presentOwnerQuestions,applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
+import {PRESENTATION_RETRY_MS,sweepSettledCandidates,decisionRecordOptions,releaseSettledOperationLeases,handleBlocked,publishAuthoredDecisions,presentOwnerQuestions,applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
 import {deriveOwnerRequests} from '../kernel/owner-requests.mjs';
 import {authoredDecisionOf} from '../kernel/owner.mjs';
 import {loadConfig} from '../scripts/config.mjs';
@@ -1034,4 +1034,29 @@ test('a settled operation releases the canonical writer it reserved, and an oper
   assert.ok(refused.lease,'a refused release keeps the reservation rather than losing the fence');
   assert.equal(releaseSettledOperationLeases(noisy,stuck,ctx,{settle:refusing}),null);
   assert.equal(log.filter(event=>event.event==='settled-lease-release-refused').length,1,'the refusal is said once, not every tick');
+});
+
+test('the frozen copy of a settled launch is removed, the copy of anything still in flight is kept, and an unreadable journal removes nothing',t=>{
+  const runtime=fs.mkdtempSync(path.join(os.tmpdir(),'starci-candidates-'));
+  t.after(()=>fs.rmSync(runtime,{recursive:true,force:true}));
+  const base=path.join(runtime,'candidates','wf');
+  for(const name of ['job-done','job-failed','job-running','job-leased-by-op'])fs.mkdirSync(path.join(base,name),{recursive:true});
+  const events=[],store={appendEvent:event=>events.push(event),saveState(){}};
+  const state={id:'wf',host:process.cwd(),engine:{schema:'starci/engine@1',generation:3,journalFile:path.join(runtime,'journal.sqlite')},needUser:[],
+    ops:[{id:'op-a',kind:'backend.implement',status:'running',lease:{jobId:'job-leased-by-op'}}]};
+  const journal={listJobs:()=>[
+    {job_id:'job-done',status:'succeeded'},{job_id:'job-failed',status:'failed'},
+    {job_id:'job-running',status:'running'},{job_id:'job-leased-by-op',status:'succeeded'}]};
+  const removed=sweepSettledCandidates(store,state,{engine:{journal}});
+  assert.deepEqual(removed.sort(),['job-done','job-failed'],'only the copies of settled launches go');
+  assert.equal(fs.existsSync(path.join(base,'job-running')),true,'a launch still in flight keeps its copy');
+  assert.equal(fs.existsSync(path.join(base,'job-leased-by-op')),true,'and so does one an operation still leases');
+  assert.equal(fs.existsSync(path.join(base,'job-done')),false);
+  assert.deepEqual(events.map(event=>event.event),['candidates-swept']);
+  assert.deepEqual(events[0],{event:'candidates-swept',removed:2,kept:2});
+  assert.deepEqual(sweepSettledCandidates(store,state,{engine:{journal}}),[],'a second sweep finds nothing and says nothing');
+  const blind={listJobs:()=>{throw Error('the journal is locked');}};
+  assert.deepEqual(sweepSettledCandidates(store,state,{engine:{journal:blind}}),[],'a journal the kernel cannot read removes nothing');
+  assert.equal(fs.existsSync(path.join(base,'job-running')),true);
+  assert.deepEqual(sweepSettledCandidates(store,{...state,engine:undefined},{engine:{journal}}),[],'a workflow that is not enrolled sweeps nothing');
 });

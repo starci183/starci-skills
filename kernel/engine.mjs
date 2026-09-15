@@ -75,7 +75,8 @@ export function relocateJournal({from,to,workflowId}={}){
  * Recover a positively recorded launch failure, not an inferred absence of effects. A missing result does not
  * prove a model never ran: require a spawn-failed receipt, no spawned PID and no worker binding. Use admission's
  * transaction to settle the job together with its leases and budget reservations. Other unknown jobs retain
- * their fences and any staged result remains available for the normal completion replay.
+ * their fences and any staged result remains available for the normal completion replay. A `check` job may have
+ * touched the tree, so it always keeps its fence until separately reconciled.
  */
 export function settleNeverStartedModelJobs({journalFile,workflowId,generation,now=Date.now}={}){
   if(!journalFile||!fs.existsSync(journalFile))return [];

@@ -334,7 +334,7 @@ export function validateAccepted(store,state,op,ctx,{files,verified,produced=nul
   if(!judged.length&&!reproducedNoDiffEvidence){store.appendEvent({event:'validator-skipped',op:op.id,reason:'the operation changed nothing inside its allowlist, so there is no diff to judge'});return strict
     ?{verdict:'inconclusive',reason:'required validation has no observed candidate files'}:{verdict:'skipped'};}
   const providers=ctx.validator??llm.DEFAULT_VALIDATOR_RUNTIMES;
-  const diff=strict&&ctx.candidate?.packet?frozenCandidateDiff(ctx.candidate,judged):opDiff(state,op,judged,ctx);
+  const diff=strict&&ctx.candidate?.packet?frozenCandidateDiff(ctx.candidate,judged,{git:ctx.git}):opDiff(state,op,judged,ctx);
   if(strict&&diff.truncated){
     store.appendEvent({event:'validator-inconclusive',op:op.id,reason:'the complete candidate diff exceeds the validator transport bound',diffFiles:files});
     return {verdict:'inconclusive',reason:'required validator did not receive the complete candidate diff'};
@@ -386,14 +386,48 @@ export function validateAccepted(store,state,op,ctx,{files,verified,produced=nul
   store.appendEvent({event:'validator-rejected',op:op.id,summary,provider,findings:findings.slice(0,5).map(findingText),usage:result?.usage??null});
   return {verdict,findings:findings.map(findingText)};
 }
-function frozenCandidateDiff(candidate,files){
+/**
+ * The frozen candidate rendered for a reader. It used to send the whole of every touched file, before and after,
+ * base64-encoded: a model cannot read base64, and sixty small YAML records blew the transport bound, so a
+ * record-authoring operation could never be judged and never be accepted. Text is sent as the unified diff git
+ * itself prints between the frozen base and the worker copy, under the repository-relative path; only a file that
+ * is not text keeps a digest line, because its bytes say nothing to a reader anyway. The digests of the packet
+ * travel with each file, so what the validator judged stays bound to what the kernel froze.
+ */
+const looksBinary=buffer=>buffer.includes(0);
+export function frozenCandidateDiff(candidate,files,{git=null}={}){
   const packet=candidate.packet,selected=new Set(files),chunks=[];
+  const run=typeof git==='function'
+    ?args=>git('git',args,{cwd:candidate.workerRoot,encoding:'utf8',windowsHide:true,maxBuffer:64*1024*1024})
+    :null;
   for(const change of packet.changes.filter(item=>selected.has(item.path))){
-    const read=(root,file)=>{try{const bytes=fs.readFileSync(path.join(root,file));return {encoding:'base64',bytes:bytes.length,content:bytes.toString('base64')};}catch{return null;}};
-    chunks.push(JSON.stringify({path:change.path,beforeSha256:change.beforeSha256,afterSha256:change.afterSha256,
-      before:read(candidate.baseRoot,change.path),after:read(candidate.workerRoot,change.path)}));
+    const read=root=>{try{return fs.readFileSync(path.join(root,change.path));}catch{return null;}};
+    const before=read(candidate.baseRoot),after=read(candidate.workerRoot);
+    const header=`diff --starci a/${change.path} b/${change.path}\nbefore ${change.beforeSha256??'absent'} after ${change.afterSha256??'absent'}`;
+    if((before&&looksBinary(before))||(after&&looksBinary(after))){
+      chunks.push(`${header}\nBinary file, ${before?.length??0} bytes before and ${after?.length??0} bytes after; its content is not rendered.`);
+      continue;
+    }
+    let body=null;
+    if(run){
+      const shown=run(['diff','--no-index','--no-color','--',
+        before?path.join(candidate.baseRoot,change.path):'/dev/null',
+        after?path.join(candidate.workerRoot,change.path):'/dev/null']);
+      // `git diff --no-index` exits 1 when the files differ, which is the ordinary case here.
+      if([0,1].includes(shown.status)&&typeof shown.stdout==='string')body=shown.stdout;
+    }
+    if(body===null){
+      // No git seam: the reader gets the text itself, which is still readable and still bounded below.
+      body=[before?`--- before\n${before.toString('utf8')}`:'--- before\n(absent)',
+        after?`+++ after\n${after.toString('utf8')}`:'+++ after\n(absent)'].join('\n');
+    }
+    // git names the two temporary copies it compared; the reader is told the one path that means anything.
+    const drop=/^(diff --git |index |--- |\+\+\+ )/;
+    const cleaned=body.split('\n').filter(line=>!drop.test(line)).join('\n').trim();
+    chunks.push(`${header}\n--- a/${change.path}\n+++ b/${change.path}\n${cleaned}`);
   }
-  const text=chunks.join('\n'),truncated=Buffer.byteLength(text)>VALIDATOR_DIFF_BYTES;
+  let text=chunks.join('\n');
+  const truncated=Buffer.byteLength(text)>VALIDATOR_DIFF_BYTES;
   return {files,base:packet.acceptedHead,text,truncated};
 }
 function resolveValidatorReferences(state,op,rootOverride=null){
