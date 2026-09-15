@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {ALLOCATION,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,budgetBand,classifyFailure,createAllocator,sequentialRuntimes} from '../kernel/schedule.mjs';
+import {ALLOCATION,withProviderPreference,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,budgetBand,classifyFailure,createAllocator,sequentialRuntimes} from '../kernel/schedule.mjs';
 import {RUNTIME_LOADS,loadsFile,loadsFileFor,readLoads} from '../kernel/loads.mjs';
 
 const profile=parseYaml(fs.readFileSync(new URL('../model/runtimes.yaml',import.meta.url),'utf8'));
@@ -522,4 +522,19 @@ test('model eligibility is filtered before provider budget ranking and returns i
   assert.equal(review.ready.some(item=>item.runtime==='gpt-5.6-sol'),false);assert.match(review.blocked.find(item=>item.runtime==='gpt-5.6-sol').reason,/model ineligible/);
   const picked=allocator.allocate('backend.implement',{job:{kind:'backend.implement',role:'implement',qualityFloor:'high'}});
   assert.equal(picked.ok,true);assert.notEqual(picked.runtime,'gpt-5.6-sol');assert.equal(picked.eligibility.mode,'qualified');assert.ok(decisions.length>=profile.maxParallelOps);
+});
+
+test('the owner provider order moves every preference and tier onto the named providers first and still overflows to the rest',()=>{
+  const preferred=withProviderPreference(profile,['codex','qwen','claude']);
+  const providersOf=list=>list.map(id=>profile.runtimes[id].provider);
+  assert.deepEqual(providersOf(preferred.allocation.preference.plan),['codex','codex','claude','claude']);
+  assert.deepEqual(preferred.allocation.preference.plan,['gpt-6-astra','gpt-5.6-sol','claude-fable-5.1','claude-opus'],'within one provider the authored order is kept');
+  assert.deepEqual(providersOf(preferred.allocation.tiers.easy),['codex','qwen','claude']);
+  assert.deepEqual(providersOf(preferred.allocation.tiers.hard.decide),['codex','codex','claude','claude']);
+  assert.deepEqual([...preferred.allocation.preference.implement].sort(),[...profile.allocation.preference.implement].sort(),'no runtime is dropped, so overflow still reaches every one of them');
+  assert.deepEqual(preferred.allocation.providerOrder,['codex','qwen','claude']);
+  assert.deepEqual(profile.allocation.preference.plan,['claude-fable-5.1','gpt-6-astra','claude-opus','gpt-5.6-sol'],'the authored profile is not mutated');
+  assert.equal(withProviderPreference(profile,[]),profile,'no order named, nothing reordered');
+  const partial=withProviderPreference(profile,['qwen']);
+  assert.deepEqual(partial.allocation.preference.verify,['qwen3.8-flash','gpt-5.6-sol','claude-fable-5.1','gpt-6-astra','claude-opus'],'providers the owner did not name keep their authored order behind the named one');
 });

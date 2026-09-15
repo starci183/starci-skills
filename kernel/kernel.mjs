@@ -19,7 +19,7 @@ import {buildReport,validateReport} from './reports.mjs';
 import {TAB_READ_LIMIT,classifyTab} from './tab.mjs';
 import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot,workflowsRoot} from './store.mjs';
 import {grammarRepository,resolveLedgerRoot,sharedLedgerStatus} from './routing.mjs';
-import {createAllocator,loadRuntimes} from './schedule.mjs';
+import {createAllocator,loadRuntimes,withProviderPreference} from './schedule.mjs';
 import {loadsFileFor} from './loads.mjs';
 import {planProtectedProof,proofApplies,proofFinding,proofPlan,protectedProofFinding,runAtBase,runProtectedProof} from '../checks/proof.mjs';
 import {evaluateAcceptance,kernelVerificationReceipt,resolveEvidencePacket} from '../checks/acceptance.mjs';
@@ -42,7 +42,7 @@ import {AUTHOR_KIND,PLAN_KIND,AUTHORS_RECORD,authorsRecord,BRAND_DECIDE,BRAND_KI
   tail,toOp,unique,validateCommandAt,workModule,workOpId,workValidateCommand,writeJson} from './common.mjs';
 import {ioBlock,kindsReadingBrand,undeclaredWrites,writesWorkRecords} from './io.mjs';
 import {readDistJson} from '../core/runtime-root.mjs';
-import {loadConfig,nonOperationModels} from '../scripts/config.mjs';
+import {configuredProviderOrder,loadConfig,nonOperationModels} from '../scripts/config.mjs';
 import {recordDigests,reconcileIntake} from './reconciliation.mjs';
 import {renderChecksFor} from '../checks/render.mjs';
 import {laneOwnerOf,laneNameOf,laneRowTitle,laneView,openLane,settleLane,laneBranchRef} from './lanes.mjs';
@@ -2855,6 +2855,16 @@ export function withSupervisorPreference(profile,runtimes){
   copy.allocation.preference.decide=[...known,...((copy.allocation.preference.decide??[]).filter(id=>!known.includes(id)))];
   return copy;
 }
+/**
+ * The runtime profile this workflow runs under: the authored profile, reordered by the provider order the owner
+ * set in the config.json the workflow is pinned to. Every allocation decision and every non-operation model
+ * choice of this workflow reads it, so one line in config.json moves the whole run onto the owner's provider
+ * without changing which runtimes may be overflowed to.
+ */
+export const workflowRuntimeProfile=state=>{
+  try{return withProviderPreference(loadRuntimes(),configuredProviderOrder(loadConfig(workflowModelConfigRoot(state))));}
+  catch{return loadRuntimes();}
+};
 /** Closed non-operation model bindings come only from validated config.json. */
 export const supervisorRuntimes=host=>nonOperationModels('kernelManager',loadConfig(host));
 export const workflowModelConfigRoot=state=>isEnrolled(state)&&state.engine.runtimePin?.root?state.engine.runtimePin.root:state.host??'';
@@ -3253,6 +3263,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     reconcile,renderChecks,contractDigest,kindsProfile,deferPreparation,...(verifyPresence?{verifyPresence}:{}),
     supervisor:supervisor??supervisorRuntimes(workflowModelConfigRoot(state)),validator:validator??validatorRuntimes(workflowModelConfigRoot(state))};
   ctx.engine=engineRuntime??(isEnrolled(state)?createEngineRuntime({store,state,now,eligibility:modelEligibility,modelPolicy,git,
+    runtimeProfile:workflowRuntimeProfile(state),
     exec:(command,options)=>ctx.engine.check(command,options,ctx.currentOp??null)}):null);
   if(ctx.engine){
     store.bindJournal?.(ctx.engine.journal,state.engine.generation,{state});
@@ -3908,7 +3919,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const pin=options['runtime-pin']?readJson(path.resolve(options['runtime-pin']),null):state.engine?.runtimePin;
     const checked=verifyRuntimePin(pin);need(checked.ok,`A verified runtime pin is required: ${checked.reason??''}`);
     if(isEnrolled(state)&&store.readEvents().some(event=>event.event==='legacy-coordinator-no-effect-proved')){
-      const runtimeRoot=path.dirname(state.engine.journalFile),runtimeProfile=loadRuntimes(),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
+      const runtimeRoot=path.dirname(state.engine.journalFile),runtimeProfile=workflowRuntimeProfile(state),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
         policyFile:path.join(skillRoot,'.dist','model','capabilities.json'),qualificationsFile:path.join(runtimeRoot,'model-qualifications.json'),probationsFile:path.join(runtimeRoot,'model-probations.json'),root:runtimeRoot});
       const refundRuntime=createEngineRuntime({store,state,modelPolicy:policy,eligibility:()=>({eligible:false,reasons:['refund-only runtime']} )});
       try{refundLegacyCoordinatorProbations(store,state,refundRuntime);}finally{refundRuntime.close();}
@@ -3984,7 +3995,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     if(relocation)store.appendEvent({event:'journal-relocated',from:relocation.from,to:relocation.to,retired:relocation.retired,copied:relocation.copied});
     // The generations this retry retires give back the probation their unfinished attempts consumed.
     if(state.modelEligibility?.probationScopes){
-      const runtimeRoot=path.dirname(state.engine.journalFile),runtimeProfile=loadRuntimes(),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
+      const runtimeRoot=path.dirname(state.engine.journalFile),runtimeProfile=workflowRuntimeProfile(state),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
         policyFile:path.join(skillRoot,'.dist','model','capabilities.json'),qualificationsFile:path.join(runtimeRoot,'model-qualifications.json'),probationsFile:path.join(runtimeRoot,'model-probations.json'),root:runtimeRoot});
       const refundRuntime=createEngineRuntime({store,state,modelPolicy:policy,eligibility:()=>({eligible:false,reasons:['refund-only runtime']})});
       try{refundRetiredGenerationProbations(store,state,refundRuntime,{generation:engine.generation});}finally{refundRuntime.close();}
@@ -4072,7 +4083,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const runtimeBinding={workflowId:state.id,from:state.from,run:state.run,hostAdapter:state.hostAdapter,launcher:state.launcher,
       kernelTerminalOwned:invocationOwnsTerminal,...(launchTask?{workflowTask:launchTask}:{})};
     store.appendEvent({event:binding?'run-bound':'run-resumed',run:state.run,from:state.from,iterations:state.iterations});
-    const runtimeProfile=withSupervisorPreference(loadRuntimes(),supervisorRuntimes(workflowModelConfigRoot(state)));
+    const runtimeProfile=withSupervisorPreference(workflowRuntimeProfile(state),supervisorRuntimes(workflowModelConfigRoot(state)));
     let modelPolicy=null;
     if(isEnrolled(state)){
       const root=path.dirname(state.engine.journalFile);fs.mkdirSync(root,{recursive:true});

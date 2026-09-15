@@ -104,7 +104,12 @@ function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadR
   const policyTargets=typeof modelPolicy?.providerFilter==='function'?new Set(modelPolicy.providerFilter(job)):null;
   const candidates=requested.map(id=>({id,runtime:{id,...runtimes.runtimes?.[id],model:runtimes.runtimes?.[id]?.target}})).filter(({runtime})=>runtime.target&&(runtime.roles??[]).includes(role)&&(!policyTargets||policyTargets.has(runtime.target)));
   const eligible=candidates.map((candidate,index)=>({...candidate,index,decision:eligibility(job,candidate.runtime),budget:budgetVerdict(candidate.runtime,budget,{now:now(),requireFresh:true})})).filter(item=>item.decision?.eligible===true);
-  const available=eligible.filter(item=>item.budget.known&&!item.budget.exhausted).sort((a,b)=>b.budget.remaining-a.budget.remaining||a.index-b.index),providers=available.slice(0,1).map(item=>item.id);
+  // The owner's provider order comes first, the probed window second: a preferred provider that is out of window
+  // is not in this list at all, so the choice reorders and never starves.
+  const order=Array.isArray(runtimes.allocation?.providerOrder)?runtimes.allocation.providerOrder:[];
+  const providerRank=item=>{const at=order.indexOf(item.runtime?.provider);return at<0?order.length:at;};
+  const available=eligible.filter(item=>item.budget.known&&!item.budget.exhausted)
+    .sort((a,b)=>providerRank(a)-providerRank(b)||b.budget.remaining-a.budget.remaining||a.index-b.index),providers=available.slice(0,1).map(item=>item.id);
   if(!providers.length){const error=Error(eligible.length?`No eligible ${name} model has known available provider quota`:`No evaluated model is eligible for ${name}`);if(eligible.length){error.code='STARCI_MODEL_QUOTA_WAIT';error.reasons=eligible.map(item=>({runtime:item.id,known:item.budget.known,exhausted:item.budget.exhausted,until:item.budget.until}));}throw error;}
   const selected=available[0];return {args:{...modelInput(args),providers},runtime:selected.runtime,decision:selected.decision,job,
     considered:available.map(item=>({runtime:item.id,remaining:item.budget.remaining})),refused:candidates.filter(candidate=>!eligible.some(item=>item.id===candidate.id)).map(candidate=>candidate.id)};
@@ -124,11 +129,12 @@ export function enrollEngine(store,state,{journalFile=journalFileFor(),runtimePi
 }
 
 /** Runtime bridge used by the real kernel. The kernel remains the only workflow state writer. */
-export function createEngineRuntime({store,state,now=Date.now,eligibility,modelPolicy=null,bridge=null,spawnChild=null,candidateBase=null,git=null,exec=null,modelBudget=null}={}){
+export function createEngineRuntime({store,state,now=Date.now,eligibility,modelPolicy=null,bridge=null,spawnChild=null,candidateBase=null,git=null,exec=null,modelBudget=null,runtimeProfile=null}={}){
   if(!isEnrolled(state))return null;
   const owned=!bridge;
   bridge??=createJobBridge({journalFile:state.engine.journalFile,now,...(spawnChild?{spawnChild}:{}),eligibility:job=>job.kind==='model'||job.kind==='judge'?{eligible:Array.isArray(job.input?.args?.providers)&&job.input.args.providers.length>0,reasons:['no evaluated provider in durable model job']}:{eligible:false,reasons:['operation eligibility must name its selected runtime']},beforeSpawn:({job})=>{const meta=job.payload?.admission;if(meta?.mode!=='probation')return {ok:true,code:'qualified'};const consumed=modelPolicy?.consumeProbation?.({kind:job.kind,role:job.role,input:job.payload,workflowId:job.workflow_id,opId:job.op_id,attempt:job.attempt,generation:job.generation,jobId:job.job_id},meta.runtime);if(!consumed?.ok)return {ok:false,code:consumed?.code??'probation-unavailable'};store.saveState(state);return consumed;}});
-  const {journal,admission}=bridge,jobs=createJobs({journal,admission,now}),runtimeProfile=loadRuntimes();
+  const {journal,admission}=bridge,jobs=createJobs({journal,admission,now});
+  runtimeProfile??=loadRuntimes();
   const writer=candidateWriterResource(state.worktree);admission.setCapacity(writer.key,1);
   const declareMachineResources=value=>resourceLocks(value).map(machineResource).map(resource=>{admission.setCapacity(resource.key,1);return resource;});
   candidateBase??=path.join(path.dirname(state.engine.journalFile),'candidates',state.id);

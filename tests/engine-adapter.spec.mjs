@@ -164,3 +164,27 @@ test('retry admits only runtime reconciliation leases and fences unresolved gene
   assert.equal(bridge.journal.getJob('never-launched').status,'cancelled');assert.equal(bridge.journal.events({workflowId:'wf'}).some(event=>event.kind==='job-retry-queued-cancelled'),true);
   assert.deepEqual(unsettledGenerationJobs({journalFile:f.state.engine.journalFile,workflowId:'wf',generation:1}),[]);bridge.close();
 });
+
+test('a non-operation model call follows the owner provider order ahead of the richer window, and still falls to the other provider when the chosen one is out',t=>{
+  const snapshot=decisionId=>({schema:'starci/manager-snapshot@1',workflowId:'wf',decisionId,generation:2,version:1,digest:'d',basisDigest:'b',
+    goal:{job:'finish',definitionOfDone:['done']},progress:{},ops:[],blockers:[],
+    actions:[{id:'act',type:'plan-verification',opId:'op',preconditions:[],summary:'plan',contextRefIds:[]}],contextCatalog:[],noProgress:{round:0,budget:2}});
+  const profile=loadRuntimes(),preferring=order=>({...profile,allocation:{...profile.allocation,providerOrder:order}});
+  const spawn=()=>({pid:7,once(){},unref(){}});
+
+  const rich=fixture(t);rich.state.engine.coordination='agent-v1';
+  rich.modelBudget.providers.claude.windows.weekly.usedPercent=10;rich.modelBudget.providers.codex.windows.weekly.usedPercent=80;
+  const richBridge=createJobBridge({journalFile:rich.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:spawn});
+  const chooser=createEngineRuntime({...rich,bridge:richBridge,eligibility:()=>({eligible:true}),runtimeProfile:preferring(['codex'])});
+  assert.throws(()=>chooser.manageWorkflow(snapshot('manager-prefers-codex')),error=>error.code==='STARCI_JOB_PENDING');
+  assert.deepEqual(chooser.journal.listJobs()[0].payload.args.providers,['gpt-5.6-sol'],'the owner order wins over the provider that has more window left');
+  richBridge.close();
+
+  const drained=fixture(t);drained.state.engine.coordination='agent-v1';
+  drained.modelBudget.providers.codex.windows.weekly.usedPercent=99;drained.modelBudget.providers.claude.windows.weekly.usedPercent=10;
+  const drainedBridge=createJobBridge({journalFile:drained.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:spawn});
+  const overflow=createEngineRuntime({...drained,bridge:drainedBridge,eligibility:()=>({eligible:true}),runtimeProfile:preferring(['codex'])});
+  assert.throws(()=>overflow.manageWorkflow(snapshot('manager-codex-drained')),error=>error.code==='STARCI_JOB_PENDING');
+  assert.deepEqual(overflow.journal.listJobs()[0].payload.args.providers,['claude-opus'],'a preference never starves: an exhausted window overflows to the other member');
+  drainedBridge.close();
+});

@@ -49,6 +49,29 @@ const orNull=value=>Number.isFinite(value)?value:null;
 const counters=value=>plain(value)?Object.fromEntries(Object.entries(value).filter(([,count])=>Number.isFinite(count))):{};
 
 export function loadRuntimes(){return readDistJson('model','runtimes.json');}
+
+/**
+ * The owner's provider order, applied to a loaded profile. Every role preference and every tier list is sorted
+ * so runtimes of an earlier-named provider come first; runtimes of a provider the owner did not name keep their
+ * authored order behind them. Nothing is removed, so `prefer-then-overflow` still overflows exactly as before
+ * when the preferred provider is saturated, cooling or out of window. The order is recorded on the profile so
+ * the non-operation model pools can honour the same choice.
+ */
+export function withProviderPreference(profile,order=[]){
+  const wanted=(Array.isArray(order)?order:[]).filter(provider=>typeof provider==='string'&&provider.trim());
+  if(!wanted.length||!profile||typeof profile.runtimes!=='object'||profile.runtimes===null)return profile;
+  const rank=id=>{const at=wanted.indexOf(profile.runtimes?.[id]?.provider);return at<0?wanted.length:at;};
+  const sort=list=>Array.isArray(list)?list.map((id,index)=>({id,index})).sort((a,b)=>rank(a.id)-rank(b.id)||a.index-b.index).map(item=>item.id):list;
+  const copy=structuredClone(profile);
+  copy.allocation=copy.allocation??{};
+  copy.allocation.providerOrder=[...wanted];
+  for(const [role,list] of Object.entries(copy.allocation.preference??{}))copy.allocation.preference[role]=sort(list);
+  for(const [tier,value] of Object.entries(copy.allocation.tiers??{})){
+    if(Array.isArray(value)){copy.allocation.tiers[tier]=sort(value);continue;}
+    if(value&&typeof value==='object')for(const [role,list] of Object.entries(value))value[role]=sort(list);
+  }
+  return copy;
+}
 /** The graph's role for an operation kind, or null when it knows none; never throws for an unknown kind. */
 const graphRole=kind=>{try{return roleOf(kind);}catch{return null;}};
 
