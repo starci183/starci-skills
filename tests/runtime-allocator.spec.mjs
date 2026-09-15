@@ -538,3 +538,21 @@ test('the owner provider order moves every preference and tier onto the named pr
   const partial=withProviderPreference(profile,['qwen']);
   assert.deepEqual(partial.allocation.preference.verify,['qwen3.8-flash','gpt-5.6-sol','claude-fable-5.1','gpt-6-astra','claude-opus'],'providers the owner did not name keep their authored order behind the named one');
 });
+
+test('a named provider order outranks the probed window, and an exhausted window still overflows past the owner choice',()=>{
+  const at=Date.UTC(2026,8,15,9);
+  const budgetAt=(claude,codex)=>({schema:'starci/runtime-budget@1',at,providers:{
+    claude:{status:'ok',windows:{session:{usedPercent:5,resetsAt:at+3_600_000,minutes:300},weekly:{usedPercent:claude,resetsAt:at+86_400_000,minutes:10080},fableWeekly:{usedPercent:claude,resetsAt:at+86_400_000,minutes:10080}}},
+    codex:{status:'ok',windows:{weekly:{usedPercent:codex,resetsAt:at+86_400_000,minutes:10080}}}}});
+  // The owner's provider has clearly less of its week left than the one they did not pick.
+  const rich=budgetAt(20,60),preferred=withProviderPreference(profile,['codex','qwen','claude']);
+  assert.equal(createAllocator({runtimes:profile,now:()=>at,budget:rich}).allocate('work.author').runtime,'claude-fable-5.1','without an order the fuller window leads');
+  const owned=createAllocator({runtimes:preferred,now:()=>at,budget:rich}).allocate('work.author');
+  assert.equal(owned.runtime,'gpt-6-astra','the owner order leads, even against a window with more left');
+  assert.deepEqual(owned.sparedOver,[],'the budget moved nothing, so it spared nothing');
+  assert.equal(createAllocator({runtimes:preferred,now:()=>at,budget:rich}).allocate('backend.implement').runtime,'gpt-5.6-sol');
+  // Codex out of window: its runtimes are not eligible at all, so the choice overflows rather than stalling.
+  const drained=createAllocator({runtimes:preferred,now:()=>at,budget:budgetAt(20,99)}).allocate('work.author');
+  assert.equal(drained.runtime,'claude-fable-5.1','an exhausted preferred provider overflows to the next runtime of the role');
+  assert.ok(drained.blocked.some(item=>item.runtime==='gpt-6-astra'&&/window|budget|exhaust/i.test(item.reason)),'the preferred runtime is blocked by its window, not by the order');
+});

@@ -282,7 +282,12 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     // the runtime with clearly more of its provider window left comes first; inside one band the local order decides.
     const bySharedOnly=ledger?(a,b)=>cmp(a.sharedLoad,b.sharedLoad)||locally(a,b):locally;
     const withoutBudget=probed?[...ready].sort(bySharedOnly).map(item=>item.runtime):null;
-    ready.sort(ledger?(a,b)=>cmp(a.sharedLoad,b.sharedLoad)||cmp(b.band,a.band)||locally(a,b):(a,b)=>cmp(b.band,a.band)||locally(a,b));
+    // When the owner named a provider order, that order outranks the probed window: the window still decides who is
+    // eligible at all - an exhausted one is in `blocked`, never in `ready` - but among runtimes that may run, the
+    // owner's choice comes before "whoever has more week left". Without such an order the band leads, as authored.
+    const owned=Array.isArray(allocation.providerOrder)&&allocation.providerOrder.length>0;
+    const byBandThenOrder=(a,b)=>owned?locally(a,b)||cmp(b.band,a.band):cmp(b.band,a.band)||locally(a,b);
+    ready.sort(ledger?(a,b)=>cmp(a.sharedLoad,b.sharedLoad)||byBandThenOrder(a,b):byBandThenOrder);
     return {kind,role,ready,blocked,preference:order,localRanked,withoutBudget,
       budget:probed?Object.fromEntries(ready.map(item=>[item.runtime,item.remainingShare])):null,
       shared:ledger?{workflow,loads:{...view.loads},cooling:{...view.cooling}}:null};
