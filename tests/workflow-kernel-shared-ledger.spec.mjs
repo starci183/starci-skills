@@ -3,12 +3,17 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {parseYaml} from '../core/yaml.mjs';
 import {createStore} from '../kernel/store.mjs';
 import {approve,createWorkflowState,detectLedgerMode,goalPhase,kernelMain,runLoop,validateWorkTree} from '../kernel/kernel.mjs';
 import {fakeAllocator,passing,scriptedOrca} from './helpers/kernel-harness.mjs';
 import {encodePng,screen} from './helpers/png.mjs';
+import {toOp} from '../kernel/common.mjs';
+import {buildReport} from '../kernel/reports.mjs';
+import {openJournal} from '../kernel/journal.mjs';
+import {sealRuntime} from '../kernel/runtime-pin.mjs';
 
 /**
  * A frontend workflow on the Work tree its backend owns. Everything here is real except the runtimes: two git
@@ -443,4 +448,88 @@ test('the launcher commands reach one workflow directory in the owner, from the 
   assert.deepEqual(Object.keys(status.lanes).sort(),[RECEIPT,UI].sort());
   // The same workflow is reachable by naming the tree outright instead of the host.
   assert.equal(kernelMain('workflow-status',{id:goal.id,'ledger-root':fixed.work},{orca:null,cwd:fixed.code}).dir,goal.dir);
+});
+
+test('public retry and pinned enrolled run preserve accepted history while settling frontend source and backend Work roots',async t=>{
+  const run=started(t);approve(run.store,run.state);let runtime=null;
+  t.after(()=>runtime?.close());
+  const accepted=toOp({id:'accepted-before-retry',kind:'backend.implement',goal:'Preserve the already accepted backend contract.',
+    allowlist:['src/accepted.ts'],acceptance:['the accepted backend contract remains accepted']},0);
+  Object.assign(accepted,{status:'done',attempt:1,head:git(run.code,'rev-parse','HEAD'),files:[],reports:[{outcome:'done',summary:'accepted before shared-root retry'}]});
+  run.state.ops.unshift(accepted);run.state.decisions=[{id:'accepted-direction',choice:1,answer:'keep the accepted frontend direction'}];
+  const pin={...sealRuntime({sourceRoot:process.cwd(),buildsRoot:path.join(run.root,'builds'),version:'1.0.0'}),sourceRoot:process.cwd()},journalFile=path.join(run.root,'runtime','journal.sqlite');
+  Object.assign(run.state,{approved:true,phase:'run',run:'run-shared-enrolled',from:'term-shared',goalDigest:'f'.repeat(64),
+    definitionOfDone:['backend-owned design and evidence are accepted','frontend source is accepted'],head:accepted.head,
+    engine:{schema:'starci/engine@1',version:'1.0.0',generation:1,journalFile,journalChosen:true,runtimePin:pin,coordination:'kernel-v0'}});
+  run.store.saveState(run.state);openJournal({file:journalFile}).close();
+  const stopped=kernelMain('workflow-stop',{id:run.state.id,host:run.host},{orca:{},cwd:run.code});assert.equal(stopped.id,run.state.id);
+  const retried=kernelMain('workflow-retry',{id:run.state.id,host:run.host},{orca:{},cwd:run.code});assert.equal(retried.ok,true);assert.equal(retried.generation,2);
+  const afterRetry=run.store.loadState();assert.equal(afterRetry.ops.find(op=>op.id===accepted.id).status,'done');assert.deepEqual(afterRetry.decisions,run.state.decisions);
+
+  const nonce=`shared-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const pinnedKernel=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','kernel.mjs')).href}?${nonce}`),
+    pinnedEngine=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','engine.mjs')).href}?${nonce}`),
+    pinnedStoreModule=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','store.mjs')).href}?${nonce}`);
+  const pinnedStore=pinnedStoreModule.createStore({repoRoot:run.owner,id:run.state.id}),engineState=pinnedStore.loadState(),
+    gitAdapter=(executable,args,options={})=>spawnSync(executable,args,{encoding:'utf8',windowsHide:true,...options});
+  runtime=pinnedEngine.createEngineRuntime({store:pinnedStore,state:engineState,git:gitAdapter,candidateBase:path.join(run.root,'candidates'),
+    eligibility:()=>({eligible:true,mode:'qualified'}),spawnChild:()=>{throw Error('the fake host owns native execution in this fixture');}});
+  runtime.model=name=>name==='validateOp'?{ok:true,verdict:'accept',summary:'both routed roots satisfy the bounded operation',findings:[],dropped:[],
+    provider:'fixture-validator',complete:true,independentFromAttempt:true,freshContext:true,reviewerAttemptId:`validator-${Date.now()}`}:{ok:true,value:{option:'continue'}};
+  runtime.manageWorkflow=snapshot=>({schema:'starci/manager-decision@1',workflowId:snapshot.workflowId,generation:snapshot.generation,version:snapshot.version,
+    digest:snapshot.digest,decisionId:snapshot.decisionId,basisDigest:snapshot.basisDigest,orderedActionIds:snapshot.actions.map(action=>action.id),rationale:'continue accepted remaining shared-root work'});
+  runtime.check=(command,options={})=>({status:0,stdout:`${command} passed`,stderr:'',...options.result});
+  runtime.candidateCheck=(command,options={},op)=>runtime.check(command,{...options,cwd:runtime.candidateCwd(op)});
+  const candidateRoots=new Map(),writerRows=new Map(),settle=runtime.settled.bind(runtime);let activeOp=null,activeJob=null;
+  const begin=runtime.beginCandidate.bind(runtime);runtime.beginCandidate=(op,options)=>{if(op.kind==='uat.verify'&&!op.checks?.length)op.checks=[{name:'unit-tests-pass',command:'npx vitest run receipt'}];
+    activeOp=op;activeJob=op.lease.jobId;const bridge=begin(op,options);
+    candidateRoots.set(op.id,bridge.rootBindings.map(root=>root.id));return bridge;};
+  runtime.settled=(op,options={})=>{const result=settle(op,options);if(result.ok&&activeJob){const count=runtime.journal.db.prepare("SELECT count(*) AS n FROM leases WHERE job_id=? AND resource_key LIKE 'canonical-writer:%'").get(activeJob).n;
+    writerRows.set(`${op.id}:${options.workerOnly===true?'worker':'final'}`,count);}return result;};
+  const allocator={maxParallelOps:1,allocate:()=>({ok:true,runtime:'gpt-5.6-sol',target:'gpt-5.6-sol',role:'implement',candidate:{selection:{target:'gpt-5.6-sol',orcaLaunch:{agent:'codex',model:'gpt-5.6-sol'}}}}),
+    release(){},failed(){},launched(){},deferred(){},snapshot:()=>({}),serialize:()=>({}),sharedSync:()=>({dropped:[]})};
+  let workerLive=false,deliverPending=false,counter=0;const dispatches=new Map();
+  const deliver=()=>{const op=activeOp,dispatch=[...dispatches.entries()].find(([,value])=>value.op===op.id)?.[0];let files=[];
+    if(op.kind==='interface.draw'){
+      const record=path.join(run.work,'features/sales/ui/index.yaml'),assets=path.join(path.dirname(record),'assets');fs.appendFileSync(record,UI_PAYLOAD);fs.mkdirSync(assets,{recursive:true});
+      fs.writeFileSync(path.join(assets,'receipt-resting.png'),PNG_BYTES);fs.writeFileSync(path.join(assets,'receipt-resting.prompt.txt'),'Synthetic ImageGen direction fixture.');
+      files=[record,path.join(assets,'receipt-resting.png'),path.join(assets,'receipt-resting.prompt.txt')];
+    }else if(op.kind==='frontend.implement'){
+      fs.writeFileSync(path.join(run.code,PAGE),'export default function Receipt(){return <main>Receipt</main>;}\n');
+      const assets=path.join(run.work,'features/sales/implementation/frontend/receipt/assets');fs.mkdirSync(assets,{recursive:true});
+      fs.writeFileSync(path.join(assets,'receipt-resting.png'),PNG_BYTES);fs.writeFileSync(path.join(assets,'receipt-resting.html'),'<main><h2>Receipt</h2></main>');
+      files=[PAGE,path.join(assets,'receipt-resting.png'),path.join(assets,'receipt-resting.html')];
+    }
+    const checks=(op.checks??[]).map(check=>({name:check.name,command:check.command,exitCode:0,evidence:'fixture pass'})),report=buildReport({outcome:'done',run:'run-shared-enrolled',task:`task-${op.id}`,dispatch,from:'term-worker',summary:`${op.id} complete`,files,checks});
+    fs.writeFileSync(pinnedStore.reportPath(dispatch),`${JSON.stringify(report)}\n`);deliverPending=false;};
+  const receipt=result=>({outcome:'ok',effectState:'none',receipt:{ok:true,result}}),orca={host:{name:'orca',capabilities:['design-tool'],sequential:false},invoke(name,args={}){
+    if(name==='run-show')return receipt({run:{id:'run-shared-enrolled',coordinator_handle:'term-shared'}});
+    if(name==='worker-list')return receipt({workers:workerLive?[...dispatches].map(([id,value])=>({dispatchId:id,taskId:value.task,workerState:'unsupervised',dispatchStatus:'dispatched',agentTerminalHandle:'term-worker'})):[]});
+    if(name==='terminal-list')return receipt({terminals:workerLive?[{handle:'term-worker',title:`[Op] ${activeOp?.kind} - ${activeOp?.id}`,worktreePath:run.code,status:'running'}]:[]});
+    if(name==='task-list')return receipt({tasks:workerLive?[...dispatches.values()].map(value=>({id:value.task,display_name:`[Op] ${value.op}`})):[]});
+    if(name==='worker-stop')return receipt({state:'stopped',dispatchId:args.dispatch});if(name==='worker-release'){workerLive=false;return receipt({state:'released',processAction:'none'});}
+    if(name==='terminal-close')return receipt({state:'closed'});if(name==='terminal-rename')return receipt({terminal:{handle:'term-worker'}});if(name==='terminal-read')return receipt({terminal:{handle:'term-worker',status:'running',tail:['worker completing shared-root change']}});
+    if(name==='check'){if(workerLive&&deliverPending)deliver();return receipt({messages:[]});}if(name==='send')return receipt({message:{id:`msg-${++counter}`}});throw Error(`Unexpected fake Orca call: ${name}`);
+  }};
+  const guards={protectedPaths:()=>[],revertProtected:()=>({reverted:[],removed:[]}),resourceLocks:()=>[],resourcesClash:()=>false,gitQueue:fn=>fn(),preflight:()=>({ok:true,fixes:[],problems:[]}),parseSharedChangePaths:()=>[]};
+  const launch=(_orca,{operation,scope})=>{const dispatch=`ctx-shared-${++counter}`,task=`task-${scope??operation}`;workerLive=true;deliverPending=true;dispatches.clear();dispatches.set(dispatch,{op:scope??operation,task});return {ok:true,effectState:'committed',selection:{target:'gpt-5.6-sol'},task:{id:task},dispatchId:dispatch,terminal:'term-worker'};};
+  let clock=Date.now();const now=()=>{clock+=1000;return clock;},wait=ms=>{clock+=Math.max(0,Number(ms)||0);};
+  const finished=pinnedKernel.kernelMain('workflow-run',{id:run.state.id,host:run.host,from:'term-shared',run:'run-shared-enrolled','max-iterations':'16'},
+    {orca,cwd:run.code,wait,functions:{engineRuntime:runtime,allocator,launch,guards,git:gitAdapter,reconcileInputs:()=>{},refreshPreparation:()=>{},deferPreparation:()=>false,now,wait,waitTimeoutMs:5000,tickMs:1000,pollMs:1000}});
+  const final=pinnedStore.loadState(),implemented=final.ops.find(op=>op.kind==='frontend.implement');
+  assert.equal(finished.finished?.outcome,'done',JSON.stringify({finished,needUser:final.needUser,ops:final.ops.map(op=>[op.id,op.kind,op.status,op.pending,op.refusal,op.findings,op.checks,op.verifiedChecks]),events:pinnedStore.readEvents().slice(-30)}));
+  assert.equal(final.ops.find(op=>op.id===accepted.id).reports[0].summary,'accepted before shared-root retry');assert.deepEqual(final.decisions,run.state.decisions);
+  const drawn=final.ops.find(op=>op.kind==='interface.draw');assert.deepEqual(candidateRoots.get(drawn.id),['source','work','runtime']);
+  assert.equal(drawn.candidate.roots.find(root=>root.id==='runtime').acceptedHead.startsWith('content:'),true,'the pinned Grammar canon is an explicit protected content root');
+  assert.ok(runtime.candidateBridge(drawn).rootBindings.find(root=>root.id==='runtime').references.some(reference=>reference.sourceRef.includes('/knowledge/grammars/')),
+    'the pre-pin drawing retains its authored canon provenance');
+  assert.deepEqual(candidateRoots.get(implemented.id),['source','work','runtime']);assert.equal(implemented.candidate?.status,'sealed');
+  assert.ok(runtime.candidateBridge(implemented).rootBindings.find(root=>root.id==='runtime').references.some(reference=>reference.sourceRef.includes('/.dist/knowledge/grammars/')),
+    'the frontend operation derived by the pinned kernel retains compiled canon');
+  assert.equal(writerRows.get(`${implemented.id}:worker`),2);assert.equal(writerRows.get(`${implemented.id}:final`),0);
+  assert.equal(fs.existsSync(path.join(run.code,'.starciwork')),false);assert.match(fs.readFileSync(path.join(run.code,PAGE),'utf8'),/Receipt/);
+  assert.ok(fs.existsSync(run.evidence(RECEIPT,`${RECEIPT}-verify`)));assert.equal(run.read(RECEIPT).state,'done');
+  assert.equal(git(run.code,'status','--porcelain'),'');assert.equal(git(run.owner,'status','--porcelain','--','.starciwork/features'),'');
+  const journal=openJournal({file:journalFile});try{assert.deepEqual(journal.liveRows(run.state.id),{leases:[],jobs:[]});}finally{journal.close();}
+  runtime.close();runtime=null;
 });

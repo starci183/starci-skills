@@ -25,6 +25,7 @@ import {planProtectedProof,proofApplies,proofFinding,proofPlan,protectedProofFin
 import {evaluateAcceptance,kernelVerificationReceipt,resolveEvidencePacket} from '../checks/acceptance.mjs';
 import {persistInlineCandidate,protectedOracleManifest} from './candidate-bridge.mjs';
 import {prepareCandidateIntegration} from './candidates.mjs';
+import {candidateRootBindings as buildCandidateRootBindings,resolveCandidateReferences} from './candidate-roots.mjs';
 import {buildManagerSnapshot,validateManagerDecision,managerProgressDigest} from './manager.mjs';
 import {stepsFor} from './contract.mjs';
 import * as work from './ledger.mjs';
@@ -413,18 +414,27 @@ export function launchWithCandidate(orca,{cwd,run,workflowTask,from,worktree,ope
 }
 
 export function candidateReferences(op,state,ctx){
-  const repo=path.resolve(state.worktree),workRoot=ctx.work?.ledger?.workRoot??path.join(repo,'.starciwork'),owner=ctx.work?.ledger?.repoRoot??repo;
-  if(path.resolve(owner)!==repo||path.relative(repo,path.resolve(workRoot)).startsWith('..'))throw new Error('a candidate cannot yet bind references from an external shared Work ledger');
-  const nodes=ctx.work?.loaded?.nodes,list=ctx.work?.loaded?.list??[];
-  return (op.references??[]).map(value=>{const parsed=parseRef(value),literal=slash(parsed.ref),at=literal.indexOf('#'),key=at<0?literal:literal.slice(0,at),fragment=at<0?'':literal.slice(at);
-    let relative=null;
-    const node=nodes?.get?.(key)??list.find(item=>item.id===key||item.path===key);
-    if(node?.path)relative=slash(path.relative(repo,path.join(workRoot,node.path)));
-    else {const workDirect=path.resolve(workRoot,key),workBack=path.relative(path.resolve(workRoot),workDirect);
-      if(!workBack.startsWith('..')&&!path.isAbsolute(workBack)&&fs.existsSync(workDirect))relative=slash(path.relative(repo,workDirect));
-      else {const direct=path.resolve(repo,key);if(!path.relative(repo,direct).startsWith('..')&&fs.existsSync(direct))relative=slash(path.relative(repo,direct));}}
-    if(!relative)throw new Error(`candidate reference is not resolved by the loaded Work tree or repository: ${key}`);
-    return {kind:parsed.kind,ref:`${relative}${fragment}`,sourceRef:literal};});
+  return resolveCandidateReferences(op,state,ctx);
+}
+
+function candidateRuntimePaths(state,op,ctx){
+  const paths=[...(op.kernelOwned??[])];
+  if(ctx.work?.shared&&op.nodeId){
+    const node=ctx.work.node?.(op.nodeId);
+    if(node?.path)paths.push(path.join(ctx.work.ledger.workRoot,node.path));
+  }
+  return unique(paths);
+}
+function candidateManagedFiles(store){
+  return store.paths.continuation?[{path:path.resolve(store.paths.continuation),start:CONTINUATION_SECTION_START,end:CONTINUATION_SECTION_END}]:[];
+}
+function bindOperationCandidate(store,state,op,ctx){
+  if(!ctx.engine)op.kernelOwned=kernelOwnedPaths(state,op,ctx);
+  op.candidateRuntimePaths=candidateRuntimePaths(state,op,ctx);
+  op.resolvedReferences=candidateReferences(op,state,ctx);
+  op.candidateRootBindings=buildCandidateRootBindings({state,op,work:ctx.work,resolvedReferences:op.resolvedReferences,
+    runtimePaths:op.candidateRuntimePaths,runtimeManagedFiles:candidateManagedFiles(store)});
+  return op.candidateRootBindings;
 }
 
 export function resetReviewEpoch(store,state,priorGeneration=state.engine?.generation??0){
@@ -610,16 +620,14 @@ function launchOp(orca,store,state,op,allocated,ctx){
   // end of the kernel: the op records it, avoids the runtime, and the loop goes on.
   let launched,workerEffectStarted=false;
   try{
-    if(ctx.engine){op.resolvedReferences=candidateReferences(op,state,ctx);const continuationRelative=slash(path.relative(state.worktree,store.paths.continuation));
-      const runtimeManagedFiles=continuationRelative&&!continuationRelative.startsWith('..')&&!path.isAbsolute(continuationRelative)
-        ?[{path:continuationRelative,start:CONTINUATION_SECTION_START,end:CONTINUATION_SECTION_END}]:[];
-      const begun=ctx.engine.beginCandidate(op,{repoRoot:state.worktree,allowlist:op.allowlist,references:op.resolvedReferences,
-      inputPaths:[...op.resolvedReferences,...unique(op.kernelOwned??[])],ownedDirtyPaths:op.ownedBaselinePaths??[],
+    if(ctx.engine){const rootBindings=op.candidateRootBindings??bindOperationCandidate(store,state,op,ctx);
+      const begun=ctx.engine.beginCandidate(op,{roots:rootBindings.bindings,bindingDigest:rootBindings.bindingDigest,
       dependencyDigests:op.dependencyDigests??{},environmentDigest:typeof op.environmentDigest==='string'&&op.environmentDigest.trim()?op.environmentDigest:
         (typeof state.engine?.runtimePin?.digest==='string'&&state.engine.runtimePin.digest.trim()?state.engine.runtimePin.digest:
           (typeof state.engine?.runtimePinDigest==='string'&&state.engine.runtimePinDigest.trim()?state.engine.runtimePinDigest:'runtime-unpinned')),
-      runtimeManagedFiles,dependencyInstall:op.dependencyInstall??null});
-      if(begun?.droppedOwnedPaths?.length){op.ownedBaselinePaths=[...(begun.ownedDirtyPaths??[])];store.appendEvent({event:'owned-baseline-dropped',op:op.id,attempt:op.attempt,paths:begun.droppedOwnedPaths,reason:'clean since the prior attempt (committed or reverted): no longer owned'});}}
+      dependencyInstall:op.dependencyInstall??null});
+      const dropped=begun.schema==='starci/candidate-root-bridge@1'?begun.roots.flatMap(root=>(root.bridge.droppedOwnedPaths??[]).map(file=>root.id==='source'?file:path.join(root.repoRoot,file))):begun.droppedOwnedPaths??[];
+      if(dropped.length){op.ownedBaselinePaths=(op.ownedBaselinePaths??[]).filter(file=>!dropped.includes(file));store.appendEvent({event:'owned-baseline-dropped',op:op.id,attempt:op.attempt,paths:dropped,reason:'clean since the prior attempt (committed or reverted): no longer owned'});}}
     if(ctx.engine)ctx.engine.beginLaunchIntent(op);
     workerEffectStarted=true;
     launched=ctx.launch(orca,{cwd:state.worktree,run:state.run,workflowTask:state.workflowTask??state.id,from:state.from,
@@ -674,7 +682,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
     dispatch:op.dispatch,terminal:op.terminal,allocation:launched.allocation??null});
   // Work v2 authors only uninvestigate, todo and done, so the launch is recorded in the node's kernel block.
   ledgerWrite(store,state,op,ctx,'in-progress',node=>ctx.work.api.markInProgress(ctx.work.at,node,{opId:op.id,dispatch:op.dispatch}));
-  if(ctx.engine)ctx.engine.acknowledgeRuntimeWrites(op,op.kernelOwned??[]);
+  if(ctx.engine)ctx.engine.acknowledgeRuntimeWrites(op,op.candidateRuntimePaths??op.kernelOwned??[]);
   // The baseline is taken after the kernel's own in-progress write, so only the operation's edits are caught.
   op.kernelOwnedAt=op.kernelOwned.length?protectedFingerprint(ctx.work?.ledger?.repoRoot??ctx.work?.repoRoot??state.worktree,op.kernelOwned):null;
   // An author op holds the whole record, so the file cannot be fingerprinted as a unit: the blocks inside it
@@ -1063,6 +1071,13 @@ function scheduleOps(orca,store,state,ctx,{orderedOpIds=null}={}){
       continue;
     }
     if(ctx.engine){
+      try{bindOperationCandidate(store,state,op,ctx);}
+      catch(error){
+        op.status='blocked';op.refusal='candidate-root-binding';
+        const detail=`${op.id} cannot bind its candidate roots and inputs: ${String(error?.message??error)}`;
+        if(!state.needUser.some(item=>item.op===op.id&&item.code==='candidate-root-binding'))state.needUser.push({op:op.id,kind:'environment',code:'candidate-root-binding',detail});
+        store.appendEvent({event:'candidate-root-binding-refused',op:op.id,reason:detail});continue;
+      }
       const reserved=ctx.engine.reserveOperation(op,allocated);
       if(!reserved.ok){
         // Nothing ran: the slot AND the day's count come back (a deferral released as a run counted three
@@ -1097,14 +1112,18 @@ function avoidForVerify(state,op){
 function commitOp(state,op,files,{git}){
   const run=args=>git('git',args,{cwd:state.worktree,encoding:'utf8',windowsHide:true});
   const head=()=>{const shown=run(['rev-parse','HEAD']);return shown.status===0?(shown.stdout??'').trim():null;};
-  if(!files.length)return {committed:false,head:head(),reason:'the operation changed nothing inside its allowlist'};
-  const added=run(['add','--',...files]);
-  if(added.status!==0)return {committed:false,head:null,reason:`git add: ${tail(added.stderr,300)}`};
+  const root=path.resolve(state.worktree),sourceFiles=unique(files.map(file=>{
+    if(!path.isAbsolute(file)&&!/^[A-Za-z]:[\\/]/.test(file))return normalize(file);
+    const relative=path.relative(root,path.resolve(file));return relative.startsWith('..')||path.isAbsolute(relative)?null:normalize(relative);
+  }).filter(Boolean));
+  if(!sourceFiles.length)return {committed:false,head:head(),files:[],reason:'the operation changed nothing in its source repository'};
+  const added=run(['add','--',...sourceFiles]);
+  if(added.status!==0)return {committed:false,head:null,files:sourceFiles,reason:`git add: ${tail(added.stderr,300)}`};
   // One op, one commit, and in ledger mode a `Work:` trailer so the history names the node it closes.
   const message=[`feat(${op.id}): ${firstLine(op.goal).slice(0,80)}`,...(op.nodeId?['',`Work: ${op.nodeId}`]:[])].join('\n');
   const committed=run(['commit','-q','-m',message]);
-  if(committed.status!==0)return {committed:false,head:null,reason:`git commit: ${tail(committed.stderr,300)}`};
-  return {committed:true,head:head(),files};
+  if(committed.status!==0)return {committed:false,head:null,files:sourceFiles,reason:`git commit: ${tail(committed.stderr,300)}`};
+  return {committed:true,head:head(),files:sourceFiles};
 }
 
 /**
@@ -2087,7 +2106,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
           ...(!fingerprint||fingerprint!==op.preparationBefore?['The research repair changed content outside preparation or has no valid launch baseline.']:[])],ctx,'integration-preparation-invalid');
     }
     if(ctx.engine&&op.candidate?.status!=='sealed'){
-      const frozen=ctx.engine.freezeCandidate(op,{reportedFiles:report.files??[]});
+      const frozen=ctx.engine.freezeCandidate(op,{reportedFiles:report.files??[],requireReported:true});
       if(frozen.status!=='sealed'){
         op.pending={kind:'candidate-quarantine',reasons:frozen.reasons??['candidate could not be sealed']};
         store.appendEvent({event:'candidate-quarantined',op:op.id,reasons:op.pending.reasons,observedFiles:frozen.observedFiles??[]});
@@ -2095,9 +2114,11 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       }
     }
     if(ctx.engine&&op.candidate?.dependency?.command&&!op.candidate?.dependency?.ready){const dependency=ctx.engine.prepareCandidateDependencies(op);if(!dependency.ready){op.pending={kind:'candidate-dependencies',reason:dependency.evidence};return 'acceptance-pending';}}
-    const candidateRoot=ctx.engine?ctx.engine.candidateCwd(op):null,candidateWork=ctx.engine&&ctx.work?{...ctx.work,repoRoot:candidateRoot,
-      ledger:{...ctx.work.ledger,repoRoot:candidateRoot,workRoot:path.join(candidateRoot,'.starciwork')},
-      at:plain(ctx.work.at)?{...ctx.work.at,repoRoot:candidateRoot,workRoot:path.join(candidateRoot,'.starciwork')}:ctx.work.at}:ctx.work;
+    const candidateView=ctx.engine?ctx.engine.candidateView(op):null,candidateRoot=candidateView?.source.workerRoot??null;
+    const workView=candidateView?.work,workRelative=workView?path.relative(workView.repoRoot,workView.workRoot??path.join(workView.repoRoot,'.starciwork')):null;
+    const candidateWorkRoot=workView?path.join(workView.workerRoot,workRelative):null,candidateWork=ctx.engine&&ctx.work?{...ctx.work,repoRoot:workView.workerRoot,
+      ledger:{...ctx.work.ledger,repoRoot:workView.workerRoot,workRoot:candidateWorkRoot},
+      at:plain(ctx.work.at)?{...ctx.work.at,repoRoot:workView.workerRoot,workRoot:candidateWorkRoot}:ctx.work.at}:ctx.work;
     const verifyCtx=ctx.engine?{...ctx,work:candidateWork,cwd:candidateRoot,exec:(command,options)=>ctx.engine.candidateCheck(command,options,op)}:ctx;
     const verified=machineVerify(state,op,verifyCtx);
     // `work-valid` is the kernel's own check and is stripped from every operation's list, so an op that edits the
@@ -2110,7 +2131,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       const tree={ok:verdict.ok,reason:verdict.ok
         ?(verdict.foreign.length?`${verdict.foreign.length} error(s) elsewhere in the tree are outside this operation`:null)
         :verdict.own.map(error=>`${error.code} ${error.path??''}`).join('; ')};
-      verified.checks.push({name:'work-valid',command,exitCode:tree.ok?0:1,evidence:tree.reason??''});
+      verified.checks.push({name:'work-valid',command,exitCode:tree.ok?0:1,evidence:tree.reason??'the operation-scoped Work tree validates'});
       if(!tree.ok){
         verified.ok=false;
         verified.failed=[...verified.failed,verified.checks.at(-1)];
@@ -2200,7 +2221,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     }
     // The validator judges what the machine could not: a reject is a contradiction of the report, the op comes
     // back with the findings; a second reject of the same op stops it at the user instead of a third launch.
-    const validation=validateAccepted(store,state,op,ctx.engine?{...verifyCtx,candidate:{packet:ctx.engine.candidatePacket(op),workerRoot:op.candidate.workerRoot,baseRoot:op.candidate.baseRoot}}:ctx,{files,verified,produced});
+    const validation=validateAccepted(store,state,op,ctx.engine?{...verifyCtx,candidate:{packet:ctx.engine.candidatePacket(op),...candidateView.source,roots:candidateView.roots}}:ctx,{files,verified,produced});
     if(ctx.engine&&!['accept','reject'].includes(validation.verdict)){
       op.reviewRound=(op.reviewRound??0)+1;
       op.pending={kind:'required-validation',verdict:validation.verdict,round:op.reviewRound};
@@ -2246,19 +2267,23 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       const resolved=resolveEvidencePacket(ownerEvidence,{evidenceRoot:store.dir,requireIndependent:true});
       if(!resolved.ok){op.pending={kind:'required-acceptance',blocking:resolved.errors};return 'acceptance-pending';}
       acceptedOwnerEvidence=resolved.packet;acceptedOwnerAcceptance=acceptance;
-      const prepared=prepareCandidateIntegration(ctx.engine.candidateSnapshot(op),candidate,{canonicalRoot:state.worktree,git:ctx.git,
-        ignoreCanonicalPaths:(ctx.engine.candidateBridge(op).runtimeManagedFiles??[]).map(item=>item.path),mode:'detection-canonical'});
+      const bridge=ctx.engine.candidateBridge(op),multi=Array.isArray(bridge.rootBindings);
+      const canonicalRoots=multi?Object.fromEntries(bridge.rootBindings.map(root=>[root.id,root.repoRoot])):null;
+      const ignored=multi?bridge.rootBindings.flatMap(root=>(root.runtimeManagedFiles??[]).map(item=>path.join(root.repoRoot,item.path))):
+        (bridge.runtimeManagedFiles??[]).map(item=>item.path);
+      const prepared=prepareCandidateIntegration(ctx.engine.candidateSnapshot(op),candidate,{canonicalRoot:state.worktree,
+        ...(canonicalRoots?{canonicalRoots}:{}),git:ctx.git,ignoreCanonicalPaths:ignored,mode:'detection-canonical'});
       if(prepared.status!=='ready'){op.pending={kind:'integration-quarantine',reasons:prepared.reasons};return 'acceptance-pending';}
     }
     const commit=ctx.guards.gitQueue(()=>commitOp(state,op,files,ctx));
-    if(!commit.committed&&files.length){
+    if(!commit.committed&&(commit.files??[]).length){
       op.status='blocked';
       state.needUser.push({op:op.id,kind:'environment',detail:`the work could not be committed: ${commit.reason}`});
       store.appendEvent({event:'commit-failed',op:op.id,reason:commit.reason,files});
       return 'commit-failed';
     }
     if(commit.head)state.head=commit.head;
-    op.status='done';op.files=files;op.head=commit.head??state.head;op.verifiedChecks=verified.checks;
+    op.status='done';op.files=commit.files??[];op.head=commit.head??state.head;op.verifiedChecks=verified.checks;
     if(op.kind==='integration.verify'&&acceptedOwnerEvidence&&acceptedOwnerAcceptance){
       const ownerVerified=verifyAcceptedIntegrationOwnerRequests(state,{op,evidence:acceptedOwnerEvidence,acceptance:acceptedOwnerAcceptance,now:ctx.now??Date.now,
         receiptFor:({request})=>kernelVerificationReceipt({id:`provider-${crypto.createHash('sha256').update(`${request.id}:${op.id}:${op.attempt}:${acceptedOwnerEvidence.candidateDigest}`).digest('hex').slice(0,32)}`,
@@ -2527,7 +2552,7 @@ function acceptReports(orca,store,state,ctx){
       ctx.engine.settled(op,{reason:'native worker settled before acceptance',workerOnly:true});
     }
     if(ctx.engine&&report.outcome==='done'&&op.workerSettled&&op.candidate?.status!=='sealed'){
-      const frozen=ctx.engine.freezeCandidate(op,{reportedFiles:report.files??[]});
+      const frozen=ctx.engine.freezeCandidate(op,{reportedFiles:report.files??[],requireReported:true});
       if(frozen.status!=='sealed'){
         quarantineCandidate(store,state,op,{kind:'candidate-quarantine',reasons:frozen.reasons??['candidate could not be sealed'],observedFiles:frozen.observedFiles??[]});continue;
       }

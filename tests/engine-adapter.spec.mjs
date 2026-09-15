@@ -106,6 +106,21 @@ test('worker-only settlement releases AI and retains writer until final acceptan
   const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'op',kind:'backend.implement',attempt:1,status:'running',allowlist:['a.js']};f.state.ops=[op];const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})}),lease=runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});assert.equal(lease.ok,true);assert.equal(runtime.settled(op,{workerOnly:true}).writerRetained,true);let rows=runtime.journal.db.prepare('SELECT resource_key FROM leases WHERE job_id=?').all(lease.jobId).map(x=>x.resource_key);assert.equal(rows.includes('ai/global'),false);assert.equal(rows.some(x=>x.startsWith('canonical-writer:')),true);assert.equal(runtime.settled(op).ok,true);rows=runtime.journal.db.prepare('SELECT resource_key FROM leases WHERE job_id=?').all(lease.jobId);assert.equal(rows.length,0);bridge.close();
 });
 
+test('cross-root admission acquires both writers atomically and retains both through acceptance',t=>{
+  const f=fixture(t),owner=path.join(f.dir,'backend-owner'),other=path.join(f.dir,'other-frontend');fs.mkdirSync(owner);fs.mkdirSync(other);
+  const binding=(id,repoRoot)=>({id,role:id,repoRoot,allowlist:['owned/**'],runtimePaths:[],workerWritable:true,runtimeWritable:false});
+  const first={id:'first',kind:'frontend.implement',attempt:1,status:'running',allowlist:['src/**'],candidateRootBindings:{bindings:[binding('source',f.dir),binding('work',owner)]}};
+  const second={id:'second',kind:'frontend.implement',attempt:1,status:'ready',allowlist:['src/**'],candidateRootBindings:{bindings:[binding('source',other),binding('work',owner)]}};f.state.ops=[first,second];
+  const bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),
+    runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})}),allocation={role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'};
+  const held=runtime.reserveOperation(first,allocation);assert.equal(held.ok,true);runtime.settled(first,{workerOnly:true});
+  const rows=runtime.journal.db.prepare('SELECT resource_key FROM leases WHERE job_id=? ORDER BY resource_key').all(held.jobId).map(row=>row.resource_key);
+  assert.equal(rows.filter(key=>key.startsWith('canonical-writer:')).length,2,'both actual repositories remain fenced');
+  const refused=runtime.reserveOperation(second,allocation);assert.equal(refused.ok,false);
+  assert.equal(runtime.journal.db.prepare('SELECT count(*) AS n FROM leases WHERE job_id=?').get(refused.jobId).n,0,'a failed second-root acquisition leaves no partial first-root reservation');
+  assert.equal(runtime.settled(first).ok,true);assert.equal(runtime.reserveOperation(second,allocation).ok,true);runtime.settled(second);bridge.close();
+});
+
 test('a stopped exact native Dispatch freezes and preserves unreported effects before releasing its writer',t=>{
   const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'native',kind:'backend.implement',attempt:1,status:'running',allowlist:['a.js'],dispatch:'ctx-native'};f.state.ops=[op];
   const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-native',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);

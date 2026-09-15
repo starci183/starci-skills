@@ -7,6 +7,7 @@ import {createJobs} from './jobs.mjs';
 import {rankJobs,updateProgressBudget,progressExhausted} from './scheduler.mjs';
 import {loadRuntimes} from './schedule.mjs';
 import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateRecord,candidateWriterResource,freezeDetectionCandidate,prepareCandidateDependencies,readCandidateBridge,readCandidatePacket,readCandidateSnapshot} from './candidate-bridge.mjs';
+import {candidateRootBindingDigest} from './candidate-roots.mjs';
 import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
 import {reconcilePureModelJobs} from './job-reconcile.mjs';
 import {openJournal} from './journal.mjs';
@@ -192,7 +193,12 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       const probationJob={...bound,kind:op.kind,role:effectiveRole,input:{op}};
       const pool=runtimeProfile.runtimes?.[allocated.runtime]??{};
       const existing=journal.getJob(bound.jobId);
-      const machineResources=declareMachineResources(op),resources=[{key:'ai/global',units:1},...((op.allowlist??[]).length?[writer]:[]),...machineResources];
+      const bindings=op.candidateRootBindings?.bindings,rootWriters=Array.isArray(bindings)
+        ?bindings.filter(binding=>binding.workerWritable||binding.runtimeWritable).map(binding=>candidateWriterResource(binding.repoRoot))
+        :((op.allowlist??[]).length?[writer]:[]);
+      for(const resource of rootWriters)admission.setCapacity(resource.key,1);
+      const machineResources=declareMachineResources(op),resources=[{key:'ai/global',units:1},...rootWriters,...machineResources]
+        .sort((a,b)=>a.key.localeCompare(b.key));
       if(existing&&existing.lease_token&&['leased','running','effect_unknown'].includes(existing.status)){
         const rows=journal.db.prepare('SELECT resource_key,units,expires_at FROM leases WHERE job_id=? AND token=? ORDER BY resource_key').all(existing.job_id,existing.lease_token),expected=existing.payload?.expectedResources??[];
         const exact=existing.payload?.reservationProtocol==='intent-v1'&&rows.length>0&&rows.every(item=>Number.isFinite(item.expires_at)&&item.expires_at>now())&&JSON.stringify(rows.map(({resource_key,units})=>({resource_key,units})))===JSON.stringify([...expected].sort((a,b)=>a.key.localeCompare(b.key)).map(item=>({resource_key:item.key,units:item.units})));
@@ -308,25 +314,39 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       return completed.ok?{ok:true,effectState:'none',observedFiles:observed,candidateDigest:op.candidateDigest??null}:{ok:false,effectState:'unknown',reason:completed.reason??'durable native job could not be completed'};
     },
     beginCandidate(op,{repoRoot=state.worktree,allowlist=op.allowlist??[],references=op.references??[],inputPaths=[],oraclePaths=[],ownedDirtyPaths=[],
-      dependencyDigests={},environmentDigest=null,runtimeManagedFiles=[],dependencyInstall=null}={}){
+      dependencyDigests={},environmentDigest=null,runtimeManagedFiles=[],dependencyInstall=null,roots=null,bindingDigest=null}={}){
       if(!git)throw Error('the candidate lifecycle requires the kernel Git adapter');
       const lease=op.lease;if(!lease)throw Error(`reserve ${op.id} before beginning its candidate`);
-      if(op.candidate?.identity?.jobId===lease.jobId)return this.candidateBridge(op);
+      if(op.candidate?.identity?.jobId===lease.jobId){const existing=this.candidateBridge(op),expected=bindingDigest??(roots?candidateRootBindingDigest(roots):null);
+        if(expected&&existing.bindingDigest!==expected)throw Error(`candidate root binding changed for ${op.id}: expected ${expected}, recorded ${existing.bindingDigest??'legacy-single-root'}`);
+        return existing;}
       delete op.candidate;delete op.candidateDigest;delete op.oracleDigest;
       const root=path.join(candidateBase,lease.jobId),bridgeRecord=beginDetectionCandidate({identity:{workflowId:lease.workflowId,opId:lease.opId,
         attempt:lease.attempt,generation:lease.generation,jobId:lease.jobId},repoRoot,workerRoot:path.join(root,'worker'),controlRoot:path.join(root,'control'),
-        allowlist,references,inputPaths,oraclePaths,ownedDirtyPaths,dependencyDigests,environmentDigest,runtimeManagedFiles,dependencyInstall,git,now});
+        allowlist,references,inputPaths,oraclePaths,ownedDirtyPaths,dependencyDigests,environmentDigest,runtimeManagedFiles,dependencyInstall,
+        ...(roots?{roots,bindingDigest:bindingDigest??candidateRootBindingDigest(roots)}:{}),git,now});
       op.candidate=candidateRecord(bridgeRecord);return bridgeRecord;
     },
     /** The manifests of an operation's candidate, read from its control root: state keeps the record, not the bytes. */
     candidateBridge(op){if(typeof op?.candidate?.controlRoot!=='string')throw Error(`candidate ${op?.id} was not begun`);return readCandidateBridge(op.candidate.controlRoot);},
     candidateSnapshot(op){if(typeof op?.candidate?.controlRoot!=='string')throw Error(`candidate ${op?.id} was not begun`);return readCandidateSnapshot(op.candidate.controlRoot);},
     candidatePacket(op){if(op?.candidate?.status!=='sealed')throw Error(`candidate ${op?.id} is not sealed`);return readCandidatePacket(op.candidate.controlRoot);},
-    freezeCandidate(op,{reportedFiles=[]}={}){
+    candidateView(op){
+      const bridge=this.candidateBridge(op),snapshot=bridge.snapshot,roots=bridge.schema==='starci/candidate-root-bridge@1'
+        ?Object.fromEntries(bridge.roots.map(root=>{const binding=bridge.rootBindings.find(item=>item.id===root.id)??{};return [root.id,{...binding,...root,
+          snapshot:root.bridge.snapshot,workerRoot:root.bridge.snapshot.workerRoot,baseRoot:root.bridge.snapshot.baseRoot,oracleRoot:root.bridge.snapshot.oracleRoot}];}))
+        :{source:{id:'source',role:'source',repoRoot:bridge.repoRoot,snapshot,workerRoot:snapshot.workerRoot,baseRoot:snapshot.baseRoot,oracleRoot:snapshot.oracleRoot}};
+      return {bridge,snapshot,roots,source:roots.source??Object.values(roots)[0],work:roots.work??roots.source??Object.values(roots)[0]};
+    },
+    freezeCandidate(op,{reportedFiles=[],requireReported=false}={}){
       if(op.candidate?.status==='sealed')return op.candidate;
-      const frozen=freezeDetectionCandidate(this.candidateBridge(op),{git,reportedFiles,now});
+      const frozen=freezeDetectionCandidate(this.candidateBridge(op),{git,reportedFiles,requireReported,now});
       const {packet}=frozen;
       op.candidate={...op.candidate,status:frozen.status,observedFiles:[...(frozen.observedFiles??[])],assurance:frozen.assurance,
+        ...(frozen.observedByRoot?{observedByRoot:frozen.observedByRoot.map(item=>({...item}))}:{}),
+        ...(frozen.roots?{roots:frozen.roots.map(root=>({id:root.id,role:root.role,repoRoot:root.repoRoot,status:root.status,
+          acceptedHead:root.acceptedHead??null,candidateDigest:root.candidateDigest??null,snapshotDigest:root.snapshotDigest??null,
+          oracleDigest:root.oracleDigest??null,observedFiles:(root.observedFiles??[]).map(item=>item.displayPath)}))}:{}),
         ...(frozen.status==='sealed'?{candidateDigest:packet.candidateDigest,oracleDigest:packet.oracleDigest,snapshotDigest:packet.snapshotDigest,sealedAt:packet.sealedAt,changed:packet.changes.length}:{reasons:[...(frozen.reasons??[])]})};
       if(frozen.status==='sealed'){op.candidateDigest=packet.candidateDigest;op.oracleDigest=packet.oracleDigest;}
       return op.candidate;

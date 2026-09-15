@@ -103,14 +103,24 @@ gates have four states: pass, fail, inconclusive and unavailable. Only complete,
 current pass evidence admits integration. A setup failure on base code does not prove a behavioral fix.
 Full evidence references must resolve; a truncated diff is not a complete review.
 
+A routed candidate can bind more than one actual root. In particular, a source-only frontend may write its
+source checkout while reading and writing the product Work tree in its backend-owned checkout. Each Git root
+keeps its own accepted head, snapshot and complete changed-file inventory; the sealed runtime canon is a
+separate content-digested, read-only input root. Work-relative, repository-relative, absolute and node-id
+references resolve only through these accepted bindings, retain their authored provenance and are checked for
+containment and links. Historical single-root candidate records remain valid.
+
 The integrator checks expected Git head and candidate/canonical drift immediately before promotion/commit.
 Files, Git and an external provider cannot join one SQLite transaction: record intent and receipts, reconcile
 partial effects, preserve unknown bytes and never autorevert unrelated user work. Goal completion requires
 all required operations, checks, goal criteria and owner decisions to be settled. A correct owner blocker is
 an honest blocked result, not a completed product outcome.
 
-Orca native workers currently use detection-only compatibility. A canonical-root writer reservation
-serializes their writes; frozen copies and drift checks detect contamination. This does not prevent a
+Orca native workers currently use detection-only compatibility. Admission atomically reserves every actual
+root the operation or runtime-owned acceptance work may write; failure releases the entire attempted set, and
+read-only roots receive drift protection without fabricated writer ownership. Separate Git worktrees remain
+separate writer resources even when they share a Git common directory. Frozen copies and drift checks detect
+contamination. This does not prevent a
 native process writing an absolute path outside its root. A hard-boundary adapter must be separately
 implemented and demonstrated with adversarial worker-level tests before parallel native writers are enabled.
 

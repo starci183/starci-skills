@@ -66,6 +66,7 @@ kernel/engine.mjs
 kernel/runtime-pin.mjs
 kernel/candidates.mjs
 kernel/candidate-bridge.mjs
+kernel/candidate-roots.mjs
 kernel/model-policy.mjs
 kernel/owner-requests.mjs
 kernel/owner-inbox.mjs

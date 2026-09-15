@@ -437,9 +437,13 @@ export function describeNode(api,repoRoot,node){
  */
 export function grammarReferences(root=skillRoot){
   // The whole canon, not a shortlist: every grammar family file, every frontend pattern, every UI rule the host carries.
-  const found=[];
-  const walk=dir=>{try{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,entry.name);if(entry.isDirectory())walk(file);else if(/\.ya?ml$/i.test(entry.name))found.push(slash(file));}}catch{}};
-  for(const relative of [['knowledge','grammars'],['knowledge','patterns','fe'],['knowledge','ui']])walk(path.join(root,...relative));
+  const found=[],authored=path.join(root,'knowledge');
+  // A sealed runtime deliberately contains compiled JSON only. Operations derived after the pin must read that
+  // exact canon, while operations authored before enrollment retain their YAML provenance and are translated by
+  // the candidate root resolver to the corresponding sealed bytes.
+  const compiled=!fs.existsSync(authored),knowledge=compiled?path.join(root,'.dist','knowledge'):authored,extension=compiled?/\.json$/i:/\.ya?ml$/i;
+  const walk=dir=>{try{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,entry.name);if(entry.isDirectory())walk(file);else if(extension.test(entry.name))found.push(slash(file));}}catch{}};
+  for(const relative of [['grammars'],['patterns','fe'],['ui']])walk(path.join(knowledge,...relative));
   return unique(found).sort();
 }
 

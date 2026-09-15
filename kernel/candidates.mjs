@@ -167,13 +167,32 @@ const readHead=(root,git)=>{
 };
 
 /** Expected-head and byte-level CAS immediately before the single canonical writer is allowed to promote. */
-export function prepareCandidateIntegration(snapshot,packet,{canonicalRoot,git,ignoreCanonicalPaths=[],mode='hard-isolation'}={}){
+export function prepareCandidateIntegration(snapshot,packet,{canonicalRoot,canonicalRoots=null,git,ignoreCanonicalPaths=[],mode='hard-isolation'}={}){
+  if(snapshot?.schema==='starci/candidate-root-snapshot@1'||packet?.schema==='starci/candidate-root-packet@1'){
+    const reasons=[],roots=[],expected=new Map(Object.entries(canonicalRoots??{}).map(([id,root])=>[id,path.resolve(root)]));
+    if(snapshot?.schema!=='starci/candidate-root-snapshot@1'||packet?.schema!=='starci/candidate-root-packet@1')reasons.push('candidate root snapshot and packet schemas disagree');
+    if(snapshot?.bindingDigest!==packet?.bindingDigest)reasons.push('candidate-root-binding-digest-mismatch');
+    const packets=new Map((packet?.roots??[]).map(root=>[root.id,root.packet??root])),snapshots=new Map((snapshot?.roots??[]).map(root=>[root.id,root.snapshot??root]));
+    if(!expected.size)reasons.push('expected canonical root bindings are required for a multi-root candidate');
+    for(const root of snapshot?.roots??[]){
+      const actual=expected.get(root.id),stored=path.resolve(root.repoRoot),rootPacket=packets.get(root.id),rootSnapshot=snapshots.get(root.id);
+      if(!actual||actual!==stored){reasons.push(`candidate-root-binding-mismatch:${root.id}`);continue;}
+      if(!rootPacket||!rootSnapshot){reasons.push(`candidate-root-record-missing:${root.id}`);continue;}
+      const ignored=ignoreCanonicalPaths.map(value=>{const absolute=path.isAbsolute(value)||/^[A-Za-z]:[\\/]/.test(value);if(!absolute)return value;const relative=path.relative(actual,path.resolve(value));return relative.startsWith('..')||path.isAbsolute(relative)?null:slash(relative);}).filter(Boolean);
+      const prepared=prepareCandidateIntegration(rootSnapshot,rootPacket,{canonicalRoot:actual,git,ignoreCanonicalPaths:ignored,mode});roots.push({id:root.id,role:root.role,...prepared});
+      for(const reason of prepared.reasons??[])reasons.push(`${root.id}:${reason}`);
+    }
+    for(const root of packet?.roots??[])if(!snapshots.has(root.id))reasons.push(`candidate-root-packet-added:${root.id}`);
+    return {schema:'starci/candidate-root-integration@1',...identityOf(packet),bindingDigest:packet?.bindingDigest??null,
+      candidateDigest:packet?.candidateDigest??null,snapshotDigest:packet?.snapshotDigest??null,mode,status:reasons.length?'quarantine':'ready',reasons,roots,changes:packet?.changes??[],preparedAt:new Date().toISOString()};
+  }
   const ignored=new Set(ignoreCanonicalPaths.map(cleanRelative));
   if(!['hard-isolation','detection-canonical'].includes(mode))throw new TypeError(`unknown candidate integration mode: ${mode}`);
   const detection=mode==='detection-canonical';
   const expected=detection?packet.files:snapshot.source.entries;
   const universe=[...new Set([...snapshot.source.entries.map(item=>item.path),...packet.files.map(item=>item.path)])].filter(file=>!ignored.has(file));
-  const identity=verifyCandidateIdentity(snapshot,packet),head=readHead(canonicalRoot,git),mismatches=[];
+  const identity=verifyCandidateIdentity(snapshot,packet),head=(()=>{try{return String(packet.acceptedHead??'').startsWith('content:')
+    ?`content:${digestEntries(inventory(canonicalRoot,snapshot.source.entries.map(item=>item.path)))}`:readHead(canonicalRoot,git);}catch{return null;}})(),mismatches=[];
   const byPath=new Map(expected.filter(item=>!ignored.has(item.path)).map(item=>[item.path,item]));
   for(const file of universe){const wanted=byPath.get(file);try{const actual=entry(canonicalRoot,file);if(!wanted||actual.sha256!==wanted.sha256)mismatches.push(`canonical-drift:${file}`);}
     catch(error){if(wanted)mismatches.push(`canonical-${error?.code==='ENOENT'?'missing':'unreadable'}:${file}`);}}
@@ -191,7 +210,19 @@ export function prepareCandidateIntegration(snapshot,packet,{canonicalRoot,git,i
  * changes are quarantined and never reverted. A caller journals the intent before invoking this function and
  * reconciles an `unknown`/partial receipt; this filesystem step cannot pretend to be a Git transaction.
  */
-export function applyPreparedIntegration(snapshot,packet,prepared,{canonicalRoot,git,ignoreCanonicalPaths=[]}={}){
+export function applyPreparedIntegration(snapshot,packet,prepared,{canonicalRoot,canonicalRoots=null,git,ignoreCanonicalPaths=[]}={}){
+  if(prepared?.schema==='starci/candidate-root-integration@1'){
+    if(prepared.status!=='ready'||prepared.candidateDigest!==packet?.candidateDigest)throw new Error('multi-root integration requires the matching ready preparation');
+    const fresh=prepareCandidateIntegration(snapshot,packet,{canonicalRoot,canonicalRoots,git,ignoreCanonicalPaths,mode:prepared.mode??'hard-isolation'});
+    if(fresh.status!=='ready')return {...fresh,outcome:'quarantine',applied:[]};
+    const snapshots=new Map(snapshot.roots.map(root=>[root.id,root.snapshot??root])),packets=new Map(packet.roots.map(root=>[root.id,root.packet??root])),applied=[];
+    for(const root of fresh.roots){
+      const result=applyPreparedIntegration(snapshots.get(root.id),packets.get(root.id),root,{canonicalRoot:canonicalRoots[root.id],git,ignoreCanonicalPaths});
+      applied.push({rootId:root.id,outcome:result.outcome,applied:result.applied??[]});
+      if(result.outcome!=='applied')return {...fresh,status:'reconcile',outcome:'unknown',reason:`root ${root.id} did not settle`,applied};
+    }
+    return {...fresh,outcome:'applied',applied};
+  }
   if(prepared?.status!=='ready'||prepared?.candidateDigest!==packet?.candidateDigest)throw new Error('integration requires the matching ready preparation');
   const fresh=prepareCandidateIntegration(snapshot,packet,{canonicalRoot,git,ignoreCanonicalPaths,mode:prepared.mode??'hard-isolation'});
   if(fresh.status!=='ready')return {...fresh,outcome:'quarantine',applied:[]};

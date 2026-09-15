@@ -339,7 +339,7 @@ export function validateAccepted(store,state,op,ctx,{files,verified,produced=nul
     store.appendEvent({event:'validator-inconclusive',op:op.id,reason:'the complete candidate diff exceeds the validator transport bound',diffFiles:files});
     return {verdict:'inconclusive',reason:'required validator did not receive the complete candidate diff'};
   }
-  const resolvedReferences=strict?resolveValidatorReferences(state,op,ctx.candidate?.workerRoot):null;
+  const resolvedReferences=strict?resolveValidatorReferences(state,op,ctx.candidate):null;
   if(strict&&!resolvedReferences.ok){
     store.appendEvent({event:'validator-inconclusive',op:op.id,reason:resolvedReferences.errors.join('; ')});
     return {verdict:'inconclusive',reason:resolvedReferences.errors.join('; ')};
@@ -396,14 +396,17 @@ export function validateAccepted(store,state,op,ctx,{files,verified,produced=nul
  */
 const looksBinary=buffer=>buffer.includes(0);
 export function frozenCandidateDiff(candidate,files,{git=null}={}){
-  const packet=candidate.packet,selected=new Set(files),chunks=[];
-  const run=typeof git==='function'
-    ?args=>git('git',args,{cwd:candidate.workerRoot,encoding:'utf8',windowsHide:true,maxBuffer:64*1024*1024})
-    :null;
-  for(const change of packet.changes.filter(item=>selected.has(item.path))){
+  const packet=candidate.packet,selected=new Set(files.map(slash)),chunks=[],roots=candidate.roots??{};
+  const viewFor=change=>change.rootId&&roots[change.rootId]?roots[change.rootId]:candidate;
+  const selectedChange=change=>selected.has(slash(change.displayPath??change.path))||selected.has(slash(change.path));
+  for(const change of packet.changes.filter(selectedChange)){
+    const view=viewFor(change),shownPath=slash(change.displayPath??change.path);
+    const run=typeof git==='function'
+      ?args=>git('git',args,{cwd:view.workerRoot,encoding:'utf8',windowsHide:true,maxBuffer:64*1024*1024})
+      :null;
     const read=root=>{try{return fs.readFileSync(path.join(root,change.path));}catch{return null;}};
-    const before=read(candidate.baseRoot),after=read(candidate.workerRoot);
-    const header=`diff --starci a/${change.path} b/${change.path}\nbefore ${change.beforeSha256??'absent'} after ${change.afterSha256??'absent'}`;
+    const before=read(view.baseRoot),after=read(view.workerRoot);
+    const header=`diff --starci a/${shownPath} b/${shownPath}\nroot ${change.rootId??'source'} (${change.rootRole??'source'})\nbefore ${change.beforeSha256??'absent'} after ${change.afterSha256??'absent'}`;
     if((before&&looksBinary(before))||(after&&looksBinary(after))){
       chunks.push(`${header}\nBinary file, ${before?.length??0} bytes before and ${after?.length??0} bytes after; its content is not rendered.`);
       continue;
@@ -411,8 +414,8 @@ export function frozenCandidateDiff(candidate,files,{git=null}={}){
     let body=null,gitBody=false;
     if(run){
       const shown=run(['diff','--no-index','--no-color','--',
-        before?path.join(candidate.baseRoot,change.path):'/dev/null',
-        after?path.join(candidate.workerRoot,change.path):'/dev/null']);
+        before?path.join(view.baseRoot,change.path):'/dev/null',
+        after?path.join(view.workerRoot,change.path):'/dev/null']);
       // `git diff --no-index` exits 1 when the files differ, which is the ordinary case here.
       if([0,1].includes(shown.status)&&typeof shown.stdout==='string'){body=shown.stdout;gitBody=true;}
     }
@@ -426,25 +429,28 @@ export function frozenCandidateDiff(candidate,files,{git=null}={}){
     // Only git's temporary path headers are noise. The no-git fallback deliberately labels its full before and
     // after bodies, so filtering those labels used to make replacement diffs ambiguous to the validator.
     const cleaned=(gitBody?body.split('\n').filter(line=>!drop.test(line)).join('\n'):body).trim();
-    chunks.push(`${header}\n--- a/${change.path}\n+++ b/${change.path}\n${cleaned}`);
+    chunks.push(`${header}\n--- a/${shownPath}\n+++ b/${shownPath}\n${cleaned}`);
   }
   let text=chunks.join('\n');
   const truncated=Buffer.byteLength(text)>VALIDATOR_DIFF_BYTES;
-  return {files,base:packet.acceptedHead,text,truncated};
+  return {files,base:packet.acceptedHead,...(packet.roots?{roots:packet.roots.map(root=>({id:root.id,role:root.role,acceptedHead:root.acceptedHead}))}:{}),text,truncated};
 }
-function resolveValidatorReferences(state,op,rootOverride=null){
-  const errors=[],entries=[],root=fs.realpathSync(rootOverride??state.worktree);
+export function resolveValidatorReferences(state,op,candidate=null){
+  const errors=[],entries=[],views=candidate?.roots??{},defaultView=candidate?.workerRoot?candidate:{workerRoot:state.worktree};
   for(const given of unique(op.resolvedReferences??op.references??[])){
-    let parsed,relative,fragment;
-    try{parsed=parseRef(given);const literal=slash(parsed.ref),hash=literal.indexOf('#');relative=normalize(hash<0?literal:literal.slice(0,hash));fragment=hash<0?null:literal.slice(hash+1);}
+    let parsed,relative,fragment,view,sourceRef,rootId,rootRole;
+    try{parsed=parseRef(given);const literal=slash(parsed.ref),hash=literal.indexOf('#');relative=normalize(given?.path??(hash<0?literal:literal.slice(0,hash)));fragment=given?.fragment??(hash<0?null:literal.slice(hash+1));
+      rootId=given?.rootId??'source';view=views[rootId]??(rootId==='source'?defaultView:null);rootRole=given?.rootRole??view?.role??'source';sourceRef=given?.sourceRef??literal;}
     catch(error){errors.push(`validator reference is invalid: ${String(given)} (${error.message})`);continue;}
+    if(!view?.workerRoot){errors.push(`validator reference names an unaccepted candidate root: ${rootId}`);continue;}
+    const root=fs.realpathSync(view.workerRoot);
     if(!relative||path.isAbsolute(relative)||/^[A-Za-z]:\//.test(relative)||relative==='..'||relative.startsWith('../')||relative.includes('/../')){errors.push(`validator reference escapes the candidate root: ${String(parsed.ref)}`);continue;}
     let target=path.resolve(root,relative);
     try{
       if(fs.lstatSync(target).isDirectory()){const index=['index.yaml','index.yml','index.json','index.md'].find(name=>fs.existsSync(path.join(target,name)));if(!index)throw Object.assign(new Error('directory has no canonical index'),{code:'EISDIR'});relative=`${relative.replace(/\/$/,'')}/${index}`;target=path.join(target,index);}
       const stat=fs.lstatSync(target),real=fs.realpathSync(target),back=path.relative(root,real);
       if(stat.isSymbolicLink()||!stat.isFile()||back.startsWith('..')||path.isAbsolute(back)){errors.push(`validator reference is not a contained regular file: ${given}`);continue;}
-      entries.push({kind:parsed.kind,path:relative,fragment,ref:parsed.ref,bytes:fs.readFileSync(real)});
+      entries.push({kind:parsed.kind,rootId,rootRole,path:relative,fragment,ref:parsed.ref,sourceRef,bytes:fs.readFileSync(real)});
     }catch(error){errors.push(`validator reference is unreadable: ${given} (${error.code??error.message})`);}
   }
   return {ok:errors.length===0,entries,errors};

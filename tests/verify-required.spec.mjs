@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import cp from 'node:child_process';
-import {frozenCandidateDiff,validateAccepted} from '../kernel/verify.mjs';
+import {frozenCandidateDiff,resolveValidatorReferences,validateAccepted} from '../kernel/verify.mjs';
+import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
 
 const fixture=t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-validator-required-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
@@ -102,4 +103,21 @@ test('the frozen candidate reaches the validator as a readable diff, not as base
   assert.match(plain.text,/--- before\nid: one/,'the fallback keeps its before-body label');
   assert.match(plain.text,/\+\+\+ after\nid: one/,'the fallback keeps its after-body label');
   assert.equal(plain.text.includes('eyJwYXRo'),false);
+});
+
+test('multi-root validator evidence reads each frozen root and retains reference provenance',t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-validator-roots-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const roots={};for(const id of ['source','work']){const baseRoot=path.join(dir,id,'base'),workerRoot=path.join(dir,id,'worker');fs.mkdirSync(baseRoot,{recursive:true});fs.mkdirSync(workerRoot,{recursive:true});roots[id]={id,role:id,baseRoot,workerRoot};}
+  fs.writeFileSync(path.join(roots.source.baseRoot,'app.js'),'old\n');fs.writeFileSync(path.join(roots.source.workerRoot,'app.js'),'new\n');
+  fs.mkdirSync(path.join(roots.work.baseRoot,'.starciwork'),{recursive:true});fs.mkdirSync(path.join(roots.work.workerRoot,'.starciwork'),{recursive:true});
+  fs.writeFileSync(path.join(roots.work.baseRoot,'.starciwork','rule.md'),'old rule\n');fs.writeFileSync(path.join(roots.work.workerRoot,'.starciwork','rule.md'),'new rule\n');
+  const workDisplay='C:/owner/.starciwork/rule.md',packet={acceptedHead:'source-head',roots:[{id:'source',role:'source',acceptedHead:'source-head'},{id:'work',role:'work',acceptedHead:'work-head'}],changes:[
+    {rootId:'source',rootRole:'source',path:'app.js',displayPath:'app.js',beforeSha256:'s1',afterSha256:'s2'},
+    {rootId:'work',rootRole:'work',path:'.starciwork/rule.md',displayPath:workDisplay,beforeSha256:'w1',afterSha256:'w2'}]};
+  const diff=frozenCandidateDiff({packet,roots,...roots.source},['app.js',workDisplay]);assert.match(diff.text,/root source/);assert.match(diff.text,/root work/);assert.match(diff.text,/new rule/);assert.deepEqual(diff.roots.map(root=>root.acceptedHead),['source-head','work-head']);
+  const resolved=resolveValidatorReferences({worktree:dir},{resolvedReferences:[{kind:'sds',ref:'.starciwork/rule.md#decision',sourceRef:'demo.rule#decision',rootId:'work',rootRole:'work',path:'.starciwork/rule.md',fragment:'decision'}]},
+    {roots,...roots.source});assert.equal(resolved.ok,true,JSON.stringify(resolved.errors));
+  const transported=normalizeResolvedReferences(resolved.entries);assert.deepEqual({...transported.entries[0],text:undefined,bytes:undefined,transportBytes:undefined,truncated:undefined},
+    {path:'.starciwork/rule.md',rootId:'work',rootRole:'work',sourceRef:'demo.rule#decision',ref:'.starciwork/rule.md#decision',fragment:'decision',text:undefined,bytes:undefined,transportBytes:undefined,truncated:undefined});
+  assert.equal(transported.entries[0].text,'new rule\n');
 });
