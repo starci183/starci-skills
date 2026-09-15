@@ -450,6 +450,29 @@ export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost
     return {ok:true,dispatch:dispatchId,observedFiles:reconciled.observedFiles??[],candidateDigest:reconciled.candidateDigest??null};
   }finally{runtime.close();}
 }
+/**
+ * The probation an owner-directed retry gives back. Every attempt of an unfinished operation that a retired
+ * generation had consumed is refunded against the exact job of its receipt - the restart ended it, the model did
+ * not fail it - so a workflow restarted twice for a runtime repair does not run out of attempts before it starts.
+ */
+export function refundRetiredGenerationProbations(store,state,runtime,{generation=state.engine?.generation??0}={}){
+  const scopes=state.modelEligibility?.probationScopes??{};
+  const refunded=[],skipped=[];
+  for(const op of (state.ops??[]).filter(item=>item.status!=='done')){
+    for(const [scopeId,scope] of Object.entries(scopes)){
+      if(!scopeId.includes(`/${op.id}/`))continue;
+      const already=new Set((scope.refundedJobs??[]).map(item=>item.jobId));
+      for(const receipt of (scope.consumedReceipts??[]).filter(item=>item.opId===op.id&&Number(item.generation)<Number(generation)&&!already.has(item.jobId))){
+        const identity={workflowId:receipt.workflowId??state.id,opId:op.id,generation:receipt.generation,jobId:receipt.jobId,probationRuntime:receipt.runtimeId};
+        const proof={code:'runtime-restart-settlement',attestationId:`retry:${state.id}:g${generation}:${receipt.jobId}`,jobId:receipt.jobId,generation:receipt.generation,workflowId:identity.workflowId,opId:op.id,runtimeId:receipt.runtimeId};
+        let result;try{result=runtime.refundUnbegunProbation(op,proof,identity);}catch(error){result={ok:false,code:String(error?.message??error).slice(0,120)};}
+        (result?.ok?refunded:skipped).push({op:op.id,jobId:receipt.jobId,generation:receipt.generation,runtime:receipt.runtimeId,code:result?.code??null});
+      }
+    }
+  }
+  if(refunded.length||skipped.length)store.appendEvent({event:'retired-generation-probation-refunded',generation,refunded,skipped});
+  return {refunded,skipped};
+}
 export function refundLegacyCoordinatorProbations(store,state,runtime){
   const events=store.readEvents(),refunded=[];
   for(const proofEvent of events.filter(event=>event.event==='legacy-coordinator-no-effect-proved')){
@@ -3775,6 +3798,13 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     }
     resetReviewEpoch(store,state,priorGeneration);
     const engine=enrollV6(store,state,{runtimePin:pin,journalFile:options['journal-file']??state.engine?.journalFile});state.launcher=checked.launcher;
+    // The generations this retry retires give back the probation their unfinished attempts consumed.
+    if(state.modelEligibility?.probationScopes){
+      const runtimeRoot=path.dirname(state.engine.journalFile),runtimeProfile=loadRuntimes(),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
+        policyFile:path.join(skillRoot,'.dist','model','capabilities.json'),qualificationsFile:path.join(runtimeRoot,'model-qualifications.json'),probationsFile:path.join(runtimeRoot,'model-probations.json'),root:runtimeRoot});
+      const refundRuntime=createV6Runtime({store,state,modelPolicy:policy,eligibility:()=>({eligible:false,reasons:['refund-only runtime']})});
+      try{refundRetiredGenerationProbations(store,state,refundRuntime,{generation:engine.generation});}finally{refundRuntime.close();}
+    }
     store.appendEvent({event:'workflow-retried',engine:6,generation:engine.generation,ops:retry,context:'fresh agents from canonical approved inputs and Work'});
     store.saveState(state);
     fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});

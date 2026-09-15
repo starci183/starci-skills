@@ -36,6 +36,14 @@ test('probation refunds only an exact authoritative pre-task no-effect attestati
   assert.equal(bound.refundProbation(job2,'a',{...perception,jobId:'job-gen3'}).code,'probation-refund-proof-invalid');
   assert.equal(bound.refundProbation(job2,'a',perception).code,'probation-refunded');assert.equal(state.modelEligibility.probationBudget.remaining,2);
   assert.equal(bound.refundProbation(job2,'a',perception).code,'probation-refund-cached');
+  // An owner-directed retry refunds the attempts of the generations it retires - and only those.
+  const job3={...job,jobId:'job-gen3-c'};
+  assert.equal(bound.consumeProbation(job3,'a').ok,true);
+  const restart={code:'runtime-restart-settlement',attestationId:'retry:wf:g4:job-gen3-c',jobId:'job-gen3-c',generation:3,workflowId:'wf',opId:'op',runtimeId:'a'};
+  assert.equal(bound.refundProbation(job3,'a',restart).code,'probation-refund-proof-invalid','the workflow is still on generation 3');
+  state.engine.generation=4;
+  assert.equal(bound.refundProbation(job3,'a',restart).code,'probation-refunded');
+  assert.equal(state.modelEligibility.probationBudget.remaining,2);
   assert.equal(bound.refundProbation(job,'a',{...proof,effectState:'unknown',attestationId:'prompt-stalled'}).ok,false);
   assert.equal(bound.refundProbation(job,'a',{...proof,generation:4}).ok,false);
   assert.equal(bound.refundProbation(job,{id:'b',provider:'claude',target:'model-b'},{...proof,runtimeId:'b',attestationId:'wrong-runtime'}).ok,false);assert.equal(state.modelEligibility.probationBudget.remaining,2);

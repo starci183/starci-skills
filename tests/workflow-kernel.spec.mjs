@@ -28,7 +28,7 @@ import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGra
 import {machineVerify} from '../kernel/kernel.mjs';
 import {attributedFiles} from '../kernel/verify.mjs';
 import {relocateLauncher,reviveSupervisor} from '../kernel/kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,LONG_CONTRACT_GRACE_MS,PERCEPTION_GRACE_MS,perceptionProviders,noteAnomaly,prepareV6WorkGate,producedKindVerdict,restoreDurableCheckpoint,recoverSatisfiedDependencyBlocks,sweepResolvedReviewLines,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,nativeActivityProof,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,LONG_CONTRACT_GRACE_MS,PERCEPTION_GRACE_MS,perceptionProviders,refundRetiredGenerationProbations,noteAnomaly,prepareV6WorkGate,producedKindVerdict,restoreDurableCheckpoint,recoverSatisfiedDependencyBlocks,sweepResolvedReviewLines,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,nativeActivityProof,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -3752,6 +3752,27 @@ const stalledTab=(harness,{dispatch,lines,kind=null})=>{
   harness.fake.setScreen(op.terminal,lines);
   return op;
 };
+
+test('a retry refunds the probation its retired generations consumed for unfinished operations, on the record',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    const state=harness.state;
+    state.engine={major:6,generation:3};
+    state.modelEligibility={probationBudget:{initial:6,remaining:2},probationScopes:{
+      'wf/op-intake/backend.implement/implement':{initial:2,remaining:0,consumedJobs:['j1','j2'],refundedJobs:[],consumedReceipts:[
+        {jobId:'j1',runtimeId:'gpt-5.6-sol',workflowId:state.id,opId:'op-intake',generation:1,at:1},
+        {jobId:'j2',runtimeId:'claude-opus',workflowId:state.id,opId:'op-intake',generation:2,at:2}]},
+      'wf/op-done/backend.implement/implement':{initial:2,remaining:1,consumedJobs:['j9'],refundedJobs:[],consumedReceipts:[{jobId:'j9',runtimeId:'gpt-5.6-sol',workflowId:state.id,opId:'op-done',generation:1,at:1}]}}};
+    state.ops.push({id:'op-done',kind:'backend.implement',status:'done',allowlist:[],references:[],checks:[],acceptance:[],dependsOn:[],ledgerIds:[],reports:[]});
+    const asked=[];
+    const runtime={refundUnbegunProbation(op,proof,identity){asked.push([op.id,proof.code,proof.jobId,proof.generation,identity.probationRuntime]);return {ok:true,code:'probation-refunded'};}};
+    const result=refundRetiredGenerationProbations(harness.store,state,runtime,{generation:3});
+    assert.deepEqual(asked,[['op-intake','runtime-restart-settlement','j1',1,'gpt-5.6-sol'],['op-intake','runtime-restart-settlement','j2',2,'claude-opus']],'a done operation is not refunded, a current-generation receipt is not either');
+    assert.equal(result.refunded.length,2);
+    const event=events(harness.store).find(item=>item.event==='retired-generation-probation-refunded');
+    assert.deepEqual(event.refunded.map(item=>item.jobId),['j1','j2']);
+  }finally{harness.cleanup();}
+});
 
 test('a partial report advances the attempt once, whichever side advanced it: the typed settlement or the resume',()=>{
   const harness=setup({plan:salesPlan,scripts:{}});

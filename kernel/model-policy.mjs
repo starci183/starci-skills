@@ -170,7 +170,10 @@ export function createWorkflowModelEligibility({runtimes,state,policyFile,qualif
     // its probation: the kernel did. The refund is bound to the exact job the settlement named and to that one
     // liveness word; a silent worker, a dead one or a refused one is still the model's own attempt.
     const perception=proof?.code==='runtime-perception-settlement'&&proof.liveness==='stalled-idle';
-    const valid=identityMatches&&(neverBegan||perception);
+    // An owner-directed retry retires a generation: the attempts it ends were the runtime's to end, not the
+    // model's to lose. The refund is bound to a receipt of a generation strictly before the workflow's current one.
+    const restart=proof?.code==='runtime-restart-settlement'&&Number.isFinite(Number(proof.generation))&&Number(proof.generation)<Number(state?.engine?.generation??-Infinity);
+    const valid=identityMatches&&(neverBegan||perception||restart);
     if(!valid)return {ok:false,code:'probation-refund-proof-invalid'};
     if(!scope?.consumedJobs?.includes(jobId))return {ok:false,code:'probation-job-not-consumed'};
     const consumed=scope.consumedReceipts?.find(item=>item.jobId===jobId),binding=proof?.journalBinding;
