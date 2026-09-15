@@ -15,6 +15,12 @@ export const BUDGET_FILE='runtime-budget.json';
 export const EXHAUSTED_PERCENT=95;
 /** How often the supervisor asks Orca; the numbers move slowly and every kernel reads the file, not Orca. */
 export const DEFAULT_PROBE_MS=3*60*1000;
+/**
+ * How old a written budget may be and still bound an allocation. It is the supervisor's cadence with room for
+ * two missed probes, and it is one constant on purpose: the freshness `budgetVerdict` demands and the freshness
+ * `freshRuntimeBudget` refreshes for must never drift apart, or a kernel reads a file its own selector rejects.
+ */
+export const FRESH_MAX_AGE_MS=DEFAULT_PROBE_MS*3;
 const GENERIC_WINDOWS=['session','weekly','daily','monthly'];
 
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
@@ -68,6 +74,43 @@ export function readRuntimeBudget(workflowsRoot){
   try{const parsed=JSON.parse(fs.readFileSync(budgetPath(workflowsRoot),'utf8'));return parsed?.schema===RUNTIME_BUDGET&&plain(parsed.providers)?parsed:null;}catch{return null;}
 }
 
+/** Whether a written budget is recent enough to bind an allocation now. A future stamp is not fresh either. */
+export function budgetIsFresh(budget,{now=Date.now(),maxAgeMs=FRESH_MAX_AGE_MS}={}){
+  const at=Number(budget?.at);
+  return Number.isFinite(at)&&at<=now&&now-at<=maxAgeMs;
+}
+
+/**
+ * The budget an allocation may actually read, refreshed when it is not.
+ *
+ * The supervisor probes on its own cadence, but a workflow's FIRST quota question is asked before any supervisor
+ * exists: `workflow-goal` runs on the bare command, selects the planner and validator pools, and used to read
+ * whatever `runtime-budget.json` the last run left behind. A file hours old is rejected by `budgetVerdict`'s
+ * freshness rule, so the pool came back empty and the goal was assessed and critiqued by nobody at all - with no
+ * model call ever made and no reason on the record. That is the hole this closes: the caller asks for a budget it
+ * may use, and gets either a fresh one or an honest refusal.
+ *
+ * Stale is never good enough. A probe that fails leaves the written file exactly where it is (the supervisor's
+ * own rule) and answers `{budget:null, reason}`, because a quota nobody can read is not a quota that permits a
+ * launch. Nothing here chooses or forces a provider: it only decides which numbers the quota-aware selector sees.
+ */
+export function freshRuntimeBudget(workflowsRoot,{probe=probeRuntimeBudget,now=Date.now,maxAgeMs=FRESH_MAX_AGE_MS,write=writeRuntimeBudget}={}){
+  const at=now();
+  const onDisk=readRuntimeBudget(workflowsRoot);
+  if(budgetIsFresh(onDisk,{now:at,maxAgeMs}))return {ok:true,budget:onDisk,source:'file',refreshed:false,reason:null};
+  const stale=onDisk?`the written budget is ${Math.round((at-Number(onDisk.at))/1000)}s old`:'no budget has been written beside this store';
+  let probed=null;
+  try{probed=probe({at});}
+  catch(error){probed={ok:false,reason:String(error?.message??error).slice(0,300)};}
+  if(!probed?.ok)return {ok:false,budget:null,source:null,refreshed:false,
+    reason:`${stale} and the provider quota could not be read: ${probed?.reason??'unknown'}`};
+  let written=null;
+  try{written=write(workflowsRoot,probed.budget);}
+  catch(error){return {ok:false,budget:null,source:null,refreshed:false,
+    reason:`${stale} and the refreshed budget could not be written beside the stores: ${String(error?.message??error).slice(0,200)}`};}
+  return {ok:true,budget:probed.budget,source:'probed',refreshed:true,reason:null,file:written};
+}
+
 /**
  * The windows that bound one runtime: every generic window of its provider (session, weekly, ...) plus a named
  * window only when the runtime's profile names it (`budgetWindow: fableWeekly`). A runtime whose profile names
@@ -88,7 +131,7 @@ export function runtimeWindows(profileEntry,budget){
  * window is at or past the limit and has not reset), `until` (that reset), `remaining` (the smallest share
  * left across its windows, 0-100) and the windows read. A runtime nobody can read is never exhausted here.
  */
-export function budgetVerdict(profileEntry,budget,{now=Date.now(),exhaustedPercent=EXHAUSTED_PERCENT,requireFresh=false,maxAgeMs=DEFAULT_PROBE_MS*3}={}){
+export function budgetVerdict(profileEntry,budget,{now=Date.now(),exhaustedPercent=EXHAUSTED_PERCENT,requireFresh=false,maxAgeMs=FRESH_MAX_AGE_MS}={}){
   const windows=runtimeWindows(profileEntry,budget);
   if(!windows.length)return {known:false,exhausted:false,until:null,remaining:null,windows:[]};
   const live=windows.filter(win=>!win.resetsAt||win.resetsAt>now);

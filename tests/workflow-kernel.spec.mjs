@@ -1030,7 +1030,7 @@ test('a scope entry that names nothing in the tree begins with an intake operati
   try{
     assert.equal(collab.goal.ok,true);
     assert.deepEqual(collab.state.ops.map(op=>[op.id,op.kind,op.nodeId,op.origin,op.intake]),
-      [['collab-intake','work.author',null,'ledger',{scope:'collab',example:'features/payments',mode:'author'}]]);
+      [['collab-intake','work.author',null,'ledger',{scope:'collab',feature:'collab',layers:[],example:'features/payments',mode:'author'}]]);
     const op=collab.state.ops[0];
     assert.deepEqual(op.allowlist,['.starciwork/features/collab/**']);
     assert.deepEqual(op.ledgerIds,[],'an intake closes no node: the records it writes are the nodes');

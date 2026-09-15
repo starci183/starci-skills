@@ -247,6 +247,10 @@ export function runHeadless(provider,prompt,options={}){return runHeadlessWithUs
 export function callFunction({kind,payload,form,providers,cwd,runHeadless:run=runHeadlessWithUsage,retries=1,extra,role}){
   const attempts=[];
   let usage=null;
+  // An empty chain is not a chain that failed: nothing was asked, nothing answered, and the caller's own selector
+  // is what came back empty. Saying so is the difference between "the model is bad at this" and "no model ran".
+  if(!Array.isArray(providers)||!providers.length)return {ok:false,attempts,usage,
+    reason:`no provider was given for ${kind}: the caller's selection returned an empty chain, so no model was called`};
   for(const provider of providers){
     for(let attempt=0;attempt<=retries;attempt+=1){
       let answered;

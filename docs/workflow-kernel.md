@@ -336,9 +336,24 @@ and in the `## Phản biện (critique)` section of `goal.md` above the definiti
 
 A critic no provider could answer is `goal-critique-unavailable`: the goal page says `Phản biện: chưa chạy được`,
 nothing binds an operation, and the workflow carries on - a dead provider is never a veto over the owner's job.
+The event and `state.critique` also record whether a critic was **asked** (`attempted`, the providers, the
+attempts): a chain that was empty - no validator runtime had known available quota - was never asked at all, and
+that is a different fact from a critic that answered badly or died mid-call.
 
-**approval.** `approve` sets `state.approved`. This is the only human gate; nothing is launched before it, and a
-goal whose critique returned `refuse` is not approvable until the override above is given.
+**grounds.** Before the page is written the phase records what the goal rests on (`state.goalGrounds`,
+`goal.json.grounds`): `assessment` is `model` when the planner answered, `ledger` when it did not and the
+criteria were derived from the authored tree (the nodes, the intakes and the cuts are facts of that tree), or
+`none`; `critique` is `answered`, `attempted` or `not-attempted`; `quotaBlocks` names the roles the quota
+selected nothing for and why. `goalApprovalBlocks` turns that into the refusals the page shows first
+(`## This goal cannot be approved as it stands`) and the `goal-not-approvable` event: a goal with no definition
+of done, or one nobody was asked to critique, cannot be frozen into an approved envelope. The repair is always
+to run `workflow-goal` again once the runtime can call a model; the missing criteria or a verdict are never
+written into the record by hand.
+
+**approval.** `approve` sets `state.approved`. This is the only human gate; nothing is launched before it. A
+first approval refuses a goal the grounds above block, and a goal whose critique returned `refuse` is not
+approvable until the override above is given. Approving again a workflow that finished `blocked` is a resume,
+not a new envelope, and does not pass the grounds gate again.
 
 **`run`.** `runLoop` first runs the worktree **preflight** once (`kernel-guards.preflight`: `core.longpaths`,
 the hooks environment for the kernel's own commits, the recorded `autocrlf` state, the branch) and appends one
@@ -498,6 +513,16 @@ skeleton - with every leaf record `todo` and the roots carrying no state, so the
 decisions stay the owner's. Neither op closes a Work node (`ledgerIds: []`); the records it writes are the
 nodes the next `syncLedgerOps` sees.
 
+A scope entry is read as the tree reads it before it becomes an intake (`featureScope`, `narrowIntakeScopes`):
+`login`, `features/login` and `.starciwork/features/login/business` name the feature `login`, the last of them
+one layer of it. A fully spelled entry never becomes a feature called `features`; a layer entry is dropped when
+the same feature is also named whole; and an intake whose scope names only some layers of its feature owns
+exactly those layers (`intake.layers`, allowlist `features/<feature>/<layer>/**` per layer) - never the module
+record `features/<feature>/index.yaml`, never a layer the goal did not approve. Such an intake writes its
+reconciliation table into the shallowest record it owns (`features/<feature>/<layer>/index.yaml`), and a change
+the module record would need is recorded there as an integration request for the index owner. The layers an
+op was granted travel with it through every retemplate.
+
 An intake op's goal and acceptance are re-derived from the current build at every sync
 (`intake-retemplated {op, changed}`): the validator reads the acceptance literally, so a wording the build
 has since corrected must reach the ops planned before the correction. Only the text moves - the allowlist and
@@ -511,7 +536,11 @@ report as the owner's, and nothing asks the user.
 
 `workflow-goal --reintake <feature>` plans the same intake in reconcile mode over drafts the tree already
 holds (`intake-planned {mode: reconcile}`), which is how a feature authored before this rule is brought under
-it.
+it. A reintake is read against the approved `--scope`, never beside it: with a scope that names only
+`features/login/business` and `features/login/architecture`, `--reintake login` is one intake over those two
+layers; a reintake naming a feature the scope does not name is refused at goal time (widen the scope or drop
+the reintake), because it would be an operation over paths the owner never approved. A feature named for
+reintake that has no record yet is authored, not reconciled.
 
 `workflow-goal --migrate <feature,...|all>` is the one workflow that executes no node. It plans one intake per
 feature in migrate mode (`intake-planned {mode: migrate}`) over an allowlist of the module record, `business/**`,
@@ -1489,7 +1518,13 @@ build needs a hand restart to take effect.
 Every three minutes the supervisor asks Orca for the usage windows its status bar shows (`orca account list
 --json` -> `rateLimits`: Claude's five-hour session, its week and Fable's own week; Codex's week) and writes
 them whole beside every store root it covers as `_local/workflows/runtime-budget.json` (`budget-probed`; a
-failed probe leaves the last good file and says `budget-probe-failed`). A runtime is bound by the generic
+failed probe leaves the last good file and says `budget-probe-failed`). The goal phase runs before any
+supervisor exists, so it does not inherit that file blindly: `freshRuntimeBudget` reads it only while it is
+younger than three probe periods and otherwise refreshes it through the same probe - the host's typed
+`probeBudget` when the host has one, else the Orca CLI - and writes the result beside the stores
+(`budget-refreshed`). A quota nobody can read selects nothing and says so (`quota-unreadable`), as does a pool
+whose every runtime is exhausted (`quota-pool-empty`); stale numbers never bind a selection and no provider is
+forced in. A runtime is bound by the generic
 windows of its provider (`provider:` in model/runtimes.yaml) and by a named window only when its profile
 names it (`budgetWindow: fableWeekly`); `budgetVerdict` says whether a window is exhausted (95% and not yet
 reset) and what share is left. Kernels read the file, never Orca. The allocator folds the verdict into every
@@ -1522,7 +1557,10 @@ under two concerns is emitted by both for the same reason.
 **The goal phase** (`kernel/goal.mjs`) - `goal` the assessed goal was written; `goal-assessment-failed` the
 model could not fill the form and the definition of done fell back to the node list; `goal-failed` the phase
 could not produce a goal at all; `goal-critiqued` the critique's verdict; `goal-critique-unavailable` no
-critic answered and the goal carries on uncritiqued; `critique-overridden` the owner overrode a `refuse` with
+critic answered and the goal carries on uncritiqued (`attempts: 0` with an empty `providers` means none was
+asked); `goal-not-approvable` the grounds block the first approval; `budget-refreshed` /
+`quota-unreadable` / `quota-pool-empty` what the quota-aware selection of the planner and validator pools found;
+`critique-overridden` the owner overrode a `refuse` with
 `--accept-critique`; `approved` the one human gate passed; `intake-planned` a scope entry the tree does not
 hold became an intake op (with `mode: reconcile` for a `--reintake`); `prerequisite-held` /
 `prerequisite-owner` / `prerequisite-unresolved` what the critique said the goal rests on - already in the

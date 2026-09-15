@@ -15,10 +15,10 @@ import {decisionKindFor} from './io.mjs';
 import {isAsk,openOwnerAsk} from './owner.mjs';
 import {loadConfig,nonOperationModels} from '../scripts/config.mjs';
 import {laneView} from './lanes.mjs';
-import {intakeOp,scopeNames} from './intake.mjs';
+import {featureScope,intakeOp,narrowIntakeScopes,scopeNames} from './intake.mjs';
 import {cutOpFor,cutPlanned,cutReason,deriveWorkOp,designGate,laneOf,laneText,laneWalked} from './sync.mjs';
 import {noteBrand} from './verify.mjs';
-import {quotaAwarePeers,readRuntimeBudget} from './budget.mjs';
+import {freshRuntimeBudget,quotaAwarePeers} from './budget.mjs';
 
 /**
  * The goal phase: everything that happens before the one human gate, and nothing that happens after it.
@@ -122,11 +122,37 @@ export function decidedRecords(api,at,loaded,{scope=[],max=40}={}){
 export function critiqueRuntimes(host){
   return nonOperationModels('validator',loadConfig(host));
 }
-function quotaSelectedProviders(store,state,role,providers){
+/**
+ * The pool one non-operation role may be called on right now.
+ *
+ * The goal phase is the FIRST thing a workflow does, and it runs before any supervisor exists - so the budget the
+ * quota-aware selector reads is refreshed here, through the same typed host probe the supervisor uses, rather
+ * than inherited from whatever a previous run left on disk. A budget too old to bind is refused, never treated as
+ * permission: an unreadable quota selects nothing and says why on the record, because a goal assessed by nobody
+ * must be visible as that and not as a model that answered badly. The pool and its eligibility are unchanged; no
+ * provider is ever forced in, and the numbers are written by the runtime, never by hand.
+ */
+function quotaSelectedProviders(store,state,role,providers,{budget=freshRuntimeBudget}={}){
   if(Array.isArray(providers))return providers;
   const configured=nonOperationModels(role,loadConfig(state.host??undefined));
-  const budget=store?.dir?readRuntimeBudget(path.dirname(store.dir)):null;
-  return quotaAwarePeers(configured,loadRuntimes(),budget).providers.slice(0,1);
+  const root=store?.dir?path.dirname(store.dir):null;
+  const fresh=root?budget(root):{ok:false,budget:null,reason:'this workflow store has no root to read the provider quota beside'};
+  if(fresh.refreshed)store.appendEvent({event:'budget-refreshed',role,at:fresh.budget.at,
+    providers:Object.fromEntries(Object.entries(fresh.budget.providers).map(([provider,entry])=>[provider,entry.status]))});
+  if(!fresh.ok||!fresh.budget){
+    state.quotaBlocks=[...(state.quotaBlocks??[]).filter(item=>item.role!==role),{role,reason:fresh.reason,at:Date.now()}];
+    store.appendEvent({event:'quota-unreadable',role,configured,reason:fresh.reason});
+    return [];
+  }
+  const peers=quotaAwarePeers(configured,loadRuntimes(),fresh.budget);
+  if(!peers.ok){
+    state.quotaBlocks=[...(state.quotaBlocks??[]).filter(item=>item.role!==role),
+      {role,reason:`every runtime of the ${role} pool is exhausted or unreadable`,at:Date.now(),reviewed:peers.reviewed}];
+    store.appendEvent({event:'quota-pool-empty',role,configured,reviewed:peers.reviewed,source:fresh.source});
+    return [];
+  }
+  state.quotaBlocks=(state.quotaBlocks??[]).filter(item=>item.role!==role);
+  return peers.providers.slice(0,1);
 }
 
 /**
@@ -134,13 +160,17 @@ function quotaSelectedProviders(store,state,role,providers){
  * quota-aware validator pool unless the caller names its own providers. An unanswered critique is
  * `goal-critique-unavailable` and the workflow carries on: a dead provider is not a veto over the owner's job.
  */
-export function critiqueGoalPhase(store,state,{critiqueGoal=llm.critiqueGoal,providers=null,cwd=state.worktree,runHeadless,
+export function critiqueGoalPhase(store,state,{critiqueGoal=llm.critiqueGoal,providers=null,cwd=state.worktree,runHeadless,budget=null,
   ledger=[],decisions=[],records=[],material=[],constraints=[]}={}){
-  const chain=critiqueGoal===llm.critiqueGoal?quotaSelectedProviders(store,state,'validator',providers):(providers??llm.DEFAULT_CRITIC_RUNTIMES);
+  const chain=critiqueGoal===llm.critiqueGoal?quotaSelectedProviders(store,state,'validator',providers,{budget:budget??freshRuntimeBudget}):(providers??llm.DEFAULT_CRITIC_RUNTIMES);
   const critiqued=typeof critiqueGoal==='function'?critiqueGoal({job:state.job,scope:state.scope??[],ledger,decisions,
     records,material,brand:state.brand??null,constraints,providers:chain,cwd,runHeadless}):null;
   if(!critiqued?.ok){
+    // `attempted` is the difference the approval gate turns on: a critic that answered badly, or refused, or died
+    // mid-call was asked and is no veto over the owner's job - the rule this runtime has always had. A chain that
+    // was EMPTY was never asked at all, so nothing independent has read this goal, and that is not the same fact.
     state.critique={verdict:'unavailable',objections:[],required:[],alternatives:[],question:null,prerequisites:[],overlaps:[],provider:null,
+      attempted:chain.length>0,providers:[...chain],attempts:critiqued?.attempts?.length??0,
       at:Date.now(),reason:critiqued?.reason??'critiqueGoal was not available'};
     state.provisions=[];
     // The form errors of the attempts travel with the event: an unavailable critique is only diagnosable from them.
@@ -148,7 +178,8 @@ export function critiqueGoalPhase(store,state,{critiqueGoal=llm.critiqueGoal,pro
       attempts:critiqued?.attempts?.length??0,providers:chain,errors:(critiqued?.attempts??[]).slice(-2).map(item=>({provider:item.provider,errors:(item.errors??[]).slice(0,3)}))});
     return state.critique;
   }
-  state.critique={verdict:critiqued.verdict,objections:(critiqued.objections??[]).map(item=>({...item})),
+  state.critique={verdict:critiqued.verdict,attempted:true,providers:[...chain],attempts:critiqued.attempts?.length??0,
+    objections:(critiqued.objections??[]).map(item=>({...item})),
     required:[...(critiqued.required??[])],alternatives:[...(critiqued.alternatives??[])],
     question:critiqued.question??null,prerequisites:(critiqued.prerequisites??[]).filter(plain).map(item=>({...item})),
     // The overlaps with the decided records are the three cases seen from the critic's side: a `reference` is a
@@ -353,14 +384,14 @@ export function noteCritiqueInGoal(store,state){
  * Plan ledger: one model call fills the whole plan form (definition of done, ledger, operations), the
  * kernel writes goal.md and goal.json and stops. Nothing is launched before the user approves.
  */
-export function planGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoal=llm.critiqueGoal,renderGoalMarkdown=llm.renderGoalMarkdown,extractMaterial=llm.extractMaterial,cwd=state.worktree,providers,runHeadless}={}){
+export function planGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoal=llm.critiqueGoal,renderGoalMarkdown=llm.renderGoalMarkdown,extractMaterial=llm.extractMaterial,cwd=state.worktree,providers,runHeadless,budget=null}={}){
   need(!state.approved,`Workflow ${state.id} is already approved; run workflow-run`);
   need(typeof assessGoal==='function','assessGoal is not available yet in models/functions.mjs');
   const material=typeof extractMaterial==='function'?extractMaterial(state.inputs.map(item=>item.ref),{cwd}):[];
   const assessed=assessGoal({job:state.job,inputs:state.inputs,material,constraints:[
     `every op runs in the one worktree ${slash(state.worktree)} on branch ${state.branch}: allowlists of ops that may run in parallel must be disjoint`,
     `at most ${state.maxParallelOps??10} ops run at a time, and the kernel re-runs every declared check itself before it accepts a done`,
-    ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)],providers:assessGoal===llm.assessGoal?quotaSelectedProviders(store,state,'planner',providers):providers,cwd,runHeadless});
+    ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)],providers:assessGoal===llm.assessGoal?quotaSelectedProviders(store,state,'planner',providers,{budget:budget??freshRuntimeBudget}):providers,cwd,runHeadless});
   if(!assessed?.ok){
     store.appendEvent({event:'goal-failed',attempts:assessed?.attempts??null});
     store.saveState(state);
@@ -392,25 +423,36 @@ export function planGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   }
   // The goal is critiqued before the page that asks for the approval is written: the plan the model assessed is
   // exactly what the critic reads, so an objection to it is an objection to what the user is about to approve.
-  critiqueGoalPhase(store,state,{critiqueGoal,providers,cwd,runHeadless,material,
+  critiqueGoalPhase(store,state,{critiqueGoal,providers,cwd,runHeadless,budget,material,
     ledger:state.ledger.map(item=>({id:item.id,kind:null,title:item.title})),
     constraints:[`the ledger of this goal was assessed by a model, not authored: a ledger item the plan calls done is approved by the user and never verified by the kernel`,
       ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)]});
   // The decisive hidden decisions are planned on a plan ledger too: the owner is asked before the work, not after.
   planCritiqueDecisions(store,state,{});
+  // A plan ledger has no authored tree to derive criteria from, so `fallback: none`: its definition of done comes
+  // from the assessment or from nowhere. The phase already refuses an assessment that failed; this is what the
+  // approval gate reads when a model answered with an empty one.
+  goalGrounds(state,{assessed,fallback:'none'});
   writeJson(store.paths.goalJson,{schema:GOAL_RECORD,id:state.id,job:state.job,inputs:state.inputs,ledgerMode:state.ledgerMode,
     definitionOfDone:state.definitionOfDone,risks:state.risks,questions:state.questions,critique:state.critique??null,
     ledger:state.ledger,ops:state.ops.map(op=>({id:op.id,kind:op.kind,goal:op.goal,
       ledgerIds:op.ledgerIds,allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn})),
-    gates:state.gates,serializedOverlaps:overlaps,assessedBy:assessed.provider??null,provisions:state.provisions??[]});
+    gates:state.gates,serializedOverlaps:overlaps,assessedBy:assessed.provider??null,provisions:state.provisions??[],
+    grounds:state.goalGrounds,approvable:!goalApprovalBlocks(state).length,approvalBlocks:goalApprovalBlocks(state)});
   const markdown=typeof renderGoalMarkdown==='function'?renderGoalMarkdown(plan,{job:state.job}):null;
   fs.writeFileSync(store.paths.goal,markdown??fallbackGoalMarkdown(state));
   state.phase='awaiting-approval';
-  store.appendEvent({event:'goal',ops:state.ops.length,ledger:state.ledger.length,gates:state.gates.length,overlaps});
+  const blocks=goalApprovalBlocks(state);
+  store.appendEvent({event:'goal',ops:state.ops.length,ledger:state.ledger.length,gates:state.gates.length,overlaps,
+    grounds:{assessment:state.goalGrounds.assessment,critique:state.goalGrounds.critique},approvable:!blocks.length});
+  if(blocks.length)store.appendEvent({event:'goal-not-approvable',blocks});
   store.saveState(state);
   return {ok:true,id:state.id,goal:store.paths.goal,goalJson:store.paths.goalJson,
     ops:state.ops.length,ledger:state.ledger.length,gates:state.gates.length,overlaps,
-    next:`review ${slash(store.paths.goal)} and approve with workflow-approve --id ${state.id}`};
+    grounds:state.goalGrounds,approvable:!blocks.length,...(blocks.length?{approvalBlocks:blocks}:{}),
+    next:blocks.length
+      ?`this goal cannot be approved as it stands: ${blocks[0]}`
+      :`review ${slash(store.paths.goal)} and approve with workflow-approve --id ${state.id}`};
 }
 
 export function fallbackGoalMarkdown(state){
@@ -449,7 +491,56 @@ const ledgerErrorText=errors=>errors.slice(0,3).map(error=>typeof error==='strin
  * "ledger incomplete" in goal.md, because guessing a scope for authored work is not the kernel's to do.
  * The model is asked for one thing only: the definition of done and the risks and questions around it.
  */
-export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoal=llm.critiqueGoal,ledgerApi=work,validate=validateWorkTree,cwd=state.worktree,providers,runHeadless,
+/**
+ * What this goal actually rests on, written onto the state so the approval gate reads a fact and not a mood.
+ *
+ * A goal is approvable when its definition of done has grounds and something independent has read it. There are
+ * exactly three ways the criteria can arise: a model assessed them (`model`), or the assessment was unavailable
+ * and the kernel derived them from the authored tree it is about to execute (`ledger`) - which is grounded,
+ * because the nodes and operations are facts of the tree - or there was nothing to derive them from and the goal
+ * has `none`. The third case used to return `ok:true` with an empty definition of done and no objection on the
+ * record, which is exactly the shape a goal takes when no model was ever called; `approve` now refuses it.
+ *
+ * Nothing here authors criteria, softens a verdict or invents a critic. It only names which of the three
+ * happened, so that a goal with no basis stops instead of being frozen into an approved envelope.
+ */
+export function goalGrounds(state,{assessed=null,fallback='ledger'}={}){
+  const critique=state.critique;
+  const grounds={
+    assessment:assessed?.ok?'model':(state.definitionOfDone??[]).length?fallback:'none',
+    assessmentReason:assessed?.ok?null:(assessed?.reason??'assessGoal was not available'),
+    assessmentAttempts:assessed?.attempts?.length??0,
+    critique:!plain(critique)?'none':critique.verdict!=='unavailable'?'answered':critique.attempted?'attempted':'not-attempted',
+    critiqueReason:plain(critique)&&critique.verdict==='unavailable'?critique.reason??null:null,
+    quotaBlocks:(state.quotaBlocks??[]).map(item=>({role:item.role,reason:item.reason})),
+    at:Date.now()};
+  state.goalGrounds=grounds;
+  return grounds;
+}
+
+/**
+ * The refusals that stand between a goal and its one approval. Empty means approvable. The wording is the repair:
+ * every case here is fixed by running `workflow-goal` again once the runtime can call a model, never by writing
+ * a definition of done or a verdict into the record by hand.
+ */
+export function goalApprovalBlocks(state){
+  const grounds=plain(state.goalGrounds)?state.goalGrounds:null;
+  const blocks=[];
+  const quota=(grounds?.quotaBlocks??[]).map(item=>`${item.role}: ${item.reason}`).join('; ');
+  if(!(state.definitionOfDone??[]).length)blocks.push(
+    `goal ${state.id} has no definition of done: nothing assessed it and the tree gave no criteria to derive`+
+    `${grounds?.assessmentReason?` (${grounds.assessmentReason})`:''}. Run workflow-goal again once a planner provider can be called`+
+    `${quota?` - ${quota}`:''}; a definition of done is never written into the goal by hand.`);
+  else if(grounds&&grounds.assessment==='none')blocks.push(
+    `goal ${state.id} was assessed by nobody and derived nothing: ${grounds.assessmentReason??'no reason was recorded'}.`);
+  if(grounds&&grounds.critique==='not-attempted')blocks.push(
+    `goal ${state.id} was never critiqued: no critic provider was selected, so nothing independent has read it`+
+    `${grounds.critiqueReason?` (${grounds.critiqueReason})`:''}${quota?` - ${quota}`:''}. Run workflow-goal again once the validator pool has quota. `+
+    `A critic that WAS called and could not answer is a different case and does not block this approval.`);
+  return blocks;
+}
+
+export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoal=llm.critiqueGoal,ledgerApi=work,validate=validateWorkTree,cwd=state.worktree,providers,runHeadless,budget=null,
   ledgerRoot=null,git=spawnSync,resolveLedger=resolveLedgerRoot}={}){
   need(!state.approved,`Workflow ${state.id} is already approved; run workflow-run`);
   // The Work ledger is the branch content of the worktree; only the workflow history lives in the main repository.
@@ -486,14 +577,34 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   // `--reintake <feature>` re-authors drafts the tree already holds under the reconciliation rule: the same intake
   // op, in reconcile mode, over the same allowlist - the way a feature authored before that rule is brought under it.
   const reintake=(state.reintake??[]).map(entry=>slash(String(entry??'')).replace(/\/+$/,'')).filter(Boolean);
-  const absent=migrating?migrated:unique([...(scope??[]).filter(entry=>!loaded.list.some(node=>scopeNames(node,entry))),...reintake]);
+  // A reintake is read against the approved scope, never beside it: a feature the scope does not name has no
+  // layer this goal may write, so asking to re-author it is a scope change the owner makes, not an operation.
+  if(scope&&scope.length&&reintake.length){
+    const named=new Set(scope.map(entry=>featureScope(entry)?.feature).filter(Boolean));
+    const outside=unique(reintake.map(entry=>featureScope(entry)?.feature??entry)).filter(feature=>!named.has(feature));
+    need(!outside.length,`--reintake names a feature outside the approved scope: ${outside.join(', ')} (the scope names ${[...named].join(', ')||'no feature'}); widen --scope or drop that reintake`);
+  }
+  // The intake scopes are resolved against the tree before they become operations: a fully spelled entry names the
+  // feature it always named rather than one called `features`, a layer entry is dropped when the same feature is
+  // also named whole, and every operation is intersected with the approved scope inside `intakeOp`. A goal that
+  // approved two layers of a feature never produces an operation holding all of it.
+  const absent=migrating?migrated:narrowIntakeScopes([...(scope??[]).filter(entry=>!loaded.list.some(node=>scopeNames(node,entry))),...reintake]);
   const repositories=(()=>{try{return Object.fromEntries(bindingRoutes(binding.binding,{source:path.dirname(path.resolve(state.host??''))}).map(route=>[route.role,route.directory]));}catch{return {};}})();
   // The folders of the other bound repositories, and the folder they all live in, so a path naming one of them
   // is never mistaken for a path of this worktree.
   state.otherRepositories=unique(Object.values(repositories).map(root=>path.basename(String(root))).filter(name=>name&&name!==path.basename(repoRoot)));
   state.repositoriesRoot=state.host?path.basename(path.dirname(path.dirname(path.resolve(state.host)))):null;
-  const modeOf=entry=>migrating?'migrate':reintake.includes(slash(String(entry)).replace(/\/+$/,''))?'reconcile':'author';
-  const intake=absent.map((entry,index)=>intakeOp(state,{workRoot:binding.ledgerRoot,loaded,index,entry,repositories,mode:modeOf(entry)}));
+  // `--reintake` names features by their tree name too, so the mode is decided on the resolved feature. It means
+  // re-authoring drafts the tree already HOLDS: a feature named for reintake that has no record yet is an author,
+  // because there is nothing there to reconcile and asking an operation to re-author nothing only spends attempts.
+  const reintakeFeatures=new Set(reintake.map(entry=>featureScope(entry)?.feature??entry));
+  const modeOf=entry=>{
+    if(migrating)return 'migrate';
+    const feature=featureScope(entry)?.feature??entry;
+    if(!reintakeFeatures.has(feature))return 'author';
+    return loaded.list.some(node=>scopeNames(node,entry))?'reconcile':'author';
+  };
+  const intake=absent.map((entry,index)=>intakeOp(state,{workRoot:binding.ledgerRoot,loaded,index,entry,repositories,mode:modeOf(entry),scope:state.scope??[]}));
   state.decisions=(migrating?[]:ledgerApi.decisionCandidates(loaded,{scope})).map(node=>({id:node.id,kind:node.kind,path:node.path,
     operation:decisionKindFor(node.kind)??'business.decide',title:describeNode(ledgerApi,at,node)}));
   state.ledgerSummary=ledgerApi.ledgerSummary(loaded,{scope});
@@ -538,7 +649,7 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
       `the ledger is the authored Work tree under ${slash(binding.ledgerRoot)} and is not yours to change`,
       ...(binding.sharedLedger?[`that tree is owned by ${binding.ownerRepository??slash(binding.ownerRepoRoot)}, not by this repository: the code is written here and the Work is recorded there`]:[]),
       `every op runs in the one worktree ${slash(state.worktree)} on branch ${state.branch} under the node's own allowlist`,
-      ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)],providers:assessGoal===llm.assessGoal?quotaSelectedProviders(store,state,'planner',providers):providers,cwd,runHeadless}):null;
+      ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)],providers:assessGoal===llm.assessGoal?quotaSelectedProviders(store,state,'planner',providers,{budget:budget??freshRuntimeBudget}):providers,cwd,runHeadless}):null;
   if(assessed?.ok){
     state.definitionOfDone=[...(assessed.value.definitionOfDone??[])];
     // Difficulty x model capability: the assessment rates every node; the allocator routes by tier inside the quota.
@@ -548,14 +659,20 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
     state.questions=[...(assessed.value.questions??[])];
   }else{
     // The TODO list is a fact of the tree, so a model that cannot answer does not block the goal: the
-    // definition of done falls back to the ledger itself and the failure is recorded as such.
-    state.definitionOfDone=state.ledger.map(item=>`\`${item.id}\` is done with checks the kernel re-ran itself`);
+    // definition of done falls back to the ledger itself and the failure is recorded as such. The operations the
+    // kernel derived with no ledger node behind them - an intake that writes the records of a feature, a cut that
+    // splits a node too big for one build - are facts of the same tree and belong in that fallback; leaving them
+    // out is what let a goal made ENTIRELY of intakes present an empty definition of done as if it were complete.
+    state.definitionOfDone=[...state.ledger.map(item=>`\`${item.id}\` is done with checks the kernel re-ran itself`),
+      ...state.ops.filter(op=>op.intake||op.cut).map(op=>op.intake
+        ?`\`${op.id}\` authored the Work records of ${op.intake.scope} inside its own allowlist and the Work tree still validates`
+        :`\`${op.id}\` cut ${op.nodeId} into the nodes that build it`)];
     state.questions=incomplete.map(node=>`${node.id}: ${node.reason}`);
     store.appendEvent({event:'goal-assessment-failed',reason:assessed?.reason??'assessGoal was not available',attempts:assessed?.attempts?.length??0});
   }
   // The critique runs whether or not the assessment answered: the job text is the goal, and the records the
   // product already accepted are what it is challenged against. An unanswered critique is an event, never a stop.
-  critiqueGoalPhase(store,state,{critiqueGoal,providers,cwd,runHeadless,
+  critiqueGoalPhase(store,state,{critiqueGoal,providers,cwd,runHeadless,budget,
     ledger:state.ledger.map(item=>({id:item.id,kind:item.kind,title:item.title})),
     decisions:state.decisions.map(item=>({id:item.id,kind:item.kind,title:item.title})),
     // A feature being authored is reconciled against what the whole product decided, not against its own scope.
@@ -564,6 +681,7 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
       `the ledger is the authored Work tree under ${slash(binding.ledgerRoot)}: the goal may not add, drop or rewrite a node, so an objection to the ledger is an objection to the scope of this goal`,
       `the Work tree ${loaded.ok?'validates':'does NOT validate'}, and ${state.ledgerSummary?.eligible??0} of ${state.ledgerSummary?.total??0} nodes in scope are eligible`,
       ...state.inputs.map(item=>`input ${item.kind}: ${item.ref}`)]});
+  goalGrounds(state,{assessed});
   const critiqueCtx={work:{shared:binding.sharedLedger,ledger:{repoRoot:binding.ownerRepoRoot,workRoot:binding.ledgerRoot},
     at:{workRoot:binding.ledgerRoot}}};
   planCritiquePrerequisites(store,state,{loaded,workRoot:binding.ledgerRoot,repositories,ctx:critiqueCtx});
@@ -580,18 +698,45 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
     lanes:Object.fromEntries(Object.entries(state.lanes??{}).map(([node,entry])=>[node,[...entry.lane]])),
     ops:state.ops.map(op=>({id:op.id,nodeId:op.nodeId,kind:op.kind,goal:op.goal,ledgerIds:op.ledgerIds,
       allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn})),
-    gates:state.gates,needUser:state.needUser,assessedBy:assessed?.provider??null,provisions:state.provisions??[]});
+    gates:state.gates,needUser:state.needUser,assessedBy:assessed?.provider??null,provisions:state.provisions??[],
+    grounds:state.goalGrounds,approvable:!goalApprovalBlocks(state).length,approvalBlocks:goalApprovalBlocks(state)});
   fs.writeFileSync(store.paths.goal,workGoalMarkdown(state,loaded));
   state.phase='awaiting-approval';
+  const blocks=goalApprovalBlocks(state);
   store.appendEvent({event:'goal',ledgerMode:state.ledgerMode,scope:state.scope,ops:state.ops.length,
-    ledger:state.ledger.length,decisions:state.decisions.length,incomplete:incomplete.length,gates:state.gates.length});
+    ledger:state.ledger.length,decisions:state.decisions.length,incomplete:incomplete.length,gates:state.gates.length,
+    grounds:{assessment:state.goalGrounds.assessment,critique:state.goalGrounds.critique},approvable:!blocks.length});
+  if(blocks.length)store.appendEvent({event:'goal-not-approvable',blocks});
   store.saveState(state);
   return {ok:true,id:state.id,ledgerMode:state.ledgerMode,goal:store.paths.goal,goalJson:store.paths.goalJson,
     ops:state.ops.length,ledger:state.ledger.length,decisions:state.decisions.length,
     incomplete:incomplete.map(node=>node.id),needUser:state.needUser,gates:state.gates.length,
+    grounds:state.goalGrounds,approvable:!blocks.length,...(blocks.length?{approvalBlocks:blocks}:{}),
     ledgerRoot:slash(binding.ledgerRoot),ledgerSource:binding.source,ledgerShared:binding.sharedLedger,
     ledgerOwner:binding.sharedLedger?(binding.ownerRepository??slash(binding.ownerRepoRoot)):null,
-    next:`review ${slash(store.paths.goal)} and approve with workflow-approve --id ${state.id}`};
+    next:blocks.length
+      ?`this goal cannot be approved as it stands: ${blocks[0]}`
+      :`review ${slash(store.paths.goal)} and approve with workflow-approve --id ${state.id}`};
+}
+
+/**
+ * What the owner reads before the definition of done when the goal cannot be approved. It is deliberately the
+ * FIRST thing under the header on such a page: a goal nothing assessed and nothing critiqued looks complete
+ * otherwise, and the one page the owner reads must not let that pass silently.
+ */
+export function goalGroundsLines(state){
+  const blocks=goalApprovalBlocks(state);
+  const grounds=plain(state.goalGrounds)?state.goalGrounds:null;
+  if(!blocks.length)return grounds&&(grounds.assessment!=='model'||grounds.critique!=='answered')
+    ?[`## How this goal was formed`,``,
+      `Definition of done: ${grounds.assessment==='model'?'assessed by a model':'derived by the kernel from the authored tree, because the assessment was unavailable'}`+
+      `${grounds.assessmentReason?` (${grounds.assessmentReason})`:''}.`,
+      `Critique: ${grounds.critique==='answered'?'answered by an independent critic':`asked and unanswered${grounds.critiqueReason?` (${grounds.critiqueReason})`:''}`}.`,``]
+    :[];
+  return [`## This goal cannot be approved as it stands`,``,
+    ...blocks.map(block=>`- ${block}`),``,
+    `Nothing below is a complete goal yet. Run \`workflow-goal\` again once the runtime can call a model; do not`,
+    `write the missing criteria or a verdict into this page by hand.`,``];
 }
 
 /** goal.md in ledger mode: the nodes the kernel will execute, as the TODO the user approves. */
@@ -604,6 +749,7 @@ export function workGoalMarkdown(state,loaded){
     ...(state.ledgerShared?[``,`The Work tree is owned by \`${state.ledgerOwner?.repository??slash(state.ledgerOwner?.repoRoot??'')}\`, not by this repository: code is written and committed in \`${slash(state.worktree)}\`, and every Work record is written and committed in the owner.`]:[]),
     `Scope: ${state.scope.length?state.scope.map(item=>`\`${item}\``).join(', '):'the whole Work tree'}. `+
     `The Work tree ${loaded.ok?'validates':'does NOT validate'}; ${state.ledgerSummary?.eligible??0} of ${state.ledgerSummary?.total??0} nodes in scope are eligible.`,``,
+    ...goalGroundsLines(state),
     `## Definition of done`,``,...state.definitionOfDone.map((item,index)=>`${index+1}. ${item}`),``,
     `## Work nodes this workflow executes`,``,
     `Each node travels its lane: every step is one operation, and the node is recorded done only when the last`,
@@ -711,6 +857,15 @@ export function proposeQuota(state,{runtimes=null,shared=undefined}={}){
 }
 
 export function approve(store,state,{allocation=null,allowDynamic=null,acceptCritique=null,host=null}={}){
+  // Fail closed on a goal with no basis, and only on the first approval: a workflow that already ran and finished
+  // blocked is being resumed by this same command, and its goal was answered for long ago. What is refused here is
+  // a NEW envelope nothing assessed and nothing independent read - the shape a goal takes when the runtime called
+  // no model at all. The repair is always to run `workflow-goal` again with a readable quota, never to author the
+  // missing criteria or a verdict into the record: this gate exists so that an empty goal cannot be frozen.
+  if(!state.approved){
+    const blocks=goalApprovalBlocks(state);
+    need(!blocks.length,`This goal cannot be approved: ${blocks.join(' ')}`);
+  }
   // A goal the critique refused is not approvable as it stands: either the question is answered and the goal is
   // written again, or the owner overrides the critique on the record. An override is the owner's own decision, so
   // it is taken once and never asked for again.

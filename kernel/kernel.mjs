@@ -4,6 +4,7 @@ import {createV6Runtime,enrollV6,isV6,isJobPending,settleGenerationLeases,prepar
 import {applyOwnerInbox} from './owner-inbox.mjs';
 import {verifyAcceptedIntegrationOwnerRequests} from './owner-requests.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
+import {freshRuntimeBudget,probeRuntimeBudget} from './budget.mjs';
 import {acquireStartup,releaseStartup} from './startup-lock.mjs';
 import {createWorkflowModelEligibility} from './model-policy.mjs';
 import {openJournal} from './journal.mjs';
@@ -3569,8 +3570,11 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       ...(ledger.sharedLedger?{'ledger-shared':{owner:ledger.ownerRepository??slash(ledger.ownerRepoRoot),root:slash(ledger.ledgerRoot)}}:{})});
     if(lane)store.appendEvent({event:'lane-created',name:lane.name,worktree:slash(lane.worktree),branch:lane.branch,
       orcaId:lane.orcaId,base:{worktree:slash(lane.base.worktree),branch:lane.base.branch},row:laneRowTitle(id)});
+    // The provider quota the goal phase selects on is refreshed through the host's typed probe when it has one;
+    // a host that cannot read it answers a reason, and the selector then chooses nothing rather than guessing.
+    const budget=root=>freshRuntimeBudget(root,{probe:typeof orca?.probeBudget==='function'?()=>orca.probeBudget():probeRuntimeBudget});
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,
-      ...goalPhase(store,state,{cwd:code,ledgerRoot:options['ledger-root']??null,...functions})};
+      ...goalPhase(store,state,{cwd:code,ledgerRoot:options['ledger-root']??null,budget,...functions})};
   }
   if(command==='workflow-lane-close'){
     const {store,state}=open(options.id);

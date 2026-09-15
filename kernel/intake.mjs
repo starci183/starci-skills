@@ -23,14 +23,88 @@ export function scopeNames(node,entry){
 }
 
 /**
+ * A scope entry read as the feature tree reads it: which feature it names and which layers of that feature it
+ * reaches. `login`, `features/login` and `.starciwork/features/login/business` are three spellings of the same
+ * tree, and the ledger's own scope filter accepts all three - so the intake must too, or a caller who wrote the
+ * path out in full got an operation over `features/features/login/business`, a feature nobody has or wants.
+ * An entry that is not a path into the feature tree (a node id, `brand`) has no feature and is left alone.
+ */
+export function featureScope(entry){
+  const key=slash(String(entry??'')).replace(/^\.\//,'').replace(/^\/+/,'').replace(/\/+$/,'').replace(/^\.starciwork\//,'');
+  if(!key||key.includes('.'))return null;
+  const parts=key.replace(/^features\//,'').split('/').filter(Boolean);
+  if(!parts.length)return null;
+  return {feature:parts[0],layers:parts.slice(1),name:parts.join('/')};
+}
+
+/**
+ * The layers of one feature that a set of scope entries actually reaches. An empty answer means the whole
+ * feature: either the scope named it whole, or the scope says nothing about it at all.
+ */
+export function scopedLayers(feature,scope=[]){
+  const named=(scope??[]).map(entry=>featureScope(entry)).filter(item=>item&&item.feature===feature);
+  if(!named.length||named.some(item=>!item.layers.length))return [];
+  return unique(named.map(item=>item.layers[0]));
+}
+
+/**
+ * The intake scopes of a goal, normalized and narrowed.
+ *
+ * Two things went wrong before this existed. A fully spelled entry produced a fake feature (above), and a
+ * `--reintake <feature>` beside a scope that named only two layers of it produced an operation holding the whole
+ * feature - ui, implementation, uat and all - because the reintake entry was taken as its own scope instead of
+ * being read against the one the owner approved. Both are the same mistake: the entry was used as a string
+ * rather than resolved against the tree and intersected with the scope. A layer entry whose feature is also
+ * named whole is dropped here, because the broader operation already covers it and two operations over nested
+ * allowlists may never run together.
+ */
+export function narrowIntakeScopes(entries){
+  const parsed=(entries??[]).map(entry=>({entry:slash(String(entry??'')).replace(/\/+$/,''),scoped:featureScope(entry)})).filter(item=>item.entry);
+  const whole=new Set(parsed.filter(item=>item.scoped&&!item.scoped.layers.length).map(item=>item.scoped.feature));
+  const out=[];
+  for(const item of parsed){
+    if(!item.scoped){if(!out.includes(item.entry))out.push(item.entry);continue;}
+    if(item.scoped.layers.length&&whole.has(item.scoped.feature))continue;
+    if(!out.includes(item.scoped.name))out.push(item.scoped.name);
+  }
+  return out;
+}
+
+/**
+ * What one intake may write: the layers of its feature the scope reaches, plus that feature's own module record
+ * - the file its reconciliation table is written into, so an intake restricted to two layers is still able to
+ * satisfy its own acceptance. Never the feature catalog `features/index.yaml`, and never a layer outside the
+ * scope: a goal that approved business and architecture did not approve ui, implementation, uat or integration.
+ */
+export function intakeAllowlist(feature,layers=[]){
+  return layers.length
+    ?layers.map(layer=>`.starciwork/features/${feature}/${layer}/**`)
+    :[`.starciwork/features/${feature}/**`];
+}
+
+/** The record the reconciliation table is written into: the module record, or the shallowest record a layer-restricted intake owns. */
+export function reconciliationCarrier(feature,layers=[]){
+  return layers.length?`the record features/${feature}/${layers[0]}/index.yaml`:'the module record';
+}
+
+/**
  * The intake operation of a scope entry the tree does not know. `brand` is authored and decided by one
  * `brand.decide` op on the one brand record; a feature is authored by one `work.author` op that mirrors the shape
  * of an existing feature - module record, business overview and SRS drafts, architecture skeleton - every record
  * `todo`, so the owner reads drafts and the decisions stay the owner's. Neither op closes a Work node: the records
  * it writes are the nodes the tree has afterwards.
  */
-export function intakeOp(state,{workRoot,loaded,index,entry=null,repositories={},mode='author'}){
-  const name=slash(String(entry??'')).replace(/\/+$/,'');
+export function intakeOp(state,{workRoot,loaded,index,entry=null,repositories={},mode='author',scope=[],layers=null}){
+  const scoped=featureScope(entry);
+  // The entry resolved against the tree, not the string the caller happened to spell: the feature it names,
+  // and the layers of that feature this operation owns - its own when the entry names one, else the ones the
+  // approved scope reaches. An empty list is the whole feature, which is what an unscoped intake always was.
+  const name=scoped?scoped.name:slash(String(entry??'')).replace(/\/+$/,'');
+  const feature=scoped?scoped.feature:name;
+  const owned=Array.isArray(layers)?layers.filter(Boolean):(scoped?(scoped.layers.length?scoped.layers:scopedLayers(scoped.feature,scope)):[]);
+  const ownedText=owned.map(layer=>`features/${feature}/${layer}`).join(' and ');
+  const carrier=reconciliationCarrier(feature,owned);
+  const onlyOwned=owned.length?` This operation owns ${ownedText} alone: the module record features/${feature}/index.yaml and every other layer of ${feature} are outside the approved scope and are never written. The reconciliation table goes into the shallowest record this operation owns, features/${feature}/${owned[0]}/index.yaml; a change the module record would need is recorded there as an integration request naming the canonical index path, its current owner and the requested reference/conflict/new change.`:'';
   const check={name:'work-tree-validates',command:validateCommandAt(workRoot)};
   if(name==='brand'){
     return {id:`brand-${index+1}`,kind:intakeKindFor('brand'),nodeId:null,intake:{scope:'brand'},
@@ -54,21 +128,24 @@ export function intakeOp(state,{workRoot,loaded,index,entry=null,repositories={}
   const id=`${name.replace(/[^A-Za-z0-9._-]+/g,'-')}-intake`;
   // Migrate mode: the records exist and are decided; what the current model makes explicit is added beside them.
   if(mode==='migrate'){
-    return {id,kind:intakeKindFor(name),nodeId:null,intake:{scope:name,example,mode},
+    return {id,kind:intakeKindFor(name),nodeId:null,intake:{scope:name,feature,layers:[],example,mode},
       goal:`Bring the decided records of the feature ${name} under the current Work model without re-deciding any of them: ${state.job}. Read every decided SRS/SDS record of the other features this feature touches and write one typed row per record into the module record at extensions.work3.reconciliation ({case, record, decision, reads, hands, detail}) - reference what a decided record already holds and cite it by id, conflict what cannot hold together with it and write a todo decision record under this feature with both sides, the options and one recommendation for the owner, new what no decided record covers, declaring what it reads and what it hands on. Declare every outside system the architecture of ${name} talks to (a messaging provider, a payment gateway, a mail or storage service, an identity provider) at extensions.work3.integrations on the module record, one entry {id, provider, credential: {name, providedBy: owner, custody: identity:<slug>}} naming the exact variable and the encrypted identity resource that holds it, and author one todo integration node features/${name}/integration/<id>/index.yaml per entry; never write a secret value anywhere. A decided record keeps its state, its rev and its wording: what contradicts it is a conflict row and a decision record, never an edit. Touch nothing under implementation/ or ui/.`,
-      ledgerIds:[],allowlist:[`.starciwork/features/${name}/index.yaml`,`.starciwork/features/${name}/business/**`,`.starciwork/features/${name}/architecture/**`,`.starciwork/features/${name}/integration/**`],
+      ledgerIds:[],allowlist:[`.starciwork/features/${feature}/index.yaml`,`.starciwork/features/${feature}/business/**`,`.starciwork/features/${feature}/architecture/**`,`.starciwork/features/${feature}/integration/**`],
       references:unique(['workspace.yaml',`features/${name}/index.yaml`,...decided]),checks:[check],
       acceptance:[`the module record of ${name} carries extensions.work3.reconciliation: one row {case, record, decision, reads, hands, detail} per decided record of another feature it touches, its case one of reference, conflict or new; every reference row cites a decided record by id and nothing under ${name} restates it; every conflict row names a todo decision record of ${name} stating both sides, the consequences, the numbered options and one recommendation; every new row names a record under ${name} and declares its reads and hands`,
         `every outside system the architecture of ${name} talks to is declared at extensions.work3.integrations on the module record with its id, its provider and a credential {name, providedBy: owner, custody: identity:<slug>}, one todo integration node features/${name}/integration/<id>/index.yaml exists per entry, and no secret value appears in any record`,
         `no decided record of ${name} changed its state, its rev or its substance, and nothing under features/${name}/implementation or features/${name}/ui changed`,
         'no other feature\'s record changed by hand','the Work tree still validates'],origin:'ledger'};
   }
-  return {id:`${name.replace(/[^A-Za-z0-9._-]+/g,'-')}-intake`,kind:intakeKindFor(name),nodeId:null,intake:{scope:name,example,mode},
-    goal:`${reconcile?`Reconcile and re-author the existing drafts of the feature ${name}`:`Author the Work records of the feature ${name}`} from the job: ${state.job}. A new feature is not appended beside the decided ones: read the decided SRS/SDS records it touches and write one typed row per record into the module record at extensions.work3.reconciliation ({case, record, decision, reads, hands, detail}) - reference what a decided record already holds and cite it by id, conflict what cannot hold together with it and write a todo decision record under this feature with both sides, the options and one recommendation for the owner, new what no decided record covers, declaring what it reads and what it hands on. No record of another feature is edited and none is reported against. Mirror the shape of the existing feature ${example??'(none yet)'}: the module record, the business overview and SRS as full drafts, the architecture as a skeleton; every leaf record todo (the module, business, srs, architecture and sds roots carry no state, exactly as the example), every open question an open decision.`,
-    ledgerIds:[],allowlist:[`.starciwork/features/${name}/**`],
+  return {id,kind:intakeKindFor(name),nodeId:null,intake:{scope:name,feature,layers:[...owned],example,mode},
+    goal:`${reconcile?`Reconcile and re-author the existing drafts of the feature ${feature}`:`Author the Work records of the feature ${feature}`} from the job: ${state.job}.${onlyOwned} A new feature is not appended beside the decided ones: read the decided SRS/SDS records it touches and write one typed row per record into ${carrier} at extensions.work3.reconciliation ({case, record, decision, reads, hands, detail}) - reference what a decided record already holds and cite it by id, conflict what cannot hold together with it and write a todo decision record under this feature with both sides, the options and one recommendation for the owner, new what no decided record covers, declaring what it reads and what it hands on. No record of another feature is edited and none is reported against. Mirror the shape of the existing feature ${example??'(none yet)'}: the module record, the business overview and SRS as full drafts, the architecture as a skeleton; every leaf record todo (the module, business, srs, architecture and sds roots carry no state, exactly as the example), every open question an open decision.`,
+    ledgerIds:[],allowlist:intakeAllowlist(feature,owned),
     references:unique(['workspace.yaml',...exampleRefs,...decided]),checks:[check],
-    acceptance:[`features/${name} has a module record, a business overview, SRS records and an architecture skeleton, every leaf record todo and the whole feature valid - the roots (module, business, srs, architecture and sds) carry no state, as in the example feature`,
-      `the module record of ${name} carries extensions.work3.reconciliation: one row {case, record, decision, reads, hands, detail} per decided record it touches, its case one of reference, conflict or new; every reference row cites a decided record by id and nothing under ${name} restates it; every conflict row names a todo decision record of ${name} stating both sides, the consequences, the numbered options and one recommendation; every new row names a record under ${name} and declares its reads and hands; no record of another feature changed`,
+    acceptance:[owned.length
+      ?`${ownedText} hold the records this goal approved, every leaf record todo and the feature valid - the roots (module, business, srs, architecture and sds) carry no state, as in the example feature`
+      :`features/${feature} has a module record, a business overview, SRS records and an architecture skeleton, every leaf record todo and the whole feature valid - the roots (module, business, srs, architecture and sds) carry no state, as in the example feature`,
+      ...(owned.length?[`nothing outside ${ownedText} changed: the module record features/${feature}/index.yaml and the layers of ${feature} this goal did not approve are untouched`]:[]),
+      `${carrier} of ${feature} carries extensions.work3.reconciliation: one row {case, record, decision, reads, hands, detail} per decided record it touches, its case one of reference, conflict or new; every reference row cites a decided record by id and nothing under ${feature} restates it; every conflict row names a todo decision record of ${feature} stating both sides, the consequences, the numbered options and one recommendation; every new row names a record under ${feature} and declares its reads and hands; no record of another feature changed`,
       'no other feature\'s record changed by hand','the Work tree still validates'],origin:'ledger'};
 }
 
@@ -83,7 +160,10 @@ export function retemplateIntakeOps(store,state,ctx,loaded){
   if(!workRoot)return;
   for(const op of state.ops.filter(item=>item.intake?.scope&&!['done','blocked'].includes(item.status)||item.intake?.scope&&item.status==='blocked'&&!item.refusal)){
     let fresh=null;
-    try{fresh=intakeOp(state,{workRoot,loaded,index:0,entry:op.intake.scope,repositories:{},mode:op.intake.mode??'author'});}catch{continue;}
+    // The layers the op was granted travel with it: retemplating rewords an operation, it never re-scopes one,
+    // so a goal that approved two layers of a feature keeps saying two layers after the build's words move.
+    try{fresh=intakeOp(state,{workRoot,loaded,index:0,entry:op.intake.scope,repositories:{},mode:op.intake.mode??'author',
+      layers:Array.isArray(op.intake.layers)?op.intake.layers:null});}catch{continue;}
     const changed=['goal','acceptance'].filter(key=>JSON.stringify(op[key])!==JSON.stringify(fresh[key]));
     if(!changed.length)continue;
     for(const key of changed)op[key]=fresh[key];
