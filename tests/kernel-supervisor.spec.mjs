@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {EventEmitter} from 'node:events';
 import {inspectWorkflow,startKernel,superviseForever,superviseOnce,supervisorAction} from '../kernel/supervisor.mjs';
-import {acquireStartup,inspectStartup} from '../kernel/startup-lock.mjs';
+import {LAUNCH_WINDOW_MS,acquireStartup,inspectStartup,reserveStartup} from '../kernel/startup-lock.mjs';
 
 test('Orca supervisor starts the kernel inside its owned coordinator terminal',()=>{
   const calls=[],orca={invoke:(name,params)=>{calls.push([name,params]);return name==='terminal-create'?{outcome:'ok',receipt:{result:{terminal:{handle:'term_monitor'}}}}:{outcome:'ok',receipt:{result:{}}};}};
@@ -200,4 +200,38 @@ test('the synchronous supervisor loop reclaims a confirmed exited local child wi
     assert.equal(starts.length,2,'the second synchronous round confirms the first pid exited and launches once more');
     assert.equal(result.rounds[0].outcome.ok,true);
   }finally{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,150);fs.rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+});
+
+test('a startup reservation a dead supervisor left past the launch window is reclaimed and the kernel starts again',()=>{
+  const root=tmp();try{
+    const dir=workflow(root,'stale-reservation',{lastAt:1});
+    const stale=reserveStartup(dir,{pid:999999,now:()=>1,alive:()=>false});assert.equal(stale.ok,true);
+    const early=superviseOnce({repoRoot:root,launcher:'L.mjs',now:()=>LAUNCH_WINDOW_MS-1,aliveFn:()=>false,spawnFn:()=>{throw Error('no launch inside the window');},log:()=>{}});
+    assert.equal(early.rounds[0].reason,'kernel launch in progress');
+    const events=[];
+    const late=superviseOnce({repoRoot:root,launcher:'L.mjs',now:()=>LAUNCH_WINDOW_MS+1,aliveFn:()=>false,spawnFn:()=>({pid:54330,unref(){},once(){}}),log:event=>events.push(event)});
+    assert.equal(late.rounds[0].action,'start');assert.equal(late.rounds[0].outcome.ok,true);
+    const reclaimed=events.find(event=>event.event==='startup-reservation-reclaimed');
+    assert.equal(reclaimed.pid,999999);assert.equal(reclaimed.phase,'launching');assert.match(reclaimed.reason,/launch window passed/);
+    assert.equal(inspectStartup(dir).pid,54330,'the new launch owns startup');
+  }finally{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,100);fs.rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+});
+
+test('an Orca kernel launch binds its coordinator terminal; a launch that never acquires is reclaimed after the window and its terminal closed',()=>{
+  const root=tmp();try{
+    const dir=workflow(root,'native-dead',{lastAt:1}),state=JSON.parse(fs.readFileSync(path.join(dir,'state.json'),'utf8'));state.hostAdapter='orca';fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify(state));
+    let creates=0;const closed=[];
+    const orca={invoke:(name,params)=>{if(name==='terminal-create'){creates+=1;return {outcome:'ok',receipt:{result:{terminal:{handle:`term_${creates}`}}}};}if(name==='terminal-close'){closed.push(params.terminal);return {outcome:'ok'};}return {outcome:'ok',receipt:{result:{}}};}};
+    const first=superviseOnce({repoRoot:root,launcher:'L.mjs',orca,now:()=>10_000_000,aliveFn:()=>true,log:()=>{}});
+    assert.equal(first.rounds[0].outcome.terminal,'term_1');assert.deepEqual([inspectStartup(dir).phase,inspectStartup(dir).terminal],['launching-native','term_1']);
+    const waiting=superviseOnce({repoRoot:root,launcher:'L.mjs',orca,now:()=>10_000_000+LAUNCH_WINDOW_MS-1,aliveFn:()=>true,log:()=>{}});
+    assert.equal(waiting.rounds[0].reason,'kernel launch in progress');assert.equal(creates,1);
+    const events=[];
+    const reclaim=superviseOnce({repoRoot:root,launcher:'L.mjs',orca,now:()=>10_000_000+LAUNCH_WINDOW_MS+1,aliveFn:()=>true,log:event=>events.push(event)});
+    assert.equal(reclaim.rounds[0].action,'start');assert.equal(reclaim.rounds[0].outcome.terminal,'term_2');
+    assert.deepEqual(closed,['term_1'],'the terminal of the dead launch is closed before the new one opens');
+    assert.deepEqual(events.map(event=>event.event),['startup-reservation-reclaimed','stale-kernel-terminals-closed','kernel-started-in-coordinator']);assert.equal(events[0].terminal,'term_1');
+    assert.match(events[0].reason,/no kernel process holds the lock/);
+    assert.equal(inspectStartup(dir).terminal,'term_2');
+  }finally{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,100);fs.rmSync(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 });

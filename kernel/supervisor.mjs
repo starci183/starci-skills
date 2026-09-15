@@ -4,7 +4,8 @@ import {spawn,spawnSync} from 'node:child_process';
 import {listWorkflows,repositoryRoot,workflowsRoot} from './store.mjs';
 import {DEFAULT_PROBE_MS,probeRuntimeBudget,writeRuntimeBudget} from './budget.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
-import {bindStartupProcess,inspectStartup,reserveStartup,releaseLaunchingStartup,releaseStartup} from './startup-lock.mjs';
+import {closeStaleCoordinatorTerminals,recordCoordinatorTerminal} from './coordinator-terminals.mjs';
+import {LAUNCH_WINDOW_MS,bindStartupProcess,bindStartupTerminal,inspectStartup,reserveStartup,releaseLaunchingStartup,releaseStartup,startupRowHolds} from './startup-lock.mjs';
 
 /**
  * The process supervisor for workflow kernels: one kernel per approved, unfinished workflow; a kernel that
@@ -28,13 +29,15 @@ export function inspectWorkflow(entry,{now=Date.now,aliveFn=pid=>{try{process.ki
   const lock=readJson(path.join(entry.dir,'kernel.lock'),null);
   const startupFile=path.join(entry.dir,'kernel-startup.sqlite');
   const startup=fs.existsSync(startupFile)?(()=>{try{return inspectStartup(entry.dir)}catch{return null}})():null;
-  const startupAlive=startup?.pid?aliveFn(Number(startup.pid)):false;
   let alive=false;
   if(lock?.pid){try{process.kill(lock.pid,0);alive=true;}catch{alive=false;}}
+  // A launch is in progress only while its reservation still holds: a reservation the launch window has outlived,
+  // with its reserving process gone and no kernel holding the lock, is a dead launch the next round reclaims.
+  const launching=Boolean(startup)&&startup.phase!=='running'&&startupRowHolds(startup,{now,alive:aliveFn,kernelAlive:()=>alive,launchWindowMs:LAUNCH_WINDOW_MS}).holds;
   const finished=Boolean(state?.finished);
   const approved=Boolean(state?.approved);
   const stopRequested=fs.existsSync(path.join(entry.dir,'stop.flag'));
-  return {id:entry.id,dir:entry.dir,approved,finished,stopRequested,alive,launching:startup?.phase==='launching'||(startup?.phase==='launching-child'&&startupAlive),startup,ledgerRoot:state?.ledgerRoot??null,ledgerSource:state?.ledgerSource??null,pid:lock?.pid??null,lastAt,lastEvent,silentMs:lastAt?now()-lastAt:null,worktree:state?.worktree??null,host:state?.host??null,run:state?.run??null,workflowTask:state?.workflowTask??null,
+  return {id:entry.id,dir:entry.dir,approved,finished,stopRequested,alive,launching,startup,ledgerRoot:state?.ledgerRoot??null,ledgerSource:state?.ledgerSource??null,pid:lock?.pid??null,lastAt,lastEvent,silentMs:lastAt?now()-lastAt:null,worktree:state?.worktree??null,host:state?.host??null,run:state?.run??null,workflowTask:state?.workflowTask??null,
     // The host the last kernel of this workflow ran on: the next one is started on the same host, or it would bind a new Orca run over a headless table.
     hostAdapter:typeof state?.hostAdapter==='string'&&state.hostAdapter?state.hostAdapter:null,engine:state?.engine??null};
 }
@@ -50,7 +53,7 @@ export function supervisorAction(info,{healthMs=DEFAULT_HEALTH_MS}={}){
 
 /** Start one kernel process detached; its lock file is the only thing that keeps a second one out. */
 const shellQuote=value=>`'${String(value).replaceAll("'","''")}'`;
-export function startKernel(info,{launcher,spawnFn=spawn,orca=null,log=()=>{},startupToken=null}){
+export function startKernel(info,{launcher,spawnFn=spawn,orca=null,log=()=>{},startupToken=null,now=Date.now}){
   if(!info.worktree)return {ok:false,reason:'the workflow state names no worktree',effectState:'none'};
   if(info.engine?.major===6){
     const checked=verifyRuntimePin(info.engine.runtimePin);
@@ -62,9 +65,15 @@ export function startKernel(info,{launcher,spawnFn=spawn,orca=null,log=()=>{},st
   const adapter=info.hostAdapter?['--host-adapter',info.hostAdapter]:[];
   const args=[launcher,'workflow-run','--id',info.id,'--worktree','.','--host',info.host??'',...(startupToken?['--startup-token',startupToken]:[]),...named,...adapter].filter(Boolean);
   if(info.hostAdapter==='orca'&&orca?.invoke){
+    // No kernel of this workflow is alive when it is started, so every coordinator terminal on record is a dead
+    // kernel's tab: closed here, by handle, because Orca re-titles an exited kernel's tab to its shell and no title
+    // sweep would find it again. What cannot be closed stays recorded for the next start.
+    const stale=closeStaleCoordinatorTerminals(info.dir,{close:handle=>{try{return orca.invoke('terminal-close',{terminal:handle},{cwd:info.worktree}).outcome==='ok';}catch{return false;}}});
+    if(stale.closed.length)log({event:'stale-kernel-terminals-closed',id:info.id,closed:stale.closed,kept:stale.kept});
     const created=orca.invoke('terminal-create',{worktree:`path:${path.resolve(info.worktree)}`,title:`[Kernel] ${info.id}`,command:process.platform==='win32'?'powershell -NoLogo':'bash'},{cwd:info.worktree});
     const terminal=created.outcome==='ok'?created.receipt?.result?.terminal?.handle:null;
     if(!terminal)return {ok:false,reason:`kernel coordinator terminal creation failed: ${created.reason??'missing terminal handle'}`,effectState:created.effectState??'unknown'};
+    recordCoordinatorTerminal(info.dir,terminal);
     const ready=orca.invoke('terminal-read',{terminal},{cwd:info.worktree});
     if(ready.outcome!=='ok'){
       let cleanup=null;if(ready.effectState==='none')try{cleanup=orca.invoke('terminal-close',{terminal},{cwd:info.worktree});}catch(error){cleanup={outcome:'unknown',effectState:'unknown',reason:error.message};}
@@ -79,6 +88,9 @@ export function startKernel(info,{launcher,spawnFn=spawn,orca=null,log=()=>{},st
       const cleaned=cleanup?.outcome==='ok';
       return {ok:false,reason:`kernel coordinator command delivery failed: ${sent.reason??'unknown'}${cleanup&&!cleaned?`; terminal cleanup unconfirmed: ${cleanup.reason??cleanup.outcome??'unknown'}`:''}`,effectState:cleaned?'none':'unknown',terminal};
     }
+    // The reservation now names the terminal the kernel command went into: a launch that never acquires within
+    // the window is reclaimed by the next round, which also closes this terminal instead of leaving it as an idle tab.
+    if(startupToken){const bound=bindStartupTerminal(info.dir,{token:startupToken,terminal,now});if(!bound.ok)log({event:'kernel-startup-terminal-unbound',id:info.id,terminal,reason:bound.reason});}
     log({event:'kernel-started-in-coordinator',id:info.id,terminal,run:info.run??null});
     return {ok:true,pid:null,terminal,run:info.run??null};
   }
@@ -90,7 +102,7 @@ export function startKernel(info,{launcher,spawnFn=spawn,orca=null,log=()=>{},st
   try{child=spawnFn(process.execPath,args,{cwd:info.worktree,detached:true,stdio:out===null?'ignore':['ignore',out,out],windowsHide:true});}
   catch(error){if(out!==null)try{fs.closeSync(out);}catch{}return {ok:false,reason:`kernel process spawn failed: ${error.message}`,effectState:'none'};}
   if(startupToken&&Number.isInteger(child.pid)&&child.pid>0){
-    const bound=bindStartupProcess(info.dir,{token:startupToken,pid:child.pid});
+    const bound=bindStartupProcess(info.dir,{token:startupToken,pid:child.pid,now});
     if(bound.ok)child.once?.('close',(status,signal)=>{const released=releaseLaunchingStartup(info.dir,bound);if(released)log({event:'kernel-launch-exited-before-acquire',id:info.id,pid:child.pid,status:Number.isInteger(status)?status:null,signal:signal??null});});
   }
   child.unref?.();
@@ -117,12 +129,24 @@ export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEA
     const info=inspectWorkflow(entry,{now,aliveFn});
     const decision=supervisorAction(info,{healthMs});
     let outcome=null;
+    // Reserve startup, then launch; a reservation reclaimed from a dead launch is recorded with its reason.
+    const reserveAndStart=()=>{
+      const reservation=reserveStartup(info.dir,{now,alive:aliveFn});
+      if(!reservation.ok)return reservation;
+      if(reservation.reclaimed){
+        // The terminal that launch was sent into is on the coordinator record; the start below closes it with the rest.
+        log({event:'startup-reservation-reclaimed',id:info.id,phase:reservation.reclaimed.phase,pid:reservation.reclaimed.pid,reservedAt:reservation.reclaimed.at,terminal:reservation.reclaimed.terminal??null,reason:reservation.reclaimed.reason});
+      }
+      const started=startKernel(info,{launcher,spawnFn,orca,log,startupToken:reservation.token,now});
+      if(!started.ok&&started.effectState==='none')releaseStartup(info.dir,reservation);
+      return started;
+    };
     if(decision.action==='restart'){
       const stopped=stopKernel(info,{killFn,log});
       if(info.engine?.major===6&&(!stopped.ok||aliveFn(info.pid))){outcome={ok:false,reason:'prior kernel termination is not confirmed; retain lock and defer restart'};log({event:'kernel-restart-deferred',id:info.id,pid:info.pid,reason:outcome.reason});}
-      else {const reservation=reserveStartup(info.dir,{now,alive:aliveFn});if(!reservation.ok)outcome=reservation;else {outcome=startKernel(info,{launcher,spawnFn,orca,log,startupToken:reservation.token});if(!outcome.ok&&outcome.effectState==='none')releaseStartup(info.dir,reservation);}}
+      else outcome=reserveAndStart();
     }
-    else if(decision.action==='start'){const reservation=reserveStartup(info.dir,{now,alive:aliveFn});if(!reservation.ok)outcome=reservation;else {outcome=startKernel(info,{launcher,spawnFn,orca,log,startupToken:reservation.token});if(!outcome.ok&&outcome.effectState==='none')releaseStartup(info.dir,reservation);}}
+    else if(decision.action==='start')outcome=reserveAndStart();
     rounds.push({id:info.id,...decision,approved:info.approved,finished:info.finished,stopRequested:info.stopRequested,alive:info.alive,silentMs:info.silentMs,outcome});
   }
   return {schema:SUPERVISOR,at:now(),rounds};

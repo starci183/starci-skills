@@ -5,6 +5,7 @@ import {dispatchLastWords,settleDispatch} from '../hosts/orca/launch.mjs';
 import {RESTART_LIMIT,firstLine,need,plain,sleepSync} from './common.mjs';
 import {buildReport} from './reports.mjs';
 import {redactSecrets} from './owner.mjs';
+import {closeStaleCoordinatorTerminals} from './coordinator-terminals.mjs';
 
 /**
  * Tabs and the Run they hang from. The rule is one sentence - a tab exists only while somebody reads it - and
@@ -109,7 +110,14 @@ export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Dat
   // A tab is an op's by the handle the op holds, whatever its title: a command-terminal launch whose rename
   // never landed keeps the agent's default title, and those were the tabs nobody could match.
   const byHandle=new Map(state.ops.filter(op=>op.terminal).map(op=>[op.terminal,op]));
-  for(const item of listTerminals(orca,cwd)){
+  const listed=listTerminals(orca,cwd);
+  // The coordinator terminals earlier kernels of this workflow ran in, by handle: Orca re-titles an exited kernel's
+  // tab to its shell, so the title match below never sees them; the record beside the store does.
+  const recorded=closeStaleCoordinatorTerminals(store.dir,{keep:state.from??null,known:listed.map(item=>item.handle),close:handle=>closeTerminal(orca,cwd,handle)});
+  for(const item of recorded.closed)if(item.reason!=='coordinator terminal already gone')closed.push({terminal:item.terminal,reason:'stale kernel tab'});
+  const closedHandles=new Set(closed.map(item=>item.terminal));
+  for(const item of listed){
+    if(closedHandles.has(item.handle))continue;
     const title=String(item.title??'');
     if(title===`[Kernel] ${state.id}`&&item.handle!==state.from){if(closeTerminal(orca,cwd,item.handle))closed.push({terminal:item.handle,reason:'stale kernel tab'});continue;}
     // The kernel tab of a sibling workflow of this repository that finished, or whose kernel is gone, has no reader.
