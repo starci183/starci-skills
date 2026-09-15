@@ -258,8 +258,16 @@ function exitedWorkerProof(orca,dispatchId,{cwd}){
   if(show.outcome!=='ok'||!TERMINAL_STOP_STATES.includes(state)||stage!=='process_exited'||!terminal)return {proven:false,state,stage,terminal,reason:'the worker record does not show an exited process in a terminal state'};
   let listed;try{listed=orca.invoke('terminal-list',{},{cwd});}catch(error){return {proven:false,state,stage,terminal,reason:String(error?.message??error)};}
   if(listed.outcome!=='ok')return {proven:false,state,stage,terminal,reason:'the worktree terminals could not be listed'};
-  const present=(getPath(listed.receipt,'result.terminals')??[]).some(item=>item?.handle===terminal);
-  return present?{proven:false,state,stage,terminal,reason:'the worker tab is still listed'}:{proven:true,state,stage,terminal,tabListed:false};
+  const listedHandles=receipt=>(getPath(receipt,'result.terminals')??[]).map(item=>item?.handle);
+  if(!listedHandles(listed.receipt).includes(terminal))return {proven:true,state,stage,terminal,tabListed:false};
+  // The fenced attempt's own tab is still there (an earlier close was answered but not honoured): contain it by
+  // closing exactly that handle, never another, and take the tab's disappearance as the proof. A tab that stays
+  // listed after that keeps the settlement unknown.
+  let closed;try{closed=orca.invoke('terminal-close',{terminal},{cwd});}catch(error){closed={outcome:'unknown',reason:String(error?.message??error)};}
+  if(closed.outcome!=='ok')return {proven:false,state,stage,terminal,reason:`the worker tab is still listed and could not be closed: ${closed.reason??closed.outcome}`};
+  let again;try{again=orca.invoke('terminal-list',{},{cwd});}catch(error){return {proven:false,state,stage,terminal,reason:String(error?.message??error)};}
+  if(again.outcome!=='ok')return {proven:false,state,stage,terminal,reason:'the worktree terminals could not be listed after the close'};
+  return listedHandles(again.receipt).includes(terminal)?{proven:false,state,stage,terminal,closedTab:true,reason:'the worker tab is still listed after its close'}:{proven:true,state,stage,terminal,tabListed:false,closedTab:true};
 }
 const classifySettlement=(stop,release)=>{
   const stopState=getPath(stop?.receipt,'result.state')??null,releaseState=getPath(release?.receipt,'result.state')??null;
