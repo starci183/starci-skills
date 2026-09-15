@@ -5023,3 +5023,28 @@ test('public retry reconciles only the exact exited native attempt before releas
   const behind={...op,attempt:2,lease:lease,candidate:{identity},launch:{task:'task-native',dispatch:'ctx-native'}};
   assert.match(reconcileStoppedNativeRetryLease(state,behind,{orca,store,createRuntime(){throw Error('must not');},settleHost(){throw Error('must not');}}).reason,/do not bind the current workflow operation attempt/);
 });
+
+test('a stray is quarantined when git names the file and the validator names the directory above it, which is how a reserved directory freezes a whole tree',()=>{
+  const harness=setupWork({dirty:['apps/agentos-controlplane/src/sales/intake.ts'],scripts:{}});
+  try{
+    const {store,state,repo}=harness;
+    approve(store,state);
+    state.run='run_wf';state.from='term_kernel';
+    // An operation stored a secret under a reserved directory. Canonical Work keeps no underscore directories,
+    // so the validator reports `_resources` while git reports the file three levels under it.
+    const stray=path.join(repo,'.starciwork','_resources','identity','recovery','secrets.enc.yaml');
+    fs.mkdirSync(path.dirname(stray),{recursive:true});
+    fs.writeFileSync(stray,'sops: {}\n');
+    const validate=()=>({ok:false,errors:[{code:'RESERVED_DIRECTORY',path:'_resources',message:'Canonical Work v2 keeps no underscore-prefixed directories.'}],warnings:[],nodes:[],resources:[]});
+    const git=(executable,args,options)=>args[0]==='status'&&args.includes('.starciwork')
+      ?{status:0,stdout:'?? .starciwork/_resources/identity/recovery/secrets.enc.yaml\n',stderr:''}
+      :harness.git.git(executable,args,options);
+    harness.run({maxIterations:2,git,validate:()=>fs.existsSync(stray)?validate():harness.validate()});
+    const log=events(store);
+    const quarantined=log.find(event=>event.event==='stray-quarantined');
+    assert.ok(quarantined,'the stray was quarantined even though the error names its parent');
+    assert.deepEqual(quarantined.strays.map(item=>item.from),['.starciwork/_resources/identity/recovery/secrets.enc.yaml']);
+    assert.equal(fs.existsSync(stray),false,'the stray left the tree');
+    assert.ok(log.some(event=>event.event==='ledger-valid-again'),'and the tree reads clean again');
+  }finally{harness.cleanup();}
+});

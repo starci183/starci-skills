@@ -746,7 +746,11 @@ export function quarantineStrays(store,state,ctx,loaded){
   if(!untracked.length)return [];
   const live=state.ops.filter(item=>liveStatus.includes(item.status)).flatMap(item=>item.allowlist??[]).map(normalize);
   const treePaths=loaded.errors.map(error=>normalize(`.starciwork/${String(error.path??'')}`));
-  const owns=(stray,file)=>file===stray||file.startsWith(stray.endsWith('/')?stray:`${stray}/`);
+  // The error and the stray name the same thing from two ends: git reports the untracked file, the validator
+  // reports the directory that must not exist. A `_resources` error whose stray is the secret file three levels
+  // under it matched neither way round and froze a whole tree, so containment is tested in both directions.
+  const within=(inner,outer)=>inner===outer||inner.startsWith(outer.endsWith('/')?outer:`${outer}/`);
+  const owns=(stray,file)=>within(file,stray)||within(stray,file);
   // Every untracked stray that carries an error and that no live op owns is moved, whether or not other errors
   // sit on tracked paths: what the kernel can clean it cleans, and the rest is reported as it is.
   const culprits=unique(treePaths.map(file=>untracked.find(stray=>owns(stray,file))).filter(Boolean)).filter(stray=>!inside(stray,live));
