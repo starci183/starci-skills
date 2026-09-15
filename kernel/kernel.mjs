@@ -428,11 +428,15 @@ export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost
   if(!exactLease)return {ok:false,reason:'candidate and durable lease do not bind the current workflow operation attempt'};
   let inspected;try{inspected=orca.invoke('worker-show',{dispatch:dispatchId},{cwd:state.worktree});}catch(error){return {ok:false,reason:`worker settlement unavailable: ${error.message}`};}
   const result=inspected?.outcome==='ok'?getPath(inspected.receipt,'result'):null,worker=result?.worker,dispatch=result?.dispatch,observation=result?.observation,terminal=result?.terminal;
-  const stopped=['failed','stopped','succeeded'].includes(worker?.state)&&observation?.exactWorker===true&&observation?.status==='exited'&&
-    (!terminal||(terminal.connected===false&&terminal.writable===false&&(terminal.paneRuntimeId===undefined||terminal.paneRuntimeId===null||terminal.paneRuntimeId===-1)));
+  // The proof of no live process is Orca's worker record: a terminal state and an exited process stage on the
+  // exact worker. A tab the kernel never closed (a partial report that ended the turn) is not a live process;
+  // it is closed by the settlement below.
+  const processExited=['failed','stopped','succeeded'].includes(worker?.state)&&observation?.exactWorker===true&&(observation?.status==='exited'||worker?.stage==='process_exited');
+  const terminalGone=!terminal||(terminal.connected===false&&terminal.writable===false&&(terminal.paneRuntimeId===undefined||terminal.paneRuntimeId===null||terminal.paneRuntimeId===-1));
+  const stopped=processExited&&(terminalGone||worker?.stage==='process_exited');
   if(dispatch?.id!==dispatchId||dispatch?.task_id!==taskId||dispatch?.run_id!==state.run||worker?.dispatch_id!==dispatchId||!stopped)
     return {ok:false,reason:'Orca does not prove the exact current Run/Task/Dispatch worker exited'};
-  let settlement;try{settlement=settleHost(orca,dispatchId,{cwd:state.worktree,reason:'workflow retry reconciles an exited native attempt',terminalHandle:terminal?.handle??null,closeTerminal:false,wait:waitFn});}
+  let settlement;try{settlement=settleHost(orca,dispatchId,{cwd:state.worktree,reason:'workflow retry reconciles an exited native attempt',terminalHandle:terminal?.handle??null,closeTerminal:!terminalGone,wait:waitFn});}
   catch(error){return {ok:false,reason:`typed host settlement failed: ${error.message}`};}
   if(settlement?.effectState!=='none')return {ok:false,reason:`exact native process settlement remains ${settlement?.effectState??'unknown'}`};
   const runtime=createRuntime({store,state,eligibility:()=>({eligible:false,reasons:['retry reconciliation only']}),git});

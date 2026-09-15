@@ -4966,6 +4966,18 @@ test('public retry reconciles only the exact exited native attempt before releas
   const createRuntimeAhead=()=>({settleStoppedOperation(candidate,{dispatch,settlement}){assert.equal(candidate,advanced);assert.equal(dispatch,'ctx-native');assert.equal(settlement.effectState,'none');delete candidate.v6Lease;return {ok:true,observedFiles:['src/real.ts'],candidateDigest:'digest'};},close(){}});
   const ahead=reconcileStoppedNativeRetryLease(state,advanced,{orca,store,createRuntime:createRuntimeAhead,settleHost:(_host,dispatch)=>({schema:'starci/orca-supervised-settlement@1',dispatchId:dispatch,effectState:'none'})});
   assert.equal(ahead.ok,true,ahead.reason);
+  // A process Orca records as exited inside a tab the kernel never closed is still an exited process: the tab is
+  // closed by the settlement, and the reconciliation proceeds.
+  const openTab={...result,observation:{exactWorker:true,status:'live',agentWait:null},worker:{dispatch_id:'ctx-native',state:'failed',stage:'process_exited'},terminal:{handle:'term-open',connected:true,writable:true,paneRuntimeId:-1}};
+  const tabbed={...op,attempt:3,v6Lease:lease,v6Candidate:{bridge:{identity}},launch:{task:'task-native',dispatch:'ctx-native'}};
+  const closes=[];
+  const withTab=reconcileStoppedNativeRetryLease(state,tabbed,{orca:{invoke:()=>({outcome:'ok',receipt:{result:openTab}})},store,
+    createRuntime:()=>({settleStoppedOperation(candidate){delete candidate.v6Lease;return {ok:true,observedFiles:[],candidateDigest:'d'};},close(){}}),
+    settleHost:(_host,dispatch,options)=>{closes.push([options.terminalHandle,options.closeTerminal]);return {schema:'starci/orca-supervised-settlement@1',dispatchId:dispatch,effectState:'none'};}});
+  assert.equal(withTab.ok,true,withTab.reason);
+  assert.deepEqual(closes,[['term-open',true]],'the open tab is closed as part of the settlement');
+  const stillRunning={...openTab,worker:{dispatch_id:'ctx-native',state:'running',stage:'process_running'}};
+  assert.match(reconcileStoppedNativeRetryLease(state,{...tabbed,v6Lease:lease},{orca:{invoke:()=>({outcome:'ok',receipt:{result:stillRunning}})},store,createRuntime(){throw Error('must not');},settleHost(){throw Error('must not');}}).reason,/does not prove/);
   const behind={...op,attempt:2,v6Lease:lease,v6Candidate:{bridge:{identity}},launch:{task:'task-native',dispatch:'ctx-native'}};
   assert.match(reconcileStoppedNativeRetryLease(state,behind,{orca,store,createRuntime(){throw Error('must not');},settleHost(){throw Error('must not');}}).reason,/do not bind the current workflow operation attempt/);
 });
