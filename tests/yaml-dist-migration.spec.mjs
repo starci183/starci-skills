@@ -148,6 +148,10 @@ test('missing knowledge compiler fails ensure-build without deferred success', t
 });
 
 test('two builds are byte-identical and .dist JSON is single-line with final newline', t => {
+  t.diagnostic('stays slow on purpose: two real `node scripts/build-workflows.mjs` invocations against a ' +
+    'disposable checkout copy are what proves the build is byte-for-byte idempotent across separate ' +
+    'process runs; an in-process double-call could share module state a real second `npm run build` never ' +
+    'gets, which is exactly the false-positive this test exists to rule out.');
   assert.equal(fs.existsSync(buildFile), true, 'scripts/build-workflows.mjs is required');
   const dir = copySkillForBuild(t);
   const runBuild = () =>
@@ -180,6 +184,10 @@ test('two builds are byte-identical and .dist JSON is single-line with final new
 });
 
 test('build:check is read-only for stale files and build creates missing .dist', t => {
+  t.diagnostic('stays slow on purpose: four real process invocations (build, declarative check, a ' +
+    'tamper then build-check expected to fail, and a rebuild after deleting .dist) against a disposable ' +
+    'checkout copy are what proves check never rewrites stale output and a missing .dist is rebuilt; ' +
+    'each leg is a separate real process because that is the actual CLI contract under test.');
   assert.equal(fs.existsSync(buildFile), true, 'scripts/build-workflows.mjs is required');
   const dir = copySkillForBuild(t);
   const built = spawnSync(process.execPath, ['scripts/build-workflows.mjs'], {
