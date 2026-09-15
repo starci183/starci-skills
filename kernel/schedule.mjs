@@ -246,6 +246,11 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     const elsewhere=id=>view.loads[id]??0;
     const sharedCooling=id=>{const entry=view.cooling[id];return entry&&entry.until>now()?entry:null;};
     const probed=readBudget?readBudget():null;
+    // The order the owner named for this run. It ranks providers, never removes one: a runtime with no free slot,
+    // a cooldown or an exhausted window is already in `blocked` and the next provider takes the operation.
+    const providerOrder=Array.isArray(allocation.providerOrder)?allocation.providerOrder:[];
+    const ownerChose=providerOrder.length>0;
+    const providerRankOf=id=>{const at=providerOrder.indexOf(pools[id]?.provider);return at<0?providerOrder.length:at;};
     const verdictOf=id=>probed?budgetVerdict(pools[id],probed,{now:now()}):{known:false,exhausted:false,until:null,remaining:null,windows:[]};
     for(const id of ids){
       const pool=pools[id],cool=cooling(id),parked=sharedCooling(id),held=elsewhere(id),free=slots(id)-load(id)-held,window=verdictOf(id);
@@ -265,7 +270,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
         :null;
       // The shared detail travels beside the reason, never inside it: the kernel reads these reasons by shape.
       if(reason){blocked.push({runtime:id,reason,...(held?{sharedLoad:held}:{}),...(parked&&!cool?{shared:true,from:parked.workflow??null}:{}),...(window.exhausted?{budget:{remaining:window.remaining,until:window.until}}:{})});continue;}
-      ready.push({runtime:id,target:pool.target??id,load:load(id),free,slots:slots(id),ratio:load(id)/slots(id),opsLeft:opsLeft(id),tokensLeft:tokensLeft(id),rotation:rotation(id),preference:order?rank(order,id):null,sharedLoad:held,remainingShare:window.remaining,band:budgetBand(window.remaining),eligibility:qualification});
+      ready.push({runtime:id,providerRank:providerRankOf(id),target:pool.target??id,load:load(id),free,slots:slots(id),ratio:load(id)/slots(id),opsLeft:opsLeft(id),tokensLeft:tokensLeft(id),rotation:rotation(id),preference:order?rank(order,id):null,sharedLoad:held,remainingShare:window.remaining,band:budgetBand(window.remaining),eligibility:qualification});
     }
     // prefer-then-overflow: the first eligible runtime of the role's order wins, so a saturated or cooling
     // preference simply is not in `ready` and the next one takes the operation without any special case.
@@ -282,12 +287,13 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     // the runtime with clearly more of its provider window left comes first; inside one band the local order decides.
     const bySharedOnly=ledger?(a,b)=>cmp(a.sharedLoad,b.sharedLoad)||locally(a,b):locally;
     const withoutBudget=probed?[...ready].sort(bySharedOnly).map(item=>item.runtime):null;
-    // When the owner named a provider order, that order outranks the probed window: the window still decides who is
-    // eligible at all - an exhausted one is in `blocked`, never in `ready` - but among runtimes that may run, the
-    // owner's choice comes before "whoever has more week left". Without such an order the band leads, as authored.
-    const owned=Array.isArray(allocation.providerOrder)&&allocation.providerOrder.length>0;
-    const byBandThenOrder=(a,b)=>owned?locally(a,b)||cmp(b.band,a.band):cmp(b.band,a.band)||locally(a,b);
-    ready.sort(ledger?(a,b)=>cmp(a.sharedLoad,b.sharedLoad)||byBandThenOrder(a,b):byBandThenOrder);
+    // An order the owner named leads everything that is only a heuristic: which provider they want is decided before
+    // whether another kernel is on that runtime and before which window has more left. Neither of those is a capacity
+    // rule - a full, cooling or exhausted runtime is in `blocked` already - so the choice reorders and never starves.
+    // Inside one provider the authored rules decide exactly as before, and with no order named nothing changes.
+    const chosenFirst=(a,b)=>ownerChose?cmp(a.providerRank,b.providerRank):0;
+    ready.sort(ledger?(a,b)=>chosenFirst(a,b)||cmp(a.sharedLoad,b.sharedLoad)||cmp(b.band,a.band)||locally(a,b)
+      :(a,b)=>chosenFirst(a,b)||cmp(b.band,a.band)||locally(a,b));
     return {kind,role,ready,blocked,preference:order,localRanked,withoutBudget,
       budget:probed?Object.fromEntries(ready.map(item=>[item.runtime,item.remainingShare])):null,
       shared:ledger?{workflow,loads:{...view.loads},cooling:{...view.cooling}}:null};

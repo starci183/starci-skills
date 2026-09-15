@@ -556,3 +556,16 @@ test('a named provider order outranks the probed window, and an exhausted window
   assert.equal(drained.runtime,'claude-fable-5.1','an exhausted preferred provider overflows to the next runtime of the role');
   assert.ok(drained.blocked.some(item=>item.runtime==='gpt-6-astra'&&/window|budget|exhaust/i.test(item.reason)),'the preferred runtime is blocked by its window, not by the order');
 });
+
+test('a named provider order also leads the shared key, so another kernel on the chosen provider does not move the work off it',t=>{
+  const shared=sharedRoot(t),other='20260915-100000-other',mine='20260915-104251-mine';
+  shared.kernel(other);
+  shared.write({'gpt-6-astra':liveOn(other,'op-plan')});
+  const preferred=withProviderPreference(profile,['codex','qwen','claude']);
+  const authored=createAllocator({runtimes:profile,now:()=>Date.UTC(2026,8,15,9),shared:{path:shared.file,workflow:mine}});
+  assert.equal(authored.allocate('work.author').runtime,'claude-fable-5.1','left to itself the kernel takes the authored first choice');
+  const owned=createAllocator({runtimes:preferred,now:()=>Date.UTC(2026,8,15,9),shared:{path:shared.file,workflow:mine}});
+  const picked=owned.allocate('work.author');
+  assert.equal(profile.runtimes[picked.runtime].provider,'codex','the owner provider keeps the work even though another kernel is on one of its runtimes');
+  assert.equal(picked.runtime,'gpt-5.6-sol','inside the chosen provider the shared key still avoids the runtime the other kernel holds');
+});
