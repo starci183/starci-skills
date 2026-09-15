@@ -8,7 +8,7 @@ import {buildReport} from '../kernel/reports.mjs';
 import {markDone,markInProgress,readNode} from '../kernel/ledger.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {inputAsk} from './helpers/input-fixture.mjs';
-import {applyOpReport,completionOutlook,renderContract} from '../kernel/kernel.mjs';
+import {applyOpReport,completionOutlook,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
 import {validateAccepted} from '../kernel/verify.mjs';
 import {settleIntake} from '../kernel/intake.mjs';
 import {recordDone,syncLedgerOps} from '../kernel/sync.mjs';
@@ -849,4 +849,12 @@ test('the completion outlook counts the open operations and estimates from the d
   const second=completionOutlook(state,{id:'b',launchedAt:0},1200000);
   assert.equal(second.estimateMs,900000,'the mean of ten and twenty minutes, times the one operation left');
   assert.equal(completionOutlook({ops:[]},{id:'x'}).estimateMs,null,'no duration yet, no estimate');
+});
+
+test('a retry brings the journal to the build default unless the operator chose one, and a refused relocation never pins the old journal',()=>{
+  const fallback='C:/local/StarCi/runtime/journal.sqlite',former='C:/local/StarCi/runtime-v6/journal.sqlite',named='D:/shared/journal.sqlite';
+  assert.equal(retryJournalTarget({option:named,previous:former,chosen:false,fallback}),path.resolve(named),'the named journal wins');
+  assert.equal(retryJournalTarget({option:null,previous:former,chosen:true,fallback}),path.resolve(former),'a journal the operator chose before is kept');
+  assert.equal(retryJournalTarget({option:null,previous:former,chosen:false,fallback}),path.resolve(fallback),'a record still on a former journal moves to the default at the next retry');
+  assert.equal(retryJournalTarget({option:null,previous:null,chosen:false,fallback}),path.resolve(fallback));
 });

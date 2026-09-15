@@ -166,6 +166,18 @@ const groupKey=(state,ledgerIds)=>{
 const implementsLedger=op=>op.kind!=='review.verify'&&op.refusal!=='superseded'&&(op.ledgerIds??[]).length>0;
 
 /**
+ * Where a retry puts the workflow's journal. An operator who names `--journal-file` chooses, and the record remembers
+ * that choice (`journalChosen`) so later retries keep it; every other record goes to this build's default journal
+ * - a record whose first relocation was refused (live rows in the former journal) is not thereby pinned to that
+ * former journal for good, it moves at the next retry that finds nothing live.
+ */
+export function retryJournalTarget({option=null,previous=null,chosen=false,fallback}={}){
+  if(option)return path.resolve(option);
+  if(chosen&&previous)return path.resolve(previous);
+  return path.resolve(fallback);
+}
+
+/**
  * What an accepted operation leaves on its `op-done` event for the owner reading the tab: the worker's own summary,
  * how many operations are still open, and an estimate from the durations accepted so far (mean, times the open
  * count) - a rough outlook, never a promise, printed only under `debug`.
@@ -3883,13 +3895,15 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     // A migrated record moves to this build's journal unless the operator names one; a retry of a current record
     // stays where it is. Either way the former journal must hold nothing live of this workflow before it is left.
     const previousJournal=state.engine?.journalFile??null;
-    const targetJournal=path.resolve(options['journal-file']??(migration.migrated?journalFileFor():previousJournal??journalFileFor()));
+    const targetJournal=retryJournalTarget({option:options['journal-file']??null,previous:previousJournal,chosen:state.engine?.journalChosen===true,fallback:journalFileFor()});
     const relocation=previousJournal&&path.resolve(previousJournal)!==targetJournal?relocateJournal({from:previousJournal,to:targetJournal,workflowId:state.id}):null;
     need(!relocation||relocation.ok,`The journal ${previousJournal} still binds ${state.id}: ${relocation?.reason??''}`);
     // The retired generation's log closes here: everything the retry settled above is its story; the enrollment opens the next.
     const rotated=store.rotateEvents?.(priorGeneration)??null;
     if(rotated?.rotated)store.appendEvent({event:'events-rotated',generation:priorGeneration,segment:path.basename(rotated.rotated)});
+    const journalChosen=Boolean(options['journal-file'])||state.engine?.journalChosen===true;
     const engine=enrollEngine(store,state,{runtimePin:pin,journalFile:targetJournal});state.launcher=checked.launcher;
+    if(journalChosen)state.engine.journalChosen=true;
     if(relocation)store.appendEvent({event:'journal-relocated',from:relocation.from,to:relocation.to,retired:relocation.retired,copied:relocation.copied});
     // The generations this retry retires give back the probation their unfinished attempts consumed.
     if(state.modelEligibility?.probationScopes){
