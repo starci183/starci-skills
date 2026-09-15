@@ -4963,7 +4963,8 @@ test('public retry reconciles only the exact exited native attempt before releas
   // An operation whose counter already moved past the leased attempt (a partial report advanced it) still binds
   // through the candidate identity; one whose lease names a LATER attempt than the operation does not.
   const advanced={...op,attempt:4,v6Lease:lease,v6Candidate:{bridge:{identity}},launch:{task:'task-native',dispatch:'ctx-native'},v6OwnedBaselinePaths:undefined};
-  const ahead=reconcileStoppedNativeRetryLease(state,advanced,{orca,store,createRuntime,settleHost:(_host,dispatch)=>({schema:'starci/orca-supervised-settlement@1',dispatchId:dispatch,effectState:'none'})});
+  const createRuntimeAhead=()=>({settleStoppedOperation(candidate,{dispatch,settlement}){assert.equal(candidate,advanced);assert.equal(dispatch,'ctx-native');assert.equal(settlement.effectState,'none');delete candidate.v6Lease;return {ok:true,observedFiles:['src/real.ts'],candidateDigest:'digest'};},close(){}});
+  const ahead=reconcileStoppedNativeRetryLease(state,advanced,{orca,store,createRuntime:createRuntimeAhead,settleHost:(_host,dispatch)=>({schema:'starci/orca-supervised-settlement@1',dispatchId:dispatch,effectState:'none'})});
   assert.equal(ahead.ok,true,ahead.reason);
   const behind={...op,attempt:2,v6Lease:lease,v6Candidate:{bridge:{identity}},launch:{task:'task-native',dispatch:'ctx-native'}};
   assert.match(reconcileStoppedNativeRetryLease(state,behind,{orca,store,createRuntime(){throw Error('must not');},settleHost(){throw Error('must not');}}).reason,/do not bind the current workflow operation attempt/);
