@@ -59,3 +59,13 @@ test('a running kernel sweep closes the recorded coordinator terminals of earlie
   assert.deepEqual(readCoordinatorTerminals(dir),['term_live'],'a terminal Orca no longer lists is dropped from the record without a close call');
   assert.equal(events.at(-1).event,'terminals-swept');
 });
+
+test('a start also closes the coordinator terminals the supervisor log remembers from before the record existed',t=>{
+  const root=tmp(t),dir=path.join(root,'wf');fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(root,'supervisor.log'),[JSON.stringify({at:1,event:'kernel-started-in-coordinator',id:'wf',terminal:'term_old_a',run:'run_wf'}),'not json',JSON.stringify({at:2,event:'kernel-started-in-coordinator',id:'other',terminal:'term_other',run:'run_o'}),JSON.stringify({at:3,event:'kernel-started-in-coordinator',id:'wf',terminal:'term_old_b',run:'run_wf'})].join('\n')+'\n');
+  const closed=[];let created=0;
+  const orca={invoke:(name,params)=>{if(name==='terminal-create'){created+=1;return {outcome:'ok',receipt:{result:{terminal:{handle:`term_new_${created}`}}}};}if(name==='terminal-close'){closed.push(params.terminal);return {outcome:'ok'};}return {outcome:'ok',receipt:{result:{}}};}};
+  const started=startKernel({id:'wf',dir,worktree:'D:/repo',host:'D:/host',hostAdapter:'orca',run:'run_wf'},{launcher:'D:/host/launch.mjs',orca});
+  assert.equal(started.terminal,'term_new_1');assert.deepEqual(closed.sort(),['term_old_a','term_old_b'],'both logged terminals of this workflow are closed, the other workflow untouched');
+  assert.deepEqual(readCoordinatorTerminals(dir),['term_new_1']);
+});

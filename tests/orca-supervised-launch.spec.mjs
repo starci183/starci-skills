@@ -325,6 +325,19 @@ test('close failure cannot turn an unknown worker stop into proven settlement',(
   assert.equal(settleDispatch(fake.orca,'ctx_live',{cwd:'.',terminalHandle:'term_live',closeTerminal:true}).effectState,'unknown');
 });
 
+test('a worker whose tab the kernel already closed settles to none only on Orca\'s exited record with the tab gone',()=>{
+  const stopFailed=()=>json(0,{ok:true,result:{dispatchId:'ctx_gone',state:'failed',alreadySettled:true,processAction:'none'}});
+  const releaseUnknown=()=>json(1,{ok:false,result:{dispatchId:'ctx_gone',state:'release_unknown',processAction:'closed_agent_terminal',reason:'The agent terminal was closed but its process could not be confirmed stopped'}});
+  const show=(state,stage)=>()=>json(0,{ok:true,result:{dispatch:{id:'ctx_gone',status:state},worker:{dispatch_id:'ctx_gone',state,stage,agent_terminal_handle:'term_gone'},observation:{status:stage==='process_exited'?'exited':'live'}}});
+  const list=handles=>()=>json(0,{ok:true,result:{terminals:handles.map(handle=>({handle,title:'x'}))}});
+  const proven=settleDispatch(fakeOrca({'worker-stop':stopFailed,'worker-release':releaseUnknown,'worker-show':show('failed','process_exited'),'terminal-list':list(['term_other'])}).orca,'ctx_gone',{cwd:'.',wait:noWait});
+assert.equal(proven.effectState,'none');assert.equal(proven.exitedWorker.proven,true);assert.equal(proven.exitedWorker.terminal,'term_gone');assert.deepEqual(proven.residualTerminal,{state:'release_unknown',reason:'The agent terminal was closed but its process could not be confirmed stopped',processAction:'closed_agent_terminal'});
+  const tabStillThere=settleDispatch(fakeOrca({'worker-stop':stopFailed,'worker-release':releaseUnknown,'worker-show':show('failed','process_exited'),'terminal-list':list(['term_gone'])}).orca,'ctx_gone',{cwd:'.',wait:noWait});
+  assert.equal(tabStillThere.effectState,'unknown');assert.match(tabStillThere.exitedWorker.reason,/still listed/);
+  const notExited=settleDispatch(fakeOrca({'worker-stop':stopFailed,'worker-release':releaseUnknown,'worker-show':show('failed','running'),'terminal-list':list([])}).orca,'ctx_gone',{cwd:'.',wait:noWait});
+  assert.equal(notExited.effectState,'unknown');assert.equal(notExited.exitedWorker.proven,false);
+});
+
 test('settlement reconciles an unknown stop, closes an unstoppable own terminal, and reports unknown when nothing settles',()=>{
   const fake=fakeOrca({'worker-stop':()=>json(1,{ok:false,result:{dispatchId:'ctx_x',state:'stop_unknown'}}),
     'worker-show':()=>json(0,{ok:true,result:{dispatch:{id:'ctx_1'},worker:{state:'ready',agent_terminal_handle:'term_1'},observation:{status:'live'}}}),

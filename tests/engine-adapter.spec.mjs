@@ -159,7 +159,8 @@ test('retry admits only runtime reconciliation leases and fences unresolved gene
   bridge.request({workflowId:'wf',opId:'op',attempt:1,generation:2,kind:'model',role:'plan',input:{handler:'model-function',functionName:'planOp',args:{providers:['gpt-5.6-sol']}}});
   assert.deepEqual(unsettledGenerationJobs({journalFile:f.state.engine.journalFile,workflowId:'wf',generation:2}),[bridge.journal.listJobs()[0].job_id]);
   bridge.journal.enqueueJob({jobId:'never-launched',workflowId:'wf',opId:'op',attempt:1,generation:2,kind:'check',role:'machine-check',payload:{command:'x'}});
-  const prepared=prepareGenerationRetry({journalFile:f.state.engine.journalFile,workflowId:'wf',generation:2,now:()=>9});assert.deepEqual(prepared.cancelled,['never-launched']);assert.equal(prepared.unsettled.length,1);assert.notEqual(prepared.unsettled[0],'never-launched');
+  bridge.journal.enqueueJob({jobId:'earlier-never-launched',workflowId:'wf',opId:'op',attempt:1,generation:1,kind:'operation',role:'implement',payload:{runtime:'gpt-5.6-sol'}});
+  const prepared=prepareGenerationRetry({journalFile:f.state.engine.journalFile,workflowId:'wf',generation:2,now:()=>9});assert.deepEqual(prepared.cancelled,['earlier-never-launched','never-launched'],'a queued job that never launched is cancelled whatever its generation or kind');assert.equal(prepared.unsettled.length,1);assert.notEqual(prepared.unsettled[0],'never-launched');
   assert.equal(bridge.journal.getJob('never-launched').status,'cancelled');assert.equal(bridge.journal.events({workflowId:'wf'}).some(event=>event.kind==='job-retry-queued-cancelled'),true);
   assert.deepEqual(unsettledGenerationJobs({journalFile:f.state.engine.journalFile,workflowId:'wf',generation:1}),[]);bridge.close();
 });

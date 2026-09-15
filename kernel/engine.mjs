@@ -83,7 +83,9 @@ export function prepareGenerationRetry({journalFile,workflowId,generation,now=Da
   const journal=openJournal({file:journalFile,now});
   try{
     const cancelled=journal.transaction(db=>{
-      const rows=db.prepare("SELECT j.job_id FROM jobs j WHERE j.workflow_id=? AND j.generation=? AND j.kind IN ('model','judge','check') AND j.status='queued' AND NOT EXISTS (SELECT 1 FROM leases l WHERE l.job_id=j.job_id) AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=j.workflow_id AND e.entity_type='job' AND e.entity_id=j.job_id AND e.kind='job-spawned') ORDER BY j.job_id").all(workflowId,generation);
+            // Every generation up to this one: a queued job of a retired generation that never launched (no lease, no
+      // receipt of any kind) would otherwise bind the workflow to its old journal for good and refuse the relocation.
+      const rows=db.prepare("SELECT j.job_id FROM jobs j WHERE j.workflow_id=? AND j.generation<=? AND j.kind IN ('model','judge','check','operation') AND j.status='queued' AND NOT EXISTS (SELECT 1 FROM leases l WHERE l.job_id=j.job_id) AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=j.workflow_id AND e.entity_type='job' AND e.entity_id=j.job_id) ORDER BY j.job_id").all(workflowId,generation);
       const stamp=now(),update=db.prepare("UPDATE jobs SET status='cancelled',result_json=?,updated_at=? WHERE job_id=? AND status='queued'"),event=db.prepare("INSERT OR IGNORE INTO events(event_id,workflow_id,entity_type,entity_id,generation,kind,payload_json,created_at) VALUES(?,?,?,?,?,?,?,?)");
       for(const row of rows){update.run(JSON.stringify({reason:'workflow retry cancelled a proven never-launched queued job'}),stamp,row.job_id);event.run(`${row.job_id}:retry-queued-cancelled`,workflowId,'job',row.job_id,generation,'job-retry-queued-cancelled',JSON.stringify({proof:'queued, unleased, and no job-spawned receipt'}),stamp);}
       return rows.map(row=>row.job_id);

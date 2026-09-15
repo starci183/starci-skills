@@ -249,6 +249,18 @@ export function dispatchLastWords(orca,dispatchId,{cwd}={}){
   const dispatch=plain(result?.dispatch)?result.dispatch:null;
   return {ok:true,status:dispatch?.status??null,...workerLastWords(dispatch,plain(result?.worker)?result.worker:null)};
 }
+const TERMINAL_STOP_STATES=['failed','stopped','abandoned'];
+/** Orca's own record of one worker: has its process exited, and is the tab it lived in gone from the worktree? */
+function exitedWorkerProof(orca,dispatchId,{cwd}){
+  let show;try{show=orca.invoke('worker-show',{dispatch:dispatchId},{cwd});}catch(error){return {proven:false,reason:String(error?.message??error)};}
+  const worker=getPath(show.receipt,'result.worker')??null;
+  const state=worker?.state??null,stage=worker?.stage??null,terminal=worker?.agent_terminal_handle??null;
+  if(show.outcome!=='ok'||!TERMINAL_STOP_STATES.includes(state)||stage!=='process_exited'||!terminal)return {proven:false,state,stage,terminal,reason:'the worker record does not show an exited process in a terminal state'};
+  let listed;try{listed=orca.invoke('terminal-list',{},{cwd});}catch(error){return {proven:false,state,stage,terminal,reason:String(error?.message??error)};}
+  if(listed.outcome!=='ok')return {proven:false,state,stage,terminal,reason:'the worktree terminals could not be listed'};
+  const present=(getPath(listed.receipt,'result.terminals')??[]).some(item=>item?.handle===terminal);
+  return present?{proven:false,state,stage,terminal,reason:'the worker tab is still listed'}:{proven:true,state,stage,terminal,tabListed:false};
+}
 const classifySettlement=(stop,release)=>{
   const stopState=getPath(stop?.receipt,'result.state')??null,releaseState=getPath(release?.receipt,'result.state')??null;
   const releaseReason=getPath(release?.receipt,'result.reason')??null,processAction=getPath(release?.receipt,'result.processAction')??null;
@@ -304,8 +316,17 @@ export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt
     }
   }
   const release=stop.outcome==='unknown'?null:orca.invoke('worker-release',{dispatch:dispatchId},{cwd});
-  const {effectState,residualTerminal,stopState,releaseState,releaseReason,processAction}=classifySettlement(stop,release);
-  return {schema:SETTLEMENT,dispatchId,reason,effectState,residualTerminal,reconciliation,closedTerminal,
+  let classified=classifySettlement(stop,release),exitedWorker=null;
+  // The worker's own tab was closed before this settlement (a blocked op's sweep closes it), so Orca answers the
+  // release with `release_unknown` / `closed_agent_terminal`: it cannot confirm a process it no longer holds. Its
+  // worker record can: a terminal state with the process exited, and a tab no longer listed, is the proof that
+  // nothing of this attempt is still running. Anything short of that stays unknown.
+  if(classified.effectState==='unknown'&&stop.outcome==='ok'&&TERMINAL_STOP_STATES.includes(classified.stopState)&&release?.outcome==='unknown'&&classified.processAction==='closed_agent_terminal'){
+    exitedWorker=exitedWorkerProof(orca,dispatchId,{cwd});
+    if(exitedWorker.proven)classified={...classified,effectState:'none',residualTerminal:{state:classified.releaseState,reason:classified.releaseReason,processAction:classified.processAction}};
+  }
+  const {effectState,residualTerminal,stopState,releaseState,releaseReason,processAction}=classified;
+  return {schema:SETTLEMENT,dispatchId,reason,effectState,residualTerminal,reconciliation,closedTerminal,...(exitedWorker?{exitedWorker}:{}),
     stop:{outcome:stop.outcome,effectState:stop.effectState,state:stopState,alreadySettled:getPath(stop.receipt,'result.alreadySettled')??null,reason:stop.reason},
     release:release?{outcome:release.outcome,effectState:release.effectState,state:releaseState,processAction,reason:releaseReason??release.reason}:{outcome:'skipped',reason:'worker-stop outcome unknown'}};
 }
