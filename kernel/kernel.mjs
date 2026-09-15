@@ -778,6 +778,12 @@ export function refreshCredentialPreparation(store,state,ctx){
     }
   }
 }
+/**
+ * Whether an operation must be held to the canonical Work gate: v6, a declared Work writer, AND a canonical Work
+ * binding to hold it to. A plan ledger binds no Work: its runtime.operate and verify ops write the runtime and
+ * evidence into their allowlists, and were refused at the gate for a tree that does not exist.
+ */
+export const needsWorkGate=(op,ctx)=>Boolean(ctx?.v6&&ctx?.work&&plain(ctx.work.ledger)&&writesWorkRecords(op.kind,{profile:ctx.kindsProfile}));
 export function prepareV6WorkGate(op,ctx){
   need(ctx?.v6,'v6 runtime is required to prepare a Work gate');
   need(ctx?.work&&plain(ctx.work.ledger),'canonical Work binding is unavailable');
@@ -882,7 +888,7 @@ function scheduleOps(orca,store,state,ctx,{orderedOpIds=null}={}){
       store.appendEvent({event:'op-host-unsupported',op:op.id,kind:op.kind,node:op.nodeId??null,host:ctx.host.name,missing});
       continue;
     }
-    if(ctx.v6&&writesWorkRecords(op.kind,{profile:ctx.kindsProfile})){
+    if(needsWorkGate(op,ctx)){
       try{if(prepareV6WorkGate(op,ctx)){store.appendEvent({event:'v6-work-gate-prepared',op:op.id,command:op.checks.find(check=>check.name==='work-valid').command});store.saveState(state);}}
       catch(error){op.status='blocked';op.refusal='runtime-gate-binding';const detail=`${op.id} cannot prepare its required canonical Work gate: ${String(error?.message??error)}`;op.v6Pending={kind:'runtime-gate-binding',detail};store.appendEvent({event:'v6-work-gate-refused',op:op.id,reason:detail});continue;}
     }
@@ -1755,7 +1761,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     const verified=machineVerify(state,op,verifyCtx);
     // `work-valid` is the kernel's own check and is stripped from every operation's list, so an op that edits the
     // tree is held to it here: the record it wrote must leave a tree that still validates, before anything is committed.
-    if((ctx.v6&&writesWorkRecords(op.kind,{profile:ctx.kindsProfile}))||authorsRecord(op.kind)){
+    if(needsWorkGate(op,ctx)||(authorsRecord(op.kind)&&ctx.work)){
       const command=workValidateCommand(ctx);
       // Scoped to what this op could have caused, the way a node's own proof is judged: an error under a path
       // another workflow owns is evidence in the check, never this op's failure.

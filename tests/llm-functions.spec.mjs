@@ -35,8 +35,13 @@ test('the goal form is a contract: shape, unique ids, a real dependency order, a
   assert.match(validateGoalPlan({...base,ops:[{...op('a'),checks:[]},op('b')]}).errors.join(';'),/ops\[0\]: checks needs at least 1/);
   // A kind no operator launches never enters a plan: the first plan-ledger trial was assessed with `inventory` ops
   // and every runtime answered "Unknown skill/operator route" until the workflow stalled.
-  assert.match(validateGoalPlan({...base,ops:[{...op('a'),kind:'inventory'},op('b')]}).errors.join(';'),/ops\[0\]: kind must be one of decision\.prepare, .*runtime\.operate/);
+  assert.match(validateGoalPlan({...base,ops:[{...op('a'),kind:'inventory'},op('b')]}).errors.join(';'),/ops\[0\]: kind must be one of .*runtime\.operate/);
   assert.equal(validateGoalPlan({...base,ops:[{...op('a'),kind:'runtime.operate'},op('b')]}).ok,true);
+  // A plan ledger binds no canonical Work: a kind that authors or decides a Work record is not a plan kind.
+  for(const kind of ['decision.prepare','work.author','implementation.plan','business.decide','architecture.decide'])
+    assert.match(validateGoalPlan({...base,ops:[{...op('a'),kind},op('b')]}).errors.join(';'),/ops\[0\]: kind must be one of/,kind);
+  for(const kind of ['backend.implement','frontend.implement','runtime.operate','review.verify','uat.verify','integration.verify','provision.ask'])
+    assert.equal(validateGoalPlan({...base,ops:[{...op('a'),kind},op('b')]}).ok,true,kind);
   // An absolute path cannot be an allowlist the worktree enforces nor a reference a candidate binds.
   assert.match(validateGoalPlan({...base,ops:[{...op('a'),allowlist:['D:/Repositories/x/.starciwork/ops/**']},op('b')]}).errors.join(';'),/op a allowlist entry D:\/Repositories\/x\/\.starciwork\/ops\/\*\* is not a path relative to the worktree/);
   assert.match(validateGoalPlan({...base,ops:[{...op('a'),references:['C:/Users/Hi/.codex/artifacts/review.md']},op('b')]}).errors.join(';'),/op a reference C:\/Users\/Hi\/\.codex\/artifacts\/review\.md is not a path relative to the worktree/);
@@ -110,7 +115,7 @@ test('assessGoal receives the complete nested form before its first answer and a
   for(const prompt of prompts){
     assert.match(prompt,/Complete recursive form contract:/);
     assert.match(prompt,/"ledger".*"each":\{"id":\{"type":"string"\},"title":\{"type":"string"\},"inputRef":\{"type":"string"\},"status":\{"type":"string","enum":\["absent","partial","done","unknown"\]\}\}/);
-    assert.match(prompt,/"ops".*"kind":\{"type":"string","enum":\["decision\.prepare",[^\]]*\]\}.*"checks":\{"type":"object\[\]","minItems":1,"each":\{"name":\{"type":"string"\},"command":\{"type":"string"\}\}\}.*"dependsOn":\{"type":"string\[\]"\}/);
+    assert.match(prompt,/"ops".*"kind":\{"type":"string","enum":\["[a-z.]+",[^\]]*\]\}.*"checks":\{"type":"object\[\]","minItems":1,"each":\{"name":\{"type":"string"\},"command":\{"type":"string"\}\}\}.*"dependsOn":\{"type":"string\[\]"\}/);
     assert.match(prompt,/Every field is required unless its rule says optional:true/);
   }
   assert.match(prompts[1],/ledger\[0\]: missing title/);

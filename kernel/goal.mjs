@@ -16,7 +16,6 @@ import {decisionKindFor} from './io.mjs';
 import {isAsk,openOwnerAsk} from './owner.mjs';
 import {loadConfig,nonOperationModels} from '../scripts/config.mjs';
 import {laneView} from './lanes.mjs';
-import {KINDS as OPERATION_KINDS} from './graph.mjs';
 import {featureScope,intakeOp,narrowIntakeScopes,scopeNames} from './intake.mjs';
 import {cutOpFor,cutPlanned,cutReason,deriveWorkOp,designGate,laneOf,laneText,laneWalked} from './sync.mjs';
 import {noteBrand} from './verify.mjs';
@@ -456,8 +455,8 @@ export function planGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   // A kind no operator launches is refused here, not discovered by the allocator: the first plan-ledger trial was
   // assessed with `inventory` ops, every runtime answered "Unknown skill/operator route", and the workflow cooled
   // and stalled without one launch. The form already carries the closed list; this is the kernel's own guard.
-  for(const op of state.ops)need(OPERATION_KINDS.includes(op.kind),
-    `Operation ${op.id} has the kind ${op.kind}, which no operator launches; a plan may only use ${OPERATION_KINDS.join(', ')}`);
+  for(const op of state.ops)need(llm.PLAN_OP_KINDS.includes(op.kind),
+    `Operation ${op.id} has the kind ${op.kind}, which no operator launches on a plan ledger; a plan may only use ${llm.PLAN_OP_KINDS.join(', ')}`);
   for(const op of state.ops){
     need(op.allowlist.length,`Operation ${op.id} has an empty allowlist`);
     for(const dependency of op.dependsOn)need(byId(state,dependency),`Operation ${op.id} depends on the unknown ${dependency}`);

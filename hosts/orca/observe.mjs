@@ -67,11 +67,18 @@ export const SCREENS={
  * A provider that refuses mid-operation says so on its own screen. The kernel reads this before any liveness
  * rule: a rate-limited worker is neither working nor stalled, it is parked until the window reopens.
  */
+/**
+ * A refusal is the provider's own error sentence, never a word. `quota` and `billing` on their own once matched
+ * the contract of a commerce feature and the agent's prose about it, and a working worker was closed as refused:
+ * every pattern here is a phrase only an error prints (a status code, "rate limit reached", "exceeded your
+ * quota", "credit balance is too low", an `_error` type). It is still read before the busy signature, so a
+ * refused runtime is parked the moment its provider says so.
+ */
 export const RATE_LIMIT_SIGNALS=[
-  ['http-429',/(?:\b|_)429\b/],
-  ['rate-limit',/rate.?limit(?:ed|ing|s)?|too many requests|resource_exhausted|retry after/i],
-  ['overloaded',/overloaded|server is busy|upstream_overloaded/i],
-  ['quota',/quota|insufficient_quota|credit balance|billing/i]
+  ['http-429',/(?:\b|_)429\b|rate_limit_error/i],
+  ['rate-limit',/rate.?limit(?:ed| reached| exceeded| hit|ing)?\b(?![^\n]*\b(?:rule|policy|design|record|feature|contract)\b)|too many requests|resource_exhausted|retry after \d/i],
+  ['overloaded',/overloaded_error|is (?:currently )?overloaded|server is busy|upstream_overloaded/i],
+  ['quota',/insufficient_quota|exceeded your (?:current )?quota|quota (?:exceeded|exhausted|reached)|out of quota|credit balance is too low|billing (?:hard )?limit|usage limit reached|you(?:'ve| have) hit your (?:usage )?limit/i]
 ];
 
 /** Screens arrive as a tail array from `terminal read` or as one joined string; both are one text. */
@@ -123,12 +130,12 @@ export function observe({screen,terminal,now,stalledAfterMs=DEFAULT_STALLED_AFTE
   if(!terminal)return verdict('dead','terminal not listed');
   if(terminal.status&&/exited|closed/i.test(terminal.status))return verdict('dead',`terminal ${terminal.status}`);
   if(reported)return verdict('reported','report file present');
-  const limited=rateLimitSignal(flat);
-  if(limited)return verdict('rate-limited',`provider refused with a ${limited.kind} signal: ${limited.text}`);
   const order=family?[family]:SCAN_ORDER;
   const match=phase=>order.find(id=>any(SCREENS[id][phase],flat))??null;
   const prompted=match('prompt');
   if(prompted)return verdict('stalled-prompt','agent is waiting for an interactive confirmation',prompted);
+  const limited=rateLimitSignal(flat);
+  if(limited)return verdict('rate-limited',`provider refused with a ${limited.kind} signal: ${limited.text}`);
   const busy=match('busy');
   if(busy)return verdict('working','agent is running',busy);
   const idle=match('idle');

@@ -3,7 +3,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {normalizeResolvedReferences} from './validator-transport.mjs';
 import {nonOperationModels} from '../scripts/config.mjs';
-import {KINDS as OPERATION_KINDS} from '../kernel/graph.mjs';
+import {KINDS as OPERATION_KINDS,writesOf} from '../kernel/graph.mjs';
+/**
+ * The kinds a plan ledger may plan: those whose writes are code, the runtime or evidence. A plan ledger binds no
+ * canonical Work, so a kind that authors or decides a Work record (decision.prepare, work.author,
+ * implementation.plan, business/architecture/brand/interface) has nowhere to write and is refused by the form.
+ */
+export const PLAN_OP_KINDS=Object.freeze(OPERATION_KINDS.filter(kind=>{try{return writesOf(kind).every(record=>['code','runtime','evidence'].includes(record));}catch{return false;}}));
 import {MANAGER_SNAPSHOT,MANAGER_DECISION,MANAGER_DECISION_FORM,validateManagerSnapshot,validateManagerDecision} from './manager-contract.mjs';
 export {MANAGER_SNAPSHOT,MANAGER_DECISION,MANAGER_DECISION_FORM,validateManagerSnapshot,validateManagerDecision} from './manager-contract.mjs';
 
@@ -194,7 +200,7 @@ export const DECISION_FORM={option:{type:'string'},rationale:{type:'string'},ins
 export const GOAL_FORM={
   definitionOfDone:{type:'string[]',minItems:1},
   ledger:{type:'object[]',minItems:1,each:{id:{type:'string'},title:{type:'string'},inputRef:{type:'string'},status:{type:'string',enum:['absent','partial','done','unknown']}}},
-  ops:{type:'object[]',minItems:1,each:{id:{type:'string'},kind:{type:'string',enum:[...OPERATION_KINDS]},goal:{type:'string'},ledgerIds:{type:'string[]',minItems:1},
+  ops:{type:'object[]',minItems:1,each:{id:{type:'string'},kind:{type:'string',enum:[...PLAN_OP_KINDS]},goal:{type:'string'},ledgerIds:{type:'string[]',minItems:1},
     allowlist:{type:'string[]',minItems:1},references:{type:'string[]'},checks:{type:'object[]',minItems:1,each:{name:{type:'string'},command:{type:'string'}}},
     acceptance:{type:'string[]',minItems:1},dependsOn:{type:'string[]'},difficulty:{type:'string',enum:['easy','medium','hard'],optional:true}}},
   risks:{type:'string[]',optional:true},questions:{type:'string[]',optional:true}
@@ -349,7 +355,7 @@ const GOAL_RULES=[
   'SRS/SDS are one input kind among others: a bug report, a UAT flow, a design, a dataset and existing code are equally valid inputs.',
   "the ledger must be derived from the job's definition of done, not from the file structure of the repository",
   'ops are dynamic: plan as many as the job needs, each small enough for one session to finish',
-  `op.kind is one of the kernel's operation kinds and nothing else - ${OPERATION_KINDS.join(', ')}: backend.implement builds code under its allowlist, runtime.operate runs environment, deployment, infrastructure and Docker effects (an inventory, a teardown, a reinstall, a backup are runtime.operate), review.verify reads a delivered slice against its acceptance without repairing, uat.verify and integration.verify prove on the real stack, decision.prepare and provision.ask put one decision or one provision to the owner, business.decide and architecture.decide settle records; a kind invented for the job (inventory, effect, integrate, merge) is launched by no operator and fails the plan`,
+  `op.kind is one of the plan kinds and nothing else - ${PLAN_OP_KINDS.join(', ')}: backend.implement builds code under its allowlist, runtime.operate runs environment, deployment, infrastructure and Docker effects (an inventory, a teardown, a reinstall, a backup are runtime.operate), review.verify reads a delivered slice against its acceptance without repairing, uat.verify and integration.verify prove on the real stack, provision.ask puts one provision the owner alone can give (a credential, an account, the go-ahead for an irreversible effect) to the owner; a decision the owner must take is a question of the plan, never an op; decision.prepare, work.author, implementation.plan, business.decide and architecture.decide write canonical Work records, which a plan ledger does not hold, and a kind invented for the job (inventory, effect, integrate, merge) is launched by no operator - both fail the plan`,
   'allowlists of ops that can run in parallel must be disjoint; overlapping paths are a re-plan, not a risk note',
   'checks are real commands runnable from the worktree',
   'allowlists and references are paths relative to the worktree root, never absolute and never climbing out of it; a declared input is referenced by the exact ref listed under inputs, which already lies inside the worktree',

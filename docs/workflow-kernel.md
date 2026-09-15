@@ -283,9 +283,12 @@ executable candidates in scope, derives one op per schedulable node and asks `as
 definition of done, the risks and the questions; when that call fails the definition of done falls back to
 the node list and the failure is an event, because the TODO list is a fact of the tree and not the model's
 to supply. On a plan ledger `assessGoal` fills one form: the definition of done, a **ledger** of goal items,
-and a dynamic list of **ops** with `dependsOn` and disjoint allowlists; every op's `kind` is one of the kernel's
-operation kinds (`KINDS` in `kernel/graph.mjs`), the form refuses any other and the phase refuses again before a
-page is written, because a kind no operator launches is rejected by every runtime and stalls the workflow. Either way the kernel writes
+and a dynamic list of **ops** with `dependsOn` and disjoint allowlists; every op's `kind` is one of the plan kinds
+(`PLAN_OP_KINDS`: the operation kinds that write code, the runtime or evidence - never a canonical Work record,
+because a plan ledger binds no Work tree), the form refuses any other and the phase refuses again before a page is
+written, because a kind no operator launches is rejected by every runtime and stalls the workflow, and a Work-record
+kind is refused by the Work gate the same way. A decision the owner must take is a question of the plan; the
+canonical Work gate itself holds only where a canonical tree is bound (`needsWorkGate`). Either way the kernel writes
 `goal.md` and `goal.json` and stops. An item the plan reports as already `done` is carried as `preexisting`:
 approved by the user, never verified by the kernel, and named as such in the final report.
 

@@ -102,6 +102,13 @@ test('a quota refusal is read off the screen before any liveness rule, so the ke
   assert.equal(rateLimitSignal('Your credit balance is too low').kind,'quota');
   assert.equal(rateLimitSignal(CLAUDE.busy),null);
   assert.equal(rateLimitSignal(''),null);
+  // Words are not refusals: a commerce contract talks about billing and quota, a design about rate-limit rules.
+  for(const prose of ['- purchase, payment, billing and entitlement journeys','the plan quota per workspace is a business rule','Reconcile the rate-limit policy of the chatbot feature','● Read(.starciwork/features/agentos-commerce/business/srs/billing/index.yaml)'])
+    assert.equal(rateLimitSignal(prose),null,prose);
+  assert.equal(rateLimitSignal('API Error: 429 {"type":"rate_limit_error","message":"This request would exceed your account\'s rate limit"}').kind,'http-429');
+  assert.equal(rateLimitSignal("You've hit your usage limit · resets 3pm").kind,'quota');
+  assert.equal(observe({screen:'⎿ API Error: 429 rate_limit_error · max retries reached\n❯\n  ⏵⏵ bypass permissions on',terminal:term(),now:2000,provider:'claude'}).liveness,'rate-limited');
+  assert.equal(observe({screen:'● The billing journey covers plan quota, invoices and refunds.\n❯\n  ⏵⏵ bypass permissions on',terminal:term(),now:2000,provider:'claude'}).liveness,'stalled-idle','prose about billing at an idle prompt is idle, not refused');
   // Busy text on the same screen does not hide the refusal; the family still comes back for the retry route.
   const limited=at(`${CLAUDE.busy}\nAPI Error: 429 rate_limit_error`);
   assert.equal(limited.liveness,'rate-limited');

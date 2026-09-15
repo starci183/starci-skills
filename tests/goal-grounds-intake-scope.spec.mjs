@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createStore} from '../kernel/store.mjs';
-import {approve,createWorkflowState,goalPhase,stageExternalInputs} from '../kernel/kernel.mjs';
+import {approve,createWorkflowState,goalPhase,needsWorkGate,stageExternalInputs} from '../kernel/kernel.mjs';
 import {featureScope,intakeOp,narrowIntakeScopes,scopedLayers} from '../kernel/intake.mjs';
 import {FRESH_MAX_AGE_MS,budgetIsFresh,freshRuntimeBudget,normalizeBudget,readRuntimeBudget,writeRuntimeBudget} from '../kernel/budget.mjs';
 import * as llm from '../models/functions.mjs';
@@ -333,6 +333,23 @@ test('on a plan ledger a decisive hidden decision is the owner\'s question on th
     assert.match(fs.readFileSync(store.paths.goal,'utf8'),/nivo-backup-store is removed as Nivo-owned/);
     assert.equal(goal.approvable,true);
   }finally{tree.cleanup();}
+});
+
+test('a plan-ledger goal that plans a Work-record kind is refused, and the Work gate holds only where a canonical tree is bound',()=>{
+  const tree=workRepo([]);
+  try{
+    const store=createStore({repoRoot:tree.repo,id:'20260915-plan-record-kind'});
+    const state=createWorkflowState({job:'Reinstall the stack',worktree:tree.repo,branch:'starci183/stacks',gates:[],store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'plan',scope:[],reintake:[],migrate:[],repoRoot:tree.repo});
+    const plan={definitionOfDone:['the owner decided'],risks:[],questions:[],ledger:[{id:'g1',title:'decide',status:'planned'}],
+      ops:[{id:'op1',kind:'decision.prepare',goal:'ask the owner',ledgerIds:['g1'],allowlist:['.starciwork/decisions/**'],references:[],checks:[{name:'c',command:'true'}],acceptance:['done'],dependsOn:[]}]};
+    assert.throws(()=>goalPhase(store,state,{cwd:tree.repo,extractMaterial:()=>[],renderGoalMarkdown:null,assessGoal:()=>({ok:true,provider:'fake',value:plan}),critiqueGoal:soundCritique}),
+      /Operation op1 has the kind decision\.prepare, which no operator launches on a plan ledger/);
+  }finally{tree.cleanup();}
+  const v6={};
+  assert.equal(needsWorkGate({kind:'runtime.operate'},{v6,work:null}),false,'a plan ledger has no tree to gate');
+  assert.equal(needsWorkGate({kind:'runtime.operate'},{v6,work:{ledger:{repoRoot:'r',workRoot:'w'}}}),true);
+  assert.equal(needsWorkGate({kind:'backend.implement'},{v6,work:{ledger:{repoRoot:'r',workRoot:'w'}}}),false,'code is not a Work record');
+  assert.equal(needsWorkGate({kind:'runtime.operate'},{v6:null,work:{ledger:{repoRoot:'r',workRoot:'w'}}}),false);
 });
 
 test('a resumed workflow that finished blocked is approved again without the first-approval gate',()=>{
