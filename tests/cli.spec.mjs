@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {parseYaml} from '../core/yaml.mjs';
@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { init as install } from '../bin/starci-skills.mjs';
 import { node as writeNode, resource, mutateJSON, mutateNode, json } from '../fixtures/build-workspace.mjs';
 
@@ -17,6 +17,24 @@ function temporary(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'work-v3-cli-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return root;
+}
+
+// `install()` copies the whole payload and rebuilds .dist (~6s). Several tests only need a
+// freshly-installed root to spawn or import the relocated CLI from; none of them assert anything
+// about the *process* of installing. Build the payload once here and clone the (path-independent,
+// verified-relocatable) result per test with fs.cpSync, which is roughly an order of magnitude
+// cheaper than re-running the installer. Tests that assert on install()'s own return value/log
+// output still call install() directly.
+let installedBaseDir = null;
+before(() => {
+  installedBaseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'work-v3-cli-installed-base-'));
+  install({ dir: installedBaseDir, bootstrap: true }, () => {});
+});
+after(() => {
+  if (installedBaseDir) fs.rmSync(installedBaseDir, { recursive: true, force: true });
+});
+function installInto(root) {
+  fs.cpSync(installedBaseDir, root, { recursive: true });
 }
 function snapshot(root) {
   const result = [];
@@ -200,24 +218,32 @@ test('impact terminates with a structured cycle error instead of treating a depe
   assert.deepEqual(snapshot(parent), before);
 });
 
-test('catalogue and op commands show contracts but do not execute or mutate workspace', t => {
+test('catalogue and op commands show contracts but do not execute or mutate workspace', async t => {
   const root = temporary(t);
-  install({ dir: root, bootstrap: true }, () => {});
+  installInto(root);
   const relocatedCLI = path.join(root, '.claude/cli/main.mjs');
   const invoke = (...args) => spawnSync(process.execPath, [relocatedCLI, ...args], { encoding: 'utf8', cwd: root, windowsHide: true });
-  const before = snapshot(root);
+  const beforeSnapshot = snapshot(root);
+  // One real process spawn proves the relocated file executes as a script (shebang, no top-level
+  // throw, real argv/exit-code plumbing). Every op after that goes through the exact same relocated
+  // module's exported `main()` in-process: same catalogue()/readOperatorDocument() resolution
+  // (import.meta.url-relative to the relocated file, so relocation is still fully exercised), just
+  // without paying for 21 extra Node process spawns to prove the identical dispatch path each time.
   const list = invoke('ops');
   assert.equal(list.status, 0, list.stderr);
   const catalog = JSON.parse(list.stdout);
   assert.ok(catalog.ops.some(op => op.id === 'workspace.manage'));
+  const { main: relocatedMain } = await import(pathToFileURL(relocatedCLI).href);
   for (const op of catalog.ops) {
-    const selected = invoke('op', op.id);
-    assert.equal(selected.status, 0, `${op.id}: ${selected.stderr}`);
-    assert.match(selected.stdout, /Contract display only/);
-    assert.match(selected.stdout, /nothing has executed/);
-    assert.ok(selected.stdout.length > 1000, `${op.id} contract missing`);
+    let stdout = '';
+    const io = { out: value => { stdout += value; }, err: value => { stdout += value; } };
+    const status = await relocatedMain(['op', op.id], io);
+    assert.equal(status, 0, `${op.id}: ${stdout}`);
+    assert.match(stdout, /Contract display only/);
+    assert.match(stdout, /nothing has executed/);
+    assert.ok(stdout.length > 1000, `${op.id} contract missing`);
   }
-  assert.deepEqual(snapshot(root), before);
+  assert.deepEqual(snapshot(root), beforeSnapshot);
 });
 
 test('invalid-workspace CLI reports failure without rewriting evidence or exposing credential values', t => {
@@ -239,7 +265,7 @@ test('installed workspace.manage forward-test authors only scoped todo planning 
   const root = temporary(t);
   const gitInit = spawnSync('git', ['init', '--quiet', root], { encoding: 'utf8', windowsHide: true });
   assert.equal(gitInit.status, 0, gitInit.stderr);
-  install({ dir: root, bootstrap: true }, () => {});
+  installInto(root);
   const installedCLI = path.join(root, '.claude/bin/starci-skills.mjs');
   const invoke = (...args) => spawnSync(process.execPath, [installedCLI, 'work', ...args], { cwd: root, encoding: 'utf8', windowsHide: true });
   const catalog = JSON.parse(fs.readFileSync(path.join(root, '.claude/.dist/ops/catalog.json'), 'utf8'));
@@ -281,7 +307,7 @@ test('installed workspace.manage forward-test authors only scoped todo planning 
 test('installed review.verify can inspect synthetic producer gate proof without changing frozen semantic inputs', t => {
   const root = temporary(t);
   assert.equal(spawnSync('git', ['init', '--quiet', root], { encoding: 'utf8', windowsHide: true }).status, 0);
-  install({ dir: root, bootstrap: true }, () => {});
+  installInto(root);
   const invoke = (...args) => spawnSync(process.execPath, [path.join(root, '.claude/bin/starci-skills.mjs'), 'work', ...args], { cwd: root, encoding: 'utf8', windowsHide: true });
   const workRoot = path.join(root, '.starciwork');
   assert.equal(invoke('init', workRoot, '--id', 'synthetic-quality-workspace').status, 0);

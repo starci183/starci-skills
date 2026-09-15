@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, {before, after} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -43,6 +43,25 @@ import {double} from './lib.mjs';
 test('double triples',()=>{assert.equal(double(2),6);});
 `;
 
+// The base commit (wrong value, no spec) is byte-identical across every repo() call - only the op commit
+// (fixed/not, and which spec) varies per test. Cut it once (init + config + the base commit is ~6 git
+// spawns) into a template repo in `before`, and give each test its own real, independent clone (a plain
+// recursive file copy - no git spawn) to add the op commit onto. `runAtBase()` below still does its own
+// real `git worktree add`/`node --test`/`git worktree remove` per test unchanged: that dual base/head
+// execution is the actual proof mechanism under test and stays fully real.
+let baseRepoRoot=null;
+before(()=>{
+  baseRepoRoot=tmp();
+  git(baseRepoRoot,'init','--quiet','-b','main');
+  git(baseRepoRoot,'config','user.email','proof@starci.local');
+  git(baseRepoRoot,'config','user.name','StarCi Proof');
+  git(baseRepoRoot,'config','commit.gpgsign','false');
+  write(baseRepoRoot,'lib.mjs','export const double=value=>value+1;\n');
+  git(baseRepoRoot,'add','-A');
+  git(baseRepoRoot,'commit','--quiet','-m','base: lib returns the wrong value');
+});
+after(()=>{if(baseRepoRoot)fs.rmSync(baseRepoRoot,{recursive:true,force:true});});
+
 /**
  * A tiny Node project in a real git repo: the base commit returns the wrong value and has no spec, the
  * working tree carries the fix plus the spec under test. The op worktree stays dirty on purpose - that is
@@ -50,13 +69,7 @@ test('double triples',()=>{assert.equal(double(2),6);});
  */
 function repo({spec,fixed=true}){
   const dir=tmp();
-  git(dir,'init','--quiet','-b','main');
-  git(dir,'config','user.email','proof@starci.local');
-  git(dir,'config','user.name','StarCi Proof');
-  git(dir,'config','commit.gpgsign','false');
-  write(dir,'lib.mjs','export const double=value=>value+1;\n');
-  git(dir,'add','-A');
-  git(dir,'commit','--quiet','-m','base: lib returns the wrong value');
+  fs.cpSync(baseRepoRoot,dir,{recursive:true});
   const baseHead=git(dir,'rev-parse','HEAD');
   write(dir,'lib.mjs',fixed?'export const double=value=>value*2;\n':'export const double=value=>value+1;\n');
   write(dir,'lib.spec.mjs',spec);
