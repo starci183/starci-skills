@@ -48,7 +48,7 @@ import {renderChecksFor} from '../checks/render.mjs';
 import {laneOwnerOf,laneNameOf,laneRowTitle,laneView,openLane,settleLane,laneBranchRef} from './lanes.mjs';
 import {INFRA_RESTART_LIMIT,RECONCILE_EVERY,SWEEP_MS,TAB_STATUSES,bindRun,closeOpTerminal,listTerminals,ownKernelTerminal,rebindRunIfNeeded,
   recoverCoordinatorTab,reconcileWithOrca,releaseKernelTab,siblingKernelGone,sweepStaleTerminals} from './terminals.mjs';
-import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,authoredDecisionOf,isAsk,openConflictDecision,answerCommand,answerOrEscalate,answerOwnerQuestion,continueOwnerRequest,dedupeNeedUser,inheritProvisional,
+import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,authoredDecisionOf,recordNamedBy,isAsk,openConflictDecision,answerCommand,answerOrEscalate,answerOwnerQuestion,continueOwnerRequest,dedupeNeedUser,inheritProvisional,
   openOwnerAsk,provisionalLines,redactSecrets,settleOwnerAsk,stopReasonFor,
   mechanicalOwnerLine,noteOwnerList,ownerItems,ownerLines,waitsForOwner} from './owner.mjs';
 import {askFillLine,credentialAsked,fillCommand,fillWaitingAsks,inputReadyAsks,ownerFillLines,settleFilledAsks} from './fill.mjs';
@@ -1310,12 +1310,61 @@ function retryOp(store,state,op,findings,ctx,reason){
  */
 function publishAuthoredDecision(store,state,op,report,reason){
   if(!isAsk(op.kind)||op.ownerAnswer||op.ownerRequestStatus==='waiting-owner')return false;
-  const authored=authoredDecisionOf(report?.summary);
+  // Either the summary carried the whole choice, or it named the record and the record supplied it.
+  const named=recordNamedBy(report?.summary),carried=(op.question?.options??[]).length>1;
+  const authored=authoredDecisionOf(report?.summary)??(named&&carried?{record:named,options:op.question.options}:null);
   if(!authored)return false;
   settleOwnerAsk(store,state,op,report);
   op.status='blocked';op.dispatch=null;op.terminal=null;op.nudged=false;
   store.appendEvent({event:'decision-published-unfinished',op:op.id,record:authored.record,options:authored.options.length,reason:String(reason??'').slice(0,200)});
   return true;
+}
+
+/**
+ * Where a decision's options actually live. A report summary is capped, so only the first numbered option of a
+ * four-option question ever survives the trip to the kernel: the owner then reads a choice as a free-text box.
+ * The record the ask authored is the canonical copy and it is complete, so the kernel reads the choices from it,
+ * by the record id the report named. One title per option, in the record's own words, English as the tree spells
+ * them; the owner page renders them in the configured language through the presenter.
+ */
+const OPTION_HEADING=/(?:^|\n)[^\S\n]*OPTION\s+(\d+)\s*[-\u2013\u2014:.]\s*([^\n]+)/g;
+const RECORD_SCAN_LIMIT=4000;
+export function decisionRecordOptions(worktree,record,{limit=12,readFile=file=>fs.readFileSync(file,'utf8')}={}){
+  const workRoot=path.join(String(worktree??''),'.starciwork'),wanted=String(record??'').trim();
+  if(!wanted||!worktree)return [];
+  let file=null,seen=0;
+  const stack=[workRoot];
+  try{
+    while(stack.length&&!file&&seen<RECORD_SCAN_LIMIT){
+      const dir=stack.pop();
+      let entries;
+      try{entries=fs.readdirSync(dir,{withFileTypes:true});}catch{continue;}
+      for(const entry of entries){
+        const full=path.join(dir,entry.name);
+        if(entry.isDirectory()){if(entry.name!=='node_modules'&&!entry.name.startsWith('.'))stack.push(full);continue;}
+        if(entry.name!=='index.yaml')continue;
+        seen+=1;
+        let text;
+        try{text=readFile(full);}catch{continue;}
+        if(new RegExp(`(?:^|\\n)\\s*id:\\s*${wanted.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\s*(?:$|\\n)`).test(text)){file=text;break;}
+      }
+    }
+  }catch{return [];}
+  if(!file)return [];
+  const found=[];
+  for(const match of file.matchAll(OPTION_HEADING)){
+    // The heading is the choice; the paragraph after its first full stop is the reasoning, which the page does not
+    // put on a radio label.
+    const title=String(match[2]).replace(/\s+/g,' ').trim().split(/\.\s/)[0].replace(/[.,;]$/,'').trim();
+    if(title)found.push({at:Number(match[1]),title:title.slice(0,220)});
+  }
+  const ordered=[];
+  for(const item of found.sort((a,b)=>a.at-b.at)){
+    if(item.at!==ordered.length+1)continue;
+    ordered.push(item.title);
+    if(ordered.length>=limit)break;
+  }
+  return ordered.length>1?ordered:[];
 }
 
 /**
@@ -1327,7 +1376,16 @@ export function publishAuthoredDecisions(store,state){
   for(const op of state.ops){
     if(!isAsk(op.kind)||op.ownerAnswer||op.ownerRequestStatus||op.refusal==='superseded')continue;
     if(!['blocked','failed'].includes(op.status))continue;
-    const report=[...(op.reports??[])].reverse().find(item=>authoredDecisionOf(item?.summary));
+    let report=[...(op.reports??[])].reverse().find(item=>authoredDecisionOf(item?.summary));
+    // A capped summary carries the record but not every option: the record itself completes the choice.
+    if(!report){
+      const named=[...(op.reports??[])].reverse().find(item=>recordNamedBy(item?.summary));
+      const options=named?decisionRecordOptions(state.worktree,recordNamedBy(named.summary)):[];
+      if(options.length>1){op.question={...op.question,options};report=named;}
+    }else if((op.question?.options??[]).length===0){
+      const complete=decisionRecordOptions(state.worktree,authoredDecisionOf(report.summary).record);
+      if(complete.length>authoredDecisionOf(report.summary).options.length)op.question={...op.question,options:complete};
+    }
     if(report&&publishAuthoredDecision(store,state,op,report,`${op.id} was blocked with its decision record already written`)){
       store.saveState(state);
       return {op:op.id};

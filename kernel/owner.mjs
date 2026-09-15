@@ -292,6 +292,8 @@ export const presentationOf=summary=>{
  * An ask that holds both needs nothing more from its own operation to put the question on the owner's page, so the
  * kernel may publish it whatever else that operation is blocked on.
  */
+/** The decision record an ask's report names, whatever else the capped summary did or did not keep. */
+export const recordNamedBy=summary=>(String(marker(redactSecrets(String(summary??'')),'decision')??'').match(/^\S+/)??[])[0]??null;
 export const authoredDecisionOf=summary=>{
   const text=redactSecrets(String(summary??''));
   const record=(String(marker(text,'decision')??'').match(/^\S+/)??[])[0]??null;

@@ -8,7 +8,7 @@ import {buildReport} from '../kernel/reports.mjs';
 import {markDone,markInProgress,readNode} from '../kernel/ledger.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {inputAsk} from './helpers/input-fixture.mjs';
-import {PRESENTATION_RETRY_MS,handleBlocked,publishAuthoredDecisions,presentOwnerQuestions,applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
+import {PRESENTATION_RETRY_MS,decisionRecordOptions,handleBlocked,publishAuthoredDecisions,presentOwnerQuestions,applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
 import {deriveOwnerRequests} from '../kernel/owner-requests.mjs';
 import {authoredDecisionOf} from '../kernel/owner.mjs';
 import {loadConfig} from '../scripts/config.mjs';
@@ -973,4 +973,34 @@ test('an ask that was already blocked in an earlier generation still reaches the
   assert.equal(quiet.ownerRequestStatus,undefined);
   const answered={...ask,id:'ask-2',ownerRequestStatus:undefined,ownerAnswer:{option:'1'}};
   assert.equal(publishAuthoredDecisions(store,{...state,ops:[answered],needUser:[]}),null,'an ask the owner already answered is not reopened');
+});
+
+test('a capped report keeps only the first option, so the choices are read from the decision record the ask authored',t=>{
+  const worktree=fs.mkdtempSync(path.join(os.tmpdir(),'starci-decision-record-'));
+  t.after(()=>fs.rmSync(worktree,{recursive:true,force:true}));
+  const dir=path.join(worktree,'.starciwork','features','login','business','srs','business-rules','policy-decisions','d-x');
+  fs.mkdirSync(dir,{recursive:true});
+  fs.writeFileSync(path.join(dir,'index.yaml'),[
+    'schema: work/node@2','id: nivo.login.decision.d-x','kind: business','description: |',
+    '  QUESTION. Who may register as purchaser principal?','',
+    '  OPTION 1 - OPEN SELF-SERVICE REGISTRATION. Any verified person may buy, and the record keeps an email.',
+    '  OPTION 2 - INVITATION-ONLY REGISTRATION. Only an invited recipient may buy.',
+    '  OPTION 3 - EXISTING-PRINCIPAL-ONLY PURCHASE. No registration journey exists at all.',
+    '  RECOMMENDATION. Option 1.',''].join(String.fromCharCode(10)));
+  assert.deepEqual(decisionRecordOptions(worktree,'nivo.login.decision.d-x'),
+    ['OPEN SELF-SERVICE REGISTRATION','INVITATION-ONLY REGISTRATION','EXISTING-PRINCIPAL-ONLY PURCHASE'],
+    'one clean title per option, the reasoning after the first full stop left off the label');
+  assert.deepEqual(decisionRecordOptions(worktree,'nivo.login.decision.d-absent'),[],'a record that is not in the tree yields nothing');
+  assert.deepEqual(decisionRecordOptions(worktree,''),[],'no record named, nothing read');
+  assert.deepEqual(decisionRecordOptions(null,'nivo.login.decision.d-x'),[],'no worktree, nothing read');
+
+  // The report kept the record and the first option only, exactly as the 600-character cap leaves it.
+  const capped=`decision: nivo.login.decision.d-x recommended: 1 BLOCKED shared-change: four paths must change. 1. OPEN SELF-SERVICE REGISTRATION. Any verified person may buy, and the record keeps`;
+  const events=[],store={appendEvent:event=>events.push(event),saveState(){}};
+  const ask={id:'ask-1',kind:'decision.prepare',status:'blocked',attempt:13,requesters:[],
+    question:{kind:'decision',text:'Who may register?'},reports:[{attempt:13,outcome:'partial',summary:capped,valid:true}]};
+  const state={id:'wf',host:process.cwd(),worktree,engine:{schema:'starci/engine@1',generation:4},needUser:[],ops:[ask]};
+  assert.deepEqual(publishAuthoredDecisions(store,state),{op:'ask-1'});
+  assert.deepEqual(state.needUser.find(item=>item.kind==='decision').options.length,3,'the owner page receives all three, not the one the cap left');
+  assert.equal(ask.ownerRequestStatus,'waiting-owner');
 });
