@@ -1570,6 +1570,11 @@ asked); `goal-not-approvable` the grounds block the first approval; `budget-refr
 hold became an intake op (with `mode: reconcile` for a `--reintake`); `prerequisite-held` /
 `prerequisite-owner` / `prerequisite-unresolved` what the critique said the goal rests on - already in the
 tree, the owner's to decide, or neither; `resumed-after-block` an approval cleared a blocked finish;
+`perception` a cheap model read a tab the heuristics called idle (`classifyScreen`: `working` makes the kernel wait,
+anything else changes nothing); `runtime-incident` a worker was settled for `stalled-idle` after every reading - the
+kernel's own perception, so its probation attempt is refunded and its runtime not avoided; `proof-skipped` the
+protected proof is no gate for this operation (a kind that writes no code, or no sealed oracle): the re-run checks,
+the Work validator and the independent validator carry its acceptance;
 `op-readmitted` an op a limit had exhausted went back to `ready`.
 
 **Creating an operation** (`kernel/common.mjs`) - `op-created` every op the kernel adds, with why;

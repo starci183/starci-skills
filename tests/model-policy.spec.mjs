@@ -28,6 +28,14 @@ test('probation refunds only an exact authoritative pre-task no-effect attestati
   const proof={code:'native-execution-never-began',effectState:'none',taskCreated:false,inputAccepted:false,attestationId:'legacy-coordinator-proof',jobId:'job-gen3',generation:3,workflowId:'wf',opId:'op',runtimeId:'a'};
   assert.equal(bound.refundProbation(job,'a',proof).code,'probation-refunded');assert.equal(state.modelEligibility.probationBudget.remaining,2);
   assert.equal(bound.refundProbation(job,'a',proof).code,'probation-refund-cached');assert.equal(state.modelEligibility.probationBudget.remaining,2);
+  // A kernel that closed a running turn as idle refunds the attempt it spent; a silent or dead worker does not.
+  const job2={...job,jobId:'job-gen3-b'};
+  assert.equal(bound.consumeProbation(job2,'a').ok,true);assert.equal(state.modelEligibility.probationBudget.remaining,1);
+  const perception={code:'runtime-perception-settlement',liveness:'stalled-idle',attestationId:'perception:ctx_1:1',jobId:'job-gen3-b',generation:3,workflowId:'wf',opId:'op',runtimeId:'a'};
+  assert.equal(bound.refundProbation(job2,'a',{...perception,liveness:'stalled-silent'}).code,'probation-refund-proof-invalid');
+  assert.equal(bound.refundProbation(job2,'a',{...perception,jobId:'job-gen3'}).code,'probation-refund-proof-invalid');
+  assert.equal(bound.refundProbation(job2,'a',perception).code,'probation-refunded');assert.equal(state.modelEligibility.probationBudget.remaining,2);
+  assert.equal(bound.refundProbation(job2,'a',perception).code,'probation-refund-cached');
   assert.equal(bound.refundProbation(job,'a',{...proof,effectState:'unknown',attestationId:'prompt-stalled'}).ok,false);
   assert.equal(bound.refundProbation(job,'a',{...proof,generation:4}).ok,false);
   assert.equal(bound.refundProbation(job,{id:'b',provider:'claude',target:'model-b'},{...proof,runtimeId:'b',attestationId:'wrong-runtime'}).ok,false);assert.equal(state.modelEligibility.probationBudget.remaining,2);

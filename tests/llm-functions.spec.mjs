@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {CRITIQUE,CRITIQUE_FORM,DECISION_FORM,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,MANAGER_DECISION,MANAGER_SNAPSHOT,OVERLAP_CASES,PROVISION_KINDS,VALIDATOR_IO_RULE,VALIDATOR_RULES,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,manageWorkflow,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateManagerDecision,validateManagerSnapshot,validateOp} from '../models/functions.mjs';
+import {classifyScreen,CRITIQUE,CRITIQUE_FORM,DECISION_FORM,GOAL_CALL_TIMEOUT_MS,runHeadlessWithUsage,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,MANAGER_DECISION,MANAGER_SNAPSHOT,OVERLAP_CASES,PROVISION_KINDS,VALIDATOR_IO_RULE,VALIDATOR_RULES,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,manageWorkflow,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateManagerDecision,validateManagerSnapshot,validateOp} from '../models/functions.mjs';
 
 const op=(id,extra={})=>({id,kind:'backend.implement',goal:`Build ${id}`,ledgerIds:[`L-${id}`],allowlist:[`apps/be/src/${id}`],
   references:['.starciwork/features/sales/sds.md#3'],checks:[{name:'unit',command:'npx vitest run sales'}],acceptance:[`${id} works`],dependsOn:[],...extra});
@@ -25,6 +25,29 @@ test('workflow manager returns only a snapshot-bound executable order and allowl
   assert.equal(validateManagerDecision({...answer,contextRequests:[{actionId:'plan-op-a',refIds:['raw/path']} ]},snapshot).ok,false);
   assert.equal(validateManagerDecision({...answer,authority:'approved'},snapshot).ok,false,'free-form authority cannot enter the executor contract');
   assert.equal(validateManagerSnapshot({...snapshot,pollTimestamp:Date.now()}).ok,false,'poll metadata cannot change manager identity');
+});
+
+test('a goal call carries its own twenty-minute window and a killed headless process is named a timeout',()=>{
+  const seen=[];
+  const result=assessGoal({job:'Prepare an application stack.',providers:['gpt-6-astra'],runHeadless:(_provider,_prompt,options)=>{seen.push(options);return JSON.stringify(goalPlan());}});
+  assert.equal(result.ok,true);
+  assert.equal(seen[0].timeoutMs,GOAL_CALL_TIMEOUT_MS);
+  assert.throws(()=>runHeadlessWithUsage('claude-fable-5.1','x',{cwd:'.',timeoutMs:1000,spawn:()=>({status:null,signal:'SIGTERM',stdout:'',stderr:''})}),/headless timed out after 1s \(SIGTERM\); nothing was written/);
+});
+
+test('classifyScreen answers one closed verdict from a rendered frame and is unavailable without a provider or a screen',()=>{
+  const frame=['"DEC-ACC-UNKNOWN\\|unknown-recovery" .starciwork/features/shared-lifecycle/','✢ Gitifying… (7m 9s · ↓ 22.9k tokens · thinking)','Tip: Use /btw to ask a quick side question'];
+  const prompts=[];
+  const read=classifyScreen({family:'claude',op:{id:'op-intake',kind:'work.author'},lines:frame,providers:['qwen3.8-flash'],
+    runHeadless:(provider,prompt)=>{prompts.push([provider,prompt]);return JSON.stringify({verdict:'working',reason:'a status line with elapsed time and a token counter is the last thing drawn',evidence:'✢ Gitifying… (7m 9s'});}});
+  assert.deepEqual([read.ok,read.verdict,read.provider],[true,'working','qwen3.8-flash']);
+  assert.match(prompts[0][1],/perception of one StarCi workflow kernel/);
+  assert.match(prompts[0][1],/Gitifying/);
+  assert.match(prompts[0][1],/a wrong idle closes a turn that is running/);
+  const bad=classifyScreen({family:'claude',op:{id:'x'},lines:frame,providers:['qwen3.8-flash'],runHeadless:()=>JSON.stringify({verdict:'maybe',reason:'?'})});
+  assert.deepEqual([bad.ok,bad.verdict],[false,'unavailable']);
+  assert.equal(classifyScreen({lines:frame,providers:[]}).reason,'no perception provider was given');
+  assert.equal(classifyScreen({lines:['','  '],providers:['qwen3.8-flash']}).reason,'the screen is empty');
 });
 
 test('the goal form is a contract: shape, unique ids, a real dependency order, a covered ledger and disjoint parallel allowlists',()=>{

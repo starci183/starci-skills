@@ -183,7 +183,9 @@ function quotaSelectedProviders(store,state,role,providers,{budget=freshRuntimeB
     return [];
   }
   state.quotaBlocks=(state.quotaBlocks??[]).filter(item=>item.role!==role);
-  return peers.providers.slice(0,1);
+  // Every peer with known quota, in quota order: the call walks the chain, and a peer whose process died before
+  // answering (a killed headless run writes nothing) is followed by the next one instead of ending the goal.
+  return peers.providers;
 }
 
 /**

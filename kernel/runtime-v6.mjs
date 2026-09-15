@@ -54,8 +54,8 @@ export function prepareGenerationRetry({journalFile,workflowId,generation,now=Da
     return {cancelled,unsettled};
   }finally{journal.close();}
 }
-const modelRole=name=>['critiqueGoal','validateOp'].includes(name)?'verify':['assessGoal','planOp'].includes(name)?'plan':'decide';
-const configuredModelRole=name=>['assessGoal','planOp'].includes(name)?'planner':['critiqueGoal','validateOp'].includes(name)?'validator':'kernelManager';
+const modelRole=name=>['critiqueGoal','validateOp','classifyScreen'].includes(name)?'verify':['assessGoal','planOp'].includes(name)?'plan':'decide';
+const configuredModelRole=name=>['assessGoal','planOp'].includes(name)?'planner':['critiqueGoal','validateOp','classifyScreen'].includes(name)?'validator':'kernelManager';
 const machineResource=key=>({key:`machine:${key}`,units:1});
 function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadRuntimes(),identity={},budget=null,now=Date.now){
   if(typeof eligibility!=='function')throw Error(`Model eligibility is required for ${name}`);

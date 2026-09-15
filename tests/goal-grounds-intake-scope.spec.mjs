@@ -202,6 +202,9 @@ test('public goal path: a stale budget is refreshed before the planner and criti
     assert.equal(harness.goal.ok,true);
     assert.ok(probes>=1,'the budget beside the store was stale or missing, so it was probed');
     assert.deepEqual(called.map(([kind])=>kind),['assessGoal','critiqueGoal'],'both pools were called once the quota was known');
+    // The whole quota-ordered pool is handed to the call: a peer whose process dies is followed by the next one.
+    const planner=events(harness.store).find(event=>event.event==='budget-refreshed');
+    assert.ok(planner,'the budget was refreshed for the planner');
     assert.ok(called.every(([,provider])=>typeof provider==='string'&&provider),'a real runtime id was selected');
     assert.ok(events(harness.store).some(event=>event.event==='budget-refreshed'),'the refresh is on the record');
     assert.equal(harness.state.critique.verdict,'sound');

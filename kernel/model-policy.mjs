@@ -164,8 +164,13 @@ export function createWorkflowModelEligibility({runtimes,state,policyFile,qualif
   };
   const refundProbation=(job,runtimeValue,proof={})=>{
     const runtime=runtimeOf(runtimeValue),actual=workloadFor(job,state),scopeId=scopeOf(job,actual),scope=state.modelEligibility.probationScopes[scopeId],jobId=clean(job?.jobId);
-    const valid=proof?.code==='native-execution-never-began'&&proof.effectState==='none'&&proof.taskCreated===false&&proof.inputAccepted===false&&clean(proof.attestationId)&&
-      clean(proof.jobId)===jobId&&String(proof.generation)===String(job?.generation)&&clean(proof.workflowId)===clean(job?.workflowId)&&clean(proof.opId)===clean(job?.opId)&&clean(proof.runtimeId)===clean(runtime?.id);
+    const identityMatches=clean(proof?.attestationId)&&clean(proof?.jobId)===jobId&&String(proof?.generation)===String(job?.generation)&&clean(proof?.workflowId)===clean(job?.workflowId)&&clean(proof?.opId)===clean(job?.opId)&&clean(proof?.runtimeId)===clean(runtime?.id);
+    const neverBegan=proof?.code==='native-execution-never-began'&&proof.effectState==='none'&&proof.taskCreated===false&&proof.inputAccepted===false;
+    // A worker the kernel closed because its screen heuristics read a running turn as an idle prompt did not fail
+    // its probation: the kernel did. The refund is bound to the exact job the settlement named and to that one
+    // liveness word; a silent worker, a dead one or a refused one is still the model's own attempt.
+    const perception=proof?.code==='runtime-perception-settlement'&&proof.liveness==='stalled-idle';
+    const valid=identityMatches&&(neverBegan||perception);
     if(!valid)return {ok:false,code:'probation-refund-proof-invalid'};
     if(!scope?.consumedJobs?.includes(jobId))return {ok:false,code:'probation-job-not-consumed'};
     const consumed=scope.consumedReceipts?.find(item=>item.jobId===jobId),binding=proof?.journalBinding;

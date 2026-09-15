@@ -227,6 +227,8 @@ export function runHeadlessWithUsage(provider,prompt,{cwd,timeoutMs=600000,spawn
   need(spec,`Unknown headless provider: ${provider}`);
   const [executable,...args]=spec.command;
   const result=spawn(executable,args,{cwd,input:prompt,encoding:'utf8',windowsHide:true,timeout:timeoutMs,shell:process.platform==='win32',maxBuffer:64*1024*1024});
+  // A process the timeout killed exits with no status: name the timeout, so the goal record says what happened.
+  if(result.status===null&&(result.error?.code==='ETIMEDOUT'||result.signal))need(false,`${provider} headless timed out after ${Math.round(timeoutMs/1000)}s (${result.signal??result.error?.code}); nothing was written`);
   if(result.status!==0){
     const output=`${result.stderr??''}\n${result.stdout??''}`;
     if(RATE_LIMITED.test(output))throw Error(`rate-limited: ${provider} refused with a quota signal: ${output.trim().slice(-200)}`);
@@ -251,7 +253,9 @@ export function runHeadless(provider,prompt,options={}){return runHeadlessWithUs
  * cross-field rules. `usage` is the sum over every attempt the call paid for, including the invalid ones: the
  * kernel charges the whole call to the runtime that ran it, not only its last try.
  */
-export function callFunction({kind,payload,form,providers,cwd,runHeadless:run=runHeadlessWithUsage,retries=1,extra,role}){
+/** A goal assessment or critique reads a whole job and its material: twice the default headless window. */
+export const GOAL_CALL_TIMEOUT_MS=20*60*1000;
+export function callFunction({kind,payload,form,providers,cwd,runHeadless:run=runHeadlessWithUsage,retries=1,extra,role,timeoutMs=null}){
   const attempts=[];
   let usage=null;
   // An empty chain is not a chain that failed: nothing was asked, nothing answered, and the caller's own selector
@@ -261,7 +265,7 @@ export function callFunction({kind,payload,form,providers,cwd,runHeadless:run=ru
   for(const provider of providers){
     for(let attempt=0;attempt<=retries;attempt+=1){
       let answered;
-      try{answered=run(provider,frame(kind,payload,form,role)+(attempt?`\nYour previous answer was invalid: ${attempts.at(-1).errors.join('; ')}. Answer again with the full JSON object.`:''),{cwd});}
+      try{answered=run(provider,frame(kind,payload,form,role)+(attempt?`\nYour previous answer was invalid: ${attempts.at(-1).errors.join('; ')}. Answer again with the full JSON object.`:''),{cwd,...(timeoutMs?{timeoutMs}:{})});}
       catch(error){attempts.push({provider,attempt,errors:/^rate-limited:/.test(error.message)?['rate-limited']:[error.message]});break;}
       // A caller may inject a plain string-returning runner; then the call simply has no usage to charge.
       const answer=typeof answered==='string'?answered:answered?.text;
@@ -387,11 +391,11 @@ export function assessGoal({job,inputs=[],material=[],constraints=[],ledger=null
   const payload={job,inputs:inputs.map(input=>({kind:input.kind,ref:input.ref,summary:input.summary})),material,constraints,
     ...(ledger?{ledger}:{}),rules:ledger?WORK_GOAL_RULES:GOAL_RULES};
   if(ledger){
-    const assessed=callFunction({kind:'assessGoal',payload,form:WORK_GOAL_FORM,providers,cwd,runHeadless:run});
+    const assessed=callFunction({kind:'assessGoal',payload,form:WORK_GOAL_FORM,providers,cwd,runHeadless:run,timeoutMs:GOAL_CALL_TIMEOUT_MS});
     if(assessed.ok)assessed.value.schema=WORK_GOAL;
     return assessed;
   }
-  const result=callFunction({kind:'assessGoal',payload,form:GOAL_FORM,providers,cwd,runHeadless:run,extra:goalPlanRules});
+  const result=callFunction({kind:'assessGoal',payload,form:GOAL_FORM,providers,cwd,runHeadless:run,extra:goalPlanRules,timeoutMs:GOAL_CALL_TIMEOUT_MS});
   if(result.ok)result.value.schema=GOAL_PLAN;
   return result;
 }
@@ -491,6 +495,34 @@ export const VALIDATOR_IO_RULE='this operation declares what it reads and what i
 const normalizeFile=value=>String(value??'').replaceAll('\\','/').replace(/^\.\//,'').replace(/^\/+/,'').trim();
 /** A reject must carry a finding, otherwise there is nothing for the operation to fix. */
 const validationRules=answer=>({errors:answer.verdict==='reject'&&!(Array.isArray(answer.findings)&&answer.findings.length)?['a reject must carry at least one finding']:[]});
+
+/* ------------------------------------------------------------------ classifyScreen: the kernel's sense */
+
+export const SCREEN_VERDICTS=['working','idle','prompt','asked','finished','refused'];
+export const SCREEN_FORM={verdict:{type:'string',enum:SCREEN_VERDICTS},reason:{type:'string'},evidence:{type:'string',optional:true}};
+const PERCEPTION_ROLE='the perception of one StarCi workflow kernel: you read the rendered screen of an agent terminal and say what the agent is doing right now - working (a turn is being drawn: a spinner, an elapsed-time status line, a token counter, a tool call in progress), idle (the agent sits at its input prompt with nothing running), prompt (a permission or confirmation dialog waits for a keystroke), asked (the agent ended its turn on a question to a person), finished (the turn ended without a question) or refused (the provider printed an error refusing the request: a rate limit, a quota, an overload, a billing error) - never what the agent should do next';
+const PERCEPTION_RULES=[
+  'the last lines are the newest: a status line with a spinner glyph, an elapsed time or a token counter near the bottom means working, whatever prose sits above it',
+  'words in the agent\'s own text or in the task it was given - quota, billing, rate limit, error - are not a refusal; a refusal is the provider\'s own error sentence, printed by the tool, not discussed by the agent',
+  'a footer, a hint bar, a tip line or a model name proves nothing about idleness; only the input prompt with nothing running above it means idle',
+  'answer only what the screen shows; when it shows too little to tell, answer working: a wrong idle closes a turn that is running, a wrong working only waits one more round'];
+/**
+ * classifyScreen: what an agent tab is doing, read by a cheap model from its rendered frame. The kernel asks it
+ * only after its own heuristics said idle and before it nudges or closes the tab; a `working` answer makes the
+ * kernel wait, any other answer changes nothing the heuristics decided. The verdict is closed, the process around
+ * it is the runtime's, and the family and operation travel as data.
+ */
+export function classifyScreen({family=null,op={},lines=[],providers=[],cwd,runHeadless:run}){
+  const tail=(Array.isArray(lines)?lines:String(lines??'').split('\n')).map(line=>String(line??'')).slice(-40);
+  const chain=(Array.isArray(providers)?providers:[providers]).filter(item=>typeof item==='string'&&item.trim());
+  if(!chain.length)return {ok:false,verdict:'unavailable',reason:'no perception provider was given',attempts:[],usage:null};
+  if(!tail.some(line=>line.trim()))return {ok:false,verdict:'unavailable',reason:'the screen is empty',attempts:[],usage:null};
+  const payload={family,op:{id:op?.id??null,kind:op?.kind??null},screen:tail,rules:PERCEPTION_RULES};
+  const result=callFunction({kind:'classifyScreen',payload,form:SCREEN_FORM,providers:chain,cwd,runHeadless:run,role:PERCEPTION_ROLE});
+  if(!result.ok)return {ok:false,verdict:'unavailable',reason:result.reason??'no provider produced a valid screen verdict',attempts:result.attempts??[],usage:result.usage??null};
+  return {ok:true,verdict:result.value.verdict,reason:String(result.value.reason??'').trim().slice(0,300),evidence:String(result.value.evidence??'').trim().slice(0,200),
+    provider:result.provider,attempts:result.attempts,usage:result.usage};
+}
 
 export function validateOp({op,node=null,diff,checks=[],references=[],resolvedReferences=[],resolvedReferencesTruncated=false,freshContext=false,authorAttemptId=null,brand=null,io=null,memory='',providers=DEFAULT_VALIDATOR_RUNTIMES,skip=[],cwd,runHeadless:run}){
   need(plain(op)&&typeof op.id==='string','validateOp needs the operation');
@@ -673,7 +705,7 @@ export function critiqueGoal({job,scope=[],ledger=[],decisions=[],records=[],mat
     rules:CRITIC_RULES
   };
   const result=callFunction({kind:'critiqueGoal',payload,form:CRITIQUE_FORM,providers:chain,cwd,runHeadless:run,
-    extra:critiqueRules,role:CRITIC_ROLE});
+    extra:critiqueRules,role:CRITIC_ROLE,timeoutMs:GOAL_CALL_TIMEOUT_MS});
   if(!result.ok)return {ok:false,verdict:'unavailable',reason:result.reason??'no provider produced a valid critique',
     attempts:result.attempts??[],usage:result.usage??null,objections:[],dropped:[],overlaps:[],provisions:[],required:[],alternatives:[],question:null,prerequisites:[]};
   const answer=result.value;

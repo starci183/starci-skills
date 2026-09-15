@@ -28,7 +28,7 @@ import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGra
 import {machineVerify} from '../kernel/kernel.mjs';
 import {attributedFiles} from '../kernel/verify.mjs';
 import {relocateLauncher,reviveSupervisor} from '../kernel/kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,noteAnomaly,prepareV6WorkGate,producedKindVerdict,restoreDurableCheckpoint,recoverSatisfiedDependencyBlocks,sweepResolvedReviewLines,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,nativeActivityProof,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,LONG_CONTRACT_GRACE_MS,PERCEPTION_GRACE_MS,perceptionProviders,noteAnomaly,prepareV6WorkGate,producedKindVerdict,restoreDurableCheckpoint,recoverSatisfiedDependencyBlocks,sweepResolvedReviewLines,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,nativeActivityProof,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -3752,6 +3752,49 @@ const stalledTab=(harness,{dispatch,lines,kind=null})=>{
   harness.fake.setScreen(op.terminal,lines);
   return op;
 };
+
+test('a tab the heuristics call idle is read once more by the perception model: working waits, idle nudges as before',()=>{
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);
+    harness.state.run='run_wf';harness.state.from='term_kernel';
+    const idleFrame=['=== TASK === op-intake','● Reconciling the intake records.','','❯','  ⏵⏵ bypass permissions on'];
+    const seen=[];
+    const perceive=({lines,providers})=>{seen.push({lines,providers});return {ok:true,verdict:'working',reason:'a status line is drawing below the fold',provider:'qwen3.8-flash'};};
+    let now=LONG_CONTRACT_GRACE_MS+1;
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>now,work:null,perceive,
+      runtimeProfile:{allocation:{tiers:{easy:['qwen3.8-flash','claude-opus']}},runtimes:{'qwen3.8-flash':{provider:'qwen',roles:['implement','verify']},'claude-opus':{provider:'claude',roles:['implement','decide']}}}};
+    const op=stalledTab(harness,{dispatch:'ctx_idle',lines:idleFrame});
+    op.launchedAt=0;
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_idle',liveness:'stalled-idle'}]});
+    assert.equal(seen.length,1,'the model read the tab once');
+    assert.deepEqual(seen[0].providers,['qwen3.8-flash'],'the cheapest verify-capable tier reads screens');
+    assert.deepEqual(events(harness.store).filter(event=>['nudged','settled'].includes(event.event)),[],'working means wait');
+    const perception=events(harness.store).find(event=>event.event==='perception');
+    assert.deepEqual([perception.op,perception.verdict,perception.provider],['op-intake','working','qwen3.8-flash']);
+    assert.equal(op.status,'running');
+    // Within the grace window the reading stands without another call.
+    now+=PERCEPTION_GRACE_MS-1000;
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_idle',liveness:'stalled-idle'}]});
+    assert.equal(seen.length,1);
+    assert.equal(events(harness.store).filter(event=>event.event==='nudged').length,0);
+    // After it, the model says idle: the tab is nudged exactly as it was before the sense existed.
+    now+=2000;
+    ctx.perceive=()=>({ok:true,verdict:'idle',reason:'the prompt is empty and nothing runs',provider:'qwen3.8-flash'});
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_idle',liveness:'stalled-idle'}]});
+    assert.equal(events(harness.store).filter(event=>event.event==='nudged').length,1);
+    assert.equal(op.nudged,true);
+    // Nudged and still idle at the next reading: settled as before, but as the kernel's own perception - the
+    // incident is recorded and the runtime is not avoided.
+    now+=PERCEPTION_GRACE_MS+1000;
+    settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_idle',liveness:'stalled-idle'}]});
+    assert.equal(events(harness.store).filter(event=>event.event==='settled').length,1);
+    const incident=events(harness.store).find(event=>event.event==='runtime-incident');
+    assert.deepEqual([incident.kind,incident.op,incident.attempt,incident.refunded],['perception-settlement','op-intake',1,false],'no v6 runtime here, so nothing to refund; the incident still stands');
+    assert.deepEqual(op.avoidRuntimes??[],[],'the same runtime may take the operation again');
+    assert.equal(op.status,'ready');
+  }finally{harness.cleanup();}
+});
 
 test('a tab the contract never reached is relaunched, and the operation is not charged a restart for it',()=>{
   const harness=setup({plan:salesPlan,scripts:{}});

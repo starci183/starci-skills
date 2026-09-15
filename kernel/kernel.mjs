@@ -20,7 +20,7 @@ import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot,workflowsRoot} f
 import {grammarRepository,resolveLedgerRoot,sharedLedgerStatus} from './routing.mjs';
 import {createAllocator,loadRuntimes} from './schedule.mjs';
 import {loadsFileFor} from './loads.mjs';
-import {planProtectedProof,proofFinding,proofPlan,protectedProofFinding,runAtBase,runProtectedProof} from '../checks/proof.mjs';
+import {planProtectedProof,proofApplies,proofFinding,proofPlan,protectedProofFinding,runAtBase,runProtectedProof} from '../checks/proof.mjs';
 import {evaluateAcceptance,kernelVerificationReceipt,resolveEvidencePacket} from '../checks/acceptance.mjs';
 import {protectedOracleManifest} from './candidate-bridge.mjs';
 import {prepareCandidateIntegration} from './candidates.mjs';
@@ -1818,6 +1818,13 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     // alone is not evidence that the behavior changed.
     if(ctx.v6){
       const manifest=protectedOracleManifest(op.v6Candidate.bridge,op,{expectedBaseFailures:op.expectedBaseFailures??{}});
+      // A record author, a decision, a drawing, a review: nothing to contrast. An implementation whose checks name
+      // no spec file: nothing sealed to contrast with. Both are skipped on the record, never refused for it.
+      const applicable=proofApplies(op,{oracleManifest:manifest,writes:(()=>{try{return graph.writesOf(op.kind,{profile:ctx.kindsProfile});}catch{return [];}})()});
+      if(!applicable.applies){
+        op.proof={verdict:'skipped',manifestDigest:manifest?.digest??null,reason:applicable.reason};
+        store.appendEvent({event:'proof-skipped',op:op.id,kind:op.kind,reason:applicable.reason});
+      }else{
       const plan=planProtectedProof(op,{oracleManifest:manifest,candidateChanges:files,policy:op.proofPolicy??null});
       const proofExec=(command,options)=>ctx.v6.check(command,{...options,env:op.v6Candidate?.dependency?.checkEnv},op);
       const proof=runProtectedProof({plan,baseRoot:op.v6Candidate.snapshot.baseRoot,candidateRoot:op.v6Candidate.snapshot.workerRoot,
@@ -1827,6 +1834,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       if(proof.verdict!=='pass'){
         op.v6Pending={kind:'protected-proof',verdict:proof.verdict,detail:protectedProofFinding(proof)};
         return 'acceptance-pending';
+      }
       }
     }else{
       const plan=proofPlan(op,{changedFiles:files});
@@ -2538,6 +2546,57 @@ export function nativeActivityProof(orca,state,op,now,{graceMs=NATIVE_ACTIVITY_G
     reason:exact?(age<=graceMs?'exact native worker heartbeat is fresh':'exact native worker heartbeat is stale'):'worker-show identity or process state differs'};
 }
 
+/** How long one model reading of a tab stands before the same tab is read again. */
+export const PERCEPTION_GRACE_MS=3*60*1000;
+/** The runtimes a screen is read on: the cheapest tier that can verify, in its own order. */
+export function perceptionProviders(profile=loadRuntimes()){
+  const easy=Array.isArray(profile?.allocation?.tiers?.easy)?profile.allocation.tiers.easy:[];
+  return easy.filter(id=>Array.isArray(profile?.runtimes?.[id]?.roles)&&profile.runtimes[id].roles.includes('verify'));
+}
+const screenFamilyOf=(op,profile)=>{const provider=profile?.runtimes?.[op?.runtime]?.provider;return typeof provider==='string'?provider:null;};
+/**
+ * The kernel's second opinion on a tab its heuristics called idle: a cheap model reads the same rendered frame
+ * (`classifyScreen`) through the same admission every model call goes through, and answers one closed word. Only
+ * `working` changes anything - the kernel waits instead of nudging or closing - so the sense can make the kernel
+ * more patient, never more violent. A pending durable job yields the tick; an unavailable model leaves the
+ * heuristics exactly as they were. `ctx.perceive` is the seam a test injects.
+ */
+function perceptionVerdict(orca,store,state,op,ctx,observed,now){
+  const perceive=typeof ctx.perceive==='function'?ctx.perceive:ctx.v6&&typeof ctx.v6.model==='function'?null:undefined;
+  if(perceive===undefined)return null;
+  if(Number.isFinite(op.perceivedAt)&&now-op.perceivedAt<PERCEPTION_GRACE_MS)return op.perceived?.verdict==='working'?'working':null;
+  const lines=readOpTab(orca,state,op);
+  if(!lines||!lines.some(line=>String(line).trim()))return null;
+  const profile=ctx.runtimeProfile??loadRuntimes();
+  const providers=perceptionProviders(profile);
+  let judged=null;
+  try{judged=perceive?perceive({family:screenFamilyOf(op,profile),op,lines,providers}):ctx.v6.model('classifyScreen',{family:screenFamilyOf(op,profile),op:{id:op.id,kind:op.kind},lines,providers},op);}
+  catch(error){
+    if(isJobPending(error))throw error;
+    judged={ok:false,verdict:'unavailable',reason:String(error?.message??error).slice(0,200)};
+  }
+  op.perceivedAt=now;
+  op.perceived=judged?.ok?{verdict:judged.verdict,reason:judged.reason??null,provider:judged.provider??null}:{verdict:'unavailable',reason:judged?.reason??null,provider:null};
+  store.appendEvent({event:'perception',op:op.id,liveness:observed.liveness,verdict:op.perceived.verdict,provider:op.perceived.provider,reason:String(op.perceived.reason??'').slice(0,200)});
+  return op.perceived.verdict==='working'?'working':null;
+}
+/**
+ * A worker the kernel closed for `stalled-idle` after every reading: the settlement is the kernel's perception,
+ * not the model's failure. The probation attempt it consumed is refunded against the exact job the lease named,
+ * the runtime is not avoided, and the incident is on the record for whoever watches the runtime.
+ */
+function notePerceptionSettlement(store,state,op,ctx,{lease,attempt,dispatch}){
+  let refund={ok:false,code:'no-v6-runtime'};
+  if(ctx.v6&&lease&&typeof ctx.v6.refundUnbegunProbation==='function'){
+    const proof={code:'runtime-perception-settlement',liveness:'stalled-idle',attestationId:`perception:${dispatch??op.id}:${attempt}`,
+      jobId:lease.jobId,generation:lease.generation,workflowId:lease.workflowId,opId:lease.opId,runtimeId:lease.probationRuntime??op.runtime};
+    try{refund=ctx.v6.refundUnbegunProbation(op,proof,lease);}catch(error){refund={ok:false,code:String(error?.message??error).slice(0,120)};}
+  }
+  store.appendEvent({event:'runtime-incident',kind:'perception-settlement',op:op.id,attempt,dispatch:dispatch??null,runtime:op.runtime,
+    perceived:op.perceived?.verdict??null,refund:refund.code??null,refunded:Boolean(refund.ok)});
+  return refund;
+}
+
 export function settleStalled(orca,store,state,ctx,tick){
   const now=clockOf(ctx);
   // An op that waits for the OWNER is exempt from the deadline: it is not slow, it is waiting, and the wait is
@@ -2569,6 +2628,8 @@ export function settleStalled(orca,store,state,ctx,tick){
       }
       // The screen is the evidence. Only an `idle` reading - or no reading at all - reaches the nudge below.
       if(settleFromTab(orca,store,state,op,ctx,observed))continue;
+      // ... and one more reading, by a model, before a turn that may be running is nudged or closed.
+      if(perceptionVerdict(orca,store,state,op,ctx,observed,now)==='working')continue;
     }
     if(observed.liveness==='stalled-idle'&&!op.nudged){
       notifyTerminal(orca,{cwd:state.worktree,terminal:op.terminal,wait:ctx.wait,
@@ -2585,6 +2646,7 @@ export function settleStalled(orca,store,state,ctx,tick){
         continue;
       }
     }
+    const lease=op.v6Lease?{...op.v6Lease}:null,priorAttempt=op.attempt??1,priorDispatch=op.dispatch;
     const settled=settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:observed.liveness,terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
     if(!reconcileStoppedNativeAttempt(store,state,op,ctx,settled,observed.liveness))continue;
     if(observed.liveness==='rate-limited'){ctx.allocator.failed(op.runtime,{reason:`rate-limited (${observed.reason??'provider screen'})`,op:op.id});store.appendEvent({event:'rate-limit-parked',op:op.id,runtime:op.runtime});}
@@ -2592,6 +2654,7 @@ export function settleStalled(orca,store,state,ctx,tick){
     if(observed.liveness==='stalled-silent'&&noteSilence(store,state,op,ctx))avoidRuntime(op,op.runtime,clockOf(ctx));
     op.restarts+=1;
     store.appendEvent({event:'settled',op:op.id,liveness:observed.liveness,restarts:op.restarts});
+    if(observed.liveness==='stalled-idle')notePerceptionSettlement(store,state,op,ctx,{lease,attempt:priorAttempt,dispatch:priorDispatch});
     noteAnomaly(store,state,`settled:${op.id}:${observed.liveness}`,{op:op.id,runtime:op.runtime,liveness:observed.liveness});
     triageAnomaly(store,state,`settled:${op.id}:${observed.liveness}`,{...ctx,orca});
     if(op.restarts>RESTART_LIMIT){
@@ -2606,7 +2669,9 @@ export function settleStalled(orca,store,state,ctx,tick){
       else state.needUser.push({op:op.id,kind:'environment',detail:`${op.id} was restarted ${op.restarts} times (${observed.liveness})`});
       continue;
     }
-    op.status='ready';op.dispatch=null;op.terminal=null;op.nudged=false;avoidRuntime(op,op.runtime,clockOf(ctx));
+    op.status='ready';op.dispatch=null;op.terminal=null;op.nudged=false;
+    // A perception settlement is the kernel's own doing: the same runtime may take the operation again.
+    if(observed.liveness!=='stalled-idle')avoidRuntime(op,op.runtime,clockOf(ctx));
   }
 }
 

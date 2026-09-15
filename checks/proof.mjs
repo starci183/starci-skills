@@ -152,6 +152,21 @@ export function proofFinding(result){
  * Build a v6 proof plan exclusively from a pre-sealed, verifier-owned oracle manifest. Tests written in the
  * candidate are supplemental and cannot become the oracle merely because the implementer reported them.
  */
+/**
+ * Whether the protected proof is a gate for this operation at all. Proof by contrast is a statement about code:
+ * a spec the operation added must fail on the code it started from. A kind that writes no code (a record author,
+ * a decision, a drawing, a review) has nothing the proof could contrast, and an operation whose checks name no spec
+ * file sealed no oracle to contrast with. Both are answered by the re-run checks, the Work validator and the
+ * independent validator - the acceptance every operation already passes - and are recorded as skipped, not judged.
+ */
+export function proofApplies(op,{oracleManifest=null,writes=null}={}){
+  const kindWrites=Array.isArray(writes)?writes:[];
+  if(!kindWrites.includes('code'))return {applies:false,reason:`the kind ${op?.kind??'operation'} writes no code: the Work validator and the independent validator are its proof`};
+  const oracles=Array.isArray(oracleManifest?.oracles)?oracleManifest.oracles:[];
+  if(!oracles.length)return {applies:false,reason:'no protected oracle was sealed for this operation (its checks name no spec file): the re-run checks and the independent validator are its proof'};
+  return {applies:true,reason:null};
+}
+
 export function planProtectedProof(op,{oracleManifest,candidateChanges=[],policy=null}={}){
   const manifest=plainOracleManifest(oracleManifest);
   const changed=new Set(candidateChanges.map(item=>normalize(typeof item==='string'?item:item?.path)).filter(Boolean));

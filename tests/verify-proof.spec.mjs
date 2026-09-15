@@ -4,7 +4,16 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {PROOF_POLICY,isSpecPath,policyFor,proofFinding,proofPlan,runAtBase,planProtectedProof,runProtectedProof,protectedProofFinding} from '../checks/proof.mjs';
+import {PROOF_POLICY,isSpecPath,policyFor,proofApplies,proofFinding,proofPlan,runAtBase,planProtectedProof,runProtectedProof,protectedProofFinding} from '../checks/proof.mjs';
+
+test('the protected proof is a gate only for a code-writing kind with a sealed oracle; everything else is skipped, not judged',()=>{
+  const manifest={schema:'starci/oracle-manifest@1',digest:'a'.repeat(64),oracles:[{id:'oracle-1',path:'protected/double.spec.mjs',sha256:'b'.repeat(64),assertionIds:['doubles'],ownerAttemptId:'kernel:wf:1',kinds:['backend.implement'],command:'node --test protected/double.spec.mjs'}]};
+  assert.deepEqual(proofApplies({id:'intake',kind:'work.author'},{oracleManifest:manifest,writes:['record','srs']}).applies,false);
+  assert.match(proofApplies({id:'intake',kind:'work.author'},{oracleManifest:manifest,writes:['record']}).reason,/writes no code/);
+  assert.match(proofApplies({id:'build',kind:'backend.implement'},{oracleManifest:{...manifest,oracles:[]},writes:['code']}).reason,/no protected oracle was sealed/);
+  assert.deepEqual(proofApplies({id:'build',kind:'backend.implement'},{oracleManifest:manifest,writes:['code']}),{applies:true,reason:null});
+  assert.equal(proofApplies({id:'ask',kind:'decision.prepare'},{oracleManifest:manifest,writes:['decision']}).applies,false);
+});
 
 const tmp=()=>{
   const dir=path.join(os.tmpdir(),'starci-verify-proof-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);
