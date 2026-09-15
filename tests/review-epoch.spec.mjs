@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {reconcileFailedLaunchLease,reconcileLegacyCoordinatorLease,refundLegacyCoordinatorProbations,resetReviewEpoch,settleSkippedGenerationLeases} from '../kernel/kernel.mjs';
+import {retryableOperation,reconcileFailedLaunchLease,reconcileLegacyCoordinatorLease,refundLegacyCoordinatorProbations,resetReviewEpoch,settleSkippedGenerationLeases} from '../kernel/kernel.mjs';
 
 test('generation retry supersedes only unanswered derived review questions and clears stale review counters',()=>{
   const events=[],store={appendEvent:event=>events.push(event)},accepted={id:'accepted-review',kind:'review.verify',status:'done',reports:[{outcome:'done'}]};
@@ -72,4 +72,21 @@ test('public retry refund binds historical runtime to the cancelled durable oper
   const op={id:'verify',kind:'review.verify'},state={id:'wf',ops:[op]},store={readEvents:()=>[{event:'legacy-coordinator-no-effect-proved',op:'verify',jobId:'old',generation:3,pin:'pin'}]},seen=[];
   const runtime={journal:{getJob:()=>({job_id:'old',workflow_id:'wf',op_id:'verify',attempt:1,generation:3,kind:'operation',role:'verify',status:'cancelled',payload:{runtime:'gpt-6-astra'}})},refundUnbegunProbation:(actual,proof,identity)=>{seen.push({actual,proof,identity});return {ok:true,code:'probation-refunded'};}};
   assert.deepEqual(refundLegacyCoordinatorProbations(store,state,runtime),[{jobId:'old',code:'probation-refunded'}]);assert.equal(seen[0].proof.runtimeId,'gpt-6-astra');assert.equal(seen[0].identity.probationRuntime,'gpt-6-astra');assert.equal(seen[0].identity.generation,3);
+});
+
+test('an accepted operation that still carries a durable lease is settled at retry instead of refusing it, and is never retried',()=>{
+  const settled=[],lease=id=>({jobId:`job-${id}`,leaseToken:'token'});
+  const state={engine:{journalFile:'journal'},ops:[
+    {id:'ask-2',status:'done',refusal:'runtime-reconciliation',lease:lease('ask-2')},
+    {id:'old',status:'cancelled',lease:lease('old')},
+    {id:'live',status:'running',lease:lease('live')}]};
+  assert.equal(retryableOperation(state.ops[0]),false,'a done operation is not retried whatever field it still carries');
+  assert.equal(retryableOperation(state.ops[2]),true);
+  const released=settleSkippedGenerationLeases(state,{settle:({leases})=>{settled.push(...leases.map(item=>item.jobId));return leases.map(()=>({ok:true}));}});
+  assert.deepEqual(released,['ask-2','old']);
+  assert.deepEqual(settled,['job-ask-2','job-old']);
+  assert.equal(state.ops[0].lease,undefined);assert.equal(state.ops[1].lease,undefined);
+  assert.ok(state.ops[2].lease,'the running operation keeps its lease for the retry loop');
+  const busy={engine:{journalFile:'journal'},ops:[{id:'done-but-live',status:'done',dispatch:'d-1',lease:lease('x')}]};
+  assert.throws(()=>settleSkippedGenerationLeases(busy,{settle:()=>{throw Error('must not settle');}}),/unsettled durable lease/,'a done operation with a live dispatch is not proof of anything');
 });

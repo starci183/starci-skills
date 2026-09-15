@@ -452,7 +452,10 @@ export function resetReviewEpoch(store,state,priorGeneration=state.engine?.gener
 }
 export function settleSkippedGenerationLeases(state,{settle=settleGenerationLeases,journalFile=state.engine?.journalFile}={}){
   const skipped=state.ops.filter(op=>op.lease&&!retryableOperation(op));
-  for(const op of skipped)need(op.workerSettled===true,`Skipped operation ${op.id} retains an unsettled durable lease`);
+  // A confirmed native stop proves a skipped worker finished; so does acceptance. An operation that is done or
+  // cancelled with no live dispatch or terminal was verified and committed by this kernel, and the reservation it
+  // still carries fences nothing - it is settled with the rest instead of refusing the owner's retry.
+  for(const op of skipped)need(op.workerSettled===true||settledOperation(op),`Skipped operation ${op.id} retains an unsettled durable lease`);
   if(!skipped.length)return [];
   const results=settle({journalFile,leases:skipped.map(op=>op.lease),reason:'generation retry after confirmed stop of skipped operation'});
   for(let index=0;index<skipped.length;index++){need(results[index]?.ok,`Durable lease ${skipped[index].lease.jobId} could not be settled before retry: ${results[index]?.reason??'unknown'}`);delete skipped[index].lease;}
@@ -3268,7 +3271,9 @@ export function guardedStage(store,state,ctx,stage,fn){
  */
 export const TRIAGE_OPTIONS=['resume-ops','park-runtime','settle-op','restart-kernel','needUser'];
 export function retryOwnedBaseline(state,op,git=spawnSync){const changed=changedFiles(state,op,{git},op.allowlist,{exclude:op.kernelOwned??[]}),attributed=attributedFiles(op,changed);return {changed,attributed,unclaimed:changed.filter(file=>!attributed.includes(file))};}
-export const retryableOperation=op=>!op?.fill&&!op?.ownerRequest&&(['running','answering'].includes(op?.status)||Boolean(op?.retryReconciled)||(Boolean(op?.lease)&&(op?.refusal==='runtime-reconciliation'||op?.workerSettled===true)));
+/** An operation the owner's retry runs again. A settled one - done or cancelled - is never among them, whatever field it still carries. */
+export const settledOperation=op=>['done','cancelled'].includes(op?.status)&&!op?.dispatch&&!op?.terminal;
+export const retryableOperation=op=>!op?.fill&&!op?.ownerRequest&&!settledOperation(op)&&(['running','answering'].includes(op?.status)||Boolean(op?.retryReconciled)||(Boolean(op?.lease)&&(op?.refusal==='runtime-reconciliation'||op?.workerSettled===true)));
 export function noteAnomaly(store,state,signature,detail){
   state.anomalies=state.anomalies??{};
   const entry=state.anomalies[signature]=state.anomalies[signature]??{count:0,detail,firstAt:Date.now(),triaged:null};
