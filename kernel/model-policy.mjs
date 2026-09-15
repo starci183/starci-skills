@@ -80,7 +80,13 @@ export function loadModelEligibilityContext({policyFile,qualificationsFile,proba
 }
 
 const HIGH_KINDS=['integration.verify','release.deliver','deployment.operate','data.correct','production.deploy'];
-const MODEL_KINDS=['model.assessGoal','model.planOp','model.decide','model.validateOp','model.manageWorkflow'];
+const MODEL_KINDS=['model.assessGoal','model.planOp','model.decide','model.validateOp','model.manageWorkflow','model.critiqueGoal','model.classifyScreen'];
+/**
+ * The kernel's own model functions - the manager, the planner, the validator, the screen sense - are not
+ * operation work: they draw a per-call scope but never the workflow's operation probation budget. A workflow
+ * that spent that budget on twenty-five manager decisions went blind and headless, with every worker idle.
+ */
+const kernelFunction=workload=>MODEL_KINDS.includes(clean(workload?.kind))||clean(workload?.kind)==='judge';
 export function workloadFor(op={},state={}){
   const declared=clean(op.kind||op.operation),functionName=clean(op.input?.functionName||op.functionName),kind=declared==='model'&&functionName?`model.${functionName}`:declared;
   const modelFunction=MODEL_KINDS.includes(kind)||op.jobType==='model-function'||declared==='judge';
@@ -99,7 +105,7 @@ const localProbationAllowed=job=>job?.approved===true&&job?.scope==='local'&&job
 function probationUnavailableReasons(job,scope,budget){
   const reasons=[];
   if((scope?.remaining??2)<1)reasons.push('probation attempts are exhausted for this operation workload');
-  if(Number(budget?.remaining??0)<1)reasons.push('workflow probation budget is exhausted');
+  if(!kernelFunction(job)&&Number(budget?.remaining??0)<1)reasons.push('workflow probation budget is exhausted');
   if(job?.approved!==true)reasons.push('probation requires an approved workflow');
   if(job?.scope!=='local')reasons.push('probation requires local scope');
   if(job?.noExternalEffects!==true)reasons.push('probation forbids external effects');
@@ -127,7 +133,7 @@ export function createWorkflowModelEligibility({runtimes,state,policyFile,qualif
     const runtime=runtimeOf(runtimeValue),id=clean(runtime?.id),actual=workloadFor(job,state),scopeId=scopeOf(job,actual),key=`${id}:${scopeId}`;
     const scope=state.modelEligibility.probationScopes[scopeId]??{remaining:2,initial:2,consumedJobs:[]};state.modelEligibility.probationScopes[scopeId]=scope;
     let probation=state.modelEligibility.probations[key];
-    if(!loaded.evidenceByRuntime[id]&&!probation&&localProbationAllowed(actual)&&scope.remaining>0&&state.modelEligibility.probationBudget.remaining>0){
+    if(!loaded.evidenceByRuntime[id]&&!probation&&localProbationAllowed(actual)&&scope.remaining>0&&(kernelFunction(actual)||state.modelEligibility.probationBudget.remaining>0)){
       probation={schema:'starci/model-probation@1',status:'active',provider:clean(runtime.provider),model:clean(runtime.model||runtime.target),scopeId,
         workloads:[clean(actual.kind)],strictMachineGates:true,independentReview:true,noExternalEffects:true,remainingAttempts:scope.remaining,createdAt:now()};
       state.modelEligibility.probations[key]=probation;
@@ -156,9 +162,9 @@ export function createWorkflowModelEligibility({runtimes,state,policyFile,qualif
     const runtime=runtimeOf(runtimeValue),actual=workloadFor(job,state),scopeId=scopeOf(job,actual),entry=state.modelEligibility.probations[`${clean(runtime?.id)}:${scopeId}`],scope=state.modelEligibility.probationScopes[scopeId],jobId=clean(job?.jobId);
     if(!jobId)return {ok:false,code:'probation-job-id-required'};
     if(scope?.consumedJobs?.includes(jobId))return {ok:true,code:'probation-consumed-cached',scopeId,remainingAttempts:scope.remaining};
-    if(!entry||entry.scopeId!==scopeId||entry.status!=='active'||!scope||scope.remaining<1||state.modelEligibility.probationBudget.remaining<1)return {ok:false,code:'probation-unavailable'};
+    if(!entry||entry.scopeId!==scopeId||entry.status!=='active'||!scope||scope.remaining<1||(!kernelFunction(actual)&&state.modelEligibility.probationBudget.remaining<1))return {ok:false,code:'probation-unavailable'};
     scope.remaining-=1;scope.consumedJobs=[...(scope.consumedJobs??[]),jobId];scope.consumedReceipts=[...(scope.consumedReceipts??[]),
-      {jobId,runtimeId:clean(runtime?.id),workflowId:clean(job?.workflowId),opId:clean(job?.opId),generation:job?.generation??null,at:now()}];state.modelEligibility.probationBudget.remaining-=1;
+      {jobId,runtimeId:clean(runtime?.id),workflowId:clean(job?.workflowId),opId:clean(job?.opId),generation:job?.generation??null,at:now()}];if(!kernelFunction(actual))state.modelEligibility.probationBudget.remaining-=1;
     for(const [key,item] of Object.entries(state.modelEligibility.probations))if(key.endsWith(`:${scopeId}`)){item.remainingAttempts=scope.remaining;if(scope.remaining===0)item.status='exhausted';}
     return {ok:true,code:'probation-consumed',scopeId,remainingAttempts:scope.remaining};
   };
@@ -185,7 +191,7 @@ export function createWorkflowModelEligibility({runtimes,state,policyFile,qualif
     if(scope.refundedJobs.some(item=>item.jobId===jobId))return {ok:true,code:'probation-refund-cached',scopeId,remainingAttempts:scope.remaining};
     scope.refundedJobs.push({jobId,attestationId:proof.attestationId,generation:job.generation,runtimeId:runtime.id,at:now()});
     scope.remaining=Math.min(scope.initial,scope.remaining+1);
-    const budget=state.modelEligibility.probationBudget;budget.remaining=Math.min(budget.initial,budget.remaining+1);
+    const budget=state.modelEligibility.probationBudget;if(!kernelFunction(actual))budget.remaining=Math.min(budget.initial,budget.remaining+1);
     for(const [key,item] of Object.entries(state.modelEligibility.probations))if(key.endsWith(`:${scopeId}`)){item.remainingAttempts=scope.remaining;if(scope.remaining>0&&item.status==='exhausted')item.status='active';}
     return {ok:true,code:'probation-refunded',scopeId,remainingAttempts:scope.remaining,attestationId:proof.attestationId};
   };

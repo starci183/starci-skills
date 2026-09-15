@@ -85,7 +85,7 @@ test('real workflow model policy consumes the same model-function scope selected
   const f=fixture(t);f.state.approved=true;f.state.ops=[{id:'op',kind:'work.author',checks:[]}];fs.writeFileSync(path.join(f.dir,'policy.json'),JSON.stringify({schema:'starci/model-capability-policy@1'}));const profiles=loadRuntimes(),policy=createWorkflowModelEligibility({runtimes:profiles,state:f.state,policyFile:path.join(f.dir,'policy.json'),qualificationsFile:path.join(f.dir,'none.json'),root:f.dir,now:()=>1});let launches=0;
   const runtime=createEngineRuntime({...f,modelPolicy:policy,eligibility:policy.eligibility,spawnChild:()=>({pid:9,once(){},unref(){}})});
   try{runtime.model('planOp',{providers:['gpt-5.6-sol'],node:{operation:'work.author'}},{id:'op',attempt:1});}catch(error){assert.equal(error.code,'STARCI_JOB_PENDING',error.stack);launches+=1;}
-  const scopes=Object.keys(f.state.modelEligibility.probationScopes);assert.deepEqual(scopes,['wf/op/model.planOp/plan']);assert.equal(f.state.modelEligibility.probationBudget.remaining,(f.state.modelEligibility.probationBudget.initial-1));assert.equal(launches,1);runtime.close();
+  const scopes=Object.keys(f.state.modelEligibility.probationScopes);assert.deepEqual(scopes,['wf/op/model.planOp/plan']);assert.equal(f.state.modelEligibility.probationScopes['wf/op/model.planOp/plan'].remaining,1,'the model function consumed its own scope');assert.equal(f.state.modelEligibility.probationBudget.remaining,f.state.modelEligibility.probationBudget.initial,'a kernel model function never spends the operation probation budget');assert.equal(launches,1);runtime.close();
 });
 
 test('real workflow policy consumes native author probation in the eligibility workload scope',t=>{
