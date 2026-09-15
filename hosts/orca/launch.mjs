@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import {classifyTab} from '../../kernel/tab.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -251,7 +252,10 @@ export function dispatchLastWords(orca,dispatchId,{cwd}={}){
 }
 const TERMINAL_STOP_STATES=['failed','stopped','abandoned'];
 /** Orca's own record of one worker: has its process exited, and is the tab it lived in gone from the worktree? */
-function exitedWorkerProof(orca,dispatchId,{cwd}){
+const IDLE_TAB_VERDICTS=['idle','finished-unreported','prompt-missing'];
+/** How long a dispatch heartbeat must have been silent before an idle prompt counts as a finished worker. */
+export const HEARTBEAT_STALE_MS=15*60*1000;
+function exitedWorkerProof(orca,dispatchId,{cwd,now=Date.now}){
   let show;try{show=orca.invoke('worker-show',{dispatch:dispatchId},{cwd});}catch(error){return {proven:false,reason:String(error?.message??error)};}
   const worker=getPath(show.receipt,'result.worker')??null;
   const state=worker?.state??null,stage=worker?.stage??null,terminal=worker?.agent_terminal_handle??null;
@@ -267,7 +271,19 @@ function exitedWorkerProof(orca,dispatchId,{cwd}){
   if(closed.outcome!=='ok')return {proven:false,state,stage,terminal,reason:`the worker tab is still listed and could not be closed: ${closed.reason??closed.outcome}`};
   let again;try{again=orca.invoke('terminal-list',{},{cwd});}catch(error){return {proven:false,state,stage,terminal,reason:String(error?.message??error)};}
   if(again.outcome!=='ok')return {proven:false,state,stage,terminal,reason:'the worktree terminals could not be listed after the close'};
-  return listedHandles(again.receipt).includes(terminal)?{proven:false,state,stage,terminal,closedTab:true,reason:'the worker tab is still listed after its close'}:{proven:true,state,stage,terminal,tabListed:false,closedTab:true};
+  if(!listedHandles(again.receipt).includes(terminal))return {proven:true,state,stage,terminal,tabListed:false,closedTab:true};
+  // Orca answered the close but the pty outlived it ("stop unverifiable"). What is left is a TUI at its prompt: the
+  // screen says whether a turn is still running, and the dispatch heartbeat says for how long nothing has. An idle
+  // prompt with a heartbeat older than the stale window is a finished worker whose tab nobody can kill; its effects
+  // are complete, the tab is recorded as residual. A drawing turn, a question, or a fresh heartbeat stays unknown.
+  let read;try{read=orca.invoke('terminal-read',{terminal},{cwd});}catch(error){return {proven:false,state,stage,terminal,closedTab:true,reason:String(error?.message??error)};}
+  if(read.outcome!=='ok')return {proven:false,state,stage,terminal,closedTab:true,reason:'the worker tab is still listed after its close and could not be read'};
+  const verdict=classifyTab({lines:getPath(read.receipt,'result.terminal.tail')??[]});
+  const heartbeatAt=Date.parse(getPath(show.receipt,'result.dispatch.last_heartbeat_at')??'');
+  const heartbeatAgeMs=Number.isFinite(heartbeatAt)?now()-heartbeatAt:null;
+  if(!IDLE_TAB_VERDICTS.includes(verdict.verdict))return {proven:false,state,stage,terminal,closedTab:true,screen:verdict.verdict,heartbeatAgeMs,reason:`the worker tab is still listed after its close and its screen reads ${verdict.verdict}`};
+  if(heartbeatAgeMs===null||heartbeatAgeMs<HEARTBEAT_STALE_MS)return {proven:false,state,stage,terminal,closedTab:true,screen:verdict.verdict,heartbeatAgeMs,reason:'the worker tab is still listed after its close and its dispatch heartbeat is not stale'};
+  return {proven:true,state,stage,terminal,tabListed:true,closedTab:true,screen:verdict.verdict,heartbeatAgeMs,residualTab:{terminal,verdict:verdict.verdict,reason:'an idle prompt whose pty Orca could not stop; retained'}};
 }
 const classifySettlement=(stop,release)=>{
   const stopState=getPath(stop?.receipt,'result.state')??null,releaseState=getPath(release?.receipt,'result.state')??null;
@@ -280,7 +296,7 @@ const classifySettlement=(stop,release)=>{
   return {effectState,residualTerminal,stopState,releaseState,releaseReason,processAction};
 };
 
-export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt',wait,terminalHandle=null,closeTerminal=false}={}){
+export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt',wait,terminalHandle=null,closeTerminal=false,now=Date.now}={}){
   let stop=orca.invoke('worker-stop',{dispatch:dispatchId},{cwd}),reconciliation=null,closedTerminal=null;
   if(closeTerminal&&terminalHandle){
     // A command-terminal attempt owns its terminal outright: the process lives only there, so closing
@@ -330,7 +346,7 @@ export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt
   // worker record can: a terminal state with the process exited, and a tab no longer listed, is the proof that
   // nothing of this attempt is still running. Anything short of that stays unknown.
   if(classified.effectState==='unknown'&&stop.outcome==='ok'&&TERMINAL_STOP_STATES.includes(classified.stopState)&&release?.outcome==='unknown'&&classified.processAction==='closed_agent_terminal'){
-    exitedWorker=exitedWorkerProof(orca,dispatchId,{cwd});
+    exitedWorker=exitedWorkerProof(orca,dispatchId,{cwd,now});
     if(exitedWorker.proven)classified={...classified,effectState:'none',residualTerminal:{state:classified.releaseState,reason:classified.releaseReason,processAction:classified.processAction}};
   }
   const {effectState,residualTerminal,stopState,releaseState,releaseReason,processAction}=classified;
