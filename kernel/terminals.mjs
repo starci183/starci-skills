@@ -5,7 +5,7 @@ import {dispatchLastWords,settleDispatch} from '../hosts/orca/launch.mjs';
 import {RESTART_LIMIT,firstLine,need,plain,sleepSync} from './common.mjs';
 import {buildReport} from './reports.mjs';
 import {redactSecrets} from './owner.mjs';
-import {closeStaleCoordinatorTerminals,seedCoordinatorTerminalsFromLog} from './coordinator-terminals.mjs';
+import {closeStaleCoordinatorTerminals,pruneClosedCoordinatorTerminals,readClosedCoordinatorTerminals,seedCoordinatorTerminalsFromLog} from './coordinator-terminals.mjs';
 
 /**
  * Tabs and the Run they hang from. The rule is one sentence - a tab exists only while somebody reads it - and
@@ -104,9 +104,21 @@ export const SWEEP_MS=5*60*1000;
  * time (`SWEEP_MS`), not only every N iterations: a workflow whose iterations are minutes long never reached
  * the N-th one, and the owner counted fifteen idle tabs.
  */
+/** A tab Orca answered a close for but still lists is not asked again before this much time has passed. */
+export const UNCLOSABLE_RETRY_MS=30*60*1000;
 export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Date.now}={}){
-  const closed=[];
+  const closed=[],unclosable=[];
   const ours=new Map(state.ops.map(op=>[op.id,op]));
+  // A close Orca answers `ok` for is not a closed tab: a pty it cannot stop keeps the tab listed, and asking every
+  // sweep spends an Orca call and an event line each time. Each attempt is remembered on the state; a handle still
+  // listed after one is reported once as unclosable and left alone for UNCLOSABLE_RETRY_MS.
+  const attempts=state.terminalCloseAttempts=plain(state.terminalCloseAttempts)?state.terminalCloseAttempts:{};
+  const tryClose=handle=>{
+    const prior=attempts[handle];
+    if(prior&&now()-Number(prior.at)<UNCLOSABLE_RETRY_MS){if(!prior.reported){prior.reported=true;unclosable.push(handle);}return false;}
+    attempts[handle]={at:now(),reported:false};
+    return closeTerminal(orca,cwd,handle);
+  };
   // A tab is an op's by the handle the op holds, whatever its title: a command-terminal launch whose rename
   // never landed keeps the agent's default title, and those were the tabs nobody could match.
   const byHandle=new Map(state.ops.filter(op=>op.terminal).map(op=>[op.terminal,op]));
@@ -114,17 +126,22 @@ export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Dat
   // The coordinator terminals earlier kernels of this workflow ran in, by handle: Orca re-titles an exited kernel's
   // tab to its shell, so the title match below never sees them; the record beside the store does.
   seedCoordinatorTerminalsFromLog(store.dir,state.id);
-  const recorded=closeStaleCoordinatorTerminals(store.dir,{keep:state.from??null,known:listed.map(item=>item.handle),close:handle=>closeTerminal(orca,cwd,handle)});
+  for(const handle of Object.keys(attempts))if(!listed.some(item=>item.handle===handle))delete attempts[handle];
+  const recorded=closeStaleCoordinatorTerminals(store.dir,{keep:state.from??null,known:listed.map(item=>item.handle),close:tryClose});
   for(const item of recorded.closed)if(item.reason!=='coordinator terminal already gone')closed.push({terminal:item.terminal,reason:'stale kernel tab'});
+  // A tab whose close was answered earlier but which Orca still lists: asked again only after the window, reported once.
+  const listedHandles=listed.map(item=>item.handle);
+  for(const handle of readClosedCoordinatorTerminals(store.dir))if(listedHandles.includes(handle)&&handle!==state.from&&tryClose(handle))closed.push({terminal:handle,reason:'stale kernel tab'});
+  pruneClosedCoordinatorTerminals(store.dir,listedHandles);
   const closedHandles=new Set(closed.map(item=>item.terminal));
   for(const item of listed){
     if(closedHandles.has(item.handle))continue;
     const title=String(item.title??'');
-    if(title===`[Kernel] ${state.id}`&&item.handle!==state.from){if(closeTerminal(orca,cwd,item.handle))closed.push({terminal:item.handle,reason:'stale kernel tab'});continue;}
+    if(title===`[Kernel] ${state.id}`&&item.handle!==state.from){if(tryClose(item.handle))closed.push({terminal:item.handle,reason:'stale kernel tab'});continue;}
     // The kernel tab of a sibling workflow of this repository that finished, or whose kernel is gone, has no reader.
     const sibling=title.startsWith('[Kernel] ')?title.slice(9).trim():null;
     if(sibling&&sibling!==state.id){
-      if(siblingKernelGone(store,sibling)&&closeTerminal(orca,cwd,item.handle))closed.push({terminal:item.handle,workflow:sibling,reason:'kernel tab of a workflow that is not running'});
+      if(siblingKernelGone(store,sibling)&&tryClose(item.handle))closed.push({terminal:item.handle,workflow:sibling,reason:'kernel tab of a workflow that is not running'});
       continue;
     }
     const opId=title.startsWith('[Op] ')?title.slice(title.lastIndexOf(' - ')+3).trim():null;
@@ -132,9 +149,10 @@ export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Dat
     if(!op)continue;
     const inUse=op.terminal===item.handle&&TAB_STATUSES.includes(op.status);
     if(inUse||(op.terminal===item.handle&&keepAskTab(store,state,op)))continue;
-    if(closeTerminal(orca,cwd,item.handle)){closed.push({terminal:item.handle,op:op.id,reason:op.status==='done'?'op done':`op ${op.status}`});if(op.terminal===item.handle)op.terminal=null;}
+    if(tryClose(item.handle)){closed.push({terminal:item.handle,op:op.id,reason:op.status==='done'?'op done':`op ${op.status}`});if(op.terminal===item.handle)op.terminal=null;}
   }
   state.lastSweepAt=now();
+  if(unclosable.length)store.appendEvent({event:'terminals-unclosable',terminals:unclosable,retryAfterMs:UNCLOSABLE_RETRY_MS,reason:'Orca answered the close but still lists the tab; its pty could not be stopped'});
   if(closed.length)store.appendEvent({event:'terminals-swept',closed});
   return closed;
 }

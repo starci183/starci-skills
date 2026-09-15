@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {closeStaleCoordinatorTerminals,readCoordinatorTerminals,recordCoordinatorTerminal} from '../kernel/coordinator-terminals.mjs';
+import {closeStaleCoordinatorTerminals,readClosedCoordinatorTerminals,readCoordinatorTerminals,recordCoordinatorTerminal} from '../kernel/coordinator-terminals.mjs';
 import {startKernel} from '../kernel/supervisor.mjs';
-import {sweepStaleTerminals} from '../kernel/terminals.mjs';
+import {UNCLOSABLE_RETRY_MS,sweepStaleTerminals} from '../kernel/terminals.mjs';
 
 const tmp=t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-coordinator-terminals-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:10,retryDelay:100}));return dir;};
 
@@ -56,7 +56,7 @@ test('a running kernel sweep closes the recorded coordinator terminals of earlie
   const closed=sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now:()=>5});
   assert.deepEqual(closes.sort(),['term_old1','term_old2'],'the shell-titled tabs of the dead kernels are closed by handle; the live kernel tab and the owner tab are not');
   assert.deepEqual(closed.map(item=>item.terminal).sort(),['term_old1','term_old2']);
-  assert.deepEqual(readCoordinatorTerminals(dir),['term_live'],'a terminal Orca no longer lists is dropped from the record without a close call');
+  assert.deepEqual(readCoordinatorTerminals(dir),['term_live'],'a terminal Orca no longer lists is dropped from the record without a close call');assert.deepEqual(readClosedCoordinatorTerminals(dir).sort(),['term_old1','term_old2'],'answered closes are remembered while Orca lists the tabs');
   assert.equal(events.at(-1).event,'terminals-swept');
 });
 
@@ -77,4 +77,23 @@ test('a running kernel sweep also seeds the record from the supervisor log, so t
   const orca={invoke:(name,params)=>{if(name==='terminal-list')return {outcome:'ok',receipt:{result:{terminals:[{handle:'term_before_record',title:'powershell.exe'},{handle:'term_live',title:'[Kernel] wf'}]}}};if(name==='terminal-close'){closes.push(params.terminal);return {outcome:'ok'};}throw Error(name);}};
   sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now:()=>5});
   assert.deepEqual(closes,['term_before_record']);assert.deepEqual(readCoordinatorTerminals(dir),[],'the closed tab leaves the record; the kernel never recorded its own');
+});
+
+test('a tab Orca answers a close for but still lists is reported unclosable once and not asked again for half an hour',t=>{
+  const dir=tmp(t);recordCoordinatorTerminal(dir,'term_zombie');
+  const events=[],store={dir,appendEvent:event=>events.push(event)},state={id:'wf',worktree:'D:/repo',from:'term_live',ops:[]},closes=[];
+  const orca={invoke:(name,params)=>{if(name==='terminal-list')return {outcome:'ok',receipt:{result:{terminals:[{handle:'term_zombie',title:'powershell.exe'},{handle:'term_live',title:'[Kernel] wf'}]}}};if(name==='terminal-close'){closes.push(params.terminal);return {outcome:'ok'};}throw Error(name);}};
+  let clock=1_000_000;const now=()=>clock;
+  sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now});
+  assert.deepEqual(closes,['term_zombie']);assert.equal(events.filter(event=>event.event==='terminals-swept').length,1);
+  clock+=30_000;sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now});
+  clock+=30_000;sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now});
+  assert.deepEqual(closes,['term_zombie'],'the tab still listed after its close is not closed again');
+  assert.deepEqual(events.filter(event=>event.event==='terminals-unclosable').map(event=>event.terminals),[['term_zombie']],'reported exactly once');
+  assert.equal(events.filter(event=>event.event==='terminals-swept').length,1,'no sweep event without a close');
+  clock+=UNCLOSABLE_RETRY_MS;sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now});
+  assert.deepEqual(closes,['term_zombie','term_zombie'],'after the window one more close is tried');
+  const gone={invoke:(name,params)=>{if(name==='terminal-list')return {outcome:'ok',receipt:{result:{terminals:[{handle:'term_live',title:'[Kernel] wf'}]}}};throw Error(name);}};
+  sweepStaleTerminals(gone,store,state,{cwd:'D:/repo',now});
+  assert.deepEqual(Object.keys(state.terminalCloseAttempts),[],'a tab that finally left is forgotten');
 });
