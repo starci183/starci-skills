@@ -50,6 +50,11 @@ function fixture(t,{mode='manual',legacy=false,ui=false}={}){
 }
 
 for(const mode of ['manual','auto','delegated'])test(`${mode}: author two exact SDS leaves, seal output, complete and preserve request through save/load`,t=>{
+ if(mode==='manual')t.diagnostic('this file stays real-cost on purpose: manual/auto/delegated are distinct '+
+  'authorization code paths, each driven here through the real lifecycle (propose/approve/issue/accept, '+
+  'real sha256 and workspace validation) against its own on-disk fixture; there is no subprocess spawning '+
+  'to trim, and sharing one on-disk fixture across the drift/tamper/hash-exemption variants below would '+
+  'let one test\'s mutation leak into another\'s assertion.');
  const f=fixture(t,{mode}),issued=f.issue(f.approve()),before=structuredClone(issued.request);f.edit();f.edit(f.files[1]);const result=f.result(issued);
  assert.deepEqual(result.requests['design-architecture'],before);assert.equal(before.schema,'starci/cell-request@2');assert.notDeepEqual(result.responses['design-architecture'].workResult.bindings,before.workBindings);
  assert.equal(preflightCompletion(result,f.completions()).ok,true);const done=markWorkDone(f.accept(result),f.completions());assert.equal(done.status,'done');verifyAutoEvidence(done);

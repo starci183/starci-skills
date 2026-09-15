@@ -46,6 +46,9 @@ function assertSingleLineJson(file) {
 }
 
 test('npm pack includes compiled .dist and can rebuild it without checkout imports', t => {
+  t.diagnostic('stays slow on purpose: real npm pack (prepack build+check), a real tarball extract, and a ' +
+    'real isolated npm install + build outside the checkout are what this test is proving; faking any leg ' +
+    'would stop proving the packaged distribution actually installs and builds standalone.');
   assert.equal(fs.existsSync(path.join(skillRoot, 'scripts', 'compile-knowledge.mjs')), true, 'Knowledge compiler is required');
   assert.equal(
     fs.existsSync(path.join(skillRoot, 'knowledge', 'code-examples', 'backend', 'graphql-command')),
@@ -128,7 +131,9 @@ function buildAndVerify(t, packageRoot, checkoutRoot) {
     'pack smoke must not build inside the checkout',
   );
 
-  const install = run('npm', ['install', '--ignore-scripts'], {
+  // --no-audit/--no-fund/--prefer-offline/--loglevel=error skip registry chatter this
+  // assertion never inspects; the install itself (and its exit code) is still real.
+  const install = run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--prefer-offline', '--loglevel=error'], {
     cwd: packageRoot,
     timeout: 600000,
   });

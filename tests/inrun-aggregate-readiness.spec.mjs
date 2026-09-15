@@ -128,6 +128,12 @@ function frontend(t,mode,{sibling=false,optional=false,optionalRef=false,uninves
 }
 
 test('partial producer rejects foreign replacement, missing response and forged later-only row',t=>{
+ t.diagnostic('this file stays real-cost on purpose: every test below builds its own on-disk .starciwork '+
+  'fixture and drives it through the real lifecycle (propose/approve/advance/accept, real sha256 and '+
+  'workspace validation) once per manual/auto/delegated mode, because the three modes are distinct '+
+  'authorization code paths, not one scenario repeated for show; there is no subprocess spawning here to '+
+  'trim, and sharing a single on-disk fixture across the many sibling/optional/stale/reopened variants '+
+  'below would let one test\'s mutations (edits, corruption, extra nodes) leak into another\'s assertions.');
  const f=frontend(t,'manual');let run=f.frontRun;for(const id of ['draw','implement','uat'])run=f.advance(run,id);
  const replaced=structuredClone(run);replaced.responses.foreign=replaced.responses.draw;delete replaced.responses.draw;
  assert.throws(()=>verifyProducerCells(replaced),/Unknown producer cell response/);
