@@ -47,12 +47,15 @@ test('a stop flag pauses a kernel but does not end supervision; only finished wo
   try{
     workflow(root,'paused',{lastAt:1,stop:true});
     const slept=[];
-    const paused=superviseForever({repoRoot:root,launcher:'L.mjs',maxRounds:3,log:()=>{},sleep:ms=>slept.push(ms),pollMs:5});
+    // Stub the quota probe like every other superviseForever() call in this file: this test is about stop-flag
+    // and finished-workflow pause behavior, not the budget cadence, and the real default probe spawns the
+    // actual `orca` binary (a slow, environment-dependent PATH lookup that usually just fails here anyway).
+    const paused=superviseForever({repoRoot:root,launcher:'L.mjs',maxRounds:3,log:()=>{},sleep:ms=>slept.push(ms),pollMs:5,probe:()=>({ok:false,reason:'no orca in tests'})});
     assert.equal(paused.rounds[0].action,'leave');
     assert.equal(slept.length,2,'the loop kept polling the paused workflow until maxRounds');
     fs.rmSync(path.join(root,'.starciwork','_local','workflows','paused'),{recursive:true,force:true});
     workflow(root,'over',{lastAt:1,finished:{outcome:'done'}});
-    const over=superviseForever({repoRoot:root,launcher:'L.mjs',maxRounds:3,log:()=>{},sleep:ms=>slept.push(ms),pollMs:5});
+    const over=superviseForever({repoRoot:root,launcher:'L.mjs',maxRounds:3,log:()=>{},sleep:ms=>slept.push(ms),pollMs:5,probe:()=>({ok:false,reason:'no orca in tests'})});
     assert.equal(over.rounds[0].finished,true);
     assert.equal(slept.length,2,'a finished workflow ends the loop without another sleep');
   }finally{fs.rmSync(root,{recursive:true,force:true});}

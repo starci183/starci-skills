@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, {before, after} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -190,9 +190,14 @@ function repository(root,{name,branch,origin,seed={}}){
   return root;
 }
 
-function fixture(t){
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-shared-ledger-'));
-  t.after(()=>{assert.equal(path.dirname(root),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(root).startsWith('starci-shared-ledger-'));fs.rmSync(root,{recursive:true,force:true});});
+// The fixture tree (two real git repositories, ~14 git spawns) is identical, deterministic content on
+// every call - no test parameterizes it. Real git behaviour is the point of these tests (committed history,
+// clean/dirty worktree, ledger ownership), so it must stay real; what does not need to be real is redoing the
+// same ~14 process spawns from scratch for every one of the four tests that need this tree. Build it once
+// into a base directory in `before`, and give each test its own on-disk copy via a plain recursive file copy
+// (no git spawn involved) - a git repository is just files, and a filesystem clone of one is exactly as real
+// a repository as the original. Each test still gets a fully independent, real, mutate-and-commit-able tree.
+function buildFixtureContent(root){
   const source=path.join(root,'source'),host=path.join(source,'.claude');
   fs.mkdirSync(host,{recursive:true});
   fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(host,'config.example.yaml'));
@@ -222,9 +227,26 @@ function fixture(t){
     repositories:{be:{pathFromSource:'../demo-backend',gitRepository:'https://github.com/demo/demo-backend.git'},
       fe:{pathFromSource:'../demo-frontend',gitRepository:'https://github.com/demo/demo-frontend.git'}},
     work:{ownerRole:'be',pathFromRepository:'.starciwork'}},null,2)}\n`);
+}
+function handleFor(root){
+  const source=path.join(root,'source'),host=path.join(source,'.claude');
+  const owner=path.join(root,'demo-backend'),code=path.join(root,'demo-frontend');
+  const work=path.join(owner,'.starciwork');
   return {root,source,host,owner,code,work,
     read:id=>parseYaml(fs.readFileSync(path.join(work,'features/sales/implementation',id===RECEIPT?'frontend/receipt':'backend/intake','index.yaml'),'utf8')),
     evidence:(id,opId=id)=>path.join(work,'features/sales/implementation',id===RECEIPT?'frontend/receipt':'backend/intake','evidence',`${opId}-evidence`,'manifest.yaml')};
+}
+let baseFixtureRoot=null;
+before(()=>{
+  baseFixtureRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-shared-ledger-base-'));
+  buildFixtureContent(baseFixtureRoot);
+});
+after(()=>{if(baseFixtureRoot)fs.rmSync(baseFixtureRoot,{recursive:true,force:true});});
+function fixture(t){
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-shared-ledger-'));
+  t.after(()=>{assert.equal(path.dirname(root),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(root).startsWith('starci-shared-ledger-'));fs.rmSync(root,{recursive:true,force:true});});
+  fs.cpSync(baseFixtureRoot,root,{recursive:true});
+  return handleFor(root);
 }
 
 /** The critic stands in: every goal is critiqued by the runtime, and a real provider call here would be a different claim. */
