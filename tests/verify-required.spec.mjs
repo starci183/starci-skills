@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {validateAccepted} from '../kernel/verify.mjs';
+import cp from 'node:child_process';
+import {frozenCandidateDiff,validateAccepted} from '../kernel/verify.mjs';
 
 const fixture=t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-validator-required-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
@@ -65,4 +66,38 @@ test('the required validator can judge a no-diff verification receipt only after
   f.ctx.validateOp=()=>({verdict:'accept',complete:true,independentFromAttempt:true,freshContext:true,reviewerAttemptId:'review-2'});
   assert.equal(validateAccepted(f.store,f.state,f.op,f.ctx,f.input).verdict,'accept');
   f.input.verified.checks=[];assert.equal(validateAccepted(f.store,f.state,f.op,f.ctx,f.input).verdict,'inconclusive');
+});
+
+test('the frozen candidate reaches the validator as a readable diff, not as base64 of every whole file',t=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-frozen-diff-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const baseRoot=path.join(dir,'base'),workerRoot=path.join(dir,'worker');
+  for(const root of [baseRoot,workerRoot])fs.mkdirSync(path.join(root,'features'),{recursive:true});
+  const line=text=>text+String.fromCharCode(10);
+  fs.writeFileSync(path.join(baseRoot,'features','a.yaml'),line('id: one')+line('title: old'));
+  fs.writeFileSync(path.join(workerRoot,'features','a.yaml'),line('id: one')+line('title: new'));
+  fs.writeFileSync(path.join(workerRoot,'features','added.yaml'),line('id: two'));
+  fs.writeFileSync(path.join(workerRoot,'features','logo.bin'),Buffer.from([0,1,2,3,0,9]));
+  const candidate={baseRoot,workerRoot,packet:{acceptedHead:'head1',changes:[
+    {path:'features/a.yaml',beforeSha256:'b1',afterSha256:'a1'},
+    {path:'features/added.yaml',beforeSha256:null,afterSha256:'a2'},
+    {path:'features/logo.bin',beforeSha256:null,afterSha256:'a3'}]}};
+  const files=['features/a.yaml','features/added.yaml','features/logo.bin'];
+  const git=(executable,args,options)=>cp.spawnSync(executable,args,options);
+  const diff=frozenCandidateDiff(candidate,files,{git});
+
+  assert.equal(diff.truncated,false);
+  assert.equal(diff.base,'head1');
+  assert.match(diff.text,/-title: old/);
+  assert.match(diff.text,/\+title: new/,'the reader sees the lines that changed');
+  assert.match(diff.text,/--- a\/features\/a\.yaml/,'under the path of the repository, not of a temporary copy');
+  assert.equal(/AppData|starci-frozen-diff-/.test(diff.text),false,'no temporary path leaks into the record');
+  assert.match(diff.text,/before b1 after a1/,'the digests the kernel froze travel with the file');
+  assert.match(diff.text,/\+id: two/,'a file that did not exist before is rendered as an addition');
+  assert.match(diff.text,/Binary file, 0 bytes before and 6 bytes after/,'a file that is not text is named, not rendered');
+  assert.equal(diff.text.includes('aWQ6IG9uZQ'),false,'nothing is sent as base64');
+
+  const plain=frozenCandidateDiff(candidate,['features/a.yaml'],{});
+  assert.match(plain.text,/title: new/,'without a git seam the reader still gets the text');
+  assert.equal(plain.text.includes('eyJwYXRo'),false);
 });
