@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createStore} from '../kernel/store.mjs';
-import {approve,createWorkflowState,goalPhase} from '../kernel/kernel.mjs';
+import {approve,createWorkflowState,goalPhase,stageExternalInputs} from '../kernel/kernel.mjs';
 import {featureScope,intakeOp,narrowIntakeScopes,scopedLayers} from '../kernel/intake.mjs';
 import {FRESH_MAX_AGE_MS,budgetIsFresh,freshRuntimeBudget,normalizeBudget,readRuntimeBudget,writeRuntimeBudget} from '../kernel/budget.mjs';
 import * as llm from '../models/functions.mjs';
@@ -291,6 +291,47 @@ test('a plan-ledger goal whose model invented an operation kind is refused befor
       /Operation op1 has the kind inventory, which no operator launches/);
     assert.equal(state.approved,false);
     assert.equal(fs.existsSync(store.paths.goalJson),false,'no goal record is written for a plan the kernel cannot launch');
+  }finally{tree.cleanup();}
+});
+
+test('a file input outside the worktree is staged under its own _local inputs and referred to by the copy',()=>{
+  const tree=workRepo([]);
+  const outside=tmp();
+  try{
+    const file=path.join(outside,'review.md');fs.writeFileSync(file,'# review\n');
+    const insideFile=path.join(tree.repo,'notes.md');fs.writeFileSync(insideFile,'notes');
+    const store=createStore({repoRoot:tree.repo,id:'20260915-inputs'});
+    const state=createWorkflowState({job:'Reinstall the stack',inputs:[`file:${file.replaceAll('\\\\','/')}`,`file:${insideFile.replaceAll('\\\\','/')}`,'file:branch:starci183/x','file:history:D:/nowhere'],
+      worktree:tree.repo,branch:'starci183/stacks',gates:[],store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'plan',scope:[],reintake:[],migrate:[],repoRoot:tree.repo});
+    const staged=stageExternalInputs(store,state,{worktree:tree.repo});
+    assert.equal(staged.length,1);
+    assert.equal(state.inputs[0].ref,'.starciwork/_local/inputs/20260915-inputs/1-review.md');
+    assert.equal(fs.readFileSync(path.join(tree.repo,state.inputs[0].ref),'utf8'),'# review\n');
+    assert.match(state.inputs[0].sha256,/^[a-f0-9]{64}$/);
+    assert.equal(state.inputs[1].ref,'notes.md','an input inside the worktree is spelled relative to it');
+    assert.equal(state.inputs[2].ref,'branch:starci183/x','a ref that is no path is left as declared');
+    assert.equal(state.inputs[3].ref,'history:D:/nowhere');
+    assert.ok(events(store).some(event=>event.event==='inputs-staged'&&event.inputs[0].to===state.inputs[0].ref));
+  }finally{tree.cleanup();fs.rmSync(outside,{recursive:true,force:true});}
+});
+
+test('on a plan ledger a decisive hidden decision is the owner\'s question on the page, never a decision.prepare op the Work gate refuses',()=>{
+  const tree=workRepo([]);
+  try{
+    const store=createStore({repoRoot:tree.repo,id:'20260915-plan-decision'});
+    const state=createWorkflowState({job:'Reinstall the stack',worktree:tree.repo,branch:'starci183/stacks',gates:[],store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'plan',scope:[],reintake:[],migrate:[],repoRoot:tree.repo});
+    const plan={definitionOfDone:['the stack is reinstalled'],risks:[],questions:['which services are in scope?'],ledger:[{id:'g1',title:'inventory',status:'planned'}],
+      ops:[{id:'op1',kind:'runtime.operate',goal:'inventory the stack',ledgerIds:['g1'],allowlist:['.stacks/**'],references:[],checks:[{name:'c',command:'true'}],acceptance:['done'],dependsOn:[]}]};
+    const critique=()=>({ok:true,verdict:'revise',provider:'fake-critic',attempts:[{provider:'fake-critic',attempt:0,errors:[]}],required:['decide the backup store first'],alternatives:[],question:null,prerequisites:[],overlaps:[],provisions:[],
+      objections:[{kind:'hidden-decision',claim:'nivo-backup-store is removed as Nivo-owned',evidence:'job text',consequence:'the only recovery copy may be deleted',decisive:true}]});
+    const goal=goalPhase(store,state,{cwd:tree.repo,extractMaterial:()=>[],renderGoalMarkdown:null,assessGoal:()=>({ok:true,provider:'fake',value:plan}),critiqueGoal:critique});
+    assert.equal(goal.ok,true);
+    assert.deepEqual(state.ops.map(op=>op.id),['op1'],'no ask op is planned on a plan ledger');
+    assert.ok(state.questions.some(line=>/nivo-backup-store is removed as Nivo-owned - the only recovery copy may be deleted/.test(line)));
+    const unplanned=events(store).find(event=>event.event==='decision-unplanned');
+    assert.match(unplanned.reason,/plan ledger binds no canonical Work/);
+    assert.match(fs.readFileSync(store.paths.goal,'utf8'),/nivo-backup-store is removed as Nivo-owned/);
+    assert.equal(goal.approvable,true);
   }finally{tree.cleanup();}
 });
 

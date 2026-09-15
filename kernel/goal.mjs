@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {skillRoot} from '../core/runtime-root.mjs';
 import * as llm from '../models/functions.mjs';
@@ -117,6 +118,36 @@ export function decidedRecords(api,at,loaded,{scope=[],max=40}={}){
       statements:recordStatements(work3?.srs??work3?.sds??work3??null)});
   }
   return records;
+}
+
+/**
+ * The declared inputs, as the worktree can reach them. A `file:` input the owner named by an absolute path outside
+ * the worktree is copied under the worktree's own `.starciwork/_local/inputs/<workflow>/` and the input refers to
+ * that copy from now on - relative, digest-bound, frozen at goal time like everything else the owner approved.
+ * Every op reference the plan derives from it then resolves inside the repository, where the candidate provenance
+ * rule can read it; the first plan-ledger trial failed its first launch on an input that lived in another folder.
+ * A relative input, a `branch:`/`history:` ref that is no path, a directory, a missing file: left as declared.
+ */
+export function stageExternalInputs(store,state,{worktree}={}){
+  const root=path.resolve(worktree??state.worktree);
+  const staged=[];
+  state.inputs=(state.inputs??[]).map((input,index)=>{
+    const ref=String(input?.ref??'');
+    if(!ref||!path.isAbsolute(ref))return input;
+    let stat=null;try{stat=fs.statSync(ref);}catch{return input;}
+    if(!stat.isFile())return input;
+    const inside=path.relative(root,ref);
+    if(inside&&!inside.startsWith('..')&&!path.isAbsolute(inside))return {...input,ref:slash(inside)};
+    const target=path.join(root,'.starciwork','_local','inputs',state.id,`${index+1}-${path.basename(ref)}`);
+    fs.mkdirSync(path.dirname(target),{recursive:true});
+    fs.copyFileSync(ref,target);
+    const sha256=crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex');
+    const relative=slash(path.relative(root,target));
+    staged.push({kind:input.kind,from:slash(ref),to:relative,sha256});
+    return {...input,ref:relative,sourceRef:slash(ref),sha256};
+  });
+  if(staged.length)store.appendEvent({event:'inputs-staged',inputs:staged});
+  return staged;
 }
 
 /** The canonical non-operation role map chooses the goal critics; invalid configuration is a startup error. */
@@ -263,6 +294,17 @@ export function planCritiqueDecisions(store,state,{ctx=null}={}){
   for(const objection of hidden){
     if(!objection.decisive){
       store.appendEvent({event:'hidden-decision-deferred',claim:firstLine(objection.claim),evidence:firstLine(objection.evidence)});
+      continue;
+    }
+    // A decision record is a canonical Work record, and a plan ledger binds no canonical Work: an ask planned here
+    // was refused by the Work gate and every op behind it "could never start". On a plan ledger the decision stays
+    // the owner's, on the goal page under Questions, and the plan's own provision.ask ops carry what the work needs.
+    if(!ctx?.work){
+      const line=`${firstLine(objection.claim)}${objection.consequence?` - ${firstLine(objection.consequence)}`:''}`;
+      state.questions=Array.isArray(state.questions)?state.questions:[];
+      if(!state.questions.includes(line))state.questions.push(line);
+      store.appendEvent({event:'decision-unplanned',claim:firstLine(objection.claim),feature:featureIn(objection.evidence,objection.claim),
+        reason:'a plan ledger binds no canonical Work to hold a decision record; the decision is listed for the owner under Questions'});
       continue;
     }
     const feature=featureIn(objection.evidence,objection.claim);

@@ -66,7 +66,7 @@ import {KERNEL_PLANNED_KINDS,LANE_LAYOUTS,advanceLanes,authorRecordOp,commitLedg
   sweepTreeStrays,syncLedgerOps} from './sync.mjs';
 import {intakeOp,retemplateIntakeOps,scopeNames,settleIntake} from './intake.mjs';
 import {CRITIQUE_HEADING,approve,critiqueGoalPhase,critiqueLines,critiqueRuntimes,decidedRecords,fallbackGoalMarkdown,
-  goalPhase,laneHeaderLines,noteCritiqueInGoal,noteLaneInGoal,planCritiquePrerequisites,planGoalPhase,proposeQuota,
+  goalPhase,laneHeaderLines,noteCritiqueInGoal,noteLaneInGoal,planCritiquePrerequisites,planGoalPhase,proposeQuota,stageExternalInputs,
   recordStatements,validateWorkTree,workGoalMarkdown,workGoalPhase} from './goal.mjs';
 
 /**
@@ -110,7 +110,7 @@ export {LANE_LAYOUTS,KERNEL_PLANNED_KINDS,nodeLayout,laneOf,lanePredicates,desig
 export {CUT_ASSERTIONS,CUT_COMPONENTS,CUT_FILES,FAN_OUT,childOwning,cutGroup,cutOp,cutParentOf,cutReason,fanOutDeferral,
   groupIncomplete,groupVerifyKind,repairTarget,sdsComponents,settleCut} from './sync.mjs';
 export {CRITIQUE_HEADING,approve,critiqueGoalPhase,critiqueLines,critiqueRuntimes,decidedRecords,goalPhase,
-  laneHeaderLines,planGoalPhase,proposeQuota,recordStatements,validateWorkTree,workGoalPhase} from './goal.mjs';
+  laneHeaderLines,planGoalPhase,proposeQuota,recordStatements,stageExternalInputs,validateWorkTree,workGoalPhase} from './goal.mjs';
 export {ioBlock,ioPayload,kindsReadingBrand,intakeKindFor,decisionKindFor,recordKindOfPath,undeclaredWrites,writesWorkRecords} from './io.mjs';
 /**
  * The design grammar and the brand record are read by exactly these kinds. The list is no longer written here:
@@ -3566,6 +3566,9 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       codeRole:ledger.role,codeSide:ledger.side,
       ledgerOwner:ledger.exists?{repoRoot:ledger.ownerRepoRoot,repository:ledger.ownerRepository,role:ledger.ownerRole,project:ledger.project}:null});
     if(options.allocation)state.quota=parseQuota(options.allocation);
+    // An input outside the worktree is copied under it before anything reads it, so every reference the plan
+    // derives from it resolves inside the repository.
+    stageExternalInputs(store,state,{worktree:code});
     store.appendEvent({event:'created',job,inputs:state.inputs,worktree:slash(code),branch:state.branch,
       ledgerMode,scope:state.scope,ledgerRoot:slash(ledger.ledgerRoot),ledgerSource:ledger.source,
       ...(lane?{lane:lane.name}:{}),

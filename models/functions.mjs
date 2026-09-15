@@ -299,9 +299,21 @@ function reachable(id,edges){
 }
 
 /** Cross-field rules of a goal plan: identity, a dependency order, a covered ledger and allowlists that cannot collide in parallel. */
+/** A path the worktree cannot hold: a drive or root, or a segment that climbs out. A `branch:`/`history:` ref is no path. */
+const outsideWorktree=value=>{
+  const text=String(value??'').replace(/^file:/,'');
+  if(/^(?:branch|history|srs|sds|design|ui|uat):/.test(text))return false;
+  return /^(?:[A-Za-z]:)?[\\/]/.test(text)||text.split(/[\\/]/).includes('..');
+};
 export function goalPlanRules(plan){
   const errors=[];
   const ops=Array.isArray(plan?.ops)?plan.ops:[];
+  // The worktree is the only place an op may write or read from: an absolute allowlist cannot be enforced and an
+  // absolute reference cannot be bound to the candidate. A declared input is referenced by the exact ref listed.
+  for(const op of ops){
+    for(const entry of op.allowlist??[])if(outsideWorktree(entry))errors.push(`op ${op.id} allowlist entry ${entry} is not a path relative to the worktree; every allowlist and reference is worktree-relative`);
+    for(const entry of op.references??[])if(outsideWorktree(entry))errors.push(`op ${op.id} reference ${entry} is not a path relative to the worktree; a declared input is referenced by the exact ref listed under inputs`);
+  }
   const ids=ops.map(op=>op.id);
   for(const id of new Set(ids))if(ids.filter(other=>other===id).length>1)errors.push(`op id ${id} is used by ${ids.filter(other=>other===id).length} ops; op ids must be unique`);
   const known=new Set(ids);
@@ -340,6 +352,7 @@ const GOAL_RULES=[
   `op.kind is one of the kernel's operation kinds and nothing else - ${OPERATION_KINDS.join(', ')}: backend.implement builds code under its allowlist, runtime.operate runs environment, deployment, infrastructure and Docker effects (an inventory, a teardown, a reinstall, a backup are runtime.operate), review.verify reads a delivered slice against its acceptance without repairing, uat.verify and integration.verify prove on the real stack, decision.prepare and provision.ask put one decision or one provision to the owner, business.decide and architecture.decide settle records; a kind invented for the job (inventory, effect, integrate, merge) is launched by no operator and fails the plan`,
   'allowlists of ops that can run in parallel must be disjoint; overlapping paths are a re-plan, not a risk note',
   'checks are real commands runnable from the worktree',
+  'allowlists and references are paths relative to the worktree root, never absolute and never climbing out of it; a declared input is referenced by the exact ref listed under inputs, which already lies inside the worktree',
   'acceptance statements are verified one by one by a verify op',
   'never plan process steps (ping, report, retry): they are fixed by the runtime'
 ];

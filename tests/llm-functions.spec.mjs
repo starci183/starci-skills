@@ -37,6 +37,11 @@ test('the goal form is a contract: shape, unique ids, a real dependency order, a
   // and every runtime answered "Unknown skill/operator route" until the workflow stalled.
   assert.match(validateGoalPlan({...base,ops:[{...op('a'),kind:'inventory'},op('b')]}).errors.join(';'),/ops\[0\]: kind must be one of decision\.prepare, .*runtime\.operate/);
   assert.equal(validateGoalPlan({...base,ops:[{...op('a'),kind:'runtime.operate'},op('b')]}).ok,true);
+  // An absolute path cannot be an allowlist the worktree enforces nor a reference a candidate binds.
+  assert.match(validateGoalPlan({...base,ops:[{...op('a'),allowlist:['D:/Repositories/x/.starciwork/ops/**']},op('b')]}).errors.join(';'),/op a allowlist entry D:\/Repositories\/x\/\.starciwork\/ops\/\*\* is not a path relative to the worktree/);
+  assert.match(validateGoalPlan({...base,ops:[{...op('a'),references:['C:/Users/Hi/.codex/artifacts/review.md']},op('b')]}).errors.join(';'),/op a reference C:\/Users\/Hi\/\.codex\/artifacts\/review\.md is not a path relative to the worktree/);
+  assert.match(validateGoalPlan({...base,ops:[{...op('a'),references:['../outside.md']},op('b')]}).errors.join(';'),/reference \.\.\/outside\.md is not a path relative/);
+  assert.equal(validateGoalPlan({...base,ops:[{...op('a'),references:['.starciwork/_local/inputs/w/1-review.md','branch:starci183/x']},op('b')]}).ok,true);
 
   // unique ids
   assert.match(validateGoalPlan({...base,ledger:ledgerOf('a'),ops:[op('a'),{...op('a'),allowlist:['apps/be/src/other']}]}).errors.join(';'),/op id a is used by 2 ops/);
