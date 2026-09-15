@@ -126,6 +126,30 @@ test('sequential, stale-projection and replayed amendments compose every prior o
   assert.equal(f.store.loadState().amendments.length,2,'replay neither duplicates nor drops either grant');
 });
 
+test('a legacy amendment reloads the final controller checkpoint after its initial read and lock acquisition',t=>{
+  const f=fixture(t);delete f.state.engine;f.store.saveState(f.state);publicCommand(f,'workflow-stop','--id',f.state.id);
+  const latest=f.store.loadState();
+  latest.ops[0].reports.push({dispatch:'ctx-after-open',outcome:'done',receipt:{digest:'d'.repeat(64)}});
+  latest.decisions.push({id:'decision-after-open',answer:'Keep the controller final decision'});
+  latest.controllerFinalCheckpoint={receipt:'controller-save-after-open',sequence:7};
+  const latestFile=path.join(f.root,'latest-state.json');fs.writeFileSync(latestFile,`${JSON.stringify(latest,null,2)}\n`);
+  const sentinel=path.join(f.root,'state-intercepted.txt');
+  const preload=`import fs from 'node:fs';
+const read=fs.readFileSync.bind(fs),target=process.env.STARCI_AMEND_INTERCEPT_TARGET,source=process.env.STARCI_AMEND_INTERCEPT_SOURCE,sentinel=process.env.STARCI_AMEND_INTERCEPT_SENTINEL;
+let intercepted=false;
+fs.readFileSync=function(file,...args){const value=read(file,...args);if(!intercepted&&String(file)===target){intercepted=true;const tmp=target+'.intercept.tmp';fs.writeFileSync(tmp,read(source));fs.renameSync(tmp,target);fs.writeFileSync(sentinel,'after-open-before-lock');}return value;};`;
+  const invoked=spawnSync(process.execPath,['--import',`data:text/javascript,${encodeURIComponent(preload)}`,path.resolve('hosts/orca/launch.mjs'),
+    'workflow-amend','--id',f.state.id,'--amendment',f.amendmentFile,'--worktree',path.relative(process.cwd(),f.root)],
+  {cwd:process.cwd(),windowsHide:true,encoding:'utf8',env:{...process.env,STARCI_AMEND_INTERCEPT_TARGET:f.store.paths.state,
+    STARCI_AMEND_INTERCEPT_SOURCE:latestFile,STARCI_AMEND_INTERCEPT_SENTINEL:sentinel}});
+  assert.equal(invoked.status,0,invoked.stderr||invoked.stdout);assert.equal(fs.readFileSync(sentinel,'utf8'),'after-open-before-lock');
+  const current=f.store.loadState();
+  assert.deepEqual(current.ops[0].reports.at(-1),latest.ops[0].reports.at(-1),'the accepted receipt from the final controller save survives');
+  assert.deepEqual(current.decisions.at(-1),latest.decisions.at(-1),'the final controller decision survives');
+  assert.deepEqual(current.controllerFinalCheckpoint,latest.controllerFinalCheckpoint,'a newly added final-checkpoint field survives');
+  assert.equal(current.amendments.length,1);assert.ok(current.scope.includes('features/frontend-recovery'));
+});
+
 test('real concurrent public amendment processes serialize, and retry composes the contender without a lost update',async t=>{
   const f=fixture(t);publicCommand(f,'workflow-stop','--id',f.state.id);
   const second=structuredClone(f.amendment);second.authority.source.quote='Also authorize the bounded audit output.';second.authority.statement=second.authority.source.quote;

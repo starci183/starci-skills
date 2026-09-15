@@ -21,7 +21,7 @@ Usage:
   starci workflow-retry --id <id> --runtime-pin <file>
   starci workflow-status --id <id> [--json true]
   starci workflow-list [--json true]
-  starci workflow-stop --id <id>  # exports _local/continuations/workflows/<id>.md
+  starci workflow-stop --id <id>  # exports backend-owned workflows/<id>.md
   starci workflow-lane-close --id <id>
   starci workflow-supervise --host <skill root> [--once true] [--poll-ms 60000]
   starci workflow-inputs --session <kernel-owned-session-file>

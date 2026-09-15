@@ -4126,14 +4126,17 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     let amendmentJournal=null,applied,continuation;
     try{
       need(fs.existsSync(path.join(store.dir,'stop.flag')),`Workflow ${state.id} ceased to be paused before its amendment lock was acquired`);
-      if(isEnrolled(state)){
+      const enrolled=isEnrolled(state);
+      if(enrolled){
         amendmentJournal=openJournal({file:state.engine.journalFile});
         store.bindJournal(amendmentJournal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
-        const durable=store.loadState();
-        need(plain(durable)&&durable.id===state.id&&durable.engine?.generation===state.engine.generation,
-          `Workflow ${state.id} has no matching durable amendment checkpoint for generation ${state.engine.generation}`);
-        Object.assign(state,durable);
       }
+      const durable=store.loadState();
+      need(plain(durable)&&durable.id===state.id,
+        `Workflow ${state.id} has no matching durable amendment checkpoint`);
+      if(enrolled)need(durable.engine?.generation===state.engine.generation,
+        `Workflow ${state.id} has no matching durable amendment checkpoint for generation ${state.engine.generation}`);
+      Object.assign(state,durable);
       applied=applyWorkflowAmendment(store,state,required(options.amendment,'amendment file'));
       continuation=exportContinuationBrief(store,state);
       if(!applied.replayed)store.appendEvent({event:'continuation-exported',file:slash(continuation.file),stateDigest:continuation.stateDigest,

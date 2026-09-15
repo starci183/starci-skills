@@ -31,7 +31,7 @@ workflow kernel (forwarded to the launcher; add --host <skill root> to reach a W
                        --journal-file <path>: use a local journal visible to the execution host
   workflow-status      print what one workflow is doing now, from its own files
   workflow-list        one line per workflow of this repository
-  workflow-stop        checkpoint/pause at the next tick and export _local/continuations/workflows/<id>.md
+  workflow-stop        checkpoint/pause at the next tick and export backend-owned workflows/<id>.md
   workflow-lane-close  remove a merged workflow's worktree, keeping its branch
   workflow-supervise   start and restart the kernel of every approved, unfinished workflow
   workflow-inputs      serve the kernel-owned credential form in its workflow's Orca browser

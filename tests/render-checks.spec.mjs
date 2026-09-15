@@ -348,6 +348,13 @@ test('the kernel hook finds the ui node the operation wrote, and answers null wh
   assert.equal(renderChecksFor({op,ctx:{work:{at:{repoRoot:path.dirname(work)}}}}).ok,false);
   assert.equal(renderChecksFor({op:{id:'repository-ref',kind:'frontend.implement',references:['.starciwork/features/learning/ui/dashboard/index.yaml']},ctx:{work:{at:{repoRoot:path.dirname(work)}}}}).ok,false,
     'repository-relative Work references do not resolve through a duplicate .starciwork namespace');
+  const implementation=path.join(work,'features','learning','implementation','frontend','dashboard');
+  fs.mkdirSync(path.dirname(implementation),{recursive:true});fs.cpSync(node,implementation,{recursive:true});
+  const absolute=renderChecksFor({op:{id:'absolute-ref',kind:'frontend.implement',references:[path.join(node,'index.yaml')],
+    allowlist:['features/learning/implementation/frontend/dashboard/assets/**']},ctx});
+  assert.equal(absolute.ok,false);
+  assert.deepEqual(absolute.checks.filter(entry=>entry.outcome==='fail').map(entry=>entry.id),['entity-list-in-card'],
+    'an absolute UI reference resolves the real node and returns its actual render-check result');
 
   assert.equal(renderChecksFor({op:{id:'op-2',kind:'backend.implement',allowlist:['src/orders/intake.ts']},ctx}),null);
   assert.equal(renderChecksFor({op,ctx:{}}),null);
