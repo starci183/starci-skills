@@ -4,10 +4,13 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {createStore,WORKFLOW_STATE} from '../kernel/store.mjs';
 import {buildContinuationBrief,continuationBoundary,exportContinuationBrief} from '../kernel/continuation.mjs';
 import {createWorkflowState,kernelMain} from '../kernel/kernel.mjs';
+import {toOp} from '../kernel/common.mjs';
+import {buildReport} from '../kernel/reports.mjs';
 import {openJournal} from '../kernel/journal.mjs';
 import {stagedResultFile} from '../kernel/job-worker.mjs';
 import {sealRuntime} from '../kernel/runtime-pin.mjs';
@@ -97,4 +100,115 @@ test('public same-ID stop, run recovery and retry use a real journal without dis
   assert.equal(fs.existsSync(stagedFile),true);after.close();
   assert.throws(()=>kernelMain('workflow-retry',{id:state.id},{orca:{},cwd:root}),/durable model\/check jobs must settle/);
   const retryJournal=openJournal({file:journalFile});assert.equal(retryJournal.getJob('judge-queued').status,'cancelled');assert.equal(retryJournal.getJob('model-staged').status,'effect_unknown');retryJournal.close();
+});
+
+test('public stop, valid-pin retry and pinned same-ID run preserve accepted history while completing remaining work',async t=>{
+  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-continuation-positive-')),root=path.join(temp,'repo');let runtime=null;fs.mkdirSync(root);
+  t.after(()=>{try{runtime?.close();}finally{fs.rmSync(temp,{recursive:true,force:true,maxRetries:5,retryDelay:100});}});
+  assert.equal(spawnSync('git',['init','-q'],{cwd:root,windowsHide:true}).status,0);
+  assert.equal(spawnSync('git',['config','user.email','fixture@example.test'],{cwd:root,windowsHide:true}).status,0);
+  assert.equal(spawnSync('git',['config','user.name','Fixture'],{cwd:root,windowsHide:true}).status,0);
+  fs.mkdirSync(path.join(root,'src'),{recursive:true});fs.writeFileSync(path.join(root,'src','app.txt'),'pending\n');fs.writeFileSync(path.join(root,'.gitignore'),'.starciwork/_local/\n');
+  assert.equal(spawnSync('git',['add','.'],{cwd:root,windowsHide:true}).status,0);
+  assert.equal(spawnSync('git',['commit','-qm','base'],{cwd:root,windowsHide:true}).status,0);
+  const git=(executable,args,options={})=>spawnSync(executable,args,{encoding:'utf8',windowsHide:true,...options});
+  const readyCheck=`node -e "const fs=require('node:fs');process.exit(fs.readFileSync('src/app.txt','utf8').trim()==='ready'?0:1)"`;
+  const store=createStore({repoRoot:root,id:'wf-positive'}),current=createWorkflowState({job:'Complete the remaining accepted delivery',worktree:root,branch:'main',store});
+  const accepted=toOp({id:'accepted',kind:'backend.implement',goal:'Preserve the accepted foundation.',allowlist:['src/accepted.txt'],acceptance:['the accepted foundation remains accepted']},0);
+  Object.assign(accepted,{status:'done',attempt:1,head:git('git',['rev-parse','HEAD'],{cwd:root}).stdout.trim(),files:[],reports:[{outcome:'done',summary:'accepted before checkpoint'}]});
+  const remaining=toOp({id:'remaining',kind:'backend.implement',goal:'Complete the remaining application state.',allowlist:['src/app.txt'],
+    checks:[{name:'ready-content',command:readyCheck}],acceptance:['src/app.txt contains ready']},1);
+  remaining.status='ready';
+  const pin=sealRuntime({sourceRoot:process.cwd(),buildsRoot:path.join(temp,'builds'),version:'1.0.0'}),journalFile=path.join(temp,'runtime','journal.sqlite');
+  Object.assign(current,{approved:true,phase:'run',run:'run-positive',from:'term-positive',goalDigest:'f'.repeat(64),
+    definitionOfDone:['accepted history remains intact','remaining application state reaches ready'],ops:[accepted,remaining],
+    decisions:[{id:'decision-accepted',choice:2,answer:'retain the accepted foundation'}],head:accepted.head,
+    engine:{schema:'starci/engine@1',version:'1.0.0',generation:1,journalFile,journalChosen:true,runtimePin:pin,coordination:'kernel-v0'}});
+  store.saveState(current);openJournal({file:journalFile}).close();
+
+  const stopped=kernelMain('workflow-stop',{id:current.id},{orca:{},cwd:root});
+  assert.equal(stopped.id,current.id);assert.ok(fs.existsSync(path.join(root,'workflows',`${current.id}.md`)));
+  const retried=kernelMain('workflow-retry',{id:current.id},{orca:{},cwd:root});
+  assert.equal(retried.ok,true);assert.equal(retried.id,current.id);assert.equal(retried.generation,2);assert.deepEqual(retried.retried,[]);
+  const afterRetry=store.loadState();assert.equal(afterRetry.engine.coordination,'agent-v1');assert.equal(afterRetry.ops.find(op=>op.id==='accepted').status,'done');
+  assert.deepEqual(afterRetry.decisions,current.decisions);assert.equal(afterRetry.ops.find(op=>op.id==='remaining').status,'ready');
+
+  const nonce=`positive-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const pinnedKernel=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','kernel.mjs')).href}?${nonce}`);
+  const pinnedEngine=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','engine.mjs')).href}?${nonce}`);
+  const pinnedStoreModule=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','store.mjs')).href}?${nonce}`);
+  const pinnedStore=pinnedStoreModule.createStore({repoRoot:root,id:current.id}),engineState=pinnedStore.loadState();
+  runtime=pinnedEngine.createEngineRuntime({store:pinnedStore,state:engineState,git,candidateBase:path.join(temp,'candidates'),
+    eligibility:()=>({eligible:true,mode:'qualified'}),spawnChild:()=>{throw Error('the fake host owns native execution in this fixture');}});
+  runtime.model=(name)=>name==='validateOp'?{ok:true,verdict:'accept',summary:'fixture validator reproduced the bounded change',findings:[],dropped:[],
+    provider:'fixture-validator',complete:true,independentFromAttempt:true,freshContext:true,reviewerAttemptId:'validator-positive'}:
+    {ok:true,value:{option:'continue'}};
+  let managerCalls=0;runtime.manageWorkflow=snapshot=>{managerCalls+=1;return {schema:'starci/manager-decision@1',workflowId:snapshot.workflowId,generation:snapshot.generation,
+    version:snapshot.version,digest:snapshot.digest,decisionId:snapshot.decisionId,basisDigest:snapshot.basisDigest,
+    orderedActionIds:snapshot.actions.map(action=>action.id),rationale:'dispatch the remaining authorized operation'};};
+  runtime.check=(command,options={})=>spawnSync(command,{shell:true,encoding:'utf8',windowsHide:true,...options});
+  runtime.candidateCheck=(command,options={},op)=>runtime.check(command,{...options,cwd:runtime.candidateCwd(op)});
+  let activeOp=null,operationJobId=null,durableSettlement=null;const beginCandidate=runtime.beginCandidate.bind(runtime);
+  runtime.beginCandidate=(op,options)=>{activeOp=op;operationJobId=op.lease?.jobId??null;return beginCandidate(op,options);};
+  const settleOperation=runtime.settled.bind(runtime);runtime.settled=(op,options={})=>{
+    const result=settleOperation(op,options);
+    if(result.ok&&options.workerOnly!==true&&op.id==='remaining'){
+      const job=runtime.journal.getJob(operationJobId);
+      durableSettlement={jobId:operationJobId,status:job?.status??null,leaseToken:job?.lease_token??null,
+        leases:runtime.journal.db.prepare('SELECT count(*) AS n FROM leases WHERE job_id=?').get(operationJobId).n};
+    }
+    return result;
+  };
+  const allocator={maxParallelOps:1,allocate:()=>({ok:true,runtime:'gpt-5.6-sol',target:'gpt-5.6-sol',role:'implement',
+    candidate:{selection:{target:'gpt-5.6-sol',orcaLaunch:{agent:'codex',model:'gpt-5.6-sol'}}}}),
+    release(){},failed(){},launched(){},deferred(){},snapshot:()=>({}),serialize:()=>({}),sharedSync:()=>({dropped:[]})};
+  const dispatch='ctx-positive';let workerLive=false,deliverPending=false;
+  const deliver=()=>{
+    fs.writeFileSync(path.join(root,'src','app.txt'),'ready\n');
+    const report=buildReport({outcome:'done',run:'run-positive',task:'task-positive',dispatch,from:'term-worker',summary:'remaining work completed',files:['src/app.txt'],
+      checks:[{name:'ready-content',command:readyCheck,exitCode:0,evidence:'ready'}]});
+    fs.writeFileSync(pinnedStore.reportPath(dispatch),`${JSON.stringify(report)}\n`);deliverPending=false;
+  };
+  const receipt=result=>({outcome:'ok',effectState:'none',receipt:{ok:true,result}}),orca={host:{name:'orca',capabilities:['design-tool'],sequential:false},
+    invoke(name){
+      if(name==='run-show')return receipt({run:{id:'run-positive',coordinator_handle:'term-positive'}});
+      if(name==='worker-list')return receipt({workers:workerLive?[{dispatchId:dispatch,taskId:'task-positive',workerState:'unsupervised',dispatchStatus:'dispatched',agentTerminalHandle:'term-worker'}]:[]});
+      if(name==='terminal-list')return receipt({terminals:workerLive?[{handle:'term-worker',title:'[Op] backend.implement - remaining',worktreePath:root,status:'running'}]:[]});
+      if(name==='task-list')return receipt({tasks:workerLive?[{id:'task-positive',display_name:'[Op] backend.implement - remaining'}]:[]});
+      if(name==='worker-stop')return receipt({state:'stopped'});
+      if(name==='worker-release'){workerLive=false;return receipt({state:'released',processAction:'none'});}
+      if(name==='terminal-close')return receipt({state:'closed'});
+      if(name==='terminal-read')return receipt({terminal:{handle:'term-worker',status:'running',tail:['worker completing bounded change']}});
+      if(name==='check'){if(workerLive&&deliverPending)deliver();return receipt({messages:[]});}
+      if(name==='send')return receipt({message:{id:'msg-positive'}});
+      throw Error(`Unexpected fake Orca call: ${name}`);
+    }};
+  const guards={protectedPaths:()=>[],revertProtected:()=>({reverted:[],removed:[]}),resourceLocks:()=>[],resourcesClash:()=>false,
+    gitQueue:fn=>fn(),preflight:()=>({ok:true,fixes:[],problems:[]}),parseSharedChangePaths:()=>[]};
+  const launch=()=>{
+    assert.equal(activeOp?.id,'remaining');
+    workerLive=true;deliverPending=true;
+    return {ok:true,effectState:'committed',selection:{target:'gpt-5.6-sol'},task:{id:'task-positive'},dispatchId:dispatch,terminal:'term-worker'};
+  };
+  let clock=Date.now();const now=()=>{clock+=1000;return clock;},wait=ms=>{clock+=Math.max(0,Number(ms)||0);};
+  const finished=pinnedKernel.kernelMain('workflow-run',{id:current.id,from:'term-positive',run:'run-positive','max-iterations':'8'},
+    {orca,cwd:root,wait,functions:{engineRuntime:runtime,allocator,launch,guards,git,reconcileInputs:()=>{},refreshPreparation:()=>{},deferPreparation:()=>false,
+      now,wait,waitTimeoutMs:5000,tickMs:1000,pollMs:1000}});
+  assert.equal(finished.id,current.id);assert.equal(finished.finished?.outcome,'done');
+  const final=pinnedStore.loadState();assert.equal(final.engine.generation,2);assert.equal(final.engine.coordination,'agent-v1');assert.ok(managerCalls>0);
+  assert.deepEqual(final.engine.manager.lastActions,['dispatch:remaining']);assert.equal(final.ops.find(op=>op.id==='accepted').status,'done');
+  assert.equal(final.ops.find(op=>op.id==='accepted').reports[0].summary,'accepted before checkpoint');
+  const completed=final.ops.find(op=>op.id==='remaining');assert.equal(completed.status,'done',JSON.stringify({finished,remaining:completed,needUser:final.needUser,events:pinnedStore.readEvents().slice(-40)}));
+  assert.equal(completed.dispatch,dispatch);assert.equal(completed.terminal,null);assert.equal(completed.lease,undefined);assert.equal(workerLive,false);
+  assert.equal(completed.candidate?.status,'sealed');assert.equal(completed.candidate?.identity?.jobId,operationJobId);assert.deepEqual(final.decisions,current.decisions);
+  assert.deepEqual(durableSettlement,{jobId:operationJobId,status:'succeeded',leaseToken:null,leases:0});
+  const settledJournal=openJournal({file:journalFile});
+  try{
+    assert.equal(settledJournal.getJob(operationJobId)??null,null);
+    assert.equal(settledJournal.db.prepare('SELECT count(*) AS n FROM leases WHERE job_id=?').get(operationJobId).n,0);
+    assert.deepEqual(settledJournal.liveRows(current.id),{leases:[],jobs:[]});
+  }finally{settledJournal.close();}
+  assert.equal(fs.readFileSync(path.join(root,'src','app.txt'),'utf8'),'ready\n');
+  assert.ok(pinnedStore.readEvents().some(event=>event.event==='run-resumed'));
+  assert.ok(pinnedStore.readEvents().some(event=>event.event==='workflow-retried'));
 });
