@@ -8,11 +8,25 @@ import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateWriterResour
 
 const git=(command,args,options)=>spawnSync(command,args,options);
 const run=(cwd,...args)=>{const result=git('git',args,{cwd,encoding:'utf8',windowsHide:true});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
-const fixture=(t,references=['src/app.js'])=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-bridge-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  run(root,'init','--quiet','-b','main');run(root,'config','user.email','bridge@starci.local');run(root,'config','user.name','Bridge');run(root,'config','commit.gpgsign','false');
-  fs.mkdirSync(path.join(root,'src'));fs.writeFileSync(path.join(root,'src','app.js'),'one\n');fs.writeFileSync(path.join(root,'keep.txt'),'user baseline\n');
-  fs.writeFileSync(path.join(root,'package.json'),'{"scripts":{"test":"node src/app.js"}}\n');fs.writeFileSync(path.join(root,'secret.enc'),'ciphertext\n');
-  run(root,'add','-A');run(root,'commit','--quiet','-m','base');fs.writeFileSync(path.join(root,'keep.txt'),'existing user edit\n');
+// Building a fresh git repo from scratch (init + 3x config + add + commit, six process spawns) is the dominant cost
+// of every test below, and most tests want the exact same tracked history. Each templated base is built once and
+// filesystem-copied per test (a single in-process fs.cpSync, no spawn) instead of re-running git to reproduce it;
+// the two tests that need a divergent commit still copy the cheap initialised-only template and commit their own
+// content, so only the repo shape is shared, never the assertions or the commit each test actually needs.
+let appBase,initOnlyBase;
+test.before(()=>{
+  appBase=fs.mkdtempSync(path.join(os.tmpdir(),'starci-bridge-basetpl-'));
+  run(appBase,'init','--quiet','-b','main');run(appBase,'config','user.email','bridge@starci.local');run(appBase,'config','user.name','Bridge');run(appBase,'config','commit.gpgsign','false');
+  fs.mkdirSync(path.join(appBase,'src'));fs.writeFileSync(path.join(appBase,'src','app.js'),'one\n');fs.writeFileSync(path.join(appBase,'keep.txt'),'user baseline\n');
+  fs.writeFileSync(path.join(appBase,'package.json'),'{"scripts":{"test":"node src/app.js"}}\n');fs.writeFileSync(path.join(appBase,'secret.enc'),'ciphertext\n');
+  run(appBase,'add','-A');run(appBase,'commit','--quiet','-m','base');
+  initOnlyBase=fs.mkdtempSync(path.join(os.tmpdir(),'starci-bridge-inittpl-'));
+  run(initOnlyBase,'init','--quiet','-b','main');run(initOnlyBase,'config','user.email','bridge@starci.local');run(initOnlyBase,'config','user.name','Bridge');run(initOnlyBase,'config','commit.gpgsign','false');
+});
+test.after(()=>{fs.rmSync(appBase,{recursive:true,force:true});fs.rmSync(initOnlyBase,{recursive:true,force:true});});
+const cloneTemplate=(t,template,prefix)=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),prefix));fs.cpSync(template,root,{recursive:true});t.after(()=>{try{fs.rmSync(root,{recursive:true,force:true});}catch{}});return root;};
+const fixture=(t,references=['src/app.js'])=>{const root=cloneTemplate(t,appBase,'starci-bridge-');
+  fs.writeFileSync(path.join(root,'keep.txt'),'existing user edit\n');
   const parent=path.dirname(root),identity={workflowId:'wf',opId:'op',attempt:1,generation:1,jobId:'job'};
   const bridge=beginDetectionCandidate({identity,repoRoot:root,workerRoot:path.join(parent,`${path.basename(root)}-candidate`),controlRoot:path.join(parent,`${path.basename(root)}-control`),
     allowlist:['src/**'],references,git,environmentDigest:'env'});
@@ -37,8 +51,7 @@ test('renames include source and destination in the observed patch',t=>{const f=
   assert.deepEqual(result.packet.changes.map(item=>item.path),['src/app.js','src/renamed.js']);});
 
 test('only explicitly provenance-owned dirty allowlist paths may advance',t=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owned-dirty-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));run(root,'init','--quiet','-b','main');
-  run(root,'config','user.email','bridge@starci.local');run(root,'config','user.name','Bridge');run(root,'config','commit.gpgsign','false');fs.mkdirSync(path.join(root,'src'));
+  const root=cloneTemplate(t,initOnlyBase,'starci-owned-dirty-');fs.mkdirSync(path.join(root,'src'));
   fs.writeFileSync(path.join(root,'src','dirty.js'),'base\n');run(root,'add','-A');run(root,'commit','--quiet','-m','base');fs.writeFileSync(path.join(root,'src','dirty.js'),'owned prior attempt\n');
   const suffix=path.basename(root),bridge=beginDetectionCandidate({identity:{workflowId:'wf',opId:'op',attempt:2,generation:1,jobId:'job'},repoRoot:root,
     workerRoot:path.join(path.dirname(root),`${suffix}-candidate`),controlRoot:path.join(path.dirname(root),`${suffix}-control`),allowlist:['src/**'],references:[],ownedDirtyPaths:['src/dirty.js'],git});
@@ -47,8 +60,7 @@ test('only explicitly provenance-owned dirty allowlist paths may advance',t=>{
 });
 
 test('a prior attempt\'s owned path that is clean now is dropped from ownership, not a launch failure',t=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owned-clean-'));t.after(()=>{try{fs.rmSync(root,{recursive:true,force:true});}catch{}});run(root,'init','--quiet','-b','main');
-  run(root,'config','user.email','bridge@starci.local');run(root,'config','user.name','Bridge');run(root,'config','commit.gpgsign','false');fs.mkdirSync(path.join(root,'src'));
+  const root=cloneTemplate(t,initOnlyBase,'starci-owned-clean-');fs.mkdirSync(path.join(root,'src'));
   fs.writeFileSync(path.join(root,'src','dirty.js'),'committed by the owner since\n');run(root,'add','-A');run(root,'commit','--quiet','-m','base');
   const suffix=path.basename(root),bridge=beginDetectionCandidate({identity:{workflowId:'wf',opId:'op',attempt:3,generation:1,jobId:'job'},repoRoot:root,
     workerRoot:path.join(path.dirname(root),`${suffix}-candidate`),controlRoot:path.join(path.dirname(root),`${suffix}-control`),allowlist:['src/**'],references:[],ownedDirtyPaths:['src/dirty.js'],git});

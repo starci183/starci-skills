@@ -453,8 +453,8 @@ test('owner controls survive unchanged polling and reset when their bound reques
     {id:'answer',opId:'ask-answer',revision:1,kind:'question',subject:'Explain',status:'waiting-owner',options:[],guidance:{}},
     {id:'preparing',opId:'ask-preparing',revision:1,kind:'question',subject:'Preparing',status:'preparing',options:[],guidance:{}},
     {id:'answered',opId:'ask-answered',revision:1,kind:'question',subject:'Answered',status:'answered',options:[],guidance:{}},
-    {id:'status',opId:'ask-status',revision:1,kind:'question',subject:'Status transition',status:'waiting-owner',options:[],guidance:{}}];let submissions=0;
-  const app=await startInputServer({token,sessionId:'poll',model:{snapshot:()=>({workflow:'poll',phase:'waiting',fields:[],unresolved:[],preparation:[],ownerRequests:structuredClone(requests).map(request=>({...request,updatedAt:Date.now()}))}),submit:async()=>({ok:false}),submitOwnerAction:()=>{submissions++;return {ok:false};}}});
+    {id:'status',opId:'ask-status',revision:1,kind:'question',subject:'Status transition',status:'waiting-owner',options:[],guidance:{}}];let submissions=0,polls=0;
+  const app=await startInputServer({token,sessionId:'poll',model:{snapshot:()=>{polls++;return {workflow:'poll',phase:'waiting',fields:[],unresolved:[],preparation:[],ownerRequests:structuredClone(requests).map(request=>({...request,updatedAt:Date.now()}))};},submit:async()=>({ok:false}),submitOwnerAction:()=>{submissions++;return {ok:false};}}});
   const child=execFile(chrome,['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check','--remote-debugging-port=0',`--user-data-dir=${profile}`,`${app.origin}/inputs/poll#${token}`]);let socket;
   t.after(async()=>{try{socket?.close();}catch{}if(child.exitCode===null){if(process.platform==='win32')spawnSync('taskkill',['/PID',String(child.pid),'/T','/F'],{windowsHide:true});else child.kill('SIGKILL');}await app.close();fs.rmSync(profile,{recursive:true,force:true});});
   const portFile=path.join(profile,'DevToolsActivePort');for(let i=0;i<100&&!fs.existsSync(portFile);i++)await new Promise(resolve=>setTimeout(resolve,50));
@@ -462,19 +462,28 @@ test('owner controls survive unchanged polling and reset when their bound reques
   let page;for(let i=0;i<100&&!page;i++){const pages=await fetch(`http://127.0.0.1:${port}/json/list`).then(response=>response.json());page=pages.find(item=>item.url.includes('/inputs/poll'));if(!page)await new Promise(resolve=>setTimeout(resolve,50));}
   assert.ok(page);socket=new WebSocket(page.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('CDP connection timed out')),5000);socket.addEventListener('open',()=>{clearTimeout(timer);resolve();},{once:true});socket.addEventListener('error',()=>{clearTimeout(timer);reject(Error('CDP connection failed'));},{once:true});});let seq=0;
   const evaluate=expression=>new Promise((resolve,reject)=>{const id=++seq,timer=setTimeout(()=>{socket.removeEventListener('message',listener);reject(Error('CDP evaluate timed out'));},3000),listener=event=>{const message=JSON.parse(String(event.data));if(message.id!==id)return;clearTimeout(timer);socket.removeEventListener('message',listener);message.error?reject(Error(message.error.message)):resolve(message.result.result.value);};socket.addEventListener('message',listener);socket.send(JSON.stringify({id,method:'Runtime.evaluate',params:{expression,returnByValue:true}}));});
+  // The page polls /status every 2500ms; overriding the client's setTimeout shortens the delay its own recursive
+  // `setTimeout(poll,2500)` call schedules, so once it lands, poll cycles arrive every ~40ms instead of every 2500ms.
+  // The very first navigation occasionally still finalises after this early evaluate (observed once as a reset global),
+  // so the override is verified and retried rather than assumed; nextPoll() below waits for a REAL server-observed
+  // poll either way (never a race on the DOM), bounded at 3200ms so a stalled poll still fails exactly as the
+  // original fixed 3000ms wait would have.
+  const patch="(()=>{const original=window.setTimeout;window.setTimeout=(fn,delay,...rest)=>original(fn,delay>=1000?40:delay,...rest);return true})()";
+  for(let i=0;i<40&&!(await evaluate(patch)&&await evaluate("window.setTimeout.toString().includes('original')"));i++)await new Promise(resolve=>setTimeout(resolve,50));
+  const nextPoll=async()=>{const target=polls+1,deadline=Date.now()+3200;while(polls<target&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,20));await new Promise(resolve=>setTimeout(resolve,80));};
   for(let i=0;i<100&&!(await evaluate("document.querySelectorAll('#owner form').length===5"));i++)await new Promise(resolve=>setTimeout(resolve,50));
   assert.deepEqual(await evaluate("(()=>[...document.querySelectorAll('#owner form')].slice(2,4).map(f=>[f.querySelector('textarea').disabled,f.querySelector('button').disabled]))()"),[[true,true],[true,true]]);
   await evaluate("(()=>{for(const f of [...document.querySelectorAll('#owner form')].slice(2,4))f.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));return true})()");assert.equal(submissions,0);
   await evaluate("(()=>{const s=document.querySelector('#owner select'),ts=document.querySelectorAll('#owner textarea'),t=ts[0];s.value='c';t.value='typed answer';ts[3].value='status draft';t.focus();t.setSelectionRange(2,6);return true})()");
-  await new Promise(resolve=>setTimeout(resolve,3000));
+  await nextPoll();
   const preserved=await evaluate("(()=>{const s=document.querySelector('#owner select'),t=document.querySelector('#owner textarea');return [s.value,t.value,document.activeElement===t,t.selectionStart,t.selectionEnd]})()");
-  requests[1].guidance={why:'Fresh presentation guidance'};await new Promise(resolve=>setTimeout(resolve,3000));
+  requests[1].guidance={why:'Fresh presentation guidance'};await nextPoll();
   const guidance=await evaluate("(()=>{const f=document.querySelectorAll('#owner form')[1],t=f.querySelector('textarea');return [f.textContent.includes('Fresh presentation guidance'),t.value,document.activeElement===t,t.selectionStart,t.selectionEnd]})()");
-  requests[0].options[2].label='Changed without digest';await new Promise(resolve=>setTimeout(resolve,3000));
+  requests[0].options[2].label='Changed without digest';await nextPoll();
   const malformedChange=await evaluate("(()=>[document.querySelector('#owner select').value,document.querySelector('#owner textarea').value])()");
-  requests[0].optionsDigest='b'.repeat(64);requests[4].status='answered';await new Promise(resolve=>setTimeout(resolve,3000));
+  requests[0].optionsDigest='b'.repeat(64);requests[4].status='answered';await nextPoll();
   const bindingChanges=await evaluate("(()=>{const f=document.querySelectorAll('#owner form')[4];return [document.querySelector('#owner select').value,document.querySelector('#owner textarea').value,f.querySelector('textarea').value,f.querySelector('textarea').disabled,f.querySelector('button').disabled]})()");
-  requests[1].revision=2;await new Promise(resolve=>setTimeout(resolve,3000));
+  requests[1].revision=2;await nextPoll();
   const reset=await evaluate("(()=>[document.querySelector('#owner select').value,document.querySelector('#owner textarea').value])()");
   socket.send(JSON.stringify({id:++seq,method:'Browser.close'}));await new Promise(resolve=>child.once('exit',resolve));
   assert.deepEqual(preserved,['c','typed answer',true,2,6]);assert.deepEqual(guidance,[true,'typed answer',true,2,6]);assert.deepEqual(malformedChange,['a','typed answer']);assert.deepEqual(bindingChanges,['a','typed answer','',true,true]);assert.deepEqual(reset,['a','']);

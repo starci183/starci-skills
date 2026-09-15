@@ -11,18 +11,29 @@ import {createV6Runtime} from '../kernel/runtime-v6.mjs';
 const git=(executable,args,options={})=>spawnSync(executable,args,{encoding:'utf8',windowsHide:true,...options});
 const command='node test/oracle.test.mjs';
 
+// All three tests below start from the exact same committed repo; building it (init + 2x config + add + commit,
+// five process spawns) is fixed cost repeated identically per test. It is built once and filesystem-copied per
+// fixture (one in-process fs.cpSync) instead, which also makes `head` identical across tests since it is the same
+// copied commit object rather than a freshly re-committed one.
+let repoTemplate;
+test.before(()=>{
+  repoTemplate=fs.mkdtempSync(path.join(os.tmpdir(),'starci-v6-kernel-flow-tpl-'));
+  fs.mkdirSync(path.join(repoTemplate,'test'),{recursive:true});
+  fs.writeFileSync(path.join(repoTemplate,'app.txt'),'pending\n');
+  fs.writeFileSync(path.join(repoTemplate,'test','oracle.test.mjs'),
+    "import fs from 'node:fs';\nconst ok=fs.readFileSync('app.txt','utf8').includes('ready');\nconsole.log(ok?'ready':'expected-pending');\nprocess.exit(ok?0:1);\n");
+  assert.equal(git('git',['init','-q'],{cwd:repoTemplate}).status,0);
+  assert.equal(git('git',['config','user.email','fixture@example.test'],{cwd:repoTemplate}).status,0);
+  assert.equal(git('git',['config','user.name','Fixture'],{cwd:repoTemplate}).status,0);
+  assert.equal(git('git',['add','.'],{cwd:repoTemplate}).status,0);
+  assert.equal(git('git',['commit','-qm','base'],{cwd:repoTemplate}).status,0);
+});
+test.after(()=>fs.rmSync(repoTemplate,{recursive:true,force:true}));
+
 function fixture(t){
   const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-v6-kernel-flow-')),root=path.join(temp,'repo');
-  fs.mkdirSync(root,{recursive:true});
-  fs.mkdirSync(path.join(root,'test'),{recursive:true});
-  fs.writeFileSync(path.join(root,'app.txt'),'pending\n');
-  fs.writeFileSync(path.join(root,'test','oracle.test.mjs'),
-    "import fs from 'node:fs';\nconst ok=fs.readFileSync('app.txt','utf8').includes('ready');\nconsole.log(ok?'ready':'expected-pending');\nprocess.exit(ok?0:1);\n");
-  assert.equal(git('git',['init','-q'],{cwd:root}).status,0);
-  assert.equal(git('git',['config','user.email','fixture@example.test'],{cwd:root}).status,0);
-  assert.equal(git('git',['config','user.name','Fixture'],{cwd:root}).status,0);
-  assert.equal(git('git',['add','.'],{cwd:root}).status,0);
-  assert.equal(git('git',['commit','-qm','base'],{cwd:root}).status,0);
+  fs.mkdirSync(temp,{recursive:true});
+  fs.cpSync(repoTemplate,root,{recursive:true});
   const head=git('git',['rev-parse','HEAD'],{cwd:root}).stdout.trim();
   const dir=path.join(temp,'kernel');
   const events=[];
