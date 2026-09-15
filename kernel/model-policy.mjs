@@ -80,7 +80,7 @@ export function loadModelEligibilityContext({policyFile,qualificationsFile,proba
 }
 
 const HIGH_KINDS=['integration.verify','release.deliver','deployment.operate','data.correct','production.deploy'];
-const MODEL_KINDS=['model.assessGoal','model.planOp','model.decide','model.validateOp','model.manageWorkflow','model.critiqueGoal','model.classifyScreen'];
+const MODEL_KINDS=['model.assessGoal','model.planOp','model.decide','model.validateOp','model.manageWorkflow','model.critiqueGoal','model.classifyScreen','model.presentOwnerQuestion'];
 /**
  * The kernel's own model functions - the manager, the planner, the validator, the screen sense - are not
  * operation work: they draw a per-call scope but never the workflow's operation probation budget. A workflow

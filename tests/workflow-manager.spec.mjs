@@ -93,3 +93,18 @@ test('a live verification is not offered again and quota waits are distinct from
   const fail=coordinateManagedWorkflow(recorder(),ready,{manageWorkflow:()=>{throw Error('bad transport');}});
   assert.equal(fail.incident,true);assert.equal(ready.engine.manager.incident.kind,'manager-unavailable');
 });
+
+test('while an operation that writes is running, ready operations that write wait out of the manager list and buy no decision',()=>{
+  const current=state(),events=[],store={saveState:()=>{},appendEvent:event=>events.push(event)};let called=0;
+  current.ops[0].status='running';current.ops[0].allowlist=['.starciwork/features/a/**'];current.ops[1].allowlist=['.starciwork/features/b/**'];
+  const ctx={engine:{},manageWorkflow(){called+=1;throw Error('no decision may be bought while nothing can be admitted');}};
+  const result=coordinateManagedWorkflow(store,current,ctx);
+  assert.deepEqual([result.waiting,result.dispatch,called],[true,[],0]);
+  assert.deepEqual(events.filter(event=>event.event==='manager-held').map(event=>event.ops),[['b']],'the waiting operation is named once, not every round');
+  assert.equal(coordinateManagedWorkflow(store,current,ctx).waiting,true);
+  assert.equal(events.filter(event=>event.event==='manager-held').length,1);
+  current.ops[0].status='done';
+  const ctx2={engine:{},manageWorkflow:snapshot=>({schema:MANAGER_DECISION,workflowId:snapshot.workflowId,generation:snapshot.generation,version:snapshot.version,
+    digest:snapshot.digest,decisionId:snapshot.decisionId,basisDigest:snapshot.basisDigest,orderedActionIds:['dispatch:b'],rationale:'the writer is free'})};
+  assert.deepEqual(coordinateManagedWorkflow(store,current,ctx2).dispatch,['b'],'once the writer is free the operation is offered again');
+});

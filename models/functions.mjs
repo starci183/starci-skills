@@ -496,6 +496,31 @@ const normalizeFile=value=>String(value??'').replaceAll('\\','/').replace(/^\.\/
 /** A reject must carry a finding, otherwise there is nothing for the operation to fix. */
 const validationRules=answer=>({errors:answer.verdict==='reject'&&!(Array.isArray(answer.findings)&&answer.findings.length)?['a reject must carry at least one finding']:[]});
 
+/* ------------------------------------------------------------------ presentOwnerQuestion: the owner's language */
+
+export const PRESENTATION_FORM={text:{type:'string'},options:{type:'string[]',optional:true}};
+const PRESENTER_ROLE='the presenter of one StarCi workflow kernel: you write out a question the workflow asks its owner, and its options, in the language the owner reads - faithfully, completely, in plain prose. Every identifier, record id, path, file name, variable, number and quoted term stays exactly as written; no option is added, dropped, merged or reordered; nothing is answered, recommended or explained beyond what the question says.';
+const PRESENTER_RULES=[
+  'answer with the same number of options as you were given, in the same order, one rendering per option',
+  'names of files, records, branches, commands, environment variables and products are not translated; the sentences around them are',
+  'the question stays a question and keeps its scope: do not soften it, do not add advice, do not pick an option'];
+/**
+ * presentOwnerQuestion: what the owner page shows for a question the workflow asks, in the configured language.
+ * The record keeps its own English words; this is a rendering for the person reading the page, asked once when the
+ * question opens and once more when its options arrive. An answer that changes the option count is refused.
+ */
+export function presentOwnerQuestion({question,options=[],language,providers=[],cwd,runHeadless:run}){
+  const text=String(question??'').trim(),choices=(Array.isArray(options)?options:[]).map(option=>String(option??'').trim()).filter(Boolean);
+  const chain=(Array.isArray(providers)?providers:[providers]).filter(item=>typeof item==='string'&&item.trim());
+  if(!text)return {ok:false,reason:'there is no question to present',attempts:[],usage:null};
+  if(!chain.length)return {ok:false,reason:'no presenter provider was given',attempts:[],usage:null};
+  const extra=answer=>({errors:(Array.isArray(answer.options)?answer.options:[]).length!==choices.length?[`options must number ${choices.length}, one for each option, in the same order`]:[]});
+  const result=callFunction({kind:'presentOwnerQuestion',payload:{language:String(language??'').trim(),question:text,options:choices,rules:PRESENTER_RULES},
+    form:PRESENTATION_FORM,providers:chain,cwd,runHeadless:run,role:PRESENTER_ROLE,extra});
+  if(result.ok)result.value={language:String(language??'').toLowerCase(),text:String(result.value.text).trim(),options:(result.value.options??[]).map(option=>String(option).trim())};
+  return result;
+}
+
 /* ------------------------------------------------------------------ classifyScreen: the kernel's sense */
 
 export const SCREEN_VERDICTS=['working','idle','prompt','asked','finished','refused'];

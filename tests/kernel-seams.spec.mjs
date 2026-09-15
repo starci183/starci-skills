@@ -8,8 +8,9 @@ import {buildReport} from '../kernel/reports.mjs';
 import {markDone,markInProgress,readNode} from '../kernel/ledger.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {inputAsk} from './helpers/input-fixture.mjs';
-import {applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
+import {PRESENTATION_RETRY_MS,presentOwnerQuestions,applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
 import {deriveOwnerRequests} from '../kernel/owner-requests.mjs';
+import {loadConfig} from '../scripts/config.mjs';
 import {validateAccepted} from '../kernel/verify.mjs';
 import {settleIntake} from '../kernel/intake.mjs';
 import {recordDone,syncLedgerOps} from '../kernel/sync.mjs';
@@ -873,4 +874,44 @@ test('an enrolled ask keeps its recommendation and its presentation for the page
   const request=deriveOwnerRequests(state)[0];
   assert.deepEqual(request.options.map(option=>[option.id,option.label,option.recommended]),[['1','Open self-service registration',false],['2','Invitation-only registration',true]]);
   assert.deepEqual(request.presentation,{language:'vi',text:'Đường đăng ký nào trước khi thanh toán?',options:[{id:'1',label:'Mở đăng ký tự phục vụ'},{id:'2',label:'Chỉ đăng ký theo lời mời'}]});
+});
+
+test('every open question is presented in the configured language once, again when its options arrive, and an ask that reports its own presentation keeps it',()=>{
+  const host=fs.mkdtempSync(path.join(os.tmpdir(),'starci-presentation-'));
+  fs.writeFileSync(path.join(host,'config.json'),JSON.stringify({...loadConfig(),language:'vi'}));
+  try{
+    const events=[],store={appendEvent:event=>events.push(event),saveState(){}},asked=[];
+    const ask={id:'ask-1',kind:'decision.prepare',status:'running',attempt:1,question:{kind:'decision',text:'Which registration path?'}};
+    const state={id:'wf',host,engine:{schema:'starci/engine@1',generation:1},needUser:[],
+      ops:[ask,{id:'w',kind:'backend.implement',status:'ready',allowlist:['x/**']}]};
+    const engine={model:(name,args)=>{asked.push([name,args.language,args.options.length]);
+      return {ok:true,value:{language:args.language,text:'Chọn đường đăng ký nào?',options:args.options.map(option=>`VI ${option}`)}};}};
+    let now=1_000_000;const ctx={engine,now:()=>now};
+    assert.deepEqual(presentOwnerQuestions(store,state,ctx),{op:'ask-1',presented:true});
+    assert.deepEqual(ask.question.presentation,{language:'vi',text:'Chọn đường đăng ký nào?',options:[],by:'kernel'});
+    assert.deepEqual(asked,[['presentOwnerQuestion','vi',0]]);
+    assert.equal(presentOwnerQuestions(store,state,ctx),null,'a presented question is not presented again');
+    ask.question.options=['Open self-service','Invitation-only'];
+    assert.deepEqual(presentOwnerQuestions(store,state,ctx),{op:'ask-1',presented:true},'the options are presented when they arrive');
+    assert.deepEqual(ask.question.presentation.options,['VI Open self-service','VI Invitation-only']);
+    ask.question.presentation={language:'vi',text:'Bản của chính op',options:['A','B']};
+    assert.equal(presentOwnerQuestions(store,state,ctx),null,'a presentation the ask itself reported is left alone');
+    const refusing={model:()=>{throw Error('No evaluated model is eligible for presentOwnerQuestion');}};
+    const second={id:'ask-2',kind:'decision.prepare',status:'ready',attempt:1,question:{kind:'decision',text:'Second question?'}};
+    state.ops.push(second);
+    assert.deepEqual(presentOwnerQuestions(store,state,{engine:refusing,now:()=>now}),{op:'ask-2',presented:false});
+    assert.equal(second.question.presentationFailedAt,now);
+    assert.equal(presentOwnerQuestions(store,state,{engine:refusing,now:()=>now+1000}),null,'a refused rendering waits before it is asked again');
+    now+=PRESENTATION_RETRY_MS+1;
+    assert.deepEqual(presentOwnerQuestions(store,state,ctx),{op:'ask-2',presented:true});
+    assert.deepEqual(events.map(event=>event.event),['question-presented','question-presented','question-presentation-unavailable','question-presented']);
+    const waiting={model:()=>{const error=Error('every presenter is out of quota');error.code='STARCI_MODEL_QUOTA_WAIT';throw error;}};
+    const third={...second,id:'ask-3',question:{text:'Third question?'}};
+    assert.throws(()=>presentOwnerQuestions(store,{...state,ops:[third]},{engine:waiting,now:()=>now}),/out of quota/,'a quota wait defers the stage instead of marking the ask');
+    assert.equal(third.question.presentationFailedAt,undefined);
+    const english=fs.mkdtempSync(path.join(os.tmpdir(),'starci-presentation-en-'));
+    fs.writeFileSync(path.join(english,'config.json'),JSON.stringify({...loadConfig(),language:'en'}));
+    assert.equal(presentOwnerQuestions(store,{...state,host:english,ops:[third]},{engine:waiting,now:()=>now}),null,'a page already in the record language is never presented');
+    fs.rmSync(english,{recursive:true,force:true});
+  }finally{fs.rmSync(host,{recursive:true,force:true});}
 });

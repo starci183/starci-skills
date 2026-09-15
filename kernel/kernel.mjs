@@ -192,6 +192,49 @@ export function completionOutlook(state,op,now=Date.now()){
   return {...(summary?{summary}:{}),durationMs,remainingOps,estimateMs:mean===null?null:Math.round(remainingOps*mean)};
 }
 
+/**
+ * The owner reads every open question in the configured language from the moment it appears, not only once the ask
+ * reports: the kernel asks its presenter - a planner-pool function, one durable job per question and one more when
+ * the options arrive - and keeps the rendering on the ask as `question.presentation`. The record itself stays in
+ * English. A presentation the ask reports later replaces this one. English pages need none; a presenter that cannot
+ * answer is noted on the ask and asked again after a while, never turned into a kernel error.
+ */
+export const PRESENTATION_RETRY_MS=30*60*1000;
+export function presentOwnerQuestions(store,state,ctx){
+  if(typeof ctx?.engine?.model!=='function')return null;
+  const code=String(configuredLanguage(state)??'en').toLowerCase().split('-')[0];
+  if(!code||code==='en')return null;
+  const now=clockOf(ctx);
+  const labelsOf=op=>(Array.isArray(op.question?.options)?op.question.options:[]).map(option=>plain(option)?String(option.label??option.text??''):String(option??'')).map(label=>label.trim()).filter(Boolean);
+  for(const op of state.ops){
+    if(!isAsk(op.kind)||!plain(op.question)||!String(op.question.text??'').trim())continue;
+    if(['done','cancelled'].includes(op.status)||op.refusal==='superseded'||op.ownerAnswer)continue;
+    const labels=labelsOf(op),current=plain(op.question.presentation)?op.question.presentation:null;
+    const stale=!current||String(current.language??'').toLowerCase()!==code
+      ||(current.by==='kernel'&&labels.length!==(Array.isArray(current.options)?current.options:[]).length);
+    if(!stale)continue;
+    if(Number.isFinite(op.question.presentationFailedAt)&&now-op.question.presentationFailedAt<PRESENTATION_RETRY_MS)continue;
+    let answered;
+    try{answered=ctx.engine.model('presentOwnerQuestion',{question:String(op.question.text).trim(),options:labels,language:code,cwd:ctx.cwd},{id:op.id,attempt:op.attempt??1});}
+    catch(error){
+      if(isJobPending(error)||error?.code==='STARCI_MODEL_QUOTA_WAIT')throw error;
+      answered={ok:false,reason:String(error?.message??error)};
+    }
+    if(answered?.ok){
+      const {text,options}=answered.value;
+      op.question={...op.question,presentation:{language:code,text,options,by:'kernel'}};
+      delete op.question.presentationFailedAt;
+      store.appendEvent({event:'question-presented',op:op.id,language:code,options:options.length});
+    }else{
+      op.question={...op.question,presentationFailedAt:now};
+      store.appendEvent({event:'question-presentation-unavailable',op:op.id,language:code,reason:String(answered?.reason??'no provider produced a valid rendering').slice(0,200)});
+    }
+    store.saveState(state);
+    return {op:op.id,presented:Boolean(answered?.ok)};
+  }
+  return null;
+}
+
 /* ------------------------------------------------------------------ contract */
 
 /**
@@ -1565,7 +1608,14 @@ export function coordinateManagedWorkflow(store,state,ctx){
   const continuations=state.ops.filter(op=>op.status==='ready'&&!op.fill&&!op.ownerRequest&&ctx.engine?.reservationPhase?.(op).phase==='reserved');
   if(continuations.length)return {pending:false,continuation:true,dispatch:continuations.map(op=>op.id)};
   const ready=state.ops.filter(op=>op.status==='ready'&&!op.fill&&!op.ownerRequest&&!op.lease);
-  const actions=ready.map(op=>({id:`${op.needsReplan?'replan':'dispatch'}:${op.id}`,type:op.needsReplan?'replan':'dispatch',opId:op.id,
+  // One canonical writer per worktree: while an operation that writes runs, a ready operation that also writes
+  // cannot be admitted, and offering it only buys a manager decision that admission defers a tick later. Such an
+  // operation waits out of the list instead, and the kernel says once which ones are waiting and why.
+  const writes=op=>Array.isArray(op.allowlist)&&op.allowlist.length>0;
+  const writerBusy=Boolean(ctx.engine)&&state.ops.some(op=>['running','answering'].includes(op.status)&&!op.fill&&!op.ownerRequest&&writes(op));
+  const held=writerBusy?ready.filter(writes).map(op=>op.id):[];
+  const offered=held.length?ready.filter(op=>!held.includes(op.id)):ready;
+  const actions=offered.map(op=>({id:`${op.needsReplan?'replan':'dispatch'}:${op.id}`,type:op.needsReplan?'replan':'dispatch',opId:op.id,
     preconditions:[`status:${op.id}:ready`,'no-live-lease','approved-operation-boundaries'],summary:`${op.needsReplan?'Replan':'Dispatch'} ${op.id} (${op.kind})`,contextRefIds:[]}));
   if(verificationCandidates(state,ctx).length)actions.unshift({id:'plan-verification',type:'plan-verification',opId:null,preconditions:['completed-implementers','lane-ready','no-live-proof-for-group'],summary:'Plan the next mandatory verification from the canonical lane graph',contextRefIds:[]});
   const blockers=state.needUser.slice(0,48).map((item,index)=>({id:`blocker:${index}:${item.op??'workflow'}`,kind:['decision','authority','credential','provision'].includes(item.kind)?'owner':'technical',opId:item.op??null,summary:String(item.kind??'blocked')}));
@@ -1573,6 +1623,11 @@ export function coordinateManagedWorkflow(store,state,ctx){
     blockers.push({id:`anomaly:${blockers.length}`,kind:'technical',opId:entry.detail?.op??null,summary:`repeated anomaly: ${String(signature).slice(0,120)}`});
   state.engine.manager=plain(state.engine.manager)?state.engine.manager:{};
   const manager=state.engine.manager,now=ctx.now?.()??Date.now(),progressDigest=managerProgressDigest(state);
+  const heldKey=held.join(',');
+  if((manager.heldForWriter??'')!==heldKey){
+    manager.heldForWriter=heldKey;
+    if(held.length)store.appendEvent({event:'manager-held',ops:held,reason:'an operation that writes is running; these ready operations wait out of the manager list until the writer is free'});
+  }
   if(manager.progressDigest!==progressDigest){manager.progressDigest=progressDigest;manager.noProgressRound=0;manager.incident=null;}
   const busy=state.ops.filter(op=>['running','answering'].includes(op.status)&&!op.fill&&!op.ownerRequest);
   const capacity={operationLimit:ctx.allocator?.maxParallelOps??null,nativeWriterLimit:ctx.engine?1:null,activeOperations:busy.length,globalAIJobLimit:10};
@@ -3454,6 +3509,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     noteOwnerList(store,state);
     if(guardedStage(store,state,ctx,'sync',()=>{syncLedgerOps(store,state,ctx);if(state.engine?.coordination!=='agent-v1')planVerifyOps(store,state,ctx);})==='stop')break;
     let managed=state.engine?.coordination==='agent-v1'?{pending:true,dispatch:[]}:null;
+    if(isEnrolled(state)&&guardedStage(store,state,ctx,'presentation',()=>{presentOwnerQuestions(store,state,ctx);})==='stop')break;
     if(state.engine?.coordination==='agent-v1'&&guardedStage(store,state,ctx,'manager',()=>{managed=coordinateManagedWorkflow(store,state,ctx);})==='stop')break;
     if(!managed?.pending&&!managed?.incident&&guardedStage(store,state,ctx,'schedule',()=>scheduleOps(orca,store,state,ctx,{orderedOpIds:managed?managed.dispatch:null}))==='stop')break;
     // A credential ask already waiting but with no command to copy - its custody was named in a place nothing had

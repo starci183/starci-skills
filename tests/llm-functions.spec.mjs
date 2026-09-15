@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {classifyScreen,CRITIQUE,CRITIQUE_FORM,DECISION_FORM,GOAL_CALL_TIMEOUT_MS,runHeadlessWithUsage,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,MANAGER_DECISION,MANAGER_SNAPSHOT,OVERLAP_CASES,PROVISION_KINDS,VALIDATOR_IO_RULE,VALIDATOR_RULES,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,manageWorkflow,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateManagerDecision,validateManagerSnapshot,validateOp} from '../models/functions.mjs';
+import {presentOwnerQuestion,classifyScreen,CRITIQUE,CRITIQUE_FORM,DECISION_FORM,GOAL_CALL_TIMEOUT_MS,runHeadlessWithUsage,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,MANAGER_DECISION,MANAGER_SNAPSHOT,OVERLAP_CASES,PROVISION_KINDS,VALIDATOR_IO_RULE,VALIDATOR_RULES,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,manageWorkflow,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateManagerDecision,validateManagerSnapshot,validateOp} from '../models/functions.mjs';
 
 const op=(id,extra={})=>({id,kind:'backend.implement',goal:`Build ${id}`,ledgerIds:[`L-${id}`],allowlist:[`apps/be/src/${id}`],
   references:['.starciwork/features/sales/sds.md#3'],checks:[{name:'unit',command:'npx vitest run sales'}],acceptance:[`${id} works`],dependsOn:[],...extra});
@@ -611,4 +611,22 @@ test('the critic answers the overlaps with the decided records as the three case
   // An unavailable critique still answers the shape, so the kernel never reads `overlaps` off undefined.
   assert.deepEqual(critiqueGoal({job:'x',providers:[],runHeadless:()=>'{}'}).overlaps,[]);
   assert.deepEqual(critiqueCall(['nonsense','nonsense',Error('gpt-6-astra headless exited 1')]).result.overlaps,[]);
+});
+
+test('the presenter writes the question and its options in the owner language, one rendering per option, or refuses the answer',()=>{
+  const answer={text:'Chọn đường đăng ký nào trước khi thanh toán?',options:['Mở đăng ký tự phục vụ','Chỉ theo lời mời']};
+  const asked=[];
+  const ok=presentOwnerQuestion({question:'Which registration path before checkout?',options:['Open self-service registration','Invitation-only'],
+    language:'vi',providers:['gpt-6-astra'],runHeadless:(provider,prompt)=>{asked.push(prompt);return JSON.stringify(answer);}});
+  assert.equal(ok.ok,true);
+  assert.deepEqual(ok.value,{language:'vi',...answer});
+  assert.match(asked[0],/Invitation-only/,'the options travel to the presenter exactly as they are written');
+  const short=presentOwnerQuestion({question:'Which path?',options:['a','b'],language:'vi',providers:['gpt-6-astra'],
+    runHeadless:()=>JSON.stringify({text:'Chọn đường nào?',options:['a']})});
+  assert.equal(short.ok,false);
+  assert.match(short.attempts.at(-1).errors.join(' '),/options must number 2/);
+  const bare=presentOwnerQuestion({question:'Proceed?',language:'vi',providers:['gpt-6-astra'],runHeadless:()=>JSON.stringify({text:'Tiếp tục chứ?'})});
+  assert.deepEqual(bare.value,{language:'vi',text:'Tiếp tục chứ?',options:[]},'a question with no options yet is presented alone');
+  assert.equal(presentOwnerQuestion({question:'Which path?',language:'vi',providers:[]}).reason,'no presenter provider was given');
+  assert.equal(presentOwnerQuestion({question:'   ',language:'vi',providers:['gpt-6-astra']}).reason,'there is no question to present');
 });
