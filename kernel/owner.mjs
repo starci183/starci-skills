@@ -274,7 +274,20 @@ const numberedOptions=summary=>{
   for(const item of found){if(item.at!==run.length+1)break;run.push(item.text);}
   return run;
 };
-const optionsOf=(ask,summary)=>ask.question?.options?.length?[...ask.question.options]:numberedOptions(summary);
+/**
+ * `presentation (vi): <question in that language> 1. <option 1> 2. <option 2>` at the end of an ask's summary: what
+ * the owner page shows, in the language of config.json. The record and the numbered options before it stay as the
+ * tree spells them; the presentation is parsed off the summary before those options are read.
+ */
+const PRESENTATION=/(?:^|\s)presentation\s*\(([a-z]{2,3}(?:-[A-Za-z0-9]+)?)\)\s*:\s*/i;
+const stripPresentation=summary=>{const match=PRESENTATION.exec(String(summary??''));return match?String(summary).slice(0,match.index):String(summary??'');};
+export const presentationOf=summary=>{
+  const text=String(summary??''),match=PRESENTATION.exec(text);if(!match)return null;
+  const tail=text.slice(match.index+match[0].length),first=tail.search(/(?:^|\s)1\.\s/);
+  const question=(first<0?tail:tail.slice(0,first)).trim(),options=first<0?[]:numberedOptions(tail.slice(first));
+  return question||options.length?{language:match[1].toLowerCase(),text:question,options}:null;
+};
+const optionsOf=(ask,summary)=>ask.question?.options?.length?[...ask.question.options]:numberedOptions(stripPresentation(summary));
 const requestersOf=(state,ask)=>state.ops.filter(item=>(ask.requesters??[]).includes(item.id));
 /**
  * The question was not what the keyword that opened the tab said it was. The op's own question is corrected -
@@ -316,6 +329,8 @@ export function settleOwnerAsk(store,state,ask,report){
   }
   if(isEnrolled(state)){
     const record=(String(marker(summary,'decision')??'').match(/^\S+/)??[])[0]??null,options=optionsOf(ask,summary);
+    const recommended=Number((String(marker(summary,'recommended')??'').match(/^\d+/)??[])[0])||null,presentation=presentationOf(summary);
+    ask.question={...(ask.question??{}),...(recommended?{recommended}:{}),...(presentation?{presentation}:{})};
     ask.ownerRequestStatus='waiting-owner';
     state.needUser.push({op:ask.id,kind:'decision',detail:`${ask.question?.text??ask.goal} - answer in the workflow owner page`,record,options,requesters:requesters.map(item=>item.id)});
     store.appendEvent({event:'owner-question',ask:ask.id,record,options:options.length,ownerRequired:true,requesters:requesters.map(item=>item.id)});

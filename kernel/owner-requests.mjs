@@ -51,7 +51,8 @@ export function deriveOwnerRequests(state,{now=Date.now}={}){
     const base={workflowId,opId:clean(ask.id),attempt:Number(ask.attempt??ask.restarts??0),generation,jobId:clean(ask.jobId)||workflowJobId,kind,subject,optionsDigest:clean(ask.decisionOptionsDigest)||null};
     const optionSource=list(ask?.question?.options).length?ask.question.options:list(ask?.options).length?ask.options:list(decisionMarker?.options);
     return {...base,id:requestKey(base),status,revision:Number(ask.ownerRequestRevision??0),guidance:guidance(ask),decisionRecord:clean(decisionMarker?.record||ask?.question?.record)||null,
-      options:optionSource.map((value,index)=>plain(value)?{id:clean(value.id)||String(index+1),label:clean(value.label||value.text)}:{id:String(index+1),label:clean(value)}).filter(item=>item.label),
+      options:optionSource.map((value,index)=>plain(value)?{id:clean(value.id)||String(index+1),label:clean(value.label||value.text)}:{id:String(index+1),label:clean(value)}).filter(item=>item.label).map((item,index)=>({...item,recommended:Number(ask?.question?.recommended)===index+1})),
+      presentation:plain(ask?.question?.presentation)?{language:clean(ask.question.presentation.language),text:clean(ask.question.presentation.text),options:list(ask.question.presentation.options).map((label,index)=>({id:String(index+1),label:clean(plain(label)?label.label:label)})).filter(item=>item.label)}:null,
       credential:kind==='credential'?{custody:clean(ask?.credential?.custody),variables:list(ask?.credential?.variables).map(clean).filter(Boolean)}:null,
       updatedAt:Number(ask.ownerRequestUpdatedAt??now())};
   });

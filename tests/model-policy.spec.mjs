@@ -70,3 +70,10 @@ test('the kernel\'s own model functions never spend the workflow probation budge
   assert.equal(bound.eligibility(judge('j-1'),'a').eligible,true);assert.equal(bound.consumeProbation(judge('j-1'),'a').ok,true);
   assert.equal(state.modelEligibility.probationBudget.remaining,0,'kernel functions neither spend nor mint the operation budget');
   assert.equal(bound.eligibility(worker('w-3','another'),'a').eligible,false,'the operation budget is still the operation budget');});
+
+test('a kernel function keeps every eligible pool member in its filter; an operation chain is narrowed to one',t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-model-filter-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));fs.writeFileSync(path.join(dir,'policy.json'),JSON.stringify({schema:'starci/model-capability-policy@1'}));const state={id:'wf',approved:true,ops:[{id:'op'}],engine:{}},profile={runtimes:{fable:{provider:'claude',target:'claude-fable',version:'1'},astra:{provider:'codex',target:'gpt-astra',version:'1'},sol:{provider:'codex',target:'gpt-sol',version:'1'}}},bound=createWorkflowModelEligibility({runtimes:profile,state,policyFile:path.join(dir,'policy.json'),qualificationsFile:path.join(dir,'none.json'),root:dir});
+  const judge={kind:'judge',input:{functionName:'validateOp'},opId:'op',jobId:'judge-1',role:'verify'};
+  assert.equal(bound.eligibility(judge,'sol').eligible,true,'a probation entry for one member exists on the scope');
+  assert.deepEqual(bound.providerFilter(judge).sort(),['claude-fable','gpt-astra','gpt-sol'],'every eligible member stays admissible for the validator pool');
+  const worker={kind:'backend.implement',opId:'op',jobId:'w-1',role:'implement',checks:[{name:'unit'}],independentReview:{required:true,freshContext:true}};
+  assert.equal(bound.providerFilter(worker).length,1,'an operation launch chain is narrowed to one target');});

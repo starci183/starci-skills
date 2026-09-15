@@ -21,7 +21,7 @@ const WORDS={
     changed:'Yêu cầu đã thay đổi. Trang sẽ cập nhật.',invalid:'Yêu cầu không hợp lệ. Hãy tải lại trang trong Orca.',disconnected:'Đang kết nối lại với workflow…',
     session:'Phiên nhập không hợp lệ. Mở trang Thông tin truy cập của workflow trong Orca.',
     why:'Vì sao cần',where:'Lấy ở đâu',prepared:'Workflow đã chuẩn bị',ownerSteps:'Việc thầy cần làm',afterSubmit:'Sau khi trả lời',officialDocs:'Tài liệu chính thức',
-    choose:'Chọn một phương án',recommended:'Khuyến nghị',preparingHint:'Workflow đang chuẩn bị các phương án cho câu hỏi này; chúng sẽ hiện tại đây.',other:'Phương án khác…',otherHint:'Chỉ dùng khi không phương án nào phù hợp.',answer:'Câu trả lời',confirm:'Tôi xác nhận',submitOwner:'Gửi câu trả lời',chooseFirst:'Hãy chọn một phương án trước.',queued:'Đã gửi. Workflow sẽ xử lý và tự tiếp tục.',
+    choose:'Chọn một phương án',recommended:'Khuyến nghị',original:'Bản ghi gốc (tiếng Anh)',preparingHint:'Workflow đang chuẩn bị các phương án cho câu hỏi này; chúng sẽ hiện tại đây.',other:'Phương án khác…',otherHint:'Chỉ dùng khi không phương án nào phù hợp.',answer:'Câu trả lời',confirm:'Tôi xác nhận',submitOwner:'Gửi câu trả lời',chooseFirst:'Hãy chọn một phương án trước.',queued:'Đã gửi. Workflow sẽ xử lý và tự tiếp tục.',
     statusWaiting:'Đang chờ thầy',statusPreparing:'Đang chuẩn bị phương án',statusAnswered:'Đã trả lời',statusCorrection:'Cần sửa',statusVerifying:'Đang kiểm tra',statusVerified:'Đã xác nhận',
     prepTitle:'Đang chuẩn bị kết nối',workflowStep:'Workflow',ownerStep:'Thầy',proofReady:'đã có bằng chứng',proofPending:'chưa có bằng chứng',docsChecked:'tài liệu chính thức đã kiểm tra',verificationPlanned:'bước xác minh đã lên kế hoạch',
     show:'Hiện',hide:'Ẩn',placeholder:'Dán giá trị tại đây',
@@ -41,7 +41,7 @@ const WORDS={
     changed:'The request changed. The page will refresh.',invalid:'Invalid request. Reload the page in Orca.',disconnected:'Reconnecting to the workflow…',
     session:'This input session is invalid. Open the workflow’s Credentials page in Orca.',
     why:'Why this is needed',where:'Where to get it',prepared:'Workflow prepared',ownerSteps:'What you need to do',afterSubmit:'After you answer',officialDocs:'Official documentation',
-    choose:'Choose one option',recommended:'Recommended',preparingHint:'The workflow is preparing the options for this question; they will appear here.',other:'Another answer…',otherHint:'Only when no option fits.',answer:'Your answer',confirm:'I confirm',submitOwner:'Submit answer',chooseFirst:'Choose an option first.',queued:'Submitted. The workflow will process it and continue.',
+    choose:'Choose one option',recommended:'Recommended',original:'Original record',preparingHint:'The workflow is preparing the options for this question; they will appear here.',other:'Another answer…',otherHint:'Only when no option fits.',answer:'Your answer',confirm:'I confirm',submitOwner:'Submit answer',chooseFirst:'Choose an option first.',queued:'Submitted. The workflow will process it and continue.',
     statusWaiting:'Waiting for you',statusPreparing:'Preparing options',statusAnswered:'Answered',statusCorrection:'Needs correction',statusVerifying:'Verifying',statusVerified:'Verified',
     prepTitle:'Preparing connection',workflowStep:'Workflow',ownerStep:'Owner',proofReady:'evidence recorded',proofPending:'evidence pending',docsChecked:'official documents checked',verificationPlanned:'verification steps planned',
     show:'Show',hide:'Hide',placeholder:'Paste the value here',
@@ -70,7 +70,9 @@ export function inputPage({nonce,language='vi'}={}){
 <section id="owner"></section><section id="preparation"></section><div id="cards"></div>
 <footer><span class="lock" aria-hidden="true">◇</span><span>${words.private}<br>${words.verify}</span></footer></main>
 <script nonce="${nonce}">${COMPONENT_SCRIPT}
-const words=${JSON.stringify(words)},tabTitle=${JSON.stringify(tab)},token=location.hash.slice(1),cards=new Map(),ownerCards=new Map();let stopped=false,busy=false;
+const words=${JSON.stringify(words)},tabTitle=${JSON.stringify(tab)},pageLanguage=${JSON.stringify(vi?'vi':'en')},token=location.hash.slice(1),cards=new Map(),ownerCards=new Map();let stopped=false,busy=false;
+// The presentation the ask wrote in the page's language, when it wrote one; the record's own words otherwise.
+const spokenOf=request=>request.presentation&&String(request.presentation.language||'').toLowerCase().startsWith(pageLanguage)?request.presentation:null;
 const {el}=ui;
 const ownerKey=request=>JSON.stringify([request.id,request.revision,request.optionsDigest??null,request.status]);
 const optionShape=request=>JSON.stringify((request.options??[]).map(option=>[option.id,option.label]));
@@ -87,12 +89,15 @@ function renderOwner(requests){const root=document.querySelector('#owner'),seen=
  if(entry){entry.heading.textContent=request.subject;entry.guide.replaceChildren();const guide=ownerGuide(request);if(guide)entry.guide.append(guide);if(root.children[position]!==entry.card)root.insertBefore(entry.card,root.children[position]??null);position++;continue;}
  const [tone,statusText]=statusBadge(request.status);
  const card=ui.card({tag:'form',kicker:[ui.badge(kindLabel(request.kind),'soft'),ui.badge(statusText,tone)],title:request.subject}),guide=el('div');
- if(request.guidance?.what&&request.guidance.what!==request.subject)card.body.append(el('p','question t-body',request.guidance.what));
+ const spoken=spokenOf(request),questionText=spoken?.text||request.guidance?.what;
+ if(questionText&&questionText!==request.subject)card.body.append(el('p','question t-body',questionText));
  card.body.append(guide);const meta=ownerGuide(request);if(meta)guide.append(meta);
  const answerable=['waiting-owner','needs-correction'].includes(request.status),hasOptions=Boolean(request.options?.length),preparing=request.status==='preparing'&&!hasOptions;let choice=null,free=null,confirm=null,otherBox=null;
+ const shown=hasOptions?request.options.map((option,index)=>({...option,label:spoken?.options?.[index]?.label||option.label})):[];
  if(preparing){card.body.append(ui.hint(words.preparingHint));}
  else if(hasOptions){
-  choice=ui.radioGroup({name:'choice-'+request.id,legend:words.choose,options:request.options,disabled:!answerable,recommendedText:words.recommended});card.body.append(choice.root);
+  choice=ui.radioGroup({name:'choice-'+request.id,legend:words.choose,options:shown,disabled:!answerable,recommendedText:words.recommended});card.body.append(choice.root);
+  if(spoken){const original=el('details','tasks'),body=el('p','',[request.guidance?.what,...request.options.map((option,index)=>(index+1)+'. '+option.label)].filter(Boolean).join(' '));original.append(el('summary','',words.original),body);card.body.append(original);}
   const toggle=ui.button(words.other,{variant:'ghost'});otherBox=el('div','other');otherBox.hidden=true;free=ui.textarea({placeholder:words.answer});free.disabled=!answerable;otherBox.append(free,ui.hint(words.otherHint));
   toggle.addEventListener('click',()=>{otherBox.hidden=!otherBox.hidden;if(!otherBox.hidden)free.focus();});card.body.append(toggle,otherBox);
  }else if(['authority','consent','irreversible-confirmation'].includes(request.kind)){const box=ui.checkbox(words.confirm,{disabled:!answerable});confirm=box.input;card.body.append(box.root);}

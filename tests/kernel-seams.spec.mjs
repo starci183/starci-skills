@@ -8,7 +8,8 @@ import {buildReport} from '../kernel/reports.mjs';
 import {markDone,markInProgress,readNode} from '../kernel/ledger.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {inputAsk} from './helpers/input-fixture.mjs';
-import {applyOpReport,completionOutlook,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
+import {applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
+import {deriveOwnerRequests} from '../kernel/owner-requests.mjs';
 import {validateAccepted} from '../kernel/verify.mjs';
 import {settleIntake} from '../kernel/intake.mjs';
 import {recordDone,syncLedgerOps} from '../kernel/sync.mjs';
@@ -85,6 +86,8 @@ test('the contract tells the worker which language the owner reads the tab in, a
     const state=stubState(store,[op]);
     const vi=renderContract({template,op,state,store,launcher:'L.mjs',run:'run_seam',language:'vi'});
     assert.match(vi,/## Language\nSpeak to the owner in Vietnamese \(tiếng Việt\)[\s\S]*stays in English[\s\S]*## Goal/,'the language section precedes the goal');
+    assert.doesNotMatch(vi,/presentation \(vi\)/,'a drawing op hands the page no presentation');
+    assert.match(languageBlock('vi',{kind:'decision.prepare'}).join(' '),/presentation \(vi\): <the question in Vietnamese \(tiếng Việt\)> 1\. <option 1/,'an ask ends its summary with the presentation the page shows');
     const en=renderContract({template,op,state,store,launcher:'L.mjs',run:'run_seam',language:'en'});
     assert.doesNotMatch(en,/## Language/,'English is the default of the record and needs no section');
     assert.match(renderContract({template,op,state,store,launcher:'L.mjs',run:'run_seam',language:'vi-VN'}),/## Language/);
@@ -857,4 +860,17 @@ test('a retry brings the journal to the build default unless the operator chose 
   assert.equal(retryJournalTarget({option:null,previous:former,chosen:true,fallback}),path.resolve(former),'a journal the operator chose before is kept');
   assert.equal(retryJournalTarget({option:null,previous:former,chosen:false,fallback}),path.resolve(fallback),'a record still on a former journal moves to the default at the next retry');
   assert.equal(retryJournalTarget({option:null,previous:null,chosen:false,fallback}),path.resolve(fallback));
+});
+
+test('an enrolled ask keeps its recommendation and its presentation for the page while the record options stay English',()=>{
+  const events=[],store={appendEvent:event=>events.push(event)};
+  const ask={id:'ask-1',kind:'decision.prepare',status:'running',requesters:[],question:{kind:'decision',text:'Which registration path?'}};
+  const state={id:'wf',approved:true,engine:{schema:'starci/engine@1',generation:1},ops:[ask],needUser:[]};
+  settleOwnerAsk(store,state,ask,{summary:'decision: nivo.login.business.srs.policy-decision.d-registration recommended: 2 1. Open self-service registration 2. Invitation-only registration presentation (vi): Đường đăng ký nào trước khi thanh toán? 1. Mở đăng ký tự phục vụ 2. Chỉ đăng ký theo lời mời'});
+  assert.deepEqual(state.needUser.at(-1).options,['Open self-service registration','Invitation-only registration'],'the record options are read without the presentation');
+  assert.equal(ask.question.recommended,2);
+  assert.deepEqual(ask.question.presentation,{language:'vi',text:'Đường đăng ký nào trước khi thanh toán?',options:['Mở đăng ký tự phục vụ','Chỉ đăng ký theo lời mời']});
+  const request=deriveOwnerRequests(state)[0];
+  assert.deepEqual(request.options.map(option=>[option.id,option.label,option.recommended]),[['1','Open self-service registration',false],['2','Invitation-only registration',true]]);
+  assert.deepEqual(request.presentation,{language:'vi',text:'Đường đăng ký nào trước khi thanh toán?',options:[{id:'1',label:'Mở đăng ký tự phục vụ'},{id:'2',label:'Chỉ đăng ký theo lời mời'}]});
 });

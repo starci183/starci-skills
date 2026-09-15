@@ -262,11 +262,12 @@ const ioLines=kind=>{try{const block=ioBlock(kind);return block?[...String(block
  * fields stay as the tree spells them, in English, so every line can be matched back to a record.
  */
 const LANGUAGE_NAMES={vi:'Vietnamese (tiếng Việt)',en:'English',ja:'Japanese',ko:'Korean',zh:'Chinese',fr:'French',de:'German',es:'Spanish'};
-export function languageBlock(language){
+export function languageBlock(language,op=null){
   const code=String(language??'en').toLowerCase().split('-')[0];
   if(!code||code==='en')return [];
   const name=LANGUAGE_NAMES[code]??code;
-  return [`## Language`,`Speak to the owner in ${name}: the progress notes you print in this terminal, your questions, and your closing summary. Every record, file, path, identifier, commit message, check name and report field stays in English, exactly as the tree spells it - the language is for the person reading this tab, never for the files.`,``];
+  const ask=op&&isAsk(op.kind)?` The owner reads your question on the workflow page in ${name}: end your report summary, after the numbered options, with \`presentation (${code}): <the question in ${name}> 1. <option 1 in ${name}> 2. <option 2 in ${name}> ...\` - the same options, in the same order and number, as the record; the record and the numbered options before it stay in English.`:'';
+  return [`## Language`,`Speak to the owner in ${name}: the progress notes you print in this terminal, your questions, and your closing summary. Every record, file, path, identifier, commit message, check name and report field stays in English, exactly as the tree spells it - the language is for the person reading this tab, never for the files.${ask}`,``];
 }
 const configuredLanguage=state=>{try{return loadConfig(state.host).language;}catch{return 'en';}};
 export function renderContract({template,op,state,store,launcher=state.launcher,run=state.run,
@@ -287,7 +288,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     `# Operation contract - \`${op.kind}\` - op \`${op.id}\` - attempt ${op.attempt}`,``,
     `Runtime StarCi ${isEnrolled(state)?state.engine.version:'5.0'}. One worktree \`${slash(state.worktree)}\` on branch \`${state.branch}\`. ${isEnrolled(state)?'The kernel serializes native writers and independently verifies a frozen copy of your observed changes. This host detects write drift but does not enforce an OS sandbox.':'Other operations are running beside you in this same worktree:'} Never touch a path outside your allowlist, never commit, never switch branches. Your Task id, Dispatch id and terminal handle are in the dispatch preamble.`,``,
     ...(laneLine(state,op)?[laneLine(state,op),``]:[]),
-    ...languageBlock(language??configuredLanguage(state)),
+    ...languageBlock(language??configuredLanguage(state),op),
     `## Goal`,op.goal,``,
     ...critiqueBlock(critique),
     ...overlapBlock(critique,op),

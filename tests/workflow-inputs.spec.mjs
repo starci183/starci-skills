@@ -434,12 +434,15 @@ test('the rendered owner page includes the choice control while credentials are 
   const token='s'.repeat(43),profile=fs.mkdtempSync(path.join(os.tmpdir(),'si-render-'));
   t.after(()=>fs.rmSync(profile,{recursive:true,force:true}));
   const snapshot={workflow:'synthetic-owner-ui',phase:'preparing',fields:[],unresolved:[],preparation:[],ownerRequests:[{id:'request-1',opId:'ask-policy',revision:0,
-    kind:'business-decision',subject:'Choose policy',status:'waiting-owner',options:[{id:'a',label:'Policy A preserves records for the complete approved audit period while keeping every binding condition visible to the owner before selection.'},{id:'b',label:'Policy B removes records after the shorter approved period and requires the owner to accept the documented reporting limitation.'}],guidance:{}}]};
+    kind:'business-decision',subject:'Choose policy',status:'waiting-owner',options:[{id:'a',label:'Policy A preserves records for the complete approved audit period while keeping every binding condition visible to the owner before selection.',recommended:true},{id:'b',label:'Policy B removes records after the shorter approved period and requires the owner to accept the documented reporting limitation.'}],
+    presentation:{language:'vi',text:'Chọn chính sách lưu trữ nào?',options:[{id:'1',label:'Chính sách A giữ hồ sơ trọn kỳ kiểm toán đã duyệt.'},{id:'2',label:'Chính sách B xóa hồ sơ sau kỳ ngắn hơn đã duyệt.'}]},guidance:{what:'Which retention policy?'}}]};
   const app=await startInputServer({token,sessionId:'render',model:{snapshot:()=>snapshot,submit:async()=>({ok:false}),submitOwnerAction:()=>({ok:false})}});
   t.after(()=>app.close());
   const {stdout}=await execFileAsync(chrome,['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check',`--user-data-dir=${profile}`,'--virtual-time-budget=1000','--dump-dom',`${app.origin}/inputs/render#${token}`],{timeout:10000,maxBuffer:1024*1024});
-  assert.match(stdout,/<fieldset class="choices">[\s\S]*<input type="radio" name="choice-request-1" value="a">[\s\S]*Policy A preserves records for the complete approved audit period[\s\S]*<input type="radio" name="choice-request-1" value="b">[\s\S]*Policy B removes records after the shorter approved period[\s\S]*<\/fieldset>/,'every option is a choice card with its full text, never a truncating native popup');
+  assert.match(stdout,/<fieldset class="choices">[\s\S]*<input type="radio" name="choice-request-1" value="a">[\s\S]*Chính sách A giữ hồ sơ trọn kỳ kiểm toán đã duyệt\.[\s\S]*<input type="radio" name="choice-request-1" value="b">[\s\S]*Chính sách B xóa hồ sơ sau kỳ ngắn hơn đã duyệt\.[\s\S]*<\/fieldset>/,'every option is a choice card with its full text in the page language, never a truncating native popup; the value stays the record id');
   assert.doesNotMatch(stdout,/<select/,'a decision with options is a choice, not a dropdown');
+  assert.match(stdout,/Chọn chính sách lưu trữ nào\?[\s\S]*Chính sách A giữ hồ sơ trọn kỳ kiểm toán đã duyệt\.[\s\S]*Khuyến nghị[\s\S]*Chính sách B xóa hồ sơ/,'the page speaks the presentation and badges the recommendation');
+  assert.match(stdout,/Bản ghi gốc \(tiếng Anh\)[\s\S]*Which retention policy\?[\s\S]*1\. Policy A preserves records/,'the English record stays one fold away');
   assert.match(stdout,/<fieldset class="choices">[\s\S]*<\/fieldset>[\s\S]*<button[^>]*>Gửi câu trả lời<\/button>/);
   assert.doesNotMatch(stdout,/type="password"/,'preparing credentials still expose no secret input');
 });

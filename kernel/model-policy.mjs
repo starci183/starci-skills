@@ -155,8 +155,12 @@ export function createWorkflowModelEligibility({runtimes,state,policyFile,qualif
       &&evaluateModelEligibility({runtime,evidence:loaded.evidenceByRuntime[runtime.id],workload:workloadFor(job,state),role:job?.role,now:now()}).eligible)
       .map(runtime=>runtime.target??runtime.id);
     if(qualified.length)return [...new Set(qualified)];
-    for(const runtime of candidates)if(callback(job,runtime).eligible)return [runtime.target??runtime.id];
-    return [];
+    // A kernel function (manager, planner, validator, screen sense) is selected from its configured pool one call at
+    // a time, so every eligible member stays admissible; an operation launch chain is still narrowed to one target,
+    // or an internal fallback could execute a probation candidate nobody consumed.
+    const eligible=[];
+    for(const runtime of candidates)if(callback(job,runtime).eligible){eligible.push(runtime.target??runtime.id);if(!kernelFunction(workloadFor(job,state)))break;}
+    return [...new Set(eligible)];
   };
   const consumeProbation=(job,runtimeValue)=>{
     const runtime=runtimeOf(runtimeValue),actual=workloadFor(job,state),scopeId=scopeOf(job,actual),entry=state.modelEligibility.probations[`${clean(runtime?.id)}:${scopeId}`],scope=state.modelEligibility.probationScopes[scopeId],jobId=clean(job?.jobId);
