@@ -1321,6 +1321,47 @@ function publishAuthoredDecision(store,state,op,report,reason){
 }
 
 /**
+ * A settled operation releases its canonical writer. One worker may write the worktree at a time, and a durable
+ * operation job that ends `effect_unknown` keeps that reservation on purpose: nobody may write into a tree whose
+ * last writer cannot be proved finished. But acceptance is that proof. Once the kernel has verified the checks and
+ * committed the operation, its effects are the accepted effects, and a reservation still standing behind it is not
+ * a fence any more - it is a workflow that can never admit another writer. Five operations of one workflow waited
+ * on a single such lease while the manager spent its whole no-progress budget on them.
+ *
+ * So: an operation that is done or cancelled, carrying no live dispatch or terminal, whose durable job is no longer
+ * running, has its lease settled and the field cleared. A job still `leased` or `running` is left exactly alone.
+ */
+const RELEASABLE_JOB_STATUS=['effect_unknown','succeeded','failed','cancelled'];
+export function releaseSettledOperationLeases(store,state,ctx,{settle=settleGenerationLeases}={}){
+  if(!isEnrolled(state)||!state.engine?.journalFile)return null;
+  const released=[];
+  for(const op of state.ops){
+    if(!plain(op.lease)||!op.lease.jobId||op.dispatch||op.terminal)continue;
+    if(!['done','cancelled'].includes(op.status))continue;
+    let status=null;
+    try{status=ctx?.engine?.journal?.getJob?.(op.lease.jobId)?.status??null;}catch{status=null;}
+    if(status!==null&&!RELEASABLE_JOB_STATUS.includes(status))continue;
+    let settled;
+    try{settled=settle({journalFile:state.engine.journalFile,leases:[op.lease],
+      reason:`operation ${op.id} was accepted and committed; its effects are the accepted effects`})[0];}
+    catch(error){settled={ok:false,reason:String(error?.message??error)};}
+    if(!settled?.ok){
+      if(op.leaseReleaseRefused!==settled?.reason){
+        op.leaseReleaseRefused=settled?.reason??'unknown';
+        store.appendEvent({event:'settled-lease-release-refused',op:op.id,jobId:op.lease.jobId,status,reason:String(settled?.reason??'unknown').slice(0,200)});
+      }
+      continue;
+    }
+    released.push(op.id);
+    store.appendEvent({event:'settled-lease-released',op:op.id,jobId:op.lease.jobId,status,
+      reason:'the operation is settled, so the writer it reserved is free for the next one'});
+    delete op.lease;delete op.leaseReleaseRefused;
+  }
+  if(released.length)store.saveState(state);
+  return released.length?{released}:null;
+}
+
+/**
  * Where a decision's options actually live. A report summary is capped, so only the first numbered option of a
  * four-option question ever survives the trip to the kernel: the owner then reads a choice as a free-text box.
  * The record the ask authored is the canonical copy and it is complete, so the kernel reads the choices from it,
@@ -3616,6 +3657,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     noteOwnerList(store,state);
     if(guardedStage(store,state,ctx,'sync',()=>{syncLedgerOps(store,state,ctx);if(state.engine?.coordination!=='agent-v1')planVerifyOps(store,state,ctx);})==='stop')break;
     let managed=state.engine?.coordination==='agent-v1'?{pending:true,dispatch:[]}:null;
+    if(isEnrolled(state)&&guardedStage(store,state,ctx,'writer-release',()=>{releaseSettledOperationLeases(store,state,ctx);})==='stop')break;
     if(isEnrolled(state)&&guardedStage(store,state,ctx,'owner-questions',()=>{publishAuthoredDecisions(store,state);})==='stop')break;
     if(isEnrolled(state)&&guardedStage(store,state,ctx,'presentation',()=>{presentOwnerQuestions(store,state,ctx);})==='stop')break;
     if(state.engine?.coordination==='agent-v1'&&guardedStage(store,state,ctx,'manager',()=>{managed=coordinateManagedWorkflow(store,state,ctx);})==='stop')break;

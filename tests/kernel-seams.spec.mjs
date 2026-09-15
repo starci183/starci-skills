@@ -8,7 +8,7 @@ import {buildReport} from '../kernel/reports.mjs';
 import {markDone,markInProgress,readNode} from '../kernel/ledger.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {inputAsk} from './helpers/input-fixture.mjs';
-import {PRESENTATION_RETRY_MS,decisionRecordOptions,handleBlocked,publishAuthoredDecisions,presentOwnerQuestions,applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
+import {PRESENTATION_RETRY_MS,decisionRecordOptions,releaseSettledOperationLeases,handleBlocked,publishAuthoredDecisions,presentOwnerQuestions,applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
 import {deriveOwnerRequests} from '../kernel/owner-requests.mjs';
 import {authoredDecisionOf} from '../kernel/owner.mjs';
 import {loadConfig} from '../scripts/config.mjs';
@@ -1003,4 +1003,35 @@ test('a capped report keeps only the first option, so the choices are read from 
   assert.deepEqual(publishAuthoredDecisions(store,state),{op:'ask-1'});
   assert.deepEqual(state.needUser.find(item=>item.kind==='decision').options.length,3,'the owner page receives all three, not the one the cap left');
   assert.equal(ask.ownerRequestStatus,'waiting-owner');
+});
+
+test('a settled operation releases the canonical writer it reserved, and an operation still running keeps it',()=>{
+  const events=[],store={appendEvent:event=>events.push(event),saveState(){}},asked=[];
+  const lease=id=>({workflowId:'wf',opId:id,attempt:1,generation:3,jobId:`operation-${id}`,leaseToken:'t'});
+  const accepted={id:'ask-2',kind:'decision.prepare',status:'done',lease:lease('ask-2')};
+  const live={id:'intake',kind:'work.author',status:'running',lease:lease('intake')};
+  const cancelled={id:'old',kind:'work.author',status:'cancelled',lease:lease('old')};
+  const dispatched={id:'busy',kind:'work.author',status:'done',lease:lease('busy'),dispatch:'d-1'};
+  const state={id:'wf',host:process.cwd(),engine:{schema:'starci/engine@1',generation:3,journalFile:'J'},needUser:[],
+    ops:[accepted,live,cancelled,dispatched]};
+  const status={'operation-ask-2':'effect_unknown','operation-intake':'running','operation-old':'succeeded','operation-busy':'effect_unknown'};
+  const ctx={engine:{journal:{getJob:id=>({status:status[id]})}}};
+  const settle=({leases})=>{asked.push(leases[0].opId);return [{ok:true}];};
+  assert.deepEqual(releaseSettledOperationLeases(store,state,ctx,{settle}),{released:['ask-2','old']});
+  assert.deepEqual(asked,['ask-2','old'],'only the settled operations are asked to release');
+  assert.equal(accepted.lease,undefined,'the released reservation is gone from the operation');
+  assert.ok(live.lease,'an operation still running keeps its writer');
+  assert.ok(dispatched.lease,'an operation with a live dispatch is left alone');
+  assert.deepEqual(events.filter(event=>event.event==='settled-lease-released').map(event=>event.op),['ask-2','old']);
+  assert.equal(releaseSettledOperationLeases(store,state,ctx,{settle}),null,'nothing to release twice');
+
+  // A journal that refuses says so once, and the reservation stays until it can be settled.
+  const refused={id:'ask-9',kind:'decision.prepare',status:'done',lease:lease('ask-9')};
+  const stuck={...state,ops:[refused]},log=[];
+  const noisy={appendEvent:event=>log.push(event),saveState(){}};
+  const refusing=()=>[{ok:false,reason:'the journal is locked'}];
+  assert.equal(releaseSettledOperationLeases(noisy,stuck,ctx,{settle:refusing}),null);
+  assert.ok(refused.lease,'a refused release keeps the reservation rather than losing the fence');
+  assert.equal(releaseSettledOperationLeases(noisy,stuck,ctx,{settle:refusing}),null);
+  assert.equal(log.filter(event=>event.event==='settled-lease-release-refused').length,1,'the refusal is said once, not every tick');
 });
