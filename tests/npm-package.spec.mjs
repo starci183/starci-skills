@@ -15,6 +15,7 @@ function npm(args,cwd){
 }
 
 test('actual npm tarball installs a runnable compiled command without development dependencies',t=>{
+  t.diagnostic('real npm pack + npm install on purpose: only a real install can prove no dev dependency or ERR_MODULE_NOT_FOUND leaks through; there is one scenario here, nothing to merge or fake');
   const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'starci-npm-package-'));
   t.after(()=>{
     assert.equal(path.dirname(temporary),fs.realpathSync(os.tmpdir()));

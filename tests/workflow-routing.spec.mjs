@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, {before, after} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,6 +16,13 @@ const read=(dir,file)=>JSON.parse(fs.readFileSync(path.join(dir,file),'utf8'));
 import {readPublicJson} from './helpers/read-public.mjs';
 const catalog=readPublicJson('workflows','catalog.json'),jobs=readPublicJson('workflows','jobs.json'),frontend=readPublicJson('workflows','frontend.json'),operators=JSON.parse(outputs().get('catalog.json'));
 const temp=t=>{const d=fs.mkdtempSync(path.join(os.tmpdir(),'starci-routing-'));t.after(()=>{assert.equal(path.dirname(d),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(d).startsWith('starci-routing-'));fs.rmSync(d,{recursive:true,force:true});});return d;};
+// init() spawns two real build/verify child processes every call. Both tests below only need an
+// already-installed host as their starting state (init()'s own behavior is covered in
+// integration.spec.mjs), so build it once and copy it instead of repeating the full install.
+let golden;
+before(()=>{golden=fs.mkdtempSync(path.join(os.tmpdir(),'starci-routing-golden-'));init({dir:golden,bootstrap:true},()=>{});});
+after(()=>fs.rmSync(golden,{recursive:true,force:true}));
+const hostFromGolden=t=>{const d=temp(t);fs.cpSync(golden,d,{recursive:true});return d;};
 test('one StarCi skill discovers all sixteen valid workflows and no preset skill layer',()=>{
   assert.match(fs.readFileSync(path.join(root,'SKILL.md'),'utf8'),/^name: starci$/m);
   assert.equal(fs.existsSync(path.join(root,'skills/catalog.json')),false);
@@ -43,7 +50,7 @@ test('direct task has no assumed Work/domain prerequisites and cannot grant itse
   }
 });
 test('relocated CLI selects/displays workflows without creating Work or executing effects',t=>{
-  const host=temp(t);init({dir:host,bootstrap:true},()=>{});
+  const host=hostFromGolden(t);
   const installed=path.join(host,'.claude');
   assert.equal(fs.existsSync(path.join(installed,'skills/catalog.json')),false);
   const cli=path.join(installed,'bin/starci-skills.mjs');
@@ -55,7 +62,7 @@ test('relocated CLI selects/displays workflows without creating Work or executin
   assert.equal(fs.existsSync(path.join(host,'result.json')),false);
 });
 test('upgrading an old preset bootstrap retires owned presets while preserving custom work and V2 docs/sites',t=>{
-  const host=temp(t);init({dir:host,bootstrap:true},()=>{});
+  const host=hostFromGolden(t);
   const dir=path.join(host,'.claude'),relative='skills/starci-fix/SKILL.md',bytes='Old installer-owned preset';
   fs.mkdirSync(path.dirname(path.join(dir,relative)),{recursive:true});fs.writeFileSync(path.join(dir,relative),bytes);
   const manifest=read(dir,'.starci-skills.json');manifest.files[relative]=crypto.createHash('sha256').update(bytes).digest('hex');fs.writeFileSync(path.join(dir,'.starci-skills.json'),JSON.stringify(manifest));

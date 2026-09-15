@@ -5,7 +5,7 @@ import os from 'node:os';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { test } from 'node:test';
+import { test, before, after } from 'node:test';
 import { init, update, doctor, PAYLOAD } from '../bin/starci-skills.mjs';
 import { validateWorkspace } from '../core/index.mjs';
 
@@ -18,6 +18,28 @@ function host(t) {
     assert.ok(path.basename(root).startsWith('starci-v3-install-'));
     fs.rmSync(root, { recursive: true, force: true });
   });
+  return root;
+}
+
+// init() spawns two real build/verify child processes on every call (buildInstalledRuntime in
+// bin/starci-skills.mjs) and always copies the same deterministic payload from packageRoot. Tests
+// below that only need "an already-installed host" as their starting state — not init()'s own
+// behavior, which stays covered by the tests that assert on it directly — copy this once-built
+// install instead of repeating the full copy+build+verify cycle on every test.
+let golden;
+before(() => {
+  golden = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-v3-golden-'));
+  init({ dir: golden, bootstrap: true }, quiet);
+});
+after(() => fs.rmSync(golden, { recursive: true, force: true }));
+function hostFromGolden(t, { bootstrap = true } = {}) {
+  const root = host(t);
+  fs.cpSync(path.join(golden, '.claude'), path.join(root, '.claude'), { recursive: true });
+  if (bootstrap) {
+    for (const name of ['AGENTS.md', 'CLAUDE.md', '.gitignore']) {
+      if (fs.existsSync(path.join(golden, name))) fs.cpSync(path.join(golden, name), path.join(root, name));
+    }
+  }
   return root;
 }
 function put(root, relative, bytes) {
@@ -96,8 +118,7 @@ test('host bootstraps use packaged templates and leave bound BE/FE projects unto
 });
 
 test('obsolete direct-task bootstrap migrates without altering custom host instructions', t => {
-  const root = host(t);
-  init({dir:root,bootstrap:true},quiet);
+  const root = hostFromGolden(t);
   const obsolete = '<!-- starci:prompt-entry -->\nUse the single [StarCi skill](.claude/SKILL.md) to select one workflow from .claude/workflows/catalog.json.\nUse direct-task for ad hoc work that does not fit a specialized workflow. Keep the selected matrix\nwithin three sequential rows and three parallel primary cells; verify requested outcomes before advancing.\nQuestions may stay read-only. Check/build .dist first. Preserve existing scope, evidence and user changes.\n<!-- /starci:prompt-entry -->';
   put(root,'AGENTS.md','# Custom host rule\n'+obsolete+'\n');
   update({dir:root},quiet);
@@ -107,8 +128,7 @@ test('obsolete direct-task bootstrap migrates without altering custom host instr
 });
 
 test('major upgrade requires opt-in before writing and never converts existing work evidence', t => {
-  const root = host(t);
-  init({ dir: root, bootstrap: true }, quiet);
+  const root = hostFromGolden(t);
   const manifestPath = path.join(root, '.claude/.starci-skills.json');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   assert.deepEqual(manifest.installProtocol,{schema:'starci/install-protocol@1',major:6},'public semver is independent from the durable workflow protocol');
@@ -132,8 +152,7 @@ test('major upgrade requires opt-in before writing and never converts existing w
 // process to restart - says so where they are looking, which is the line the installer prints. The note
 // itself ships with the payload, so an operator with no network still has it.
 test('an update that changed the installed version names the upgrade note of what it installed', t => {
-  const root = host(t);
-  init({ dir: root, bootstrap: false }, quiet);
+  const root = hostFromGolden(t, { bootstrap: false });
   const version = JSON.parse(read(packageRoot, 'package.json')).version;
   const catalog = read(root, '.claude/upgrades/index.yaml');
   assert.match(catalog, /^schema: starci\/upgrades@1$/m);
@@ -157,8 +176,7 @@ test('an update that changed the installed version names the upgrade note of wha
 });
 
 test('known old managed entry is replaced, custom text and CRLF suffix preserved', t => {
-  const root = host(t);
-  init({ dir: root, bootstrap: true }, quiet);
+  const root = hostFromGolden(t);
   const old = '<!-- starci:prompt-entry -->\nFor every user prompt, enter [StarCi](.claude/INDEX.md) before planning or target work and follow\nthe entry\'s user-session and goal protocol. Follow-up prompts reuse that host session.\n<!-- /starci:prompt-entry -->';
   const current = read(root, 'AGENTS.md');
   const managed = current.match(/<!-- starci:prompt-entry -->[\s\S]*?<!-- \/starci:prompt-entry -->/)[0];
@@ -173,8 +191,7 @@ test('known old managed entry is replaced, custom text and CRLF suffix preserved
 });
 
 test('custom protocol conflict stops before installer payload changes', t => {
-  const root = host(t);
-  init({ dir: root, bootstrap: true }, quiet);
+  const root = hostFromGolden(t);
   const custom = '# Team\n<!-- starci:prompt-entry -->\nUse our custom orchestrator.\n<!-- /starci:prompt-entry -->\n';
   put(root, 'AGENTS.md', custom);
   const before = read(root, '.claude/.starci-skills.json');
@@ -184,8 +201,7 @@ test('custom protocol conflict stops before installer payload changes', t => {
 });
 
 test('unmanaged v2 session mandate is not mixed with the new selected-op protocol', t => {
-  const root = host(t);
-  init({ dir: root, bootstrap: true }, quiet);
+  const root = hostFromGolden(t);
   const custom = '# Team\nNothing is designed, written or committed outside a session: use validated request.json.\n';
   put(root, 'AGENTS.md', custom);
   const before = read(root, '.claude/.starci-skills.json');
@@ -206,8 +222,7 @@ test('installer refuses a junction payload before touching external ownership', 
 });
 
 test('no-bootstrap does not claim changed host routing and local skill edits remain owned', t => {
-  const root = host(t);
-  init({ dir: root, bootstrap: true }, quiet);
+  const root = hostFromGolden(t);
   const before = read(root, 'AGENTS.md');
   const source = read(root, '.claude/SKILL.md');
   put(root, '.claude/SKILL.md', source + '\nLocal reviewed policy.\n');
@@ -228,7 +243,7 @@ test('linked host instructions and manifest cannot redirect installer writes out
   assert.equal(fs.existsSync(path.join(root, '.claude')), false);
   assert.equal(read(external, 'keep.txt'), 'External instructions must remain untouched.');
   fs.unlinkSync(path.join(root, 'AGENTS.md'));
-  init({ dir: root, bootstrap: false }, quiet);
+  fs.cpSync(path.join(golden, '.claude'), path.join(root, '.claude'), { recursive: true });
   fs.unlinkSync(path.join(root, '.claude/.starci-skills.json'));
   fs.symlinkSync(external, path.join(root, '.claude/.starci-skills.json'), process.platform === 'win32' ? 'junction' : 'dir');
   assert.throws(() => update({ dir: root }, quiet), /symlink\/junction/);
@@ -237,8 +252,7 @@ test('linked host instructions and manifest cannot redirect installer writes out
 });
 
 test('packaged v3 references survive relocation; malformed commands do not create a workflow', t => {
-  const root = host(t);
-  init({ dir: root, bootstrap: true }, quiet);
+  const root = hostFromGolden(t);
   assert.ok(PAYLOAD.includes('core'));
   const catalog = JSON.parse(read(root, '.claude/.dist/ops/catalog.json'));
   assert.ok(catalog.ops.some(op => op.id === 'workspace.manage'));
@@ -279,22 +293,21 @@ test('retained domain knowledge links resolve without the retired orchestration 
 });
 
 test('doctor cannot downgrade an incomplete current-protocol installation into legacy success', t => {
-  const root = host(t);
-  init({ dir: root, bootstrap: false }, quiet);
+  const root = hostFromGolden(t, { bootstrap: false });
   fs.unlinkSync(path.join(root, '.claude/cli/main.mjs'));
   assert.throws(() => doctor({ dir: root, quick: true }, quiet), /refusing fallback to legacy validation/);
 });
 
 test('doctor fails closed on an invalid durable install protocol marker', t => {
-  const root = host(t);init({ dir: root, bootstrap: false }, quiet);
+  const root = hostFromGolden(t, { bootstrap: false });
   const file=path.join(root,'.claude/.starci-skills.json'),manifest=JSON.parse(fs.readFileSync(file,'utf8'));
   manifest.installProtocol={schema:'starci/install-protocol@1',major:'6'};fs.writeFileSync(file,JSON.stringify(manifest));
   assert.throws(()=>doctor({dir:root,quick:true},quiet),/invalid install protocol marker/);
 });
 
 test('doctor rejects an all-skipped runner even when its process exits successfully', t => {
-  const root = host(t);
-  init({ dir: root, bootstrap: false }, quiet);
+  t.diagnostic('doctor spawns real node --test runs on the installed copy on purpose; this test only trims its own setup cost');
+  const root = hostFromGolden(t, { bootstrap: false });
   put(root, '.claude/tests/ops.spec.mjs', "import test from 'node:test'; test.skip('unexecuted check', () => {});\n");
   const output = [];
   assert.equal(doctor({ dir: root, quick: true }, value => output.push(value)), 1, output.join('\n'));
@@ -311,8 +324,7 @@ function ownRetired(root, relative, text, kept = false) {
 }
 
 test('retirement removes only unchanged owned files and keeps data through repeated forced updates', t => {
-  const root = host(t);
-  init({ dir: root, bootstrap: true }, quiet);
+  const root = hostFromGolden(t);
   ownRetired(root, 'alias/alias.json', '{"oldAuthority":"worktrees"}');
   ownRetired(root, 'workflows/old.md', 'owned old workflow');
   ownRetired(root, 'ops/compatibility.md', 'old compatibility routing');
@@ -345,8 +357,7 @@ test('retirement removes only unchanged owned files and keeps data through repea
 
 
 test('a fresh install carries the 5-plus runtime roots and an update sheds the folder they replaced', t => {
-  const root = host(t);
-  init({ dir: root, bootstrap: true }, quiet);
+  const root = hostFromGolden(t);
   // The renamed tree must actually arrive: one file from each root the release introduced, so an install that
   // shipped the package.json `files` list without one of them fails here instead of at the first workflow.
   for (const relative of ['.claude/kernel/kernel.mjs', '.claude/model/kinds.yaml', '.claude/model/hosts.yaml',
@@ -374,8 +385,7 @@ test('a fresh install carries the 5-plus runtime roots and an update sheds the f
 });
 
 test('V2 docs and sites survive forced update and init even when previously installer-owned', t => {
-  const root=host(t);
-  init({dir:root,bootstrap:true},quiet);
+  const root=hostFromGolden(t);
   ownRetired(root,'docs/index.mdx','original V2 documentation');
   ownRetired(root,'sites/skills/src/main.ts','original V2 site');
   put(root,'.claude/sites/skills/dist/index.html','local site build');
@@ -395,8 +405,7 @@ test('V2 docs and sites survive forced update and init even when previously inst
 });
 
 test('retired traversal and junction manifest paths stop before writes', t => {
-  const root = host(t), external = host(t);
-  init({ dir: root, bootstrap: true }, quiet);
+  const root = hostFromGolden(t), external = host(t);
   put(external, 'keep.txt', 'outside-owned');
   ownRetired(root, 'alias/alias.json', '{}');
   const manifestPath = path.join(root, '.claude/.starci-skills.json');
@@ -423,7 +432,8 @@ test('Lite cannot be installed; an old managed Lite bootstrap upgrades without a
   const root = host(t);
   assert.throws(() => init({ dir: root, profile: 'lite', bootstrap: true }, quiet), /retired/);
   assert.equal(fs.existsSync(path.join(root, '.claude')), false);
-  init({ dir: root, bootstrap: true }, quiet);
+  fs.cpSync(path.join(golden, '.claude'), path.join(root, '.claude'), { recursive: true });
+  for (const name of ['AGENTS.md', 'CLAUDE.md', '.gitignore']) fs.cpSync(path.join(golden, name), path.join(root, name));
   const oldEntry = '<!-- starci:prompt-entry -->\nFor every user prompt, enter [StarCi Lite](.claude/skills/starci-lite/SKILL.md) and use its scope classification.\nExisting full workflows keep their current session and gates; formal UAT and publication use full StarCi.\n<!-- /starci:prompt-entry -->';
   put(root, 'AGENTS.md', '# Custom preserved\n\n' + oldEntry + '\n');
   ownRetired(root, 'skills/starci-lite/SKILL.md', 'old runtime');
@@ -441,8 +451,7 @@ test('Lite cannot be installed; an old managed Lite bootstrap upgrades without a
 });
 
 test('custom or no-bootstrap routing cannot retain a dangling retired runtime reference', t => {
-  const root = host(t);
-  init({ dir: root, bootstrap: true }, quiet);
+  const root = hostFromGolden(t);
   ownRetired(root, 'workflows/old.md', 'old workflow still consumed');
   const before = read(root, '.claude/.starci-skills.json');
   const current = read(root, 'AGENTS.md');
@@ -455,8 +464,7 @@ test('custom or no-bootstrap routing cannot retain a dangling retired runtime re
 });
 
 test('source and relocated payload contain only current runtime, presets and domain knowledge', t => {
-  const root = host(t);
-  init({ dir: root, bootstrap: true }, quiet);
+  const root = hostFromGolden(t);
   const retired = ['alias', 'routing.json', 'helpers', 'operators', 'readiness', 'resources', 'templates', 'skills/starci-lite', 'knowledge/findings'];
   for (const relative of retired) {
     assert.equal(fs.existsSync(path.join(packageRoot, relative)), false, 'source: ' + relative);
