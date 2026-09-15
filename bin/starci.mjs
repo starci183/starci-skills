@@ -9,6 +9,7 @@ import {fileURLToPath} from 'node:url';
  */
 const LAUNCHER_COMMANDS=['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status',
   'workflow-list','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs',
+  'journal-prune','journal-retire',
   'start-op','settle','sweep','notify','report','wait','verify'];
 
 /**
@@ -25,7 +26,7 @@ workflow kernel (forwarded to the launcher; add --host <skill root> to reach a W
   workflow-answer      give the owner's answer to a question or a reconciliation conflict
   workflow-run         run the approved workflow: allocate, launch, verify, commit, gate, report
                        --startup-token <token> is supplied by the supervisor's exclusive startup reservation
-  workflow-retry       --id <id> --engine 6 --runtime-pin <file>: retry a paused workflow with fresh agents
+  workflow-retry       --id <id> --runtime-pin <file>: retry a paused workflow with fresh agents on that sealed build
                        --journal-file <path>: use a local journal visible to the execution host
   workflow-status      print what one workflow is doing now, from its own files
   workflow-list        one line per workflow of this repository
@@ -33,6 +34,8 @@ workflow kernel (forwarded to the launcher; add --host <skill root> to reach a W
   workflow-lane-close  remove a merged workflow's worktree, keeping its branch
   workflow-supervise   start and restart the kernel of every approved, unfinished workflow
   workflow-inputs      serve the kernel-owned credential form in its workflow's Orca browser
+  journal-prune        --journal-file <file> [--store-root <root,..>] [--retire <id,..>] [--vacuum true] [--dry-run]: retire settled workflow rows
+  journal-retire       --journal-file <file> --store-root <root,..> [--delete true]: remove a journal nothing binds
   start-op settle sweep notify report wait verify   the host calls an operation makes
 
 machine checks (read-only; they judge bytes, not claims):

@@ -111,7 +111,7 @@ test('major upgrade requires opt-in before writing and never converts existing w
   init({ dir: root, bootstrap: true }, quiet);
   const manifestPath = path.join(root, '.claude/.starci-skills.json');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-  assert.deepEqual(manifest.installProtocol,{schema:'starci/install-protocol@1',major:6},'public semver is independent from the durable workflow protocol');
+  assert.deepEqual(manifest.installProtocol,{schema:'starci/install-protocol@2',engine:'starci/engine@1'},'public semver is independent from the durable workflow protocol');
   manifest.version = '2.5.0';
   delete manifest.installProtocol; // exact markerless receipt shape written by the historical installer
   fs.writeFileSync(manifestPath, JSON.stringify(manifest));
@@ -288,7 +288,7 @@ test('doctor cannot downgrade an incomplete current-protocol installation into l
 test('doctor fails closed on an invalid durable install protocol marker', t => {
   const root = host(t);init({ dir: root, bootstrap: false }, quiet);
   const file=path.join(root,'.claude/.starci-skills.json'),manifest=JSON.parse(fs.readFileSync(file,'utf8'));
-  manifest.installProtocol={schema:'starci/install-protocol@1',major:'6'};fs.writeFileSync(file,JSON.stringify(manifest));
+  manifest.installProtocol={schema:'starci/install-protocol@1',major:'six'};fs.writeFileSync(file,JSON.stringify(manifest));
   assert.throws(()=>doctor({dir:root,quick:true},quiet),/invalid install protocol marker/);
 });
 

@@ -5,24 +5,28 @@ import {bridgeJobId,createJobBridge,inputDigest,replayModelFunction} from './job
 import {createJobs} from './jobs.mjs';
 import {rankJobs,updateProgressBudget,progressExhausted} from './scheduler.mjs';
 import {loadRuntimes} from './schedule.mjs';
-import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateWriterResource,freezeDetectionCandidate,prepareCandidateDependencies} from './candidate-bridge.mjs';
+import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateRecord,candidateWriterResource,freezeDetectionCandidate,prepareCandidateDependencies,readCandidateBridge,readCandidatePacket,readCandidateSnapshot} from './candidate-bridge.mjs';
 import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
 import {reconcilePureModelJobs} from './job-reconcile.mjs';
 import {openJournal} from './journal.mjs';
 import {createAdmission} from './admission.mjs';
 import {resourceLocks} from './guards.mjs';
-import {kindRole} from './common.mjs';
+import {ENGINE_SCHEMA,isEnrolled,kindRole,predatesEngineSchema,sealedRuntimeOf} from './common.mjs';
 import {nonOperationModels} from '../scripts/config.mjs';
 import {budgetVerdict,readRuntimeBudget} from './budget.mjs';
+import {readDistJson} from '../core/runtime-root.mjs';
 
-export const ENGINE_VERSION='1.0.0-alpha';
-export const isV6=state=>state?.engine?.major===6;
+/** The engine version is the package version: one build, one name. */
+export const ENGINE_VERSION=readDistJson('manifest.json').version;
+export {ENGINE_SCHEMA,isEnrolled,predatesEngineSchema,sealedRuntimeOf};
 export const isJobPending=error=>error?.code==='STARCI_JOB_PENDING';
 export function deferJob(result){
   const error=new Error(result.reasons?.join('; ')||`Waiting for ${result.identity?.jobId??'durable job'}`);
   error.code='STARCI_JOB_PENDING';error.job=result;throw error;
 }
-export const journalFileFor=(env=process.env)=>path.join(env.LOCALAPPDATA||path.join(os.homedir(),'.local','state'),'StarCi','runtime-v6','journal.sqlite');
+/** The machine-local runtime root: the shared admission journal, candidates and probation ledgers live here. */
+export const runtimeRootFor=(env=process.env)=>path.join(env.LOCALAPPDATA||path.join(os.homedir(),'.local','state'),'StarCi','runtime');
+export const journalFileFor=(env=process.env)=>path.join(runtimeRootFor(env),'journal.sqlite');
 const opIdentity=(state,op)=>({workflowId:state.id,opId:op?.id??null,attempt:op?.attempt??1,generation:state.engine.generation});
 const modelInput=input=>{
   const copy=structuredClone(input);
@@ -48,6 +52,23 @@ export function staleLeaseProof({journalFile,lease}={}){
     if(['succeeded','failed','cancelled'].includes(job.status))return `job ${lease.jobId} is ${job.status} and holds no lease`;
     return null;
   }finally{journal.close();}
+}
+/**
+ * Move a workflow's journal binding: the former journal must hold nothing live of it. Its settled rows are then
+ * retired there and the probation ledgers beside the former journal are copied beside the new one when the new
+ * root has none. The state itself is bound to the new file by enrollment, not here.
+ */
+export function relocateJournal({from,to,workflowId}={}){
+  const source=path.resolve(from),target=path.resolve(to);
+  if(!fs.existsSync(source))return {ok:true,from:source,to:target,retired:null,copied:[],note:'the former journal does not exist'};
+  const journal=openJournal({file:source});
+  let retired;
+  try{const live=journal.liveRows(workflowId);if(live.leases.length||live.jobs.length)return {ok:false,from:source,to:target,reason:`${live.leases.length} lease(s) and ${live.jobs.length} unsettled job(s) remain`,live};
+    retired=journal.retireWorkflow(workflowId).removed??null;}
+  finally{journal.close();}
+  const copied=[];fs.mkdirSync(path.dirname(target),{recursive:true});
+  for(const name of ['model-qualifications.json','model-probations.json']){const file=path.join(path.dirname(source),name),into=path.join(path.dirname(target),name);if(fs.existsSync(file)&&!fs.existsSync(into)){fs.copyFileSync(file,into);copied.push(name);}}
+  return {ok:true,from:source,to:target,retired,copied};
 }
 /** Read-only retry fence: pure model and command jobs must settle in their current generation before it advances. */
 export function unsettledGenerationJobs({journalFile,workflowId,generation}={}){
@@ -87,21 +108,21 @@ function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadR
 }
 
 /** Opt in only at a settled workflow boundary. Canonical Work and approved goal references stay intact. */
-export function enrollV6(store,state,{journalFile=journalFileFor(),runtimePin=null,now=Date.now}={}){
-  if(state.ops.some(op=>op.dispatch&&['running','answering'].includes(op.status)))throw Error('Settle live operation dispatches before enrolling a workflow in v6');
+export function enrollEngine(store,state,{journalFile=journalFileFor(),runtimePin=null,now=Date.now}={}){
+  if(state.ops.some(op=>op.dispatch&&['running','answering'].includes(op.status)))throw Error('Settle live operation dispatches before enrolling a workflow in the durable engine');
   const previous=state.engine;
-  state.engine={major:6,version:ENGINE_VERSION,generation:(previous?.generation??0)+1,journalFile:path.resolve(journalFile),
+  state.engine={schema:ENGINE_SCHEMA,version:ENGINE_VERSION,generation:(previous?.generation??0)+1,journalFile:path.resolve(journalFile),
     assurance:'detection-only',coordination:'agent-v1',runtimePin:runtimePin??previous?.runtimePin??null,enrolledAt:now()};
   state.finished=null;state.phase='run';
-  store.appendEvent({event:'engine-enrolled',major:6,generation:state.engine.generation,version:ENGINE_VERSION,
+  store.appendEvent({event:'engine-enrolled',schema:ENGINE_SCHEMA,generation:state.engine.generation,version:ENGINE_VERSION,
     assurance:state.engine.assurance,coordination:state.engine.coordination,note:'Existing accepted Work remains accepted; only unfinished operations receive the new execution policy.'});
   store.saveState(state);
   return state.engine;
 }
 
 /** Runtime bridge used by the real kernel. The kernel remains the only workflow state writer. */
-export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolicy=null,bridge=null,spawnChild=null,candidateBase=null,git=null,exec=null,modelBudget=null}={}){
-  if(!isV6(state))return null;
+export function createEngineRuntime({store,state,now=Date.now,eligibility,modelPolicy=null,bridge=null,spawnChild=null,candidateBase=null,git=null,exec=null,modelBudget=null}={}){
+  if(!isEnrolled(state))return null;
   const owned=!bridge;
   bridge??=createJobBridge({journalFile:state.engine.journalFile,now,...(spawnChild?{spawnChild}:{}),eligibility:job=>job.kind==='model'||job.kind==='judge'?{eligible:Array.isArray(job.input?.args?.providers)&&job.input.args.providers.length>0,reasons:['no evaluated provider in durable model job']}:{eligible:false,reasons:['operation eligibility must name its selected runtime']},beforeSpawn:({job})=>{const meta=job.payload?.admission;if(meta?.mode!=='probation')return {ok:true,code:'qualified'};const consumed=modelPolicy?.consumeProbation?.({kind:job.kind,role:job.role,input:job.payload,workflowId:job.workflow_id,opId:job.op_id,attempt:job.attempt,generation:job.generation,jobId:job.job_id},meta.runtime);if(!consumed?.ok)return {ok:false,code:consumed?.code??'probation-unavailable'};store.saveState(state);return consumed;}});
   const {journal,admission}=bridge,jobs=createJobs({journal,admission,now}),runtimeProfile=loadRuntimes();
@@ -119,7 +140,7 @@ export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolic
     model:requestModel,
     manageWorkflow(snapshot,{providers=nonOperationModels('kernelManager')}={}){if(state.engine.coordination!=='agent-v1')throw Error('Agent-led coordination is not enrolled');return requestModel('manageWorkflow',{snapshot,providers},{id:snapshot.decisionId,attempt:1});},
     check(command,options={},op=null){const resources=declareMachineResources({kind:op?.kind,checks:[{command}],resources:options.resources});return unwrap(bridge.request({...identity(op),kind:'check',role:'machine-check',...(resources.length?{resources}:{}),input:{handler:'command',shellCommand:command,cwd:options.cwd??state.worktree,timeoutMs:options.timeoutMs??1800000,
-      candidate:op?.v6CandidateDigest??state.head??null,...(options.env?{env:options.env}:{})}}));},
+      candidate:op?.candidateDigest??state.head??null,...(options.env?{env:options.env}:{})}}));},
     reserveOperation(op,allocated){
       const bound={...identity(op),jobId:`operation-${inputDigest({...identity(op),dispatchAttempt:op.launchFailures??0}).slice(0,32)}`};
       const effectiveRole=allocated.role??kindRole(op.kind),job={kind:'operation',role:effectiveRole,input:{op,runtime:allocated.runtime,target:allocated.target},...bound};
@@ -131,7 +152,7 @@ export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolic
         const rows=journal.db.prepare('SELECT resource_key,units,expires_at FROM leases WHERE job_id=? AND token=? ORDER BY resource_key').all(existing.job_id,existing.lease_token),expected=existing.payload?.expectedResources??[];
         const exact=existing.payload?.reservationProtocol==='intent-v1'&&rows.length>0&&rows.every(item=>Number.isFinite(item.expires_at)&&item.expires_at>now())&&JSON.stringify(rows.map(({resource_key,units})=>({resource_key,units})))===JSON.stringify([...expected].sort((a,b)=>a.key.localeCompare(b.key)).map(item=>({resource_key:item.key,units:item.units})));
         if(!exact)return {ok:false,reasons:['existing durable reservation resource binding is incomplete']};
-        op.v6Lease={...bound,leaseToken:existing.lease_token,machineResources:expected.map(item=>item.key).filter(key=>key.startsWith('machine:')),probationRuntime:existing.payload.runtime,probationRole:existing.role};
+        op.lease={...bound,leaseToken:existing.lease_token,machineResources:expected.map(item=>item.key).filter(key=>key.startsWith('machine:')),probationRuntime:existing.payload.runtime,probationRole:existing.role};
         return {ok:true,...bound,leaseToken:existing.lease_token,runtime:existing.payload.runtime,target:existing.payload.target,reattached:true};
       }
       const decision=eligibility?.(job,{id:allocated.runtime,...pool,model:pool.target??allocated.target});
@@ -139,11 +160,11 @@ export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolic
       journal.enqueueJob({...bound,kind:'operation',role:effectiveRole,payload:{runtime:allocated.runtime,target:allocated.target,kind:op.kind,reservationProtocol:'intent-v1',expectedResources:resources.map(item=>({key:item.key,units:item.units})).sort((a,b)=>a.key.localeCompare(b.key))}});
       const result=admission.reserve({...bound,resources,ttlMs:10*60*1000});
       if(result.ok&&decision.mode==='probation'){const consumed=modelPolicy?.consumeProbation?.(probationJob,{id:allocated.runtime,...pool,model:pool.target??allocated.target});if(!consumed?.ok){admission.release({...bound,leaseToken:result.leaseToken});journal.db.prepare("UPDATE jobs SET status='cancelled',result_json=?,updated_at=? WHERE job_id=?").run(JSON.stringify({reason:consumed?.code??'probation-unavailable'}),now(),bound.jobId);return {ok:false,reasons:[consumed?.code??'probation-unavailable'],...bound};}}
-      if(result.ok)op.v6Lease={...bound,leaseToken:result.leaseToken,machineResources:machineResources.map(item=>item.key),probationRuntime:allocated.runtime,probationRole:effectiveRole};
+      if(result.ok)op.lease={...bound,leaseToken:result.leaseToken,machineResources:machineResources.map(item=>item.key),probationRuntime:allocated.runtime,probationRole:effectiveRole};
       return {...result,...bound};
     },
     reservationPhase(op){
-      const lease=op?.v6Lease;if(!lease)return {phase:'absent'};
+      const lease=op?.lease;if(!lease)return {phase:'absent'};
       const job=journal.getJob(lease.jobId),exact=job&&job.workflow_id===lease.workflowId&&job.op_id===lease.opId&&job.attempt===lease.attempt&&job.generation===lease.generation&&job.lease_token===lease.leaseToken;
       if(!exact||job.payload?.reservationProtocol!=='intent-v1')return {phase:'unknown',reason:'reservation is not bound to the intent-v1 protocol'};
       if(['cancelled','failed','succeeded'].includes(job.status))return {phase:'settled',status:job.status};
@@ -158,16 +179,16 @@ export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolic
       return {phase:'reserved',...binding};
     },
     beginLaunchIntent(op){
-      const phase=this.reservationPhase(op);if(phase.phase!=='reserved'){const error=Error(`Operation ${op.id} reservation cannot enter launch intent: ${phase.reason??phase.phase}`);error.effectState=op?.v6Lease?'unknown':'none';throw error;}
-      const lease=op.v6Lease;journal.appendEvent({eventId:`${lease.jobId}:launch-intent`,workflowId:lease.workflowId,entityType:'job',entityId:lease.jobId,generation:lease.generation,kind:'operation-launch-intent',payload:{opId:lease.opId,attempt:lease.attempt}});
+      const phase=this.reservationPhase(op);if(phase.phase!=='reserved'){const error=Error(`Operation ${op.id} reservation cannot enter launch intent: ${phase.reason??phase.phase}`);error.effectState=op?.lease?'unknown':'none';throw error;}
+      const lease=op.lease;journal.appendEvent({eventId:`${lease.jobId}:launch-intent`,workflowId:lease.workflowId,entityType:'job',entityId:lease.jobId,generation:lease.generation,kind:'operation-launch-intent',payload:{opId:lease.opId,attempt:lease.attempt}});
       return {phase:'effect-intent'};
     },
     recordLaunchObservation(op){
-      const lease=op?.v6Lease;if(!lease||!op.launch?.task||!op.launch?.dispatch)return {ok:false};
+      const lease=op?.lease;if(!lease||!op.launch?.task||!op.launch?.dispatch)return {ok:false};
       journal.appendEvent({eventId:`${lease.jobId}:launch-observed:${op.launch.dispatch}`,workflowId:lease.workflowId,entityType:'job',entityId:lease.jobId,generation:lease.generation,kind:'operation-launch-observed',payload:{opId:lease.opId,attempt:lease.attempt,task:op.launch.task,dispatch:op.launch.dispatch}});
       return {ok:true};
     },
-    refundUnbegunProbation(op,proof,identity=op.v6Lease){
+    refundUnbegunProbation(op,proof,identity=op.lease){
       if(!identity)return {ok:false,code:'probation-refund-job-identity-required'};
       const durable=journal.getJob(identity.jobId),payload=durable?.payload??{},runtimeId=payload.runtime??identity.probationRuntime??op.runtime,pool=runtimeProfile.runtimes?.[runtimeId]??{};
       const role=durable?.role??identity.probationRole??kindRole(op.kind),job={...identity,kind:op.kind,role,input:{op}};
@@ -179,20 +200,20 @@ export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolic
       return result;
     },
     launched(op){
-      if(!op.v6Lease)return;
-      journal.db.prepare("UPDATE jobs SET status='running',worker_id=?,updated_at=? WHERE job_id=? AND lease_token=?").run(op.dispatch,now(),op.v6Lease.jobId,op.v6Lease.leaseToken);
-      journal.appendEvent({eventId:`${op.v6Lease.jobId}:launched`,workflowId:state.id,entityType:'job',entityId:op.v6Lease.jobId,generation:state.engine.generation,kind:'operation-launched',payload:{dispatch:op.dispatch,terminal:op.terminal}});
+      if(!op.lease)return;
+      journal.db.prepare("UPDATE jobs SET status='running',worker_id=?,updated_at=? WHERE job_id=? AND lease_token=?").run(op.dispatch,now(),op.lease.jobId,op.lease.leaseToken);
+      journal.appendEvent({eventId:`${op.lease.jobId}:launched`,workflowId:state.id,entityType:'job',entityId:op.lease.jobId,generation:state.engine.generation,kind:'operation-launched',payload:{dispatch:op.dispatch,terminal:op.terminal}});
     },
     settled(op,{status='succeeded',reason='dispatch settlement confirmed',workerOnly=false}={}){
-      if(!op.v6Lease)return {ok:true,absent:true};
+      if(!op.lease)return {ok:true,absent:true};
       if(workerOnly){
-        const releasable=new Set(['ai/global',...(op.v6Lease.machineResources??[])]);
-        journal.transaction(db=>{const remove=db.prepare('DELETE FROM leases WHERE job_id=? AND token=? AND resource_key=?');for(const key of releasable)remove.run(op.v6Lease.jobId,op.v6Lease.leaseToken,key);});
-        journal.appendEvent({eventId:`${op.v6Lease.jobId}:worker-stopped`,workflowId:state.id,entityType:'job',entityId:op.v6Lease.jobId,generation:state.engine.generation,kind:'operation-worker-stopped',payload:{reason,writerRetained:true}});
+        const releasable=new Set(['ai/global',...(op.lease.machineResources??[])]);
+        journal.transaction(db=>{const remove=db.prepare('DELETE FROM leases WHERE job_id=? AND token=? AND resource_key=?');for(const key of releasable)remove.run(op.lease.jobId,op.lease.leaseToken,key);});
+        journal.appendEvent({eventId:`${op.lease.jobId}:worker-stopped`,workflowId:state.id,entityType:'job',entityId:op.lease.jobId,generation:state.engine.generation,kind:'operation-worker-stopped',payload:{reason,writerRetained:true}});
         return {ok:true,writerRetained:true};
       }
-      const result=jobs.complete({...op.v6Lease,eventId:`${op.v6Lease.jobId}:settled`,status,result:{reason}});
-      if(result.ok)delete op.v6Lease;
+      const result=jobs.complete({...op.lease,eventId:`${op.lease.jobId}:settled`,status,result:{reason}});
+      if(result.ok)delete op.lease;
       return result;
     },
     /**
@@ -201,7 +222,7 @@ export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolic
      * and its observed byte delta becomes the only baseline a fresh attempt may inherit.
      */
     settleStoppedOperation(op,{dispatch=op?.dispatch,settlement=null,reason='native worker stopped without a report'}={}){
-      const lease=op?.v6Lease;if(!lease)return {ok:false,reason:'operation has no durable native lease'};
+      const lease=op?.lease;if(!lease)return {ok:false,reason:'operation has no durable native lease'};
       const effectState=settlement?.effectState??'unknown';
       if(settlement?.schema!=='starci/orca-supervised-settlement@1'||settlement.dispatchId!==dispatch||effectState!=='none')return {ok:false,effectState,reason:'typed host settlement did not prove this exact native process stopped'};
       const job=journal.getJob(lease.jobId),events=journal.events({workflowId:lease.workflowId});
@@ -210,7 +231,7 @@ export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolic
       const launched=events.some(event=>event.entity_id===lease.jobId&&event.generation===lease.generation&&event.kind==='operation-launched'
         &&event.payload?.dispatch===dispatch);
       if(!exact||!launched||typeof dispatch!=='string'||!dispatch)return {ok:false,effectState:'unknown',reason:'host settlement is not bound to this exact durable Dispatch attempt'};
-      op.v6WorkerSettled=true;
+      op.workerSettled=true;
       const worker=this.settled(op,{workerOnly:true,reason:`${reason}; exact Dispatch ${dispatch} stopped`});
       if(!worker.ok)return {ok:false,effectState:'unknown',reason:'worker resources could not be settled'};
       let frozen;
@@ -218,49 +239,54 @@ export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolic
       catch(error){return {ok:false,effectState:'unknown',reason:`candidate freeze failed after native stop: ${String(error?.message??error)}`};}
       if(frozen.status!=='sealed')return {ok:false,effectState:'unknown',reason:'candidate effects could not be sealed',pending:frozen};
       const observed=[...new Set(frozen.observedFiles??[])].sort();
-      op.v6OwnedBaselinePaths=observed;
-      op.v6RetryReconciled={schema:'starci/native-retry-reconciliation@1',jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,
-        dispatch,observedFiles:observed,candidateDigest:op.v6CandidateDigest??null};
+      op.ownedBaselinePaths=observed;
+      op.retryReconciled={schema:'starci/native-retry-reconciliation@1',jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,
+        dispatch,observedFiles:observed,candidateDigest:op.candidateDigest??null};
       journal.appendEvent({eventId:`${lease.jobId}:stopped-unreported-effects`,workflowId:lease.workflowId,entityType:'job',entityId:lease.jobId,
         generation:lease.generation,kind:'operation-stopped-effects-preserved',payload:{dispatch,reason,observedFiles:observed,
-          candidateDigest:op.v6CandidateDigest??null,historicalEffectState:observed.length?'partial':'none-observed'}});
+          candidateDigest:op.candidateDigest??null,historicalEffectState:observed.length?'partial':'none-observed'}});
       store.saveState(state);
       const completed=this.settled(op,{status:'failed',reason:`${reason}; worker stopped and ${observed.length} observed path(s) preserved for a fresh attempt`});
       if(completed.ok)store.saveState(state);
-      return completed.ok?{ok:true,effectState:'none',observedFiles:observed,candidateDigest:op.v6CandidateDigest??null}:{ok:false,effectState:'unknown',reason:completed.reason??'durable native job could not be completed'};
+      return completed.ok?{ok:true,effectState:'none',observedFiles:observed,candidateDigest:op.candidateDigest??null}:{ok:false,effectState:'unknown',reason:completed.reason??'durable native job could not be completed'};
     },
     beginCandidate(op,{repoRoot=state.worktree,allowlist=op.allowlist??[],references=op.references??[],inputPaths=[],oraclePaths=[],ownedDirtyPaths=[],
       dependencyDigests={},environmentDigest=null,dependencyInstall=null}={}){
-      if(!git)throw Error('v6 candidate lifecycle requires the kernel Git adapter');
-      const lease=op.v6Lease;if(!lease)throw Error(`reserve ${op.id} before beginning its candidate`);
-      if(op.v6Candidate?.bridge?.identity?.jobId===lease.jobId)return op.v6Candidate.bridge;
-      delete op.v6Candidate;delete op.v6CandidateDigest;delete op.v6OracleDigest;
+      if(!git)throw Error('the candidate lifecycle requires the kernel Git adapter');
+      const lease=op.lease;if(!lease)throw Error(`reserve ${op.id} before beginning its candidate`);
+      if(op.candidate?.identity?.jobId===lease.jobId)return this.candidateBridge(op);
+      delete op.candidate;delete op.candidateDigest;delete op.oracleDigest;
       const root=path.join(candidateBase,lease.jobId),bridgeRecord=beginDetectionCandidate({identity:{workflowId:lease.workflowId,opId:lease.opId,
         attempt:lease.attempt,generation:lease.generation,jobId:lease.jobId},repoRoot,workerRoot:path.join(root,'worker'),controlRoot:path.join(root,'control'),
         allowlist,references,inputPaths,oraclePaths,ownedDirtyPaths,dependencyDigests,environmentDigest,dependencyInstall,git,now});
-      op.v6Candidate={status:'running',bridge:bridgeRecord};return bridgeRecord;
+      op.candidate=candidateRecord(bridgeRecord);return bridgeRecord;
     },
+    /** The manifests of an operation's candidate, read from its control root: state keeps the record, not the bytes. */
+    candidateBridge(op){if(typeof op?.candidate?.controlRoot!=='string')throw Error(`candidate ${op?.id} was not begun`);return readCandidateBridge(op.candidate.controlRoot);},
+    candidateSnapshot(op){if(typeof op?.candidate?.controlRoot!=='string')throw Error(`candidate ${op?.id} was not begun`);return readCandidateSnapshot(op.candidate.controlRoot);},
+    candidatePacket(op){if(op?.candidate?.status!=='sealed')throw Error(`candidate ${op?.id} is not sealed`);return readCandidatePacket(op.candidate.controlRoot);},
     freezeCandidate(op,{reportedFiles=[]}={}){
-      if(op.v6Candidate?.status==='sealed')return op.v6Candidate;
-      if(!op.v6Candidate?.bridge)throw Error(`candidate ${op.id} was not begun`);
-      const frozen=freezeDetectionCandidate(op.v6Candidate.bridge,{git,reportedFiles,now});
-      op.v6Candidate={...op.v6Candidate,...frozen};
-      if(frozen.status==='sealed'){op.v6CandidateDigest=frozen.packet.candidateDigest;op.v6OracleDigest=frozen.packet.oracleDigest;}
-      return op.v6Candidate;
+      if(op.candidate?.status==='sealed')return op.candidate;
+      const frozen=freezeDetectionCandidate(this.candidateBridge(op),{git,reportedFiles,now});
+      const {packet}=frozen;
+      op.candidate={...op.candidate,status:frozen.status,observedFiles:[...(frozen.observedFiles??[])],assurance:frozen.assurance,
+        ...(frozen.status==='sealed'?{candidateDigest:packet.candidateDigest,oracleDigest:packet.oracleDigest,snapshotDigest:packet.snapshotDigest,sealedAt:packet.sealedAt,changed:packet.changes.length}:{reasons:[...(frozen.reasons??[])]})};
+      if(frozen.status==='sealed'){op.candidateDigest=packet.candidateDigest;op.oracleDigest=packet.oracleDigest;}
+      return op.candidate;
     },
-    acknowledgeRuntimeWrites(op,paths){if(!op.v6Candidate?.bridge)throw Error(`candidate ${op.id} was not begun`);return acknowledgeRuntimeBaseline(op.v6Candidate.bridge,paths);},
+    acknowledgeRuntimeWrites(op,paths){return acknowledgeRuntimeBaseline(this.candidateBridge(op),paths);},
     prepareCandidateDependencies(op){
-      if(op.v6Candidate?.status!=='sealed')throw Error(`seal candidate ${op.id} before preparing its dependency artifact`);
-      if(!exec)throw Error('v6 dependency preparation requires the kernel command adapter');
-      const dependency=prepareCandidateDependencies(op.v6Candidate.bridge,{exec});op.v6Candidate.dependency=dependency;return dependency;
+      if(op.candidate?.status!=='sealed')throw Error(`seal candidate ${op.id} before preparing its dependency artifact`);
+      if(!exec)throw Error('dependency preparation requires the kernel command adapter');
+      const dependency=prepareCandidateDependencies(this.candidateBridge(op),{exec});op.candidate.dependency=dependency;return dependency;
     },
-    candidateCwd(op){if(op.v6Candidate?.status!=='sealed')throw Error(`candidate ${op.id} is not sealed`);return op.v6Candidate.snapshot.workerRoot;},
+    candidateCwd(op){if(op.candidate?.status!=='sealed')throw Error(`candidate ${op.id} is not sealed`);return op.candidate.workerRoot;},
     candidateCheck(command,options={},op){
-      const cwd=this.candidateCwd(op);return this.check(command,{...options,cwd,env:op.v6Candidate?.dependency?.checkEnv},op);
+      const cwd=this.candidateCwd(op);return this.check(command,{...options,cwd,env:op.candidate?.dependency?.checkEnv},op);
     },
     pulse(){
-      for(const op of state.ops)if(!op.v6Lease){const adopted=journal.listJobs().filter(job=>job.kind==='operation'&&job.workflow_id===state.id&&job.op_id===op.id&&job.attempt===op.attempt&&job.generation===state.engine.generation&&job.lease_token&&['leased','running','effect_unknown'].includes(job.status)).at(-1);if(adopted){const machineResources=journal.db.prepare("SELECT resource_key FROM leases WHERE job_id=? AND token=? AND resource_key LIKE 'machine:%'").all(adopted.job_id,adopted.lease_token).map(row=>row.resource_key);op.v6Lease={workflowId:state.id,opId:op.id,attempt:adopted.attempt,generation:adopted.generation,jobId:adopted.job_id,leaseToken:adopted.lease_token,machineResources};}}
-      for(const op of state.ops)if(op.v6Lease&&['running','answering'].includes(op.status))admission.renew({...op.v6Lease,ttlMs:10*60*1000});
+      for(const op of state.ops)if(!op.lease){const adopted=journal.listJobs().filter(job=>job.kind==='operation'&&job.workflow_id===state.id&&job.op_id===op.id&&job.attempt===op.attempt&&job.generation===state.engine.generation&&job.lease_token&&['leased','running','effect_unknown'].includes(job.status)).at(-1);if(adopted){const machineResources=journal.db.prepare("SELECT resource_key FROM leases WHERE job_id=? AND token=? AND resource_key LIKE 'machine:%'").all(adopted.job_id,adopted.lease_token).map(row=>row.resource_key);op.lease={workflowId:state.id,opId:op.id,attempt:adopted.attempt,generation:adopted.generation,jobId:adopted.job_id,leaseToken:adopted.lease_token,machineResources};}}
+      for(const op of state.ops)if(op.lease&&['running','answering'].includes(op.status))admission.renew({...op.lease,ttlMs:10*60*1000});
       admission.expire();
       const reconciled=reconcilePureModelJobs({journal,admission,workflowId:state.id,generation:state.engine.generation,now});
       for(const item of reconciled.unknown){
@@ -277,7 +303,7 @@ export function createV6Runtime({store,state,now=Date.now,eligibility,modelPolic
       const downstream=id=>state.ops.filter(op=>op.dependsOn?.includes(id)&&op.status!=='done');
       const depth=(id,seen=new Set())=>seen.has(id)?0:1+Math.max(0,...downstream(id).map(op=>depth(op.id,new Set([...seen,id]))));
       const queued=ops.map(op=>({...identity(op),jobId:op.id,kind:'operation',role:/verify|repair/.test(op.kind)?'review':op.kind,status:'queued',createdAt:op.createdAt??state.createdAt??now()}));
-      return rankJobs({jobs:queued,now,graph:{criticalPath:job=>depth(job.opId),unlockCount:job=>downstream(job.opId).length},eligibility:()=>({eligible:true}),progress:{unverifiedCandidates:state.ops.filter(op=>op.v6Pending).length}}).ranked.map(row=>all.get(row.job.opId));
+      return rankJobs({jobs:queued,now,graph:{criticalPath:job=>depth(job.opId),unlockCount:job=>downstream(job.opId).length},eligibility:()=>({eligible:true}),progress:{unverifiedCandidates:state.ops.filter(op=>op.pending).length}}).ranked.map(row=>all.get(row.job.opId));
     },
     incident(op,reason,findings){
       const fingerprint=inputDigest({reason,findings,head:state.head});

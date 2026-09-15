@@ -3,7 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {loadConfig} from '../scripts/config.mjs';
-import {GOAL_RECORD,REF_KINDS,plain} from './common.mjs';
+import {GOAL_RECORD,REF_KINDS,plain,sealedRuntimeOf} from './common.mjs';
 import {fillWaitingAsks} from './fill.mjs';
 import {inputBinding} from './inputs-model.mjs';
 import {inputFiles,privateJson,processAlive} from './inputs-server.mjs';
@@ -90,8 +90,7 @@ export function reconcileWorkflowInputs(orca,store,state,{host=orca?.host,now=Da
     privateJson(files.session,session);
     privateJson(files.launch,{session:session.id,phase:'starting',pid:null,at});
     try{
-      const runtimeRoot=state.engine?.major===6&&plain(state.engine.runtimePin)&&typeof state.engine.runtimePin.root==='string'
-        ?state.engine.runtimePin.root:state.host;
+      const runtimeRoot=sealedRuntimeOf(state)?.root??state.host;
       const child=spawnProcess(process.execPath,[path.join(runtimeRoot,'bin','starci.mjs'),'workflow-inputs','--session',files.session],
         {cwd:state.worktree,stdio:'ignore',detached:true,windowsHide:true});
       child.on('error',()=>{});child.unref();

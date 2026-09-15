@@ -1,14 +1,14 @@
 # The StarCi workflow kernel
 
-This page preserves the historical 5-plus compatibility path and documents the current StarCi v1-alpha
-kernel. Enrolled workflows retain internal `engine.major = 6` compatibility identity and follow the
-[execution contract](runtime-v6.md), including its strict acceptance, owner receipts, durable jobs and native-host
+This page preserves the historical 5-plus compatibility path and documents the current StarCi 1.0
+kernel. Enrolled workflows carry `engine.schema: starci/engine@1` in their durable state and follow the
+[execution contract](execution-contract.md), including its strict acceptance, owner receipts, durable jobs and native-host
 isolation limits. An explicitly enrolled `engine.coordination: agent-v1` workflow calls `manageWorkflow`
 through the same durable model bridge. Its snapshot exposes bounded semantic state, technical and owner
 blocker classes, and kernel-authored executable action IDs. The manager can order `dispatch:<op>` and
 `plan-verification`; the kernel rechecks the action and retains all Work derivation, owner authority,
 acceptance, budgets and state writes. Pending or invalid manager work schedules no strategic action. See
-[the deliberate upgrade boundary](../upgrades/1.0.0-alpha.md).
+[the deliberate upgrade boundary](../upgrades/1.0.0.md).
 
 An enrolled operation reservation is durable before native launch. A Windows sharing denial during atomic
 state projection retains the old complete snapshot and the exact reservation; only an `intent-v1` job with
@@ -29,8 +29,12 @@ other:
 | module | the concern | section |
 | --- | --- | --- |
 | `kernel/kernel.mjs` | the loop itself: the phases, `applyOpReport`, `renderContract`, the seams | [Phases](#phases), [The policy table](#the-policy-table) |
-| `kernel/manager.mjs` | the bounded agent-led snapshot, identity and action decision validation used only by enrolled v6 | [Runtime v6](runtime-v6.md) |
-| `kernel/common.mjs` | what every concern shares: op creation, status vocabulary, scope reading, the tree paths of a shared ledger | throughout |
+| `kernel/manager.mjs` | the bounded agent-led snapshot, identity and action decision validation used only by enrolled workflows | [Execution contract](execution-contract.md) |
+| `kernel/common.mjs` | what every concern shares: op creation, status vocabulary, scope reading, the tree paths of a shared ledger, the engine's identity | throughout |
+| `kernel/engine.mjs` | the durable engine: enrollment, the admission journal bridge, leases, candidates, journal relocation | [Execution contract](execution-contract.md) |
+| `kernel/journal.mjs` | the SQLite admission journal and its retention policy | [Execution contract](execution-contract.md#what-the-journal-keeps) |
+| `kernel/journal-maintenance.mjs` | `journal-prune` and `journal-retire`: the operator's hand on rows no kernel owns | [Upgrade note](../upgrades/1.0.0.md#what-the-journal-and-the-store-keep) |
+| `kernel/disk.mjs` | disk headroom: measured before every tick, by the kernel and the supervisor | [Execution contract](execution-contract.md#disk-headroom) |
 | `kernel/graph.mjs` | the process as data: kinds, lanes, routes, `validateGraph` | [Lanes and routes](#lanes-and-routes) |
 | `kernel/io.mjs` | the record catalog: what a path IS, what a kind may cite and produce | [Declared inputs and outputs](#declared-inputs-and-outputs) |
 | `kernel/goal.mjs` | the goal phase and its critique | [Phases](#phases) |
@@ -1292,7 +1296,7 @@ node <skill root>/bin/starci.mjs workflow-supervise --host <skill root> [--once 
 ### Supervisor level
 
 `config.json` (host-local, gitignored) carries the closed `models.nonOperation` role map. Legacy
-`supervisor.runtimes` is translated in memory to `kernelManager` when the new map is absent. Agent-led v6
+`supervisor.runtimes` is translated in memory to `kernelManager` when the new map is absent. Agent-led coordination
 uses `kernelManager: opus-sol` for both `manageWorkflow` and the separately typed `decide` function.
 `planner: fable-astra` serves `assessGoal` and `planOp`; `validator: fable-astra` serves `critiqueGoal` and
 `validateOp`. Only known runtimes with the required role can load, and eligibility, qualification, known

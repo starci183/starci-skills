@@ -14,8 +14,9 @@ import {spawnSync} from 'node:child_process';
  * temporary linked worktree that is removed in a `finally`.
  */
 export const VERIFY_PROOF='starci/verify-proof@1';
-export const VERIFY_PROOF_V6='starci/verify-proof@2';
-export const PROOF_V6_VERDICTS=['pass','fail','inconclusive','unavailable'];
+/** The proof of a sealed candidate: planned only from a verifier-owned oracle manifest. */
+export const CANDIDATE_PROOF='starci/verify-proof@2';
+export const PROOF_VERDICTS=['pass','fail','inconclusive','unavailable'];
 /** What a proof is worth per operation kind. `fail-before` demands the contrast; `checks-only` accepts the re-run. */
 export const PROOF_POLICY={'backend.implement':'fail-before','interface.implement':'fail-before',default:'checks-only'};
 /** A spec/test file in any of the suites this runtime drives (unit, e2e, container). */
@@ -149,7 +150,7 @@ export function proofFinding(result){
 }
 
 /**
- * Build a v6 proof plan exclusively from a pre-sealed, verifier-owned oracle manifest. Tests written in the
+ * Build a proof plan exclusively from a pre-sealed, verifier-owned oracle manifest. Tests written in the
  * candidate are supplemental and cannot become the oracle merely because the implementer reported them.
  */
 /**
@@ -183,8 +184,8 @@ export function planProtectedProof(op,{oracleManifest,candidateChanges=[],policy
   const selected=oracles.filter(oracle=>!Array.isArray(oracle.kinds)||oracle.kinds.includes(op?.kind));
   if(!selected.length)errors.push(`no protected oracle covers ${op?.kind??'operation'}`);
   const mode=policy??(op?.proofPolicy==='equivalence'?'equivalence':'fail-before');
-  if(!['fail-before','equivalence'].includes(mode))errors.push(`unsupported v6 proof policy ${mode}`);
-  return {schema:VERIFY_PROOF_V6,mode,opId:op?.id??null,kind:op?.kind??null,manifestDigest:manifest?.digest??null,
+  if(!['fail-before','equivalence'].includes(mode))errors.push(`unsupported proof policy ${mode}`);
+  return {schema:CANDIDATE_PROOF,mode,opId:op?.id??null,kind:op?.kind??null,manifestDigest:manifest?.digest??null,
     oracles:selected.map(oracle=>({...oracle,path:normalize(oracle.path)})),errors,ready:errors.length===0};
 }
 
@@ -203,8 +204,8 @@ const classifyBase=(result,oracle)=>{
 
 /** Run protected commands against immutable base/candidate roots. Only a discriminating, candidate-green result passes. */
 export function runProtectedProof({plan,baseRoot,candidateRoot,oracleRoot,exec=spawnSync,timeoutMs=PROOF_TIMEOUT_MS}={}){
-  if(plan?.schema!==VERIFY_PROOF_V6||!plan.ready)return {schema:VERIFY_PROOF_V6,verdict:'inconclusive',results:[],errors:plan?.errors??['proof plan is not ready']};
-  if(!baseRoot||!candidateRoot||!oracleRoot)return {schema:VERIFY_PROOF_V6,verdict:'unavailable',results:[],errors:['proof roots are unavailable']};
+  if(plan?.schema!==CANDIDATE_PROOF||!plan.ready)return {schema:CANDIDATE_PROOF,verdict:'inconclusive',results:[],errors:plan?.errors??['proof plan is not ready']};
+  if(!baseRoot||!candidateRoot||!oracleRoot)return {schema:CANDIDATE_PROOF,verdict:'unavailable',results:[],errors:['proof roots are unavailable']};
   const results=[];
   for(const oracle of plan.oracles){
     const baseResult=runOne(exec,oracle.command,{cwd:baseRoot,timeoutMs});
@@ -216,7 +217,7 @@ export function runProtectedProof({plan,baseRoot,candidateRoot,oracleRoot,exec=s
   }
   const order=['fail','inconclusive','unavailable'];
   const verdict=order.find(value=>results.some(result=>result.outcome===value))??'pass';
-  return {schema:VERIFY_PROOF_V6,mode:plan.mode,manifestDigest:plan.manifestDigest,verdict,results};
+  return {schema:CANDIDATE_PROOF,mode:plan.mode,manifestDigest:plan.manifestDigest,verdict,results};
 }
 
 export function protectedProofFinding(result){

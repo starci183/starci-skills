@@ -1,6 +1,6 @@
 # Execution agent model
 
-For explicitly enrolled 6.0 workflows, [the v6 contract](runtime-v6.md) replaces the 5-plus scheduling,
+For explicitly enrolled workflows, [the execution contract](execution-contract.md) replaces the 5-plus scheduling,
 acceptance and provisional-decision details below. The kernel and supervisor remain programs. An explicitly
 enrolled `agent-v1` workflow also has one bounded manager model function; other workflows retain their recorded policy.
 
@@ -21,7 +21,7 @@ StarCi 5-plus has three kinds of participant, and only one of them is an agent.
 3. **Operation agents.** One agent executes exactly one operation contract inside the workflow worktree
    and ends with exactly one typed report. It does not schedule, supervise, re-plan, or create worktrees.
 
-There is no state-owning Coordinator or Workflow Manager layer. In agent-led v6, `manageWorkflow` is a
+There is no state-owning Coordinator or Workflow Manager layer. In agent-led coordination, `manageWorkflow` is a
 typed decision function over a bounded, digest-bound snapshot. It orders kernel-authored executable action
 IDs and may request only listed opaque context references. The kernel alone persists the decision, rechecks
 preconditions and executes actions. Owner choices, authority changes and evidence acceptance stay outside the manager.

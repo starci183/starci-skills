@@ -16,7 +16,7 @@ StarCi provides:
 
 StarCi is a local supervised delivery system. Its deterministic kernel owns workflow state, authority, evidence and effects; bounded model functions choose only kernel-offered actions, and operation agents execute one approved contract at a time. Provider access comes from configured local agent hosts rather than a StarCi API key.
 
-**StarCi v1-alpha:** open source under MIT, not yet released · **Requirements:** Node.js 22.13+, npm, and a coding agent with local file/shell access. This repository does not yet provide a verified public npm release. Use the source or a reviewed archive below; do not assume unpinned `npx starci` installs this project.
+**StarCi 1.0:** open source under MIT, not yet published to npm · **Requirements:** Node.js 22.13+, npm, and a coding agent with local file/shell access. This repository does not yet provide a verified public npm release. Use the source or a reviewed archive below; do not assume unpinned `npx starci` installs this project.
 
 [Quick start](#quick-start) · [First project](#first-project) · [Execution modes](#execution-modes) · [CLI](#cli) · [Documentation](#documentation)
 

@@ -9,13 +9,13 @@ const state=()=>({id:'wf',job:'Ship approved work',definitionOfDone:['proof pass
     {id:'b',kind:'backend.implement',status:'ready',attempt:1,dependsOn:[],ledgerIds:[],checks:[]} ]});
 
 test('enrolled model configuration is read from the sealed pin instead of mutable host settings',()=>{
-  assert.equal(workflowModelConfigRoot({host:'host',engine:{major:6,runtimePin:{root:'sealed'}}}),'sealed');
+  assert.equal(workflowModelConfigRoot({host:'host',engine:{schema:'starci/engine@1',runtimePin:{root:'sealed'}}}),'sealed');
   assert.equal(workflowModelConfigRoot({host:'host'}),'host');
 });
 
 test('a persisted prelaunch reservation continues mechanically without spending another manager decision',()=>{
-  const current=state(),reserved=current.ops[0];reserved.v6Lease={jobId:'job-a'};let called=0;
-  const result=coordinateManagedWorkflow({saveState(){},appendEvent(){}},current,{v6:{reservationPhase:op=>op===reserved?{phase:'reserved',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'}:{phase:'absent'}},manageWorkflow(){called+=1;throw Error('manager must not rerank a persisted reservation');}});
+  const current=state(),reserved=current.ops[0];reserved.lease={jobId:'job-a'};let called=0;
+  const result=coordinateManagedWorkflow({saveState(){},appendEvent(){}},current,{engine:{reservationPhase:op=>op===reserved?{phase:'reserved',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'}:{phase:'absent'}},manageWorkflow(){called+=1;throw Error('manager must not rerank a persisted reservation');}});
   assert.deepEqual(result.dispatch,['a']);assert.equal(result.continuation,true);assert.equal(called,0);
 });
 
@@ -32,7 +32,7 @@ test('manager snapshot identity is stable while semantics do not change and stal
 
 test('agent coordination dispatches only the selected executable action and persists the bound decision',()=>{
   const current=state(),events=[],store={saveState:()=>{},appendEvent:event=>events.push(event)};
-  const ctx={v6:{},manageWorkflow:snapshot=>({schema:MANAGER_DECISION,workflowId:snapshot.workflowId,generation:snapshot.generation,
+  const ctx={engine:{},manageWorkflow:snapshot=>({schema:MANAGER_DECISION,workflowId:snapshot.workflowId,generation:snapshot.generation,
     version:snapshot.version,digest:snapshot.digest,decisionId:snapshot.decisionId,basisDigest:snapshot.basisDigest,orderedActionIds:['dispatch:b'],rationale:'choose b'})};
   const result=coordinateManagedWorkflow(store,current,ctx);
   assert.deepEqual(result.dispatch,['b']);assert.equal(current.ops[0].status,'ready');assert.equal(current.ops[1].status,'ready');
@@ -41,7 +41,7 @@ test('agent coordination dispatches only the selected executable action and pers
 
 test('invalid manager output causes an explicit incident and never falls back to dispatching every ready op',()=>{
   const current=state(),events=[],store={saveState:()=>{},appendEvent:event=>events.push(event)};
-  const ctx={v6:{},manageWorkflow:snapshot=>({schema:MANAGER_DECISION,workflowId:snapshot.workflowId,generation:snapshot.generation,
+  const ctx={engine:{},manageWorkflow:snapshot=>({schema:MANAGER_DECISION,workflowId:snapshot.workflowId,generation:snapshot.generation,
     version:snapshot.version,digest:snapshot.digest,decisionId:snapshot.decisionId,basisDigest:snapshot.basisDigest,orderedActionIds:['dispatch:not-offered'],rationale:'invent'})};
   const result=coordinateManagedWorkflow(store,current,ctx);
   assert.deepEqual(result.dispatch,[]);assert.equal(result.incident,true);assert.equal(current.engine.manager.incident.kind,'manager-invalid');assert.equal(current.engine.manager.lastRationale,undefined);
@@ -50,7 +50,7 @@ test('invalid manager output causes an explicit incident and never falls back to
 test('a durable pending manager turn selects no work and remains replayable',()=>{
   const current=state(),events=[],store={saveState:()=>{},appendEvent:event=>events.push(event)};
   const pending=Object.assign(new Error('pending'),{code:'STARCI_JOB_PENDING',job:{identity:{jobId:'manager-job'}}});
-  const result=coordinateManagedWorkflow(store,current,{v6:{},manageWorkflow:()=>{throw pending;}});
+  const result=coordinateManagedWorkflow(store,current,{engine:{},manageWorkflow:()=>{throw pending;}});
   assert.deepEqual(result,{pending:true,dispatch:[]});assert.equal(current.engine.manager.pendingDecisionId.startsWith('manager-'),true);
   assert.equal(events.at(-1).event,'manager-pending');assert.equal(current.ops.every(op=>op.status==='ready'),true);
 });

@@ -6,6 +6,8 @@ import {DEFAULT_PROBE_MS,probeRuntimeBudget,writeRuntimeBudget} from './budget.m
 import {verifyRuntimePin} from './runtime-pin.mjs';
 import {closeStaleCoordinatorTerminals,recordCoordinatorTerminal} from './coordinator-terminals.mjs';
 import {LAUNCH_WINDOW_MS,bindStartupProcess,bindStartupTerminal,inspectStartup,reserveStartup,releaseLaunchingStartup,releaseStartup,startupRowHolds} from './startup-lock.mjs';
+import {sealedRuntimeOf} from './common.mjs';
+import {measureHeadroom} from './disk.mjs';
 
 /**
  * The process supervisor for workflow kernels: one kernel per approved, unfinished workflow; a kernel that
@@ -18,8 +20,10 @@ const DEFAULT_POLL_MS=60*1000;
 const readJson=(file,fallback)=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return fallback;}};
 
 /** What the log says about a workflow: last event time and whether the kernel declared itself finished or stopped. */
-export function inspectWorkflow(entry,{now=Date.now,aliveFn=pid=>{try{process.kill(pid,0);return true;}catch{return false;}}}={}){
+export function inspectWorkflow(entry,{now=Date.now,aliveFn=pid=>{try{process.kill(pid,0);return true;}catch{return false;}},measure=measureHeadroom}={}){
   const state=entry.state??readJson(path.join(entry.dir,'state.json'),null);
+  // The disk where this workflow writes, measured every round: a kernel is never started onto a volume with no room.
+  const headroom=measure([entry.dir,state?.worktree,state?.engine?.journalFile]);
   const events=path.join(entry.dir,'events.jsonl');
   let lastAt=0,lastEvent=null;
   try{
@@ -39,13 +43,14 @@ export function inspectWorkflow(entry,{now=Date.now,aliveFn=pid=>{try{process.ki
   const stopRequested=fs.existsSync(path.join(entry.dir,'stop.flag'));
   return {id:entry.id,dir:entry.dir,approved,finished,stopRequested,alive,launching,startup,ledgerRoot:state?.ledgerRoot??null,ledgerSource:state?.ledgerSource??null,pid:lock?.pid??null,lastAt,lastEvent,silentMs:lastAt?now()-lastAt:null,worktree:state?.worktree??null,host:state?.host??null,run:state?.run??null,workflowTask:state?.workflowTask??null,
     // The host the last kernel of this workflow ran on: the next one is started on the same host, or it would bind a new Orca run over a headless table.
-    hostAdapter:typeof state?.hostAdapter==='string'&&state.hostAdapter?state.hostAdapter:null,engine:state?.engine??null};
+    hostAdapter:typeof state?.hostAdapter==='string'&&state.hostAdapter?state.hostAdapter:null,engine:state?.engine??null,headroom};
 }
 
 /** Decide, for one workflow, what the supervisor does this round. */
 export function supervisorAction(info,{healthMs=DEFAULT_HEALTH_MS}={}){
   if(!info.approved||info.finished||info.stopRequested)return {action:'leave',reason:!info.approved?'not approved':info.finished?'finished':'stop requested'};
   if(info.launching)return {action:'leave',reason:'kernel launch in progress'};
+  if(info.headroom&&!info.headroom.ok)return {action:'leave',reason:'disk headroom below threshold',headroom:info.headroom};
   if(info.alive&&(info.silentMs===null||info.silentMs<healthMs))return {action:'leave',reason:'healthy'};
   if(info.alive)return {action:'restart',reason:`silent for ${Math.round(info.silentMs/60000)} min`};
   return {action:'start',reason:'no kernel process'};
@@ -55,7 +60,7 @@ export function supervisorAction(info,{healthMs=DEFAULT_HEALTH_MS}={}){
 const shellQuote=value=>`'${String(value).replaceAll("'","''")}'`;
 export function startKernel(info,{launcher,spawnFn=spawn,orca=null,log=()=>{},startupToken=null,now=Date.now}){
   if(!info.worktree)return {ok:false,reason:'the workflow state names no worktree',effectState:'none'};
-  if(info.engine?.major===6){
+  if(sealedRuntimeOf({engine:info.engine})){
     const checked=verifyRuntimePin(info.engine.runtimePin);
     if(!checked.ok){log({event:'runtime-pin-rejected',id:info.id,reason:checked.reason});return {ok:false,reason:checked.reason,effectState:'none'};}
     launcher=checked.launcher;
@@ -118,7 +123,9 @@ export function stopKernel(info,{killFn=pid=>process.kill(pid),log=()=>{}}={}){
 }
 
 /** One supervision round over every workflow of a repository. */
-export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEALTH_MS,now=Date.now,spawnFn,killFn,orca=null,aliveFn=pid=>{try{process.kill(pid,0);return true;}catch{return false;}},log=()=>{},only=null}){
+/** Which workflows the supervisor has already reported as out of disk: the event is logged on the change, not every round. */
+const headroomReported=new Set();
+export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEALTH_MS,now=Date.now,spawnFn,killFn,orca=null,aliveFn=pid=>{try{process.kill(pid,0);return true;}catch{return false;}},log=()=>{},only=null,measure=measureHeadroom}){
   const rounds=[];
   // Every store root this supervisor covers: the repository's own and, when it runs from a worktree, that worktree's (a shared ledger puts a workflow's store beside the tree it was named with).
   const stores=[...new Set((roots??[repoRoot]).map(root=>path.resolve(root)))];
@@ -126,8 +133,10 @@ export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEA
   for(const entry of stores.flatMap(root=>{try{return listWorkflows(root);}catch{return [];}})){
     if(seen.has(entry.dir))continue;seen.add(entry.dir);
     if(only&&!only.includes(entry.id))continue;
-    const info=inspectWorkflow(entry,{now,aliveFn});
+    const info=inspectWorkflow(entry,{now,aliveFn,measure});
     const decision=supervisorAction(info,{healthMs});
+    if(decision.headroom){if(!headroomReported.has(info.id)){headroomReported.add(info.id);log({event:'disk-headroom-exhausted',id:info.id,thresholdBytes:decision.headroom.thresholdBytes,volumes:decision.headroom.exhausted.map(item=>({path:item.path,freeBytes:item.freeBytes}))});}}
+    else if(headroomReported.delete(info.id))log({event:'disk-headroom-restored',id:info.id});
     let outcome=null;
     // Reserve startup, then launch; a reservation reclaimed from a dead launch is recorded with its reason.
     const reserveAndStart=()=>{
@@ -143,7 +152,7 @@ export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEA
     };
     if(decision.action==='restart'){
       const stopped=stopKernel(info,{killFn,log});
-      if(info.engine?.major===6&&(!stopped.ok||aliveFn(info.pid))){outcome={ok:false,reason:'prior kernel termination is not confirmed; retain lock and defer restart'};log({event:'kernel-restart-deferred',id:info.id,pid:info.pid,reason:outcome.reason});}
+      if(info.engine&&(!stopped.ok||aliveFn(info.pid))){outcome={ok:false,reason:'prior kernel termination is not confirmed; retain lock and defer restart'};log({event:'kernel-restart-deferred',id:info.id,pid:info.pid,reason:outcome.reason});}
       else outcome=reserveAndStart();
     }
     else if(decision.action==='start')outcome=reserveAndStart();

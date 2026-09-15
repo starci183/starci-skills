@@ -768,18 +768,18 @@ test('ownerItems is the one list: every ask tab, every provisional decision, eve
         text:`Put PAYMENTS_API_TOKEN into custody: run \`${command}\` - the value ${value} must never be typed here.`}},0);
     ask.status='running';ask.terminal='term_ask';ask.launchedAt=1700;
     ask.inputMode='gui';ask.credential=inputAsk('prepared',['PAYMENTS_API_TOKEN'],{slug:'payments'}).credential;
-    const author=toOp({id:'n-four-author',kind:'work.author',nodeId:'prod.alpha.four',
-      goal:'Complete the Work record of prod.alpha.four',allowlist:['.starciwork/features/alpha/four/index.yaml']},1);
+    const author=toOp({id:'n-four-author',kind:'work.author',nodeId:'prod.admin.four',
+      goal:'Complete the Work record of prod.admin.four',allowlist:['.starciwork/features/admin/four/index.yaml']},1);
     author.status='running';
     const state=stubState(store,[ask,author]);
     // A real workflow id: long, and it starts with digits. The secret masker cannot tell one from a key, so it
     // must never be run over a command the owner has to type - it once handed them `--id [redacted]`.
     state.id='20260101-093000-deliver-the-sales-intake';
-    state.provisional=[{decision:'prod.alpha.business.srs.policy-decision.d-refund',op:'ask-refund',recommended:2,
+    state.provisional=[{decision:'prod.admin.business.srs.policy-decision.d-refund',op:'ask-refund',recommended:2,
       options:['reopen the order','close it and issue a credit note'],at:1600,answered:null}];
     state.needUser=[
       {op:'op-verify',kind:'validator',detail:'the Work validator is not installed in this worktree'},
-      {node:'prod.alpha.four',kind:'ledger',detail:'ledger incomplete: prod.alpha.four declares no write scope'}
+      {node:'prod.admin.four',kind:'ledger',detail:'ledger incomplete: prod.admin.four declares no write scope'}
     ];
 
     const items=ownerItems(state);
@@ -795,7 +795,7 @@ test('ownerItems is the one list: every ask tab, every provisional decision, eve
     assert.deepEqual(items.map(entry=>[entry.terminal,entry.since]),[['term_ask',1700],[null,1600],[null,null]]);
     assert.equal(items[0].what,
       'Put PAYMENTS_API_TOKEN into custody: run `node /skills/bin/starci.mjs identity set payments --name PAYMENTS_API_TOKEN` - the value [redacted] must never be typed here.');
-    assert.match(items[1].what,/^prod\.alpha\.business\.srs\.policy-decision\.d-refund: the runtime took option 2 - close it and issue a credit note and carried on$/);
+    assert.match(items[1].what,/^prod\.admin\.business\.srs\.policy-decision\.d-refund: the runtime took option 2 - close it and issue a credit note and carried on$/);
 
     // No value of anything, anywhere: not in an item, not in the rendered section, not in the event.
     const page=ownerLines(state).join('\n');
@@ -813,9 +813,9 @@ test('ownerItems is the one list: every ask tab, every provisional decision, eve
     // The author op blocks: the record is nobody's job again, so the line is the owner's and comes back.
     author.status='blocked';author.refusal='shared-change';
     assert.deepEqual(ownerItems(state).map(entry=>[entry.kind,entry.op]),
-      [['provision','ask-cred'],['decision','ask-refund'],['blocked','op-verify'],['ledger','prod.alpha.four']]);
+      [['provision','ask-cred'],['decision','ask-refund'],['blocked','op-verify'],['ledger','prod.admin.four']]);
     assert.equal(ownerItems(state).at(-1).how,
-      'complete the Work record of prod.alpha.four, then `starci workflow-approve --id 20260101-093000-deliver-the-sales-intake`');
+      'complete the Work record of prod.admin.four, then `starci workflow-approve --id 20260101-093000-deliver-the-sales-intake`');
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 

@@ -328,9 +328,9 @@ test('approved input references without credential waits do not start an owner i
   assert.equal(f.state.inputs,inputs);assert.equal(b.calls.length,0);
 });
 
-test('v6 owner input helper launches from the runtime pin while preserving the original workflow binding',t=>{
+test('the owner input helper of an enrolled workflow launches from the runtime pin while preserving the original workflow binding',t=>{
   const f=fixture(t),b=browserFixture(),pinned=path.join(f.repo,'sealed-runtime');
-  f.state.engine={major:6,runtimePin:{root:pinned,digest:'a'.repeat(64)}};
+  f.state.engine={schema:'starci/engine@1',runtimePin:{root:pinned,digest:'a'.repeat(64)}};
   let launch=null;
   const child=new EventEmitter();child.pid=101;child.unref=()=>{};
   const result=reconcileWorkflowInputs(b.orca,f.store,f.state,{now:()=>100000,alive:()=>false,

@@ -16,30 +16,89 @@ export function sqliteAtLeast(actual,minimum){
   return true;
 }
 export const newToken=()=>crypto.randomBytes(24).toString('hex');
-/** Bodies kept per bound (workflow, generation, goal): the latest is the recovery state, the rest a short margin. */
-export const SNAPSHOT_BODIES_KEPT=3;
+/** A job in one of these states holds nothing the runtime still needs from it: its result is recorded or void. */
+export const SETTLED_JOB_STATUSES=['succeeded','failed','cancelled'];
 /**
- * Retire snapshot bodies the runtime can never read again. A bound generation reads only its latest body; an
- * older generation is never read. The checkpoint rows themselves stay, with their ids, so a replayed transition
- * is still recognised; only the state text is let go. Returns the number of bodies retired.
+ * The retention policy of the journal, in one place. The journal keeps what a workflow needs to continue and
+ * nothing it has settled:
+ *
+ * - the bound generation of a workflow keeps ONE state body (its recovery state), every `transition:` and
+ *   `bind:` checkpoint row (so a replayed transition is still recognised, body or not) and only the latest
+ *   `save:` checkpoint (an older save row is a duplicate of a state the next save replaced);
+ * - a retired generation (older than the bound one) keeps no snapshot rows, no settled jobs and none of their
+ *   events: nothing reads them again - replay identity carries the generation, and a probation refund at the
+ *   retry boundary runs before the generation it refunds is retired;
+ * - live reservations (lease rows), unsettled jobs and the events of unsettled jobs are never touched, whatever
+ *   their generation.
+ */
+export const RETENTION={snapshotBodiesKept:1,retiredGenerationRows:0};
+/** Bodies kept per bound (workflow, generation, goal): the latest is the recovery state. */
+export const SNAPSHOT_BODIES_KEPT=RETENTION.snapshotBodiesKept;
+/**
+ * Retire what the runtime can never read again. Bound (workflow, generation, goal): older bodies are let go,
+ * older `save:` rows are dropped, retired generations are dropped whole. Unbound: the same, taking each
+ * workflow's newest generation as its bound one. Returns the number of rows changed or removed.
  */
 export function compactSnapshots(db,{workflowId=null,generation=null,goalIdentity=null,keep=SNAPSHOT_BODIES_KEPT}={}){
+  const bound=workflowId&&generation!==null&&goalIdentity!==null;
+  let changed=0;
+  if(bound){
+    changed+=db.prepare(`UPDATE state_snapshots SET state_json='' WHERE workflow_id=? AND generation=? AND goal_identity=? AND state_json<>'' AND snapshot_id NOT IN (SELECT snapshot_id FROM state_snapshots WHERE workflow_id=? AND generation=? AND goal_identity=? ORDER BY snapshot_id DESC LIMIT ?)`).run(workflowId,generation,goalIdentity,workflowId,generation,goalIdentity,keep).changes;
+    changed+=db.prepare(`DELETE FROM state_snapshots WHERE workflow_id=? AND generation=? AND checkpoint_id LIKE 'save:%' AND snapshot_id<>(SELECT max(snapshot_id) FROM state_snapshots WHERE workflow_id=? AND generation=?)`).run(workflowId,generation,workflowId,generation).changes;
+    changed+=db.prepare('DELETE FROM state_snapshots WHERE workflow_id=? AND generation<?').run(workflowId,generation).changes;
+    return changed;
+  }
   const scope=workflowId?' AND workflow_id=?':'',args=workflowId?[workflowId]:[];
-  const bound=generation!==null&&goalIdentity!==null;
-  // The bound generation - or, unbound, the newest generation of each workflow - keeps its latest few bodies.
-  const current=bound
-    ?db.prepare(`UPDATE state_snapshots SET state_json='' WHERE workflow_id=? AND generation=? AND goal_identity=? AND state_json<>'' AND snapshot_id NOT IN (SELECT snapshot_id FROM state_snapshots WHERE workflow_id=? AND generation=? AND goal_identity=? ORDER BY snapshot_id DESC LIMIT ?)`).run(workflowId,generation,goalIdentity,workflowId,generation,goalIdentity,keep).changes
-    :db.prepare(`UPDATE state_snapshots SET state_json='' WHERE state_json<>''${scope} AND generation=(SELECT max(generation) FROM state_snapshots m WHERE m.workflow_id=state_snapshots.workflow_id) AND snapshot_id NOT IN (SELECT snapshot_id FROM state_snapshots s WHERE s.workflow_id=state_snapshots.workflow_id AND s.generation=state_snapshots.generation AND s.goal_identity=state_snapshots.goal_identity ORDER BY s.snapshot_id DESC LIMIT ?)`).run(...args,keep).changes;
-  // An older generation keeps exactly one body as evidence.
-  const older=bound
-    ?db.prepare(`UPDATE state_snapshots SET state_json='' WHERE workflow_id=? AND generation<? AND state_json<>'' AND snapshot_id NOT IN (SELECT max(snapshot_id) FROM state_snapshots WHERE workflow_id=? AND generation<? GROUP BY generation,goal_identity)`).run(workflowId,generation,workflowId,generation).changes
-    :db.prepare(`UPDATE state_snapshots SET state_json='' WHERE state_json<>''${scope} AND generation<(SELECT max(generation) FROM state_snapshots m WHERE m.workflow_id=state_snapshots.workflow_id) AND snapshot_id NOT IN (SELECT max(snapshot_id) FROM state_snapshots GROUP BY workflow_id,generation,goal_identity)`).run(...args).changes;
-  return current+older;
+  changed+=db.prepare(`DELETE FROM state_snapshots WHERE 1=1${scope} AND generation<(SELECT max(generation) FROM state_snapshots m WHERE m.workflow_id=state_snapshots.workflow_id)`).run(...args).changes;
+  changed+=db.prepare(`UPDATE state_snapshots SET state_json='' WHERE state_json<>''${scope} AND snapshot_id NOT IN (SELECT snapshot_id FROM state_snapshots s WHERE s.workflow_id=state_snapshots.workflow_id AND s.generation=state_snapshots.generation AND s.goal_identity=state_snapshots.goal_identity ORDER BY s.snapshot_id DESC LIMIT ?)`).run(...args,keep).changes;
+  changed+=db.prepare(`DELETE FROM state_snapshots WHERE checkpoint_id LIKE 'save:%'${scope} AND snapshot_id<>(SELECT max(snapshot_id) FROM state_snapshots s WHERE s.workflow_id=state_snapshots.workflow_id AND s.generation=state_snapshots.generation)`).run(...args).changes;
+  return changed;
+}
+/**
+ * Drop the settled jobs and events of every generation older than `generation` for one workflow. A job that
+ * still holds a lease or is not settled stays, with its events, whatever its generation. Returns the counts.
+ */
+export function pruneRetiredGenerations(db,{workflowId,generation}){
+  need(workflowId&&Number.isInteger(generation),'pruneRetiredGenerations needs a workflow and its bound generation');
+  const settled=SETTLED_JOB_STATUSES.map(()=>'?').join(',');
+  const jobs=db.prepare(`DELETE FROM jobs WHERE workflow_id=? AND generation<? AND status IN (${settled}) AND NOT EXISTS (SELECT 1 FROM leases l WHERE l.job_id=jobs.job_id)`).run(workflowId,generation,...SETTLED_JOB_STATUSES).changes;
+  const events=db.prepare(`DELETE FROM events WHERE workflow_id=? AND generation<? AND (entity_type<>'job' OR NOT EXISTS (SELECT 1 FROM jobs j WHERE j.job_id=events.entity_id))`).run(workflowId,generation).changes;
+  return {jobs,events};
+}
+/** What still binds a workflow to this journal: its leases and its unsettled jobs. Empty means nothing does. */
+export function liveRows(db,workflowId){
+  const settled=SETTLED_JOB_STATUSES.map(()=>'?').join(',');
+  const leases=db.prepare('SELECT job_id,resource_key FROM leases WHERE workflow_id=? ORDER BY job_id,resource_key').all(workflowId).map(row=>({jobId:row.job_id,resource:row.resource_key}));
+  const jobs=db.prepare(`SELECT job_id,status,generation FROM jobs WHERE workflow_id=? AND status NOT IN (${settled}) ORDER BY job_id`).all(workflowId,...SETTLED_JOB_STATUSES).map(row=>({jobId:row.job_id,status:row.status,generation:row.generation}));
+  return {leases,jobs};
+}
+/**
+ * Remove every row of a workflow that holds nothing live. Refuses - and removes nothing - while the workflow
+ * still holds a lease or an unsettled job: those are what the next kernel or retry reconciles, on the record.
+ */
+export function retireWorkflow(db,workflowId){
+  need(workflowId,'retireWorkflow needs a workflow id');
+  const live=liveRows(db,workflowId);
+  if(live.leases.length||live.jobs.length)return {ok:false,workflowId,live,reason:'the workflow still holds live reservations or unsettled jobs'};
+  const removed={
+    snapshots:db.prepare('DELETE FROM state_snapshots WHERE workflow_id=?').run(workflowId).changes,
+    jobs:db.prepare('DELETE FROM jobs WHERE workflow_id=?').run(workflowId).changes,
+    events:db.prepare('DELETE FROM events WHERE workflow_id=?').run(workflowId).changes,
+    incidents:db.prepare('DELETE FROM incidents WHERE workflow_id=?').run(workflowId).changes};
+  return {ok:true,workflowId,removed};
+}
+/** Every workflow id the journal holds a row for, with what still binds it. */
+export function journalWorkflows(db){
+  const ids=new Set();
+  for(const table of ['state_snapshots','jobs','events','leases','incidents'])for(const row of db.prepare(`SELECT DISTINCT workflow_id FROM ${table}`).all())ids.add(row.workflow_id);
+  return [...ids].sort().map(workflowId=>({workflowId,...liveRows(db,workflowId),rows:{snapshots:db.prepare('SELECT count(*) n FROM state_snapshots WHERE workflow_id=?').get(workflowId).n,jobs:db.prepare('SELECT count(*) n FROM jobs WHERE workflow_id=?').get(workflowId).n,events:db.prepare('SELECT count(*) n FROM events WHERE workflow_id=?').get(workflowId).n}}));
 }
 
 function migrate(db){
   const version=Number(db.prepare('PRAGMA user_version').get().user_version);
   need(version<=JOURNAL_VERSION,`Operational journal version ${version} is newer than supported ${JOURNAL_VERSION}`);
+  // A journal created by this build gives freed pages back on its own; the setting must precede the first table.
+  if(version===0)db.exec('PRAGMA auto_vacuum=INCREMENTAL');
   if(version===0)db.exec(`
     BEGIN IMMEDIATE;
     CREATE TABLE events(seq INTEGER PRIMARY KEY AUTOINCREMENT,event_id TEXT NOT NULL UNIQUE,workflow_id TEXT NOT NULL,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,generation INTEGER NOT NULL,kind TEXT NOT NULL,payload_json TEXT,created_at INTEGER NOT NULL);
@@ -61,6 +120,22 @@ function migrate(db){
     COMMIT;`);
 }
 
+/** Give freed pages back to the filesystem where the file was created to allow it; a no-op on an older file. */
+export function reclaimSpace(db){try{db.exec('PRAGMA incremental_vacuum');}catch{}}
+
+/**
+ * A journal opened to be read and nothing else: no migration, no compaction, no reclaim. What an operator's
+ * inspection uses on a file a kernel may hold, and what a retirement check uses before it is allowed to touch.
+ */
+export function inspectJournal({file}={}){
+  const {DatabaseSync}=require('node:sqlite');
+  need(typeof file==='string'&&fs.existsSync(file),'inspectJournal needs an existing file');
+  const db=new DatabaseSync(file,{readOnly:true,timeout:5000});
+  return {schema:JOURNAL_SCHEMA,file,path:path.resolve(file),db,readOnly:true,
+    version:Number(db.prepare('PRAGMA user_version').get().user_version),
+    liveRows(workflowId){return liveRows(db,workflowId);},workflows(){return journalWorkflows(db);},close(){db.close();}};
+}
+
 export function openJournal({file,now=Date.now,busyTimeoutMs=5000,journalMode='DELETE',allowWal=false}={}){
   const {DatabaseSync}=require('node:sqlite');
   need(typeof file==='string'&&file.trim(),'openJournal needs a file');
@@ -74,10 +149,13 @@ export function openJournal({file,now=Date.now,busyTimeoutMs=5000,journalMode='D
   const actual=String(db.prepare(`PRAGMA journal_mode=${requested}`).get().journal_mode).toUpperCase();
   need(actual===requested,`SQLite selected journal mode ${actual}, expected ${requested}`);
   migrate(db);
-  compactSnapshots(db);
+  const autoVacuum=Number(db.prepare('PRAGMA auto_vacuum').get().auto_vacuum);
+  // Opening compacts what an older runtime left behind, for every workflow the file holds: no runtime reads it again.
+  db.exec('BEGIN IMMEDIATE');try{compactSnapshots(db);db.exec('COMMIT');}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}
+  reclaimSpace(db);
   const transaction=fn=>{db.exec('BEGIN IMMEDIATE');try{const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}};
   return {
-    schema:JOURNAL_SCHEMA,file,path:path.resolve(file),sqliteVersion,journalMode:actual,db,now,transaction,
+    schema:JOURNAL_SCHEMA,file,path:path.resolve(file),sqliteVersion,journalMode:actual,autoVacuum,db,now,transaction,
     appendEvent({eventId=newToken(),workflowId,entityType,entityId,generation=0,kind,payload=null,createdAt=now()}){
       need(workflowId&&entityType&&entityId&&kind,'Event identity and kind are required');
       db.prepare('INSERT OR IGNORE INTO events(event_id,workflow_id,entity_type,entity_id,generation,kind,payload_json,created_at) VALUES(?,?,?,?,?,?,?,?)').run(eventId,workflowId,entityType,entityId,generation,kind,json(payload),createdAt);
@@ -91,6 +169,12 @@ export function openJournal({file,now=Date.now,busyTimeoutMs=5000,journalMode='D
     getJob(jobId){return value(db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId));},
     listJobs({status=null,kind=null}={}){let sql='SELECT * FROM jobs WHERE 1=1';const args=[];if(status){sql+=' AND status=?';args.push(status);}if(kind){sql+=' AND kind=?';args.push(kind);}sql+=' ORDER BY created_at,job_id';return db.prepare(sql).all(...args).map(value);},
     events({workflowId=null}={}){return (workflowId?db.prepare('SELECT * FROM events WHERE workflow_id=? ORDER BY seq').all(workflowId):db.prepare('SELECT * FROM events ORDER BY seq').all()).map(row=>({...row,payload:JSON.parse(row.payload_json)}));},
+    /** The rows of a workflow that are only history now: retired generations go, then freed pages are given back. */
+    retireGenerations({workflowId,generation}){const pruned=transaction(inner=>pruneRetiredGenerations(inner,{workflowId,generation}));reclaimSpace(db);return pruned;},
+    /** Everything of a workflow, when nothing of it is live. */
+    retireWorkflow(workflowId){const result=transaction(inner=>retireWorkflow(inner,workflowId));if(result.ok)reclaimSpace(db);return result;},
+    liveRows(workflowId){return liveRows(db,workflowId);},
+    workflows(){return journalWorkflows(db);},
     close(){db.close();}
   };
 }

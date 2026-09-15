@@ -23,7 +23,7 @@ Do not change the bound root halfway through a run. Absolute paths can participa
 
 ## Migrate deliberately
 
-There is no automatic migration command in this alpha. A separate migration must:
+There is no automatic migration command for product Work. A separate migration must:
 
 1. Identify the backend owner and stop concurrent writes; inventory bindings, unfinished plans, receipts and source/evidence references.
 2. Make a recoverable backup and verify the original workspace before moving anything.

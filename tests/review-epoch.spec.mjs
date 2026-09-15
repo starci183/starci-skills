@@ -44,14 +44,14 @@ test('accepted group review history stays active while the retired epoch is arch
 });
 
 test('generation retry cannot skip a blocked operation whose durable writer lease is unsettled',()=>{
-  const lease={jobId:'job',leaseToken:'token'},state={engine:{journalFile:'journal'},ops:[{id:'blocked',status:'blocked',v6Lease:lease,v6WorkerSettled:false}]};
+  const lease={jobId:'job',leaseToken:'token'},state={engine:{journalFile:'journal'},ops:[{id:'blocked',status:'blocked',lease:lease,workerSettled:false}]};
   assert.throws(()=>settleSkippedGenerationLeases(state,{settle:()=>{throw Error('must not settle')}}),/unsettled durable lease/);
-  state.ops[0].v6WorkerSettled=true;assert.deepEqual(settleSkippedGenerationLeases(state,{settle:()=>{throw Error('retryable settled operation is handled by the normal retry loop')}}),[]);
-  assert.equal(state.ops[0].v6Lease,lease);
+  state.ops[0].workerSettled=true;assert.deepEqual(settleSkippedGenerationLeases(state,{settle:()=>{throw Error('retryable settled operation is handled by the normal retry loop')}}),[]);
+  assert.equal(state.ops[0].lease,lease);
 });
 
 test('legacy coordinator reconciliation requires sealed pre-task control flow and a live mismatch',()=>{
-  const message='Operation can be launched only by the exact Workflow Monitor bound as nested Run coordinator',events=[],lease={jobId:'job',leaseToken:'token',workflowId:'wf',opId:'verify',generation:3},baseOp={id:'verify',status:'blocked',refusal:'effect-unknown',v6Lease:lease,launch:{task:null,dispatch:null,stopReason:message}},state={id:'wf',run:'run',from:'old',worktree:'D:/repo',engine:{generation:3,journalFile:'journal',runtimePin:{root:'D:/pin',digest:'a'.repeat(64)}},ops:[]};
+  const message='Operation can be launched only by the exact Workflow Monitor bound as nested Run coordinator',events=[],lease={jobId:'job',leaseToken:'token',workflowId:'wf',opId:'verify',generation:3},baseOp={id:'verify',status:'blocked',refusal:'effect-unknown',lease:lease,launch:{task:null,dispatch:null,stopReason:message}},state={id:'wf',run:'run',from:'old',worktree:'D:/repo',engine:{generation:3,journalFile:'journal',runtimePin:{root:'D:/pin',digest:'a'.repeat(64)}},ops:[]};
   const source=Buffer.from('reviewed bytes'),reviewed=()=> '34c167c6fb5150b552992350ff43f22c36e935af03b93b91e661cf4e62479801',store={appendEvent:event=>events.push(event)},mismatch={invoke:()=>({outcome:'ok',receipt:{result:{run:{id:'run',coordinator_handle:'new'}}}})},settle=()=>[{ok:true}];
   const accepted=reconcileLegacyCoordinatorLease(state,structuredClone(baseOp),{orca:mismatch,store,verifyPin:()=>({ok:true}),readFile:()=>source,hashSource:reviewed,settle});assert.equal(accepted.ok,true);assert.equal(events[0].event,'legacy-coordinator-no-effect-proved');
   assert.match(reconcileLegacyCoordinatorLease(state,structuredClone(baseOp),{orca:mismatch,store,verifyPin:()=>({ok:false,reason:'changed'}),readFile:()=>source,hashSource:reviewed,settle}).reason,/pin rejected/);
@@ -62,10 +62,10 @@ test('legacy coordinator reconciliation requires sealed pre-task control flow an
 });
 
 test('failed launch reconciliation requires exact stopped worker and released owned terminal',()=>{
-  const lease={jobId:'lease',generation:4},op={id:'verify',status:'blocked',v6Lease:lease,launch:{task:'task',dispatch:null}},events=[],state={run:'run',worktree:'D:/repo',engine:{journalFile:'journal'}},receipt={dispatch:{id:'ctx',task_id:'task',run_id:'run',assignee_handle:'term',status:'failed',last_failure:'agent_prompt_stalled'},worker:{dispatch_id:'ctx',state:'failed',stage:'dispatch_input'},terminal:{handle:'term',connected:false},observation:{exactWorker:true,status:'exited'},terminalResource:{originDispatchId:'ctx',ownerDispatchId:'ctx',ownershipState:'released',releaseState:'released'}};
+  const lease={jobId:'lease',generation:4},op={id:'verify',status:'blocked',lease:lease,launch:{task:'task',dispatch:null}},events=[],state={run:'run',worktree:'D:/repo',engine:{journalFile:'journal'}},receipt={dispatch:{id:'ctx',task_id:'task',run_id:'run',assignee_handle:'term',status:'failed',last_failure:'agent_prompt_stalled'},worker:{dispatch_id:'ctx',state:'failed',stage:'dispatch_input'},terminal:{handle:'term',connected:false},observation:{exactWorker:true,status:'exited'},terminalResource:{originDispatchId:'ctx',ownerDispatchId:'ctx',ownershipState:'released',releaseState:'released'}};
   const orca={invoke:name=>name==='dispatch-show'?{outcome:'ok',receipt:{result:{dispatch:receipt.dispatch}}}:{outcome:'ok',receipt:{result:receipt}}},store={appendEvent:event=>events.push(event)},settle=()=>[{ok:true}];
-  const observeLaunch=()=>({kind:'operation-launch-observed'});assert.equal(reconcileFailedLaunchLease(state,op,{orca,store,settle,observeLaunch}).ok,true);assert.equal(op.v6WorkerSettled,true);assert.equal(op.launch.dispatch,'ctx');assert.equal(events[0].event,'failed-launch-stopped-proved');
-  const unknown={...structuredClone(op),v6Lease:lease,launch:{task:'task',dispatch:null}};delete unknown.v6WorkerSettled;receipt.terminalResource.releaseState='retained';assert.match(reconcileFailedLaunchLease(state,unknown,{orca,store,settle,observeLaunch}).reason,/not proven exited/);assert.equal(unknown.v6WorkerSettled,undefined);assert.match(reconcileFailedLaunchLease(state,unknown,{orca,store,settle,observeLaunch:()=>null}).reason,/not bound/);
+  const observeLaunch=()=>({kind:'operation-launch-observed'});assert.equal(reconcileFailedLaunchLease(state,op,{orca,store,settle,observeLaunch}).ok,true);assert.equal(op.workerSettled,true);assert.equal(op.launch.dispatch,'ctx');assert.equal(events[0].event,'failed-launch-stopped-proved');
+  const unknown={...structuredClone(op),lease:lease,launch:{task:'task',dispatch:null}};delete unknown.workerSettled;receipt.terminalResource.releaseState='retained';assert.match(reconcileFailedLaunchLease(state,unknown,{orca,store,settle,observeLaunch}).reason,/not proven exited/);assert.equal(unknown.workerSettled,undefined);assert.match(reconcileFailedLaunchLease(state,unknown,{orca,store,settle,observeLaunch:()=>null}).reason,/not bound/);
 });
 
 test('public retry refund binds historical runtime to the cancelled durable operation job',()=>{

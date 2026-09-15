@@ -8,7 +8,7 @@ mandatory agent boundary and maps one-to-one to one concrete provider agent. Ope
 worktrees and never create nested agents.
 
 There is no state-owning Plan Coordinator or Workflow Manager. The 5-plus compatibility loop is code. An
-explicitly enrolled v6 workflow may call `manageWorkflow` as a bounded typed function that orders only
+explicitly enrolled workflow may call `manageWorkflow` as a bounded typed function that orders only
 kernel-authored action IDs; the kernel rechecks and executes them. It has no state, owner or Work authority.
 Other typed functions remain `assessGoal`, `critiqueGoal`, `planOp`, `decide`, and `validateOp`. Orca supplies exactly two things - worktrees, and
 terminals in which an agent can be launched and attested - so the same kernel runs in a Codex or Claude host
@@ -169,7 +169,7 @@ more before release. Title drift alone never invalidates otherwise valid operati
 
 ## Workflow kernel (5-plus)
 
-For 5-plus compatibility the control loop above the launcher is code. Agent-led v6 adds only the bounded manager decision function described above; the kernel still executes the loop. `workflow-goal` turns a job into a goal and prints it
+For 5-plus compatibility the control loop above the launcher is code. Agent-led coordination adds only the bounded manager decision function described above; the kernel still executes the loop. `workflow-goal` turns a job into a goal and prints it
 for exactly one user approval. In a repository that owns a Work tree (`<repo>/.starciwork/features`) the
 ledger **is** that tree: the kernel lists the eligible nodes in `--scope`, derives each operation from its
 node (goal from `description`, allowlist from `implementation.changes[].files`, checks from
@@ -178,7 +178,7 @@ as `ledger incomplete` instead of guessing one, and asks `assessGoal` only for t
 the risks and questions. Without a Work tree, `assessGoal` assesses the whole ledger and the operation set
 itself. Either way the goal is frozen by the approval; `workflow-approve` records that approval and freezes the goal; `workflow-run` runs the loop;
 `workflow-status` reads one workflow's own directory. A workflow is one goal in one worktree with a pool
-whose admitted AI work shares a global ceiling of ten; in agent-led v6 the manager occupies one slot while it runs, and operations are parallel whenever their allowlists are disjoint, so there is no shared
+whose admitted AI work shares a global ceiling of ten; in agent-led coordination the manager occupies one slot while it runs, and operations are parallel whenever their allowlists are disjoint, so there is no shared
 file to arbitrate. `kernel/schedule.mjs` assigns each ready operation to the
 first runtime of that role's preference order that has a free slot, remaining budget and no cooldown
 (`prefer-then-overflow`, declared in `model/runtimes.yaml` and explained in

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
-import {AUTHOR_KIND,addOp,firstLine,liveStatus,locateSharedTreePaths,need,slash,unique,validateCommandAt} from './common.mjs';
+import {AUTHOR_KIND,addOp,firstLine,isEnrolled,liveStatus,locateSharedTreePaths,need,slash,unique,validateCommandAt} from './common.mjs';
 import {closeOpTerminal,keepsAskTab} from './terminals.mjs';
 import {settleCredentialPresence,askFillLine} from './fill.mjs';
 
@@ -202,8 +202,8 @@ export function openOwnerAsk(store,state,op,question,ctx,report=null){
   // The shape of the tab is a HINT, not a ruling: whichever of the two forms is opened, the ask op may come back
   // with either answer and the kernel takes it by what the report says (`settleOwnerAsk`).
   const stop=stopReasonFor(question,report);
-  const v6=ctx?.v6===true||Number(state?.engine?.major)>=6;
-  const ownerRequired=v6&&!MECHANICAL_QUESTION.test(String(question?.kind??''));
+  const enrolled=ctx?.engine===true||isEnrolled(state);
+  const ownerRequired=enrolled&&!MECHANICAL_QUESTION.test(String(question?.kind??''));
   const by=stop?(declaredStopOf(question,report)?'declared':'words'):'none';
   const kind=stop??(question.kind&&QUESTION_KINDS.includes(String(question.kind))?question.kind:'decision');
   const same=state.ops.find(item=>isAsk(item.kind)&&liveStatus.includes(item.status)&&item.question?.text===question.text&&item.question?.inputRevision===question.inputRevision);
@@ -245,16 +245,16 @@ export function openConflictDecision(store,state,intake,conflict,ctx){
   let recordPath=null;
   try{recordPath=slash(ctx?.work?.node?.(record)?.path??'')||null;}catch{recordPath=null;}
   const folder=recordPath?recordPath.replace(/\/index\.yaml$/,''):null;
-  const v6=ctx?.v6===true||Number(state?.engine?.major)>=6;
+  const enrolled=ctx?.engine===true||isEnrolled(state);
   const ask=addOp(store,state,{kind:DECISION_PREPARE,nodeId:null,
-    goal:`${v6?`Present the conflict ${intake.id} recorded to the owner`:`Take the conflict ${intake.id} recorded provisionally`}: ${firstLine(conflict.detail??`${conflict.record} conflicts with what ${intake.intake?.scope??intake.id} needs`)}`,
+    goal:`${enrolled?`Present the conflict ${intake.id} recorded to the owner`:`Take the conflict ${intake.id} recorded provisionally`}: ${firstLine(conflict.detail??`${conflict.record} conflicts with what ${intake.intake?.scope??intake.id} needs`)}`,
     question:{kind:'decision',prepared:true,stop:null,record,from:intake.id,options:[...(conflict.options??[])],
-      text:`${conflict.detail??`${conflict.record} conflicts with what ${intake.intake?.scope??intake.id} needs`} The decision record ${record} is already written with both sides and numbered options: read it and report \`decision: ${record}\` with ${v6?'the options. The authenticated owner must choose; do not select an option.':'`recommended: <n>`; the runtime takes it provisionally and the owner may overturn it.'} Write nothing.`},
+      text:`${conflict.detail??`${conflict.record} conflicts with what ${intake.intake?.scope??intake.id} needs`} The decision record ${record} is already written with both sides and numbered options: read it and report \`decision: ${record}\` with ${enrolled?'the options. The authenticated owner must choose; do not select an option.':'`recommended: <n>`; the runtime takes it provisionally and the owner may overturn it.'} Write nothing.`},
     // The record's own folder when the tree knows it; the feature's policy-decisions folder otherwise. The op writes nothing either way.
     ledgerIds:[],allowlist:folder?[`.starciwork/${folder}/**`]:decisionAllowlistFor(state,intake,ctx),references:unique([...(recordPath?[recordPath]:[]),...(intake.references??[]).slice(0,8)]),
-    checks:[],acceptance:[v6?`the summary begins \`decision: ${record}\` with the numbered options and no selected answer, and no file changed`:`the summary begins \`decision: ${record}\` with \`recommended: <n>\` and the numbered options, and no file changed`],
+    checks:[],acceptance:[enrolled?`the summary begins \`decision: ${record}\` with the numbered options and no selected answer, and no file changed`:`the summary begins \`decision: ${record}\` with \`recommended: <n>\` and the numbered options, and no file changed`],
     origin:'ask',requesters:[]},`conflict of ${intake.id} taken provisionally`);
-  if(ask)store.appendEvent({event:'owner-ask-opened',op:intake.id,ask:ask.id,kind:'decision',stop:null,by:'none',provisional:!v6,ownerRequired:v6,record,question:firstLine(conflict.detail??record)});
+  if(ask)store.appendEvent({event:'owner-ask-opened',op:intake.id,ask:ask.id,kind:'decision',stop:null,by:'none',provisional:!enrolled,ownerRequired:enrolled,record,question:firstLine(conflict.detail??record)});
   return ask;
 }
 
@@ -314,7 +314,7 @@ export function settleOwnerAsk(store,state,ask,report){
     store.appendEvent({event:'owner-ask-answered-from-record',ask:ask.id,record,requesters:requesters.map(item=>item.id)});
     return;
   }
-  if(Number(state?.engine?.major)>=6){
+  if(isEnrolled(state)){
     const record=(String(marker(summary,'decision')??'').match(/^\S+/)??[])[0]??null,options=optionsOf(ask,summary);
     ask.ownerRequestStatus='waiting-owner';
     state.needUser.push({op:ask.id,kind:'decision',detail:`${ask.question?.text??ask.goal} - answer in the workflow owner page`,record,options,requesters:requesters.map(item=>item.id)});

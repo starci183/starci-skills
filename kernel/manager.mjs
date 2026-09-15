@@ -17,7 +17,7 @@ export function buildManagerSnapshot({state,actions,blockers=[],contextCatalog=[
   const projected=[...active.filter(op=>offered.has(op.id)),...active.filter(op=>!offered.has(op.id))];
   const ops=projected.slice(0,limit).map(op=>({
     id:op.id,kind:op.kind,status:op.status,attempt:op.attempt??1,dependsOn:strings(op.dependsOn),waitingFor:op.waitingFor??null,
-    refusal:brief(op.refusal),hasLease:Boolean(op.v6Lease),needsReplan:Boolean(op.needsReplan),ledgerIds:strings(op.ledgerIds),
+    refusal:brief(op.refusal),hasLease:Boolean(op.lease),needsReplan:Boolean(op.needsReplan),ledgerIds:strings(op.ledgerIds),
     purpose:brief(op.goal,300),acceptance:strings(op.acceptance,3).map(item=>brief(item)),findingCount:(op.findings??[]).length,
     unlocks:active.filter(other=>(other.dependsOn??[]).includes(op.id)).length,
     dependencies:strings(op.dependsOn).map(id=>({id,status:state.ops.find(other=>other.id===id)?.status??'missing'})),

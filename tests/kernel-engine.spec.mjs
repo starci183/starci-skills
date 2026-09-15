@@ -10,7 +10,7 @@ import {createAdmission,GLOBAL_AI_RESOURCE} from '../kernel/admission.mjs';
 import {createJobs,createJobRunner} from '../kernel/jobs.mjs';
 import {rankJobs,scheduleJobs,updateProgressBudget,progressExhausted} from '../kernel/scheduler.mjs';
 import {createJobBridge,replayCommandCheck,JOB_PENDING,isJobPending,jobPendingError} from '../kernel/job-bridge.mjs';
-import {createStore,WORKFLOW_STATE} from '../kernel/store.mjs';
+import {createStore,WORKFLOW_STATE,stateGoalIdentity} from '../kernel/store.mjs';
 import {PURE_MODEL_EXECUTION,reconcilePureModelJobs} from '../kernel/job-reconcile.mjs';
 import {runDurableJob} from '../kernel/job-worker.mjs';
 
@@ -163,28 +163,29 @@ test('journal-bound store recovers committed state when the JSON projection is l
   const journal=openJournal({file:path.join(repo,'journal.sqlite')});store.bindJournal(journal,1,{state});store.saveState({...state,counter:2});fs.writeFileSync(store.paths.state,'{"torn":');assert.equal(store.loadState().counter,2);journal.close();fs.rmSync(repo,{recursive:true,force:true});
 });
 
-test('the snapshot ledger keeps every checkpoint but only the latest few bodies, and one per retired generation',async()=>{
+test('the snapshot ledger keeps one body and the transition checkpoints of the bound generation, and nothing of a retired one',async()=>{
   const repo=temporary(),store=createStore({repoRoot:repo,id:'wf'}),state={schema:WORKFLOW_STATE,id:'wf',job:'goal',ops:[],counter:0};store.saveState(state);
   const journal=openJournal({file:path.join(repo,'journal.sqlite')});store.bindJournal(journal,1,{state});
   for(let counter=1;counter<=6;counter+=1)store.saveState({...state,counter});
   const rows=()=>journal.db.prepare('SELECT snapshot_id,checkpoint_id,generation,length(state_json) body FROM state_snapshots ORDER BY snapshot_id').all();
-  assert.equal(rows().length,7,'every checkpoint stays on the ledger');
-  assert.deepEqual(rows().map(row=>row.body>0),[false,false,false,false,true,true,true],`only the latest ${SNAPSHOT_BODIES_KEPT} bodies stay`);
+  assert.equal(rows().length,2,'the bind checkpoint and the latest save: an older save is a duplicate of a state the next save replaced');
+  assert.deepEqual(rows().map(row=>row.body>0),[false,true],`only the latest ${SNAPSHOT_BODIES_KEPT} body stays`);
   assert.equal(store.loadState().counter,6,'the recovery state is the latest body');
   // A transition whose checkpoint was already taken - even one whose body is gone - replays to the latest state.
   const options={transitionId:'t-1',event:{kind:'owner-action-applied',payload:{}},apply:next=>{next.counter+=10;}};
   assert.equal(store.transition(store.loadState(),options).counter,16);
   for(let counter=20;counter<=23;counter+=1)store.saveState({...state,counter});
   assert.equal(journal.db.prepare("SELECT length(state_json) body FROM state_snapshots WHERE checkpoint_id='transition:wf:1:t-1'").get().body,0,'the transition body was retired by later saves');
+  assert.deepEqual(rows().map(row=>row.checkpoint_id.split(':')[0]),['bind','transition','save'],'the bind and transition checkpoints stay beside the latest save');
   assert.equal(store.transition(store.loadState(),options).counter,23,'a replayed transition is recognised by its checkpoint id, body or not');
   // A later generation retires the earlier one to a single body; reopening the journal compacts what it finds.
   const reopened=createStore({repoRoot:repo,id:'wf'});reopened.bindJournal(journal,2,{state:reopened.loadState()});
-  assert.equal(journal.db.prepare("SELECT count(*) n FROM state_snapshots WHERE generation=1 AND state_json<>''").get().n,1,'a retired generation keeps one body');
+  assert.equal(journal.db.prepare('SELECT count(*) n FROM state_snapshots WHERE generation=1').get().n,0,'a retired generation keeps no snapshot rows');
   assert.equal(reopened.loadState().counter,23);
-  journal.db.prepare("UPDATE state_snapshots SET state_json='{\"stale\":true}' WHERE generation=1 AND state_json=''").run();
+  journal.db.prepare("INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at) VALUES('save:wf:1:stale','wf',1,?,'{\"stale\":true}',1)").run(stateGoalIdentity(state));
   journal.close();
   const again=openJournal({file:path.join(repo,'journal.sqlite')});
-  assert.equal(again.db.prepare("SELECT count(*) n FROM state_snapshots WHERE generation=1 AND state_json<>''").get().n,1,'opening the journal compacts what an older runtime left behind');
+  assert.equal(again.db.prepare('SELECT count(*) n FROM state_snapshots WHERE generation=1').get().n,0,'opening the journal compacts what an older runtime left behind');
   assert.equal(compactSnapshots(again.db),0,'compaction is idempotent');
   again.close();fs.rmSync(repo,{recursive:true,force:true});
 });

@@ -39,26 +39,26 @@ function richStore(repoRoot,id='20260101-000000-rich'){
     allocation:{loads:{fast:2},usedToday:{fast:5,slow:1},
       cooling:{slow:{kind:'rate-limited',until:NOW+10*MIN,cooldownMs:600000,reason:'429 from the provider'}}},
     ops:[
-      op('a','done',{nodeId:'prod.alpha.one',ledgerIds:['prod.alpha.one']}),
+      op('a','done',{nodeId:'prod.admin.one',ledgerIds:['prod.admin.one']}),
       op('r1','running',{nodeId:'prod.beta.two',ledgerIds:['prod.beta.two'],dispatch:'ctx_r1',restarts:1}),
       op('r2','running',{kind:'interface.implement',nodeId:'prod.beta.three',ledgerIds:['prod.beta.three'],dispatch:'ctx_r2'}),
-      op('p1','paused',{ledgerIds:['prod.alpha.two']}),
+      op('p1','paused',{ledgerIds:['prod.admin.two']}),
       op('shared-1','blocked',{refusal:'dynamic-op'}),
       op('x1','blocked',{nodeId:'prod.gamma.one',ledgerIds:['prod.gamma.one'],refusal:'out-of-repository'})
     ],
-    ledger:[item('prod.alpha.one','verified'),item('prod.alpha.two','implemented'),item('prod.alpha.three','planned'),
+    ledger:[item('prod.admin.one','verified'),item('prod.admin.two','implemented'),item('prod.admin.three','planned'),
       item('prod.beta.one','verified'),item('prod.beta.two','planned'),item('prod.beta.three','planned'),
       item('prod.gamma.one','out-of-repository'),item('prod.gamma.two','preexisting')],
-    lanes:{'lane-a':['prod.alpha.one','prod.alpha.two'],'lane-b':{nodes:['prod.beta.one','prod.beta.two','prod.beta.three']}},
-    verifyRounds:{'prod.alpha.one+prod.alpha.two':3,'prod.beta.one':1},
+    lanes:{'lane-a':['prod.admin.one','prod.admin.two'],'lane-b':{nodes:['prod.beta.one','prod.beta.two','prod.beta.three']}},
+    verifyRounds:{'prod.admin.one+prod.admin.two':3,'prod.beta.one':1},
     reviewFindings:[{op:'verify-1',finding:'the migration is not reversible'}],
     needUser:[{kind:'dynamic-op',op:'shared-1',detail:'shared-1 was created beyond the dynamic-op budget'}],
     // Decisions the runtime took on its own recommendation: nothing waits on them, so they are not "needs you"
     // - but the owner is still owed the question, and a workflow that finished done may owe them all of these.
     provisional:[
-      {decision:'prod.alpha.business.srs.policy-decision.d-refund',op:'ask-1',recommended:2,
+      {decision:'prod.admin.business.srs.policy-decision.d-refund',op:'ask-1',recommended:2,
         options:['reopen the order','close it and issue a credit note'],at:NOW-60000,answered:null},
-      {decision:'prod.alpha.business.srs.policy-decision.d-retry',op:'ask-2',recommended:1,
+      {decision:'prod.admin.business.srs.policy-decision.d-retry',op:'ask-2',recommended:1,
         options:['retry twice','retry five times'],at:NOW-60000,answered:{choice:'1',note:null,at:NOW}}
     ],
     anomalies:{'settled:r1:stalled-idle':{count:4,firstAt:ago(60),lastAt:ago(5),triaged:{option:'settle-op'}},
@@ -68,19 +68,19 @@ function richStore(repoRoot,id='20260101-000000-rich'){
   writeLines(path.join(dir,'events.jsonl'),[
     {at:ago(240),seq:1,event:'created',job:'Deliver the fixture product'},
     {at:ago(210),seq:2,event:'approved',ops:6},
-    {at:ago(200),seq:3,event:'op-done',op:'a0',node:'prod.alpha.zero',runtime:'fast',files:['src/a0']},
-    {at:ago(120),seq:4,event:'op-done',op:'a',node:'prod.alpha.one',runtime:'fast',files:['src/a']},
+    {at:ago(200),seq:3,event:'op-done',op:'a0',node:'prod.admin.zero',runtime:'fast',files:['src/a0']},
+    {at:ago(120),seq:4,event:'op-done',op:'a',node:'prod.admin.one',runtime:'fast',files:['src/a']},
     {at:ago(60),seq:5,event:'op-done',op:'b',node:'prod.beta.one',runtime:'slow',files:['src/b']},
     {at:ago(45),seq:6,event:'launched',op:'r1',kind:'backend.implement',runtime:'fast',dispatch:'ctx_r1'},
     {at:ago(30),seq:7,event:'op-done',op:'c',node:'prod.beta.one',runtime:'fast',files:['src/c']},
-    {at:ago(20),seq:8,event:'verify-exhausted',component:'prod.alpha.one+prod.alpha.two',rounds:3},
+    {at:ago(20),seq:8,event:'verify-exhausted',component:'prod.admin.one+prod.admin.two',rounds:3},
     {at:ago(10),seq:9,event:'launched',op:'r2',kind:'interface.implement',runtime:'fast',dispatch:'ctx_r2'},
     {at:ago(5),seq:10,event:'wait',result:'timeout',ticks:3,liveness:['ctx_r1:working','ctx_r2:working']},
     {at:ago(2),seq:11,event:'nudged',op:'r2',liveness:'stalled-idle'},
     {at:NOW-90_000,seq:12,event:'tick',iteration:12,ops:['r1=running','r2=running']}
   ]);
   writeLines(path.join(dir,'validator','verdicts.jsonl'),[
-    {at:ago(50),node:'prod.alpha.one',outcome:'accepted'},
+    {at:ago(50),node:'prod.admin.one',outcome:'accepted'},
     {at:ago(40),node:'prod.gamma.two',outcome:'accepted'},
     {at:ago(30),node:'prod.beta.one',outcome:'rejected',summary:'prod.beta.one declares no checks'}
   ]);
@@ -136,13 +136,13 @@ test('the view counts exactly what the files say, and the clock comes from the c
   assert.equal(view.ledger.todo,3);
   assert.equal(view.ledger.outOfRepository,1);
   assert.equal(view.ledger.eligible,3,'the items a live op is carrying');
-  assert.deepEqual(view.ledger.byFeature,[{feature:'prod.alpha',done:1,total:3},
+  assert.deepEqual(view.ledger.byFeature,[{feature:'prod.admin',done:1,total:3},
     {feature:'prod.beta',done:1,total:3},{feature:'prod.gamma',done:1,total:2}]);
   assert.deepEqual([view.ledger.treeEligible,view.ledger.treeTotal],[40,50]);
 
   assert.deepEqual(view.lanes,[{lane:'lane-a',done:1,total:2},{lane:'lane-b',done:1,total:3}]);
-  assert.deepEqual(view.reviews.rounds,{'prod.alpha.one+prod.alpha.two':3,'prod.beta.one':1});
-  assert.deepEqual(view.reviews.exhausted,['prod.alpha.one+prod.alpha.two']);
+  assert.deepEqual(view.reviews.rounds,{'prod.admin.one+prod.admin.two':3,'prod.beta.one':1});
+  assert.deepEqual(view.reviews.exhausted,['prod.admin.one+prod.admin.two']);
   assert.equal(view.reviews.findings,1);
 
   assert.deepEqual({...view.validator,lastAt:undefined},{source:'verdicts',accepted:2,rejected:1,unavailable:0,
@@ -191,8 +191,8 @@ test('a young workflow is measured over its own life, not a three hour window th
   const dir=path.join(workflows(repoRoot),id);
   writeLines(path.join(dir,'events.jsonl'),[
     {at:ago(30),seq:1,event:'created'},
-    {at:ago(20),seq:2,event:'op-done',op:'a',node:'prod.alpha.one'},
-    {at:ago(10),seq:3,event:'op-done',op:'b',node:'prod.alpha.two'},
+    {at:ago(20),seq:2,event:'op-done',op:'a',node:'prod.admin.one'},
+    {at:ago(10),seq:3,event:'op-done',op:'b',node:'prod.admin.two'},
     {at:ago(1),seq:4,event:'tick',iteration:1}
   ]);
   const view=buildView({repoRoot,id,now:NOW});
@@ -221,16 +221,16 @@ test('the render is a plain terminal page with tables and no control codes',t=>{
   assert.match(page,/\| prod\.gamma \| 1 \| 2 \|/);
   assert.match(page,/## Lanes\n\| lane \| done \| total \|\n\| --- \| --- \| --- \|\n\| lane-a \| 1 \| 2 \|/);
   assert.match(page,/## Reviews\n\| group \| rounds \| exhausted \|/);
-  assert.match(page,/\| prod\.alpha\.one\+prod\.alpha\.two \| 3 \| yes \|/);
+  assert.match(page,/\| prod\.admin\.one\+prod\.admin\.two \| 3 \| yes \|/);
   assert.match(page,/## Validator {2}accepted 2, rejected 1, unavailable 0 \(from verdicts\)/);
   // The one section that answers "where does it ask me?": every ask tab, every unanswered decision and every
   // line that is really the owner's, each with the command or the tab that settles it. A `dynamic-op` line is a
   // mechanical bound of the runtime, so it is not on it.
-  assert.match(page,new RegExp(`## Owner \\(1\\)\n- decision ask-1: prod\\.alpha\\.business\\.srs\\.policy-decision\\.d-refund: the runtime took option 2 - close it and issue a credit note and carried on\n  how: starci workflow-answer --id ${id} --op ask-1 --choice <n> \\[--note "\\.\\.\\."\\]`));
+  assert.match(page,new RegExp(`## Owner \\(1\\)\n- decision ask-1: prod\\.admin\\.business\\.srs\\.policy-decision\\.d-refund: the runtime took option 2 - close it and issue a credit note and carried on\n  how: starci workflow-answer --id ${id} --op ask-1 --choice <n> \\[--note "\\.\\.\\."\\]`));
   assert.ok(page.indexOf('## Owner (1)')<page.indexOf('## Runtimes'),'it is the first section of the page: the owner reads what waits on them first');
   assert.match(page,/## Needs you \(1\)\n- dynamic-op shared-1: shared-1 was created beyond the dynamic-op budget/);
   // Separate from "needs you": nothing is blocked on these, and only the ones the owner has not answered show.
-  assert.match(page,/## Provisional decisions \(1\)\n- prod\.alpha\.business\.srs\.policy-decision\.d-refund: the runtime took option 2 - close it and issue a credit note and carried on\./);
+  assert.match(page,/## Provisional decisions \(1\)\n- prod\.admin\.business\.srs\.policy-decision\.d-refund: the runtime took option 2 - close it and issue a credit note and carried on\./);
   assert.match(page,new RegExp(`workflow-answer --id ${id} --op ask-1 --choice <n>`));
   assert.match(page,/a different option reopens what was built on it/);
   assert.doesNotMatch(page,/d-retry/,'a decision the owner has answered is not still owed');
@@ -287,7 +287,7 @@ test('workflow-status prints one line per declared integration and what each is 
   const dir=path.join(workflows(repoRoot),id);
   const ledgerRoot=path.join(repoRoot,'.starciwork');
   const write=(relative,body)=>{const file=path.join(ledgerRoot,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,body);};
-  write('features/sales/business/srs/delivery/index.yaml',`schema: work/node@2
+  write('features/admin/business/srs/delivery/index.yaml',`schema: work/node@2
 id: demo.sales.business.srs.fr.delivery
 kind: business
 required: true
@@ -313,13 +313,13 @@ extensions:
           name: VIBER_TOKEN
           providedBy: owner
 `);
-  write('features/sales/integration/telegram/index.yaml',`schema: work/node@2
+  write('features/admin/integration/telegram/index.yaml',`schema: work/node@2
 id: demo.sales.integration.telegram
 kind: integration
 required: true
 state: done
 `);
-  write('features/sales/integration/telegram/evidence/op-telegram-evidence/manifest.yaml',`schema: work/evidence@1
+  write('features/admin/integration/telegram/evidence/op-telegram-evidence/manifest.yaml',`schema: work/evidence@1
 id: op-telegram-evidence
 nodeId: demo.sales.integration.telegram
 inputDigest: ${'a'.repeat(64)}
@@ -330,13 +330,13 @@ proof:
   boundary: live
   fakes: []
 `);
-  write('features/sales/e2e/checkout/index.yaml',`schema: work/node@2
+  write('features/admin/e2e/checkout/index.yaml',`schema: work/node@2
 id: demo.sales.e2e.checkout
 kind: e2e
 required: true
 state: done
 `);
-  write('features/sales/e2e/checkout/evidence/op-checkout-evidence/manifest.yaml',`schema: work/evidence@1
+  write('features/admin/e2e/checkout/evidence/op-checkout-evidence/manifest.yaml',`schema: work/evidence@1
 id: op-checkout-evidence
 nodeId: demo.sales.e2e.checkout
 inputDigest: ${'b'.repeat(64)}

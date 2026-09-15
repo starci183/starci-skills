@@ -13,8 +13,10 @@ so every terminal of one product writes into the same workflows root.
   runtime-loads.json  the shared runtime ledger of the repository (every kernel reads and writes it)
   supervisor.log      one line per supervision round
 .starciwork/_local/workflows/<workflowId>/
-  events.jsonl        append-only audit trail, one JSON object per line
-  state.json          derived snapshot, schema starci/workflow-state@1
+  events.jsonl        append-only audit trail of the current generation, one JSON object per line
+  events.g<n>.jsonl   the audit trail of retired generation n, closed at the retry that retired it
+  state.json          derived snapshot, schema starci/workflow-state@1; candidate manifests stay under the
+                      candidate's own control root beside the journal, the state keeps a record of them
   goal.md, goal.json  the confirmed goal, readable and machine form; both carry the mandatory
                       critique of that goal (`## Phản biện (critique)`, `critique`) above its
                       definition of done - see docs/workflow-kernel.md, Phases
@@ -50,8 +52,9 @@ its loaded state.
 carries `at`, a monotonic `seq` and whatever the caller recorded; `seq`
 continues after the process restarts because the store reads the highest seq
 already on disk, and a torn or hand-edited line cannot reset the counter.
-`readEvents({since})` replays everything after a seq, which is how a resumed
-coordinator catches up without trusting a snapshot.
+`readEvents({since})` replays everything after a seq, retired segments first, which is how a resumed
+coordinator catches up without trusting a snapshot. A retry closes the live log as the segment of the
+generation it retires (`rotateEvents`); the next event opens a fresh live log and the counter continues.
 
 `state.json` is derived: it is whatever the current phase needs in order to act
 without replaying the log, and it is written atomically (a sibling tmp file, then

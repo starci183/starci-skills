@@ -14,17 +14,17 @@ const decision=(snapshot,ids)=>({schema:MANAGER_DECISION,workflowId:snapshot.wor
 
 test('a completed durable manager answer is discarded when worker progress changed its pending snapshot',()=>{
   const state=workflow(),journal=store(),pending=Object.assign(new Error('pending'),{code:'STARCI_JOB_PENDING'});
-  const first=coordinateManagedWorkflow(journal,state,{v6:{},manageWorkflow(){throw pending;}});
+  const first=coordinateManagedWorkflow(journal,state,{engine:{},manageWorkflow(){throw pending;}});
   assert.equal(first.pending,true);const pendingId=state.engine.manager.pendingDecisionId;
-  state.ops[0].status='running';state.ops[0].v6Lease={jobId:'native-work-1'};
-  const second=coordinateManagedWorkflow(journal,state,{v6:{},manageWorkflow:snapshot=>decision(snapshot,['dispatch:work-1'])});
+  state.ops[0].status='running';state.ops[0].lease={jobId:'native-work-1'};
+  const second=coordinateManagedWorkflow(journal,state,{engine:{},manageWorkflow:snapshot=>decision(snapshot,['dispatch:work-1'])});
   assert.deepEqual(second,{pending:false,stale:true,dispatch:[]});
   assert.equal(journal.events.at(-1).event,'manager-stale-discarded');assert.equal(journal.events.at(-1).decisionId,pendingId);
 });
 
 test('manager output cannot select or resolve an owner decision request',()=>{
   const state=workflow(),journal=store();let snapshot;
-  const result=coordinateManagedWorkflow(journal,state,{v6:{},manageWorkflow:value=>{snapshot=value;return decision(value,['owner:ask-2']);}});
+  const result=coordinateManagedWorkflow(journal,state,{engine:{},manageWorkflow:value=>{snapshot=value;return decision(value,['owner:ask-2']);}});
   assert.equal(result.incident,true);assert.deepEqual(result.dispatch,[]);
   assert.equal(snapshot.actions.some(action=>action.opId==='ask-2'),false);
   assert.equal(state.needUser[0].record,'decision.customer-proof');assert.equal(state.ops[1].ownerRequest,true);

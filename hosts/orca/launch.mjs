@@ -14,6 +14,8 @@ import {supervisorMain} from '../../kernel/supervisor.mjs';
 import {serveWorkflowInputs} from '../../kernel/inputs-server.mjs';
 import {WORKFLOW_LIST,buildList,buildView,renderList,renderView} from '../../kernel/view.mjs';
 import {repositoryRoot} from '../../kernel/store.mjs';
+import {journalMaintenanceMain} from '../../kernel/journal-maintenance.mjs';
+import {DISK_HEADROOM_CODE} from '../../kernel/disk.mjs';
 
 /**
  * Canonical supervised launcher for Orca operation agents, plus the CLI surface of the 5.0 workflow
@@ -629,13 +631,19 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
     --accept-critique is the owner overriding a goal critique that answered refuse: the reason is recorded and
     the kernel never asks for it again.
   node bin/starci.mjs workflow-run --id <workflow-id> [--from <own-terminal> --run <run>] [--launch-file <file>] [--allocation <runtime=slots,...>] [--max-iterations N] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
-  node bin/starci.mjs workflow-retry --id <workflow-id> --engine 6 --runtime-pin <pin-record.json> [--host <path-to-.claude>] [--worktree <relative-path>]
+  node bin/starci.mjs workflow-retry --id <workflow-id> --runtime-pin <pin-record.json> [--journal-file <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     After the kernel is paused, settle native dispatches and retry unfinished active operations with fresh
-    contexts on the sealed v6 alpha. Preserve accepted Work, goal authority and owner inputs.
+    contexts on the sealed build named by the pin. A state written by an earlier build is migrated here: op fields,
+    the engine record and the journal location move to this build's shape on the record, never by hand.
     runs the kernel loop: up to 10 operation agents in one worktree, machine-verified acceptance, gates, final report.
     On the Work ledger every accepted slice is written back into its node (state, completion, evidence) and
     committed with a "Work: <node id>" trailer - in the repository that owns the tree, which is this one
     unless the product routes the Work elsewhere.
+  node bin/starci.mjs journal-prune --journal-file <journal.sqlite> [--store-root <root[,root]>] [--retire <id[,id]>] [--vacuum true] [--dry-run]
+    retire the rows of every workflow the named stores prove settled (finished, bound to another journal, or named
+    with --retire); a workflow with live reservations is kept by the journal itself; unknown ids are reported only.
+  node bin/starci.mjs journal-retire --journal-file <journal.sqlite> --store-root <root[,root]> [--delete true]
+    a whole journal nothing binds: no state under the stores names it and no row is live; deleted only with --delete true.
   node bin/starci.mjs workflow-status --id <workflow-id> [--json true] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     prints one status view of the workflow, derived from its own files: kernel liveness, runtimes, running
     and blocked operations, the ledger by feature, reviews, the validator, what needs you, the rate and the
@@ -661,6 +669,8 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
 const KERNEL_COMMANDS=['workflow-goal','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs'];
 /** Read-only views of the workflow store: they open no kernel, call no Orca and never write. */
 const VIEW_COMMANDS=['workflow-list'];
+/** Operator maintenance of a local journal: no kernel, no Orca; the store roots named on the command line are the proof. */
+const JOURNAL_COMMANDS=['journal-prune','journal-retire'];
 
 /**
  * A command may answer with text instead of a record: `print` is written verbatim by the CLI, so a status
@@ -670,7 +680,8 @@ const printed=(schema,command,print,rest={})=>({schema,command,...rest,print});
 
 export function main(argv=process.argv.slice(2),{orca,wait,env=process.env}={}){
   const {command,options}=parseArgs(argv);
-  need(['start-op','settle','sweep','verify','notify','report','wait',...KERNEL_COMMANDS,...VIEW_COMMANDS].includes(command),usage());
+  need(['start-op','settle','sweep','verify','notify','report','wait',...KERNEL_COMMANDS,...VIEW_COMMANDS,...JOURNAL_COMMANDS].includes(command),usage());
+  if(JOURNAL_COMMANDS.includes(command))return journalMaintenanceMain(command,options);
   if(command==='workflow-inputs'){
     need(Object.keys(options).length===1&&typeof options.session==='string'&&options.session.trim(),
       'Use starci workflow-inputs --session <kernel-owned-session-file>. The kernel owns this helper.');
@@ -715,5 +726,5 @@ if(direct){
     // A text view prints as text; everything else is the record it always was.
     process.stdout.write(typeof output?.print==='string'?output.print.endsWith('\n')?output.print:`${output.print}\n`:`${JSON.stringify(output,null,2)}\n`);
     if(output?.ok===false)process.exitCode=1;
-  }catch(error){process.stderr.write(`${JSON.stringify({ok:false,error:{message:error.message}},null,2)}\n`);process.exitCode=1;}
+  }catch(error){process.stderr.write(`${JSON.stringify({ok:false,error:{code:error.code??null,message:error.message}},null,2)}\n`);process.exitCode=error?.code===DISK_HEADROOM_CODE?3:1;}
 }

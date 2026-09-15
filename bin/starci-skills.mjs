@@ -12,6 +12,7 @@
 // .claude it did not install unless --force; update keeps a file a person changed locally unless
 // --force; neither ever runs a git command.
 import {loadConfig} from '../scripts/config.mjs';
+import {ENGINE_SCHEMA} from '../kernel/common.mjs';
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, rmdirSync, statSync, lstatSync, writeFileSync, appendFileSync } from 'node:fs';
 import path from 'node:path';
@@ -29,7 +30,12 @@ const pkg = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf
 // CLI must survive relocation: installed doctor fixtures copy this same declared payload.
 export const PAYLOAD = [...new Set(['package.json', ...pkg.files.map(ref => ref.replace(/\/$/, ''))])];
 const MANIFEST = '.starci-skills.json';
-const INSTALL_PROTOCOL = Object.freeze({ schema: 'starci/install-protocol@1', major: 6 });
+// The durable workflow protocol an installed tree speaks, independent of public semver: named by the engine
+// schema it enrolls workflows into, ranked by that schema's number. A receipt from before public 1.0 - a
+// numbered marker or none at all - is the pre-release protocol, ranked below every public engine.
+const INSTALL_PROTOCOL = Object.freeze({ schema: 'starci/install-protocol@2', engine: ENGINE_SCHEMA });
+const PRE_RELEASE_PROTOCOL_SCHEMA = 'starci/install-protocol@1';
+const engineRank = (engine) => { const m = /^starci\/engine@(\d+)$/.exec(String(engine ?? '')); return m ? Number(m[1]) : null; };
 const LOCAL_IGNORES = ['.starciwork/_local/'];
 const ENTRY_MARKER = '<!-- starci:prompt-entry -->';
 const LEGACY_PROMPT_ENTRY = `${ENTRY_MARKER}
@@ -244,25 +250,28 @@ function checkRetiredHostReferences(repo, plan) {
   }
 }
 
-function installedProtocolMajor(manifest) {
+/**
+ * What protocol an installed tree speaks: `{rank, label, modern}`. `rank` orders engines; `modern` says the tree
+ * has the current layout (a cli entry). A malformed marker is refused, never guessed.
+ */
+function installedProtocol(manifest) {
   if (!manifest) return null;
   if (manifest.installProtocol !== undefined) {
     const marker = manifest.installProtocol;
-    if (!marker || typeof marker !== 'object' || Array.isArray(marker) || marker.schema !== INSTALL_PROTOCOL.schema || !Number.isInteger(marker.major) || marker.major < 1) {
-      throw new Error('installed manifest has an invalid install protocol marker; refusing to infer compatibility');
-    }
-    return marker.major;
+    const object = marker && typeof marker === 'object' && !Array.isArray(marker);
+    if (object && marker.schema === INSTALL_PROTOCOL.schema && engineRank(marker.engine) !== null) return { rank: engineRank(marker.engine), label: marker.engine, modern: true };
+    if (object && marker.schema === PRE_RELEASE_PROTOCOL_SCHEMA && Number.isInteger(marker.major) && marker.major >= 1) return { rank: 0, label: 'pre-release protocol ' + marker.major, modern: true };
+    throw new Error('installed manifest has an invalid install protocol marker; refusing to infer compatibility');
   }
-  // Compatibility for installer receipts written before the explicit protocol marker. Their package major was
-  // the workflow protocol major; public v1 manifests always carry the marker above.
+  // A receipt written before any marker existed: its package major is the only protocol identity it has.
   const legacy = Number(String(manifest.version ?? '').split('.')[0]);
   if (!Number.isInteger(legacy) || legacy < 1) throw new Error('legacy installed manifest has no recognizable protocol version');
-  return legacy;
+  return { rank: 0, label: 'pre-release package ' + legacy, modern: legacy >= 3 };
 }
 function checkMajorUpgrade(manifest, opts) {
-  const installed = installedProtocolMajor(manifest);
-  if (installed > INSTALL_PROTOCOL.major) throw new Error(`installed workflow protocol ${installed} is newer than supported protocol ${INSTALL_PROTOCOL.major}`);
-  if (installed !== null && installed < INSTALL_PROTOCOL.major && !opts.upgradeMajor) {
+  const installed = installedProtocol(manifest), current = engineRank(INSTALL_PROTOCOL.engine);
+  if (installed && installed.rank > current) throw new Error(`installed workflow protocol ${installed.label} is newer than supported ${INSTALL_PROTOCOL.engine}`);
+  if (installed !== null && installed.rank < current && !opts.upgradeMajor) {
     throw new Error('major workflow upgrade requires --upgrade-major after reviewing README.md and the applicable upgrade note; existing .worktrees data is not migrated or deleted');
   }
 }
@@ -483,8 +492,8 @@ export function update(opts, log = console.log) {
 export function doctor(opts, log = console.log) {
   const target = path.join(opts.dir, '.claude');
   const installedPackage = path.join(target, 'package.json');
-  const manifest = readManifest(target),protocol = manifest ? installedProtocolMajor(manifest) : null;
-  if (existsSync(installedPackage) && (protocol !== null ? protocol >= 3 : Number(JSON.parse(readFileSync(installedPackage, 'utf8')).version?.split('.')[0]) >= 3) && !existsSync(path.join(target, 'cli', 'main.mjs'))) {
+  const manifest = readManifest(target),protocol = manifest ? installedProtocol(manifest) : null;
+  if (existsSync(installedPackage) && (protocol !== null ? protocol.modern : Number(JSON.parse(readFileSync(installedPackage, 'utf8')).version?.split('.')[0]) >= 3) && !existsSync(path.join(target, 'cli', 'main.mjs'))) {
     throw new Error('installed current workflow protocol is incomplete: missing cli/main.mjs; refusing fallback to legacy validation');
   }
   if (existsSync(path.join(target, 'cli', 'main.mjs'))) {

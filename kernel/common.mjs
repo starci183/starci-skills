@@ -56,6 +56,13 @@ export const kindRole=kind=>{try{return graph.roleOf(kind);}catch{return null;}}
  * its own node's `index.yaml`. It runs before the node's lane, never inside it: no lane names it, no route
  * creates it, and the kernel creates exactly one per node when the ledger reports that node incomplete.
  */
+/** The durable engine's identity in workflow state: a schema, not a number, so a build is named by what it is. */
+export const ENGINE_SCHEMA='starci/engine@1';
+export const isEnrolled=state=>state?.engine?.schema===ENGINE_SCHEMA;
+/** A state enrolled by a build that wrote the engine as a numbered marker: it runs only through workflow-retry, which migrates it. */
+export const predatesEngineSchema=state=>Boolean(state?.engine)&&typeof state.engine==='object'&&!state.engine.schema&&typeof state.engine.journalFile==='string';
+/** The sealed build a durable workflow runs from, whatever shape its engine record has. */
+export const sealedRuntimeOf=state=>{const pin=state?.engine?.runtimePin;return pin&&typeof pin==='object'&&typeof pin.root==='string'?pin:null;};
 export const AUTHOR_KIND='work.author';
 /**
  * Its sibling: the kind that cuts one node too big for a single operation into child nodes with disjoint write

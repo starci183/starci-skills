@@ -18,4 +18,4 @@ For Codex, the official [AGENTS.md guide](https://learn.chatgpt.com/docs/agent-c
 
 ## Validation limits
 
-Frontmatter checks and passing unit tests establish syntax and tested invariants. They do not demonstrate automatic selection in every host, model quality, browser UAT, or compatibility with a hosted API environment. Test the installed archive in an isolated host, then evaluate real project outcomes before treating an alpha as production-ready.
+Frontmatter checks and passing unit tests establish syntax and tested invariants. They do not demonstrate automatic selection in every host, model quality, browser UAT, or compatibility with a hosted API environment. Test the installed archive in an isolated host, then evaluate real project outcomes before treating a build as production-ready.

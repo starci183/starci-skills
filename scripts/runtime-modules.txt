@@ -49,6 +49,8 @@ kernel/inputs-ui.mjs
 kernel/inputs-readiness.mjs
 kernel/inputs-replacement.mjs
 kernel/journal.mjs
+kernel/journal-maintenance.mjs
+kernel/disk.mjs
 kernel/admission.mjs
 kernel/jobs.mjs
 kernel/scheduler.mjs
@@ -57,7 +59,7 @@ kernel/job-worker.mjs
 kernel/job-model-worker.mjs
 kernel/job-attestation.mjs
 kernel/job-reconcile.mjs
-kernel/runtime-v6.mjs
+kernel/engine.mjs
 kernel/runtime-pin.mjs
 kernel/candidates.mjs
 kernel/candidate-bridge.mjs

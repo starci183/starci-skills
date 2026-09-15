@@ -17,13 +17,15 @@ Usage:
   starci workflow-approve --id <id> [--allocation <runtime>=<slots>,...] [--allow-dynamic N] [--accept-critique "<reason>"]
   starci workflow-answer --id <id> --op <ask op> [--choice <n>] [--note "<answer>"]
   starci workflow-run --id <id> [--host-adapter orca|headless] [--max-iterations N]
-  starci workflow-retry --id <id> --engine 6 --runtime-pin <file>
+  starci workflow-retry --id <id> --runtime-pin <file>
   starci workflow-status --id <id> [--json true]
   starci workflow-list [--json true]
   starci workflow-stop --id <id>
   starci workflow-lane-close --id <id>
   starci workflow-supervise --host <skill root> [--once true] [--poll-ms 60000]
   starci workflow-inputs --session <kernel-owned-session-file>
+  starci journal-prune --journal-file <file> [--store-root <root,..>] [--retire <id,..>] [--vacuum true] [--dry-run]
+  starci journal-retire --journal-file <file> --store-root <root,..> [--delete true]
   starci start-op --run <run> --workflow-task <task> --from <terminal> --worktree <path> --operation <op> --scope <scope> --spec-file <file>
   starci settle --dispatch <dispatch> [--terminal <terminal>] [--close true]
   starci sweep --worktree <path> --from <monitor terminal> [--keep <handle,handle>]

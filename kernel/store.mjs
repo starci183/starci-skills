@@ -33,10 +33,22 @@ export function newWorkflowId(title,now=Date.now){
 }
 
 function readJson(file,fallback){try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return fallback;}}
-/** The highest seq already on disk: a torn or hand-edited last line must never reset the counter. */
-function lastSeq(file){
-  const lines=readText(file).split('\n').map(line=>line.trim()).filter(Boolean);
-  for(let index=lines.length-1;index>=0;index-=1){const event=readLine(lines[index]);if(Number.isInteger(event?.seq))return event.seq;}
+/**
+ * The retired generations of a workflow keep their events in segments beside the live log: `events.g<n>.jsonl`
+ * is what generation n recorded before a retry retired it. The live log is the current generation's only.
+ */
+const SEGMENT=/^events\.g(\d+)\.jsonl$/;
+function eventSegments(dir){
+  let names=[];try{names=fs.readdirSync(dir);}catch{return [];}
+  return names.map(name=>SEGMENT.exec(name)).filter(Boolean).map(match=>({generation:Number(match[1]),file:path.join(dir,match[0])})).sort((a,b)=>a.generation-b.generation);
+}
+const eventsIn=file=>readText(file).split('\n').map(line=>line.trim()).filter(Boolean).map(readLine).filter(event=>event&&Number.isInteger(event.seq));
+/** The highest seq already on disk - live log first, then the newest segment: a rotation must never reset the counter. */
+function lastSeq(file,dir){
+  for(const candidate of [file,...eventSegments(dir).map(segment=>segment.file).reverse()]){
+    const lines=readText(candidate).split('\n').map(line=>line.trim()).filter(Boolean);
+    for(let index=lines.length-1;index>=0;index-=1){const event=readLine(lines[index]);if(Number.isInteger(event?.seq))return event.seq;}
+  }
   return 0;
 }
 function readText(file){try{return fs.readFileSync(file,'utf8');}catch{return '';}}
@@ -72,7 +84,7 @@ export function createStore({repoRoot,id}){
   let durable=null;
   const reportProgress=createProgressReporter();
   const nextSeq=()=>{
-    if(seq===null)seq=lastSeq(paths.events);
+    if(seq===null)seq=lastSeq(paths.events,dir);
     seq+=1;return seq;
   };
   const project=state=>{const tmp=`${paths.state}.${process.pid}.tmp`;fs.writeFileSync(tmp,`${JSON.stringify(state,null,2)}\n`);replaceStateSnapshot(tmp,paths.state);return state;};
@@ -87,9 +99,19 @@ export function createStore({repoRoot,id}){
       reportProgress(line);
       return line;
     },
+    /** Every event of the workflow, retired segments first, then the live log; `since` replays after a seq. */
     readEvents({since=0}={}){
-      return readText(paths.events).split('\n').map(line=>line.trim()).filter(Boolean)
-        .map(readLine).filter(event=>event&&Number.isInteger(event.seq)&&event.seq>since);
+      return [...eventSegments(dir).flatMap(segment=>eventsIn(segment.file)),...eventsIn(paths.events)].filter(event=>event.seq>since);
+    },
+    /** Retire the live log as the segment of the generation that just ended; the next event opens a new live log. */
+    rotateEvents(generation){
+      need(Number.isInteger(generation)&&generation>0,'rotateEvents needs the retired generation');
+      const target=path.join(dir,`events.g${generation}.jsonl`);
+      if(!fs.existsSync(paths.events)||!readText(paths.events).trim())return {rotated:null};
+      need(!fs.existsSync(target),`event segment already exists: ${target}`);
+      if(seq===null)seq=lastSeq(paths.events,dir);
+      fs.renameSync(paths.events,target);
+      return {rotated:target};
     },
     /** Atomic: write a sibling tmp file, then rename over state.json, so no reader ever sees a partial state. */
     saveState(state){

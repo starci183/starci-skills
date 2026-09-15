@@ -28,7 +28,7 @@ import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGra
 import {machineVerify} from '../kernel/kernel.mjs';
 import {attributedFiles} from '../kernel/verify.mjs';
 import {relocateLauncher,reviveSupervisor} from '../kernel/kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,LONG_CONTRACT_GRACE_MS,PERCEPTION_GRACE_MS,perceptionProviders,refundRetiredGenerationProbations,noteAnomaly,prepareV6WorkGate,producedKindVerdict,restoreDurableCheckpoint,recoverSatisfiedDependencyBlocks,sweepResolvedReviewLines,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,nativeActivityProof,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,LONG_CONTRACT_GRACE_MS,PERCEPTION_GRACE_MS,perceptionProviders,refundRetiredGenerationProbations,noteAnomaly,prepareWorkGate,producedKindVerdict,restoreDurableCheckpoint,recoverSatisfiedDependencyBlocks,sweepResolvedReviewLines,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,nativeActivityProof,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -639,11 +639,11 @@ test('a stopped native overrun preserves its candidate baseline and advances to 
   const harness=setup({plan:salesPlan,scripts:{}});
   try{
     approve(harness.store,harness.state);harness.state.run='run_wf';harness.state.from='term_kernel';
-    const op=running(harness.state,'op-intake','ctx_native');Object.assign(op,{kind:'backend.implement',attempt:1,launchedAt:0,v6Lease:{jobId:'job-native'},v6Candidate:{status:'running'}});
+    const op=running(harness.state,'op-intake','ctx_native');Object.assign(op,{kind:'backend.implement',attempt:1,launchedAt:0,lease:{jobId:'job-native'},candidate:{status:'running'}});
     let call=null;const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>OP_DEADLINE_MS.default+1,work:null,
-      v6:{settleStoppedOperation(candidate,input){call={candidate,input};delete candidate.v6Lease;candidate.v6OwnedBaselinePaths=['src/preserved.ts'];return {ok:true,effectState:'none',observedFiles:['src/preserved.ts'],candidateDigest:'candidate-1'};}}};
+      engine:{settleStoppedOperation(candidate,input){call={candidate,input};delete candidate.lease;candidate.ownedBaselinePaths=['src/preserved.ts'];return {ok:true,effectState:'none',observedFiles:['src/preserved.ts'],candidateDigest:'candidate-1'};}}};
     settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[]});
-    assert.equal(call.candidate,op);assert.equal(call.input.dispatch,'ctx_native');assert.equal(call.input.settlement.schema,'starci/orca-supervised-settlement@1');assert.equal(call.input.settlement.effectState,'none');assert.equal(op.status,'ready');assert.equal(op.attempt,2);assert.deepEqual(op.v6OwnedBaselinePaths,['src/preserved.ts']);assert.equal(op.v6PriorStoppedAttempt.candidateDigest,'candidate-1');assert.equal(events(harness.store).some(event=>event.event==='native-attempt-reconciled'&&event.dispatch==='ctx_native'),true);
+    assert.equal(call.candidate,op);assert.equal(call.input.dispatch,'ctx_native');assert.equal(call.input.settlement.schema,'starci/orca-supervised-settlement@1');assert.equal(call.input.settlement.effectState,'none');assert.equal(op.status,'ready');assert.equal(op.attempt,2);assert.deepEqual(op.ownedBaselinePaths,['src/preserved.ts']);assert.equal(op.priorStoppedAttempt.candidateDigest,'candidate-1');assert.equal(events(harness.store).some(event=>event.event==='native-attempt-reconciled'&&event.dispatch==='ctx_native'),true);
   }finally{harness.cleanup();}
 });
 
@@ -659,11 +659,11 @@ test('stalled-prompt does not terminate a native worker with fresh exact host ac
   const harness=setup({plan:salesPlan,scripts:{}});
   try{
     approve(harness.store,harness.state);const now=Date.parse('2026-09-15T01:00:00Z');harness.state.run='run-exact';harness.state.from='term-kernel';
-    const op=running(harness.state,'op-intake','ctx-active');Object.assign(op,{task:'task-active',launchedAt:now-10*60*1000,v6Lease:{jobId:'job-active'}});
+    const op=running(harness.state,'op-intake','ctx-active');Object.assign(op,{task:'task-active',launchedAt:now-10*60*1000,lease:{jobId:'job-active'}});
     const base=harness.fake.orca,orca={...base,invoke(name,args,options){if(name==='worker-show')return {outcome:'ok',receipt:{result:{dispatch:{id:'ctx-active',run_id:'run-exact',task_id:'task-active',last_heartbeat_at:new Date(now-20_000).toISOString()},worker:{dispatch_id:'ctx-active'},observation:{exactWorker:true,status:'running'}}}};return base.invoke(name,args,options);}};
-    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>now,work:null,v6:{settleStoppedOperation(){throw Error('fresh worker must not settle');}}};
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>now,work:null,engine:{settleStoppedOperation(){throw Error('fresh worker must not settle');}}};
     settleStalled(orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx-active',liveness:'stalled-prompt'}]});
-    assert.equal(op.status,'running');assert.ok(op.v6Lease);assert.equal(events(harness.store).some(event=>event.event==='native-settlement-deferred'&&event.dispatch==='ctx-active'),true);
+    assert.equal(op.status,'running');assert.ok(op.lease);assert.equal(events(harness.store).some(event=>event.event==='native-settlement-deferred'&&event.dispatch==='ctx-active'),true);
   }finally{harness.cleanup();}
 });
 
@@ -728,7 +728,7 @@ test('a dependency block is re-admitted from its exact transition receipt when t
   const staleState={ops:[stale,shared],needUser:[{op:'stale',kind:'authority'}]};
   assert.deepEqual(recoverSatisfiedDependencyBlocks(store,staleState,{events:[{event:'shared-change-blocked',op:'stale',shared:'shared',attempt:2},{event:'report',op:'stale',attempt:3}]}),[],
     'a stale dependency receipt cannot erase a newer authority block');
-  staleState.needUser=[];stale.v6Lease={jobId:'live'};
+  staleState.needUser=[];stale.lease={jobId:'live'};
   assert.deepEqual(recoverSatisfiedDependencyBlocks(store,staleState,{events:[{event:'shared-change-blocked',op:'stale',shared:'shared',attempt:3}]}),[],'a live native lease is never inferred settled');
   const decision={id:'decision',kind:'decision.prepare',status:'done'},ownerBlocked={id:'owner-blocked',kind:'backend.implement',status:'blocked',refusal:null,attempt:1,dependsOn:['decision'],blockedByDependency:{id:'decision',attempt:1}};
   assert.deepEqual(recoverSatisfiedDependencyBlocks(store,{ops:[ownerBlocked,decision],needUser:[]},{events:[]}),[],'a completed decision operation is still an owner boundary');
@@ -1771,21 +1771,21 @@ test('a run bound to a coordinator tab that is gone is re-bound to the tab the k
   }finally{harness.cleanup();}
 });
 
-test('v6 prepares one authentic canonical Work gate for every Work-writing kind and rejects a forged name',()=>{
-  const ctx={v6:{},work:{repoRoot:'D:/product',ledger:{workRoot:'D:/canonical/.starciwork'}}},op={kind:'architecture.revise',checks:[]};
-  assert.equal(prepareV6WorkGate(op,ctx),true);assert.equal(op.checks.length,1);assert.equal(op.checks[0].name,'work-valid');assert.match(op.checks[0].command,/D:[\\/]canonical[\\/]\.starciwork/);assert.equal(op.checks[0].runtimePrepared,true);
-  assert.equal(prepareV6WorkGate(op,ctx),false);assert.equal(op.checks.length,1,'the exact runtime gate is deduplicated');
-  assert.throws(()=>prepareV6WorkGate({kind:'architecture.revise',checks:[{name:'work-valid',command:'exit 0'}]},ctx),/reserved for the exact canonical Work validator/);
-  assert.throws(()=>prepareV6WorkGate({kind:'architecture.revise',checks:[]},{v6:{},work:null}),/canonical Work binding is unavailable/);
+test('the engine prepares one authentic canonical Work gate for every Work-writing kind and rejects a forged name',()=>{
+  const ctx={engine:{},work:{repoRoot:'D:/product',ledger:{workRoot:'D:/canonical/.starciwork'}}},op={kind:'architecture.revise',checks:[]};
+  assert.equal(prepareWorkGate(op,ctx),true);assert.equal(op.checks.length,1);assert.equal(op.checks[0].name,'work-valid');assert.match(op.checks[0].command,/D:[\\/]canonical[\\/]\.starciwork/);assert.equal(op.checks[0].runtimePrepared,true);
+  assert.equal(prepareWorkGate(op,ctx),false);assert.equal(op.checks.length,1,'the exact runtime gate is deduplicated');
+  assert.throws(()=>prepareWorkGate({kind:'architecture.revise',checks:[{name:'work-valid',command:'exit 0'}]},ctx),/reserved for the exact canonical Work validator/);
+  assert.throws(()=>prepareWorkGate({kind:'architecture.revise',checks:[]},{engine:{},work:null}),/canonical Work binding is unavailable/);
 });
 
-test('v6 record-kind validation sees every sealed observed write while legacy attribution remains report-bound',()=>{
+test('engine record-kind validation sees every sealed observed write while legacy attribution remains report-bound',()=>{
   const record='.starciwork/features/sales/ui/index.yaml';
   const op={kind:'backend.implement',nodeId:null,reports:[{files:[]}]};
   assert.deepEqual(producedKindVerdict(op,[record],{}).produced,[]);
-  const v6=producedKindVerdict(op,[record],{v6:{}});
-  assert.deepEqual(v6.produced,[record]);assert.deepEqual(v6.undeclared.map(item=>item.file),[record]);
-  assert.equal(producedKindVerdict(op,[record],{v6:{},kindsProfile:{}}).ok,false,'an unavailable v6 kind schema fails closed');
+  const verdict=producedKindVerdict(op,[record],{engine:{}});
+  assert.deepEqual(verdict.produced,[record]);assert.deepEqual(verdict.undeclared.map(item=>item.file),[record]);
+  assert.equal(producedKindVerdict(op,[record],{engine:{},kindsProfile:{}}).ok,false,'an unavailable kind schema fails closed');
 });
 
 test('an intake op planned by an older build carries the current goal and acceptance after a sync, its allowlist untouched',()=>{
@@ -3757,7 +3757,7 @@ test('a retry refunds the probation its retired generations consumed for unfinis
   const harness=setup({plan:salesPlan,scripts:{}});
   try{
     const state=harness.state;
-    state.engine={major:6,generation:3};
+    state.engine={schema:'starci/engine@1',generation:3};
     state.modelEligibility={probationBudget:{initial:6,remaining:2},probationScopes:{
       'wf/op-intake/backend.implement/implement':{initial:2,remaining:0,consumedJobs:['j1','j2'],refundedJobs:[],consumedReceipts:[
         {jobId:'j1',runtimeId:'gpt-5.6-sol',workflowId:state.id,opId:'op-intake',generation:1,at:1},
@@ -3783,10 +3783,10 @@ test('a partial report advances the attempt once, whichever side advanced it: th
     const op=running(harness.state,'op-intake','ctx_p');
     const report=buildReport({outcome:'partial',run:'run_wf',task:'task_p',dispatch:'ctx_p',from:'term_ctx_p',summary:'half done',open:['the rest']});
     report.sent={messageId:'msg_p',sentAt:1,type:report.signal.type};
-    op.attempt=2;op.v6AttemptAdvanced=true;
+    op.attempt=2;op.attemptAdvanced=true;
     assert.equal(applyOpReport(harness.fake.orca,harness.store,harness.state,op,report,ctx),'resume');
     assert.equal(op.attempt,2,'the settlement already advanced it');
-    assert.equal(op.v6AttemptAdvanced,undefined);
+    assert.equal(op.attemptAdvanced,undefined);
     const again=running(harness.state,'op-intake','ctx_p2');again.attempt=2;
     assert.equal(applyOpReport(harness.fake.orca,harness.store,harness.state,again,{...report,dispatch:'ctx_p2'},ctx),'resume');
     assert.equal(again.attempt,3,'without the settlement the resume advances it');
@@ -3830,7 +3830,7 @@ test('a tab the heuristics call idle is read once more by the perception model: 
     settleStalled(harness.fake.orca,harness.store,harness.state,ctx,{liveness:[{dispatch:'ctx_idle',liveness:'stalled-idle'}]});
     assert.equal(events(harness.store).filter(event=>event.event==='settled').length,1);
     const incident=events(harness.store).find(event=>event.event==='runtime-incident');
-    assert.deepEqual([incident.kind,incident.op,incident.attempt,incident.refunded],['perception-settlement','op-intake',1,false],'no v6 runtime here, so nothing to refund; the incident still stands');
+    assert.deepEqual([incident.kind,incident.op,incident.attempt,incident.refunded],['perception-settlement','op-intake',1,false],'no engine runtime here, so nothing to refund; the incident still stands');
     assert.deepEqual(op.avoidRuntimes??[],[],'the same runtime may take the operation again');
     assert.equal(op.status,'ready');
   }finally{harness.cleanup();}
@@ -4971,34 +4971,34 @@ test('the fan-out cap and the seam rule are read from the allocation profile, ne
 
 test('public retry reconciles only the exact exited native attempt before releasing its candidate fence',()=>{
   const lease={workflowId:'wf',opId:'author',attempt:3,generation:7,jobId:'operation-job',leaseToken:'token'},identity={workflowId:'wf',opId:'author',attempt:3,generation:7,jobId:'operation-job'};
-  const op={id:'author',attempt:3,status:'ready',v6Lease:lease,v6Candidate:{bridge:{identity}},launch:{task:'task-native',dispatch:'ctx-native'}};
+  const op={id:'author',attempt:3,status:'ready',lease:lease,candidate:{identity},launch:{task:'task-native',dispatch:'ctx-native'}};
   const state={id:'wf',run:'run-native',worktree:'C:/repo',engine:{generation:7},ops:[op]},events=[];
   const store={appendEvent:event=>events.push(event),saveState(){}},result={dispatch:{id:'ctx-native',task_id:'task-native',run_id:'run-native'},worker:{dispatch_id:'ctx-native',state:'failed',stage:'process_exited'},observation:{exactWorker:true,status:'exited'},terminal:{handle:'term-native',connected:false,writable:false,paneRuntimeId:-1}};
   let settled=0,closed=0;
-  const orca={invoke:()=>({outcome:'ok',receipt:{result}})},createRuntime=()=>({settleStoppedOperation(candidate,{dispatch,settlement}){assert.equal(candidate,op);assert.equal(dispatch,'ctx-native');assert.equal(settlement.effectState,'none');settled++;delete candidate.v6Lease;candidate.v6OwnedBaselinePaths=['src/real.ts'];candidate.v6RetryReconciled={schema:'starci/native-retry-reconciliation@1',jobId:'operation-job',attempt:3,generation:7,dispatch,observedFiles:['src/real.ts'],candidateDigest:'candidate'};return {ok:true,observedFiles:['src/real.ts'],candidateDigest:'candidate'};},close(){closed++;}});
+  const orca={invoke:()=>({outcome:'ok',receipt:{result}})},createRuntime=()=>({settleStoppedOperation(candidate,{dispatch,settlement}){assert.equal(candidate,op);assert.equal(dispatch,'ctx-native');assert.equal(settlement.effectState,'none');settled++;delete candidate.lease;candidate.ownedBaselinePaths=['src/real.ts'];candidate.retryReconciled={schema:'starci/native-retry-reconciliation@1',jobId:'operation-job',attempt:3,generation:7,dispatch,observedFiles:['src/real.ts'],candidateDigest:'candidate'};return {ok:true,observedFiles:['src/real.ts'],candidateDigest:'candidate'};},close(){closed++;}});
   const recovered=reconcileStoppedNativeRetryLease(state,op,{orca,store,createRuntime,settleHost:(_host,dispatch)=>({schema:'starci/orca-supervised-settlement@1',dispatchId:dispatch,effectState:'none'})});
-  assert.equal(recovered.ok,true);assert.equal(settled,1);assert.equal(closed,1);assert.deepEqual(op.v6OwnedBaselinePaths,['src/real.ts']);assert.equal(events.at(-1).event,'retry-native-attempt-reconciled');
-  const mismatched={...op,v6Lease:lease,v6Candidate:{bridge:{identity}},launch:{task:'task-native',dispatch:'ctx-other'}};
+  assert.equal(recovered.ok,true);assert.equal(settled,1);assert.equal(closed,1);assert.deepEqual(op.ownedBaselinePaths,['src/real.ts']);assert.equal(events.at(-1).event,'retry-native-attempt-reconciled');
+  const mismatched={...op,lease:lease,candidate:{identity},launch:{task:'task-native',dispatch:'ctx-other'}};
   const denied=reconcileStoppedNativeRetryLease(state,mismatched,{orca,store,createRuntime(){throw Error('must not create runtime');},settleHost(){throw Error('must not settle');}});
   assert.equal(denied.ok,false);assert.match(denied.reason,/exact current Run\/Task\/Dispatch/);
   // An operation whose counter already moved past the leased attempt (a partial report advanced it) still binds
   // through the candidate identity; one whose lease names a LATER attempt than the operation does not.
-  const advanced={...op,attempt:4,v6Lease:lease,v6Candidate:{bridge:{identity}},launch:{task:'task-native',dispatch:'ctx-native'},v6OwnedBaselinePaths:undefined};
-  const createRuntimeAhead=()=>({settleStoppedOperation(candidate,{dispatch,settlement}){assert.equal(candidate,advanced);assert.equal(dispatch,'ctx-native');assert.equal(settlement.effectState,'none');delete candidate.v6Lease;return {ok:true,observedFiles:['src/real.ts'],candidateDigest:'digest'};},close(){}});
+  const advanced={...op,attempt:4,lease:lease,candidate:{identity},launch:{task:'task-native',dispatch:'ctx-native'},ownedBaselinePaths:undefined};
+  const createRuntimeAhead=()=>({settleStoppedOperation(candidate,{dispatch,settlement}){assert.equal(candidate,advanced);assert.equal(dispatch,'ctx-native');assert.equal(settlement.effectState,'none');delete candidate.lease;return {ok:true,observedFiles:['src/real.ts'],candidateDigest:'digest'};},close(){}});
   const ahead=reconcileStoppedNativeRetryLease(state,advanced,{orca,store,createRuntime:createRuntimeAhead,settleHost:(_host,dispatch)=>({schema:'starci/orca-supervised-settlement@1',dispatchId:dispatch,effectState:'none'})});
   assert.equal(ahead.ok,true,ahead.reason);
   // A process Orca records as exited inside a tab the kernel never closed is still an exited process: the tab is
   // closed by the settlement, and the reconciliation proceeds.
   const openTab={...result,observation:{exactWorker:true,status:'live',agentWait:null},worker:{dispatch_id:'ctx-native',state:'failed',stage:'process_exited'},terminal:{handle:'term-open',connected:true,writable:true,paneRuntimeId:-1}};
-  const tabbed={...op,attempt:3,v6Lease:lease,v6Candidate:{bridge:{identity}},launch:{task:'task-native',dispatch:'ctx-native'}};
+  const tabbed={...op,attempt:3,lease:lease,candidate:{identity},launch:{task:'task-native',dispatch:'ctx-native'}};
   const closes=[];
   const withTab=reconcileStoppedNativeRetryLease(state,tabbed,{orca:{invoke:()=>({outcome:'ok',receipt:{result:openTab}})},store,
-    createRuntime:()=>({settleStoppedOperation(candidate){delete candidate.v6Lease;return {ok:true,observedFiles:[],candidateDigest:'d'};},close(){}}),
+    createRuntime:()=>({settleStoppedOperation(candidate){delete candidate.lease;return {ok:true,observedFiles:[],candidateDigest:'d'};},close(){}}),
     settleHost:(_host,dispatch,options)=>{closes.push([options.terminalHandle,options.closeTerminal]);return {schema:'starci/orca-supervised-settlement@1',dispatchId:dispatch,effectState:'none'};}});
   assert.equal(withTab.ok,true,withTab.reason);
   assert.deepEqual(closes,[['term-open',true]],'the open tab is closed as part of the settlement');
   const stillRunning={...openTab,worker:{dispatch_id:'ctx-native',state:'running',stage:'process_running'}};
-  assert.match(reconcileStoppedNativeRetryLease(state,{...tabbed,v6Lease:lease},{orca:{invoke:()=>({outcome:'ok',receipt:{result:stillRunning}})},store,createRuntime(){throw Error('must not');},settleHost(){throw Error('must not');}}).reason,/does not prove/);
-  const behind={...op,attempt:2,v6Lease:lease,v6Candidate:{bridge:{identity}},launch:{task:'task-native',dispatch:'ctx-native'}};
+  assert.match(reconcileStoppedNativeRetryLease(state,{...tabbed,lease:lease},{orca:{invoke:()=>({outcome:'ok',receipt:{result:stillRunning}})},store,createRuntime(){throw Error('must not');},settleHost(){throw Error('must not');}}).reason,/does not prove/);
+  const behind={...op,attempt:2,lease:lease,candidate:{identity},launch:{task:'task-native',dispatch:'ctx-native'}};
   assert.match(reconcileStoppedNativeRetryLease(state,behind,{orca,store,createRuntime(){throw Error('must not');},settleHost(){throw Error('must not');}}).reason,/do not bind the current workflow operation attempt/);
 });

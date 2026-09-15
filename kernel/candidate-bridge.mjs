@@ -1,10 +1,50 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import {bindRuntimeInputs,createCandidateSnapshot,sealCandidate,verifyCandidateIdentity} from './candidates.mjs';
+import {CANDIDATE_PACKET,CANDIDATE_SNAPSHOT,bindRuntimeInputs,createCandidateSnapshot,sealCandidate,verifyCandidateIdentity} from './candidates.mjs';
 import {parseRef} from './common.mjs';
 
 export const DETECTION_BRIDGE='starci/candidate-bridge@1';
+/** What workflow state keeps of a candidate: identity, roots and digests. The manifests stay under the control root. */
+export const CANDIDATE_RECORD='starci/candidate-record@1';
+const CANDIDATE_FILES={bridge:'bridge.json',snapshot:'snapshot.json',packet:'candidate.json'};
+const readJsonFile=(file,schema)=>{const value=JSON.parse(fs.readFileSync(file,'utf8'));if(value?.schema!==schema)throw new Error(`${file} is not a ${schema} record`);return value;};
+const writeJsonAtomic=(file,value)=>{const tmp=`${file}.${process.pid}.tmp`;fs.writeFileSync(tmp,`${JSON.stringify(value,null,2)}\n`);fs.renameSync(tmp,file);return file;};
+/** Rewrite the bridge under its control root after a mutation; the snapshot file stays the snapshot's own authority. */
+export function writeCandidateBridge(bridge){return writeJsonAtomic(path.join(bridge.snapshot.controlRoot,CANDIDATE_FILES.bridge),bridge);}
+export function readCandidateSnapshot(controlRoot){return readJsonFile(path.join(controlRoot,CANDIDATE_FILES.snapshot),CANDIDATE_SNAPSHOT);}
+export function readCandidatePacket(controlRoot){return readJsonFile(path.join(controlRoot,CANDIDATE_FILES.packet),CANDIDATE_PACKET);}
+/** The bridge as last written, carrying the snapshot as last written: two files, one authority each. */
+export function readCandidateBridge(controlRoot){
+  const bridge=readJsonFile(path.join(controlRoot,CANDIDATE_FILES.bridge),DETECTION_BRIDGE);
+  bridge.snapshot=readCandidateSnapshot(controlRoot);
+  return bridge;
+}
+export function candidateRecord(bridge,{status='running'}={}){
+  const {snapshot}=bridge;
+  return {schema:CANDIDATE_RECORD,status,identity:{...bridge.identity},controlRoot:snapshot.controlRoot,workerRoot:snapshot.workerRoot,
+    baseRoot:snapshot.baseRoot,oracleRoot:snapshot.oracleRoot,acceptedHead:bridge.acceptedHead,
+    dependency:{command:bridge.dependency?.command??null,ready:bridge.dependency?.ready??true}};
+}
+/**
+ * A bridge an earlier build kept whole inside workflow state is put on disk under its own control root, so the
+ * record can point at it. The snapshot is written beside it when the state carried a sealed one. Answers null
+ * when the control root is gone: then there is nothing to point at and the next attempt begins a new candidate.
+ */
+export function persistInlineCandidate(inline){
+  const bridge=inline?.bridge,controlRoot=bridge?.snapshot?.controlRoot??inline?.snapshot?.controlRoot;
+  if(!bridge?.schema||typeof controlRoot!=='string'||!fs.existsSync(controlRoot))return null;
+  if(inline.snapshot?.schema===CANDIDATE_SNAPSHOT)writeJsonAtomic(path.join(controlRoot,CANDIDATE_FILES.snapshot),inline.snapshot);
+  else if(bridge.snapshot?.schema===CANDIDATE_SNAPSHOT&&!fs.existsSync(path.join(controlRoot,CANDIDATE_FILES.snapshot)))writeJsonAtomic(path.join(controlRoot,CANDIDATE_FILES.snapshot),bridge.snapshot);
+  writeCandidateBridge({...bridge,snapshot:bridge.snapshot??inline.snapshot});
+  const record=candidateRecord({...bridge,snapshot:readCandidateSnapshot(controlRoot)},{status:inline.status??'running'});
+  if(Array.isArray(inline.observedFiles))record.observedFiles=[...inline.observedFiles];
+  if(Array.isArray(inline.reasons))record.reasons=[...inline.reasons];
+  if(inline.assurance)record.assurance=inline.assurance;
+  if(inline.dependency&&typeof inline.dependency==='object')record.dependency={...record.dependency,...inline.dependency};
+  if(inline.packet?.schema===CANDIDATE_PACKET){record.candidateDigest=inline.packet.candidateDigest;record.oracleDigest=inline.packet.oracleDigest;record.snapshotDigest=inline.packet.snapshotDigest;record.sealedAt=inline.packet.sealedAt;record.changed=(inline.packet.changes??[]).length;}
+  return record;
+}
 const slash=value=>String(value??'').replaceAll('\\','/');
 const sha256=value=>crypto.createHash('sha256').update(value).digest('hex');
 const clean=value=>slash(value).replace(/^\.\//,'');
@@ -113,7 +153,7 @@ export function acknowledgeRuntimeBaseline(bridge,paths=[]){
   if(entries.some(item=>item.state!=='file'))throw new Error('runtime baseline inputs must be readable regular files');
   bindRuntimeInputs(bridge.snapshot,{canonicalRoot:bridge.repoRoot,paths:bounded});
   bridge.sourceBaseline=states(bridge.repoRoot,bridge.snapshot.source.entries.map(item=>item.path));
-  bridge.runtimeBaseline=entries;bridge.runtimeOwnedPaths=bounded;return {paths:bounded,entries,assurance:'detection-only'};
+  bridge.runtimeBaseline=entries;bridge.runtimeOwnedPaths=bounded;writeCandidateBridge(bridge);return {paths:bounded,entries,assurance:'detection-only'};
 }
 
 /** After confirmed worker settlement, copy the complete observed delta into the verifier snapshot and seal it. */

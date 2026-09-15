@@ -85,7 +85,7 @@ const oracleManifest=overrides=>({schema:'starci/oracle-manifest@1',digest:'d'.r
   id:'oracle-double',path:'protected/double.spec.mjs',sha256:'e'.repeat(64),ownerAttemptId:'verify-attempt-2',
   assertionIds:['SRS-1#AC-1'],kinds:['backend.implement'],command:'node protected/double.spec.mjs',expectedBaseFailure:'expected 4',...overrides}]});
 
-test('v6 proof plans only independently owned protected oracles',()=>{
+test('the proof plans only independently owned protected oracles',()=>{
   const plan=planProtectedProof({id:'implement-attempt-1',kind:'backend.implement'},{oracleManifest:oracleManifest(),candidateChanges:['src/lib.mjs']});
   assert.equal(plan.ready,true);assert.equal(plan.mode,'fail-before');assert.equal(plan.oracles.length,1);
   const changed=planProtectedProof({id:'implement-attempt-1',kind:'backend.implement'},{oracleManifest:oracleManifest(),candidateChanges:['protected/double.spec.mjs']});
@@ -94,17 +94,17 @@ test('v6 proof plans only independently owned protected oracles',()=>{
   assert.equal(self.ready,false);assert.match(self.errors.join(' '),/non-independent/);
 });
 
-test('v6 fail-before distinguishes expected product failure from environment and unrelated failures',()=>{
+test('fail-before distinguishes expected product failure from environment and unrelated failures',()=>{
   const plan=planProtectedProof({id:'implement-attempt-1',kind:'backend.implement'},{oracleManifest:oracleManifest()});
   const run=tails=>runProtectedProof({plan,baseRoot:'base',candidateRoot:'candidate',oracleRoot:'oracle',exec:(command,{cwd})=>
     cwd==='candidate'?{status:0,stdout:'pass'}:{status:1,stderr:tails}});
   assert.equal(run('expected 4 but got 3').verdict,'pass');
   const unrelated=run('MODULE_NOT_FOUND fixture');assert.equal(unrelated.verdict,'inconclusive');assert.match(protectedProofFinding(unrelated),/different reason/);
   const weak=runProtectedProof({plan,baseRoot:'base',candidateRoot:'candidate',oracleRoot:'oracle',exec:()=>({status:0,stdout:'pass'})});
-  assert.equal(weak.verdict,'fail','an oracle green at base cannot silently pass v6 acceptance');
+  assert.equal(weak.verdict,'fail','an oracle green at base cannot silently pass acceptance');
 });
 
-test('v6 proof marks an unavailable runner and candidate failure as blocking verdicts',()=>{
+test('the proof marks an unavailable runner and candidate failure as blocking verdicts',()=>{
   const plan=planProtectedProof({id:'implement-attempt-1',kind:'backend.implement'},{oracleManifest:oracleManifest()});
   const unavailable=runProtectedProof({plan,baseRoot:'base',candidateRoot:'candidate',oracleRoot:'oracle',exec:()=>({status:null,error:{code:'ENOENT',message:'runner missing'}})});
   assert.equal(unavailable.verdict,'fail','candidate inability to run is a failure, never acceptance');

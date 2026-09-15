@@ -1,8 +1,8 @@
 # StarCi execution contract
 
-Status: StarCi v1-alpha, open source under MIT and not yet released. This contract governs agent-led workflows. The internal
-`engine.major = 6` compatibility marker remains part of durable state; existing workflows retain their
-recorded policy until the explicit retry boundary in the upgrade note.
+Status: StarCi 1.0, open source under MIT. This contract governs enrolled workflows. An enrolled workflow carries
+`engine.schema: starci/engine@1` in its durable state; a workflow enrolled by an earlier build keeps its recorded
+policy until the explicit retry boundary in the upgrade note, which migrates its record.
 
 ## Participants and authority
 
@@ -45,6 +45,26 @@ uses the cross-provider `opus-sol` pool; planner and validator use `fable-astra`
 eligible, qualified member using known quota and capacity before the call; unknown quota is not unlimited.
 The functions keep separate typed inputs and independent contexts even when they share a pool. See
 [the local config format](config-format.md) for the complete closed role map.
+
+## What the journal keeps
+
+The journal keeps what a workflow needs to continue and nothing it has settled. The bound generation keeps one
+state body, every transition checkpoint (so a replayed transition is recognised, body or not) and the latest
+save checkpoint. A retired generation keeps nothing: no snapshot rows, no settled jobs, none of their events;
+the kernel retires them when it binds the next generation. A finished workflow retires every row it holds.
+Live reservations, unsettled jobs and their events are never touched, whatever their generation. The policy is
+one record in `kernel/journal.mjs`, and `journal-prune` and `journal-retire` are the only operator commands
+that act on rows a kernel does not own. Workflow state keeps a candidate record - identity, roots and digests -
+and the candidate manifests stay under the candidate's control root; the event log rotates by generation at
+the retry boundary and history stays readable.
+
+## Disk headroom
+
+The kernel measures the free space of the volumes it writes to before its first tick and before every tick,
+against one threshold it prints with every finding. Below it the kernel records `disk-headroom-exhausted`,
+saves nothing and exits with its own code; a write the disk refused mid-stage is `disk-full` and ends the
+kernel the same way, never one more kernel error toward a crash loop. The supervisor measures the same
+volumes every round and starts nothing onto an exhausted one; it starts the kernel again when room returns.
 
 ## Candidate acceptance
 

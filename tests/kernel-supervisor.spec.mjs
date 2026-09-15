@@ -142,8 +142,8 @@ test('failed bootstrap releases only its reservation and never removes a live ke
   const root=tmp();try{
     const dir=workflow(root,'failed',{lastAt:1});
     const live={pid:process.pid,startedAt:1,owner:'existing'};fs.writeFileSync(path.join(dir,'kernel.lock'),JSON.stringify(live));
-    // A stale inspection may decide to restart, but an unconfirmed v6 stop retains the incumbent lock.
-    const state=JSON.parse(fs.readFileSync(path.join(dir,'state.json'),'utf8'));state.engine={major:6};fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify(state));
+    // A stale inspection may decide to restart, but an unconfirmed stop of an enrolled kernel retains the incumbent lock.
+    const state=JSON.parse(fs.readFileSync(path.join(dir,'state.json'),'utf8'));state.engine={schema:'starci/engine@1'};fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify(state));
     const held=superviseOnce({repoRoot:root,launcher:'L.mjs',now:()=>10_000_000,killFn:()=>{},aliveFn:()=>true,log:()=>{}});
     assert.equal(held.rounds[0].outcome.ok,false);assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir,'kernel.lock'),'utf8')),live);
     assert.equal(fs.existsSync(path.join(dir,'kernel.launch.lock')),false);

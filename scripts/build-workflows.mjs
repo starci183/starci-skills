@@ -189,6 +189,9 @@ export function buildFiles(skillRoot = root) {
   const manifestFiles = [...files].map(([file, bytes]) => ({ path: file, sha256: hash(bytes) }));
   files.set('manifest.json', compactJsonBuffer({
     schema: 'starci/dist@1',
+    // The package version the payload was built from: a relocated runtime carries no package.json, so this is
+    // where the engine reads its own version.
+    version: fs.existsSync(packageFile) ? JSON.parse(fs.readFileSync(packageFile, 'utf8')).version : null,
     workflow: 'frontend',
     matrix: 'workflows/matrix.json',
     contracts: 'workflows/contracts.json',

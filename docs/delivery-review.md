@@ -73,7 +73,7 @@ Check all terminal Plan criteria after workflow results are accepted. A passed
 step does not complete its successors. Changed accepted content remains editable,
 but its affected consumers need current verification, not stale done labels.
 
-For an explicitly requested alpha/beta trial, keep actual observed process defects
+For an explicitly requested runtime trial, keep actual observed process defects
 separate from product defects. Link each runtime change to a reproduced problem
 and a focused regression test where executable, then exercise the corrected
 workflow on the real trial. Packaging/build/unit checks alone cannot certify

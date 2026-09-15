@@ -1,6 +1,6 @@
 # StarCi 4.0 plan: orchestration that cannot silently fail
 
-Status: accepted 2026-09-12 and in progress on branch `v4/orchestration`. Written against runtime `3.0.0-alpha.3`
+Status: accepted 2026-09-12 and in progress on branch `v4/orchestration`. Written against the 3.0 pre-release runtime
 (`.claude` branch `codex/host-bootstrap-routing`, head `c45997b8`, 738/738 tests green)
 and Orca app `1.4.188` (`agent-context` schema 1, 232 commands).
 
@@ -110,7 +110,7 @@ the same model also exists as a working target.
 | 4 Launcher | Rewrite `start-op`/`start-monitor` on the runner; add `settle`, `replace-monitor`; prompt-delivery proof; chain fall-through | `hosts/orca/launch.mjs`, `execution/supervision.mjs`, `tests/orca-supervised-launch.spec.mjs` | simulated Qwen stall → fenced → released → Opus selected; simulated monitor death → replaced with `--retry-of` | 5 h |
 | 5 Coordinator loop | `orca.mjs` adapter consumes the runner; `check --wait` with `--ack`, keepalive filtering; liveness → `replace-monitor` | `execution/orca.mjs`, `tests/orca-execution.spec.mjs` | event-loop tests: timeout re-arm, worker_done ack, escalation routing | 3 h |
 | 6 Solo parity | `solo.mjs` uses the same result envelope for Agent-tool operations (no behavior change beyond envelope) | `execution/solo.mjs`, `tests/solo-execution.spec.mjs` | existing solo tests green + envelope assertions | 1.5 h |
-| 7 Contracts & docs | `providers/orca/index|recipes|validation.yaml` reference `calls`; `docs/orca-execution.md`, `execution-agent-model.md`, `orca-runtime-upgrades.md` (mark F1–F3 resolved-in-runtime); `SKILL.md` paragraph on Orca launch rewritten to point at `start-op`/`settle`/`replace-monitor`; version `4.0.0-alpha.1`; `INDEX.yaml`, `README.yaml` | as named | `npm run build`, `build:check`, `build:knowledge:check`, `npm test`, `starci doctor --quick` in a scratch host | 2 h |
+| 7 Contracts & docs | `providers/orca/index|recipes|validation.yaml` reference `calls`; `docs/orca-execution.md`, `execution-agent-model.md`, `orca-runtime-upgrades.md` (mark F1–F3 resolved-in-runtime); `SKILL.md` paragraph on Orca launch rewritten to point at `start-op`/`settle`/`replace-monitor`; the 4.0 pre-release version; `INDEX.yaml`, `README.yaml` | as named | `npm run build`, `build:check`, `build:knowledge:check`, `npm test`, `starci doctor --quick` in a scratch host | 2 h |
 | 8 Live proof | One bounded op on `nivo-backend` R14 Core child (`review.verify` read-only or a `task.execute` no-op): Qwen first; then a forced-unavailable drill proving fall-through to Opus; then `settle` on the two retained `identity_unproven` terminals | receipts under `docs/examples/v4-live-proof/` | receipts show `[Op]` name, attested provider, effectState per attempt, released terminals | 2 h |
 
 Total ≈ 22–24 h of work, sequential (phases 2→3→4 depend on each other; 1 and 6 can interleave).

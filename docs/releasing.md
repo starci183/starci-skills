@@ -40,4 +40,4 @@ Also verify new workspace initialization/validation, an update preserving custom
 
 The intended package is `starci`, release `5.0.0-plus`. A registry lookup returning not-found is not proof of namespace ownership. Before any publish, the maintainer must confirm authenticated npm account rights, name/version availability, archive contents, license ownership and intended prerelease dist-tag. Require explicit publication authority, then publish the exact reviewed archive. Do not expose tokens in logs or source. Update README release status only after registry verification succeeds.
 
-Never publish unrelated dirty changes, silently retag a stable release as an alpha, or assume the previous `@starci/skills` package redirects users. Announce the naming transition and migration limits in the release notes.
+Never publish unrelated dirty changes, silently retag a stable release as a pre-release, or assume the previous `@starci/skills` package redirects users. Announce the naming transition and migration limits in the release notes.

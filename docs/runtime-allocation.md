@@ -1,8 +1,8 @@
 # Runtime allocation: prefer, then overflow
 
-For enrolled v6 workflows, measured eligibility or explicitly bounded local probation filters this pool
+For enrolled workflows, measured eligibility or explicitly bounded local probation filters this pool
 before budget ranking. SQLite admission enforces the shared ceiling for operation workers and model jobs;
-native Orca writers also require the exclusive canonical-root reservation. Read [runtime v6](runtime-v6.md).
+native Orca writers also require the exclusive canonical-root reservation. Read [the execution contract](execution-contract.md).
 
 In runtime 5-plus the kernel no longer walks an ordered list of providers. Every
 runtime is a pool declared in `model/runtimes.yaml` with the roles it may

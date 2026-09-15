@@ -800,7 +800,7 @@ mirrors the source tree.
 | brand rules in prose only | render checks with named findings over the capture and the kept markup; canon rules `COLLECTION-*`, `BRAND-*` |
 | `profiles/`, `execution/` | `model/`, `kernel/`, `hosts/`, `models/`, `checks/` |
 | `.dist/execution/orca-supervised-launch.mjs` on every command line | `node <skill>/bin/starci.mjs <command>` |
-| version `5.0.0-alpha.1` | `5.0.0-plus` |
+| the pre-release version tag | `5.0.0-plus` |
 
 What is deliberately unchanged: the kernel's seams (`invoke`, `runHeadless`, the allocator, the kind graph),
 the lane worktree and merge-back, the terminal rules (a tab exists only while its op runs, the coordinator

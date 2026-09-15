@@ -4,7 +4,7 @@
 
 Use Node.js 20+ and npm. The runtime includes its YAML parser and does not require a separate dependency install to run the CLI. Development builds require dev dependencies. Review the downloaded archive before executing its CLI; `npx` executes package code. Pin a reviewed version instead of assuming `latest` is safe.
 
-This alpha is not published as `starci` yet. The commands below use the local release archive. Replace the archive path with your actual file; `--dir` always means the **host**, not automatically the backend or frontend.
+This release is not published as `starci` yet. The commands below use the local release archive. Replace the archive path with your actual file; `--dir` always means the **host**, not automatically the backend or frontend.
 
 ```sh
 npx --yes --package=./starci-5.0.0-plus.tgz starci init --dir /absolute/host
@@ -75,7 +75,7 @@ The ownership manifest retains the historical filename `.starci-skills.json` for
 
 | Symptom | Check |
 | --- | --- |
-| Public `npx starci` cannot find this alpha | Use the reviewed `.tgz`; it is not published yet. |
+| Public `npx starci` cannot find this release | Use the reviewed `.tgz`; it is not published yet. |
 | Agent asks for retired `INDEX.md` | Read actual host entry; run `node .claude/scripts/check-entry.mjs /absolute/host`. Do not recreate a retired entry. |
 | `.claude` already exists | Inspect ownership/custom files; do not reflexively pass `--force`. |
 | No project binding | Supply backend/FE paths and verified remotes. Do not initialize inside FE. |

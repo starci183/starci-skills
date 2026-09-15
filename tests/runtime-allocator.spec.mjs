@@ -105,15 +105,15 @@ test('a rate-limited preference overflows to the next runtime and is taken up ag
 
 test('an exact tie rotates to the runtime after the last allocated one',()=>{
   const runtimes=fixture({
-    alpha:{target:'alpha',roles:['implement'],maxParallel:2},
+    quick:{target:'quick',roles:['implement'],maxParallel:2},
     beta:{target:'beta',roles:['implement'],maxParallel:2}
   });
   const allocator=createAllocator({runtimes,now:()=>0});
-  assert.equal(allocator.allocate('x.implement').runtime,'alpha');
-  allocator.release('alpha');
+  assert.equal(allocator.allocate('x.implement').runtime,'quick');
+  allocator.release('quick');
   assert.equal(allocator.allocate('x.implement').runtime,'beta');
   allocator.release('beta');
-  assert.equal(allocator.allocate('x.implement').runtime,'alpha');
+  assert.equal(allocator.allocate('x.implement').runtime,'quick');
 });
 
 test('an allocation the admission deferred gives the slot and the day\'s count back, without cooling',()=>{

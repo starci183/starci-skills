@@ -315,7 +315,7 @@ export function treeForVerdict(ctx,files){
   try{const loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});ctx.work.loaded=loaded;return loaded;}catch{return ctx.work.loaded??null;}
 }
 export function validateAccepted(store,state,op,ctx,{files,verified,produced=null}){
-  const strict=Boolean(ctx.v6?.requiredValidation);
+  const strict=Boolean(ctx.engine?.requiredValidation);
   if(ctx.validateOp===null||ctx.validateOp===undefined){
     if(!state.validatorSkipped){state.validatorSkipped=true;store.appendEvent({event:'validator-skipped',reason:'no validator function was given to this kernel'});}
     return strict?{verdict:'unavailable',reason:'required validator is not configured'}:{verdict:'skipped'};
@@ -334,12 +334,12 @@ export function validateAccepted(store,state,op,ctx,{files,verified,produced=nul
   if(!judged.length&&!reproducedNoDiffEvidence){store.appendEvent({event:'validator-skipped',op:op.id,reason:'the operation changed nothing inside its allowlist, so there is no diff to judge'});return strict
     ?{verdict:'inconclusive',reason:'required validation has no observed candidate files'}:{verdict:'skipped'};}
   const providers=ctx.validator??llm.DEFAULT_VALIDATOR_RUNTIMES;
-  const diff=strict&&ctx.v6Candidate?.packet?frozenCandidateDiff(ctx.v6Candidate,judged):opDiff(state,op,judged,ctx);
+  const diff=strict&&ctx.candidate?.packet?frozenCandidateDiff(ctx.candidate,judged):opDiff(state,op,judged,ctx);
   if(strict&&diff.truncated){
     store.appendEvent({event:'validator-inconclusive',op:op.id,reason:'the complete candidate diff exceeds the validator transport bound',diffFiles:files});
     return {verdict:'inconclusive',reason:'required validator did not receive the complete candidate diff'};
   }
-  const resolvedReferences=strict?resolveValidatorReferences(state,op,ctx.v6Candidate?.snapshot?.workerRoot):null;
+  const resolvedReferences=strict?resolveValidatorReferences(state,op,ctx.candidate?.workerRoot):null;
   if(strict&&!resolvedReferences.ok){
     store.appendEvent({event:'validator-inconclusive',op:op.id,reason:resolvedReferences.errors.join('; ')});
     return {verdict:'inconclusive',reason:resolvedReferences.errors.join('; ')};
@@ -350,8 +350,8 @@ export function validateAccepted(store,state,op,ctx,{files,verified,produced=nul
   const proven=[...verified.checks,...kernelProof(ctx,op.nodeId??op.ledgerIds?.[0]??null,op)];
   try{result=ctx.validateOp({op,node:validatorNode(ctx,op),diff,checks:proven,references:op.references,
     ...(strict?{resolvedReferences:resolvedReferences.entries,freshContext:true,
-      authorAttemptId:ctx.v6Candidate?.packet?Object.fromEntries(['workflowId','opId','attempt','generation','jobId'].map(field=>[field,ctx.v6Candidate.packet[field]])):
-        (typeof ctx.v6?.identity==='function'?ctx.v6.identity(op):{opId:op.id,attempt:op.attempt})}:{}),
+      authorAttemptId:ctx.candidate?.packet?Object.fromEntries(['workflowId','opId','attempt','generation','jobId'].map(field=>[field,ctx.candidate.packet[field]])):
+        (typeof ctx.engine?.identity==='function'?ctx.engine.identity(op):{opId:op.id,attempt:op.attempt})}:{}),
     // What the kind declares it reads and produces travels with the verdict: a record cited outside `reads` or
     // written outside `writes` is a defect the validator can only name if it was told the declaration.
     io:ioPayloadOf(op.kind),
@@ -387,18 +387,18 @@ export function validateAccepted(store,state,op,ctx,{files,verified,produced=nul
   return {verdict,findings:findings.map(findingText)};
 }
 function frozenCandidateDiff(candidate,files){
-  const packet=candidate.packet,snapshot=candidate.snapshot,selected=new Set(files),chunks=[];
+  const packet=candidate.packet,selected=new Set(files),chunks=[];
   for(const change of packet.changes.filter(item=>selected.has(item.path))){
     const read=(root,file)=>{try{const bytes=fs.readFileSync(path.join(root,file));return {encoding:'base64',bytes:bytes.length,content:bytes.toString('base64')};}catch{return null;}};
     chunks.push(JSON.stringify({path:change.path,beforeSha256:change.beforeSha256,afterSha256:change.afterSha256,
-      before:read(snapshot.baseRoot,change.path),after:read(snapshot.workerRoot,change.path)}));
+      before:read(candidate.baseRoot,change.path),after:read(candidate.workerRoot,change.path)}));
   }
   const text=chunks.join('\n'),truncated=Buffer.byteLength(text)>VALIDATOR_DIFF_BYTES;
   return {files,base:packet.acceptedHead,text,truncated};
 }
 function resolveValidatorReferences(state,op,rootOverride=null){
   const errors=[],entries=[],root=fs.realpathSync(rootOverride??state.worktree);
-  for(const given of unique(op.v6ResolvedReferences??op.references??[])){
+  for(const given of unique(op.resolvedReferences??op.references??[])){
     let parsed,relative,fragment;
     try{parsed=parseRef(given);const literal=slash(parsed.ref),hash=literal.indexOf('#');relative=normalize(hash<0?literal:literal.slice(0,hash));fragment=hash<0?null:literal.slice(hash+1);}
     catch(error){errors.push(`validator reference is invalid: ${String(given)} (${error.message})`);continue;}

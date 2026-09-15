@@ -10,7 +10,7 @@ import {FRESH_MAX_AGE_MS,budgetIsFresh,freshRuntimeBudget,normalizeBudget,readRu
 import * as llm from '../models/functions.mjs';
 
 /**
- * Held-out checks for the three defects the first live trials of v1-alpha exposed, each driven through the public
+ * Held-out checks for the three defects the first live trials of 1.0 exposed, each driven through the public
  * goal path (`goalPhase` -> `workGoalPhase`/`planGoalPhase`, `approve`) rather than through a helper:
  *
  * 1. the goal phase read whatever `runtime-budget.json` a previous run left behind, so a stale file emptied the
@@ -348,11 +348,11 @@ test('a plan-ledger goal that plans a Work-record kind is refused, and the Work 
     assert.throws(()=>goalPhase(store,state,{cwd:tree.repo,extractMaterial:()=>[],renderGoalMarkdown:null,assessGoal:()=>({ok:true,provider:'fake',value:plan}),critiqueGoal:soundCritique}),
       /Operation op1 has the kind decision\.prepare, which no operator launches on a plan ledger/);
   }finally{tree.cleanup();}
-  const v6={};
-  assert.equal(needsWorkGate({kind:'runtime.operate'},{v6,work:null}),false,'a plan ledger has no tree to gate');
-  assert.equal(needsWorkGate({kind:'runtime.operate'},{v6,work:{ledger:{repoRoot:'r',workRoot:'w'}}}),true);
-  assert.equal(needsWorkGate({kind:'backend.implement'},{v6,work:{ledger:{repoRoot:'r',workRoot:'w'}}}),false,'code is not a Work record');
-  assert.equal(needsWorkGate({kind:'runtime.operate'},{v6:null,work:{ledger:{repoRoot:'r',workRoot:'w'}}}),false);
+  const engine={};
+  assert.equal(needsWorkGate({kind:'runtime.operate'},{engine,work:null}),false,'a plan ledger has no tree to gate');
+  assert.equal(needsWorkGate({kind:'runtime.operate'},{engine,work:{ledger:{repoRoot:'r',workRoot:'w'}}}),true);
+  assert.equal(needsWorkGate({kind:'backend.implement'},{engine,work:{ledger:{repoRoot:'r',workRoot:'w'}}}),false,'code is not a Work record');
+  assert.equal(needsWorkGate({kind:'runtime.operate'},{engine:null,work:{ledger:{repoRoot:'r',workRoot:'w'}}}),false);
 });
 
 test('a resumed workflow that finished blocked is approved again without the first-approval gate',()=>{
