@@ -165,6 +165,21 @@ const groupKey=(state,ledgerIds)=>{
 };
 const implementsLedger=op=>op.kind!=='review.verify'&&op.refusal!=='superseded'&&(op.ledgerIds??[]).length>0;
 
+/**
+ * What an accepted operation leaves on its `op-done` event for the owner reading the tab: the worker's own summary,
+ * how many operations are still open, and an estimate from the durations accepted so far (mean, times the open
+ * count) - a rough outlook, never a promise, printed only under `debug`.
+ */
+export function completionOutlook(state,op,now=Date.now()){
+  const durationMs=Number.isFinite(op?.launchedAt)?Math.max(0,now-op.launchedAt):null;
+  state.opDurations=Array.isArray(state.opDurations)?state.opDurations.filter(Number.isFinite).slice(-50):[];
+  if(durationMs!==null)state.opDurations.push(durationMs);
+  const remainingOps=(state.ops??[]).filter(item=>item.id!==op?.id&&!['done','cancelled'].includes(item.status)&&!item.refusal).length;
+  const mean=state.opDurations.length?state.opDurations.reduce((a,b)=>a+b,0)/state.opDurations.length:null;
+  const summary=String(op?.reports?.at?.(-1)?.summary??'').replace(/\s+/g,' ').trim().slice(0,240);
+  return {...(summary?{summary}:{}),durationMs,remainingOps,estimateMs:mean===null?null:Math.round(remainingOps*mean)};
+}
+
 /* ------------------------------------------------------------------ contract */
 
 /**
@@ -1966,7 +1981,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     // An ask op closes no node either: it prepared a decision, answered a question or confirmed a provision.
     if(authorsRecord(op.kind)||isAsk(op.kind)){
       const settled=settleAuthoredRecord(store,state,op,ctx);
-      store.appendEvent({event:'op-done',op:op.id,node:op.nodeId,runtime:op.runtime,head:op.head,files,
+      store.appendEvent({event:'op-done',op:op.id,node:op.nodeId,runtime:op.runtime,head:op.head,files,...completionOutlook(state,op,clockOf(ctx)),...completionOutlook(state,op,clockOf(ctx)),
         checks:verified.checks.map(check=>`${check.name}=${check.exitCode}`),committed:commit.committed});
       ctx.guards.gitQueue(()=>cleanStrayFiles(store,state,op,ctx));
       if(ctx.orca)closeOpTerminal(ctx.orca,store,state,op);

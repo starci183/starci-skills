@@ -8,7 +8,7 @@ import {buildReport} from '../kernel/reports.mjs';
 import {markDone,markInProgress,readNode} from '../kernel/ledger.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {inputAsk} from './helpers/input-fixture.mjs';
-import {applyOpReport,renderContract} from '../kernel/kernel.mjs';
+import {applyOpReport,completionOutlook,renderContract} from '../kernel/kernel.mjs';
 import {validateAccepted} from '../kernel/verify.mjs';
 import {settleIntake} from '../kernel/intake.mjs';
 import {recordDone,syncLedgerOps} from '../kernel/sync.mjs';
@@ -840,4 +840,13 @@ test('the owner section says so when nothing is waiting, instead of leaving itse
     const store=stubStore(dir);
     assert.deepEqual(ownerLines(stubState(store,[])),['## Owner (0)','nothing is waiting on you']);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('the completion outlook counts the open operations and estimates from the durations accepted so far',()=>{
+  const state={ops:[{id:'a',status:'done'},{id:'b',status:'running'},{id:'c',status:'pending'},{id:'d',status:'blocked',refusal:'superseded'},{id:'e',status:'cancelled'}]};
+  const first=completionOutlook(state,{id:'a',launchedAt:1000,reports:[{summary:'  Did   the thing.  '}]},601000);
+  assert.deepEqual(first,{summary:'Did the thing.',durationMs:600000,remainingOps:2,estimateMs:1200000},'two open operations at ten minutes each');
+  const second=completionOutlook(state,{id:'b',launchedAt:0},1200000);
+  assert.equal(second.estimateMs,900000,'the mean of ten and twenty minutes, times the one operation left');
+  assert.equal(completionOutlook({ops:[]},{id:'x'}).estimateMs,null,'no duration yet, no estimate');
 });

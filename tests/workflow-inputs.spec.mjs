@@ -438,9 +438,9 @@ test('the rendered owner page includes the choice control while credentials are 
   const app=await startInputServer({token,sessionId:'render',model:{snapshot:()=>snapshot,submit:async()=>({ok:false}),submitOwnerAction:()=>({ok:false})}});
   t.after(()=>app.close());
   const {stdout}=await execFileAsync(chrome,['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check',`--user-data-dir=${profile}`,'--virtual-time-budget=1000','--dump-dom',`${app.origin}/inputs/render#${token}`],{timeout:10000,maxBuffer:1024*1024});
-  assert.match(stdout,/<select class="owner-select">[\s\S]*<option value="a">Policy A preserves records[\s\S]*<option value="b">Policy B removes records[\s\S]*<\/select>/);
-  assert.match(stdout,/<ul class="option-list">[\s\S]*Policy A preserves records for the complete approved audit period[\s\S]*Policy B removes records after the shorter approved period[\s\S]*<\/ul>/,'the rendered page exposes every long option outside the truncating native popup');
-  assert.match(stdout,/<select[^>]*>[\s\S]*<\/select>[\s\S]*<button[^>]*>Gửi câu trả lời<\/button>/);
+  assert.match(stdout,/<fieldset class="choices">[\s\S]*<input type="radio" name="choice-request-1" value="a">[\s\S]*Policy A preserves records for the complete approved audit period[\s\S]*<input type="radio" name="choice-request-1" value="b">[\s\S]*Policy B removes records after the shorter approved period[\s\S]*<\/fieldset>/,'every option is a choice card with its full text, never a truncating native popup');
+  assert.doesNotMatch(stdout,/<select/,'a decision with options is a choice, not a dropdown');
+  assert.match(stdout,/<fieldset class="choices">[\s\S]*<\/fieldset>[\s\S]*<button[^>]*>Gửi câu trả lời<\/button>/);
   assert.doesNotMatch(stdout,/type="password"/,'preparing credentials still expose no secret input');
 });
 
@@ -472,21 +472,24 @@ test('owner controls survive unchanged polling and reset when their bound reques
   for(let i=0;i<40&&!(await evaluate(patch)&&await evaluate("window.setTimeout.toString().includes('original')"));i++)await new Promise(resolve=>setTimeout(resolve,50));
   const nextPoll=async()=>{const target=polls+1,deadline=Date.now()+3200;while(polls<target&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,20));await new Promise(resolve=>setTimeout(resolve,80));};
   for(let i=0;i<100&&!(await evaluate("document.querySelectorAll('#owner form').length===5"));i++)await new Promise(resolve=>setTimeout(resolve,50));
-  assert.deepEqual(await evaluate("(()=>[...document.querySelectorAll('#owner form')].slice(2,4).map(f=>[f.querySelector('textarea').disabled,f.querySelector('button').disabled]))()"),[[true,true],[true,true]]);
+  // A preparing request shows no control at all; an answered one keeps its control and button, disabled.
+  assert.deepEqual(await evaluate("(()=>{const fs=[...document.querySelectorAll('#owner form')];return [[fs[2].querySelector('textarea')===null,fs[2].querySelector('button')===null,fs[2].textContent.includes('chuẩn bị')],[fs[3].querySelector('textarea').disabled,fs[3].querySelector('button').disabled]]})()"),[[true,true,true],[true,true]]);
   await evaluate("(()=>{for(const f of [...document.querySelectorAll('#owner form')].slice(2,4))f.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));return true})()");assert.equal(submissions,0);
-  await evaluate("(()=>{const s=document.querySelector('#owner select'),ts=document.querySelectorAll('#owner textarea'),t=ts[0];s.value='c';t.value='typed answer';ts[3].value='status draft';t.focus();t.setSelectionRange(2,6);return true})()");
+  // The first form is the choice: its own "other answer" textarea is hidden and comes first in the textarea list.
+  await evaluate("(()=>{document.querySelector('#owner input[type=radio][value=c]').checked=true;const ts=[...document.querySelectorAll('#owner form')].slice(1).map(f=>f.querySelector('textarea')),t=ts[0];t.value='typed answer';ts[3].value='status draft';t.focus();t.setSelectionRange(2,6);return true})()");
   await nextPoll();
-  const preserved=await evaluate("(()=>{const s=document.querySelector('#owner select'),t=document.querySelector('#owner textarea');return [s.value,t.value,document.activeElement===t,t.selectionStart,t.selectionEnd]})()");
+  const picked="((document.querySelector('#owner input[type=radio]:checked')||{}).value||'')",answerBox="document.querySelectorAll('#owner form')[1].querySelector('textarea')";
+  const preserved=await evaluate("(()=>{const t="+answerBox+";return ["+picked+",t.value,document.activeElement===t,t.selectionStart,t.selectionEnd]})()");
   requests[1].guidance={why:'Fresh presentation guidance'};await nextPoll();
   const guidance=await evaluate("(()=>{const f=document.querySelectorAll('#owner form')[1],t=f.querySelector('textarea');return [f.textContent.includes('Fresh presentation guidance'),t.value,document.activeElement===t,t.selectionStart,t.selectionEnd]})()");
   requests[0].options[2].label='Changed without digest';await nextPoll();
-  const malformedChange=await evaluate("(()=>[document.querySelector('#owner select').value,document.querySelector('#owner textarea').value])()");
+  const malformedChange=await evaluate("(()=>["+picked+","+answerBox+".value])()");
   requests[0].optionsDigest='b'.repeat(64);requests[4].status='answered';await nextPoll();
-  const bindingChanges=await evaluate("(()=>{const f=document.querySelectorAll('#owner form')[4];return [document.querySelector('#owner select').value,document.querySelector('#owner textarea').value,f.querySelector('textarea').value,f.querySelector('textarea').disabled,f.querySelector('button').disabled]})()");
+  const bindingChanges=await evaluate("(()=>{const f=document.querySelectorAll('#owner form')[4];return ["+picked+","+answerBox+".value,f.querySelector('textarea').value,f.querySelector('textarea').disabled,f.querySelector('button').disabled]})()");
   requests[1].revision=2;await nextPoll();
-  const reset=await evaluate("(()=>[document.querySelector('#owner select').value,document.querySelector('#owner textarea').value])()");
+  const reset=await evaluate("(()=>["+picked+","+answerBox+".value])()");
   socket.send(JSON.stringify({id:++seq,method:'Browser.close'}));await new Promise(resolve=>child.once('exit',resolve));
-  assert.deepEqual(preserved,['c','typed answer',true,2,6]);assert.deepEqual(guidance,[true,'typed answer',true,2,6]);assert.deepEqual(malformedChange,['a','typed answer']);assert.deepEqual(bindingChanges,['a','typed answer','',true,true]);assert.deepEqual(reset,['a','']);
+  assert.deepEqual(preserved,['c','typed answer',true,2,6]);assert.deepEqual(guidance,[true,'typed answer',true,2,6]);assert.deepEqual(malformedChange,['','typed answer'],'a changed option shape rebuilds the choice with nothing picked');assert.deepEqual(bindingChanges,['','typed answer','',true,true]);assert.deepEqual(reset,['','']);
 });
 
 test('preparing credentials expose safe per-request progress while an independent owner decision stays answerable',t=>{

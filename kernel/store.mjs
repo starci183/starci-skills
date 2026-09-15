@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {readReports as readReportFiles,repositoryRoot} from './reports.mjs';
 import crypto from 'node:crypto';
-import {configuredProgressLanguage,createProgressReporter} from './progress.mjs';
+import {configuredProgressDebug,configuredProgressLanguage,createProgressReporter} from './progress.mjs';
 import {compactSnapshots} from './journal.mjs';
 
 /**
@@ -83,7 +83,7 @@ export function createStore({repoRoot,id}){
   let seq=null;
   let durable=null;
   // The tab speaks the host's configured language; the events it renders stay as recorded.
-  const reportProgress=createProgressReporter({language:configuredProgressLanguage()});
+  const reportProgress=createProgressReporter({language:configuredProgressLanguage(),debug:configuredProgressDebug()});
   const nextSeq=()=>{
     if(seq===null)seq=lastSeq(paths.events,dir);
     seq+=1;return seq;

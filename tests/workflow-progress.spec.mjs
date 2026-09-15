@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {configuredProgressLanguage,createProgressReporter,progressLine} from '../kernel/progress.mjs';
+import {configuredProgressDebug,configuredProgressLanguage,createProgressReporter,progressLine} from '../kernel/progress.mjs';
 
 test('kernel progress prints bounded decisions and transitions while deduplicating identical waits',()=>{
   const lines=[],report=createProgressReporter({enabled:true,write:value=>lines.push(value)});
@@ -45,4 +45,26 @@ test('the terminal lines follow config.json language while ids, runtimes and rec
   assert.equal(progressLine({event:'stopped'},{language:'vi-VN'}),'[Kernel] đã dừng','a regional tag selects its language');
   assert.equal(progressLine({event:'stopped'},{language:'xx'}),'[Kernel] stopped','an unknown language speaks English');
   assert.equal(configuredProgressLanguage(()=>({language:'vi'})),'vi');assert.equal(configuredProgressLanguage(()=>{throw Error('no config');}),'en');
+});
+
+test('runtime and model choices print only when config.json says debug, in the configured language',()=>{
+  const shared={event:'allocation-shared',op:'op-01',runtime:'qwen3.8-flash',preferredOver:['gpt-5.6-sol','claude-opus'],sharedLoad:{'claude-opus':1}};
+  const budgeted={event:'allocation-budgeted',op:'op-01',runtime:'qwen3.8-flash',remaining:{'qwen3.8-flash':null,'gpt-5.6-sol':50}};
+  const model={event:'model-selected',function:'manageWorkflow',op:'manager-1',runtime:'gpt-5.6-sol',provider:'gpt-5.6-sol',mode:'probation',considered:[{runtime:'gpt-5.6-sol',remaining:50},{runtime:'claude-opus',remaining:12}]};
+  for(const event of [shared,budgeted,model])assert.equal(progressLine(event),null,'silent without debug');
+  assert.equal(progressLine(shared,{debug:true}),'[Kernel] op-01: chose runtime qwen3.8-flash (over gpt-5.6-sol, claude-opus) · shared load {"claude-opus":1}');
+  assert.match(progressLine(budgeted,{debug:true,language:'vi'}),/^\[Kernel\] op-01: chọn runtime qwen3\.8-flash · quota còn /);
+  assert.equal(progressLine(model,{debug:true,language:'vi'}),'[Kernel] model gpt-5.6-sol cho manageWorkflow manager-1 · chế độ probation · đã xét gpt-5.6-sol:50, claude-opus:12');
+  const lines=[],report=createProgressReporter({enabled:true,debug:true,write:value=>lines.push(value)});
+  assert.equal(report(shared),true);assert.equal(report({event:'tick'}),false);
+  assert.equal(configuredProgressDebug(()=>({debug:true})),true);assert.equal(configuredProgressDebug(()=>({})),false);assert.equal(configuredProgressDebug(()=>{throw Error('x');}),false);
+});
+
+test('an accepted operation tells, under debug, what it did and how much is left with an estimate',()=>{
+  const done={event:'op-done',op:'op-03',summary:'Wrote the ownership inventory for eight containers.',durationMs:600000,remainingOps:5,estimateMs:5*3600000+1200000};
+  assert.equal(progressLine(done),'[Kernel] op-03: accepted','without debug the line is the plain acceptance');
+  assert.equal(progressLine(done,{debug:true}),'[Kernel] op-03: accepted — Wrote the ownership inventory for eight containers. · 5 ops left · about 5h 20min');
+  assert.equal(progressLine(done,{debug:true,language:'vi'}),'[Kernel] op-03: đã chấp nhận — Wrote the ownership inventory for eight containers. · 5 op còn lại · dự kiến ~ 5giờ 20phút');
+  assert.equal(progressLine({event:'op-done',op:'last',remainingOps:0,estimateMs:0},{debug:true}),'[Kernel] last: accepted · 0 ops left');
+  assert.equal(progressLine({event:'accepted-early',ops:['a']},{debug:true}),'[Kernel]: accepted','an early acceptance names no single op');
 });

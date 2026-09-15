@@ -37,12 +37,14 @@ export function deriveOwnerRequests(state,{now=Date.now}={}){
   const decisionMarkers=new Map(list(state?.needUser).filter(item=>item?.kind==='decision'&&clean(item.op)&&clean(item.record)).map(item=>[clean(item.op),item]));
   return list(state?.ops).filter(ask=>{
     const legacyDecision=ask?.kind==='decision.prepare'&&!ask.ownerAnswer&&!ask.answer&&decisionMarkers.has(clean(ask.id));
+    // A decision the kernel has not launched yet (queued behind the canonical writer) is shown as preparing, so the
+    // owner sees every question the workflow will ask, not only the one being worked on.
     return ask?.question&&ask.refusal!=='superseded'&&ask.status!=='cancelled'&&ask.ownerRequestStatus!=='cancelled'&&(legacyDecision||OWNER_REQUEST_STATES.includes(ask.ownerRequestStatus)
-      ||(!ask.ownerAnswer&&['running','waiting-owner','blocked'].includes(ask.status)&&(ask.kind==='provision.ask'||ask.kind==='decision.prepare')));
+      ||(!ask.ownerAnswer&&['running','waiting-owner','blocked','ready','pending'].includes(ask.status)&&(ask.kind==='provision.ask'||ask.kind==='decision.prepare')));
   }).map(ask=>{
     const decisionMarker=decisionMarkers.get(clean(ask.id)),kind=decisionMarker?'business-decision':askKind(ask),answer=plain(ask.ownerAnswer)?ask.ownerAnswer:null,verification=plain(ask.ownerVerification)?ask.ownerVerification:null;
     let status=clean(ask.ownerRequestStatus);
-    if(!OWNER_REQUEST_STATES.includes(status))status=answer?(kind==='credential'?'saved':'answered'):'waiting-owner';
+    if(!OWNER_REQUEST_STATES.includes(status))status=answer?(kind==='credential'?'saved':'answered'):['ready','pending'].includes(ask.status)?'preparing':'waiting-owner';
     if(verification?.status==='verified')status='verified';
     else if(verification?.status==='rejected')status='needs-correction';
     const subject=clean(ask?.question?.subject||ask?.credential?.provider||ask?.question?.text||ask.id);

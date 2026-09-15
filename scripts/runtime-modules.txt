@@ -46,6 +46,7 @@ kernel/inputs.mjs
 kernel/inputs-model.mjs
 kernel/inputs-server.mjs
 kernel/inputs-ui.mjs
+kernel/inputs-components.mjs
 kernel/inputs-readiness.mjs
 kernel/inputs-replacement.mjs
 kernel/journal.mjs

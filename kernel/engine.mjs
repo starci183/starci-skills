@@ -106,7 +106,8 @@ function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadR
   const eligible=candidates.map((candidate,index)=>({...candidate,index,decision:eligibility(job,candidate.runtime),budget:budgetVerdict(candidate.runtime,budget,{now:now(),requireFresh:true})})).filter(item=>item.decision?.eligible===true);
   const available=eligible.filter(item=>item.budget.known&&!item.budget.exhausted).sort((a,b)=>b.budget.remaining-a.budget.remaining||a.index-b.index),providers=available.slice(0,1).map(item=>item.id);
   if(!providers.length){const error=Error(eligible.length?`No eligible ${name} model has known available provider quota`:`No evaluated model is eligible for ${name}`);if(eligible.length){error.code='STARCI_MODEL_QUOTA_WAIT';error.reasons=eligible.map(item=>({runtime:item.id,known:item.budget.known,exhausted:item.budget.exhausted,until:item.budget.until}));}throw error;}
-  const selected=available[0];return {args:{...modelInput(args),providers},runtime:selected.runtime,decision:selected.decision,job};
+  const selected=available[0];return {args:{...modelInput(args),providers},runtime:selected.runtime,decision:selected.decision,job,
+    considered:available.map(item=>({runtime:item.id,remaining:item.budget.remaining})),refused:candidates.filter(candidate=>!eligible.some(item=>item.id===candidate.id)).map(candidate=>candidate.id)};
 }
 
 /** Opt in only at a settled workflow boundary. Canonical Work and approved goal references stay intact. */
@@ -135,7 +136,8 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
   const unwrap=result=>{if(result?.pending)deferJob(result);if(result?.status!=='succeeded')throw Error(result?.result?.reason??`Durable job ${result?.status}`);return result.result;};
   const requestModel=(name,args,op=null)=>{args=Array.isArray(args?.providers)?args:{...args,providers:nonOperationModels(configuredModelRole(name))};const bound=identity(op),base=modelInput(args),selectionKey=inputDigest({name,args:base,...bound});state.engine.modelSelections??={};let saved=state.engine.modelSelections[selectionKey],selected;
     if(saved){const replayArgs={...base,providers:[saved.provider]},kind=name==='validateOp'?'judge':'model',role=modelRole(name),input={handler:'model-function',functionName:name,args:replayArgs,admission:{runtime:saved.runtime,mode:saved.mode}},jobId=bridgeJobId({...bound,kind,input}),existing=journal.getJob(jobId);if(existing&&existing.status!=='queued')selected={args:replayArgs,runtime:{id:saved.runtime},decision:{mode:saved.mode},job:{kind,role}};}
-    if(!selected){const budget=typeof modelBudget==='function'?modelBudget():modelBudget??readRuntimeBudget(path.dirname(store.dir));selected=eligibleModelSelection(name,args,eligibility,modelPolicy,runtimeProfile,bound,budget,now);saved={provider:selected.args.providers[0],runtime:selected.runtime.id,mode:selected.decision.mode??'qualified'};state.engine.modelSelections[selectionKey]=saved;store.saveState(state);}
+    if(!selected){const budget=typeof modelBudget==='function'?modelBudget():modelBudget??readRuntimeBudget(path.dirname(store.dir));selected=eligibleModelSelection(name,args,eligibility,modelPolicy,runtimeProfile,bound,budget,now);saved={provider:selected.args.providers[0],runtime:selected.runtime.id,mode:selected.decision.mode??'qualified'};state.engine.modelSelections[selectionKey]=saved;
+      store.appendEvent?.({event:'model-selected',function:name,op:bound.opId??null,runtime:saved.runtime,provider:saved.provider,mode:saved.mode,considered:selected.considered??[],refused:selected.refused??[]});store.saveState(state);}
     return unwrap(replayModelFunction(bridge,name,selected.args,bound,{admission:{runtime:saved.runtime,mode:saved.mode},kind:selected.job?.kind??(name==='validateOp'?'judge':'model'),role:selected.job?.role??modelRole(name)}));};
   return {
     journal,admission,jobs,bridge,identity,requiredValidation:true,
