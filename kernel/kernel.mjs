@@ -1365,6 +1365,37 @@ export function releaseSettledOperationLeases(store,state,ctx,{settle=settleGene
 }
 
 /**
+ * A candidate is the frozen working copy of one operation launch, and it is only ever read while that launch is
+ * unsettled: the kernel compares it, accepts or quarantines it, and then the job is terminal and the copy is
+ * history. Nothing removed them, so every retry of every operation left another whole tree behind - five gigabytes
+ * beside a two-megabyte journal, growing about a gigabyte an hour, on a disk the runtime itself fails closed on.
+ * Storage keeps what is in progress. A candidate whose job is terminal in the journal, and which no live lease of
+ * this workflow names, is removed; anything the kernel cannot read the journal for is kept.
+ */
+export const CANDIDATE_SWEEP_LIMIT=64;
+export function sweepSettledCandidates(store,state,ctx,{limit=CANDIDATE_SWEEP_LIMIT,remove=directory=>fs.rmSync(directory,{recursive:true,force:true})}={}){
+  if(!ctx?.engine?.journal||!isEnrolled(state))return [];
+  const base=path.join(path.dirname(state.engine.journalFile),'candidates',state.id);
+  let entries;
+  try{entries=fs.readdirSync(base,{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name);}catch{return [];}
+  if(!entries.length)return [];
+  let live;
+  try{live=new Set(ctx.engine.journal.listJobs()
+    .filter(job=>!['succeeded','failed','cancelled'].includes(job.status))
+    .map(job=>job.job_id));}
+  catch{return [];}
+  for(const op of state.ops)if(op.lease?.jobId)live.add(op.lease.jobId);
+  const removed=[];
+  for(const name of entries){
+    if(live.has(name))continue;
+    try{remove(path.join(base,name));removed.push(name);}catch{/* a copy the filesystem will not give up stays; the next tick tries again */}
+    if(removed.length>=limit)break;
+  }
+  if(removed.length)store.appendEvent({event:'candidates-swept',removed:removed.length,kept:entries.length-removed.length});
+  return removed;
+}
+
+/**
  * Where a decision's options actually live. A report summary is capped, so only the first numbered option of a
  * four-option question ever survives the trip to the kernel: the owner then reads a choice as a free-text box.
  * The record the ask authored is the canonical copy and it is complete, so the kernel reads the choices from it,
@@ -3611,6 +3642,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   const swept=allocator.sharedSync?.(state.ops.filter(op=>op.status==='running').map(op=>op.id));
   if(swept?.dropped?.length)store.appendEvent({event:'runtime-loads-swept',dropped:swept.dropped});
   if(!ctx.engine)sweepTreeStrays(store,state,ctx);
+  sweepSettledCandidates(store,state,ctx);
   sweepStaleTerminals(orca,store,state,{cwd});
   state.buildStamp=buildStamp();
   rejudgeParked(store,state,ctx);

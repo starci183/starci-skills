@@ -2,6 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import {bridgeJobId,createJobBridge,inputDigest,replayModelFunction} from './job-bridge.mjs';
+import {hasReplayableStagedResult} from './job-worker.mjs';
 import {createJobs} from './jobs.mjs';
 import {rankJobs,updateProgressBudget,progressExhausted} from './scheduler.mjs';
 import {loadRuntimes} from './schedule.mjs';
@@ -70,6 +71,36 @@ export function relocateJournal({from,to,workflowId}={}){
   for(const name of ['model-qualifications.json','model-probations.json']){const file=path.join(path.dirname(source),name),into=path.join(path.dirname(target),name);if(fs.existsSync(file)&&!fs.existsSync(into)){fs.copyFileSync(file,into);copied.push(name);}}
   return {ok:true,from:source,to:target,retired,copied};
 }
+/**
+ * A model or judge job left `effect_unknown` because its worker never started has nothing unknown about it: a model
+ * function answers, it does not write, and a spawn that failed produced no answer and staged no result. Fencing the
+ * generation behind it froze a workflow for good - the retry waits for the job, the job settles only while a kernel
+ * runs, and the kernel cannot advance past the retry. Such a job is settled failed and named, so the generation may
+ * move. A `check` job runs a command and may have touched the tree, so it keeps the fence whatever its status.
+ */
+export function settleNeverStartedModelJobs({journalFile,workflowId,generation,now=Date.now}={}){
+  if(!journalFile||!fs.existsSync(journalFile))return [];
+  const journal=openJournal({file:journalFile,now});
+  try{
+    const stranded=journal.listJobs().filter(job=>job.workflow_id===workflowId&&job.generation===generation
+      &&['model','judge'].includes(job.kind)&&job.status==='effect_unknown'&&!hasReplayableStagedResult(journal.path,job));
+    if(!stranded.length)return [];
+    return journal.transaction(db=>{
+      const stamp=now();
+      const update=db.prepare("UPDATE jobs SET status='failed',result_json=?,updated_at=? WHERE job_id=? AND status='effect_unknown'");
+      const event=db.prepare("INSERT OR IGNORE INTO events(event_id,workflow_id,entity_type,entity_id,generation,kind,payload_json,created_at) VALUES(?,?,?,?,?,?,?,?)");
+      const settled=[];
+      for(const job of stranded){
+        const reason={reason:'the worker of this pure model job never started, so it produced no answer and left no effect'};
+        if(update.run(JSON.stringify(reason),stamp,job.job_id).changes!==1)continue;
+        event.run(`${job.job_id}:never-started-settled`,workflowId,'job',job.job_id,generation,'model-job-never-started',JSON.stringify(reason),stamp);
+        settled.push(job.job_id);
+      }
+      return settled;
+    });
+  }finally{journal.close();}
+}
+
 /** Read-only retry fence: pure model and command jobs must settle in their current generation before it advances. */
 export function unsettledGenerationJobs({journalFile,workflowId,generation}={}){
   if(!journalFile||!fs.existsSync(journalFile))return [];
@@ -80,6 +111,7 @@ export function unsettledGenerationJobs({journalFile,workflowId,generation}={}){
 /** Cancel only never-launched queued pure jobs, then report every job whose effect still needs settlement. */
 export function prepareGenerationRetry({journalFile,workflowId,generation,now=Date.now}={}){
   if(!journalFile||!fs.existsSync(journalFile))return {cancelled:[],unsettled:[]};
+  const neverStarted=settleNeverStartedModelJobs({journalFile,workflowId,generation,now});
   const journal=openJournal({file:journalFile,now});
   try{
     const cancelled=journal.transaction(db=>{
@@ -91,7 +123,7 @@ export function prepareGenerationRetry({journalFile,workflowId,generation,now=Da
       return rows.map(row=>row.job_id);
     });
     const unsettled=journal.listJobs().filter(job=>job.workflow_id===workflowId&&job.generation===generation&&['model','judge','check'].includes(job.kind)&&!['succeeded','failed','cancelled'].includes(job.status)).map(job=>job.job_id);
-    return {cancelled,unsettled};
+    return {cancelled,unsettled,neverStarted};
   }finally{journal.close();}
 }
 const modelRole=name=>['critiqueGoal','validateOp','classifyScreen'].includes(name)?'verify':['assessGoal','planOp','presentOwnerQuestion'].includes(name)?'plan':'decide';
