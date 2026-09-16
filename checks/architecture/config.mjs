@@ -3,9 +3,13 @@ import path from 'node:path';
 
 const CONFIG_SCHEMA = 'starci/architecture-config@1';
 const KINDS = new Set(['backend', 'frontend']);
-const TOP_LEVEL_KEYS = new Set(['schema', 'kinds', 'tsconfig', 'projects', 'backend', 'frontend']);
+const TOP_LEVEL_KEYS = new Set(['schema', 'kinds', 'tsconfig', 'projects', 'backend', 'frontend', 'owners']);
 const BACKEND_KEYS = new Set(['modules', 'features', 'apps']);
-const FRONTEND_KEYS = new Set(['routes', 'components', 'hooks', 'transport']);
+const FRONTEND_KEYS = new Set(['routes', 'components', 'hooks', 'transport', 'grammar']);
+const OWNER_KEYS = new Set(['id', 'root', 'entry']);
+const GRAMMAR_KEYS = new Set(['package', 'entry', 'styleEntry', 'styleSources', 'consumerManifests', 'peers']);
+const PRODUCTION_SOURCE = /\.(?:[cm]?[jt]sx?)$/i;
+const DECLARATION_SOURCE = /\.d\.[cm]?[jt]s$/i;
 
 function slash(value) {
   return value.replaceAll('\\', '/');
@@ -33,6 +37,15 @@ function exactKeys(value, allowed, label) {
 function existingDirectory(root, relative) {
   try {
     return fs.lstatSync(path.join(root, relative)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function existingRegularFile(root, relative) {
+  try {
+    const stat = fs.lstatSync(path.join(root, ...relative.split('/')));
+    return stat.isFile() && !stat.isSymbolicLink();
   } catch {
     return false;
   }
@@ -179,6 +192,60 @@ function requireAuthoredDirectories(root, value, label) {
   }
 }
 
+function configuredOwners(root, value) {
+  if (value === undefined) return null;
+  if (!Array.isArray(value)) throw Error('Architecture owners must be an array.');
+  const owners = value.map((owner, index) => {
+    exactKeys(owner, OWNER_KEYS, `Architecture owners[${index}]`);
+    if (typeof owner.id !== 'string' || !owner.id.trim()) throw Error(`Architecture owners[${index}].id must be non-empty.`);
+    const ownerRoot = safeRelative(owner.root, `Architecture owners[${index}].root`);
+    const entry = safeRelative(owner.entry, `Architecture owners[${index}].entry`);
+    if (!existingDirectory(root, ownerRoot)) throw Error(`Architecture owner root does not exist: ${ownerRoot}.`);
+    if (!existingRegularFile(root, entry)) throw Error(`Architecture owner entry must be a regular non-link file: ${entry}.`);
+    if (!PRODUCTION_SOURCE.test(entry) || DECLARATION_SOURCE.test(entry)) {
+      throw Error(`Architecture owner entry must be a production TypeScript or JavaScript source file: ${entry}.`);
+    }
+    if (!isInside(path.join(root, ownerRoot), path.join(root, entry))) throw Error(`Architecture owner entry must stay inside ${ownerRoot}.`);
+    return { id: owner.id.trim(), root: ownerRoot, entry };
+  });
+  for (const field of ['id', 'root', 'entry']) if (new Set(owners.map(owner => owner[field])).size !== owners.length) {
+    throw Error(`Architecture owner ${field} values must be unique.`);
+  }
+  return owners;
+}
+
+function grammarConfig(root, value) {
+  if (value === undefined) return null;
+  exactKeys(value, GRAMMAR_KEYS, 'Architecture frontend.grammar');
+  for (const key of ['package', 'entry', 'styleEntry']) if (typeof value[key] !== 'string' || !value[key].trim()) {
+    throw Error(`Architecture frontend.grammar.${key} must be non-empty.`);
+  }
+  const packageName = value.package.trim();
+  const entry = value.entry.trim();
+  const styleEntry = value.styleEntry.trim();
+  if (!entry.startsWith(`${packageName}/`) || !styleEntry.startsWith(`${packageName}/`) || !styleEntry.endsWith('.css')) {
+    throw Error('Architecture frontend.grammar entries must be subpaths of its package and styleEntry must end in .css.');
+  }
+  const styleSources = Array.isArray(value.styleSources)
+    ? value.styleSources.map(source => safeRelative(source, 'Architecture frontend.grammar.styleSources')) : [];
+  if (!styleSources.length || new Set(styleSources).size !== styleSources.length
+    || styleSources.some(source => !existingRegularFile(root, source) || !source.endsWith('.css'))) {
+    throw Error('Architecture frontend.grammar.styleSources must name existing regular non-link CSS files.');
+  }
+  const consumerManifests = Array.isArray(value.consumerManifests)
+    ? value.consumerManifests.map(source => safeRelative(source, 'Architecture frontend.grammar.consumerManifests')) : [];
+  if (!consumerManifests.length || new Set(consumerManifests).size !== consumerManifests.length
+    || consumerManifests.some(source => path.posix.basename(source) !== 'package.json' || !existingRegularFile(root, source))) {
+    throw Error('Architecture frontend.grammar.consumerManifests must name existing regular non-link package.json files.');
+  }
+  if (styleSources.some(source => !consumerManifests.some(manifest => isInside(path.join(root, path.posix.dirname(manifest)), path.join(root, source))))) {
+    throw Error('Architecture frontend.grammar.styleSources must stay inside a declared consumer package.');
+  }
+  const peers = Array.isArray(value.peers) ? value.peers.map(item => typeof item === 'string' ? item.trim() : '') : [];
+  if (!peers.length || peers.some(item => !item) || new Set(peers).size !== peers.length) throw Error('Architecture frontend.grammar.peers must contain unique package names.');
+  return { package: packageName, entry, styleEntry, styleSources, consumerManifests, peers };
+}
+
 /** Resolve a strict layout contract. It deliberately has no ignore, waiver, or baseline field. */
 export function loadArchitectureConfig(repositoryRoot, configFile) {
   const root = fs.realpathSync(path.resolve(repositoryRoot));
@@ -197,24 +264,28 @@ export function loadArchitectureConfig(repositoryRoot, configFile) {
   exactKeys(backend, BACKEND_KEYS, 'Architecture config backend');
   exactKeys(frontend, FRONTEND_KEYS, 'Architecture config frontend');
   for (const [key, value] of Object.entries(backend)) requireAuthoredDirectories(root, value, `Architecture backend.${key}`);
-  for (const [key, value] of Object.entries(frontend)) requireAuthoredDirectories(root, value, `Architecture frontend.${key}`);
+  for (const key of ['routes', 'components', 'hooks', 'transport']) requireAuthoredDirectories(root, frontend[key], `Architecture frontend.${key}`);
   const discovered = discoveredProjects(root, workspaces);
   const projects = pathList(authored.projects ?? authored.tsconfig, discovered, 'Architecture TypeScript project');
+  const resolvedBackend = {
+    modules: pathList(backend.modules, ['src/modules'], 'Architecture backend.modules'),
+    features: pathList(backend.features, ['src/features'], 'Architecture backend.features'),
+    apps: pathList(backend.apps, ['apps'], 'Architecture backend.apps'),
+  };
+  const owners = configuredOwners(root, authored.owners);
   return {
     root,
     kinds: [...kinds].sort(),
     projects,
     workspaces,
-    backend: {
-      modules: pathList(backend.modules, ['src/modules'], 'Architecture backend.modules'),
-      features: pathList(backend.features, ['src/features'], 'Architecture backend.features'),
-      apps: pathList(backend.apps, ['apps'], 'Architecture backend.apps'),
-    },
+    owners,
+    backend: resolvedBackend,
     frontend: {
       routes: pathList(frontend.routes, inferred.routes.length ? inferred.routes : ['src/app'], 'Architecture frontend.routes'),
       components: pathList(frontend.components, inferred.components.length ? inferred.components : ['src/components'], 'Architecture frontend.components'),
       hooks: pathList(frontend.hooks, inferred.hooks.length ? inferred.hooks : ['src/hooks'], 'Architecture frontend.hooks'),
       transport: pathList(frontend.transport, inferred.transport.length ? inferred.transport : ['src/modules/api'], 'Architecture frontend.transport'),
+      grammar: grammarConfig(root, frontend.grammar),
     },
   };
 }

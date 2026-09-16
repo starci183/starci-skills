@@ -201,6 +201,23 @@ test('config has layout fields but rejects waiver and baseline fields', t => {
   assert.match(result.errors[0].message, /unsupported fields: waivers/);
 });
 
+test('omitted owner and Grammar declarations remain explicit unavailable coverage', t => {
+  const backend = fixture(t, 'backend', {
+    'src/modules/value.ts': 'export const value=1\n',
+    'src/features/feature.ts': 'export const feature=1\n',
+  });
+  const backendResult = check(backend);
+  assert.deepEqual(backendResult.coverage, { ownerPublicApi: { status: 'unavailable', reason: 'architecture.json does not declare owners and public entries' },
+    grammarContract: { status: 'not-applicable' } });
+  const frontend = fixture(t, 'frontend', {
+    'src/app/page.tsx': 'import { HomePage } from "@/components/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
+    'src/components/pages/HomePage/index.tsx': 'export const HomePage=()=> <main/>\n',
+  });
+  const frontendResult = check(frontend);
+  assert.equal(frontendResult.coverage.ownerPublicApi.status, 'unavailable');
+  assert.equal(frontendResult.coverage.grammarContract.status, 'unavailable');
+});
+
 test('solution tsconfig references merge workspace programs and honor declared package exports', t => {
   const root = monorepoFixture(t, {
     'apps/web/src/app/page.tsx': 'import { HomePage } from "@/components/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
@@ -348,6 +365,132 @@ test('feature application cannot import a protocol decorator re-exported by an i
   const violations = result.violations.filter(item => item.ruleId === 'BE_APPLICATION_TRANSPORT_FRAMEWORK');
   assert.ok(violations.some(item => item.path.endsWith('/invalid.use-case.ts') && item.dependencyChain?.at(-1).endsWith('/shared/protocol.ts')), JSON.stringify(result, null, 2));
   assert.equal(violations.some(item => item.path.endsWith('/valid.use-case.ts')), false, JSON.stringify(result, null, 2));
+});
+
+test('declared same-source owners require named public entries without export-star barrels', t => {
+  const root = fixture(t, 'backend', {
+    'src/features/orders/index.ts': 'export * from "./public"\n',
+    'src/features/orders/public.ts': 'export const publicOrder = 1\n',
+    'src/features/orders/private.ts': 'export const secretOrder = 2\n',
+    'src/features/orders/internal.ts': 'import { secretOrder } from "./private"; export const internal = secretOrder\n',
+    'src/features/catalog/valid.ts': 'import { publicOrder } from "../orders"; export const valid = publicOrder\n',
+    'src/features/catalog/invalid.ts': 'import { secretOrder } from "../orders/private"; export const invalid = secretOrder\n',
+    'src/shared/orders.ts': 'export { secretOrder } from "../features/orders/private"\n',
+    'src/features/catalog/indirect.ts': 'import { secretOrder } from "../../shared/orders"; export const indirect = secretOrder\n',
+  });
+  const configFile = path.join(root, 'architecture.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.owners = [{ id: 'feature:orders', root: 'src/features/orders', entry: 'src/features/orders/index.ts' }];
+  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const result = check(root);
+  assert.deepEqual(result.coverage.ownerPublicApi, { status: 'checked', declarations: 1 });
+  assert.ok(result.violations.some(item => item.ruleId === 'ARCH_OWNER_EXPORT_STAR' && item.path === 'src/features/orders/index.ts'), JSON.stringify(result, null, 2));
+  const bypasses = result.violations.filter(item => item.ruleId === 'ARCH_OWNER_EXPORT_BYPASS');
+  assert.ok(bypasses.some(item => item.path.endsWith('/invalid.ts')));
+  assert.ok(bypasses.some(item => item.path.endsWith('/indirect.ts') && item.dependencyChain.some(part => part.endsWith('/shared/orders.ts'))));
+  assert.equal(bypasses.some(item => item.path.endsWith('/valid.ts') || item.path.endsWith('/internal.ts')), false, JSON.stringify(result, null, 2));
+});
+
+test('owner coverage is unavailable when a declared entry is outside the checked production program', t => {
+  const root = fixture(t, 'backend', {
+    'src/modules/value.ts': 'export const value=1\n',
+    'declared/index.ts': 'export const outsideProgram=1\n',
+  });
+  const configFile = path.join(root, 'architecture.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.owners = [{ id: 'declared:outside-program', root: 'declared', entry: 'declared/index.ts' }];
+  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const result = check(root);
+  assert.equal(result.ok, false);
+  assert.equal(result.coverage.ownerPublicApi.status, 'unavailable');
+  assert.deepEqual(result.coverage.ownerPublicApi.missingEntries, ['declared/index.ts']);
+  assert.ok(result.violations.some(item => item.ruleId === 'ARCH_OWNER_EXPORT_BYPASS'
+    && item.path === 'declared/index.ts' && /outside the configured TypeScript programs/.test(item.message)), JSON.stringify(result, null, 2));
+});
+
+test('owner entries must be production TypeScript or JavaScript sources', t => {
+  const root = fixture(t, 'backend', {
+    'src/features/orders/README.md': '# Orders\n',
+    'src/features/orders/value.ts': 'export const value=1\n',
+  });
+  const configFile = path.join(root, 'architecture.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.owners = [{ id: 'feature:orders', root: 'src/features/orders', entry: 'src/features/orders/README.md' }];
+  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const result = check(root);
+  assert.equal(result.ok, false);
+  assert.equal(result.errors[0].ruleId, 'ARCH_CONFIG_INVALID');
+  assert.match(result.errors[0].message, /production TypeScript or JavaScript source file/);
+});
+
+test('declared Grammar contract binds public code, style entry, peers, and product imports', t => {
+  const root = fixture(t, 'frontend', {
+    'src/app/page.tsx': 'import { ProductPage } from "@/components/pages/ProductPage"; export default function Route(){ return <ProductPage/> }\n',
+    'src/app/globals.css': '@import "@fixture/grammar/core/styles.css";\n',
+    'src/components/pages/ProductPage/index.tsx': 'import { Button } from "@fixture/grammar/common"; export const ProductPage=()=> <Button/>\n',
+    'src/components/pages/ProductPage/shadow.ts': 'const require=(value:string)=>value; export const local=require("@fixture/grammar/private")\n',
+    'packages/grammar/src/common/index.tsx': 'export const Button=()=> <button/>\n',
+    'packages/grammar/src/private.tsx': 'export const Button=()=> <button data-private/>\n',
+    'packages/grammar/src/core/styles.css': ':root{}\n',
+  });
+  const packageFile = path.join(root, 'package.json');
+  fs.writeFileSync(packageFile, JSON.stringify({ private: true, dependencies: { '@fixture/grammar': 'file:packages/grammar', react: '19.0.0', '@fixture/theme': '1.0.0' } }));
+  fs.writeFileSync(path.join(root, 'packages/grammar/package.json'), JSON.stringify({ name: '@fixture/grammar',
+    exports: { './common': './src/common/index.tsx', './core/styles.css': './src/core/styles.css' },
+    peerDependencies: { react: '>=18', '@fixture/theme': '>=1' } }));
+  const tsconfigFile = path.join(root, 'tsconfig.json');
+  const tsconfig = JSON.parse(fs.readFileSync(tsconfigFile, 'utf8'));
+  tsconfig.compilerOptions.paths['@fixture/grammar/common'] = ['packages/grammar/src/common/index.tsx'];
+  fs.writeFileSync(tsconfigFile, `${JSON.stringify(tsconfig, null, 2)}\n`);
+  const configFile = path.join(root, 'architecture.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.owners = [];
+  config.frontend = { grammar: { package: '@fixture/grammar', entry: '@fixture/grammar/common',
+    styleEntry: '@fixture/grammar/core/styles.css', styleSources: ['src/app/globals.css'], consumerManifests: ['package.json'],
+    peers: ['react', '@fixture/theme'] } };
+  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const valid = check(root);
+  assert.equal(valid.ok, true, JSON.stringify(valid, null, 2));
+  assert.deepEqual(valid.coverage, { ownerPublicApi: { status: 'checked', declarations: 0 },
+    grammarContract: { status: 'checked', package: '@fixture/grammar' } });
+
+  fs.writeFileSync(path.join(root, 'src/components/pages/ProductPage/shadow.ts'), 'export const direct=require("@fixture/grammar/private")\n');
+  const realRequireBypass = check(root);
+  assert.ok(realRequireBypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS'
+    && item.path.endsWith('/shadow.ts')), JSON.stringify(realRequireBypass, null, 2));
+  fs.writeFileSync(path.join(root, 'src/components/pages/ProductPage/shadow.ts'), 'const require=(value:string)=>value; export const local=require("@fixture/grammar/private")\n');
+
+  tsconfig.compilerOptions.paths['@fixture/grammar/common'] = ['packages/grammar/src/private.tsx'];
+  fs.writeFileSync(tsconfigFile, `${JSON.stringify(tsconfig, null, 2)}\n`);
+  const misresolved = check(root);
+  assert.ok(misresolved.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS'), JSON.stringify(misresolved, null, 2));
+  tsconfig.compilerOptions.paths['@fixture/grammar/common'] = ['packages/grammar/src/common/index.tsx'];
+  fs.writeFileSync(tsconfigFile, `${JSON.stringify(tsconfig, null, 2)}\n`);
+
+  fs.writeFileSync(path.join(root, 'src/app/globals.css'), '@import "@fixture/grammar/core/styles.css";\n@import "@fixture/grammar/heritage/styles.css";\n');
+  const styleBypass = check(root);
+  assert.ok(styleBypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS' && item.specifier === '@fixture/grammar/heritage/styles.css'), JSON.stringify(styleBypass, null, 2));
+  assert.ok(styleBypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_CONTRACT_INVALID' && /heritage\/styles\.css/.test(item.message)), JSON.stringify(styleBypass, null, 2));
+  fs.writeFileSync(path.join(root, 'src/app/globals.css'), '@import url(@fixture/grammar/core/styles.css);\n@import url(@fixture/grammar/heritage/styles.css);\n');
+  const unquotedStyleBypass = check(root);
+  assert.ok(unquotedStyleBypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS' && item.specifier === '@fixture/grammar/heritage/styles.css'), JSON.stringify(unquotedStyleBypass, null, 2));
+  fs.writeFileSync(path.join(root, 'src/app/globals.css'), '@import "@fixture/grammar/core/styles.css";\n');
+
+  fs.writeFileSync(path.join(root, 'src/components/pages/ProductPage/index.tsx'), 'import { Button } from "@fixture/grammar/core"; export const ProductPage=()=> <Button/>\n');
+  const bypass = check(root);
+  assert.ok(bypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS'), JSON.stringify(bypass, null, 2));
+
+  fs.writeFileSync(path.join(root, 'packages/grammar/package.json'), JSON.stringify({ name: '@fixture/grammar',
+    exports: { './common': './src/common/index.tsx', './core/styles.css': './src/core/styles.css' },
+    peerDependencies: { react: '>=18', '@fixture/theme': '>=1', '@fixture/extra': '>=1' } }));
+  fs.writeFileSync(path.join(root, 'src/components/pages/ProductPage/index.tsx'), 'import { Button } from "@fixture/grammar/common"; export const ProductPage=()=> <Button/>\n');
+  const extraPeer = check(root);
+  assert.ok(extraPeer.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_CONTRACT_INVALID' && /exactly match/.test(item.message)), JSON.stringify(extraPeer, null, 2));
+
+  fs.writeFileSync(path.join(root, 'packages/grammar/package.json'), JSON.stringify({ name: '@fixture/grammar', exports: { './common': './src/common/index.tsx' }, peerDependencies: { react: '>=18' } }));
+  fs.writeFileSync(path.join(root, 'src/app/globals.css'), ':root{}\n');
+  const invalid = check(root);
+  assert.ok(invalid.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_CONTRACT_INVALID'), JSON.stringify(invalid, null, 2));
 });
 
 test('internal aliases and relative imports cannot resolve outside the checked repository', t => {
