@@ -1,13 +1,14 @@
 # Next error-state code check
 
-`checks/code-patterns/next-errors.mjs` implements three adopted mechanical rules for a selected Next application. It reads source and installed declarations; it never executes application code or a provider.
+`checks/code-patterns/next-errors.mjs` implements five adopted mechanical rules for a selected Next application. It reads source and installed declarations; it never executes application code or a provider.
 
 ## Rules
 
 - `FE_ERROR_WORLD_STATE_MAPPING` binds a resolved world/data source call to one connected owner, a closed failure-state contract and the actual render symbol/state prop that consumes it. Every reachable render of that symbol must carry the proven failure mapping; mutable state provenance and statically unreachable source/render paths fail unavailable. The render function may be local in the same file; no Base twin or extra file is required. Calls outside the declared owner and dynamic source aliases fail closed. `FE_WORLD_OWNER_RENDER_BOUNDARY` remains the separate architecture proof that selected world ownership does not leak into presentation.
-- `FE_ERROR_ENVELOPE_POLICY` binds an explicitly selected transport envelope type and its readers. The envelope exposes a boolean success discriminator, data and failure fields. Each reader handles transport failure before returning data, and mutable aliases cannot supply data provenance. `emptyData: valid` may return `data ?? null`; `emptyData: required` proves an explicit missing-data throw. A normal business disposition such as `pending` or `refused` remains data.
+- `FE_ERROR_ENVELOPE_POLICY` binds an explicitly selected transport envelope type and its readers. The envelope exposes a boolean success discriminator, data and failure fields. Each reader handles transport failure before returning data, and mutable aliases cannot supply data provenance. `emptyData: valid` may return `data ?? null`; `emptyData: required` proves an explicit missing-data throw. Resolved consumers of the selected envelope type must be declared exported readers; opaque flows make reader inventory unavailable. A normal business disposition such as `pending` or `refused` remains data.
 - `FE_WRITE_FEEDBACK_OWNER` binds a resolved write action, feedback owner and every selected site. Every reachable call of that action in the covered source roots belongs to a declared site and flows through the resolved feedback owner using the selected `promise` or `callback` binding. A promise is passed before it is awaited, so rejection remains visible to the owner. A callback owner must reachably invoke its operation parameter. A local same-named function does not satisfy the rule. Passing or storing an action through an unsupported dynamic shape makes coverage unavailable.
 - `FE_NEXT_ERROR_BOUNDARY_LOCATION` checks only explicitly declared global or segment boundaries. It verifies the reserved Next filename, `use client`, typed `error` and recovery props, a reachable recovery action and the global HTML shell. The permitted recovery prop is read from the installed Next error-boundary declarations, so the checker does not assume `reset` when the installed contract uses `unstable_retry`.
+- `FE_REQUIRED_VALUE_FAILURE` checks only semantically selected required values. Each entry binds one exact exported owner and immutable parameter/local identifier. A reachable, dominating null/undefined guard must terminate its failure branch with the standard Error constructor or a statically resolved Error subclass. Type assertions, opaque thrown values, uncalled helpers and dead branches cannot provide the proof.
 
 These rules do not require GraphQL, Apollo, SWR, a toast, or a boundary in every route folder. The application contract selects the mechanisms that actually apply. Retry eligibility, user copy, redaction, telemetry and whether a write warrants feedback remain design review obligations.
 
@@ -60,6 +61,14 @@ The target `package.json` owns `starci.codePatterns.next.errorState`:
       "path": "src/app/global-error.tsx",
       "recoveryProp": "reset"
     }
+  ],
+  "requiredValues": [
+    {
+      "id": "course-value",
+      "owner": { "path": "src/api/required.ts", "export": "requireCourse" },
+      "binding": "value",
+      "absence": "undefined"
+    }
   ]
 }
 ```
@@ -67,6 +76,8 @@ The target `package.json` owns `starci.codePatterns.next.errorState`:
 Paths are normalized repository-relative regular files and every named export is resolved through the owning TypeScript program. The parent may supply the canonical architecture config; direct invocation may use inferred project authority, which is recorded with a null config path and the resolved project list. `contextFiles` accepts the aggregate's exact mixed source/metadata inventory and may overlap selected source; the checker validates every path, forms one deduplicated source context internally, and preserves `files` as the exact requested result set. All owning-program sources below `sourceRoots` must appear in that selected/context source set; otherwise omission detection is unavailable and the check fails closed.
 
 `transports` records whether a selected root uses a typed envelope or throws transport failures. A throwing-only inventory needs no invented envelope. Empty world-state, feedback-write, or Next-boundary declarations are checked only when source inventory supports absence: resolved world/transport calls or an undeclared reserved `error.tsx`/`global-error.tsx` make coverage unavailable. This absence proof does not decide whether an existing write deserves user feedback; that selection remains design review. The checker binds whichever feedback helper the project declares and does not require a generic `runGraphQL` name, GraphQL, a toast, or an additional network wrapper.
+
+`requiredValues` is an explicit semantic inventory, not automatic discovery of every domain precondition. An empty list means no required value has been selected for this mechanical rule; it does not certify that the domain has no missing-context decisions. Once selected, the owner, binding, absence mode and reachable Error termination are mechanically checked. Envelope reader inventory is different: every resolved source consumer of a selected envelope identity must match a declared reader, while type-only references and producers do not count as readers.
 
 The uniform adapter is:
 
@@ -89,4 +100,4 @@ Primary references reviewed 2026-09-16:
 
 ## Static limits
 
-The check proves declared symbols, reachable direct call paths, immutable promise/callback and state/data provenance, source-to-state mapping on every selected render, envelope branches and boundary structure. Statically dead proof sites, higher-order registries, reflective invocation, computed envelope fields or unsupported control-flow indirection produce typed unavailable errors. It cannot judge retry safety, message quality, security redaction, telemetry usefulness or business-state meaning.
+The check proves declared symbols, reachable direct call paths, immutable promise/callback and state/data provenance, source-to-state mapping on every selected render, selected required-value guards, exhaustive resolved envelope readers and boundary structure. Statically dead proof sites, higher-order registries, reflective invocation, computed envelope fields or unsupported control-flow indirection produce typed unavailable errors. It cannot discover domain-required values, judge retry safety, message quality, security redaction, telemetry usefulness or business-state meaning.

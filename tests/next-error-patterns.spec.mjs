@@ -27,6 +27,10 @@ export function readCourse(result: ReadEnvelope): string | null {
 import { withFeedback } from '../ui/feedback';
 export async function saveFromForm() { return withFeedback(saveCourse()); }`,
     'src/api/use-course.ts': `export function useCourseWorld() { return { error: null as Error | null }; }`,
+    'src/api/required.ts': `export function requireCourse(value: string | undefined): string {
+  if (value === undefined) throw new Error('Course is required');
+  return value;
+}`,
     'src/ui/course-view.tsx': `export type CourseState = 'ready' | 'failed';
 export function CourseView({ state }: { readonly state: CourseState }) { return <p>{state}</p>; }`,
     'src/features/course-owner.tsx': `import { useCourseWorld } from '../api/use-course';
@@ -52,6 +56,7 @@ export default function GlobalError({ error, reset }: BoundaryProps) {
     writes: [{ action: { path: 'src/api/write.ts', export: 'saveCourse' }, feedback: { path: 'src/ui/feedback.ts', export: 'withFeedback' }, binding: 'promise',
       sites: [{ path: 'src/features/save.ts', export: 'saveFromForm' }] }],
     boundaries: [{ role: 'global', routeRoot: 'src/app', path: 'src/app/global-error.tsx', recoveryProp: 'reset' }],
+    requiredValues: [{ id: 'course-value', owner: { path: 'src/api/required.ts', export: 'requireCourse' }, binding: 'value', absence: 'undefined' }],
   };
   const write = (file, content) => { const target = path.join(root, file); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, typeof content === 'string' ? content : JSON.stringify(content)); };
   write('package.json', { private: true, dependencies: { next: '15.5.0' }, starci: { codePatterns: { next: { errorState: contract } } } });
@@ -80,6 +85,87 @@ test('valid envelope, exact feedback site and installed Next boundary are checke
   assert.deepEqual(result.violations, []);
   assert.deepEqual(result.checkedRuleIds, [...NEXT_ERROR_RULES].sort());
   assert.equal(result.compiler.next.version, '15.5.0');
+});
+
+test('selected required values terminate absent continuation with global Error or a resolved subclass', t => {
+  const f = fixture(t);
+  let result = checkNextErrors({ ...f.input, ruleIds: ['FE_REQUIRED_VALUE_FAILURE'] });
+  assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
+  f.write('src/api/required.ts', `class MissingCourseError extends Error {}
+export function requireCourse(value: string | null): string {
+  if (value !== null) return value;
+  else throw new MissingCourseError('Course is required');
+}`);
+  f.contract.requiredValues[0].absence = 'null';
+  f.write('package.json', { private: true, starci: { codePatterns: { next: { errorState: f.contract } } } });
+  result = checkNextErrors({ ...f.input, ruleIds: ['FE_REQUIRED_VALUE_FAILURE'] });
+  assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
+});
+
+test('required-value proof rejects pre-guard use, mutable provenance, dead helpers and lookalike Error constructors', async t => {
+  const cases = [
+    ['pre-guard continuation', `export function requireCourse(value:string|undefined){console.log(value);if(value===undefined)throw new Error('missing');return value}`, false],
+    ['mutable binding', `export function requireCourse(value:string|undefined){value='fallback';if(value===undefined)throw new Error('missing');return value}`, true],
+    ['destructuring mutation', `export function requireCourse(value:string|undefined){[value]=['fallback'];if(value===undefined)throw new Error('missing');return value}`, true],
+    ['uncalled helper', `export function requireCourse(value:string|undefined){if(value===undefined){const fail=()=>{throw new Error('missing')}}return value}`, false],
+    ['dead throw', `export function requireCourse(value:string|undefined){if(value===undefined){if(false)throw new Error('missing')}return value}`, false],
+    ['non-error terminal path in failure branch', `export function requireCourse(value:string|undefined){if(value===undefined){if(Math.random()>0.5)return 'fallback';throw new Error('missing')}return value}`, false],
+    ['guard after return', `export function requireCourse(value:string|undefined){return 'fallback';if(value===undefined)throw new Error('missing')}`, true],
+    ['parameter initializer before guard', `export function requireCourse(value:string|undefined,snapshot=value){if(value===undefined)throw new Error('missing');return value}`, false],
+    ['selected absence missing from type', `export function requireCourse(value:string){if(value===undefined)throw new Error('missing');return value}`, false],
+    ['lookalike Error', `class Error{constructor(_:string){}} export function requireCourse(value:string|undefined){if(value===undefined)throw new Error('missing');return value}`, false],
+  ];
+  for (const [name, source, unavailable] of cases) await t.test(name, t => {
+    const f = fixture(t); f.write('src/api/required.ts', source);
+    const result = checkNextErrors({ ...f.input, ruleIds: ['FE_REQUIRED_VALUE_FAILURE'] });
+    assert.ok((unavailable ? result.errors : result.violations).length, JSON.stringify(result, null, 2));
+    if (unavailable) assert.deepEqual(result.checkedRuleIds, []);
+  });
+  const opaque = fixture(t); opaque.write('src/api/required.ts', `const missing=()=>new Error('missing');
+export function requireCourse(value:string|undefined){if(value===undefined)throw missing();return value}`);
+  const unavailable = checkNextErrors({ ...opaque.input, ruleIds: ['FE_REQUIRED_VALUE_FAILURE'] });
+  assert.ok(unavailable.errors.some(item => item.message.includes('opaque thrown value')));
+  const spoof = fixture(t); spoof.write('src/api/required.ts', `class LocalLookalike {}
+const Spoofed = LocalLookalike as typeof Error;
+export function requireCourse(value:string|undefined){if(value===undefined)throw new Spoofed();return value}`);
+  const spoofed = checkNextErrors({ ...spoof.input, ruleIds: ['FE_REQUIRED_VALUE_FAILURE'] });
+  assert.ok(spoofed.errors.some(item => item.message.includes('opaque thrown value')), JSON.stringify(spoofed, null, 2));
+});
+
+test('envelope inventory follows resolved reader identity and rejects undeclared or opaque consumers', t => {
+  const f = fixture(t, files => {
+    files['src/api/other.ts'] = `import type {ReadEnvelope} from './envelope';
+type Alias=ReadEnvelope; type AliasAgain=Alias;
+export function other(result:AliasAgain){if(!result.ok)throw new Error(result.error);return result.data}`;
+  });
+  let result = checkNextErrors({ ...f.input, ruleIds: ['FE_ERROR_ENVELOPE_POLICY'] });
+  assert.ok(result.violations.some(item => item.message.includes('undeclared reader')), JSON.stringify(result, null, 2));
+  f.write('src/api/other.ts', `import type {ReadEnvelope} from './envelope';
+function consume(value:ReadEnvelope){return identity(value)} function identity<T>(value:T){return value}`);
+  result = checkNextErrors({ ...f.input, ruleIds: ['FE_ERROR_ENVELOPE_POLICY'] });
+  assert.ok(result.errors.some(item => item.message.includes('opaque consumer flow')), JSON.stringify(result, null, 2));
+  f.write('src/api/other.ts', `import type {ReadEnvelope} from './envelope';
+export function generic<T extends ReadEnvelope>(value:T){return value.data}`);
+  result = checkNextErrors({ ...f.input, ruleIds: ['FE_ERROR_ENVELOPE_POLICY'] });
+  assert.ok(result.violations.some(item => item.message.includes('undeclared reader')), JSON.stringify(result, null, 2));
+  f.write('src/api/other.ts', `import type {ReadEnvelope} from './envelope';
+export class Stored{constructor(readonly value:ReadEnvelope){}}`);
+  result = checkNextErrors({ ...f.input, ruleIds: ['FE_ERROR_ENVELOPE_POLICY'] });
+  assert.ok(result.errors.some(item => item.message.includes('opaque consumer flow')), JSON.stringify(result, null, 2));
+});
+
+test('public reader aliases are resolved while envelope producers and type-only uses are not consumers', t => {
+  const f = fixture(t, files => {
+    files['src/api/read.ts'] = `import type {ReadEnvelope} from './envelope';
+type Alias=ReadEnvelope; type AliasAgain=Alias;
+function actual(result:AliasAgain){if(!result.ok)throw new Error(result.error);return result.data??null}
+export {actual as readCourse};`;
+    files['src/api/producer.ts'] = `import type {ReadEnvelope} from './envelope';
+export type StoredEnvelope=ReadEnvelope;
+export function makeEnvelope():ReadEnvelope{return {ok:true,data:null}}`;
+  });
+  const result = checkNextErrors({ ...f.input, ruleIds: ['FE_ERROR_ENVELOPE_POLICY'] });
+  assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
 });
 
 test('envelope failure is distinct from valid empty data and required payload absence', t => {
@@ -174,12 +260,45 @@ test('throwing-only and static inventories prove conditional error surfaces abse
   f.contract.envelopes = [];
   f.contract.writes = [];
   f.contract.boundaries = [];
+  f.contract.requiredValues = [];
   f.write('package.json', { private: true, starci: { codePatterns: { next: { errorState: f.contract } } } });
+  f.write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['frontend'], tsconfig: 'tsconfig.json',
+    frontend: { routes: ['src/static/app'], transport: ['src/static/api'] } });
   const input = { ...f.input, files: ['src/static/app/page.tsx'], contextFiles: ['src/static/api/client.ts', 'package.json', 'architecture.json', 'tsconfig.json'] };
   const result = checkNextErrors(input);
   assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
   assert.deepEqual(result.checkedRuleIds, [...NEXT_ERROR_RULES].sort());
   assert.equal(result.compiler.next, undefined);
+});
+
+test('canonical architecture route coverage prevents narrow source roots from hiding a reserved boundary', t => {
+  const f = fixture(t);
+  f.write('src/static/api/client.ts', `export const staticValue = 'ready' as const;`);
+  f.write('src/static/app/page.tsx', `export default function StaticPage(){return <p>ready</p>}`);
+  Object.assign(f.contract, { sourceRoots: ['src/static'], transports: [{ root: 'src/static/api', mode: 'throwing' }],
+    worldMappings: [], envelopes: [], writes: [], boundaries: [], requiredValues: [] });
+  f.write('package.json', { private: true, starci: { codePatterns: { next: { errorState: f.contract } } } });
+  const result = checkNextErrors({ root: f.root, files: ['src/static/app/page.tsx'],
+    contextFiles: ['src/static/api/client.ts', 'package.json', 'architecture.json', 'tsconfig.json'],
+    ruleIds: ['FE_NEXT_ERROR_BOUNDARY_LOCATION'], architectureConfig: 'architecture.json' });
+  assert.ok(result.errors.some(item => /coverage is incomplete/.test(item.message)), JSON.stringify(result, null, 2));
+});
+
+test('immutable aliases and local re-exports of installed SWR select world-state applicability', t => {
+  const f = fixture(t);
+  f.write('src/static/api/client.ts', `export const staticValue = 'ready' as const;`);
+  f.write('src/static/swr.ts', `export {default as selectedSWR} from 'swr';`);
+  f.write('src/static/hook.ts', `import {selectedSWR} from './swr'; const selected=selectedSWR;
+export function useData(){return selected('/api/data',async()=>({ok:true}))}`);
+  f.write('node_modules/swr/package.json', { name: 'swr', version: '2.5.1', types: 'index.d.ts' });
+  f.write('node_modules/swr/index.d.ts', `export default function useSWR<T>(key:unknown,fetcher:()=>Promise<T>):{data:T|undefined,error:Error|undefined}`);
+  Object.assign(f.contract, { sourceRoots: ['src/static'], transports: [{ root: 'src/static/api', mode: 'throwing' }],
+    worldMappings: [], envelopes: [], writes: [], boundaries: [], requiredValues: [] });
+  f.write('package.json', { private: true, dependencies: { swr: '2.5.1' }, starci: { codePatterns: { next: { errorState: f.contract } } } });
+  const result = checkNextErrors({ root: f.root, files: ['src/static/hook.ts'],
+    contextFiles: ['src/static/api/client.ts', 'src/static/swr.ts', 'package.json', 'architecture.json', 'tsconfig.json'],
+    ruleIds: ['FE_ERROR_WORLD_STATE_MAPPING'], architectureConfig: 'architecture.json' });
+  assert.ok(result.errors.some(item => /absent world-state surface/.test(item.message)), JSON.stringify(result, null, 2));
 });
 
 test('empty surface declarations cannot hide resolved world/write calls or reserved Next boundaries', t => {
@@ -313,7 +432,7 @@ test('resolved identities remain stable across separate canonical TypeScript pro
   const f = fixture(t);
   f.write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['frontend'], projects: ['tsconfig.api.json', 'tsconfig.app.json'] });
   const options = { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', strict: true };
-  f.write('tsconfig.api.json', { compilerOptions: options, include: ['src/api/envelope.ts', 'src/api/write.ts', 'src/api/use-course.ts'] });
+  f.write('tsconfig.api.json', { compilerOptions: options, include: ['src/api/envelope.ts', 'src/api/write.ts', 'src/api/use-course.ts', 'src/api/required.ts'] });
   f.write('tsconfig.app.json', { compilerOptions: options, include: ['src/api/read.ts', 'src/app/**/*', 'src/features/**/*', 'src/ui/**/*'] });
   const result = checkNextErrors(f.input);
   assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);

@@ -8,6 +8,7 @@ export const NEXT_ERROR_RULES = Object.freeze([
   'FE_ERROR_ENVELOPE_POLICY',
   'FE_WRITE_FEEDBACK_OWNER',
   'FE_NEXT_ERROR_BOUNDARY_LOCATION',
+  'FE_REQUIRED_VALUE_FAILURE',
 ]);
 
 const SOURCE = /\.[cm]?tsx?$/i;
@@ -92,7 +93,7 @@ function parseContract(repository, bound) {
   const manifest = regular(repository, 'package.json', 'Next code-pattern manifest');
   const parsed = JSON.parse(fs.readFileSync(manifest, 'utf8'));
   const contract = parsed?.starci?.codePatterns?.next?.errorState;
-  exactKeys(contract, ['schema', 'sourceRoots', 'transports', 'worldMappings', 'envelopes', 'writes', 'boundaries'], 'package.json#starci.codePatterns.next.errorState');
+  exactKeys(contract, ['schema', 'sourceRoots', 'transports', 'worldMappings', 'envelopes', 'writes', 'boundaries', 'requiredValues'], 'package.json#starci.codePatterns.next.errorState');
   if (contract.schema !== 'starci/next-error-state@1') throw Error('errorState.schema must be starci/next-error-state@1.');
   const sourceRoots = array(contract.sourceRoots, 'errorState.sourceRoots').map((root, index) => exactRelative(root, `errorState.sourceRoots[${index}]`));
   if (new Set(sourceRoots).size !== sourceRoots.length || sourceRoots.some((root, index) => sourceRoots.some((other, otherIndex) => index !== otherIndex && (root.startsWith(`${other}/`) || other.startsWith(`${root}/`))))) {
@@ -165,6 +166,14 @@ function parseContract(repository, bound) {
     if (!['reset', 'unstable_retry'].includes(entry.recoveryProp)) throw Error(`${label}.recoveryProp must name a supported installed Next recovery callback.`);
     return { ...source, role: entry.role, routeRoot, recoveryProp: entry.recoveryProp };
   });
+  const requiredValues = array(contract.requiredValues ?? [], 'errorState.requiredValues', { nonempty: false }).map((entry, index) => {
+    const label = `errorState.requiredValues[${index}]`;
+    exactKeys(entry, ['id', 'owner', 'binding', 'absence'], label);
+    if (!/^[a-z][a-z0-9-]*$/.test(entry.id ?? '')) throw Error(`${label}.id must be kebab-case.`);
+    if (typeof entry.binding !== 'string' || !/^[A-Za-z_$][\w$]*$/.test(entry.binding)) throw Error(`${label}.binding must be an exact identifier.`);
+    if (!['undefined', 'null', 'nullish'].includes(entry.absence)) throw Error(`${label}.absence must be undefined, null or nullish.`);
+    return { id: entry.id, owner: bind(entry.owner, `${label}.owner`), binding: entry.binding, absence: entry.absence };
+  });
   const transports = array(contract.transports, 'errorState.transports').map((transport, index) => {
     const label = `errorState.transports[${index}]`;
     exactKeys(transport, ['root', 'mode', 'envelopeIds'], label);
@@ -200,10 +209,13 @@ function parseContract(repository, bound) {
   uniqueBindings(envelopes.flatMap(item => item.readers), 'errorState envelope readers');
   uniqueBindings(writes.map(item => item.action), 'errorState write actions');
   uniqueBindings(boundaries, 'errorState boundaries');
+  if (new Set(requiredValues.map(item => item.id)).size !== requiredValues.length) throw Error('errorState.requiredValues IDs must be unique.');
+  const requiredKeys = requiredValues.map(item => `${item.owner.path}\0${item.owner.export}\0${item.binding}`);
+  if (new Set(requiredKeys).size !== requiredKeys.length) throw Error('errorState.requiredValues contains a duplicate owner binding.');
   if (new Set(worldMappings.map(item => item.id)).size !== worldMappings.length) throw Error('errorState.worldMappings IDs must be unique.');
   const worldKeys = worldMappings.map(item => `${item.owner.path}\0${item.owner.export}\0${item.source.path}\0${item.source.export}\0${item.failurePath}`);
   if (new Set(worldKeys).size !== worldKeys.length) throw Error('errorState.worldMappings contains a duplicate owner/source/failure path.');
-  return { sourceRoots, transports, worldMappings, envelopes, writes, boundaries };
+  return { sourceRoots, transports, worldMappings, envelopes, writes, boundaries, requiredValues };
 }
 
 function projectFor(context, repository, relative) {
@@ -595,6 +607,86 @@ function missingDataCondition(ts, checker, node, owner, field) {
     && !(checker.getSymbolAtLocation(opposite)?.declarations?.length));
 }
 
+function typeUsesContractIdentity(ts, checker, type, node, target, seen = new Set()) {
+    if (!type || seen.has(type) || type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return false;
+    seen.add(type);
+    const symbol = type.aliasSymbol ?? type.getSymbol?.();
+    if (sameSymbol(symbol, target)) return true;
+    if ((type.types ?? []).some(part => typeUsesContractIdentity(ts, checker, part, node, target, seen))) return true;
+    const constraint = checker.getBaseConstraintOfType?.(type);
+    if (constraint && constraint !== type && typeUsesContractIdentity(ts, checker, constraint, node, target, seen)) return true;
+    const aliasDeclarations = symbol?.declarations?.filter(declaration => ts.isTypeAliasDeclaration(declaration)) ?? [];
+    for (const declaration of aliasDeclarations) {
+      const nested = checker.getTypeAtLocation(declaration.type);
+      if (nested !== type && typeUsesContractIdentity(ts, checker, nested, declaration, target, seen)) return true;
+      let found = false;
+      const inspect = child => {
+        if ((ts.isTypeReferenceNode(child) || ts.isExpressionWithTypeArguments(child))
+          && sameSymbol(symbolOf(ts, checker, child.typeName ?? child.expression), target)) found = true;
+        if (!found) ts.forEachChild(child, inspect);
+      };
+      inspect(declaration.type);
+      if (found) return true;
+    }
+    if (node?.type) {
+      let found = false;
+      const inspect = child => {
+        if ((ts.isTypeReferenceNode(child) || ts.isExpressionWithTypeArguments(child))
+          && sameSymbol(symbolOf(ts, checker, child.typeName ?? child.expression), target)) found = true;
+        if (!found) ts.forEachChild(child, inspect);
+      };
+      inspect(node.type);
+      if (found) return true;
+    }
+    return false;
+}
+
+function checkEnvelopeConsumerCoverage(entry, typeItem, env, result) {
+  const declaredReaders = entry.readers.map(binding => exportedSymbol(binding, env.context, env.repository));
+  const knownFields = new Set([entry.discriminator.field, entry.dataField, ...entry.errorFields]);
+  const add = (relative, source, node, message, unavailable = false) => (unavailable ? result.errors : result.violations)
+    .push({ ruleId: 'FE_ERROR_ENVELOPE_POLICY', path: relative, ...location(source, node), message });
+  for (const relative of [...env.bound].filter(file => SOURCE.test(file) && !TEST_SOURCE.test(file))) {
+    const { source, checker, ts } = projectFor(env.context, env.repository, relative);
+    const visit = node => {
+      if (ts.isFunctionLike(node)) for (const parameter of node.parameters) {
+        if (!typeUsesContractIdentity(ts, checker, checker.getTypeAtLocation(parameter), parameter, typeItem.symbol)) continue;
+        if (!node.body) {
+          add(relative, source, parameter, `Envelope ${entry.id} appears in a declaration without an inspectable reader body.`, true);
+          continue;
+        }
+        if (!ts.isIdentifier(parameter.name)) {
+          add(relative, source, parameter, `Envelope ${entry.id} is consumed through an unsupported destructured parameter.`, true);
+          continue;
+        }
+        const owner = symbolOf(ts, checker, parameter.name), symbol = functionSymbol(ts, checker, node);
+        let knownUse = false, opaqueUse = Boolean(ts.isConstructorDeclaration(node) && parameter.modifiers?.length);
+        const inspect = child => {
+          if (child !== node.body && ts.isFunctionLike(child)) {
+            if (containsSymbol(ts, checker, child, owner)) opaqueUse = true;
+            return;
+          }
+          if (ts.isIdentifier(child) && sameSymbol(symbolOf(ts, checker, child), owner) && child !== parameter.name) {
+            const parent = child.parent;
+            if (ts.isPropertyAccessExpression(parent) && parent.expression === child) {
+              if (knownFields.has(parent.name.text)) knownUse = true; else opaqueUse = true;
+            } else if (ts.isElementAccessExpression(parent) && parent.expression === child && ts.isStringLiteralLike(parent.argumentExpression)) {
+              if (knownFields.has(parent.argumentExpression.text)) knownUse = true; else opaqueUse = true;
+            } else opaqueUse = true;
+          }
+          ts.forEachChild(child, inspect);
+        };
+        inspect(node.body);
+        const declared = declaredReaders.some(reader => sameSymbol(reader.symbol, symbol));
+        if (knownUse && !declared) add(relative, source, node, `Envelope ${entry.id} is consumed by an undeclared reader; every reader must be an exact exported contract entry.`);
+        if (opaqueUse) add(relative, source, node, `Envelope ${entry.id} has opaque consumer flow that prevents complete reader inventory.`, true);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+}
+
 function checkEnvelope(entry, env, result) {
   const typeItem = exportedSymbol(entry.type, env.context, env.repository), { checker, ts } = typeItem;
   const declared = checker.getDeclaredTypeOfSymbol(typeItem.symbol);
@@ -612,8 +704,9 @@ function checkEnvelope(entry, env, result) {
     if (!ts.isIdentifier(parameter.name)) { add(parameter, 'Envelope reader input binding must be a statically resolved identifier.', true, reader.source, binding.path); continue; }
     const owner = symbolOf(ts, reader.checker, parameter.name), inputType = reader.checker.getTypeAtLocation(parameter);
     if (inputType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) { add(parameter, `Reader ${binding.export} input type is any/unknown.`, true, reader.source, binding.path); continue; }
-    const inputContract = inputType.aliasSymbol ?? inputType.getSymbol?.();
-    if (!sameSymbol(inputContract, typeItem.symbol)) add(parameter, `Reader ${binding.export} input is not the declared ${entry.id} envelope.`, false, reader.source, binding.path);
+    if (!typeUsesContractIdentity(ts, reader.checker, inputType, parameter, typeItem.symbol)) {
+      add(parameter, `Reader ${binding.export} input is not the declared ${entry.id} envelope.`, false, reader.source, binding.path);
+    }
     let handled = false, handledAt = Number.POSITIVE_INFINITY, sawFailureBranch = false, returned = false,
       returnedAt = Number.POSITIVE_INFINITY, missingHandled = binding.emptyData === 'valid', sawMissingBranch = false,
       unstableDataAlias = false;
@@ -664,6 +757,200 @@ function checkEnvelope(entry, env, result) {
     if (!missingHandled) add(fn, sawMissingBranch ? `Reader ${binding.export} missing-data branch uses an unsupported indirect handler.`
       : `Reader ${binding.export} declares required data and must reject an absent data field.`, sawMissingBranch, reader.source, binding.path);
   }
+  checkEnvelopeConsumerCoverage(entry, typeItem, env, result);
+}
+
+function requiredConditionTruth(ts, checker, node, binding) {
+  const value = unwrap(ts, node);
+  if (ts.isPrefixUnaryExpression(value) && value.operator === ts.SyntaxKind.ExclamationToken) {
+    const nested = requiredConditionTruth(ts, checker, value.operand, binding);
+    return nested && Object.fromEntries(Object.entries(nested).map(([name, truth]) => [name, !truth]));
+  }
+  if (ts.isBinaryExpression(value) && [ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken].includes(value.operatorToken.kind)) {
+    const left = requiredConditionTruth(ts, checker, value.left, binding), right = requiredConditionTruth(ts, checker, value.right, binding);
+    if (!left || !right) return null;
+    const and = value.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken;
+    return Object.fromEntries(['null', 'undefined', 'present'].map(name => [name, and ? left[name] && right[name] : left[name] || right[name]]));
+  }
+  if (!ts.isBinaryExpression(value) || ![ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.EqualsEqualsEqualsToken,
+    ts.SyntaxKind.ExclamationEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken].includes(value.operatorToken.kind)) return null;
+  const strict = [ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken].includes(value.operatorToken.kind);
+  const negative = [ts.SyntaxKind.ExclamationEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken].includes(value.operatorToken.kind);
+  const isBinding = candidate => ts.isIdentifier(unwrap(ts, candidate)) && sameSymbol(symbolOf(ts, checker, unwrap(ts, candidate)), binding);
+  const absentKind = candidate => {
+    const selected = unwrap(ts, candidate);
+    if (selected.kind === ts.SyntaxKind.NullKeyword) return 'null';
+    if (ts.isIdentifier(selected) && selected.text === 'undefined' && !(checker.getSymbolAtLocation(selected)?.declarations?.length)) return 'undefined';
+    if (ts.isStringLiteralLike(selected) && selected.text === 'undefined') return 'typeof';
+    return null;
+  };
+  let kind = null;
+  if (isBinding(value.left)) kind = absentKind(value.right);
+  else if (isBinding(value.right)) kind = absentKind(value.left);
+  else {
+    const typeofBinding = candidate => ts.isTypeOfExpression(unwrap(ts, candidate)) && isBinding(unwrap(ts, candidate).expression);
+    if (typeofBinding(value.left)) kind = absentKind(value.right);
+    else if (typeofBinding(value.right)) kind = absentKind(value.left);
+    if (kind !== 'typeof') return null;
+    kind = 'undefined';
+  }
+  if (!kind || kind === 'typeof') return null;
+  const equal = {
+    null: kind === 'null' || !strict,
+    undefined: kind === 'undefined' || !strict,
+    present: false,
+  };
+  return negative ? Object.fromEntries(Object.entries(equal).map(([name, truth]) => [name, !truth])) : equal;
+}
+
+function requiredAbsentBranch(entry, truth) {
+  if (!truth) return null;
+  const branch = entry.absence === 'nullish'
+    ? truth.null === truth.undefined && truth.null !== truth.present ? truth.null : null
+    : truth[entry.absence] !== truth.present ? truth[entry.absence] : null;
+  return typeof branch === 'boolean' ? branch : null;
+}
+
+function errorConstructorSymbol(ts, checker, expression, seen = new Set()) {
+  let selected = expression;
+  while (selected && (ts.isParenthesizedExpression(selected) || ts.isNonNullExpression(selected))) selected = selected.expression;
+  if (!selected || ts.isAsExpression(selected) || ts.isTypeAssertionExpression(selected) || ts.isSatisfiesExpression?.(selected)) return null;
+  const symbol = symbolOf(ts, checker, selected);
+  if (!symbol || seen.has(symbol)) return null;
+  seen.add(symbol);
+  const variable = (symbol.declarations ?? []).find(declaration => ts.isVariableDeclaration(declaration) && declaration.initializer);
+  if (variable) {
+    if (!isConstVariable(ts, variable)) return null;
+    return errorConstructorSymbol(ts, checker, variable.initializer, seen);
+  }
+  return symbol;
+}
+
+function standardErrorConstructor(ts, checker, symbol, seen = new Set()) {
+  if (!symbol || seen.has(symbol)) return false;
+  seen.add(symbol);
+  if (symbol.name === 'Error' && (symbol.declarations ?? []).some(declaration => declaration.getSourceFile().hasNoDefaultLib)) return true;
+  for (const declaration of symbol.declarations ?? []) if (ts.isClassDeclaration(declaration) || ts.isClassExpression(declaration)) {
+    const extension = declaration.heritageClauses?.find(clause => clause.token === ts.SyntaxKind.ExtendsKeyword)?.types;
+    if (!extension || extension.length !== 1) continue;
+    const parent = errorConstructorSymbol(ts, checker, extension[0].expression);
+    if (standardErrorConstructor(ts, checker, parent, seen)) return true;
+  }
+  return false;
+}
+
+function failureTerminal(ts, checker, statement) {
+  if (!statement) return { terminal: false, valid: false, unavailable: false };
+  const selected = unwrap(ts, statement);
+  if (ts.isBlock(selected)) {
+    for (const child of selected.statements) {
+      const outcome = failureTerminal(ts, checker, child);
+      if (outcome.terminal || outcome.unavailable) return outcome;
+    }
+    return { terminal: false, valid: false, unavailable: false };
+  }
+  if (ts.isThrowStatement(selected)) {
+    const expression = selected.expression;
+    let constructor = expression;
+    while (constructor && (ts.isParenthesizedExpression(constructor) || ts.isNonNullExpression(constructor))) constructor = constructor.expression;
+    if (!constructor || !ts.isNewExpression(constructor)) return { terminal: true, valid: false, unavailable: true };
+    const symbol = errorConstructorSymbol(ts, checker, constructor.expression);
+    if (!symbol) return { terminal: true, valid: false, unavailable: true };
+    return { terminal: true, valid: standardErrorConstructor(ts, checker, symbol), unavailable: false };
+  }
+  if (ts.isReturnStatement(selected)) return { terminal: true, valid: false, unavailable: false };
+  if (ts.isIfStatement(selected)) {
+    const fixed = staticBoolean(ts, selected.expression);
+    if (fixed !== null) return failureTerminal(ts, checker, fixed ? selected.thenStatement : selected.elseStatement);
+    const left = failureTerminal(ts, checker, selected.thenStatement);
+    if (!selected.elseStatement) {
+      if (left.unavailable) return left;
+      return left.terminal && !left.valid ? left : { terminal: false, valid: false, unavailable: false };
+    }
+    const right = failureTerminal(ts, checker, selected.elseStatement);
+    if (left.unavailable || right.unavailable) return { terminal: true, valid: false, unavailable: true };
+    if (left.terminal && !left.valid || right.terminal && !right.valid) return { terminal: true, valid: false, unavailable: false };
+    return { terminal: left.terminal && right.terminal, valid: left.valid && right.valid, unavailable: false };
+  }
+  if (ts.isTryStatement(selected) || ts.isSwitchStatement(selected) || ts.isLoop?.(selected)
+    || ts.isWhileStatement(selected) || ts.isDoStatement(selected) || ts.isForStatement(selected) || ts.isForInStatement(selected) || ts.isForOfStatement(selected)) {
+    return { terminal: false, valid: false, unavailable: true };
+  }
+  return { terminal: false, valid: false, unavailable: false };
+}
+
+function checkRequiredValue(entry, env, result) {
+  const owner = exportedSymbol(entry.owner, env.context, env.repository), { ts, checker, source } = owner, fn = functionNode(ts, owner);
+  const add = (node, message, unavailable = false) => (unavailable ? result.errors : result.violations)
+    .push({ ruleId: 'FE_REQUIRED_VALUE_FAILURE', path: entry.owner.path, ...location(source, node), message });
+  if (!fn?.body || !ts.isBlock(fn.body)) return add(source, `Required-value owner ${entry.owner.export} must resolve to a block-bodied source function.`, true);
+  const candidates = [];
+  for (const parameter of fn.parameters) if (ts.isIdentifier(parameter.name) && parameter.name.text === entry.binding) {
+    candidates.push({ node: parameter.name, declaration: parameter, symbol: symbolOf(ts, checker, parameter.name), stable: true });
+  }
+  const collect = node => {
+    if (node !== fn.body && ts.isFunctionLike(node)) return;
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === entry.binding) {
+      candidates.push({ node: node.name, declaration: node, symbol: symbolOf(ts, checker, node.name), stable: isConstVariable(ts, node) });
+    }
+    ts.forEachChild(node, collect);
+  };
+  collect(fn.body);
+  if (candidates.length !== 1 || !candidates[0].symbol) return add(fn, `Required binding ${entry.binding} must resolve exactly once in ${entry.owner.export}.`, true);
+  const binding = candidates[0];
+  if (!binding.stable) add(binding.node, `Required binding ${entry.binding} must be immutable so its guard remains valid.`, true);
+  const bindingType = checker.getTypeAtLocation(binding.node);
+  if (bindingType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) add(binding.node, `Required binding ${entry.binding} has an any/unknown type.`, true);
+  const parts = bindingType.types ?? [bindingType], hasNull = parts.some(type => Boolean(type.flags & ts.TypeFlags.Null)),
+    hasUndefined = parts.some(type => Boolean(type.flags & ts.TypeFlags.Undefined));
+  if (entry.absence === 'null' && !hasNull || entry.absence === 'undefined' && !hasUndefined
+    || entry.absence === 'nullish' && (!hasNull || !hasUndefined)) {
+    add(binding.node, `Required binding ${entry.binding} type does not expose selected ${entry.absence} absence.`);
+  }
+  let mutated = false;
+  const mutation = node => {
+    if (ts.isIdentifier(node) && sameSymbol(symbolOf(ts, checker, node), binding.symbol)) {
+      for (let current = node; current?.parent && !ts.isFunctionLike(current.parent); current = current.parent) {
+        const parent = current.parent;
+        if (ts.isBinaryExpression(parent) && containsNode(ts, parent.left, node) && parent.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+          && parent.operatorToken.kind <= ts.SyntaxKind.LastAssignment) mutated = true;
+        if ((ts.isPrefixUnaryExpression(parent) || ts.isPostfixUnaryExpression(parent))
+          && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(parent.operator)) mutated = true;
+        if ((ts.isForInStatement(parent) || ts.isForOfStatement(parent)) && containsNode(ts, parent.initializer, node)) mutated = true;
+        if (ts.isStatement(parent)) break;
+      }
+    }
+    ts.forEachChild(node, mutation);
+  };
+  mutation(fn.body);
+  if (mutated) add(binding.node, `Required binding ${entry.binding} is reassigned, so the selected guard cannot dominate later use.`, true);
+  const guards = [];
+  for (const statement of fn.body.statements) if (ts.isIfStatement(statement)) {
+    const absent = requiredAbsentBranch(entry, requiredConditionTruth(ts, checker, statement.expression, binding.symbol));
+    if (absent !== null) guards.push({ statement, absent, failure: absent ? statement.thenStatement : statement.elseStatement });
+  }
+  if (!guards.length) return add(fn, `Required binding ${entry.binding} needs an explicit ${entry.absence} failure guard before continuation.`);
+  if (guards.length > 1) return add(fn, `Required binding ${entry.binding} has multiple candidate guards whose dominance is ambiguous.`, true);
+  const guard = guards[0];
+  if (ts.isVariableDeclaration(binding.declaration) && binding.declaration.pos > guard.statement.pos) {
+    return add(guard.statement, `Required binding ${entry.binding} is declared after its selected failure guard.`, true);
+  }
+  if (staticallyUnreachable(ts, guard.statement, fn.body)) return add(guard.statement, `Required binding ${entry.binding} guard is statically unreachable.`, true);
+  if (!guard.failure) return add(guard.statement, `Required binding ${entry.binding} guard has no statically selected failure branch.`);
+  const terminal = failureTerminal(ts, checker, guard.failure);
+  if (terminal.unavailable) add(guard.failure, `Required binding ${entry.binding} failure branch uses an unsupported or opaque thrown value.`, true);
+  else if (!terminal.terminal || !terminal.valid) add(guard.failure, `Required binding ${entry.binding} failure branch must terminate with standard Error or a resolved Error subclass.`);
+  let useBefore = false;
+  const uses = node => {
+    if (ts.isIdentifier(node) && sameSymbol(symbolOf(ts, checker, node), binding.symbol) && node !== binding.node) {
+      const inside = container => container && container.pos <= node.pos && node.end <= container.end;
+      if (!inside(guard.statement.expression) && !inside(guard.failure) && node.pos < guard.statement.pos) useBefore = true;
+    }
+    ts.forEachChild(node, uses);
+  };
+  for (const parameter of fn.parameters) if (parameter.initializer) uses(parameter.initializer);
+  uses(fn.body);
+  if (useBefore) add(guard.statement, `Required binding ${entry.binding} is used before its selected failure guard.`);
 }
 
 function enclosingFunction(ts, node) {
@@ -833,8 +1120,23 @@ function declarationInside(repository, roots, declaration) {
   return roots.some(root => isInside(path.resolve(repository, root), file));
 }
 
-function importedCallIdentity(ts, checker, expression) {
+function importedCallIdentity(ts, checker, expression, seen = new Set()) {
   const selected = unwrap(ts, expression);
+  if (ts.isIdentifier(selected)) {
+    const local = checker.getSymbolAtLocation(selected);
+    if (local && !seen.has(local)) {
+      seen.add(local);
+      const declaration = local.declarations?.find(item => ts.isVariableDeclaration(item) && item.initializer);
+      if (declaration) {
+        const traced = importedCallIdentity(ts, checker, declaration.initializer, seen);
+        if (traced) return traced;
+      }
+    }
+    const resolved = symbolOf(ts, checker, selected);
+    const packageDeclaration = resolved?.declarations?.find(declaration => /(?:^|\/)node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?swr(?:\/|$)/
+      .test(slash(declaration.getSourceFile().fileName)));
+    if (packageDeclaration) return { specifier: 'swr', imported: resolved.name === 'default' ? 'default' : resolved.name };
+  }
   const declarationFor = node => checker.getSymbolAtLocation(node)?.declarations?.find(declaration =>
     ts.isImportSpecifier(declaration) || ts.isImportClause(declaration) || ts.isNamespaceImport(declaration));
   let declaration = null, imported = null;
@@ -1031,10 +1333,14 @@ export function checkNextErrors({ root, files, ruleIds, contextFiles = [], archi
       projects: [...config.projects].sort(),
       metadataFiles: [...new Set(contextFiles.filter(file => !SOURCE.test(file)))].sort(),
     };
+    const coverageRoots = [...new Set([
+      ...contract.sourceRoots,
+      ...(ruleIds.includes('FE_NEXT_ERROR_BOUNDARY_LOCATION') ? config.frontend.routes : []),
+    ])];
     const covered = new Set();
     for (const project of context.projects) for (const file of project.program.getRootFileNames()) {
       const relative = slash(path.relative(repository, file));
-      if (SOURCE.test(relative) && contract.sourceRoots.some(root => relative === root || relative.startsWith(`${root}/`))) covered.add(relative);
+      if (SOURCE.test(relative) && coverageRoots.some(root => relative === root || relative.startsWith(`${root}/`))) covered.add(relative);
     }
     const missing = [...covered].filter(relative => !bound.has(relative));
     if (missing.length) throw Error(`errorState.sourceRoots coverage is incomplete; bind every owning-program source (${missing.slice(0, 4).join(', ')}${missing.length > 4 ? ', …' : ''}).`);
@@ -1068,6 +1374,9 @@ export function checkNextErrors({ root, files, ruleIds, contextFiles = [], archi
         for (const entry of contract.boundaries) checkBoundary(entry, env, result, next);
         result.compiler.next = { ...next, recoveryProps: [...next.recoveryProps].sort() };
       }
+    }
+    if (ruleIds.includes('FE_REQUIRED_VALUE_FAILURE')) {
+      for (const entry of contract.requiredValues) checkRequiredValue(entry, env, result);
     }
     result.files = [...files].sort();
     if (!result.errors.length) result.checkedRuleIds = [...ruleIds].sort();
