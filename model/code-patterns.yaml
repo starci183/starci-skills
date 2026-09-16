@@ -741,7 +741,7 @@ profiles:
         semantic:
           guidance: docs/portable-source-architecture.md
           review: Review cohesion, public API shape and behavior separately; each source root follows the same roles in a single application or monorepo.
-        status: missing
+        status: implemented
       - id: NEXT-ERROR-STATE-MAPPING
         sourceRuleIds: [FE-ERROR-1, FE-ERROR-2, FE-ERROR-4]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx', '**/*.test.ts', '**/*.test.tsx', '**/__tests__/**', 'test/**', 'tests/**'] }

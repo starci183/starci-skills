@@ -34,22 +34,22 @@ function fixture(t){
   fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')),path.join(root,'node_modules','typescript'),'junction');
   const contract={
     schema:'starci/next-error-state@1',sourceRoots:['src'],worldMappings:[],writes:[],boundaries:[],
-    transports:[{root:'src/api',mode:'envelope',envelopeIds:['read']}],
-    envelopes:[{id:'read',type:{path:'src/api/envelope.ts',export:'ReadEnvelope'},discriminator:{field:'ok',success:true},dataField:'data',errorFields:['error'],readers:[{path:'src/api/read.ts',export:'readCourse',emptyData:'valid'}]}],
-    requiredValues:[{id:'course',owner:{path:'src/api/required.ts',export:'requireCourse'},binding:'value',absence:'undefined'}],
+    transports:[{root:'src/modules/api',mode:'envelope',envelopeIds:['read']}],
+    envelopes:[{id:'read',type:{path:'src/modules/api/envelope.ts',export:'ReadEnvelope'},discriminator:{field:'ok',success:true},dataField:'data',errorFields:['error'],readers:[{path:'src/modules/api/read.ts',export:'readCourse',emptyData:'valid'}]}],
+    requiredValues:[{id:'course',owner:{path:'src/modules/api/required.ts',export:'requireCourse'},binding:'value',absence:'undefined'}],
   };
   const manifest={private:true,starci:{codePatterns:{next:{errorState:contract}}}};
   write('package.json',manifest);write('package-lock.json',{lockfileVersion:3});
   write('architecture.scope.json',{schema:'starci/architecture-config@1',kinds:['frontend'],tsconfig:'tsconfig.json'});
   write('tsconfig.json',{compilerOptions:{module:'ESNext',moduleResolution:'Bundler',target:'ES2022',strict:true},include:['src/**/*.ts']});
-  write('jest.config.ts',`import type {ReadEnvelope} from './src/api/envelope';
+  write('jest.config.ts',`import type {ReadEnvelope} from './src/modules/api/envelope';
 export function uncheckedMetadata(value:ReadEnvelope){return value.data}`);
-  write('src/api/envelope.ts',`export type ReadEnvelope=
+  write('src/modules/api/envelope.ts',`export type ReadEnvelope=
   |{readonly ok:true;readonly data:string|null;readonly error?:never}
   |{readonly ok:false;readonly data:null;readonly error:string};`);
-  write('src/api/read.ts',`import type {ReadEnvelope} from './envelope';
+  write('src/modules/api/read.ts',`import type {ReadEnvelope} from './envelope';
 export function readCourse(result:ReadEnvelope){if(!result.ok)throw new Error(result.error);return result.data??null}`);
-  write('src/api/required.ts',`export function requireCourse(value:string|undefined):string{
+  write('src/modules/api/required.ts',`export function requireCourse(value:string|undefined):string{
   if(value===undefined)throw new Error('Course is required');return value
 }`);
   const obligations=[architectureObligation,
@@ -80,7 +80,7 @@ test('default Next dispatcher proves required values while sourceOnly excludes b
   assert.ok(!report.coverage.lintedFiles.includes('jest.config.ts'));
   for(const id of ['REQUIRED','ENVELOPE']){
     const selected=report.obligations.find(item=>item.id===id).files;
-    assert.ok(selected.includes('src/api/required.ts'));
+    assert.ok(selected.includes('src/modules/api/required.ts'));
     assert.ok(!selected.includes('jest.config.ts'));
   }
   const required=report.machineResults.find(item=>item.obligation==='REQUIRED');
@@ -89,14 +89,14 @@ test('default Next dispatcher proves required values while sourceOnly excludes b
 });
 
 test('missing required-value guard reaches the aggregate as a finding',async t=>{
-  const f=fixture(t);f.write('src/api/required.ts',`export function requireCourse(value:string|undefined):string{return value??'fallback'}`);
+  const f=fixture(t);f.write('src/modules/api/required.ts',`export function requireCourse(value:string|undefined):string{return value??'fallback'}`);
   const report=await f.check();
   assert.equal(report.status,'findings',JSON.stringify(report.issues));
   assert.ok(report.issues.some(item=>item.code==='SCRIPT_PATTERN_VIOLATION'&&item.ruleId==='FE_REQUIRED_VALUE_FAILURE'));
 });
 
 test('a cast Error lookalike cannot produce a clean aggregate result',async t=>{
-  const f=fixture(t);f.write('src/api/required.ts',`class LocalLookalike{}
+  const f=fixture(t);f.write('src/modules/api/required.ts',`class LocalLookalike{}
 const Spoofed=LocalLookalike as typeof Error;
 export function requireCourse(value:string|undefined):string{if(value===undefined)throw new Spoofed();return value}`);
   const report=await f.check();
@@ -105,7 +105,7 @@ export function requireCourse(value:string|undefined):string{if(value===undefine
 });
 
 test('an opaque undeclared envelope consumer makes the aggregate unavailable',async t=>{
-  const f=fixture(t);f.write('src/api/opaque.ts',`import type {ReadEnvelope} from './envelope';
+  const f=fixture(t);f.write('src/modules/api/opaque.ts',`import type {ReadEnvelope} from './envelope';
 export class StoredEnvelope{constructor(readonly value:ReadEnvelope){}}`);
   const report=await f.check();
   assert.equal(report.status,'unavailable',JSON.stringify(report.issues));

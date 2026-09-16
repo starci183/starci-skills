@@ -133,9 +133,10 @@ observations:
       Three-agent rescan: BE config does not activate all installed canon recommendations;
       transaction/eager-relation rules and handler-twin checks cannot be assumed active.
       Existing non-CQRS handlers and inline suppressions are residuals, not reusable patterns.
-      FE current public entry is @starci/grammar/common; product-shells is an unresolved
-      exception. Installed FE Grammar-boundary module has no active rules, and split checks do
-      not cover every tier or aliased world access.
+      At that scan the FE public entry was @starci/grammar/common; product-shells was an unresolved
+      legacy exception, and the installed FE Grammar-boundary module had no active rules. These are
+      historical source observations; the adopted layout now places product shells in features/layouts
+      and current script coverage is declared in model/code-patterns.yaml.
 
   - id: remaining-rescan
     lane: cross-cutting

@@ -141,8 +141,8 @@ rules:
     requirement: |
       Extend connected/pure structural checks to all sanctioned split tiers and
       indirect/aliased world access; validate Grammar exports and props through typechecking;
-      require both connected and pure tests for new split units. Explicitly resolve the
-      product-shells legacy exception before making it a reusable tier.
+      require behavioral coverage of both connected mapping and rendering for new split units.
+      The adopted layout puts product shells in features/layouts; product-shells is not a sanctioned tier.
     rationale: |
       Block-scoped twin enforcement cannot establish every tier or aliased escape route.
     relatedExamples:

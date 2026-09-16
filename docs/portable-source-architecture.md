@@ -106,10 +106,10 @@ Keep four contracts distinct:
 
 1. The schema-derived wire contract belongs to the API adapter. Prefer generated `TypedDocumentNode`
    documents and generated variable/result types when the GraphQL toolchain is available.
-2. A feature input/result or view model belongs to the feature and is neutral to Apollo, GraphQL, Next, and
-   persistence.
-3. A mapper at the owning hook/module adapter boundary translates wire values and failures into that
-   feature contract.
+2. A reusable capability or hook input/result belongs to its module or hook and is neutral to Apollo,
+   GraphQL, Next, and persistence. A feature-specific view model stays with its feature.
+3. The owning hook/module adapter maps wire values and failures into its own public result; the feature
+   maps that result to its view model or presentation props. Hooks and modules never import feature types.
 4. A presentational props contract contains resolved render values and user actions. It does not runtime-
    import transport enums, response envelopes, Apollo errors, or operation types.
 

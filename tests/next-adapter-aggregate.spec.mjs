@@ -53,19 +53,19 @@ function fixture(t,obligations){
 test('aggregate executes real SWR identity checks, rejects omitted metadata, and accepts proven absence',async t=>{
   const f=fixture(t,[obligation('DATA','architecture',swrRules)]);f.link('swr');
   f.manifest.starci={codePatterns:{next:{schema:'starci/next-code-pattern-contract@1',owners:[],closedVocabularies:[],dataLifecycle:{
-    schema:'starci/next-data-lifecycle@1',swr:{package:'swr',major:2},hooks:[{id:'item',path:'src/use-item.ts',export:'useItem',kind:'query',identities:[{id:'item',binding:'id',gatesRequest:true,resource:true}]}],
+    schema:'starci/next-data-lifecycle@1',swr:{package:'swr',major:2},hooks:[{id:'item',path:'src/hooks/item/useItem.ts',export:'useItem',kind:'query',identities:[{id:'item',binding:'id',gatesRequest:true,resource:true}]}],
   }}}};
   f.write('package.json',f.manifest);
   const source="import useSWR from 'swr'; export const useItem=(id?:string)=>useSWR(id===undefined?null:['item',id],async()=>null);";
-  f.write('src/use-item.ts',source);
+  f.write('src/hooks/item/useItem.ts',source);
   let report=await f.check();assert.equal(report.status,'clean',JSON.stringify(report.issues));
   assert.equal(report.machineResults[0].coverage.frontendDataLifecycle.status,'checked');
-  f.write('src/use-item.ts',source.replace("['item',id]","['item']"));
+  f.write('src/hooks/item/useItem.ts',source.replace("['item',id]","['item']"));
   report=await f.check();assert.equal(report.status,'findings',JSON.stringify(report.issues));
   assert.ok(report.issues.some(item=>item.ruleId==='FE_SWR_KEY_IDENTITY'));
   delete f.manifest.starci.codePatterns.next.dataLifecycle;f.write('package.json',f.manifest);
   report=await f.check();assert.equal(report.status,'unavailable');
-  f.write('src/use-item.ts','export const item=1;');
+  f.write('src/hooks/item/useItem.ts','export const item=1;');
   report=await f.check();assert.equal(report.status,'clean',JSON.stringify(report.issues));
   assert.equal(report.machineResults[0].coverage.frontendDataLifecycle.status,'not-applicable');
 });
@@ -83,16 +83,16 @@ test('aggregate rejects claimed SWR rule IDs without matching lifecycle coverage
 test('Next error adapter receives canonical project config and mixed overlapping source/metadata context',async t=>{
   const f=fixture(t,[obligation('SOURCE','architecture',['ARCH_SYNTAX_INVALID']),obligation('ENVELOPE','script',['FE_ERROR_ENVELOPE_POLICY'])]);
   f.manifest.starci={codePatterns:{next:{errorState:{schema:'starci/next-error-state@1',sourceRoots:['src'],worldMappings:[],writes:[],boundaries:[],
-    transports:[{root:'src/api',mode:'envelope',envelopeIds:['read']}],envelopes:[{id:'read',type:{path:'src/api/envelope.ts',export:'Envelope'},discriminator:{field:'ok',success:true},dataField:'data',errorFields:['error'],readers:[{path:'src/api/read.ts',export:'read',emptyData:'valid'}]}],
+    transports:[{root:'src/modules/api',mode:'envelope',envelopeIds:['read']}],envelopes:[{id:'read',type:{path:'src/modules/api/envelope.ts',export:'Envelope'},discriminator:{field:'ok',success:true},dataField:'data',errorFields:['error'],readers:[{path:'src/modules/api/read.ts',export:'read',emptyData:'valid'}]}],
   }}}};f.write('package.json',f.manifest);
-  f.write('src/api/envelope.ts',"export type Envelope={readonly ok:true;readonly data:string|null;readonly error?:never}|{readonly ok:false;readonly data:null;readonly error:string};");
+  f.write('src/modules/api/envelope.ts',"export type Envelope={readonly ok:true;readonly data:string|null;readonly error?:never}|{readonly ok:false;readonly data:null;readonly error:string};");
   const source="import type {Envelope} from './envelope'; export function read(result:Envelope){if(!result.ok)throw new Error(result.error);return result.data??null;}";
-  f.write('src/api/read.ts',source);
+  f.write('src/modules/api/read.ts',source);
   let report=await f.check();assert.equal(report.status,'clean',JSON.stringify(report.issues));
   const result=report.machineResults.find(item=>item.obligation==='ENVELOPE');
   assert.equal(result.compiler.architectureConfig,'architecture.scope.json');
   assert.deepEqual(result.checkedRuleIds,['FE_ERROR_ENVELOPE_POLICY']);
-  f.write('src/api/read.ts',source.replace('if(!result.ok)throw new Error(result.error);',''));
+  f.write('src/modules/api/read.ts',source.replace('if(!result.ok)throw new Error(result.error);',''));
   report=await f.check();assert.equal(report.status,'findings',JSON.stringify(report.issues));
   assert.ok(report.issues.some(item=>item.ruleId==='FE_ERROR_ENVELOPE_POLICY'));
 });
