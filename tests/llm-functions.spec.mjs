@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
+import {nonOperationModels} from '../scripts/config.mjs';
 import {presentOwnerQuestion,classifyScreen,CRITIQUE,CRITIQUE_FORM,DECISION_FORM,GOAL_CALL_TIMEOUT_MS,runHeadlessWithUsage,DEFAULT_CRITIC_RUNTIMES,GOAL_FORM,GOAL_PLAN,MANAGER_DECISION,MANAGER_SNAPSHOT,OVERLAP_CASES,PROVISION_KINDS,VALIDATOR_IO_RULE,VALIDATOR_RULES,assessGoal,boundRecords,callFunction,critiqueGoal,extractCodex,extractMaterial,manageWorkflow,renderGoalMarkdown,usageClaude,usageCodex,usageQwen,validateGoalPlan,validateManagerDecision,validateManagerSnapshot,validateOp} from '../models/functions.mjs';
 
 const op=(id,extra={})=>({id,kind:'backend.implement',goal:`Build ${id}`,ledgerIds:[`L-${id}`],allowlist:[`apps/be/src/${id}`],
@@ -494,7 +495,7 @@ test('a critique that costs work must carry something to act on: evidence, requi
   assert.deepEqual(exhausted.result.attempts.map(item=>[item.provider,item.attempt]),
     [['claude-fable',0],['claude-fable',1],['codex-agent',0]]);
   // Both validator-pool peers are available to the quota-aware selector; configuration order is not a fallback promise.
-  assert.deepEqual(new Set(DEFAULT_CRITIC_RUNTIMES),new Set(['claude-fable','codex-agent']));
+  assert.deepEqual(new Set(DEFAULT_CRITIC_RUNTIMES),new Set(nonOperationModels('validator')),'the critic chain is the configured validator pool, whichever pool the host config selects');
   // Objections written as sentences or with a kind outside the list are shaped, never sent back: the evidenced ones stay.
   const lenient=critiqueCall([JSON.stringify({verdict:'revise',required:['name the record'],objections:['just a sentence',{kind:'security',claim:'The token is read from a file nobody fills',evidence:'delivery.module.ts',consequence:'Delivery silently disabled.'}]})]);
   assert.equal(lenient.result.verdict,'revise');
