@@ -53,13 +53,13 @@ A repository may declare the roles that syntax cannot supply at `package.json#st
 {
   "schema": "starci/next-code-pattern-contract@1",
   "owners": [
-    { "root": "src/features/authentication", "name": "Authentication" }
+    { "root": "src/features/pages/AuthenticationPage", "name": "AuthenticationPage" }
   ],
   "closedVocabularies": [
     {
-      "path": "src/features/authentication/view-state.ts",
-      "type": "AuthenticationPhase",
-      "inventory": "AUTHENTICATION_MODES",
+      "path": "src/features/pages/AuthenticationPage/view-state.ts",
+      "type": "AuthenticationPagePhase",
+      "inventory": "AUTHENTICATION_PAGE_MODES",
       "role": "mode"
     }
   ],
