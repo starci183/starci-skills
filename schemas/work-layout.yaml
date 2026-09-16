@@ -88,6 +88,16 @@ rules:
     owned assets. Re-evaluate changed inputs and affected dependents; never copy stale completion
     onto changed content. Preserve unrelated work and useful media. New required work prevents
     parent done; unrelated completed branches remain intact.
+  - "Freshness reports keep three conditions distinct: source drift means current implementation no
+    longer matches an implementation completion's sourceIdentity; evidence invalidation means a
+    canonical semantic digest or required proof changed; unavailable input means a required
+    repository, revision, asset, tool or proof cannot be resolved. Unavailability blocks an
+    observation without rewriting state or guessing drift. Current code never becomes SRS/SDS truth."
+  - "Impact follows declared semantic edges and the canonical digest model: ancestor specifications,
+    child aggregation, refs, dependsOn, typed SRS/SDS links, resources and implicit frontend brand
+    binding. A shared aggregate constraint can legitimately affect several branches; directory
+    proximity or an unrelated SRS sibling edit cannot create a global invalidation on its own.
+    Reports name the owner, edge and cause and never alter hash policy."
   - Declare semantic design/source files using node.assets with paths under own assets/. Their exact
     bytes contribute to semantic context; conservative hashing does not ignore presumed typo-only
     edits.

@@ -23,14 +23,16 @@ provenance:
     @starci/grammar/common.
 rules:
   - id: FE-FOLDER-1
-    title: Tier directories
+    title: Responsibility directories
     kind: mandatory
     requirement: |
-      src/components/ holds eight tier folders. Blocks are grouped by product domain; pages and leaves
-      are flat. Place each unit in the tier that matches its role.
+      Place a unit in the directory that owns its responsibility. Pages own routed screens; product
+      blocks and domain overlays own feature composition; reusable compositions own visual assembly;
+      leaves own narrow visual primitives. These roles form a partial dependency graph rather than a
+      total rank inferred from folder names.
     rationale: |
-      Tier directories encode reuse vs feature-connected vs routed ownership so file location answers
-      composition questions without reading the unit body.
+      Stable roles make ownership discoverable while allowing a domain overlay or other composition
+      to keep its real feature responsibility.
     cases:
       - id: case-1
         when: "A reusable fixed visual unit"
@@ -57,16 +59,18 @@ rules:
       - connected-block
 
   - id: FE-FOLDER-2
-    title: The file set of one unit
+    title: Discoverable files for one unit
     kind: mandatory
     requirement: |
-      One unit is one PascalCase folder. Its files carry fixed names; the unit name is the folder, never
-      the file. classNames.ts is present only when the unit owns class strings.
+      One unit is one PascalCase folder and uses the repository's sanctioned basenames. Add
+      component.tsx and the Base export only when the unit has a meaningful connected/presentational
+      boundary. classNames.ts is present only when the unit owns class strings.
     rationale: |
-      Fixed basenames make connected/pure split, class ownership and specs discoverable by path.
+      Stable basenames make class, tests, and an applicable connected/presentational split discoverable
+      without requiring empty forwarding twins.
     cases:
       - id: case-1
-        when: "Page unit (pages/AuthenticationPage/)"
+        when: "Page unit with a connected/presentational boundary (pages/AuthenticationPage/)"
         write: "classNames.ts · component.tsx · index.tsx"
       - id: case-2
         when: "Page unit with specs (pages/CartPage/)"
@@ -75,9 +79,9 @@ rules:
         when: "Block unit (blocks/ai/StarCiAiChat/)"
         write: "classNames.ts · component.spec.tsx · component.tsx · index.spec.tsx · index.tsx"
       - id: case-4
-        when: "Leaf unit (leaves/ButtonStateSample/)"
+        when: "Single visual unit (leaves/ButtonStateSample/)"
         write: >
-          classNames.ts · index.tsx — a leaf has no component.tsx, because it has no connected half
+          classNames.ts · index.tsx — no component.tsx/Base twin is required without a separate world owner
     notes: |
       Counts across pages (50): index.tsx 49, component.tsx 49, component.spec.tsx 42,
       index.spec.tsx 24, audit.json 22, classNames.ts 9. Across blocks (109): component.tsx 101,
@@ -97,16 +101,17 @@ rules:
         - class-names-in-colocated-file
         - no-inline-class-name
       manual:
-        - Confirm unit folder uses the sanctioned basename set for its tier.
+        - Confirm each file owns a real responsibility; do not add a component.tsx/Base twin by census.
     relatedExamples:
       - connected-block
 
   - id: FE-FOLDER-3
-    title: Route files mount one page
+    title: Route files adapt to one visual owner
     kind: mandatory
     requirement: |
-      src/app/[lang]/**/page.tsx is the only place a default export exists (67 in src/app, 0 in
-      src/components). A route mounts one page and makes no drawing decision.
+      A route may resolve framework server inputs and then mounts one page-level visual owner. A route
+      whose complete responsibility is redirect or notFound mounts none. Route files do not compose a
+      shell beside the page or make product drawing decisions.
     rationale: |
       Keeping default exports in the App Router layer prevents components from becoming route-coupled.
     cases:
@@ -117,6 +122,10 @@ rules:
           "@/components/pages/AuthenticationPage" … const AuthenticationRoute = () =>
           <AuthenticationPage {...{}} /> … export default AuthenticationRoute
       - id: case-2
+        kind: exception
+        when: "Redirect/notFound adapter"
+        write: "Resolve framework inputs and redirect or terminate without a visual owner."
+      - id: case-3
         when: "Global app files"
         write: >
           app/globals.css, app/providers.tsx, app/global-error.tsx, app/sitemap.ts, app/robots.ts,
@@ -124,7 +133,7 @@ rules:
     verification:
       automated: []
       manual:
-        - Confirm src/components has no default exports.
+        - Confirm visual routes have one page owner and redirect/notFound-only routes have no visual tree.
     relatedExamples: []
 
   - id: FE-FOLDER-4

@@ -19,13 +19,15 @@ provenance:
     edf72554425f918e80c9205e9c6db10596e722f0; not a fresh audit. Old counts cannot claim a fresh scan.
 rules:
   - id: FE-NAMING-1
-    title: Unit folder and its two exports
+    title: Unit folder and applicable exports
     kind: mandatory
     requirement: |
-      The folder name is the connected export; the pure twin appends Base. Leaves have no Base twin.
-      Route wrappers use a local …Route const.
+      The folder name is the public unit export. When a meaningful connected/presentational split
+      exists, the resolved presentation export appends Base. Units whose only client concerns are
+      intrinsic visual interaction need no Base twin. Route wrappers use a local …Route const.
     rationale: |
-      Matching folder and export names makes ownership discoverable; Base marks the pure half.
+      Matching folder and export names makes ownership discoverable; Base marks an actual resolved
+      presentation contract rather than a mandatory second file.
     cases:
       - id: case-1
         when: "Page connected half, pages/CartPage/index.tsx"
@@ -44,13 +46,17 @@ rules:
       - id: case-5
         when: "Route wrapper, app/[lang]/authentication/page.tsx"
         write: "const AuthenticationRoute = () => …"
+      - id: case-6
+        kind: exception
+        when: "One client visual unit owns only focus, disclosure, measurement, drag, or motion"
+        write: "Export X from the unit entry; do not invent XBase."
     notes: |
       The two CoursePlayground*Page …PageShell exports are residual naming for those units, not a
       template for new pages.
     verification:
       automated: []
       manual:
-        - Confirm new split units use X / XBase, not PageShell, unless explicitly resolving that legacy pair.
+        - Confirm split units use X / XBase and unsplit units do not add an empty forwarding twin.
     relatedExamples:
       - connected-block
 

@@ -33,6 +33,30 @@ authored record is work, not a chore for the user, and inside that file `state`,
 record still incomplete after it was accepted is the question the user has to answer. See **Ledger
 incomplete → work.author** in [workflow-kernel.md](workflow-kernel.md).
 
+## Read-only freshness classification
+
+The ledger remains the canonical semantic record. A read-only `review.verify` operation can inspect
+it in `stales` or `lint` mode, but it does not create a second freshness ledger and cannot write
+canonical state or completion.
+
+A useful freshness report names the Work owner, affected node, edge/reason, old and current binding,
+and one of three non-interchangeable conditions:
+
+1. `source-drift`: current implementation source differs from the exact source identity bound by its
+   completion. Source is checked against SRS/SDS; it is never promoted into them.
+2. `evidence-invalid`: canonical semantic input or required proof changed, so a retained historical
+   receipt no longer certifies the current node.
+3. `input-unavailable`: a required repository/ref/snapshot/asset/tool cannot be resolved, so the
+   observation is blocked rather than guessed.
+
+Impact follows the canonical digest/edge model. Descendants inherit ancestor specification changes;
+parents aggregate child inputs; refs, dependencies, typed SRS/SDS links, resources and the implicit
+frontend brand binding propagate to their declared consumers. This can legitimately reach a sibling
+only through a real shared/aggregate edge. Folder proximity and an unrelated SRS edit are not global
+invalidation rules. `impactWorkspace` is an explanation aid; `validateWorkspace` remains the
+authority for current digests/effective state, and a future stale operation must not silently change
+hash policy.
+
 ## Brand: one record the design reads
 
 A product's brand is not a paragraph repeated in every design record. It is one Work node —
