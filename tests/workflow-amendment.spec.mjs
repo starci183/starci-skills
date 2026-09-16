@@ -49,10 +49,12 @@ function fixture(t){
   return {root,store,state,journalFile,amendment,amendmentFile};
 }
 const publicCommand=(fixture,...args)=>launcherMain([...args,'--worktree',path.relative(process.cwd(),fixture.root)],{orca:{}});
-const addOperation=(id,kind='review.verify')=>({id,kind,goal:`Run ${id} against the authorized source slice.`,ledgerIds:['frontend-slice'],
-  allowlist:['src/frontend/**'],references:['src/frontend/**'],checks:[{name:`${id}-check`,command:'node --test tests/frontend.spec.mjs'}],
+const addOperation=(id,kind='review.verify',operation=null)=>({id,kind,...(operation?{operation}:{}),goal:`Run ${id} against the authorized source slice.`,ledgerIds:['frontend-slice'],
+  allowlist:['src/frontend/**'],references:['src/frontend/**'],checks:[{name:`${id}-check`,command:operation==='stales'
+    ?'node bin/starci.mjs check-stales --work .starciwork --repo source=.'
+    :'node --test tests/frontend.spec.mjs'}],
   acceptance:[`${id} records a current independent result.`],dependsOn:[]});
-const operationAmendment=(fixture)=>{const record=structuredClone(fixture.amendment);record.changes.addOperations=[addOperation('pre-source-audit'),addOperation('post-independent-review')];
+const operationAmendment=(fixture)=>{const record=structuredClone(fixture.amendment);record.changes.addOperations=[addOperation('pre-source-audit','review.verify','stales'),addOperation('post-independent-review')];
   record.changes.operationDependencies={'remaining-1':['pre-source-audit'],'post-independent-review':['remaining-1']};return record;};
 
 test('public stop and same-ID amendment preserve accepted history, owner decisions and an unknown writer',t=>{
@@ -118,6 +120,7 @@ test('an authorized amendment atomically inserts pre-audit and post-review opera
   const applied=applyWorkflowAmendment(f.store,f.state,f.amendmentFile,{now:()=>1234});assert.equal(applied.replayed,false);
   const pre=f.state.ops.find(op=>op.id==='pre-source-audit'),remaining=f.state.ops.find(op=>op.id==='remaining-1'),post=f.state.ops.find(op=>op.id==='post-independent-review');
   assert.equal(pre.kind,'review.verify');assert.equal(pre.origin,'amendment');assert.equal(pre.status,'pending');assert.equal(pre.amendment,applied.amendment.digest);
+  assert.equal(pre.operation,'stales');assert.match(amendmentContractLines(f.state,pre).join('\n'),/read-only stales measurement mode/);
   assert.deepEqual(remaining.dependsOn,['pre-source-audit']);assert.deepEqual(remaining.preAmendmentDependsOn,[]);
   assert.deepEqual(remaining.dependencyAmendments,[{amendment:applied.amendment.digest,added:['pre-source-audit']}]);
   assert.deepEqual(post.dependsOn,['remaining-1']);assert.equal(operationAmendmentVerdict(f.state,post,{files:['src/frontend/result.ts']}).ok,true);
@@ -132,6 +135,10 @@ test('invalid added operations and dependency edits fail before any workflow byt
   const cases={
     collision:record=>{record.changes.addOperations[0].id='accepted-1';},
     kind:record=>{record.changes.addOperations[0].kind='task.execute';},
+    wrongAuditKind:record=>{record.changes.addOperations[0].kind='backend.implement';},
+    unknownAuditMode:record=>{record.changes.addOperations[0].operation='repair';},
+    unboundStalesCommand:record=>{record.changes.addOperations[0].checks=[{name:'looks-like-audit',command:'npm run lint'}];},
+    compoundLintCommand:record=>{record.changes.addOperations[0].operation='lint';record.changes.addOperations[0].checks=[{name:'compound',command:'npm run lint; echo clean'}];},
     ledger:record=>{record.changes.addOperations[0].ledgerIds=['unknown-ledger'];},
     checks:record=>{record.changes.addOperations[0].checks=[];},
     ceiling:record=>{record.changes.addOperations[0].allowlist=['src/backend/**'];},

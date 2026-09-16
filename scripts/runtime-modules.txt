@@ -40,6 +40,7 @@ hosts/orca/protocol.mjs
 hosts/orca/observe.mjs
 kernel/reports.mjs
 kernel/source-staleness.mjs
+kernel/audit.mjs
 models/functions.mjs
 kernel/store.mjs
 kernel/continuation.mjs

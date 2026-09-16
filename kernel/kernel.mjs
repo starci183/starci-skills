@@ -28,6 +28,7 @@ import {prepareCandidateIntegration} from './candidates.mjs';
 import {candidateRootBindings as buildCandidateRootBindings,resolveCandidateReferences} from './candidate-roots.mjs';
 import {buildManagerSnapshot,validateManagerDecision,managerProgressDigest} from './manager.mjs';
 import {stepsFor} from './contract.mjs';
+import {isAuditOperation,measureAuditChecks} from './audit.mjs';
 import * as work from './ledger.mjs';
 import * as llm from '../models/functions.mjs';
 import * as graph from './graph.mjs';
@@ -331,7 +332,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
   const locks=guards.resourceLocks(op);
   const owned=protectedPaths??op.kernelOwned??[];
   const sections=[
-    `# Operation contract - \`${op.kind}\` - op \`${op.id}\` - attempt ${op.attempt}`,``,
+    `# Operation contract - \`${op.kind}\`${isAuditOperation(op)?` - read-only \`${op.operation}\` measurement`:''} - op \`${op.id}\` - attempt ${op.attempt}`,``,
     `Runtime StarCi ${isEnrolled(state)?state.engine.version:'5.0'}. One worktree \`${slash(state.worktree)}\` on branch \`${state.branch}\`. ${isEnrolled(state)?'The kernel serializes native writers and independently verifies a frozen copy of your observed changes. This host detects write drift but does not enforce an OS sandbox.':'Other operations are running beside you in this same worktree:'} Never touch a path outside your allowlist, never commit, never switch branches. Your Task id, Dispatch id and terminal handle are in the dispatch preamble.`,``,
     ...(laneLine(state,op)?[laneLine(state,op),``]:[]),
     ...languageBlock(language??configuredLanguage(state),op),
@@ -680,7 +681,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
   // A launch is an external effect: the state that names it is written before anything else can interrupt the kernel.
   store.saveState(state);
   op.launchedAt=clockOf(ctx);
-  store.appendEvent({event:'launched',op:op.id,kind:op.kind,node:op.nodeId,attempt:op.attempt,runtime:op.runtime,target:op.target,
+  store.appendEvent({event:'launched',op:op.id,kind:op.kind,operation:op.operation??null,node:op.nodeId,attempt:op.attempt,runtime:op.runtime,target:op.target,
     dispatch:op.dispatch,terminal:op.terminal,allocation:launched.allocation??null});
   // Work v2 authors only uninvestigate, todo and done, so the launch is recorded in the node's kernel block.
   ledgerWrite(store,state,op,ctx,'in-progress',node=>ctx.work.api.markInProgress(ctx.work.at,node,{opId:op.id,dispatch:op.dispatch}));
@@ -2057,8 +2058,47 @@ function settleAuthoredRecord(store,state,op,ctx){
 }
 
 /** One accepted report, one deterministic action. `done` passes through machine verification and a commit. */
+function rejectAuditMeasurement(store,state,op,ctx,failures,checks=[]){
+  const safeFailures=failures.map(failure=>String(failure)).slice(0,8);
+  op.audit={schema:'starci/audit-measurement@1',operation:op.operation,outcome:'failed',checks,
+    findingCount:0,reportFindingCount:0,failures:safeFailures};
+  op.verifiedChecks=checks;op.files=[];op.status='blocked';op.verdict='failed';op.refusal='audit-measurement-failed';op.dispatch=null;op.nudged=false;
+  store.appendEvent({event:'audit-measurement-failed',op:op.id,operation:op.operation,failures:safeFailures,
+    checks:checks.map(check=>`${check.name}=${check.exitCode}`)});
+  if(ctx.orca)closeOpTerminal(ctx.orca,store,state,op);
+  return 'audit-failed';
+}
+
+function settleAuditMeasurement(orca,store,state,op,report,ctx){
+  const workerFiles=unique([...(report.files??[]),...(ctx.engine?(op.candidate?.observedFiles??[]):[])]);
+  const measurement=measureAuditChecks(op,check=>ctx.exec(sharedCheckCommand(check.command,{work:ctx.work}),{
+    cwd:state.worktree,timeoutMs:op.timeoutMs??CHECK_TIMEOUT_MS}));
+  const reportedFindings=[...(report.open??[]),...(report.checks??[]).filter(check=>check.exitCode!==0)
+    .map(check=>`${check.name}: ${check.evidence??`exit ${check.exitCode}`}`)];
+  const reportMatches=measurement.ok&&(measurement.outcome==='clean'
+    ?report.outcome==='done'&&reportedFindings.length===0
+    :['partial','failed'].includes(report.outcome)&&reportedFindings.length>0);
+  const failures=[...measurement.failures,
+    ...(workerFiles.length?[`read-only audit reported or produced files: ${workerFiles.join(', ')}`]:[]),
+    ...(!reportMatches?[`operation report outcome ${report.outcome} does not match the independently measured ${measurement.outcome}`]:[])];
+  const result={schema:'starci/audit-measurement@1',operation:op.operation,
+    outcome:failures.length?'failed':measurement.outcome,checks:measurement.checks,
+    findingCount:measurement.findings??0,reportFindingCount:reportedFindings.length,failures};
+  writeJson(store.checksPath(`${op.id}-audit`),result);
+  store.acknowledgeRuntimeFile?.(store.checksPath(`${op.id}-audit`),`checks/${op.id}-audit.json`,'replace');
+  if(failures.length){
+    const action=rejectAuditMeasurement(store,state,op,ctx,failures,measurement.checks);op.audit=result;return action;
+  }
+  op.audit=result;op.verifiedChecks=measurement.checks;op.files=[];op.dispatch=null;op.nudged=false;
+  op.status='done';op.verdict=measurement.outcome;
+  store.appendEvent({event:'audit-measured',op:op.id,operation:op.operation,outcome:measurement.outcome,
+    findingCount:measurement.findings??0,checks:measurement.checks.map(check=>`${check.name}=${check.exitCode}`)});
+  if(ctx.orca)closeOpTerminal(ctx.orca,store,state,op);
+  return 'audit-measured';
+}
+
 export function applyOpReport(orca,store,state,op,report,ctx){
-  if(validatorOnlyBlock(report)){
+  if(!isAuditOperation(op)&&validatorOnlyBlock(report)){
     const outcome=(report.open??[]).length?'partial':'done';
     store.appendEvent({event:'validator-only-block',op:op.id,from:report.outcome,to:outcome,note:'the kernel owns the whole-tree validator and judges it by what this operation could have caused'});
     // The failing tree check leaves the report: the kernel adds its own, scoped, at acceptance.
@@ -2075,6 +2115,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
   }
   if(!checked.ok){
     store.appendEvent({event:'report-rejected',op:op.id,errors:checked.errors});
+    if(isAuditOperation(op))return rejectAuditMeasurement(store,state,op,ctx,checked.errors.map(error=>`invalid audit report: ${error}`));
     return retryOp(store,state,op,checked.errors.map(error=>`your previous report was rejected: ${error}`),ctx,'report-rejected');
   }
   store.appendEvent({event:'report',op:op.id,outcome:report.outcome,runtime:op.runtime,attempt:op.attempt});
@@ -2092,6 +2133,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
   const touched=ctx.engine?[]:guardKernelPaths(store,state,op,ctx);
   if(touched.length){
     op.reports.at(-1).downgradedTo='failed';
+    if(isAuditOperation(op))return rejectAuditMeasurement(store,state,op,ctx,[`read-only audit modified kernel-owned ledger paths: ${touched.join(', ')}`]);
     return retryOp(store,state,op,[`operation modified kernel-owned ledger paths: ${touched.join(', ')}`],ctx,'kernel-paths-modified');
   }
   // The record-authoring op holds its own node's index.yaml, so the blocks inside it the kernel owns are guarded
@@ -2099,8 +2141,13 @@ export function applyOpReport(orca,store,state,op,report,ctx){
   const blocks=ctx.engine?[]:guardRecordBlocks(store,state,op,ctx);
   if(blocks.length){
     op.reports.at(-1).downgradedTo='failed';
+    if(isAuditOperation(op))return rejectAuditMeasurement(store,state,op,ctx,[`read-only audit modified kernel-owned fields: ${blocks.join(', ')}`]);
     return retryOp(store,state,op,[`operation modified kernel-owned fields (${(plain(op.cut)?CUT_OWNED:RECORD_OWNED).join(', ')}) of the Work record it authors: ${blocks.join(', ')}`],ctx,'record-blocks-modified');
   }
+  // A named audit settles only the measurement. It never commits, marks a ledger item, records Work completion,
+  // creates a repair operation or turns a finding into a delivery verdict. The kernel re-runs the exact check so
+  // a model-authored report cannot bless stale inputs or reinterpret an arbitrary nonzero shell exit as findings.
+  if(isAuditOperation(op))return settleAuditMeasurement(orca,store,state,op,report,ctx);
   // An ask op that found the answer - in a decided record, from the owner in its tab, or as a provision present -
   // has done its job whatever outcome it wrote: the marker is the ruling, and a `blocked` beside it is noise
   // (one ask answered from a record, then asked for a Work path it had no business with, and died four times
@@ -2780,9 +2827,9 @@ function finish(store,state,outcome,reason=null,ctx=null){
     // The same list the status page prints, in the report that outlives the run: a finished workflow still owes
     // the owner every question on it, and the report is where they read what to type.
     owner:ownerItems(state),ownerReport:ownerLines(state).join('\n'),
-    ops:state.ops.map(op=>({id:op.id,kind:op.kind,node:op.nodeId,origin:op.origin,status:op.status,runtime:op.runtime,attempt:op.attempt,
+    ops:state.ops.map(op=>({id:op.id,kind:op.kind,operation:op.operation??null,node:op.nodeId,origin:op.origin,status:op.status,runtime:op.runtime,attempt:op.attempt,
       allowlist:op.allowlist,ledgerIds:op.ledgerIds,head:op.head,ledgerCommit:op.ledgerCommit??null,verdict:op.verdict,validation:op.validation??null,
-      provisional:[...(op.provisional??[])],files:op.files})),
+      audit:op.audit??null,provisional:[...(op.provisional??[])],files:op.files})),
     iterations:state.iterations,finishedAt:Date.now()};
   writeJson(store.paths.final,final);
   state.finished={outcome,reason,report:store.paths.final};

@@ -6,6 +6,7 @@ import {ORCA_HOST} from '../hosts/orca/calls.mjs';
 import {resolveLedgerRoot} from './routing.mjs';
 import * as graph from './graph.mjs';
 import {DECISION_OPERATION} from './io.mjs';
+import {normalizeAuditOperation} from './audit.mjs';
 
 /**
  * What every concern of the kernel needs and none of them owns.
@@ -265,7 +266,8 @@ export const nextId=(state,prefix)=>`${prefix}-${state.counters[prefix]=(state.c
 
 export function toOp(raw,index){
   const id=typeof raw?.id==='string'&&raw.id.trim()?raw.id.trim():`op-${index+1}`;
-  return {id,kind:required(raw?.kind,`kind of operation ${id}`),goal:required(raw?.goal,`goal of operation ${id}`),
+  const kind=required(raw?.kind,`kind of operation ${id}`),operation=normalizeAuditOperation(kind,raw?.operation,{label:`operation mode of ${id}`});
+  return {id,kind,...(operation?{operation}:{}),goal:required(raw?.goal,`goal of operation ${id}`),
     nodeId:typeof raw?.nodeId==='string'&&raw.nodeId.trim()?raw.nodeId.trim():null,
     ledgerIds:[...(raw.ledgerIds??[])],allowlist:[...(raw.allowlist??[])],references:[...(raw.references??[])],
     checks:(raw.checks??[]).map(check=>({name:required(check?.name,'check name'),command:required(check?.command,'check command')})),

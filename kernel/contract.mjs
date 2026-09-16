@@ -27,6 +27,7 @@
  */
 
 import {INTEGRATION_RESEARCH_ORDER} from './inputs-readiness.mjs';
+import {isAuditOperation} from './audit.mjs';
 
 export const STEPS_HEADING='## Working order (mandatory, in this order)';
 export const DONE_HEADING='## Definition of done for this kind';
@@ -621,6 +622,28 @@ const SEQUENCE_STEPS={
 
 /** The two markdown sections for the contract: the numbered working order and the definition of done of this kind. */
 export function stepsFor(op,{node=null}={}){
+  if(isAuditOperation(op)){
+    const stales=op.operation==='stales';
+    const steps=stales?[
+      `Read the selected audit request, canonical Work binding and explicit repository roots. The selected subjects may be stale, blocked or unfinished because they are inputs to measure, not delivery prerequisites.`,
+      `Run the exact declared check once (${codes((op.checks??[]).map(check=>check.command),'no check')}). Preserve its JSON report and exit code without rewriting source, Work, stacks, baselines, completion hashes or evidence.`,
+      `Interpret exit 0 only as a structurally clean scanner report and exit 1 only as findings in a valid \`starci/source-staleness-report@1\` report. Exit 2/3, malformed JSON or changed inputs are an audit failure, never clean.`,
+      `Report \`done\` for clean or \`partial\` with the measured findings. A finding completes this measurement only; it does not pass delivery, complete a Work node, authorize repair or dispatch another operation.`
+    ]:[
+      `Read the selected lint request, exact source/Work/stack inputs and every declared command. Stale or unfinished subjects are inputs to measure, not delivery prerequisites.`,
+      `Run every declared check verbatim (${codes((op.checks??[]).map(check=>check.command),'no check')}) and retain its output and exit code. Change no source, Work, stack, policy, baseline, completion or evidence input.`,
+      `A nonzero result is measured findings only when a known StarCi checker returns its parseable typed report. An arbitrary lint/typecheck shell failure, missing tool or malformed report is an audit failure and never gains repair authority.`,
+      `Report \`done\` for clean or \`partial\` with measured findings. Neither result is a delivery verdict; never fix, complete a node or dispatch follow-up work from this operation.`
+    ];
+    return [
+      `External integrations in this operation's scope have a precondition: ${INTEGRATION_RESEARCH_ORDER}`,
+      ``,STEPS_HEADING,`Sequence \`review.verify.${op.operation}\`. Do these in order; this is read-only measurement, not delivery review.`,
+      ...steps.map((step,index)=>`${index+1}. ${step}`),``,DONE_HEADING,
+      `- every declared check was actually run and bound to its exact command and input`,
+      `- the result is recorded as clean, findings or failed without changing an inspected input`,
+      `- findings create no repair operation and prove no delivery or ledger completion`
+    ].join('\n');
+  }
   const sequence=sequenceFor(op,{node});
   const {steps,done}=SEQUENCE_STEPS[sequence](values(op,node));
   return [

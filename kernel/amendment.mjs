@@ -4,6 +4,7 @@ import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {PLAN_OP_KINDS} from '../models/functions.mjs';
 import {toOp} from './common.mjs';
+import {auditDefinitionErrors} from './audit.mjs';
 import {stateGoalIdentity} from './store.mjs';
 
 export const WORKFLOW_AMENDMENT='starci/workflow-amendment@1';
@@ -56,9 +57,9 @@ const checks=(value,label)=>{need(Array.isArray(value)&&value.length,`Workflow a
     need(!seen.has(check.name),`Workflow amendment ${label} must use unique check names`);seen.add(check.name);return check;});};
 function addedOperation(value,index){
   const label=`changes.addOperations[${index}]`;
-  exactKeys(value,['id','kind','goal','ledgerIds','allowlist','references','checks','acceptance','dependsOn'],label);
+  exactKeys(value,['id','kind','operation','goal','ledgerIds','allowlist','references','checks','acceptance','dependsOn'],label);
   need(Object.hasOwn(value,'id'),`Workflow amendment needs ${label}.id`);
-  const raw={id:text(value.id,`${label}.id`),kind:text(value.kind,`${label}.kind`),goal:text(value.goal,`${label}.goal`),
+  const raw={id:text(value.id,`${label}.id`),kind:text(value.kind,`${label}.kind`),...(value.operation===undefined?{}:{operation:text(value.operation,`${label}.operation`)}),goal:text(value.goal,`${label}.goal`),
     ledgerIds:list(value.ledgerIds,`${label}.ledgerIds`,{required:true}),
     allowlist:list(value.allowlist,`${label}.allowlist`,{required:true}).map((item,pathIndex)=>operationPath(item,`${label}.allowlist[${pathIndex}]`)),
     references:list(value.references,`${label}.references`).map((item,pathIndex)=>operationPath(item,`${label}.references[${pathIndex}]`)),
@@ -66,7 +67,8 @@ function addedOperation(value,index){
     dependsOn:list(value.dependsOn,`${label}.dependsOn`)};
   const op=toOp(raw,index);need(PLAN_OP_KINDS.includes(op.kind),
     `Workflow amendment operation ${op.id} has unsupported plan kind ${op.kind}; expected one of ${PLAN_OP_KINDS.join(', ')}`);
-  return {id:op.id,kind:op.kind,goal:op.goal,ledgerIds:op.ledgerIds,allowlist:op.allowlist,references:op.references,
+  const auditErrors=auditDefinitionErrors(op);need(!auditErrors.length,`Workflow amendment operation ${op.id} is invalid: ${auditErrors.join('; ')}`);
+  return {id:op.id,kind:op.kind,...(op.operation?{operation:op.operation}:{}),goal:op.goal,ledgerIds:op.ledgerIds,allowlist:op.allowlist,references:op.references,
     checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn};
 }
 const addedOperations=value=>{if(value===undefined)return [];need(Array.isArray(value),'Workflow amendment changes.addOperations must be an array');
@@ -274,7 +276,7 @@ export function amendmentContractLines(state,op=null){
     for(const clarification of item.changes.clarifications)lines.push(`  - clarification: ${clarification}`);
     for(const replacement of item.changes.supersedeDefinitionOfDone??[])lines.push(`  - superseded historical criterion: ${replacement.from}`,`    effective criterion: ${replacement.to}`);
     const added=(item.changes.addOperations??[]).find(candidate=>candidate.id===op?.id);
-    if(added)lines.push(`  - this operation was added by the amendment as ${added.kind}; its exact ledger ids are ${added.ledgerIds.join(', ')}`);
+    if(added)lines.push(`  - this operation was added by the amendment as ${added.kind}${added.operation?` in read-only ${added.operation} measurement mode`:''}; its exact ledger ids are ${added.ledgerIds.join(', ')}`);
     const dependencies=item.changes.operationDependencies?.[op?.id]??[];
     if(dependencies.length)lines.push(`  - this operation's added dependencies: ${dependencies.join(', ')}`);
     lines.push(`  - paths: ${item.changes.effectCeiling.paths.join(', ')||'none'}`,
