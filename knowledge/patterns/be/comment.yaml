@@ -129,8 +129,9 @@ rules:
   - id: BE-COMMENT-3
     title: Methods and fields
     kind: mandatory
-    requirement: Methods, fields and generic templates carry responsibility-focused docs including params/returns
-      and cross-references where useful.
+    requirement: Methods and declared class/interface/type fields carry nonempty responsibility docblocks.
+      Generic parameters have named @template or @typeParam documentation. Parameter/return explanations and
+      cross-references are added where useful; their semantic usefulness is reviewed by an agent.
     rationale: ""
     cases:
       - id: case-1
@@ -153,8 +154,10 @@ rules:
         when: Generic
         write: "@template TParams - The parameters type. (ICQRSHandler)"
     verification:
-      automated: []
-      manual: []
+      automated:
+        - NEST_MEMBER_DOCUMENTATION
+      manual:
+        - Review responsibility, useful parameter/return explanation and cross-reference meaning.
     relatedExamples:
       - graphql-command
   - id: BE-COMMENT-4
@@ -175,8 +178,9 @@ rules:
   - id: BE-COMMENT-5
     title: Line comments are prose about why
     kind: mandatory
-    requirement: Line comments sit above the statement, in lowercase sentence form, and give the consequence that
-      motivates the code.
+    requirement: Prose line comments sit above code and their first ASCII letter is lowercase. Recognized
+      triple-slash compiler references and vn-ok locale annotations are structured metadata with their own
+      placement. An agent reviews whether prose explains a consequence that motivates the code.
     rationale: 9720 // lines in non-spec src/ at extraction; the ` -- ` join appears in 1299 of them; a plain
       sentence is the majority form.
     cases:
@@ -204,15 +208,18 @@ rules:
         when: The ` -- ` join
         write: used in a minority of lines; a plain sentence is the majority form
     verification:
-      automated: []
-      manual: []
+      automated:
+        - NEST_COMMENT_FORM
+      manual:
+        - Review why the prose is needed and whether it explains the actual consequence.
     relatedExamples:
       - graphql-command
   - id: BE-COMMENT-6
     title: Block comments for multi-paragraph reasoning inside a body
     kind: mandatory
-    requirement: Multi-paragraph reasoning inside a function body uses /* … */ blocks that open with a capitalised
-      claim, then evidence, then corrected history when applicable.
+    requirement: Reasoning block comments inside a function body open with a capitalized first ASCII letter.
+      Multi-paragraph reasoning uses a block. Claim, evidence and corrected history where applicable are
+      semantic content reviewed by an agent, not inferred from punctuation.
     rationale: ""
     cases:
       - id: case-1
@@ -227,8 +234,10 @@ rules:
         write: the eslint.config.mjs blocks that record why a rule is at error, with the measured debt (nợ=0 (296/296)
           in source)
     verification:
-      automated: []
-      manual: []
+      automated:
+        - NEST_COMMENT_FORM
+      manual:
+        - Review the claim, evidence and useful corrected history; a capitalization pass is not prose review.
     relatedExamples: []
   - id: BE-COMMENT-7
     title: What a comment never contains
