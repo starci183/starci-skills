@@ -22,26 +22,28 @@ rules:
     title: Unit folder and applicable exports
     kind: mandatory
     requirement: |
-      The folder name is the public unit export. When a meaningful connected/presentational split
-      exists, the resolved presentation export appends Base. Units whose only client concerns are
-      intrinsic visual interaction need no Base twin. Route wrappers use a local …Route const.
+      UI feature units live below features/pages, features/layouts or features/overlays. Reusable visual
+      units live below components/blocks, components/composites, components/branches or components/leaves.
+      The folder name is the public unit export. A connected block uses sibling index.tsx and component.tsx
+      exports; its resolved presentation export appends Base. Lower reusable tiers and feature UI units do
+      not acquire a twin merely for symmetry. Route wrappers use a local …Route const.
     rationale: |
       Matching folder and export names makes ownership discoverable; Base marks an actual resolved
       presentation contract rather than a mandatory second file.
     cases:
       - id: case-1
-        when: "Page connected half, pages/CartPage/index.tsx"
+        when: "Feature page entry, features/pages/CartPage/index.tsx"
         write: "export const CartPage = (props: CartPageProps) => … (49/49 pages)"
       - id: case-2
-        when: "Page pure half, pages/AuthenticationPage/component.tsx"
+        when: "Historical page render half, features/pages/AuthenticationPage/component.tsx"
         write: >
           export const AuthenticationPageBase = (props: AuthenticationPageProps) => … (47/49; the two
           CoursePlayground*Page units export …PageShell)
       - id: case-3
-        when: "Block pure half, blocks/ai/StarCiAiChat/component.tsx"
+        when: "Connected block render half, components/blocks/StarCiAiChat/component.tsx"
         write: "export const StarCiAiChatBase = … (98 of 118 component.tsx exports end in Base)"
       - id: case-4
-        when: "Leaf, leaves/ButtonStateSample/index.tsx"
+        when: "Leaf, components/leaves/ButtonStateSample/index.tsx"
         write: "export const ButtonStateSample = … — no Base, no twin"
       - id: case-5
         when: "Route wrapper, app/[lang]/authentication/page.tsx"
@@ -137,18 +139,19 @@ rules:
     title: Feature data hooks and cache keys
     kind: mandatory
     requirement: |
-      Feature hooks start with use and name the lifecycle they own. When SWR is selected, read/write hooks
-      and keys follow the repository's Query/Mutate convention. GraphQL document modules use the owning
-      adapter's basename convention. Generated document names remain generator-owned.
+      Every authored custom hook lives below hooks/<domain>, starts with use, and names the lifecycle it
+      owns. When SWR is selected, read/write hooks and keys follow the repository's Query/Mutate convention.
+      GraphQL documents and wire adapters live below modules/api and use the owning adapter's basename
+      convention. Generated document names remain generator-owned.
     rationale: |
       Parallel suffixes make cache keys and hook roles obvious at the call site.
     cases:
       - id: case-1
         when: "Read hook"
-        write: "useQueryCourseSwr, useQueryMyCartSwr (80 files useQuery…Swr.ts)"
+        write: "hooks/course/useQueryCourseSwr.ts, hooks/cart/useQueryMyCartSwr.ts (80 files useQuery…Swr.ts)"
       - id: case-2
         when: "Write hook"
-        write: "useMutateAddToCartSwr, useMutateClearCartSwr (32 files useMutate…Swr.ts)"
+        write: "hooks/cart/useMutateAddToCartSwr.ts, hooks/cart/useMutateClearCartSwr.ts (32 files useMutate…Swr.ts)"
       - id: case-3
         when: "Key constant"
         write: >
@@ -161,12 +164,13 @@ rules:
           AddToCartArg, export type AddToCartTrigger
       - id: case-5
         when: "Non-data hooks"
-        write: "useAuthentication under features/authentication/data; useSessionToken under the session module when shared"
+        write: "useAuthentication under hooks/authentication; useSessionToken under hooks/session"
       - id: case-6
         when: "GraphQL document module"
         write: >
-          A legacy handwritten adapter may use query-course.ts/queryCourse. A generated operation keeps
-          its generated name and is consumed behind the feature data mapper.
+          A legacy handwritten adapter may use modules/api/graphql/query-course.ts/queryCourse. A generated
+          operation keeps its generated name and is mapped behind the owning hooks/<domain> entry before
+          presentation.
     verification:
       automated: []
       manual: []
@@ -241,8 +245,8 @@ rules:
     title: File names outside component folders
     kind: mandatory
     requirement: |
-      Hook files are camelCase equal to the export. Module files are kebab-case. Spec files add .spec
-      to the basename. describe uses the export under test.
+      Hook files live below hooks/<domain> and are camelCase equal to the export. Module files are
+      kebab-case. Spec files add .spec to the basename. describe uses the export under test.
     rationale: |
       Parallel basenames keep specs and modules locatable beside their subjects.
     cases:

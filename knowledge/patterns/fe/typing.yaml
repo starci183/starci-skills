@@ -226,8 +226,8 @@ rules:
       - id: case-2
         when: "A GraphQL/provider enum"
         write: >
-          Keep the generated/wire enum in modules/api or feature data, then map it to a feature literal
-          before rendering or accepting a user action.
+          Keep the generated/wire enum in modules/api, then map it at the owning hook/module boundary to a
+          presentation literal before rendering or accepting a user action.
     verification:
       automated:
         - FE_CLOSED_VOCABULARY_SHAPE
@@ -250,7 +250,7 @@ rules:
     cases:
       - id: case-1
         when: "GraphQL code generation is available"
-        write: "Use generated TypedDocumentNode documents and generated result/variable types in data."
+        write: "Use generated TypedDocumentNode documents and generated result/variable types in modules/api."
       - id: case-2
         when: "A feature exposes authentication state"
         write: "Export feature-owned AuthMode/AuthFailure/view types, not GraphQL response envelopes."

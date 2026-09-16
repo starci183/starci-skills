@@ -29,23 +29,24 @@ rules:
     title: Placement
     kind: mandatory
     requirement: |
-      Specs sit beside their subject. When a unit has two meaningful halves, component.spec.tsx covers
-      the Base contract and index.spec.tsx covers connected mapping. A one-part unit has the one
-      behavior-focused spec its risk requires. Hooks and classNames use matching .spec siblings; no
-      __tests__/ folders. The runner is vitest with @testing-library/react.
+      Specs sit beside their subject. A connected block's component.spec.tsx covers its sibling Base
+      contract and index.spec.tsx covers connected mapping. Feature pages/layouts/overlays and reusable
+      composites/branches/leaves keep the one behavior-focused spec their actual responsibility and risk
+      require; no lower-tier twin is manufactured for test symmetry. Hooks and classNames use matching
+      .spec siblings; no __tests__/ folders. The runner is vitest with @testing-library/react.
     rationale: |
       Colocation makes ownership clear. Tests follow behavior boundaries; file counts never create a
       second component or a redundant spec.
     cases:
       - id: case-1
-        when: "Pure half"
-        write: "component.spec.tsx beside component.tsx (55 blocks, 42 pages)"
+        when: "Connected block pure half"
+        write: "component.spec.tsx beside components/blocks/<Block>/component.tsx"
       - id: case-2
-        when: "Connected half"
-        write: "index.spec.tsx beside index.tsx (61 blocks, 24 pages, 19 leaves)"
+        when: "Connected block owner"
+        write: "index.spec.tsx beside components/blocks/<Block>/index.tsx"
       - id: case-3
         when: "Hook"
-        write: "useQueryCourseSwr.spec.ts beside the hook"
+        write: "hooks/course/useQueryCourseSwr.spec.ts beside useQueryCourseSwr.ts"
       - id: case-4
         when: "Class strings"
         write: "classNames.spec.ts beside classNames.ts (2 in blocks); Grammar CSS proof in styles.spec.ts (6)"
@@ -56,12 +57,11 @@ rules:
         when: "Runner"
         write: "vitest, @testing-library/react; describe/it/expect/vi imported from \"vitest\""
       - id: case-7
-        when: "A new unit that has both halves (FE-FUNCTION-4)"
+        when: "A connected block has both sibling responsibilities"
         write: >
           Both files above, one per half. Neither stands in for the other: the connected spec replaces
           the pure half wholesale (FE-TEST-2 Case 4) and the pure spec stubs its child owners
-          (FE-TEST-3 Case 3), so a unit carrying one spec has one uncovered half rather than partial
-          coverage of two. This applies only after FE-FUNCTION-4 establishes two real responsibilities.
+          (FE-TEST-3 Case 3), so one spec cannot claim both responsibilities.
       - id: case-8
         kind: exception
         when: "A one-part visual unit"
@@ -77,10 +77,10 @@ rules:
     title: "Connected spec: mock the doors, assert the props handed down"
     kind: mandatory
     requirement: |
-      When a separate connected owner exists, its focused spec mocks the feature/module public doors and
-      framework translation/router adapters, replaces a separate render unit when useful, and asserts
-      resolved mapping/actions. It does not require a global hooks barrel or a render twin that production
-      does not own.
+      A connected block's focused spec mocks the selected hooks/<domain> entry and any framework adapter
+      it actually owns, replaces its sibling render unit, and asserts resolved mapping/actions. It never
+      imports a feature or transport module to arrange the test. Other visual tiers do not require a render
+      twin that production does not own.
     rationale: |
       Mocking owned boundaries isolates connected mapping without turning a repository-wide barrel into
       architecture or manufacturing an extra production file for the test.
@@ -92,10 +92,10 @@ rules:
           as string | undefined, cart: { data: undefined as unknown, error: undefined as unknown,
           isLoading: false, mutate: vi.fn() }, … }))
       - id: case-2
-        when: "The feature or module door"
+        when: "The hook door"
         write: >
-          vi.mock("@/features/cart", …) or mock the same-feature data module. Legacy Academy specs may
-          mock @/hooks while that compatibility surface remains.
+          vi.mock("@/hooks/cart", …). A modules/api transport is mocked in the hook or transport spec that
+          owns it, not from a connected block or lower visual tier.
       - id: case-3
         when: "Translation and routing"
         write: >
@@ -129,7 +129,8 @@ rules:
     kind: mandatory
     requirement: |
       Pure specs render fixtures, assert landmarks/text, stub child owners, and may iterate exported
-      state inventories. Pages that compose without owning assert the connected child presence.
+      state inventories. Feature pages/layouts/overlays that compose without owning assert the connected
+      child presence.
     rationale: |
       Reader-facing assertions prove presentation without locking class strings or network behaviour.
     cases:
@@ -200,7 +201,9 @@ rules:
         write: "0 toMatchSnapshot / toMatchInlineSnapshot in src/"
       - id: case-2
         when: "Network"
-        write: "never reached; mock the owning feature data or API-module boundary"
+        write: >
+          never reached; mock hooks/<domain> in a visual spec, the declared feature public entry in an app
+          wrapper spec, or modules/api in the hook/transport spec that owns the request
       - id: case-3
         when: "Translation content"
         write: "useTranslations: () => (key: string) => key — a spec asserts keys, not copy"
@@ -260,5 +263,6 @@ openQuestions:
   - id: existing-units-single-spec-backlog
     kind: residual
     summary: |
-      FE-TEST-1 Case 7 binds a new unit. It is not a census of the tree: most existing units carry one
-      spec and not two, and no sweep of that backlog is legislated here.
+      FE-TEST-1 Case 7 binds connected blocks with two real sibling responsibilities. It is not a census
+      of the tree: one-part units legitimately carry one focused spec, and no second half is inferred from
+      a historical file count.
