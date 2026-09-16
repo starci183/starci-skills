@@ -87,6 +87,13 @@ omit `options`, but cannot become an actionable choice from its agenda, report t
 The canonical `question` and `options` bind the owner request together. A receipt selecting a topic
 such as "Whether notice is required" does not establish a yes/no policy. Preserve that receipt
 as history and return the unresolved policy to its owner; never reinterpret or rewrite the receipt.
+On workflow reconciliation, a historical authenticated receipt is withdrawn from active semantics only
+when its selected label and complete displayed option set match the canonical `requiredDecisions` agenda,
+or the canonical authority history binds that exact ask and receipt and explicitly says its question-form
+selection did not settle policy. The same receipt must have continued into an unfinished requester, and the
+open record must not name the label as an explicit outcome. The runtime snapshots the receipt, old question,
+operation identity and requester continuation, removes only their active dependency effect, and re-prepares
+from current canonical `options`. Ambiguous, unlinked or already accepted requester state fails closed.
 
 ## Customer journeys
 
