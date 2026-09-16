@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import {spawnSync} from 'node:child_process';
 import {parseRef,plain,slash,unique} from './common.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
 
@@ -103,16 +104,45 @@ function containedCanonicalFile(root,given){
   return {target:real,relative};
 }
 
+// A source directory is an input inventory, not a Work node. Bind every tracked regular file so the
+// candidate digests the actual code instead of silently selecting an index or accepting an opaque folder.
+function sourceDirectoryFiles(root,relative){
+  let cursor=path.resolve(root);
+  for(const segment of relative.split('/').filter(Boolean)){
+    const names=fs.readdirSync(cursor),matches=names.filter(name=>name.toLowerCase()===segment.toLowerCase()),
+      actual=names.includes(segment)?segment:matches.length===1&&fs.existsSync(path.join(cursor,segment))?matches[0]:segment;
+    cursor=path.join(cursor,actual);if(fs.lstatSync(cursor).isSymbolicLink())throw new Error(`candidate source directory traverses a symbolic link: ${relative}`);
+  }
+  // Git returns canonical tracked spelling even when Windows accepted a differently cased reference.
+  const canonical=path.relative(fs.realpathSync(root),fs.realpathSync(cursor));
+  if(outside(canonical))throw new Error(`candidate source directory escapes its accepted root: ${relative}`);
+  relative=clean(canonical);
+  const inventory=spawnSync('git',['--literal-pathspecs','-C',root,'ls-files','-z','--',`${relative.replace(/\/$/,'')}/`],
+    {encoding:'utf8',windowsHide:true,maxBuffer:4*1024*1024});
+  if(inventory.status!==0)throw new Error(`candidate source directory cannot be inventoried: ${relative}`);
+  const paths=unique(inventory.stdout.split('\0').filter(Boolean)).sort();
+  if(!paths.length||paths.length>10000)throw new Error(`candidate source directory requires 1..10000 tracked files: ${relative}`);
+  return paths.map(file=>{
+    if(!file.startsWith(`${relative.replace(/\/$/,'')}/`)||/(^|\/)(?:\.git|node_modules)(?:\/|$)/.test(file))
+      throw new Error(`candidate source directory contains an unsupported input: ${file}`);
+    return containedCanonicalFile(root,file);
+  });
+}
+
 /** Resolve node ids and Work-/repository-/absolute references only through the accepted routing roots. */
 export function resolveCandidateReferences(op,state,ctx){
   const roots=candidateAcceptedRoots(state,ctx.work),source=roots[0],workBinding=roots.find(root=>root.id==='work')??source;
   const runtimeBinding=roots.find(root=>root.id==='runtime');
   const workRoot=path.resolve(ctx.work?.ledger?.workRoot??path.join(source.repoRoot,'.starciwork'));
   const nodes=ctx.work?.loaded?.nodes,list=ctx.work?.loaded?.list??[];
-  return (op.references??[]).map(value=>{
+  return (op.references??[]).flatMap(value=>{
     const parsed=parseRef(value),literal=slash(parsed.ref),{key,fragment}=fragmentOf(literal);let routed=null,target=null;
     const node=nodes?.get?.(key)??list.find(item=>item.id===key||item.path===key);
-    if(node?.path){target=path.join(workRoot,node.path);routed={root:workBinding,relative:rootRelative(workBinding.repoRoot,target)};}
+    if(key==='.claude'){
+      if(!runtimeBinding||!verifyRuntimePin(state.engine?.runtimePin).ok)throw new Error('candidate runtime reference .claude requires the verified workflow runtime pin');
+      target=path.join(runtimeBinding.repoRoot,'SKILL.md');routed={root:runtimeBinding,relative:'SKILL.md'};
+    }
+    else if(node?.path){target=path.join(workRoot,node.path);routed={root:workBinding,relative:rootRelative(workBinding.repoRoot,target)};}
     else if(absolute(key)){
       target=path.resolve(key);
       try{routed=routePath(target,roots);}
@@ -133,9 +163,13 @@ export function resolveCandidateReferences(op,state,ctx){
       else {const sourceDirect=path.join(source.repoRoot,normalized);if(fs.existsSync(sourceDirect)){target=sourceDirect;routed={root:source,relative:normalized};}}
     }
     if(!routed||routed.relative===null||!target)throw new Error(`candidate reference is not resolved by the loaded Work tree or repository: ${key}`);
-    let checked;try{checked=containedCanonicalFile(routed.root.repoRoot,routed.relative);}catch(error){throw new Error(`candidate reference is not a readable, contained routed file: ${literal} (${error.message})`);}
-    return {kind:parsed.kind,ref:`${checked.relative}${fragment}`,sourceRef:literal,rootId:routed.root.id,rootRole:routed.root.role,
-      path:checked.relative,fragment:fragment?fragment.slice(1):null};
+    let checked;try{
+      const stat=fs.lstatSync(target),isSourceDirectory=routed.root.id==='source'&&rootRelative(workRoot,target)===null&&stat.isDirectory();
+      if(isSourceDirectory&&fragment)throw new Error('a source directory reference cannot select a file fragment');
+      checked=isSourceDirectory?sourceDirectoryFiles(routed.root.repoRoot,routed.relative):[containedCanonicalFile(routed.root.repoRoot,routed.relative)];
+    }catch(error){throw new Error(`candidate reference is not a readable, contained routed file: ${literal} (${error.message})`);}
+    return checked.map(file=>({kind:parsed.kind,ref:`${file.relative}${fragment}`,sourceRef:literal,rootId:routed.root.id,rootRole:routed.root.role,
+      path:file.relative,fragment:fragment?fragment.slice(1):null}));
   });
 }
 
