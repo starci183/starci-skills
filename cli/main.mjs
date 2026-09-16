@@ -38,6 +38,7 @@ Usage:
   starci storage <backend-root>
   starci source-layout <backend-root> <frontend-root>
   starci architecture check <repo-root> [--config <repository-relative.json>]
+  starci code-patterns check --profile <nest|next> --root <repo-root> --all [--architecture-config <file>]
   starci check-stales --work <work-root> --repo <id>=<git-root> [--repo ...] [--target <node-id> ...]
   starci stacks check <repo-root> --environment dev|vps --deployment-model <rendered.yaml-or-json>
   starci validate <work-root>
@@ -178,6 +179,11 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
   try {
     const [command, ...args] = argv;
     if (!command || ['--help', '-h', 'help'].includes(command)) { emit(help); return 0; }
+    if(command==='code-patterns'){
+      if(args[0]!=='check')throw Error('Use starci code-patterns check --profile <nest|next> --root <repo-root> --all [--architecture-config <file>].');
+      const {scopedLintMain}=await import('../scripts/check-scoped-lint.mjs');
+      return (await scopedLintMain(args.slice(1),{write:value=>io.out(value)})).exitCode;
+    }
     if(command==='check-stales'){
       const {checkStalesMain}=await import('../scripts/check-stales.mjs');
       const result=checkStalesMain(args);emit(result.report.help??result.report);return result.exitCode;

@@ -1178,7 +1178,7 @@ executionModes:
         purpose:
           en: Identify exact repositories, projects, Work root and optional stack profiles. Select only required checks; do not infer deployment or repair authority.
       - id: policy
-        path: knowledge/coding-reference.json + docs/architecture-check.md + docs/application-stacks.md
+        path: knowledge/coding-reference.json + docs/code-pattern-enforcement.md + model/code-patterns.json + docs/architecture-check.md + docs/application-stacks.md
         purpose:
           en: Read the applicable FE/BE responsibility boundaries and static-check limits for mono or separate repositories, accepted Work ownership and selected Docker/native stack declarations.
       - id: inputs
@@ -1195,7 +1195,7 @@ executionModes:
       - reads: [request, policy, inputs]
         writes: [evidence]
         action:
-          en: Execute starci architecture check for every selected FE/BE source project, starci validate for selected canonical Work, and starci stacks check for selected materialized stack profiles. Inspect each selected repository's real package scripts and run its required non-mutating lint/typecheck commands; a script that auto-fixes source is not a checking command. Use documented explicit layout configuration when inference is insufficient. Capture each original report and exit code. Do not run fix flags, hide files, lower rules or replace machine output with prose. An unavailable required checker or unresolved target fails the gate. Route measured findings to separately authorized owners; static pass never proves runtime dependency injection, live startup, browser UAT or business correctness.
+          en: Execute starci code-patterns check --profile nest or next --root ROOT --all for every selected FE/BE source repository with the actual project bindings. This aggregate runs required architecture and adopted code-pattern machines with exact rule/file coverage; a repository's package lint cannot substitute for it. Execute starci validate for selected canonical Work and starci stacks check for selected materialized stack profiles. Inspect each repository's real package scripts and run its additional required non-mutating lint/typecheck commands; a script that auto-fixes source is not a checking command. Use --architecture-config with the documented explicit layout configuration when inference is insufficient. Capture each original report and exit code. Do not run fix flags, hide files, lower rules or replace machine output with prose. An unavailable required checker or unresolved target fails the gate. Route measured findings to separately authorized owners; static pass never proves runtime dependency injection, live startup, browser UAT or business correctness.
     proofs:
       - id: executed-checks
         requirement:
