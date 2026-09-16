@@ -655,3 +655,97 @@ test('cross-workflow adaptive selection compare-and-reserves projected service b
   assert.notEqual(profile.runtimes[a.runtime].provider,profile.runtimes[b.runtime].provider,'the second selector sees the first projected reservation, not identical stale headroom');
   const live=shared.read().runtimes;assert.equal(Object.values(live).flatMap(entry=>entry.live??[]).filter(item=>item.phase==='reserved').length,2);
 });
+
+test('the granted slots are the target share: the deficit pick fills the starved weight before the owner order',()=>{
+  // beta is first in the owner order, so preference alone would open with beta. alpha holds 4 shares against
+  // beta's 1: the largest targetShare - inFlight deficit is alpha's until the weights are filled.
+  const runtimes={maxParallelOps:10,allocation:{policy:PREFER_THEN_OVERFLOW},roleOfKind:{'x.implement':'implement'},
+    runtimes:{alpha:{target:'alpha',roles:['implement'],maxParallel:8},beta:{target:'beta',roles:['implement'],maxParallel:8}}};
+  const quota=parseQuota('beta=1,alpha=4');
+  assert.deepEqual(quota.targets,{beta:1,alpha:4},'parseQuota carries the granted slots as target shares');
+  const hand={order:['beta','alpha'],slots:{beta:1,alpha:4}};
+  const applied=applyQuota(runtimes,hand);
+  assert.deepEqual(hand.targets,{beta:1,alpha:4},'applyQuota records quota.targets[runtime] = slots');
+  assert.deepEqual(applied.allocation.targets,{beta:1,alpha:4},'and mirrors the weights into the applied profile');
+  const allocator=createAllocator({runtimes,quota,now:()=>0});
+  const first=allocator.allocate('x.implement');
+  assert.equal(first.runtime,'alpha');
+  assert.equal(first.targetShare,4);assert.equal(first.effectiveShare,4);assert.equal(first.deficit,4);
+  assert.deepEqual(allocator.review('x.implement').targets,{beta:1,alpha:4});
+  const picked=[1,2,3].map(()=>allocator.allocate('x.implement').runtime);
+  assert.deepEqual(picked,['alpha','alpha','beta'],'at a 1:1 tie of remaining deficit the owner order decides');
+  assert.equal(allocator.allocate('x.implement').runtime,'alpha');
+});
+
+test('a downweighted runtime frees its share proportionally to the remaining targets, never wholly to the largest deficit',()=>{
+  const at=Date.UTC(2026,8,16,9);
+  const runtimes={maxParallelOps:10,allocation:{policy:LEAST_LOADED},roleOfKind:{'x.implement':'implement'},runtimes:{
+    fat:{target:'fat',provider:'fatprov',roles:['implement'],maxParallel:8},
+    mid:{target:'mid',provider:'midprov',roles:['implement'],maxParallel:8},
+    thin:{target:'thin',provider:'thinprov',roles:['implement'],maxParallel:8}}};
+  // fat's probed week is half spent: capacityFactor 0.5 frees 3 of its 6-share. mid and thin are unread windows,
+  // trusted at full factor, and split the freed share 3:1 - the rebalance never dumps it all on mid.
+  const budget={schema:'starci/runtime-budget@1',at,providers:{fatprov:{status:'ok',windows:{weekly:{usedPercent:50,resetsAt:at+86_400_000,minutes:10080}}}}};
+  const allocator=createAllocator({runtimes,quota:parseQuota('fat=6,mid=3,thin=1'),now:()=>at,budget});
+  const share=(list,id)=>list.find(item=>item.runtime===id);
+  const reviewed=allocator.review('x.implement');
+  assert.equal(share(reviewed.ready,'fat').capacityFactor,0.5);
+  assert.equal(share(reviewed.ready,'fat').effectiveShare,3);
+  assert.equal(share(reviewed.ready,'mid').effectiveShare,5.25);
+  assert.equal(share(reviewed.ready,'thin').effectiveShare,1.75);
+  const picked=[1,2,3].map(()=>allocator.allocate('x.implement').runtime);
+  assert.deepEqual(picked,['mid','mid','mid']);
+  // mid's granted slots (3) are full now, so the freed share re-deals over the remaining receivers: thin alone
+  // absorbs fat's 3 and outranks it for one op, then fat drains alone at its halved share.
+  const filled=allocator.review('x.implement');
+  assert.equal(share(filled.ready,'thin').effectiveShare,4);
+  assert.equal(allocator.allocate('x.implement').runtime,'thin');
+  assert.deepEqual([1,2,3].map(()=>allocator.allocate('x.implement').runtime),['fat','fat','fat']);
+});
+
+test('a launch accepted then silent is a stalled soft-fail: it parks like other, dents launch success, then releases',()=>{
+  const time=clock(Date.UTC(2026,8,16,9));
+  const runtimes=fixture({
+    devin:{target:'devin',provider:'devin',roles:['implement'],maxParallel:0,capacityAuthority:'explicit-workflow-quota',quotaTelemetry:'launch-status'},
+    sol:{target:'sol',provider:'codex',roles:['implement'],maxParallel:2}});
+  assert.equal(classifyFailure('accepted but no progress within the readiness timeout'),'stalled');
+  assert.equal(classifyFailure('stalled'),'stalled');
+  const allocator=createAllocator({runtimes,quota:parseQuota('devin=2,sol=1'),now:time.now});
+  const first=allocator.allocate('x.implement',{job:{opId:'op-1'}});
+  assert.equal(first.runtime,'devin');
+  assert.equal(first.capacityFactor,1,'no launch observed yet: full factor');
+  allocator.launched('devin',{op:'op-1'});
+  const parked=allocator.failed('devin',{reason:'stalled: accepted but no progress within the readiness timeout',op:'op-1'});
+  assert.equal(parked.kind,'stalled');
+  assert.equal(parked.cooldownMs,DEFAULT_COOLDOWN_MS.other,'a stalled soft-fail cools down like other');
+  assert.equal(parked.shared,false,'a stalled launch is this kernel\'s observation, never a provider limit');
+  const next=allocator.allocate('x.implement');
+  assert.equal(next.runtime,'sol');
+  assert.match(next.blocked.find(item=>item.runtime==='devin').reason,/cooling after stalled until 2026-09-16T09:05:00\.000Z/);
+  time.advance(300001);
+  const reviewed=allocator.review('x.implement');
+  assert.equal(reviewed.ready.find(item=>item.runtime==='devin').capacityFactor,0.5,'one failed launch of one observation');
+  // devin's effective share is 2 x 0.5 = 1 against sol's 1 - 1 in flight: the starved share wins the next op.
+  const back=allocator.allocate('x.implement');
+  assert.equal(back.runtime,'devin');
+  assert.equal(back.effectiveShare,1);
+});
+
+test('a pool may pin a model per role: allocate exposes it and the role gate stays exact',()=>{
+  const runtimes={maxParallelOps:10,allocation:{policy:LEAST_LOADED},
+    roleOfKind:{'x.implement':'implement','x.verify':'verify','x.write':'write'},runtimes:{
+      multi:{target:'multi',roles:['implement','verify'],maxParallel:2,models:{implement:'swe-2-max',verify:'claude-fable-5-1'}},
+      plain:{target:'plain',roles:['implement','verify','write'],maxParallel:2},
+      writer:{target:'writer',roles:['write'],maxParallel:1,models:{default:'writer-9'}}}};
+  const seen=[];const allocator=createAllocator({runtimes,now:()=>0,eligibility:(job,runtime)=>{seen.push([job.kind,runtime.model]);return {eligible:true,reasons:[]};}});
+  const implement=allocator.allocate('x.implement');
+  assert.equal(implement.runtime,'multi');
+  assert.equal(implement.model,'swe-2-max','the implement role resolves its pinned model');
+  assert.equal(allocator.review('x.verify').ready.find(item=>item.runtime==='multi').model,'claude-fable-5-1');
+  const write=allocator.allocate('x.write');
+  assert.equal(write.runtime,'plain');
+  assert.equal(write.model,'plain','a pool without a models map falls back to its own name');
+  assert.equal(allocator.review('x.write').ready.find(item=>item.runtime==='writer').model,'writer-9','models.default covers every role of the pool');
+  assert.equal(write.blocked.find(item=>item.runtime==='multi').reason,'no write role','a models map never widens the role gate');
+  assert.ok(seen.some(([kind,model])=>kind==='x.implement'&&model==='swe-2-max'),'eligibility sees the resolved model');
+});

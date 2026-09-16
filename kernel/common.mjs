@@ -197,7 +197,9 @@ export function parseQuota(value){
     for(const role of roleNames)need(['implement','verify','decide','plan','write'].includes(role),`--allocation roles are implement|verify|decide|plan|write: ${entry}`);
     if(roleNames.length)roles[runtime]=roleNames;
   }
-  return {order,slots,tags,roles,total:Object.values(slots).reduce((a,b)=>a+b,0)};
+  // The granted slot count is also the owner's target share (goal §4): `targets` carries the weights the
+  // allocator's deficit pick balances in-flight operations against.
+  return {order,slots,tags,roles,targets:{...slots},total:Object.values(slots).reduce((a,b)=>a+b,0)};
 }
 
 /**
