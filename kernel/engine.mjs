@@ -136,6 +136,21 @@ export function prepareGenerationRetry({journalFile,workflowId,generation,now=Da
 const modelRole=name=>['critiqueGoal','validateOp','classifyScreen'].includes(name)?'verify':['assessGoal','planOp','presentOwnerQuestion'].includes(name)?'plan':'decide';
 const configuredModelRole=name=>['assessGoal','planOp','presentOwnerQuestion'].includes(name)?'planner':['critiqueGoal','validateOp','classifyScreen'].includes(name)?'validator':'kernelManager';
 const machineResource=key=>({key:`machine:${key}`,units:1});
+/** Preserve pre-cooldown-fix durable identities; never relaunch a job just to normalize routing metadata. */
+function legacyModelReplay({journal,state,name,base,bound}){
+  const kind=name==='validateOp'?'judge':'model',role=modelRole(name),matches=[];
+  for(const job of journal.listJobs()){
+    if(job.workflow_id!==bound.workflowId||job.op_id!==bound.opId||job.attempt!==bound.attempt||job.generation!==bound.generation
+      ||job.kind!==kind||job.role!==role||job.status==='queued'||job.payload?.functionName!==name||!Array.isArray(job.payload?.args?.skip))continue;
+    const legacyBase={...base,skip:job.payload.args.skip},key=inputDigest({name,args:legacyBase,...bound}),saved=state.engine.modelSelections?.[key];
+    if(!saved)continue;
+    const input={handler:'model-function',functionName:name,args:{...legacyBase,providers:[saved.provider]},admission:{runtime:saved.runtime,mode:saved.mode}};
+    if(inputDigest(input)!==inputDigest(job.payload)||bridgeJobId({...bound,kind,input})!==job.job_id)continue;
+    matches.push({saved,selected:{args:input.args,runtime:{id:saved.runtime},decision:{mode:saved.mode},job:{kind,role}}});
+  }
+  if(matches.length>1)throw Error(`Multiple legacy durable ${name} jobs match this semantic call; reconcile their exact custody before continuing`);
+  return matches[0]??null;
+}
 function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadRuntimes(),identity={},budget=null,now=Date.now,providerAdmission={},cooling=[]){
   if(typeof eligibility!=='function')throw Error(`Model eligibility is required for ${name}`);
   const at=now(),role=modelRole(name),requested=Array.isArray(args?.providers)?args.providers:Object.keys(runtimes.runtimes??{});
@@ -157,8 +172,8 @@ function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadR
   else available.sort((a,b)=>b.budget.remaining-a.budget.remaining||a.index-b.index);
   const providers=available.slice(0,1).map(item=>item.id);
   if(!providers.length){const quotaReady=eligible.filter(item=>item.budget.known&&!item.budget.exhausted),cooldownBlocked=quotaReady.length>0&&quotaReady.every(item=>parked.has(item.id)),capacityBlocked=quotaReady.length>0&&quotaReady.every(item=>{const view=admitted(item.runtime.provider);return view&&view.used>=view.capacity;});
-    const error=Error(eligible.length?(cooldownBlocked?`Every eligible ${name} model with available quota is cooling`:capacityBlocked?`No eligible ${name} model has provider admission capacity`:`No eligible ${name} model has known available provider quota`):`No evaluated model is eligible for ${name}`);
-    if(eligible.length){error.code='STARCI_MODEL_QUOTA_WAIT';error.waitKind=cooldownBlocked?'provider-cooldown':capacityBlocked?'provider-capacity':'provider-quota';error.reasons=eligible.map(item=>({runtime:item.id,known:item.budget.known,exhausted:item.budget.exhausted,until:item.budget.until,cooling:parked.has(item.id),
+    const error=Error(eligible.length?(cooldownBlocked?`Every eligible ${name} model with available quota is cooling`:capacityBlocked?`No eligible ${name} model has provider admission capacity`:quotaReady.length?`Eligible ${name} models are waiting for cooldown or provider admission capacity`:`No eligible ${name} model has known available provider quota`):`No evaluated model is eligible for ${name}`);
+    if(eligible.length){error.code='STARCI_MODEL_QUOTA_WAIT';error.waitKind=cooldownBlocked?'provider-cooldown':capacityBlocked?'provider-capacity':quotaReady.length?'provider-availability':'provider-quota';error.reasons=eligible.map(item=>({runtime:item.id,known:item.budget.known,exhausted:item.budget.exhausted,until:item.budget.until,cooling:parked.has(item.id),
       admitted:admitted(item.runtime.provider)?.used??null,capacity:admitted(item.runtime.provider)?.capacity??null}));}throw error;}
   const selected=available[0];return {args:{...modelInput(args),providers},runtime:selected.runtime,decision:selected.decision,job,
     considered:available.map(item=>({runtime:item.id,provider:item.runtime.provider,remaining:item.budget.remaining,active:admitted(item.runtime.provider)?.used??0,
@@ -223,6 +238,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
   const unwrap=result=>{if(result?.pending)deferJob(result);if(result?.status!=='succeeded')throw Error(result?.result?.reason??`Durable job ${result?.status}`);return result.result;};
   const requestModel=(name,args,op=null)=>{args=Array.isArray(args?.providers)?args:{...args,providers:nonOperationModels(configuredModelRole(name))};const bound=identity(op),base=modelInput(args),selectionKey=inputDigest({name,args:base,...bound});state.engine.modelSelections??={};let saved=state.engine.modelSelections[selectionKey],selected;
     if(saved){const replayArgs={...base,providers:[saved.provider]},kind=name==='validateOp'?'judge':'model',role=modelRole(name),input={handler:'model-function',functionName:name,args:replayArgs,admission:{runtime:saved.runtime,mode:saved.mode}},jobId=bridgeJobId({...bound,kind,input}),existing=journal.getJob(jobId);if(existing&&existing.status!=='queued')selected={args:replayArgs,runtime:{id:saved.runtime},decision:{mode:saved.mode},job:{kind,role}};}
+    if(!selected){const legacy=legacyModelReplay({journal,state,name,base,bound});if(legacy){saved=legacy.saved;selected=legacy.selected;}}
     if(!selected){const budget=typeof modelBudget==='function'?modelBudget():modelBudget??readRuntimeBudget(path.dirname(store.dir));
       const providerAdmission=providerAdmissionView().providers;
       const cooling=[...Object.entries(state.allocation?.cooling??{}),...Object.entries(readLoads({path:loadsFileFor(store.dir),workflow:state.id,now}).cooling)]

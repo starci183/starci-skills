@@ -134,6 +134,10 @@ list is also filtered at selection time. If every feasible peer is cooling,
 the call waits without launching a model job and is reconsidered after expiry.
 Cooldown observations are not part of a semantic job's identity: an already
 launched or completed job replays its durable result even when that list changes.
+For jobs created by older builds that included the skip list in their identity,
+the engine replays the original stored input only after matching the saved
+selection, semantic input and exact workflow/operation/attempt/generation. More
+than one matching legacy job requires custody reconciliation rather than a new launch.
 
 ## One ledger per repository
 

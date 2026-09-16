@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {createJobBridge} from '../kernel/job-bridge.mjs';
+import {createJobBridge,inputDigest} from '../kernel/job-bridge.mjs';
 import {createJobs} from '../kernel/jobs.mjs';
 import {createEngineRuntime,settleGenerationLeases,settleNeverStartedModelJobs,unsettledGenerationJobs,prepareGenerationRetry} from '../kernel/engine.mjs';
 import {attestModelResult} from '../kernel/job-attestation.mjs';
@@ -37,6 +37,43 @@ test('an in-process allocator cooldown routes a new model job to its healthy pee
   const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true}),modelCooling:()=>[{runtime:'gpt-5.6-sol',until:Date.now()+60_000}]});
   assert.throws(()=>runtime.model('decide',{providers:['gpt-5.6-sol','claude-opus'],situation:'next',options:['a']},{id:'next',attempt:1}),error=>error.code==='STARCI_JOB_PENDING');
   assert.deepEqual(runtime.journal.listJobs()[0].payload.args.providers,['claude-opus']);bridge.close();
+});
+
+test('upgrade replays the exact legacy skip-bearing validator job after routing observations change',t=>{
+  for(const status of ['running','succeeded','effect_unknown']){
+    const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),bound={workflowId:'wf',opId:'legacy',attempt:1,generation:2};
+    const args={providers:['gpt-6-astra','claude-fable-5.1'],skip:['claude-fable-5.1'],diff:{files:['a.js']}},saved={provider:'gpt-6-astra',runtime:'gpt-6-astra',mode:'qualified'};
+    f.state.engine.modelSelections={[inputDigest({name:'validateOp',args,...bound})]:saved};
+    const input={handler:'model-function',functionName:'validateOp',args:{...args,providers:[saved.provider]},admission:{runtime:saved.runtime,mode:saved.mode}},old=bridge.request({...bound,kind:'judge',role:'verify',input});
+    bridge.journal.db.prepare('UPDATE jobs SET status=? WHERE job_id=?').run(status==='succeeded'?'running':status,old.identity.jobId);
+    const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:false,reasons:['new admission is unavailable']})});
+    if(status==='succeeded')assert.equal(runtime.jobs.complete({...old.identity,leaseToken:bridge.journal.getJob(old.identity.jobId).lease_token,status:'succeeded',result:{ok:true,verdict:'accept'}}).ok,true);
+    const replay=()=>runtime.model('validateOp',{...args,skip:['gpt-6-astra']},{id:'legacy',attempt:1});
+    if(status==='succeeded')assert.deepEqual(replay(),{ok:true,verdict:'accept'});
+    else assert.throws(replay,error=>error.code==='STARCI_JOB_PENDING'&&error.job.identity.jobId===old.identity.jobId);
+    assert.equal(runtime.journal.listJobs().length,1,'an upgrade cannot launch or reserve a second legacy review');
+    assert.throws(()=>runtime.model('validateOp',{...args,diff:{files:['other.js']}},{id:'legacy',attempt:1}),/No evaluated model is eligible/,'different semantic input cannot consume legacy evidence');
+    assert.throws(()=>runtime.model('validateOp',args,{id:'foreign',attempt:1}),/No evaluated model is eligible/,'another operation cannot consume the legacy job');bridge.close();
+  }
+});
+
+test('mixed model cooldown and capacity blocks report availability rather than exhausted quota',t=>{
+  const f=fixture(t),profile=loadRuntimes();for(const item of Object.values(profile.runtimes))if(item.provider==='claude')item.maxParallel=1;
+  const bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),runtime=createEngineRuntime({...f,bridge,runtimeProfile:profile,eligibility:()=>({eligible:true}),modelCooling:()=>[{runtime:'gpt-5.6-sol',until:Date.now()+60_000}]});
+  assert.throws(()=>runtime.model('decide',{providers:['claude-opus'],situation:'occupy',options:['a']},{id:'busy',attempt:1}),error=>error.code==='STARCI_JOB_PENDING');
+  assert.throws(()=>runtime.model('decide',{providers:['gpt-5.6-sol','claude-opus'],situation:'wait',options:['a']},{id:'wait',attempt:1}),error=>error.code==='STARCI_MODEL_QUOTA_WAIT'&&error.waitKind==='provider-availability'&&error.reasons.every(item=>item.known&&!item.exhausted));
+  assert.equal(runtime.journal.listJobs().length,1);bridge.close();
+});
+
+test('ambiguous legacy validator jobs retain custody and cannot silently choose a completion',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),bound={workflowId:'wf',opId:'legacy',attempt:1,generation:2},base={providers:['gpt-6-astra','claude-fable-5.1'],diff:{files:['a.js']}},saved={provider:'gpt-6-astra',runtime:'gpt-6-astra',mode:'qualified'};f.state.engine.modelSelections={};
+  for(const skip of [[],['claude-fable-5.1']]){
+    const args={...base,skip};f.state.engine.modelSelections[inputDigest({name:'validateOp',args,...bound})]=saved;
+    bridge.request({...bound,kind:'judge',role:'verify',input:{handler:'model-function',functionName:'validateOp',args:{...args,providers:[saved.provider]},admission:{runtime:saved.runtime,mode:saved.mode}}});
+  }
+  const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})}),leases=runtime.journal.db.prepare('SELECT count(*) AS n FROM leases').get().n;
+  assert.throws(()=>runtime.model('validateOp',{...base,skip:['gpt-6-astra']},{id:'legacy',attempt:1}),/Multiple legacy durable validateOp jobs/);
+  assert.equal(runtime.journal.listJobs().length,2);assert.equal(runtime.journal.db.prepare('SELECT count(*) AS n FROM leases').get().n,leases);bridge.close();
 });
 
 test('prelaunch persistence failure retains one resumable reservation while launch intent remains effect-unknown',t=>{
