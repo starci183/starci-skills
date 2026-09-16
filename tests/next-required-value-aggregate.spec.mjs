@@ -76,7 +76,7 @@ test('default Next dispatcher proves required values while sourceOnly excludes b
   const f=fixture(t),report=await f.check();
   assert.equal(report.status,'clean',JSON.stringify(report.issues));
   assert.ok(report.coverage.expectedFiles.includes('jest.config.ts'));
-  assert.ok(report.inputs.before.files.some(item=>item.path==='jest.config.ts'));
+  assert.ok(report.inputs.before.files.includes('jest.config.ts'));
   assert.ok(!report.coverage.lintedFiles.includes('jest.config.ts'));
   for(const id of ['REQUIRED','ENVELOPE']){
     const selected=report.obligations.find(item=>item.id===id).files;
