@@ -71,8 +71,10 @@ import {KERNEL_PLANNED_KINDS,LANE_LAYOUTS,advanceLanes,authorRecordOp,commitLedg
   CUT_OWNED,quarantineStrays,recordBlocks,recordDone,recordPath,repairKernelRecords,repairTarget,retemplateLanes,settleCut,
   sweepTreeStrays,syncLedgerOps} from './sync.mjs';
 import {intakeOp,retemplateIntakeOps,scopeNames,settleIntake} from './intake.mjs';
-import {CRITIQUE_HEADING,approve,critiqueGoalPhase,critiqueLines,critiqueRuntimes,decidedRecords,fallbackGoalMarkdown,
-  goalPhase,laneHeaderLines,noteCritiqueInGoal,noteLaneInGoal,planCritiquePrerequisites,planGoalPhase,proposeQuota,stageExternalInputs,
+import {CRITIQUE_HEADING,GOAL_SPIN_LIMIT,adoptReportRev,approve,critiqueGoalPhase,critiqueLines,critiqueRuntimes,decidedRecords,
+  deriveGoalMetrics,evaluateGoalMetrics,fallbackGoalMarkdown,goalMetricsOf,goalPhase,goalRevOf,laneHeaderLines,metricsBindingOp,
+  normalizeDoneMetrics,noteCritiqueInGoal,noteGoalMetrics,noteLaneInGoal,opInputDigests,planCritiquePrerequisites,planGoalPhase,
+  propagateInvalidation,proposeQuota,reopenStaleOp,reviseGoal,stageExternalInputs,validateGoalRevision,
   recordStatements,validateWorkTree,workGoalMarkdown,workGoalPhase} from './goal.mjs';
 
 /**
@@ -115,7 +117,9 @@ export {LANE_LAYOUTS,KERNEL_PLANNED_KINDS,nodeLayout,laneOf,lanePredicates,desig
   kernelOwnedPaths,protectedFingerprint} from './sync.mjs';
 export {CUT_ASSERTIONS,CUT_COMPONENTS,CUT_FILES,FAN_OUT,childOwning,cutGroup,cutOp,cutParentOf,cutReason,fanOutDeferral,
   groupIncomplete,groupVerifyKind,repairTarget,sdsComponents,settleCut} from './sync.mjs';
-export {CRITIQUE_HEADING,approve,critiqueGoalPhase,critiqueLines,critiqueRuntimes,decidedRecords,goalPhase,
+export {CRITIQUE_HEADING,GOAL_SPIN_LIMIT,adoptReportRev,approve,critiqueGoalPhase,critiqueLines,critiqueRuntimes,decidedRecords,
+  deriveGoalMetrics,evaluateGoalMetrics,goalMetricsOf,goalPhase,goalRevOf,metricsBindingOp,normalizeDoneMetrics,noteGoalMetrics,
+  opInputDigests,propagateInvalidation,reopenStaleOp,reviseGoal,validateGoalRevision,
   laneHeaderLines,planGoalPhase,proposeQuota,recordStatements,stageExternalInputs,validateWorkTree,workGoalPhase} from './goal.mjs';
 export {ioBlock,ioPayload,kindsReadingBrand,intakeKindFor,decisionKindFor,recordKindOfPath,undeclaredWrites,writesWorkRecords} from './io.mjs';
 /**
@@ -146,6 +150,9 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
     // one the kernel routes to itself, and null here means this workflow may not change the grammar.
     ledgerRoles:null,
     run:null,from:null,workflowTask:null,phase:'goal',approved:false,
+    // The goal carries a revision (`goalRev`) and a checkable `done` contract (`doneMetrics`, null = derive
+    // from the ledger and gates); every derivation names the rev it was made under.
+    goalRev:1,doneMetrics:null,goalRevisions:[],metricSpin:null,goalStatus:null,
     definitionOfDone:[],amendments:[],risks:[],questions:[],ledger:[],ops:[],needUser:[],gateResults:[],verifyRounds:{},gateRounds:0,
     // Decisions the runtime took on its own recommendation so the work could continue. They are NOT `needUser`:
     // the workflow may finish `done` over them, and the owner's different answer is what reopens what rests on one.
@@ -728,6 +735,10 @@ function launchOp(orca,store,state,op,allocated,ctx){
   }
   // A reconciliation is judged against what the tree held BEFORE the intake ran: the digests are taken here.
   if(op.intake?.scope&&ctx.work?.loaded)op.intakeDigests=(()=>{try{return recordDigests(ctx.work.loaded);}catch{return null;}})();
+  // The dispatch binds the goal rev it was made under and the digests of every input it reads: a report that
+  // lands after the goal moved is adopted only while these still read the same, and a stale-marked op that
+  // launches re-derives under the current rev.
+  op.goalRev=goalRevOf(state);op.inputDigests=opInputDigests(state,op,ctx);delete op.goalStale;delete op.inputsHeld;
   op.kernelOwned=kernelOwnedPaths(state,op,ctx);
   const contract=renderContract({template:ctx.template,op,state,store,guards:ctx.guards,protectedPaths:op.kernelOwned});
   fs.writeFileSync(store.contractPath(op.id),contract);
@@ -2268,7 +2279,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
   }
   const checked=validateReport(report,{allowlist:reportAllowlist(op,ctx)});
   op.reports.push({attempt:op.attempt,runtime:op.runtime,outcome:report.outcome,summary:report.summary,
-    files:report.files,open:report.open,checks:report.checks,blocker:report.blocker,question:report.question,
+    files:report.files,open:report.open,checks:report.checks,blocker:report.blocker,question:report.question,goalRev:op.goalRev??goalRevOf(state),
     ...(checked.ok&&report.credentialRequest?{credentialRequest:report.credentialRequest}:{}),valid:checked.ok});
   if(ctx.engine&&typeof store.acknowledgeRuntimeFile==='function'){
     const reportDispatch=[op.dispatch,report.dispatch].find(item=>typeof item==='string'&&item.length>0&&!/[\\/]/.test(item))??null;
@@ -2281,6 +2292,10 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     return retryOp(store,state,op,checked.errors.map(error=>`your previous report was rejected: ${error}`),ctx,'report-rejected');
   }
   store.appendEvent({event:'report',op:op.id,outcome:report.outcome,runtime:op.runtime,attempt:op.attempt});
+  // A report from an attempt dispatched under an older goal rev counts only while every input it was
+  // derived from still reads the same: identical digests adopt it into the current rev, changed inputs
+  // make it stale - it never counts toward the current metrics - and work still owed reopens.
+  if(adoptReportRev(store,state,op,ctx).stale)return reopenStaleOp(store,state,op,ctx);
   if(ctx.engine&&authorsRecord(op.kind)&&typeof op.recordBlocks==='string'){
     const current=recordBlocks(ctx,op.nodeId),before=(()=>{try{return JSON.parse(op.recordBlocks);}catch{return null;}})(),after=(()=>{try{return JSON.parse(current);}catch{return null;}})();
     const owned=plain(op.cut)?CUT_OWNED:RECORD_OWNED,keys={state:'state',completion:'completion','extensions.work3.kernel':'kernel'};
@@ -2548,6 +2563,8 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       ctx.guards.gitQueue(()=>commitLedgerWrite(store,state,op,ctx));
     }
     markLedger(state,op,op.head);
+    // An accepted op at the current rev re-proves the items it serves: their stale marks go with the rev that made them.
+    for(const id of op.ledgerIds??[]){const item=ledgerItem(state,id);if(item)delete item.goalStale;}
     store.appendEvent({event:'op-done',op:op.id,node:op.nodeId,runtime:op.runtime,head:op.head,files,
       checks:verified.checks.map(check=>`${check.name}=${check.exitCode}`),committed:commit.committed});
     if(ctx.orca)closeOpTerminal(ctx.orca,store,state,op);
@@ -3013,6 +3030,8 @@ function finish(store,state,outcome,reason=null,ctx=null){
     ledgerMode:state.ledgerMode,scope:state.scope,ledgerSummary:refreshLedgerSummary(state,ctx),decisions:state.decisions,brand:state.brand??null,
     ledgerRoot:state.ledgerRoot?slash(state.ledgerRoot):null,ledgerShared:Boolean(state.ledgerShared),ledgerOwner:state.ledgerOwner??null,
     definitionOfDone:state.definitionOfDone,amendments:state.amendments??[],
+    // The evidence the outcome was judged against: the rev the goal stood at and every metric's verdict.
+    goalRev:goalRevOf(state),goalMetrics:evaluateGoalMetrics(state).metrics,
     ledger:state.ledger.map(item=>({...item})),
     acceptedAsPreexisting:state.ledger.filter(item=>item.status==='preexisting').map(item=>item.id),
     gates:state.gateResults.map(result=>({name:result.name,command:result.command,status:result.status,exitCode:result.exitCode})),
@@ -3811,6 +3830,14 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   // never reinstated by --allow-dynamic, and its needUser item goes with it.
   state.dynamicOps=state.ops.filter(item=>countsAgainstBudget(item)).length;
   for(const op of state.ops)if(!countsAgainstBudget(op)&&op.refusal==='dynamic-op'){op.refusal='superseded';state.needUser=state.needUser.filter(item=>item.op!==op.id||item.kind!=='dynamic-op');}
+  // A state written before goals were versioned resumes at rev 1: every derivation it holds was made under
+  // that rev, and a state saved mid-revision already carries its own.
+  state.goalRev=goalRevOf(state);
+  state.doneMetrics=normalizeDoneMetrics(state.doneMetrics);
+  state.goalRevisions=Array.isArray(state.goalRevisions)?state.goalRevisions:[];
+  state.metricSpin=plain(state.metricSpin)?state.metricSpin:{signature:null,reportsAtChange:0,stalled:false};
+  for(const op of state.ops){op.goalRev??=state.goalRev;if(plain(op.question))op.question.goalRev??=op.goalRev;for(const report of op.reports??[])report.goalRev??=op.goalRev;}
+  for(const decision of state.decisions??[])decision.goalRev??=state.goalRev;
   // A shared op an older rule opened on behalf of a record-authoring op (an intake asking for the code that reads a
   // variable) is withdrawn: a record author never delegates a code change, and its requester runs again with the rule.
   for(const shared of state.ops.filter(item=>item.origin==='shared'&&authorsRecord(item.kind)&&['pending','ready','running','paused'].includes(item.status))){
@@ -4047,6 +4074,9 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     state.iterations+=1;
     store.appendEvent({event:'tick',iteration:state.iterations,
       ops:state.ops.map(op=>`${op.id}=${op.status}`),ledger:state.ledger.map(item=>`${item.id}=${item.status}`)});
+    // Every tick reads the goal's `done` metrics against the state as it now is: the answer drives the finish
+    // boundary, and enough settled dispatches that changed none of them surfaces a classified stall.
+    noteGoalMetrics(store,state);
     answerQuestions(orca,store,state,ctx);
     refuseForeignShared(store,state,{...ctx,orca});
     readmitCooled(store,state,ctx);
@@ -4136,6 +4166,31 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     try{ctx.currentOp=null;gate=runGates(store,state,ctx);}
     catch(error){if(!isJobPending(error))throw error;store.saveState(state);wait(Math.min(pollMs,1000));continue;}
     if(gate.ok){
+      // The goal's `done` contract decides `done`: every metric must hold against the state as it now is.
+      // A gap a stale derivation could still close re-queues that derivation under the current rev; one a
+      // refused op owes stays refused; one nothing can still address is a classified block, never silent.
+      const evaluated=evaluateGoalMetrics(state);
+      const reopen=state.ops.find(op=>op.goalStale&&!op.refusal&&!liveStatus.includes(op.status)
+        &&metricsBindingOp(state,op).some(metric=>!metric.met));
+      if(reopen){
+        const owed=metricsBindingOp(state,reopen).filter(metric=>!metric.met).map(metric=>metric.id);
+        reopen.status='ready';reopen.attempt+=1;reopen.dispatch=null;reopen.terminal=null;reopen.nudged=false;
+        reopen.findings=unique([...(reopen.findings??[]),`goal rev ${goalRevOf(state)} still owes ${owed.join(', ')}`]);
+        delete reopen.goalStale;
+        store.appendEvent({event:'goal-gap-reopened',op:reopen.id,attempt:reopen.attempt,metrics:owed});
+        store.saveState(state);
+        continue;
+      }
+      if(evaluated.gaps.length){
+        const detail=evaluated.gaps.map(gap=>`${gap.id} is ${gap.status}${gap.detail?` (${gap.detail})`:''}`).join('; ');
+        const stalled=state.metricSpin?.stalled===true;
+        state.needUser.push({kind:'goal-gap',code:'goal-metrics-unmet',
+          detail:`${stalled?'goal metrics stalled':'goal metrics unmet'} and no operation can still address them: ${detail}`});
+        finish(store,state,'blocked',
+          stalled?`goal metrics stalled: ${state.goalStatus?.dispatchesWithoutProgress??0} settled dispatches changed nothing; unmet: ${detail}`
+            :`goal metrics unmet and no applicable op can address them: ${detail}`,ctx);
+        break;
+      }
       // A node of another repository of the product is settled there, never here: it does not hold this
       // workflow open, and the final ledger names it as `out-of-repository`.
       const unverified=state.ledger.filter(item=>!['verified','preexisting','out-of-repository'].includes(item.status));
@@ -4290,6 +4345,12 @@ export function applyInbox(store,state,ctx){
     }else if(command.kind==='answer'){
       try{const answered=answerOwnerQuestion(store,state,{op:command.op,choice:command.choice??null,note:command.note??null},ctx);store.appendEvent({event:'inbox-applied',kind:'answer',ask:answered.ask});}
       catch(error){store.appendEvent({event:'inbox-rejected',kind:'answer',reason:String(error?.message??error)});}
+    }else if(command.kind==='goal-revise'){
+      // The one way a live goal moves: the typed transition validates the body, persists rev+1, marks the
+      // stale derivations and re-validates what is in flight. A rejected body is recorded, never applied.
+      try{const revised=reviseGoal(store,state,command.goal,{ctx,source:command.source??'owner'});
+        store.appendEvent({event:'inbox-applied',kind:'goal-revise',rev:revised.rev});}
+      catch(error){store.appendEvent({event:'inbox-rejected',kind:'goal-revise',reason:String(error?.message??error)});}
     }else store.appendEvent({event:'inbox-ignored',kind:command.kind??null});
   }
 }
@@ -4486,6 +4547,22 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       amendment:{digest:applied.amendment.digest,baseGoalIdentity:applied.amendment.baseGoalIdentity,
         ownerGrant:applied.amendment.authority.source,coordinatorDecision:applied.amendment.coordinator.source},
       continuation:continuation.file,boundary:continuation.boundary.findings,next};
+  }
+  if(command==='workflow-revise'){
+    const {store,state}=open(options.id);
+    need(state.approved,`Workflow ${state.id} has no approved goal to revise`);
+    const file=path.resolve(required(options.revision??options.file,'revision file (--revision <goal.json>)'));
+    const body=readJson(file,null);
+    need(plain(body),`The revision file ${slash(file)} is not a readable JSON object: it holds the revised goal body`);
+    // A running kernel owns the state: the revision is queued in its inbox and applied at its next tick.
+    if(kernelAlive(store)){
+      const inbox=queueInbox(store,{kind:'goal-revise',goal:body,source:options.source??'owner'});
+      return {schema:WORKFLOW_KERNEL,command,dir:store.dir,id:state.id,queued:true,inbox,
+        next:'the running kernel applies the revision at its next tick (events goal-revised or inbox-rejected)'};
+    }
+    const revised=reviseGoal(store,state,body,{source:options.source??'owner'});
+    return {schema:WORKFLOW_KERNEL,command,dir:store.dir,id:state.id,...revised,
+      next:`run workflow-approve --id ${state.id} to resume under rev ${revised.rev}, then workflow-run`};
   }
   if(command==='workflow-approve'){
     const {store,state}=open(options.id);

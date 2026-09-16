@@ -34,6 +34,7 @@ import {machineVerify} from '../kernel/kernel.mjs';
 import {attributedFiles} from '../kernel/verify.mjs';
 import {relocateLauncher,reviveSupervisor} from '../kernel/kernel.mjs';
 import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,LONG_CONTRACT_GRACE_MS,PERCEPTION_GRACE_MS,perceptionProviders,refundRetiredGenerationProbations,noteAnomaly,prepareWorkGate,producedKindVerdict,restoreDurableCheckpoint,recoverSatisfiedDependencyBlocks,sweepResolvedReviewLines,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,retryableOperation,runLoop,settleStalled,nativeActivityProof,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
+import {GOAL_SPIN_LIMIT,adoptReportRev,applyInbox,evaluateGoalMetrics,goalMetricsOf,goalRevOf,metricsBindingOp,normalizeDoneMetrics,noteGoalMetrics,opInputDigests,propagateInvalidation,reopenStaleOp,reviseGoal,validateGoalRevision} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -5402,4 +5403,245 @@ test('a stray is quarantined when git names the file and the validator names the
     assert.equal(fs.existsSync(stray),false,'the stray left the tree');
     assert.ok(log.some(event=>event.event==='ledger-valid-again'),'and the tree reads clean again');
   }finally{harness.cleanup();}
+});
+
+/* ------------------------------------------------------------------ goal revisions and done metrics
+ * The goal freezes at rev 1 with a checkable `done` contract; the typed `goal.revise` is the only way it
+ * moves, and a report that lands on an older rev counts only while every input it was derived from still
+ * reads the same.
+ */
+const goalFixture=()=>{
+  const repo=tmp();
+  const store=createStore({repoRoot:repo,id:'20260912-120000-goal-spec'});
+  const state=createWorkflowState({job:'Ship the goal',inputs:[],worktree:repo,branch:'main',store});
+  const op=(id='op-a',extra={})=>toOp({id,kind:'backend.implement',goal:'build A',ledgerIds:['feature-a'],allowlist:['src/a.ts'],...extra});
+  return {repo,store,state,op,cleanup:()=>fs.rmSync(repo,{recursive:true,force:true})};
+};
+
+test('goal metrics evaluate against the ledger, gates and kernel-derived ops; a fresh goal is rev 1',()=>{
+  const {state,op,cleanup}=goalFixture();
+  try{
+    assert.equal(state.goalRev,1,'a fresh workflow goal is rev 1');
+    assert.equal(goalRevOf({}),1,'a state written before versioning still reads as rev 1');
+    assert.equal(normalizeDoneMetrics('verified'),null,'a done block is a list');
+    assert.equal(normalizeDoneMetrics([]),null,'an empty block is not a block');
+    state.ledger=[{id:'feature-a',title:'A',status:'implemented'},{id:'feature-b',title:'B',status:'verified'}];
+    state.gates=[{name:'smoke',command:'npm test'}];
+    const intake=op('op-intake',{ledgerIds:[],allowlist:['.starciwork/**']});intake.intake={scope:'feature-a'};
+    state.ops=[intake];
+    let evaluated=evaluateGoalMetrics(state);
+    assert.deepEqual(evaluated.metrics.map(m=>m.id).sort(),['gate:smoke','ledger:feature-a','ledger:feature-b','operation:op-intake']);
+    assert.equal(evaluated.ok,false);
+    assert.deepEqual(evaluated.gaps.map(m=>m.id).sort(),['gate:smoke','ledger:feature-a','operation:op-intake']);
+    // The supplied `done` block, not the derivation, is what a declared contract is checked against.
+    evaluated=evaluateGoalMetrics(state,{done:[{kind:'ledger',ref:'feature-a',expect:['implemented']}]});
+    assert.equal(evaluated.ok,true,'a metric that declares its own expect list is judged by it');
+    assert.equal(evaluateGoalMetrics(state,{done:[{kind:'ledger',ref:'ghost'}]}).unevaluable.length,1,'a ref the goal does not hold is unevaluable, not merely unmet');
+    state.gateResults=[{name:'smoke',status:'passed',exitCode:0}];state.ledger[0].status='verified';intake.status='done';
+    assert.equal(evaluateGoalMetrics(state).ok,true,'every metric holding is what done means');
+    assert.deepEqual(metricsBindingOp(state,op()).map(m=>m.id),['ledger:feature-a'],'an op answers for the ledger items it serves');
+    assert.deepEqual(metricsBindingOp(state,intake).map(m=>m.id),['operation:op-intake']);
+  }finally{cleanup();}
+});
+
+test('approval freezes the goal at rev 1, stamps every derivation and refuses a goal with no evaluable metric',()=>{
+  const {store,state,op,cleanup}=goalFixture();
+  try{
+    state.definitionOfDone=['A exists'];
+    state.ledger=[{id:'feature-a',title:'A',status:'planned'}];
+    const build=op();build.question={kind:'decision',text:'Which?',record:'feature-a'};
+    state.ops=[build];
+    state.decisions=[{id:'dec-1',kind:'decision',title:'Pick'}];
+    state.quota='qwen:1';
+    approve(store,state);
+    assert.equal(state.goalRev,1);
+    assert.equal(build.goalRev,1,'the op binds the rev it was derived under');
+    assert.equal(build.question.goalRev,1,'and its question');
+    assert.equal(state.decisions[0].goalRev,1,'and each decision');
+  }finally{cleanup();}
+  // The enrolled goal.json names the frozen rev and materializes the `done` contract it was assessed under.
+  const harness=setup({plan:salesPlan,scripts:{}});
+  try{
+    const written=JSON.parse(fs.readFileSync(harness.store.paths.goalJson,'utf8'));
+    assert.equal(written.rev,1,'the machine contract on disk names the frozen rev');
+    assert.deepEqual(written.done,[{id:'ledger:goal-1',kind:'ledger',ref:'goal-1',expect:['verified','preexisting','out-of-repository']}],
+      'with no declared block, the materialized contract is the derivation: every ledger item verified');
+  }finally{harness.cleanup();}
+  // A goal nothing can evaluate is refused at enroll, not discovered at the finish line.
+  const bare=goalFixture();
+  try{
+    bare.state.definitionOfDone=['something'];bare.state.ops=[bare.op('op-x',{ledgerIds:[]})];bare.state.quota='qwen:1';
+    assert.throws(()=>approve(bare.store,bare.state),/no evaluable done metric/);
+  }finally{bare.cleanup();}
+});
+
+test('goal.revise validates the contract, bumps the rev, persists goal.json and records the diff',()=>{
+  const {store,state,op,cleanup}=goalFixture();
+  try{
+    state.approved=true;
+    state.ledger=[{id:'feature-a',title:'A',inputRef:'sds:old',status:'planned'}];
+    state.ops=[op()];
+    // The contract: a `done` block of checkable metrics, stable ids, the same workflow identity.
+    assert.throws(()=>reviseGoal(store,state,{}),/`done` block/);
+    assert.throws(()=>reviseGoal(store,state,{done:[]}),/`done` block/);
+    assert.throws(()=>reviseGoal(store,state,{done:[{kind:'ledger',ref:'ghost'}]}),/does not hold/);
+    assert.throws(()=>reviseGoal(store,state,{done:[{kind:'ledger',ref:'feature-a'}],ledger:[]}),/cannot drop ledger ids/);
+    assert.throws(()=>reviseGoal(store,state,{done:[{kind:'ledger',ref:'feature-a'}],ops:[]}),/cannot drop op ids/);
+    assert.throws(()=>reviseGoal(store,state,{id:'other',done:[{kind:'ledger',ref:'feature-a'}]}),/identity/);
+    assert.throws(()=>reviseGoal(store,{...state,approved:false},{done:[{kind:'ledger',ref:'feature-a'}]}),/no approved goal/);
+    const revised=reviseGoal(store,state,{done:[{kind:'ledger',ref:'feature-a'},{kind:'ledger',ref:'feature-b'}],
+      ledger:[{id:'feature-a',title:'A',inputRef:'sds:old'},{id:'feature-b',title:'B',inputRef:'sds:new'}]});
+    assert.equal(revised.rev,2);assert.equal(state.goalRev,2);
+    assert.equal(state.ledger.length,2,'a revision may add items; dropping them was refused above');
+    assert.equal(state.ledger[1].goalRev,2,'the item this revision made belongs to the new rev');
+    assert.equal(state.ops[0].goalRev,1,'the op still names the rev it was derived under');
+    assert.ok(!state.ops[0].goalStale,'and nothing it read moved');
+    const written=JSON.parse(fs.readFileSync(store.paths.goalJson,'utf8'));
+    assert.equal(written.rev,2);assert.deepEqual(written.done.map(m=>m.id),['ledger:feature-a','ledger:feature-b']);
+    assert.equal(state.goalRevisions.length,1);assert.equal(state.goalRevisions[0].schema,'starci/goal-revision@1');
+    assert.deepEqual(state.goalRevisions[0].changed.records,['feature-b']);
+    assert.ok(state.goalDigest,'the revision froze the goal identity before moving it, so the durable binding still attests it');
+    const revisedEvent=store.readEvents().find(e=>e.event==='goal-revised');
+    assert.equal(revisedEvent.rev,2);assert.equal(revisedEvent.fromRev,1);
+  }finally{cleanup();}
+});
+
+test('a report dispatched under rev N is adopted while every input it was derived from still reads the same',()=>{
+  const {store,state,op,cleanup}=goalFixture();
+  try{
+    state.approved=true;
+    state.ledger=[{id:'feature-a',title:'A',inputRef:'sds:old',status:'planned'}];
+    const build=op();state.ops=[build];
+    build.goalRev=1;build.status='running';build.inputDigests=opInputDigests(state,build,null);
+    // Rev 2 adds a sibling item; nothing op-a reads moved.
+    reviseGoal(store,state,{done:[{kind:'ledger',ref:'feature-a'},{kind:'ledger',ref:'feature-b'}],
+      ledger:[{id:'feature-a',title:'A',inputRef:'sds:old'},{id:'feature-b',title:'B'}]});
+    assert.equal(build.inputsHeld,true,'the in-flight revalidation proved the digests still hold');
+    build.reports.push({attempt:1,outcome:'done',summary:'built',goalRev:1});
+    const adopted=adoptReportRev(store,state,build,null);
+    assert.deepEqual([adopted.stale,adopted.adopted],[false,true]);
+    assert.equal(build.goalRev,2,'adoption binds the op to the rev its report landed under');
+    assert.equal(build.reports.at(-1).stale,undefined,'and the report keeps no stale mark');
+    assert.equal(build.goalStale,undefined);
+    assert.ok(store.readEvents().some(e=>e.event==='goal-rev-adopted'&&e.op==='op-a'&&e.toRev===2));
+  }finally{cleanup();}
+});
+
+test('a report whose inputs moved under rev N+1 is stale, does not count, and reopens the owed work',()=>{
+  const {store,state,op,cleanup}=goalFixture();
+  try{
+    state.approved=true;
+    state.ledger=[{id:'feature-a',title:'A',inputRef:'sds:old',status:'planned'}];
+    const build=op();state.ops=[build];
+    build.goalRev=1;build.status='running';build.inputDigests=opInputDigests(state,build,null);
+    // Rev 2 rewrites the item the op was derived from.
+    reviseGoal(store,state,{done:[{kind:'ledger',ref:'feature-a'}],
+      ledger:[{id:'feature-a',title:'A renamed',inputRef:'sds:new'}]});
+    assert.equal(build.goalStale?.rev,2,'the propagation marked the derivation stale');
+    assert.equal(state.ledger[0].goalStale?.rev,2,'and the record it serves');
+    assert.equal(build.inputsHeld,false,'the in-flight revalidation saw the input move');
+    build.reports.push({attempt:1,outcome:'done',summary:'built the old spec',goalRev:1});
+    const adopted=adoptReportRev(store,state,build,null);
+    assert.equal(adopted.stale,true);
+    assert.equal(build.reports.at(-1).stale.fromRev,1,'the stale mark is on the record - visible, never dropped');
+    assert.equal(build.goalRev,1,'a stale op is not adopted into the new rev');
+    assert.equal(reopenStaleOp(store,state,build,null),'goal-rev-stale');
+    assert.equal(build.status,'ready','the bound ledger metric is still unmet, so the op re-queues under the new rev');
+    assert.equal(build.attempt,2);
+    const log=store.readEvents();
+    assert.ok(log.some(e=>e.event==='goal-rev-stale'&&e.op==='op-a'));
+    assert.ok(log.some(e=>e.event==='goal-rev-reopened'&&e.op==='op-a'));
+  }finally{cleanup();}
+});
+
+test('a stale report whose bound metrics already hold settles the op instead of reopening it',()=>{
+  const {store,state,op,cleanup}=goalFixture();
+  try{
+    state.approved=true;
+    state.ledger=[{id:'feature-a',title:'A',status:'verified'}];
+    const build=op();state.ops=[build];
+    build.goalRev=1;build.status='running';build.inputDigests=opInputDigests(state,build,null);
+    // Rev 2 moves prose the op's input digests cover but leaves its verified item alone.
+    reviseGoal(store,state,{done:[{kind:'ledger',ref:'feature-a'}],definitionOfDone:['a stricter definition']});
+    build.reports.push({attempt:1,outcome:'done',summary:'done',goalRev:1});
+    assert.equal(adoptReportRev(store,state,build,null).stale,true,'the definition of done is an input the op read');
+    assert.equal(reopenStaleOp(store,state,build,null),'goal-rev-stale');
+    assert.equal(build.status,'skipped','its metric already holds, so nothing is owed to reopen');
+    assert.equal(build.verdict,'stale');
+  }finally{cleanup();}
+});
+
+test(`${GOAL_SPIN_LIMIT} settled dispatches that move no metric surface a classified stall, then progress clears it`,()=>{
+  const {store,state,op,cleanup}=goalFixture();
+  try{
+    state.approved=true;
+    state.ledger=[{id:'feature-a',title:'A',status:'planned'}];
+    state.ops=[op()];
+    noteGoalMetrics(store,state);
+    assert.equal(state.goalStatus.ok,false);assert.deepEqual(state.goalStatus.gaps,['ledger:feature-a']);
+    for(let attempt=1;attempt<=GOAL_SPIN_LIMIT;attempt+=1)state.ops[0].reports.push({attempt,outcome:'partial',goalRev:1});
+    noteGoalMetrics(store,state);
+    assert.equal(state.goalStatus.dispatchesWithoutProgress,GOAL_SPIN_LIMIT);
+    assert.equal(state.metricSpin.stalled,true);
+    const stall=state.needUser.find(item=>item.code==='goal-metric-spin');
+    assert.equal(stall?.kind,'stall','the classification is a stall, not a silent end');
+    assert.ok(stall.detail.includes('ledger:feature-a'));
+    assert.ok(store.readEvents().some(e=>e.event==='goal-stall'&&e.kind==='stall'));
+    // Once classified it is not re-classified every tick.
+    state.ops[0].reports.push({attempt:GOAL_SPIN_LIMIT+1,outcome:'partial',goalRev:1});
+    noteGoalMetrics(store,state);
+    assert.equal(store.readEvents().filter(e=>e.event==='goal-stall').length,1);
+    // The signature moving again - progress - clears the classification.
+    state.ledger[0].status='verified';
+    assert.equal(noteGoalMetrics(store,state).ok,true);
+    assert.equal(state.metricSpin.stalled,false);
+    assert.equal(state.metricSpin.reportsAtChange,GOAL_SPIN_LIMIT+1);
+    assert.ok(!state.needUser.some(item=>item.code==='goal-metric-spin'));
+  }finally{cleanup();}
+});
+
+test('a goal-revise command in the inbox applies the typed transition on the next tick and a bad body is recorded, not applied',()=>{
+  const {store,state,op,cleanup}=goalFixture();
+  try{
+    state.approved=true;
+    state.ledger=[{id:'feature-a',title:'A',status:'planned'}];
+    state.ops=[op()];
+    queueInbox(store,{kind:'goal-revise',goal:{done:[{kind:'ledger',ref:'feature-a'}],definitionOfDone:['A exists']},source:'owner'});
+    applyInbox(store,state,{});
+    assert.equal(state.goalRev,2,'the inbox command ran the typed revision');
+    const log=store.readEvents();
+    assert.ok(log.some(e=>e.event==='goal-revised'&&e.rev===2));
+    assert.ok(log.some(e=>e.event==='inbox-applied'&&e.kind==='goal-revise'));
+    queueInbox(store,{kind:'goal-revise',goal:{}});
+    applyInbox(store,state,{});
+    assert.equal(state.goalRev,2,'the invalid body did not move the rev');
+    assert.ok(store.readEvents().some(e=>e.event==='inbox-rejected'&&e.kind==='goal-revise'));
+  }finally{cleanup();}
+});
+
+test('workflow-revise applies a typed revision to a stopped kernel and queues it to a live one',()=>{
+  const {store,state,op,cleanup}=goalFixture();
+  try{
+    state.approved=true;
+    state.ledger=[{id:'feature-a',title:'A',status:'planned'}];
+    state.ops=[op()];
+    store.saveState(state);
+    const file=path.join(store.dir,'rev2.json');
+    fs.writeFileSync(file,JSON.stringify({done:[{kind:'ledger',ref:'feature-a'}],definitionOfDone:['A exists']}));
+    // No kernel.lock: the stopped path applies the revision itself.
+    const applied=kernelMain('workflow-revise',{id:state.id,revision:file},{cwd:store.repoRoot,orca:null,wait:()=>{}});
+    assert.equal(applied.rev,2);assert.equal(applied.fromRev,1);
+    const saved=createStore({repoRoot:store.repoRoot,id:state.id}).loadState();
+    assert.equal(saved.goalRev,2);assert.equal(saved.doneMetrics.length,1);
+    assert.equal(saved.ops[0].goalRev,1);
+    // A live kernel.lock: the command queues the revision for the running kernel's next tick.
+    fs.writeFileSync(path.join(store.dir,'kernel.lock'),JSON.stringify({pid:process.pid}));
+    fs.writeFileSync(file,JSON.stringify({done:[{kind:'ledger',ref:'feature-a'}],scope:['src/']}));
+    const queued=kernelMain('workflow-revise',{id:state.id,revision:file},{cwd:store.repoRoot,orca:null,wait:()=>{}});
+    assert.equal(queued.queued,true);assert.ok(fs.existsSync(queued.inbox));
+    // And the kernel itself applies the queued command: the durable inbox hands the state across.
+    const durable=createStore({repoRoot:store.repoRoot,id:state.id}).loadState();
+    applyInbox(store,durable,{});
+    assert.equal(durable.goalRev,3);assert.deepEqual(durable.scope,['src/']);
+  }finally{cleanup();}
 });
