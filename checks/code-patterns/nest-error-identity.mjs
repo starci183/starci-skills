@@ -147,9 +147,7 @@ function readContract(root, bound) {
       if (item.academy !== undefined) throw Error('Capability families cannot declare Academy constructor policy.');
     } else {
       exact(item.academy, ['classSuffix', 'codeArgument', 'metadataArgument'], 'Academy family policy');
-      if (typeof item.academy.classSuffix !== 'string' || !item.academy.classSuffix || !Number.isInteger(item.academy.codeArgument)
-        || item.academy.codeArgument < 0 || !Number.isInteger(item.academy.metadataArgument) || item.academy.metadataArgument < 0
-        || item.academy.codeArgument === item.academy.metadataArgument) throw Error('Academy policy needs a suffix and distinct zero-based argument indices.');
+      if (item.academy.classSuffix !== 'Exception' || item.academy.codeArgument !== 1 || item.academy.metadataArgument !== 2) throw Error('Academy profile fixes classSuffix Exception, codeArgument 1 and metadataArgument 2.');
     }
     const identity = `${item.path}#${item.export}`;
     if (identities.has(identity)) throw Error('Error family source identities must be unique.');
@@ -214,16 +212,30 @@ function nearestCatch(ts, node) {
   return null;
 }
 
-function selectedNewFamily(ts, checker, input, families) {
+function constructorIdentity(ts, checker, input, scope, before, seen = new Set()) {
+  const node = unwrap(ts, input);
+  if (!node) return null;
+  const identity = symbolAt(ts, checker, node);
+  if (!identity || seen.has(identity)) return null;
+  if ((identity.declarations ?? []).some(item => ts.isClassDeclaration(item) || ts.isClassExpression(item))) return identity;
+  seen.add(identity);
+  const declaration = identity.valueDeclaration;
+  if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer
+    || !(ts.getCombinedNodeFlags(declaration.parent) & ts.NodeFlags.Const)
+    || assignedBefore(ts, checker, scope, identity, before)) return null;
+  return constructorIdentity(ts, checker, declaration.initializer, scope, declaration.initializer.pos, seen);
+}
+
+function selectedNewFamily(ts, checker, input, families, scope, before) {
   const node = unwrap(ts, input);
   if (!ts.isNewExpression(node)) return null;
-  const type = checker.getTypeAtLocation(node);
+  const identity = constructorIdentity(ts, checker, node.expression, scope, before), type = identity && declaredType(checker, identity);
   return families.find(item => item.identity && extendsIdentity(type, item.identity)) ?? null;
 }
 
 function selectedThrownFamily(ts, checker, input, families, scope, before, seen = new Set()) {
   const node = unwrap(ts, input);
-  const direct = selectedNewFamily(ts, checker, node, families);
+  const direct = selectedNewFamily(ts, checker, node, families, scope, before);
   if (direct) return { family: direct, construction: node };
   if (!ts.isIdentifier(node)) return null;
   const identity = symbolAt(ts, checker, node);
@@ -251,13 +263,15 @@ function exported(ts, node) {
 }
 
 function directSuperCalls(ts, constructor) {
-  const calls = [];
-  const visit = node => {
-    if (node !== constructor.body && (ts.isFunctionLike(node) || ts.isClassDeclaration(node) || ts.isClassExpression(node))) return;
-    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.SuperKeyword) calls.push(node);
-    else ts.forEachChild(node, visit);
-  };
-  visit(constructor.body); return calls;
+  return constructor.body.statements.flatMap(statement => {
+    if (!ts.isExpressionStatement(statement)) return [];
+    const expression = unwrap(ts, statement.expression);
+    return ts.isCallExpression(expression) && expression.expression.kind === ts.SyntaxKind.SuperKeyword ? [expression] : [];
+  });
+}
+
+function academyCode(name) {
+  return name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2').toUpperCase();
 }
 
 /** Verify selected error-family declarations and every escaping thrown identity in production sources. */
@@ -332,8 +346,9 @@ export function checkNestErrorIdentity({ root, files, ruleIds, architectureConfi
                   || unwrap(ts, metadata).properties.some(item => ts.isSpreadAssignment(item) || item.name && ts.isComputedPropertyName(item.name))) {
                   add(source, 'NEST_ERROR_DECLARATION_IDENTITY', constructor, 'Academy constructor directly supplies one literal code and one static metadata object to super at the declared zero-based positions.', false);
                 } else {
-                  const codeValue = unwrap(ts, code).text, previous = academyCodes.get(codeValue);
-                  if (previous) {
+                  const codeValue = unwrap(ts, code).text, expectedCode = academyCode(node.name.text), previous = academyCodes.get(codeValue);
+                  if (codeValue !== expectedCode) add(source, 'NEST_ERROR_DECLARATION_IDENTITY', code, `Academy error code must be ${expectedCode}, derived from the owning class.`, false);
+                  else if (previous) {
                     add(source, 'NEST_ERROR_DECLARATION_IDENTITY', code, `Academy error code is duplicated by ${previous}.`, false);
                   } else academyCodes.set(codeValue, `${relative}#${node.name.text}`);
                 }

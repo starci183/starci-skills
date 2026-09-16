@@ -14,7 +14,7 @@ The target owns `package.json#starci.codePatterns.nest.errorIdentity`:
 {
   "schema": "starci/nest-error-identity@1",
   "profile": "capability",
-  "throwRoots": ["src", "apps/api/src", "libs/domain/src"],
+  "throwRoots": ["src", "apps/api/src", "libs/account/src", "libs/domain/src"],
   "families": [{
     "id": "account",
     "path": "libs/account/src/errors/account-error.ts",
@@ -47,12 +47,15 @@ family also declares:
 }
 ```
 
-Argument positions are zero-based. Academy subclasses live under the declared
-roots, use the configured suffix, declare an earlier exported
+Argument positions are zero-based. This profile fixes `classSuffix` to
+`Exception`, `codeArgument` to `1`, and `metadataArgument` to `2`, matching the
+selected Academy base API rather than permitting target-defined alternatives.
+Academy subclasses live under the declared roots, use that suffix, declare an earlier exported
 `<ClassName>Metadata` interface, take that interface through one object-binding
 constructor parameter, and pass one literal unique code plus a static metadata
-object directly to `super`. The named interface must expose the declared cause
-properties, directly or through interface inheritance.
+object through one direct top-level `super` statement. The code is the exact
+upper-snake form of the owning class name. The named interface must expose the
+declared cause properties, directly or through interface inheritance.
 
 A status-only health/readiness endpoint may explicitly select protocol-native
 Nest HTTP exceptions without changing the family policy:

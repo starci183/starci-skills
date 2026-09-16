@@ -163,6 +163,13 @@ export function dynamic(): never { throw factory(); }` } });
   assert.deepEqual(result.checkedRuleIds, []);
 });
 
+test('a type assertion cannot turn the actual Error constructor into a selected family', t => {
+  const f = fixture(t, { sources: { 'src/use.ts': `import { WidgetError } from './errors/widget-error';
+export function execute(): never { throw new (Error as unknown as typeof WidgetError)({}); }` } });
+  const result = checkNestErrorIdentity(f.input);
+  assert.ok(result.violations.some(item => item.message.includes('selected error family')), JSON.stringify(result));
+});
+
 test('reassigned caught identities and aliases do not receive rethrow credit', t => {
   const f = fixture(t, { sources: { 'src/use.ts': `import { WidgetError } from './errors/widget-error';
 export function direct(): never { try { JSON.parse('x'); } catch (error) { error = new WidgetError({}); throw error; } }
@@ -207,8 +214,16 @@ test('a nested class super call cannot supply the Academy constructor proof', t 
   assert.ok(result.violations.some(item => item.message.includes('directly supplies')));
 });
 
+test('a conditional super call cannot supply mandatory Academy constructor flow', t => {
+  const bad = academyChild.replace("super('User missing', 'USER_MISSING_EXCEPTION', { id, originalError });",
+    "if (false) super('User missing', 'USER_MISSING_EXCEPTION', { id, originalError });");
+  const f = fixture(t, { profile: 'academy-abstract-exception', sources: { 'src/errors/user-missing.ts': bad } });
+  const result = checkNestErrorIdentity(f.input);
+  assert.ok(result.violations.some(item => item.message.includes('directly supplies')));
+});
+
 test('Academy constructor sites require one object literal and codes stay unique', t => {
-  const duplicate = academyChild.replace('UserMissingException', 'AnotherException').replace('User missing', 'Another');
+  const duplicate = academyChild;
   const f = fixture(t, { profile: 'academy-abstract-exception', sources: {
     'src/errors/another.ts': duplicate,
     'src/use.ts': academyUse.replace('new Failures.UserMissingException({})', 'new Failures.UserMissingException(undefined as never)'),
@@ -216,6 +231,13 @@ test('Academy constructor sites require one object literal and codes stay unique
   const result = checkNestErrorIdentity(f.input);
   assert.ok(result.violations.some(item => item.message.includes('duplicated')));
   assert.ok(result.violations.some(item => item.message.includes('exactly one object-literal')));
+});
+
+test('Academy code is derived exactly from the owning class', t => {
+  const bad = academyChild.replace('USER_MISSING_EXCEPTION', 'UNRELATED_CODE');
+  const f = fixture(t, { profile: 'academy-abstract-exception', sources: { 'src/errors/user-missing.ts': bad } });
+  const result = checkNestErrorIdentity(f.input);
+  assert.ok(result.violations.some(item => item.message.includes('must be USER_MISSING_EXCEPTION')));
 });
 
 test('Academy subclasses cannot override the selected base code property', t => {
@@ -240,5 +262,8 @@ test('missing contracts, malformed roots and unsupported rules fail closed', t =
   assert.ok(checkNestErrorIdentity(f.input).errors.length);
   f.write('package.json', { private: true, starci: { codePatterns: { nest: { errorIdentity: capabilityContract({ throwRoots: [] }) } } } });
   assert.ok(checkNestErrorIdentity(f.input).errors.length);
+  const academy = fixture(t, { profile: 'academy-abstract-exception' });
+  academy.write('package.json', { private: true, starci: { codePatterns: { nest: { errorIdentity: academyContract({ families: [{ ...academyContract().families[0], academy: { classSuffix: 'Failure', codeArgument: 0, metadataArgument: 1 } }] }) } } } });
+  assert.ok(checkNestErrorIdentity(academy.input).errors.some(item => item.message.includes('Academy profile fixes')));
   assert.ok(checkNestErrorIdentity({ ...f.input, ruleIds: ['UNKNOWN'] }).errors.length);
 });
