@@ -250,7 +250,7 @@ test('backend workspace packages cannot reach executable app packages through ty
 
 test('frontend accepts redirect-only server routes and intrinsic client visual state', t => {
   const root = fixture(t, 'frontend', {
-    'src/app/home/page.tsx': 'import { redirect } from "next/navigation"; export default async function Route({params}){await params;redirect("/next")}\n',
+    'src/app/home/page.tsx': 'import { redirect } from "next/navigation"; export default async function Route({params}){const {lang}=await params;redirect(lang === "vi" ? "/next" : `/${lang}/next`)}\n',
     'src/components/pages/HomePage/index.tsx': 'export const HomePage=()=>null\n',
     'src/components/leaves/Disclosure/component.tsx': '"use client"; import { useRef,useState,useEffect } from "react"; export const Disclosure=()=>{const r=useRef(null);const [open,setOpen]=useState(false);useEffect(()=>{},[]);return <button ref={r} onClick={()=>setOpen(!open)} /> }\n',
   });
