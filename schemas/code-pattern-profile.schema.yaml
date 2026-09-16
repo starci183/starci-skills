@@ -21,7 +21,7 @@ $defs:
   profile:
     type: object
     additionalProperties: false
-    required: [title, canon, sourceRuleRoots, expectedSourceRuleIds, sourceGlobs, obligations, semanticOnly]
+    required: [title, canon, sourceRuleRoots, expectedSourceRuleIds, sourceGlobs, inputGlobs, obligations, semanticOnly]
     properties:
       title: {$ref: '#/$defs/nonempty'}
       canon:
@@ -45,6 +45,7 @@ $defs:
       sourceRuleRoots: {$ref: '#/$defs/stringList'}
       expectedSourceRuleIds: {$ref: '#/$defs/stringList'}
       sourceGlobs: {$ref: '#/$defs/stringList'}
+      inputGlobs: {$ref: '#/$defs/stringList'}
       obligations:
         type: array
         minItems: 1

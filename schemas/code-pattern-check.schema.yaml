@@ -2,7 +2,7 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: starci://schemas/code-pattern-check.schema.json
 type: object
 additionalProperties: false
-required: [schema, profile, repository, ok, status, inventoryDigest, canon, machineResults, coverage, obligations, files, issues, limitations, reportDigest]
+required: [schema, profile, repository, ok, status, inventoryDigest, canon, tooling, inputs, machineResults, coverage, obligations, files, issues, limitations, reportDigest]
 properties:
   schema: {const: starci/code-pattern-check@1}
   profile: {type: [string, 'null']}
@@ -21,6 +21,27 @@ properties:
           version: {type: [string, 'null']}
           digest: {type: string, pattern: '^[a-f0-9]{64}$'}
           files: {type: integer, minimum: 0}
+  tooling:
+    anyOf:
+      - {type: 'null'}
+      - type: object
+        additionalProperties: false
+        required: [eslintVersion]
+        properties:
+          eslintVersion: {type: [string, 'null']}
+  inputs:
+    anyOf:
+      - {type: 'null'}
+      - type: object
+        additionalProperties: false
+        required: [before, after, stable]
+        properties:
+          before: {$ref: '#/$defs/inputSnapshot'}
+          after:
+            anyOf:
+              - {type: 'null'}
+              - {$ref: '#/$defs/inputSnapshot'}
+          stable: {type: boolean}
   machineResults:
     type: array
     items:
@@ -103,6 +124,14 @@ properties:
     items: {type: string, minLength: 1}
   reportDigest: {type: string, pattern: '^[a-f0-9]{64}$'}
 $defs:
+  inputSnapshot:
+    type: object
+    additionalProperties: false
+    required: [digest, files, unsafe]
+    properties:
+      digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+      files: {$ref: '#/$defs/strings'}
+      unsafe: {$ref: '#/$defs/strings'}
   strings:
     type: array
     uniqueItems: true
