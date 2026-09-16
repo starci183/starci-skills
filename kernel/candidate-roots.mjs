@@ -11,6 +11,7 @@ const fragmentOf=literal=>{const at=literal.indexOf('#');return {key:at<0?litera
 const bindingShape=binding=>({id:binding.id,role:binding.role,repoRoot:slash(path.resolve(binding.repoRoot)),
   workRoot:binding.workRoot?slash(path.resolve(binding.workRoot)):null,
   sourceRoot:binding.sourceRoot?slash(path.resolve(binding.sourceRoot)):null,
+  runtimePin:binding.runtimePin?{schema:binding.runtimePin.schema??null,digest:binding.runtimePin.digest??null,version:binding.runtimePin.version??null}:null,
   primary:Boolean(binding.primary),nonGit:Boolean(binding.nonGit),readOnly:Boolean(binding.readOnly),
   workerWritable:Boolean(binding.workerWritable),runtimeWritable:Boolean(binding.runtimeWritable),
   allowlist:[...(binding.allowlist??[])].sort(),runtimePaths:[...(binding.runtimePaths??[])].sort(),
@@ -32,7 +33,8 @@ export function candidateAcceptedRoots(state,work=null){
   if(runtimeRoot&&fs.existsSync(runtimeRoot))roots.push({id:'runtime',role:'runtime-input',repoRoot:path.resolve(runtimeRoot),
     // The explicit pin source identity (or the workflow-bound `host` used by historical pins) is the only
     // authored runtime whose pre-pin references may translate to the sealed payload. Matching suffixes do not.
-    sourceRoot:state.engine?.runtimePin?.sourceRoot?path.resolve(state.engine.runtimePin.sourceRoot):(state.host?path.resolve(state.host):null),primary:false,nonGit:true});
+    sourceRoot:state.engine?.runtimePin?.sourceRoot?path.resolve(state.engine.runtimePin.sourceRoot):(state.host?path.resolve(state.host):null),
+    runtimePin:{schema:state.engine.runtimePin.schema,digest:state.engine.runtimePin.digest,version:state.engine.runtimePin.version},primary:false,nonGit:true});
   return roots;
 }
 

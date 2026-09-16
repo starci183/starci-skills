@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import {verifyRuntimePin} from './runtime-pin.mjs';
 
 export const CANDIDATE_SNAPSHOT='starci/candidate-snapshot@1';
 export const CANDIDATE_PACKET='starci/candidate-packet@1';
@@ -165,6 +166,7 @@ const readHead=(root,git)=>{
   const result=git('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8',windowsHide:true});
   return result?.status===0?String(result.stdout??'').trim():null;
 };
+const runtimePinIdentity=pin=>pin?{schema:pin.schema??null,digest:pin.digest??null,version:pin.version??null}:null;
 
 /** Expected-head and byte-level CAS immediately before the single canonical writer is allowed to promote. */
 export function prepareCandidateIntegration(snapshot,packet,{canonicalRoot,canonicalRoots=null,git,ignoreCanonicalPaths=[],mode='hard-isolation'}={}){
@@ -172,12 +174,14 @@ export function prepareCandidateIntegration(snapshot,packet,{canonicalRoot,canon
     const reasons=[],roots=[],expected=new Map(Object.entries(canonicalRoots??{}).map(([id,root])=>[id,path.resolve(root)]));
     if(snapshot?.schema!=='starci/candidate-root-snapshot@1'||packet?.schema!=='starci/candidate-root-packet@1')reasons.push('candidate root snapshot and packet schemas disagree');
     if(snapshot?.bindingDigest!==packet?.bindingDigest)reasons.push('candidate-root-binding-digest-mismatch');
-    const packets=new Map((packet?.roots??[]).map(root=>[root.id,root.packet??root])),snapshots=new Map((snapshot?.roots??[]).map(root=>[root.id,root.snapshot??root]));
+    const packetRecords=new Map((packet?.roots??[]).map(root=>[root.id,root])),packets=new Map((packet?.roots??[]).map(root=>[root.id,root.packet??root])),snapshots=new Map((snapshot?.roots??[]).map(root=>[root.id,root.snapshot??root]));
     if(!expected.size)reasons.push('expected canonical root bindings are required for a multi-root candidate');
     for(const root of snapshot?.roots??[]){
-      const actual=expected.get(root.id),stored=path.resolve(root.repoRoot),rootPacket=packets.get(root.id),rootSnapshot=snapshots.get(root.id);
+      const actual=expected.get(root.id),stored=path.resolve(root.repoRoot),rootPacketRecord=packetRecords.get(root.id),rootPacket=packets.get(root.id),rootSnapshot=snapshots.get(root.id);
       if(!actual||actual!==stored){reasons.push(`candidate-root-binding-mismatch:${root.id}`);continue;}
       if(!rootPacket||!rootSnapshot){reasons.push(`candidate-root-record-missing:${root.id}`);continue;}
+      if(JSON.stringify(runtimePinIdentity(root.runtimePin))!==JSON.stringify(runtimePinIdentity(rootPacketRecord.runtimePin))){reasons.push(`candidate-runtime-pin-binding-mismatch:${root.id}`);continue;}
+      if(root.runtimePin){const checked=verifyRuntimePin({...root.runtimePin,root:actual});if(!checked.ok){reasons.push(`${root.id}:runtime-pin-drift:${checked.reason}`);continue;}}
       const ignored=ignoreCanonicalPaths.map(value=>{const absolute=path.isAbsolute(value)||/^[A-Za-z]:[\\/]/.test(value);if(!absolute)return value;const relative=path.relative(actual,path.resolve(value));return relative.startsWith('..')||path.isAbsolute(relative)?null:slash(relative);}).filter(Boolean);
       const prepared=prepareCandidateIntegration(rootSnapshot,rootPacket,{canonicalRoot:actual,git,ignoreCanonicalPaths:ignored,mode});roots.push({id:root.id,role:root.role,...prepared});
       for(const reason of prepared.reasons??[])reasons.push(`${root.id}:${reason}`);

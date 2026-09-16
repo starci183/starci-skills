@@ -106,9 +106,10 @@ Full evidence references must resolve; a truncated diff is not a complete review
 A routed candidate can bind more than one actual root. In particular, a source-only frontend may write its
 source checkout while reading and writing the product Work tree in its backend-owned checkout. Each Git root
 keeps its own accepted head, snapshot and complete changed-file inventory; the sealed runtime canon is a
-separate content-digested, read-only input root. Work-relative, repository-relative, absolute and node-id
-references resolve only through these accepted bindings, retain their authored provenance and are checked for
-containment and links. Historical single-root candidate records remain valid.
+separate read-only input root whose complete sealed manifest is verified before snapshot, at replay/freeze and
+again before integration, including files the operation did not reference. Work-relative, repository-relative,
+absolute and node-id references resolve only through these accepted bindings, retain their authored provenance
+and are checked for containment and links. Historical single-root candidate records remain valid.
 
 The integrator checks expected Git head and candidate/canonical drift immediately before promotion/commit.
 Files, Git and an external provider cannot join one SQLite transaction: record intent and receipts, reconcile

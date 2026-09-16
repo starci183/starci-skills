@@ -4,6 +4,7 @@ import path from 'node:path';
 import {CANDIDATE_PACKET,CANDIDATE_SNAPSHOT,bindRuntimeInputs,createCandidateSnapshot,sealCandidate,verifyCandidateIdentity} from './candidates.mjs';
 import {parseRef} from './common.mjs';
 import {candidateDisplayPath,candidateRootBindingDigest,pathInCandidateRoots} from './candidate-roots.mjs';
+import {verifyRuntimePin} from './runtime-pin.mjs';
 
 export const DETECTION_BRIDGE='starci/candidate-bridge@1';
 export const ROOT_DETECTION_BRIDGE='starci/candidate-root-bridge@1';
@@ -149,7 +150,8 @@ export function runtimeWriterHint({host='orca-native',repoRoot}={}){
 
 /** Capture accepted head, relevant input bytes and every pre-existing dirty path before a native worker starts. */
 function beginSingleDetectionCandidate({identity,repoRoot,workerRoot,controlRoot,allowlist=[],references=[],inputPaths=[],oraclePaths=[],git,
-  dependencyDigests={},environmentDigest='runtime-unpinned',ownedDirtyPaths=[],runtimeManagedFiles=[],dependencyInstall=null,nonGit=false,now=Date.now}={}){
+  dependencyDigests={},environmentDigest='runtime-unpinned',ownedDirtyPaths=[],runtimeManagedFiles=[],dependencyInstall=null,nonGit=false,runtimePin=null,now=Date.now}={}){
+  if(runtimePin){const checked=verifyRuntimePin({...runtimePin,root:repoRoot});if(!checked.ok)throw new Error(`candidate runtime pin is invalid before snapshot: ${checked.reason}`);}
   const dirty=nonGit?[]:statusPaths(git,repoRoot).filter(file=>!runtimeInternal(file)),allTracked=nonGit?[]:trackedFor(git,repoRoot,['.']);
   if(typeof environmentDigest!=='string'||!environmentDigest.trim())throw new TypeError('candidate environmentDigest must be a nonempty string');
   const resolveOnDisk=value=>{const reference=resolveCandidateReference(value),target=path.join(repoRoot,...reference.path.split('/'));
@@ -177,7 +179,7 @@ function beginSingleDetectionCandidate({identity,repoRoot,workerRoot,controlRoot
   if(invalidOwned.length)throw new Error(`owned dirty baseline paths must be inside the bounded allowlist: ${invalidOwned.join(', ')}`);
   const managed=runtimeManagedFiles.filter(item=>item&&typeof item.path==='string'&&typeof item.start==='string'&&typeof item.end==='string')
     .map(item=>({path:clean(item.path),start:item.start,end:item.end}));
-  const bridge={schema:DETECTION_BRIDGE,identity,snapshot,repoRoot:path.resolve(repoRoot),nonGit:Boolean(nonGit),allowlist:[...allowlist],references:[...references],resolvedReferences,inputPaths:[...inputPaths],
+  const bridge={schema:DETECTION_BRIDGE,identity,snapshot,repoRoot:path.resolve(repoRoot),nonGit:Boolean(nonGit),runtimePin:runtimePin?{...runtimePin}:null,allowlist:[...allowlist],references:[...references],resolvedReferences,inputPaths:[...inputPaths],
     acceptedHead,sourceBaseline:states(repoRoot,sourcePaths),dirtyBaseline:states(repoRoot,dirty),dirtyBaselinePaths:dirty,
     runtimeManagedFiles:managed,runtimeManagedBaseline:managed.map(item=>managedOutside(repoRoot,item)),
     ownedDirtyPaths:[...owned].sort(),droppedOwnedPaths,dependency:{mode:'isolated-artifact',command:dependencyInstall,
@@ -189,10 +191,10 @@ function beginSingleDetectionCandidate({identity,repoRoot,workerRoot,controlRoot
 
 const identityFields=value=>Object.fromEntries(['workflowId','opId','attempt','generation','jobId'].map(field=>[field,value[field]]));
 const rootBridgeRecord=(binding,bridge)=>({id:binding.id,role:binding.role,repoRoot:path.resolve(binding.repoRoot),controlRoot:bridge.snapshot.controlRoot,
-  nonGit:Boolean(binding.nonGit),workerWritable:Boolean(binding.workerWritable),runtimeWritable:Boolean(binding.runtimeWritable),readOnly:Boolean(binding.readOnly)});
+  runtimePin:binding.runtimePin?{...binding.runtimePin}:null,nonGit:Boolean(binding.nonGit),workerWritable:Boolean(binding.workerWritable),runtimeWritable:Boolean(binding.runtimeWritable),readOnly:Boolean(binding.readOnly)});
 const rootSnapshotRecord=(binding,bridge)=>({id:binding.id,role:binding.role,repoRoot:path.resolve(binding.repoRoot),controlRoot:bridge.snapshot.controlRoot,
   workerRoot:bridge.snapshot.workerRoot,baseRoot:bridge.snapshot.baseRoot,oracleRoot:bridge.snapshot.oracleRoot,acceptedHead:bridge.snapshot.acceptedHead,
-  snapshotDigest:bridge.snapshot.snapshotDigest,nonGit:Boolean(binding.nonGit),workerWritable:Boolean(binding.workerWritable),runtimeWritable:Boolean(binding.runtimeWritable),readOnly:Boolean(binding.readOnly)});
+  snapshotDigest:bridge.snapshot.snapshotDigest,runtimePin:binding.runtimePin?{...binding.runtimePin}:null,nonGit:Boolean(binding.nonGit),workerWritable:Boolean(binding.workerWritable),runtimeWritable:Boolean(binding.runtimeWritable),readOnly:Boolean(binding.readOnly)});
 const rootSnapshotDigest=(bindingDigest,roots)=>sha256(JSON.stringify({bindingDigest,roots:roots.map(root=>({id:root.id,snapshotDigest:root.snapshotDigest,acceptedHead:root.acceptedHead}))}));
 
 /** Begin either the historical one-root candidate or an aggregate of independently sealed routed roots. */
@@ -220,6 +222,7 @@ export function beginDetectionCandidate(options={}){
     const bridge={schema:ROOT_DETECTION_BRIDGE,identity:identityFields(options.identity),bindingDigest,rootBindings:roots.map(binding=>({
       id:binding.id,role:binding.role,repoRoot:path.resolve(binding.repoRoot),workRoot:binding.workRoot?path.resolve(binding.workRoot):null,
       sourceRoot:binding.sourceRoot?path.resolve(binding.sourceRoot):null,
+      runtimePin:binding.runtimePin?{...binding.runtimePin}:null,
       primary:Boolean(binding.primary),nonGit:Boolean(binding.nonGit),workerWritable:Boolean(binding.workerWritable),runtimeWritable:Boolean(binding.runtimeWritable),readOnly:Boolean(binding.readOnly),
       allowlist:[...(binding.allowlist??[])],runtimePaths:[...(binding.runtimePaths??[])],references:(binding.references??[]).map(item=>({...item})),
       inputPaths:(binding.inputPaths??[]).map(item=>typeof item==='object'?{...item}:item),oraclePaths:[...(binding.oraclePaths??[])],ownedDirtyPaths:[...(binding.ownedDirtyPaths??[])],
@@ -268,6 +271,7 @@ export function acknowledgeRuntimeBaseline(bridge,paths=[]){
 
 /** After confirmed worker settlement, copy the complete observed delta into the verifier snapshot and seal it. */
 function freezeSingleDetectionCandidate(bridge,{git,reportedFiles=[],now=Date.now}={}){
+  if(bridge.runtimePin){const checked=verifyRuntimePin({...bridge.runtimePin,root:bridge.repoRoot});if(!checked.ok)return {schema:DETECTION_BRIDGE,status:'quarantine',reasons:[`runtime-pin-drift:${checked.reason}`],observedFiles:[],assurance:bridge.writer};}
   const {repoRoot,snapshot}=bridge,postDirty=bridge.nonGit?[]:statusPaths(git,repoRoot).filter(file=>!runtimeInternal(file)),before=new Map([...(bridge.sourceBaseline??[]),...bridge.dirtyBaseline,...(bridge.runtimeBaseline??[])].map(item=>[item.path,item]));
   const candidates=[...new Set([...before.keys(),...postDirty])].sort(),after=new Map(states(repoRoot,candidates).map(item=>[item.path,item]));
   const observed=candidates.filter(file=>!same(before.get(file)??{path:file,state:'absent'},after.get(file)??{path:file,state:'absent'}));
@@ -349,7 +353,7 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],requireRep
     const frozen=freezeSingleDetectionCandidate(root.bridge,{git,reportedFiles:[],now});
     if(frozen.status!=='sealed')quarantined=true;
     const changed=(frozen.observedFiles??[]).map(file=>({rootId:root.id,rootRole:root.role,path:file,displayPath:candidateDisplayPath(root,file)}));observed.push(...changed);
-    roots.push({id:root.id,role:root.role,repoRoot:root.repoRoot,controlRoot:root.controlRoot,workerWritable:Boolean(root.workerWritable),
+    roots.push({id:root.id,role:root.role,repoRoot:root.repoRoot,controlRoot:root.controlRoot,runtimePin:root.runtimePin?{...root.runtimePin}:null,workerWritable:Boolean(root.workerWritable),
       runtimeWritable:Boolean(root.runtimeWritable),readOnly:Boolean(root.readOnly),status:frozen.status,reasons:[...(frozen.reasons??[])],observedFiles:changed,
       ...(frozen.status==='sealed'?{acceptedHead:frozen.packet.acceptedHead,snapshotDigest:frozen.packet.snapshotDigest,candidateDigest:frozen.packet.candidateDigest,
         oracleDigest:frozen.packet.oracleDigest,environmentDigest:frozen.packet.environmentDigest,files:frozen.packet.files,changes:frozen.packet.changes}:{}),packet:frozen.packet});
