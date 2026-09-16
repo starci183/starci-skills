@@ -37,10 +37,15 @@ export function readCourse(result:ReadEnvelope){if(!result.ok)throw new Error(re
   write('jest.config.ts', `import type {ReadEnvelope} from './src/api/envelope';
 export function metadataOnly(value:ReadEnvelope){return value.data}
 export default {testEnvironment:'node'}`);
+  write('src/api/read.spec.ts', `import type {ReadEnvelope} from './envelope';
+export function testMetadata(value:ReadEnvelope){return value.data}`);
+  write('src/api/generated.d.ts', `import type {ReadEnvelope} from './envelope';
+export declare const generatedMetadata:ReadEnvelope;`);
   fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
   fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')), path.join(root, 'node_modules', 'typescript'), 'junction');
   const selected = ['src/api/envelope.ts', 'src/api/read.ts'];
-  const input = { root, files: selected, contextFiles: ['jest.config.ts'], sourceContextFiles: [],
+  const metadata = ['jest.config.ts', 'src/api/generated.d.ts', 'src/api/read.spec.ts'];
+  const input = { root, files: selected, contextFiles: metadata, sourceContextFiles: ['src/api/generated.d.ts', 'src/api/read.spec.ts'],
     ruleIds: ['FE_ERROR_ENVELOPE_POLICY'], architectureConfig: 'architecture.json' };
   return { root, write, contract, input };
 }
@@ -50,7 +55,7 @@ test('explicit source roles retain TypeScript metadata without applying producti
   assert.deepEqual(result.errors, []);
   assert.deepEqual(result.violations, []);
   assert.deepEqual(result.checkedRuleIds, ['FE_ERROR_ENVELOPE_POLICY']);
-  assert.deepEqual(result.compiler.metadataFiles, ['jest.config.ts']);
+  assert.deepEqual(result.compiler.metadataFiles, ['jest.config.ts', 'src/api/generated.d.ts', 'src/api/read.spec.ts']);
 });
 
 test('a context-only application source remains covered and inspected when its source role is explicit', t => {
@@ -59,7 +64,7 @@ test('a context-only application source remains covered and inspected when its s
 export class StoredEnvelope{constructor(readonly value:ReadEnvelope){}}`);
   const result = checkNextErrors({ ...f.input, contextFiles: [...f.input.contextFiles, 'src/api/opaque.ts'], sourceContextFiles: ['src/api/opaque.ts'] });
   assert.ok(result.errors.some(item => item.ruleId === 'FE_ERROR_ENVELOPE_POLICY' && item.path === 'src/api/opaque.ts'), JSON.stringify(result.errors));
-  assert.deepEqual(result.compiler.metadataFiles, ['jest.config.ts']);
+  assert.deepEqual(result.compiler.metadataFiles, ['jest.config.ts', 'src/api/generated.d.ts', 'src/api/read.spec.ts']);
 });
 
 test('an explicit metadata role cannot hide an owning-program source beneath a declared source root', t => {
@@ -76,7 +81,7 @@ test('standalone calls derive source context from the owning program and declare
 export class StoredEnvelope{constructor(readonly value:ReadEnvelope){}}`);
   const result = checkNextErrors({ ...f.input, contextFiles: [...f.input.contextFiles, 'src/api/opaque.ts'], sourceContextFiles: undefined });
   assert.ok(result.errors.some(item => item.ruleId === 'FE_ERROR_ENVELOPE_POLICY' && item.path === 'src/api/opaque.ts'), JSON.stringify(result.errors));
-  assert.deepEqual(result.compiler.metadataFiles, ['jest.config.ts']);
+  assert.deepEqual(result.compiler.metadataFiles, ['jest.config.ts', 'src/api/generated.d.ts', 'src/api/read.spec.ts']);
 });
 
 test('sourceContextFiles is unique, source-shaped and bounded by the selected context', t => {
@@ -85,5 +90,9 @@ test('sourceContextFiles is unique, source-shaped and bounded by the selected co
     const result = checkNextErrors({ ...f.input, sourceContextFiles });
     assert.ok(result.errors.length, JSON.stringify({ sourceContextFiles, result }));
     assert.deepEqual(result.checkedRuleIds, []);
+  }
+  for (const file of ['src/api/read.spec.ts', 'src/api/generated.d.ts']) {
+    const result = checkNextErrors({ ...f.input, files: [...f.input.files, file] });
+    assert.ok(result.errors.some(item => item.message.includes('production source files')), JSON.stringify({ file, result }));
   }
 });

@@ -13,6 +13,7 @@ export const NEXT_ERROR_RULES = Object.freeze([
 
 const SOURCE = /\.[cm]?tsx?$/i;
 const TEST_SOURCE = /(?:^|\/).*\.(?:spec|test)\.[cm]?tsx?$/i;
+const DECLARATION_SOURCE = /\.d\.[cm]?tsx?$/i;
 const key = file => slash(path.resolve(file));
 
 function exactKeys(value, keys, label) {
@@ -1338,10 +1339,11 @@ export function checkNextErrors({ root, files, ruleIds, contextFiles = [], sourc
   const result = { schema: 'starci/code-pattern-script@1', repository: '', files: [], requestedRuleIds: ruleIds ?? [], checkedRuleIds: [], violations: [], errors: [], compiler: null };
   try {
     const repository = fs.realpathSync(path.resolve(root)); result.repository = repository;
-    if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length || files.some(file => !SOURCE.test(file))) throw Error('Exact unique selected Next source files are required.');
+    if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length
+      || files.some(file => !SOURCE.test(file) || TEST_SOURCE.test(file) || DECLARATION_SOURCE.test(file))) throw Error('Exact unique selected Next production source files are required.');
     if (!Array.isArray(contextFiles) || new Set(contextFiles).size !== contextFiles.length) throw Error('Next context files must be an exact unique array.');
     if (sourceContextFiles !== undefined && (!Array.isArray(sourceContextFiles) || new Set(sourceContextFiles).size !== sourceContextFiles.length
-      || sourceContextFiles.some(file => typeof file !== 'string' || !SOURCE.test(file) || TEST_SOURCE.test(file)))) throw Error('Next sourceContextFiles must be an exact unique production-source path array when supplied.');
+      || sourceContextFiles.some(file => typeof file !== 'string' || !SOURCE.test(file)))) throw Error('Next sourceContextFiles must be an exact unique source-path array when supplied.');
     if (!Array.isArray(ruleIds) || !ruleIds.length || new Set(ruleIds).size !== ruleIds.length || ruleIds.some(id => !NEXT_ERROR_RULES.includes(id))) throw Error('Unique supported Next error-state rule IDs are required.');
     for (const relative of files) regular(repository, relative, 'Selected Next error-state source');
     for (const relative of contextFiles) regular(repository, relative, 'Next error-state context');
@@ -1355,9 +1357,9 @@ export function checkNextErrors({ root, files, ruleIds, contextFiles = [], sourc
     ])];
     const programSources = programSourceFiles(context, repository);
     const ownedSources = new Set([...programSources].filter(relative => insideSourceRoots(relative, coverageRoots)));
-    const sourceContext = sourceContextFiles === undefined
+    const sourceContext = (sourceContextFiles === undefined
       ? contextFiles.filter(relative => ownedSources.has(relative))
-      : sourceContextFiles;
+      : sourceContextFiles).filter(relative => !TEST_SOURCE.test(relative) && !DECLARATION_SOURCE.test(relative));
     const bound = new Set([...files, ...sourceContext]);
     const contract = parseContract(repository, bound, document);
     const missing = [...ownedSources].filter(relative => !bound.has(relative));
