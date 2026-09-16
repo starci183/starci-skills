@@ -46,10 +46,10 @@ vocabularies:
   # `srs-gap` is the deepest of the record gaps and the one that was missing until 5-plus: the REQUIREMENT the
   # work is derived from does not settle the case, or settles it twice in two ways. It is not an `sds-gap` -
   # revising the design would invent the product rule the design is supposed to realise - and it is not an
-  # `authority` block either, because a confusing, contradictory or silent record is not a reason to stop: the
-  # runtime revises the record towards its most reasonable reading, says why, bumps the rev and moves on. Only a
-  # reading that changes an observable outcome about money, authority or customer data is taken provisionally on
-  # the runtime's recommendation instead of silently.
+  # `authority` block either when ordinary technical ambiguity has one safe reversible reading: the runtime may
+  # revise that record towards its most reasonable reading, say why and bump the rev. A reading that changes an
+  # observable product policy about money, authority or customer data remains an unresolved owner dependency.
+  # The runtime prepares distinct typed outcomes and one recommendation, but cannot infer or provisionally take it.
   # Keep this list in step with `BLOCKER_KINDS` of `kernel/reports.mjs`.
   blockers: [shared-change, srs-gap, sds-gap, interface-gap, brand-gap, grammar-gap, environment, authority]
   # Verdicts the kernel computes about a report (never the reporter's own claim) and routes on.
@@ -79,10 +79,9 @@ kinds:
   # What happens to the op that asked depends on the question. Something only the owner can provide (a
   # credential, an account on an outside system, a real dataset, a legal authority) and an effect nobody can
   # undo (a message to real customers, a payment, a deletion of real data, a publish) PAUSE it: there is
-  # nothing honest to do until the owner acts. Every other question leaves it running - the kernel takes this
-  # op's own recommendation provisionally so the work continues, and tells the owner it did. The owner answers
-  # in this op's own terminal with the option number, or later with `workflow-answer`; a different answer then
-  # reopens what was built on the recommendation.
+  # nothing honest to do until the owner acts. A decisive product-policy choice about money, authority or customer
+  # data also remains non-actionable until an exact owner answer/receipt selects one prepared outcome. Ordinary
+  # reversible technical ambiguity may continue on a recorded recommendation; it cannot stand in for that receipt.
   decision.prepare:
     family: design
     role: decide
@@ -91,7 +90,7 @@ kinds:
     # It reads what the question touches and writes the one thing the owner owns: the decision record.
     reads: [srs, sds, decision]
     writes: [decision]
-    purpose: Prepare one decision the runtime takes provisionally - question, analysis per side, options, recommendation - or answer it from the decided records when they already settle it. It never decides for the owner and never waits for them; the owner overturns a provisional decision later with workflow-answer.
+    purpose: Prepare one canonical decision question with distinct typed outcomes, analysis and one recommendation, or answer it from already-decided records. Ordinary reversible technical ambiguity may use a recorded recommendation. Decisive product policy about money, authority or customer data waits for an exact owner answer/receipt and is never inferred from the recommendation.
     reports:
       outcomes: [done, failed]
   provision.ask:
@@ -123,8 +122,8 @@ kinds:
   # derive its behaviour from. It reads the same records the decision did and it may not write a new `decision`
   # of its own - except the one exception both revise sequences state, where the readings differ in an
   # observable outcome about money, authority or customer data: then it does not choose silently, it reports
-  # `ask` with `question.kind: decision`, the numbered options and one recommendation, and the kernel's
-  # `decision.prepare` writes that decision record and continues on the recommendation until the owner overturns it.
+  # `ask` with `question.kind: decision`, distinct numbered outcomes and one recommendation. `decision.prepare`
+  # writes the draft; the requester remains non-actionable until the exact owner answer/receipt settles it.
   business.revise:
     family: repair
     role: decide
