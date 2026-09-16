@@ -195,7 +195,7 @@ function lockBinding(root, packages, packageRecord) {
   throw Error(`External dependency ${packageRecord.pkg.name}@${packageRecord.pkg.version} has no unique canonical lock binding.`);
 }
 
-function externalPackageInventory(record) {
+function externalPackageInventory(root, record) {
   const files = new Map(); let bytes = 0;
   const names = fs.readdirSync(record.root);
   if (names.some(name => ['node_modules', '.git'].includes(name))) {
@@ -213,7 +213,8 @@ function externalPackageInventory(record) {
     if (!files.has(relative)) { files.set(relative, canonical); bytes += stat.size; }
   };
   for (const absolute of roots) visit(absolute);
-  return { files: [...files].sort(([a], [b]) => a.localeCompare(b)), bytes, readRoots: [record.root] };
+  return { files: [...files].sort(([a], [b]) => a.localeCompare(b)), bytes,
+    readRoots: [...new Set([record.root, path.resolve(root, record.lockKey)])].sort() };
 }
 
 function staticReferences(ts, file, packageType) {
@@ -270,6 +271,7 @@ function closureInputs(ts, root, resolved, inventory, spawn) {
   const files = new Map();
   const pending = [resolved.entry];
   const builtins = new Set();
+  const edges = [];
   const add = (file, owner) => {
     const canonical = fs.realpathSync(file);
     if (!inside(owner.root, canonical)) throw Error('Grammar static dependency escapes its canonical package root.');
@@ -301,7 +303,10 @@ function closureInputs(ts, root, resolved, inventory, spawn) {
     const urls = resolveReferences(root, requests, spawn);
     for (let index = 0; index < requests.length; index += 1) {
       const { owner, reference } = requests[index], value = urls[index];
-      if (BUILTINS.has(value)) { builtins.add(value.startsWith('node:') ? value : `node:${value}`); continue; }
+      if (BUILTINS.has(value)) {
+        const builtin = value.startsWith('node:') ? value : `node:${value}`;
+        builtins.add(builtin); edges.push({ importer: requests[index].importer, reference, resolved: builtin }); continue;
+      }
       let dependency;
       if (path.isAbsolute(value)) dependency = fs.realpathSync(value);
       else {
@@ -310,6 +315,7 @@ function closureInputs(ts, root, resolved, inventory, spawn) {
         if (url.protocol !== 'file:') throw Error(`Grammar dependency resolution is not file-bound: ${reference.specifier}`);
         dependency = fs.realpathSync(fileURLToPath(url));
       }
+      edges.push({ importer: requests[index].importer, reference, resolved: dependency });
       let targetOwner;
       if (reference.specifier.startsWith('.')) {
         targetOwner = owner;
@@ -334,13 +340,14 @@ function closureInputs(ts, root, resolved, inventory, spawn) {
     .sort(([a], [b]) => a.localeCompare(b));
   const manifests = packageList.map(item => [`${packageLabels.get(item.root)}:package.json`, item.manifest]);
   return { files: [...new Map([...closureFiles, ...manifests].map(item => [item[0], item])).values()].sort(([a], [b]) => a.localeCompare(b)),
-    dependencyFiles: closureFiles.map(([name]) => name), builtins: [...builtins].sort(), packages: packageList.filter(item => item.kind === 'external') };
+    dependencyFiles: closureFiles.map(([name]) => name), builtins: [...builtins].sort(), edges,
+    packages: packageList.filter(item => item.kind === 'external') };
 }
 
 function identity(ts, root, resolved, spawn) {
   const inventory = packageInputs(resolved.root, resolved.sourceKind, resolved.entry);
   const closure = closureInputs(ts, root, resolved, inventory, spawn);
-  const externalInventories = closure.packages.map(item => ({ item, inventory: externalPackageInventory(item) }));
+  const externalInventories = closure.packages.map(item => ({ item, inventory: externalPackageInventory(root, item) }));
   return assembleIdentity(root, inventory, closure, externalInventories);
 }
 
@@ -360,17 +367,36 @@ function assembleIdentity(root, inventory, closure, externalInventories) {
   return { digest: hash.digest('hex'), files: files.map(([name]) => name), readFiles,
     package: inventory.pkg, bytes, dependencyFiles: closure.dependencyFiles, builtins: closure.builtins,
     externalPackages: closure.packages.map(item => ({ name: item.pkg.name, version: item.pkg.version, lockKey: item.lockKey })),
-    externalRecords: closure.packages };
+    externalRecords: closure.packages, resolutionEdges: closure.edges };
 }
 
-function recheckIdentity(root, resolved, before) {
+function recheckResolutions(root, before, spawn) {
+  const requests = before.resolutionEdges.map(edge => ({ importer: edge.importer, reference: edge.reference }));
+  const values = resolveReferences(root, requests, spawn);
+  for (let index = 0; index < before.resolutionEdges.length; index += 1) {
+    const edge = before.resolutionEdges[index], value = values[index];
+    let actual;
+    if (BUILTINS.has(value)) actual = value.startsWith('node:') ? value : `node:${value}`;
+    else if (path.isAbsolute(value)) actual = fs.realpathSync(value);
+    else {
+      let url;
+      try { url = new URL(value); } catch { throw Error('Grammar dependency re-resolution returned an invalid URL.'); }
+      if (url.protocol !== 'file:') throw Error(`Grammar dependency re-resolution is not file-bound: ${edge.reference.specifier}`);
+      actual = fs.realpathSync(fileURLToPath(url));
+    }
+    if (actual !== edge.resolved) throw Error(`Grammar dependency selection changed during the behavior probe: ${edge.reference.specifier}`);
+  }
+}
+
+function recheckIdentity(root, resolved, before, spawn) {
+  recheckResolutions(root, before, spawn);
   const inventory = packageInputs(resolved.root, resolved.sourceKind, resolved.entry);
   const externalInventories = before.externalRecords.map(item => {
     if (lockBinding(root, npmLock(root), item) !== item.lockKey) throw Error(`External dependency ${item.pkg.name} selection changed during the behavior probe.`);
-    return { item, inventory: externalPackageInventory(item) };
+    return { item, inventory: externalPackageInventory(root, item) };
   });
   return assembleIdentity(root, inventory, { dependencyFiles: before.dependencyFiles, builtins: before.builtins,
-    packages: before.externalRecords }, externalInventories);
+    edges: before.resolutionEdges, packages: before.externalRecords }, externalInventories);
 }
 
 function permissionCapabilities() {
@@ -444,7 +470,7 @@ export function checkGrammarGuards({ root, files, contextFiles = [], ruleIds } =
     const before = identity(loaded.ts, root, resolved, spawn), probe = executeProbe(resolved, before, spawn), reselected = resolvePackage(root, contract, spawn);
     reselected.sourceKind = contract.source.kind;
     if (reselected.root !== resolved.root || reselected.entry !== resolved.entry || reselected.selection !== resolved.selection) throw Error('The consumer Grammar package selection changed during the behavior probe.');
-    const after = recheckIdentity(root, reselected, before);
+    const after = recheckIdentity(root, reselected, before, spawn);
     if (before.digest !== after.digest || before.files.join('\0') !== after.files.join('\0')) throw Error('Grammar package or target selection inputs changed during the behavior probe.');
     result.execution = { engine: 'node-esm-import', node: process.version, permissions: permissionCapabilities(), vectorProfile: VECTOR_PROFILE,
       package: { name: before.package.name, version: before.package.version ?? null, root: slash(resolved.root), entry: slash(resolved.entry), selection: resolved.selection,

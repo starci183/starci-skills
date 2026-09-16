@@ -169,6 +169,32 @@ test('external imports and behavior reads are covered by canonical dependency cu
     assert.ok(changed.errors.some(item => item.message.includes('changed during the behavior probe')));
     assert.deepEqual(changed.checkedRuleIds, []);
   });
+  await t.test('a linked locked package is readable and every resolved edge is replayed after the probe', inner => {
+    const moduleSource = `export {COMMON_UI_RULE_IDS,PRESENTATION_STATES,defineGrammarRuleConformance,assertPresentationState} from '@external/helper';`;
+    const f = fixture(inner, { moduleSource });
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-grammar-selection-'));
+    inner.after(() => fs.rmSync(outside, { recursive: true, force: true }));
+    for (const name of ['before', 'after']) {
+      const directory = path.join(outside, name); fs.mkdirSync(directory);
+      fs.writeFileSync(path.join(directory, 'package.json'), JSON.stringify({ name: '@external/helper', version: '1.0.0', type: 'module', exports: './index.js' }));
+      fs.writeFileSync(path.join(directory, 'index.js'), `${goodModule}\n// ${name}`);
+    }
+    const link = path.join(f.root, 'node_modules/@external/helper'); fs.mkdirSync(path.dirname(link), { recursive: true });
+    fs.symlinkSync(path.join(outside, 'before'), link, 'junction');
+    f.write('package-lock.json', { lockfileVersion: 3, packages: { 'node_modules/@external/helper': { version: '1.0.0' } } });
+    const clean = checkGrammarGuards(f.input); assert.deepEqual(clean.errors, []); assert.deepEqual(clean.violations, []);
+    let redirected = false;
+    const spawn = (command, args, options) => {
+      const result = spawnSync(command, args, options);
+      if (!redirected && args.some(value => value.includes('starci/grammar-guard-probe@1'))) {
+        fs.unlinkSync(link); fs.symlinkSync(path.join(outside, 'after'), link, 'junction'); redirected = true;
+      }
+      return result;
+    };
+    const changed = checkGrammarGuards(f.input, { spawn });
+    assert.equal(redirected, true); assert.ok(changed.errors.some(item => item.message.includes('selection changed during the behavior probe')));
+    assert.deepEqual(changed.checkedRuleIds, []);
+  });
   await t.test('a bare package absent from the target lock cannot provide the guard API', inner => {
     const moduleSource = `export {COMMON_UI_RULE_IDS,PRESENTATION_STATES,defineGrammarRuleConformance,assertPresentationState} from '@external/helper';`;
     const f = fixture(inner, { moduleSource });

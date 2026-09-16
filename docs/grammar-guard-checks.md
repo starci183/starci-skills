@@ -38,8 +38,11 @@ separately. Absolute/file/data imports, non-literal module names, ambiguous lock
 bindings, interior links and package escapes make coverage unavailable.
 
 This is a bounded identity, not a claim that every file in the repository
-belongs to the published package. The same byte inventory and public selection
-must remain before and after the probe. External static dependencies currently
+belongs to the published package. Linked packages grant the probe both the
+lock-selected logical path and its canonical path, backed by the same hashed
+inventory. After the probe, the adapter replays every resolved static edge and
+requires the same canonical target, then rechecks the byte inventory and public
+selection. External static dependencies currently
 require npm lock package records; another lock format with external runtime
 dependencies is unavailable rather than treated as equivalent evidence.
 
