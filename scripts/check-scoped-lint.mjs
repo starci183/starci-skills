@@ -54,7 +54,7 @@ function bindToolPackage(entry,tools){let root=path.dirname(entry);while(path.di
 function configurationInputs(repository,{compiler=null,extraFiles=[],scopeFiles=[]}={}){
   const roots=configurationRoots(repository,scopeFiles),files=new Set(roots.files),tools=new Set(),unsafe=new Set(roots.unsafe),issues=roots.unsafe.map(file=>({code:'CONFIG_PATH_UNSAFE',file})),pending=[],typescriptConfigs=new Set();
   for(const relative of roots.files){const absolute=path.resolve(repository,relative);pending.push(absolute);if(/^tsconfig(?:\..+)?\.json$/.test(path.basename(relative)))typescriptConfigs.add(absolute);}
-  for(const value of extraFiles){if(typeof value!=='string'||!value.trim())continue;const absolute=path.resolve(repository,value);if(!inside(repository,absolute)){issues.push({code:'CONFIG_PATH_OUTSIDE_REPOSITORY',file:String(value)});continue;}const relative=clean(path.relative(repository,absolute));files.add(relative);pending.push(absolute);}
+  for(const value of extraFiles){if(typeof value!=='string'||!value.trim())continue;const absolute=path.resolve(repository,value);if(!inside(repository,absolute)){issues.push({code:'CONFIG_PATH_OUTSIDE_REPOSITORY',file:String(value)});continue;}files.add(clean(path.relative(repository,absolute)));}
   const seen=new Set();let parsedCompiler=compiler;
   while(pending.length){let absolute=pending.pop();try{absolute=fs.realpathSync(absolute);}catch{}if(seen.has(absolute))continue;seen.add(absolute);const local=inside(repository,absolute)&&!clean(absolute).includes('/node_modules/'),label=local?clean(path.relative(repository,absolute)):clean(absolute);
     try{
