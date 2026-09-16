@@ -55,12 +55,14 @@ writes:
     path: .starciwork/_local/workflows/<workflow>/goal.json +
       .starciwork/_local/workflows/<workflow>/goal.md
     fields:
+      - schema
       - rev
       - sections
       - done
       - derivedFrom
     content:
-      en: Write goal v(n+1) whole - rev bumped by exactly one, derivedFrom naming the previous rev
+      en: Write goal v(n+1) whole - goal.json carries schema starci/workflow-goal@1, goal.md its human
+        rendering - rev bumped by exactly one, derivedFrom naming the previous rev
         and its digest, done still a checkable metrics block. Every changed section is carried at
         its new value; sections the revision did not touch are carried byte-identical. A direct edit
         that leaves no diff, a rev jump other than +1, or a done block the kernel cannot evaluate is
@@ -123,7 +125,9 @@ steps:
       - node
       - evidence
     action:
-      en: Validate the new goal - ids stable, done metrics still evaluable, rev exactly +1, diff
+      en: Validate the new goal - `starci validate` over the node and evidence layout, goal.json
+        carrying schema starci/workflow-goal@1, ids stable, done metrics still evaluable, rev
+        exactly +1, diff
         complete - and report done once with the rev transition and the invalidation surface.
         Reports settled on the old rev stay bound to it and never count toward the new one.
 proofs:
@@ -173,3 +177,9 @@ goalPolicy:
   authorityWidening: owner-decision-only
   silentWidening: never
   doneBlock: checkable-metrics-required
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

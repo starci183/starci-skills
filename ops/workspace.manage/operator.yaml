@@ -190,12 +190,14 @@ executionModes:
           - id
           - extensions
         content:
-          en: Initialize only an explicitly new canonical workspace; reuse an existing workspace unchanged.
+          en: Initialize only an explicitly new canonical workspace (schema work/workspace@1); reuse an
+            existing workspace unchanged.
             Never invent repository/environment resources merely to satisfy setup.
       - id: node
         path: .starciwork/<business>/index.yaml + .starciwork/<business>/setup/index.yaml + selected child
           directories/index.yaml
         fields:
+          - schema
           - id
           - kind
           - required
@@ -205,7 +207,8 @@ executionModes:
           - "description: Purpose / Scope / Done when / Decisions / Unknowns"
           - "extensions.work3.nativeGoal: actual returned current-task goal reference only"
         content:
-          en: "Capture the customer-language product overview first in .starciwork/business/index.yaml using
+          en: "Every authored index.yaml is a work/node@2 record at its catalog-declared path. Capture the
+            customer-language product overview first in .starciwork/business/index.yaml using
             readable block prose for purpose, customerUnderstanding, desiredOutcome, scope and
             openQuestions; it does not approve inferred module requirements. Write other parent
             purpose with no state. The one setup leaf .starciwork/<business>/setup/index.yaml is N
@@ -245,6 +248,7 @@ executionModes:
       - id: resource
         path: .starciwork/_resources/repositories/<resource>/resource.yaml
         fields:
+          - schema
           - id
           - kind
           - owner
@@ -255,7 +259,8 @@ executionModes:
           - details.sourceRoots
           - details.workRootRef
         content:
-          en: Create/repair only the explicitly selected repository declaration from verified Git metadata;
+          en: Create/repair only the explicitly selected repository declaration (schema work/resource@1) from
+            verified Git metadata;
             machine-specific checkout paths stay local or observations, not portable identity.
       - id: matrixHandoff
         path: E/job-result.json
@@ -344,7 +349,7 @@ executionModes:
     proofs:
       - id: binding
         requirement:
-          en: Run workspace validation; every cited ID/path exists or is explicitly proposed, required
+          en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
             assertions are covered, input bindings are current, and an honest not-run/fail cannot
             earn done.
       - id: scope
@@ -442,7 +447,8 @@ executionModes:
           en: When the imported source contains application deployment, .stacks compose material or
             bootstrap/recovery declarations, load the whole-application dev/VPS contract and its
             .starciwork schema so deployment files are classified and mapped as stack material -
-            observed facts with provenance - never silently dropped as clutter and never promoted
+            observed facts with provenance, checked against `starci stacks check` where a rendered
+            deployment is inspected - never silently dropped as clutter and never promoted
             to accepted deployment authority. This conditional read grants no extra deployment or
             source scope.
       - id: matrix
@@ -467,7 +473,8 @@ executionModes:
           - id
           - extensions
         content:
-          en: Initialize only the explicitly selected new canonical workspace; preserve an existing identity.
+          en: Initialize only the explicitly selected new canonical workspace (schema work/workspace@1);
+            preserve an existing identity.
             Never put the canonical root inside the selected disposable target.
       - id: node
         path: .starciwork/<business>/index.yaml + .starciwork/<business>/migration/index.yaml + optional
@@ -487,7 +494,8 @@ executionModes:
           - "description: Pilot boundary / Observed source mapping / Approved intent / Candidate
             scope / Unknowns"
         content:
-          en: "N is the operations migration-review leaf, with inventory/preservation/import assertions; the
+          en: "Every authored index.yaml is a work/node@2 record at its catalog-declared path. N is the
+            operations migration-review leaf, with inventory/preservation/import assertions; the
             business parent has no state/completion. Capture the current customer-language product
             overview in .starciwork/business/index.yaml before module SRS import. Every newly
             imported business/architecture/ui/implementation/UAT leaf starts state:uninvestigate
@@ -516,7 +524,8 @@ executionModes:
           - details
           - files:[{path}]
         content:
-          en: Record inspected repository root/identity/full commits and source mappings in details; keep
+          en: Record inspected repository root/identity/full commits and source mappings in details on
+            work/resource@1 records; keep
             observed versus inferred facts explicit. Preserve selected nonsecret source/design
             documents and images in imports assets with files relative paths. A source image is not
             product screenshot evidence. Preserve original artifact names, actual hashes and origin
@@ -680,7 +689,7 @@ executionModes:
     proofs:
       - id: binding
         requirement:
-          en: Run workspace validation; every cited ID/path exists or is explicitly proposed, required
+          en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
             assertions are covered, input bindings are current, and an honest not-run/fail cannot
             earn done.
       - id: source
@@ -741,3 +750,10 @@ executionModes:
       intentAuthority: approved-intent-not-inferred-source
       cleanup: explicit-exact-preserved-inactive-only
       registeredWorktreeRemoval: git-without-force
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+    - starci-stacks-check
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

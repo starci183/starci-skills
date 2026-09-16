@@ -292,7 +292,7 @@ executionModes:
     proofs:
       - id: binding
         requirement:
-          en: Run workspace validation; every cited ID/path exists or is explicitly proposed, required
+          en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
             assertions are covered, input bindings are current, and an honest not-run/fail cannot
             earn done.
       - id: published-ref
@@ -408,6 +408,7 @@ executionModes:
       - id: resource
         path: .starciwork/_resources/releases/<resource>/resource.yaml
         fields:
+          - schema
           - id
           - kind
           - owner
@@ -418,7 +419,8 @@ executionModes:
           - details.target
           - details.deploymentEvidence
         content:
-          en: Keep immutable artifact identity and actual deployment evidence; do not retag/rebuild and call
+          en: Keep immutable artifact identity and actual deployment evidence on the work/resource@1
+            record; do not retag/rebuild and call
             it the same release.
       - id: evidence
         path: E/manifest.yaml + E/deployment.json + E/probes.json + E/recovery.json + E/result.md
@@ -517,7 +519,7 @@ executionModes:
     proofs:
       - id: binding
         requirement:
-          en: Run workspace validation; every cited ID/path exists or is explicitly proposed, required
+          en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
             assertions are covered, input bindings are current, and an honest not-run/fail cannot
             earn done.
       - id: deployment
@@ -731,7 +733,7 @@ executionModes:
     proofs:
       - id: binding
         requirement:
-          en: Run workspace validation; every cited ID/path exists or is explicitly proposed, required
+          en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
             assertions are covered, input bindings are current, and an honest not-run/fail cannot
             earn done.
       - id: migration
@@ -773,3 +775,9 @@ executionModes:
       piece: Stable selected piece slug
       flow: Selected UAT journey slug
       screen: Selected surface/state slug
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

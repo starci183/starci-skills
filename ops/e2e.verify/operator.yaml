@@ -279,8 +279,8 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: Workspace validation ran; every cited ID and path exists or is explicitly proposed, the input
-        bindings are current, and an honest not-run or fail cannot earn done.
+      en: "`starci validate` ran; every cited ID and path exists or is explicitly proposed, the input
+        bindings are current, and an honest not-run or fail cannot earn done."
   - id: coverage
     requirement:
       en: Every required assertion maps to exactly one scenario that ran, with its original ID, its client
@@ -359,3 +359,9 @@ e2ePolicy:
   productCode: unchanged
   environmentBlocker: provably-unfixable-only
   teardown: run-owned-ephemeral-disposed
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

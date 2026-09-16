@@ -197,6 +197,26 @@ sections:
         auto-rerun consumers. Report impact and run only the next separately selected eligible op.
         Changes in unbound external source/runtime state still require actual inspection and
         resource revision updates; this is not a background watcher.
+  - title: Canonical layout ownership
+    blocks:
+      - ".claude owns the layout of .starciwork and .stacks: directory structure, file names and
+        the `schema:` const of every record class are defined in the catalog, never chosen by the
+        agent. An operation writes each artifact only at its declared path and name. A wrong path,
+        wrong file name, missing `schema:` const or wrong const fails the run; the layout is never
+        adapted to fit an observed file."
+      - "Every structured artifact an op writes carries its declared `schema:` const as a record
+        key: node records `work/node@2`, the workspace `work/workspace@1`, resources
+        `work/resource@1`, evidence manifests `work/evidence@1` (emitted by the kernel from the
+        op's manifest fields), the workflow goal `starci/workflow-goal@1`, intake records
+        `starci/workflow-intake@1`, .stacks compose `starci/application-stacks@1`. Staged handoffs
+        carry the request-frozen contract the kernel stores as `starci/staged-job-result@1` /
+        `starci/staged-op-response@1`. Repository-side artifacts (source, tests, documents)
+        carry no YAML const of their own but land exactly at the declared ceiling path."
+      - "Every operation's checks include the record-class validator `starci validate` for the
+        .starciwork artifacts it writes; operations that materialize or verify .stacks deployments
+        also run `starci stacks check`. An op that authors `extensions.work3.checks` on a node
+        includes the validator there. Layout, name and schema violations are operator failures,
+        not content to repair silently."
   - title: Evidence, completion and commits
     blocks:
       - "Before executing, establish the selected node's current `inputDigest` using the read-only

@@ -84,12 +84,13 @@ writes:
   - id: node
     path: N/index.yaml
     fields:
+      - schema
       - "ui: {status,intent,surfaces,states,coverage,accessibility,responsive,assets,artworkSlots,observations,gaps}"
       - assets:[{path}]
       - assertions
     content:
       en: >-
-        Write the selected image-first direction in the approved UI node. Keep every required screen and reachable
+        Write the selected image-first direction in the approved UI node (work/node@2). Keep every required screen and reachable
         state, then add `ui.coverage`: scale, representativeScreens and a map of screen/state/viewport to actual
         Grammar components, derivation and optional directionAsset. For a large frontend task select a deliberately
         small critical-screen set covering the highest-risk anatomy and journeys; derive the rest in the map.
@@ -192,7 +193,7 @@ proofs:
   - id: binding
     requirement:
       en: >-
-        Workspace validation passes; every cited ID/path and asset byte exists, required assertions are covered,
+        `starci validate` passes; every cited ID/path and asset byte exists, required assertions are covered,
         input bindings are current, and an honest not-run/fail cannot earn done.
 blockers:
   - code: IMAGEGEN_TOOL_UNAVAILABLE
@@ -220,3 +221,9 @@ placeholders:
   piece: Stable selected piece slug
   flow: Selected UAT journey slug
   screen: Selected surface/state slug
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

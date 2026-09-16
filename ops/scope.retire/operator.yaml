@@ -57,6 +57,7 @@ writes:
   - id: node
     path: N/index.yaml
     fields:
+      - schema
       - state
       - blocker
       - completion.inputDigest
@@ -66,7 +67,7 @@ writes:
       - assertions
       - required
     content:
-      en: "Write only the explicitly authorized retirement decision/scope before review; preserve stable
+      en: "Write only the explicitly authorized retirement decision/scope on the work/node@2 record before review; preserve stable
         IDs and obligations. Actual removal/retention observations belong in evidence. Graph edits
         apply only to the explicitly selected approved scope: declare real prerequisite node IDs in
         dependsOn and semantic input node/resource IDs in refs. No catalogue-wide chain or new
@@ -167,7 +168,7 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: Run workspace validation; every cited ID/path exists or is explicitly proposed, required
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
         assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
         done.
   - id: retention
@@ -196,3 +197,9 @@ placeholders:
   piece: Stable selected piece slug
   flow: Selected UAT journey slug
   screen: Selected surface/state slug
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

@@ -41,6 +41,7 @@ writes:
   - id: intake
     path: .starciwork/_local/workflows/<workflow>/intake.json
     fields:
+      - schema
       - request
       - workflow
       - scope
@@ -48,7 +49,7 @@ writes:
       - exclusions
       - open
     content:
-      en: The typed handoff the calling chat hands to the Orca host - the request digest, exactly one
+      en: The typed handoff (schema starci/workflow-intake@1) the calling chat hands to the Orca host - the request digest, exactly one
         selected workflow id from the catalog, the scope statement (proposed nodes, dependencies and
         exclusions for scope.define to bound), the acceptance criteria and the unresolved questions.
         No guessed defaults; an unanswerable question is carried in open, not answered.
@@ -98,7 +99,8 @@ steps:
     writes:
       - intake
     action:
-      en: Select exactly one matching workflow from the catalog and write the intake record - the
+      en: Select exactly one matching workflow from the catalog and write the intake record carrying
+        schema starci/workflow-intake@1 - the
         selection, the scope statement with proposed nodes/dependencies/exclusions, the criteria and
         the open questions. One request can need several workflows; this op selects the one that
         owns the first segment and names the rest as open items, never collapsing a multi-stage
@@ -112,6 +114,8 @@ steps:
     action:
       en: Verify the selected workflow can produce every criterion assigned to this segment and that
         the scope statement bounds it - other requested outcomes remain covered as named open items.
+        Verify the written intake record carries schema starci/workflow-intake@1 at its declared
+        _local path; a wrong path, name or schema fails the run.
         If no catalog workflow safely matches, return blocked with the exact missing decision or
         contract gap; never use analysis as a broad fallback executor.
   - reads:
@@ -169,3 +173,9 @@ intakePolicy:
   successors: named-open-items-never-hidden
   execution: none
   host: calling-chat-app-not-kernel
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

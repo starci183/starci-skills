@@ -73,12 +73,13 @@ writes:
   - id: node
     path: N/index.yaml
     fields:
+      - schema
       - "brand: {identity,colors,typography,mascot,logo,iconography,imagery,voice,motion,forbidden,sources,artworkSlots}"
       - assets:[{path}]
       - assertions
       - rev
     content:
-      en: "Write the whole identity into the one brand record: identity (name and the installed grammar
+      en: "Write the whole identity into the one brand record (schema work/node@2): identity (name and the installed grammar
         family), colour tokens as grammar token name -> value with role and the policy that governs them
         (`dangerMayMatchPrimary`, `minContrast`), typography, mascot, logo, iconography, imagery, voice,
         motion, the explicit forbidden list, the `artworkSlots` conventions every later prompt fills, and
@@ -200,7 +201,7 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: Run workspace validation; every cited ID/path exists or is explicitly proposed, required
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
         assertions are covered, input bindings are current, and an honest not-run/fail cannot earn done.
   - id: token-traceability
     requirement:
@@ -253,3 +254,9 @@ placeholders:
   piece: Stable selected piece slug
   flow: Selected UAT journey slug
   screen: Selected surface/state slug
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

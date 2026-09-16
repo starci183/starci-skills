@@ -23,8 +23,8 @@ reads:
     purpose:
       en: When the selected scope touches application deployment, .stacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
-        credential custody, lifecycle commands and existing consumers. Run the static stacks
-        check when validating a materialized stack; bind its exact inputs and limitations.
+        credential custody, lifecycle commands and existing consumers. Run `starci stacks check`
+        when validating a materialized stack; bind its exact inputs and limitations.
         Acceptance additionally requires the selected real startup, persistence, recovery and
         application checks. This conditional read grants no extra deployment or source scope.
   - id: official-docs
@@ -260,8 +260,8 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: Workspace validation ran; every cited ID and path exists or is explicitly proposed, the input
-        bindings are current, and an honest not-run or fail cannot earn done.
+      en: "`starci validate` ran; every cited ID and path exists or is explicitly proposed, the input
+        bindings are current, and an honest not-run or fail cannot earn done."
   - id: declaration
     requirement:
       en: The integration under proof is the one a business or architecture record declared, with its
@@ -339,3 +339,10 @@ integrationPolicy:
   missingCredential: blocked-environment-with-custody-slug-and-variable-name
   secretValues: never-written
   evidenceProof: live
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+    - starci-stacks-check
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

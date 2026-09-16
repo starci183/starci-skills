@@ -78,13 +78,15 @@ writes:
   - id: node
     path: .starciwork/<business>/architecture/{overview,sds/**}/index.yaml
     fields:
+      - schema
       - refs
       - dependsOn
       - assertions
       - required
       - extensions.work3.sds
     content:
-      en: Author overview plus typed extensions.work3.sds leaves in flows, components, contracts,
+      en: Every authored index.yaml is a work/node@2 record at its catalog-declared path. Author
+        overview plus typed extensions.work3.sds leaves in flows, components, contracts,
         data, quality, deployment, decisions and verification. Parent indexes carry only
         starci/sds-aggregate@1 metadata. Components prescribe logical responsibilities and
         interfaces without repository roles, paths, symbols, signatures, source status or revision
@@ -233,7 +235,7 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: Run workspace validation; every cited ID/path exists or is explicitly proposed, required
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
         assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
         done. Legacy specification@3 remains a readable compatibility input, never new
         authoring output.
@@ -285,3 +287,9 @@ placeholders:
   piece: Stable selected piece slug
   flow: Selected UAT journey slug
   screen: Selected surface/state slug
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

@@ -57,6 +57,7 @@ writes:
   - id: node
     path: N/index.yaml
     fields:
+      - schema
       - state
       - blocker
       - completion.inputDigest
@@ -64,7 +65,8 @@ writes:
       - description
       - extensions.work3.docs
     content:
-      en: Write the document's own declaration on the selected node - which documents it owns under
+      en: Write the document's own declaration on the selected node (schema work/node@2 preserved) -
+        which documents it owns under
         extensions.work3.docs - plus state/blocker/completion. The document content itself belongs
         to the docs write and observations to evidence; do not widen refs/dependencies/acceptance to
         obtain pass.
@@ -76,7 +78,8 @@ writes:
       - body
       - source references
     content:
-      en: Author or update the selected document in place - real prose grounded in the records and
+      en: Author or update the selected document in place at the catalog-declared docs path and name
+        (prose carries no schema const) - real prose grounded in the records and
         code actually read, with every command, path, symbol and behavior named as observed and
         every source cited. Documentation that must live beside product code is proposed as
         separately selected scope, never written into the repository from this op. Preserve stable
@@ -159,14 +162,14 @@ steps:
       - evidence
       - matrixHandoff
     action:
-      en: Declare the authored documents on the node, run workspace validation over the edited tree
+      en: Declare the authored documents on the node, run the record-class validator `starci validate` over the edited tree
         and report done once with the docs map and open questions. When selected in a job matrix,
         produce E/job-result.json bound to the exact request, its output schema and every required
         criterion. Never dispatch a successor.
 proofs:
   - id: binding
     requirement:
-      en: Run workspace validation; every cited ID/path exists or is explicitly proposed, required
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
         assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
         done.
   - id: grounded
@@ -213,3 +216,9 @@ docsPolicy:
   repoWrite: never
   untraceableClaim: cut-not-kept
   openQuestions: recorded-honestly
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
