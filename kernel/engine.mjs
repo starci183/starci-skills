@@ -354,10 +354,13 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
      * Filesystem effects are not called absent: the launch candidate is frozen under the retained writer fence,
      * and its observed byte delta becomes the only baseline a fresh attempt may inherit.
      */
-    settleStoppedOperation(op,{dispatch=op?.dispatch,settlement=null,reason='native worker stopped without a report'}={}){
+    settleStoppedOperation(op,{dispatch=op?.dispatch,settlement=null,reason='native worker stopped without a report',acceptedPreparedDecision=false}={}){
       const lease=op?.lease;if(!lease)return {ok:false,reason:'operation has no durable native lease'};
       const effectState=settlement?.effectState??'unknown';
-      if(settlement?.schema!=='starci/orca-supervised-settlement@1'||settlement.dispatchId!==dispatch||effectState!=='none')return {ok:false,effectState,reason:'typed host settlement did not prove this exact native process stopped'};
+      const preparedTakeover=acceptedPreparedDecision&&settlement?.schema==='starci/orca-user-takeover-settlement@1'&&
+        settlement.dispatchId===dispatch&&settlement.dispatchStatus==='completed'&&settlement.workerState==='succeeded'&&settlement.workerStage==='settled'&&
+        settlement.capabilityRevoked===true&&settlement.ownershipState==='user_owned';
+      if((settlement?.schema!=='starci/orca-supervised-settlement@1'&&!preparedTakeover)||settlement.dispatchId!==dispatch||effectState!=='none')return {ok:false,effectState,reason:'typed host settlement did not prove this exact native process stopped'};
       let job=journal.getJob(lease.jobId),events=journal.events({workflowId:lease.workflowId});
       const attempts=Array.isArray(op?.launch?.attempts)?op.launch.attempts:[],candidate=op?.candidate?.identity,
         leaseRows=journal.db.prepare('SELECT resource_key,units FROM leases WHERE job_id=? AND token=? ORDER BY resource_key').all(lease.jobId,lease.leaseToken),
@@ -390,6 +393,12 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       catch(error){return {ok:false,effectState:'unknown',reason:`candidate freeze failed after native stop: ${String(error?.message??error)}`};}
       if(frozen.status!=='sealed')return {ok:false,effectState:'unknown',reason:'candidate effects could not be sealed',pending:frozen};
       const observed=[...new Set(frozen.observedFiles??[])].sort();
+      if(acceptedPreparedDecision){
+        if(observed.length)return {ok:false,effectState:'partial',reason:'prepared decision retry produced candidate changes that were never accepted',observedFiles:observed,candidateDigest:op.candidateDigest??null};
+        const completed=this.settled(op,{status:'succeeded',reason:`${reason}; prepared decision retry stopped with no candidate changes`});
+        return completed.ok?{ok:true,effectState:'none',observedFiles:[],candidateDigest:op.candidateDigest??null,acceptedPreparedDecision:true}:
+          {ok:false,effectState:'unknown',reason:completed.reason??'prepared decision durable job could not be completed'};
+      }
       op.ownedBaselinePaths=observed;
       op.retryReconciled={schema:'starci/native-retry-reconciliation@1',jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,
         dispatch,observedFiles:observed,candidateDigest:op.candidateDigest??null};

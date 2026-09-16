@@ -330,6 +330,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
   const afterCook=text.split('## Cook until done')[1];
   const processText=afterCook.split('## Never')[0];
   const namedAudit=isAuditOperation(op);
+  const nativeReportAuthority=state.hostAdapter!=='headless';
   const cook=namedAudit?[
     '## Complete the named audit',
     'Run the declared measurement against unchanged inputs. A valid clean result (exit 0) is `done`; a valid result with findings (exit 1) is `partial`, with the actual findings in `open[]` and checks. This `partial` completes the measurement: the kernel independently verifies it and records the audit as done with findings. It does not require session-budget exhaustion, source repair, or repeated checks until clean.',
@@ -397,8 +398,9 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
       `An error the whole-tree validator reports under a path outside your allowlist is not yours: name it in your summary and report as if that check passed for your files. The kernel judges the tree by what you could have caused, never by a red corner another workflow owns.`
     ]),``,
     `## Report (exactly once, at the end)`,
-    `\`node ${launcher} report --run ${run} --from <your terminal> --task <op task> --dispatch <your dispatch> --reports-dir ${reportsDir} --outcome done|partial|failed|ask|blocked --summary "<what you did, what the checks showed, what is left>" ${namedAudit?'':'--files <comma-separated changed paths> '}--checks-file ${checksFile} [--open "<item>,<item>"] [--question "<text>" --options "a,b"] [--blocker shared-change|srs-gap|sds-gap|interface-gap|brand-gap|grammar-gap|environment|authority:<detail>] [--credential-request-file <safe JSON>]\``,
-    ...(namedAudit?[`- \`--files\` is exactly empty for this named audit. Findings belong in the summary, checks and \`open[]\`; they never become files.`]:[`- \`--files\` must acknowledge every net changed path. Use source-relative paths for source files; for routed Work files use \`.starciwork/...\` or the displayed absolute path. One relative non-Work name belongs only to source. Unknown or escaping entries authorize nothing; an unchanged touched-and-reverted extra is diagnostic.`]),
+    `\`node ${launcher} report --run ${run} --from <your terminal> --task <op task> --dispatch <your dispatch> ${nativeReportAuthority?'--capability "<your Dispatch capability from the injected Orca preamble>" ':''}--reports-dir ${reportsDir} --outcome done|partial|failed|ask|blocked --summary "<what you did, what the checks showed, what is left>" ${namedAudit?'':'--files <comma-separated changed paths> '}--checks-file ${checksFile} [--open "<item>,<item>"] [--question "<text>" --options "a,b"] [--blocker shared-change|srs-gap|sds-gap|interface-gap|brand-gap|grammar-gap|environment|authority:<detail>] [--credential-request-file <safe JSON>]\``,
+    ...(nativeReportAuthority?[`- Orca requires the exact Dispatch capability already supplied in your injected worker preamble to authorize this lifecycle signal. Pass it only to this report invocation. Never invent it, use another Dispatch's capability, or copy its value into source, reports, checks, evidence or progress notes. A report file alone does not prove Orca accepted the signal.`]:[]),
+    ...(namedAudit?[`- \`--files\` is exactly empty for this named audit. Findings belong in the summary, checks and \`open[]\`; they never become files.`]:[`- \`--files\` must acknowledge every net changed operation output path. Exclude the exact check control file \`${checksFile}\` and the report control file: they are kernel transport, not operation output. Use source-relative paths for source files; for routed Work files use \`.starciwork/...\` or the displayed absolute path. One relative non-Work name belongs only to source. Unknown or escaping entries authorize nothing; an unchanged touched-and-reverted extra is diagnostic.`]),
     `- \`done\` needs every check exiting 0 and no open item; otherwise report \`partial\` (with \`--open\`) or \`failed\`.`,
     `- Only an \`integration.verify\` whose declared live check explicitly rejected a credential as invalid or expired may report \`blocked\` \`environment\` with \`--credential-request-file ${credentialRequestFile}\`. Writing this nonsecret report artifact beside your checks file is permitted. The file is exactly \`{"reason":"invalid|expired","variables":["DECLARED_VARIABLE"],"check":"declared-failed-check"}\`, using one actual reason. The named check must have a nonzero exit and safe observed evidence, with its declared command. Never include values, custody paths or a baseline; the kernel binds the request to the exact tested custody version. Other provider failures keep their actual failure path.`,
     `- \`ask\` pauses you until the kernel answers in this terminal; then continue and report again.`,
@@ -553,9 +555,10 @@ function stoppedRetryDispatchId(op){
   const persisted=attempts[0]?.dispatchId;
   return typeof persisted==='string'&&persisted?persisted:null;
 }
-export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost=settleDispatch,createRuntime=createEngineRuntime,git=spawnSync,waitFn=sleepSync}={}){
+export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost=settleDispatch,createRuntime=createEngineRuntime,git=spawnSync,waitFn=sleepSync,acceptedPreparedDecision=false}={}){
   const lease=op?.lease,dispatchId=stoppedRetryDispatchId(op),taskId=op?.launch?.task,candidate=op?.candidate?.identity;
-  if(!lease||!dispatchId||!taskId||op.dispatch||op.terminal)return {ok:false,reason:'stopped native retry identity is incomplete or still active'};
+  const preparedDecision=acceptedPreparedDecision&&op?.status==='done'&&preparedOwnerDecision(op);
+  if(!lease||!dispatchId||!taskId||(!preparedDecision&&(op.dispatch||op.terminal)))return {ok:false,reason:'stopped native retry identity is incomplete or still active'};
   // The exact binding is lease <-> candidate identity, attempt for attempt. The operation's own counter may sit
   // past the lease (a partial report advanced it before the attempt was settled) - never behind it.
   const exactLease=lease.workflowId===state.id&&lease.opId===op.id&&lease.attempt<=(op.attempt??1)&&lease.generation===state.engine?.generation&&
@@ -569,18 +572,25 @@ export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost
   const processExited=['failed','stopped','succeeded'].includes(worker?.state)&&observation?.exactWorker===true&&(observation?.status==='exited'||worker?.stage==='process_exited');
   const terminalGone=!terminal||(terminal.connected===false&&terminal.writable===false&&(terminal.paneRuntimeId===undefined||terminal.paneRuntimeId===null||terminal.paneRuntimeId===-1));
   const stopped=processExited&&(terminalGone||worker?.stage==='process_exited');
-  if(dispatch?.id!==dispatchId||dispatch?.task_id!==taskId||dispatch?.run_id!==state.run||worker?.dispatch_id!==dispatchId||!stopped)
+  const terminalResource=result?.terminalResource,ownershipState=String(terminalResource?.ownershipState??'').toLowerCase(),
+    userTakeover=preparedDecision&&dispatch?.status==='completed'&&Boolean(dispatch?.completed_at)&&Boolean(dispatch?.capability_revoked_at)&&
+      worker?.state==='succeeded'&&worker?.stage==='settled'&&ownershipState==='user_owned'&&terminalResource?.originDispatchId===dispatchId&&
+      terminalResource?.terminalHandle===(op.terminal??terminal?.handle);
+  if(dispatch?.id!==dispatchId||dispatch?.task_id!==taskId||dispatch?.run_id!==state.run||worker?.dispatch_id!==dispatchId||(!stopped&&!userTakeover))
     return {ok:false,reason:'Orca does not prove the exact current Run/Task/Dispatch worker exited'};
-  let settlement;try{settlement=settleHost(orca,dispatchId,{cwd:state.worktree,reason:'workflow retry reconciles an exited native attempt',terminalHandle:terminal?.handle??null,closeTerminal:!terminalGone,wait:waitFn});}
+  let settlement;
+  if(userTakeover)settlement={schema:'starci/orca-user-takeover-settlement@1',dispatchId,effectState:'none',dispatchStatus:dispatch.status,
+    workerState:worker.state,workerStage:worker.stage,capabilityRevoked:true,ownershipState};
+  else try{settlement=settleHost(orca,dispatchId,{cwd:state.worktree,reason:'workflow retry reconciles an exited native attempt',terminalHandle:terminal?.handle??null,closeTerminal:preparedDecision?false:!terminalGone,wait:waitFn});}
   catch(error){return {ok:false,reason:`typed host settlement failed: ${error.message}`};}
   if(settlement?.effectState!=='none')return {ok:false,reason:`exact native process settlement remains ${settlement?.effectState??'unknown'}`};
   const runtime=createRuntime({store,state,eligibility:()=>({eligible:false,reasons:['retry reconciliation only']}),git});
   try{
-    const reconciled=runtime.settleStoppedOperation(op,{dispatch:dispatchId,settlement,reason:'public workflow retry proved the exact native worker exited'});
+    const reconciled=runtime.settleStoppedOperation(op,{dispatch:dispatchId,settlement,reason:'public workflow retry proved the exact native worker exited',acceptedPreparedDecision:preparedDecision});
     if(!reconciled.ok)return reconciled;
-    store.appendEvent({event:'retry-native-attempt-reconciled',op:op.id,jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,
+    store.appendEvent({event:preparedDecision?'prepared-decision-lease-reconciled':'retry-native-attempt-reconciled',op:op.id,jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,
       run:state.run,task:taskId,dispatch:dispatchId,candidateDigest:reconciled.candidateDigest??null,observedFiles:reconciled.observedFiles??[],
-      proof:'exact Orca worker exited; typed process settlement succeeded; candidate bytes were sealed while its writer fence remained held'});
+      proof:preparedDecision?(userTakeover?'the owner request was already prepared; Orca completed the exact worker, revoked its capability and transferred the retained terminal to the user; sealed candidate had no changes':'the owner request was already prepared; exact Orca worker exited; typed process settlement succeeded; sealed candidate had no changes'):'exact Orca worker exited; typed process settlement succeeded; candidate bytes were sealed while its writer fence remained held'});
     store.saveState(state);
     return {ok:true,dispatch:dispatchId,observedFiles:reconciled.observedFiles??[],candidateDigest:reconciled.candidateDigest??null};
   }finally{store.unbindJournal?.(runtime.journal);runtime.close();}
@@ -1007,7 +1017,7 @@ export function persistPrelaunchReservation(store,state,op,engine){
 function scheduleOps(orca,store,state,ctx,{orderedOpIds=null}={}){
   activatePendingOps(store,state);
   const launched=[];
-  const ready=state.ops.filter(item=>item.status==='ready');
+  const ready=state.ops.filter(item=>item.status==='ready'&&!preparedOwnerDecision(item));
   const ranked=ctx.engine?ctx.engine.rank(ready):ready;
   const selected=orderedOpIds?orderedOpIds.map(id=>ready.find(op=>op.id===id)).filter(Boolean):ranked;
   for(const op of selected){
@@ -1908,9 +1918,9 @@ export function sweepResolvedReviewLines(store,state){
 export function coordinateManagedWorkflow(store,state,ctx){
   if(state.engine?.coordination!=='agent-v1')return null;
   activatePendingOps(store,state);
-  const continuations=state.ops.filter(op=>op.status==='ready'&&!op.fill&&!op.ownerRequest&&ctx.engine?.reservationPhase?.(op).phase==='reserved');
+  const continuations=state.ops.filter(op=>op.status==='ready'&&!preparedOwnerDecision(op)&&!op.fill&&!op.ownerRequest&&ctx.engine?.reservationPhase?.(op).phase==='reserved');
   if(continuations.length)return {pending:false,continuation:true,dispatch:continuations.map(op=>op.id)};
-  const ready=state.ops.filter(op=>op.status==='ready'&&!op.fill&&!op.ownerRequest&&!op.lease);
+  const ready=state.ops.filter(op=>op.status==='ready'&&!preparedOwnerDecision(op)&&!op.fill&&!op.ownerRequest&&!op.lease);
   // One canonical writer per worktree: while an operation that writes runs, a ready operation that also writes
   // cannot be admitted, and offering it only buys a manager decision that admission defers a tick later. Such an
   // operation waits out of the list instead, and the kernel says once which ones are waiting and why.
@@ -3508,7 +3518,13 @@ const candidatePrelaunchInactive=op=>!op?.lease&&!op?.pending&&!op?.dispatch&&!o
 const retryableAuditFailure=op=>isAuditOperation(op)&&op?.status==='blocked'&&op?.refusal==='audit-measurement-failed'&&op?.workerSettled!==false&&
   !op?.lease&&!op?.pending&&!op?.dispatch&&!op?.terminal&&op?.audit?.schema==='starci/audit-measurement@1'&&op.audit.operation===op.operation&&op.audit.outcome==='failed'&&
   Array.isArray(op.audit.failures)&&op.audit.failures.length>0;
-export const retryableOperation=op=>!op?.fill&&!op?.ownerRequest&&!settledOperation(op)&&(['running','answering'].includes(op?.status)||Boolean(op?.retryReconciled)||
+const preparedOwnerDecision=op=>{
+  if(op?.kind!=='decision.prepare'||op?.question?.prepared!==true)return false;
+  if(op.ownerRequestStatus==='waiting-owner')return !op.ownerAnswer;
+  return op.ownerRequestStatus==='answered'&&typeof op?.ownerAnswer?.receiptId==='string'&&Boolean(op.ownerAnswer.receiptId)&&
+    op.ownerContinuationReceipt===op.ownerAnswer.receiptId;
+};
+export const retryableOperation=op=>!preparedOwnerDecision(op)&&!op?.fill&&!op?.ownerRequest&&!settledOperation(op)&&(['running','answering'].includes(op?.status)||Boolean(op?.retryReconciled)||
   (op?.status==='blocked'&&op?.refusal==='candidate-root-binding'&&candidatePrelaunchInactive(op))||
   retryableAuditFailure(op)||(op?.refusal!=='audit-measurement-failed'&&Boolean(op?.lease)&&(op?.refusal==='runtime-reconciliation'||op?.workerSettled===true)));
 
@@ -4386,6 +4402,10 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       store.appendEvent({event:'stale-lease-cleared',op:op.id,jobId:op.lease.jobId,attempt:op.lease.attempt,generation:op.lease.generation,proof:stale});
       for(const key of ['lease','pending','workerSettled','retryReconciled'])delete op[key];
       if(op.status==='blocked'&&op.refusal==='runtime-reconciliation'){op.status='ready';delete op.refusal;}
+    }
+    for(const op of state.ops.filter(item=>item.lease&&preparedOwnerDecision(item)&&item.status==='done'&&item.launch?.task&&stoppedRetryDispatchId(item)&&item.candidate?.identity)){
+      const reconciled=reconcileStoppedNativeRetryLease(state,op,{orca,store,acceptedPreparedDecision:true});
+      need(reconciled.ok,`Answered decision lease ${op.lease?.jobId??op.id} cannot be reconciled for retry: ${reconciled.reason}`);
     }
     for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&!settledOperation(item)&&item.launch?.task&&stoppedRetryDispatchId(item)&&!item.dispatch&&!item.terminal&&item.candidate?.identity)){
       const reconciled=reconcileStoppedNativeRetryLease(state,op,{orca,store});

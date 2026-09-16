@@ -123,6 +123,68 @@ test('wait tick acknowledges the previous batch, reads report files, classifies 
   }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
 });
 
+test('wait tick replaces only a fenced Delivery and returns the redelivered mail to the kernel',()=>{
+  const dir=tmp();const cwd=path.resolve('fixtures/orca/agentos-r14-sales');
+  try{
+    fs.writeFileSync(path.join(dir,'wait-state.json'),JSON.stringify({lastDeliveryId:'delivery_old',seenReports:{}}));
+    const checks=[];
+    const fake=fakeOrca({
+      check:(args)=>{
+        if(args.includes('--peek'))return json(0,{ok:true,result:{messages:[]}});
+        checks.push(args);
+        if(has(args,'--ack','delivery_old'))return json(1,{ok:false,error:{code:'delivery_consumer_fenced',message:'This mailbox Delivery belongs to a fenced consumer generation.'}});
+        return json(0,{ok:true,result:{deliveryId:'delivery_new',messages:[{id:'msg_new',type:'worker_done',subject:'Done',body:'complete',payload:'{"dispatchId":"ctx_new"}'}]}});
+      },
+      'worker-list':()=>json(0,{ok:true,result:{workers:[]}}),
+      'terminal-list':()=>json(0,{ok:true,result:{terminals:[]}}),
+      'task-list':()=>json(0,{ok:true,result:{tasks:[]}})
+    });
+    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_new_monitor',reportsDir:dir,timeoutMs:1000,tickMs:1000,now:()=>5000,wait:()=>{}});
+    assert.equal(result.event,'report');
+    assert.equal(result.messages[0].id,'msg_new','redelivered mail is returned, not consumed unseen');
+    assert.equal(checks.length,2);
+    assert.ok(has(checks[0],'--ack','delivery_old'));
+    assert.ok(!has(checks[1],'--ack'));
+    const state=JSON.parse(fs.readFileSync(path.join(dir,'wait-state.json'),'utf8'));
+    assert.deepEqual({lastDeliveryId:state.lastDeliveryId,run:state.run,from:state.from},{lastDeliveryId:'delivery_new',run:'run_sales',from:'term_new_monitor'});
+  }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
+});
+
+test('wait tick does not retry or discard a Delivery for an unrelated check failure',()=>{
+  const dir=tmp();const cwd=path.resolve('fixtures/orca/agentos-r14-sales');
+  try{
+    fs.writeFileSync(path.join(dir,'wait-state.json'),JSON.stringify({lastDeliveryId:'delivery_keep',run:'run_sales',from:'term_me',seenReports:{}}));
+    let boundaryChecks=0;
+    const fake=fakeOrca({
+      check:(args)=>args.includes('--peek')?json(0,{ok:true,result:{messages:[]}}):(boundaryChecks++,json(1,{ok:false,error:{code:'mailbox_unavailable',message:'Mailbox unavailable.'}})),
+      'worker-list':()=>json(0,{ok:true,result:{workers:[]}}),
+      'terminal-list':()=>json(0,{ok:true,result:{terminals:[]}}),
+      'task-list':()=>json(0,{ok:true,result:{tasks:[]}})
+    });
+    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_me',reportsDir:dir,timeoutMs:1000,tickMs:1000,now:()=>5000,wait:()=>{}});
+    assert.equal(result.event,'check-failed');assert.equal(boundaryChecks,1);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(dir,'wait-state.json'),'utf8')).lastDeliveryId,'delivery_keep');
+  }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
+});
+
+test('wait tick never sends a cursor explicitly bound to another monitor',()=>{
+  const dir=tmp();const cwd=path.resolve('fixtures/orca/agentos-r14-sales');
+  try{
+    fs.writeFileSync(path.join(dir,'wait-state.json'),JSON.stringify({lastDeliveryId:'delivery_other',run:'run_sales',from:'term_old_monitor',seenReports:{}}));
+    const checks=[];let clock=0;
+    const fake=fakeOrca({
+      check:(args)=>{if(args.includes('--peek'))return json(0,{ok:true,result:{messages:[]}});checks.push(args);clock+=1000;return json(0,{ok:true,result:{deliveryId:null,messages:[]}});},
+      'worker-list':()=>json(0,{ok:true,result:{workers:[]}}),
+      'terminal-list':()=>json(0,{ok:true,result:{terminals:[]}}),
+      'task-list':()=>json(0,{ok:true,result:{tasks:[]}})
+    });
+    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_new_monitor',reportsDir:dir,timeoutMs:1000,tickMs:1000,now:()=>clock,wait:()=>{}});
+    assert.equal(result.event,'timeout');assert.ok(!has(checks[0],'--ack'));
+    const state=JSON.parse(fs.readFileSync(path.join(dir,'wait-state.json'),'utf8'));
+    assert.deepEqual({lastDeliveryId:state.lastDeliveryId,run:state.run,from:state.from},{lastDeliveryId:null,run:'run_sales',from:'term_new_monitor'});
+  }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
+});
+
 test('report files of a linked worktree live in the main repository so op and kernel scan the same directory',()=>{
   const root=repositoryRoot(process.cwd());
   assert.ok(fs.existsSync(path.join(root,'.git')));

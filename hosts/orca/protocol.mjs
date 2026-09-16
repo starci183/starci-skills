@@ -23,6 +23,7 @@ const required=(value,label)=>{need(typeof value==='string'&&value.trim(),`Missi
 const resultOf=receipt=>plain(receipt?.result)?receipt.result:receipt;
 const csv=value=>String(value??'').split(',').map(item=>item.trim()).filter(Boolean);
 const sleepSync=ms=>{if(ms>0)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,ms);};
+const FENCED_DELIVERY_REASON='This mailbox Delivery belongs to a fenced consumer generation.';
 
 function readJson(file,fallback){try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return fallback;}}
 function writeJson(file,value){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,`${JSON.stringify(value,null,2)}\n`);}
@@ -96,9 +97,21 @@ function singleTick(orca,{cwd,run,from,timeoutMs,reportsDir,stalledAfterMs,heart
   const stateFile=path.join(directory,'wait-state.json');
   const state=readJson(stateFile,{lastDeliveryId:null,seenReports:{}});
   const checkParams={run,terminal:required(from,'own terminal handle'),wait:true,'timeout-ms':String(timeoutMs),types:BOUNDARY_TYPES};
-  const ackId=ack??(noAck?null:state.lastDeliveryId);
+  // New cursors are scoped to the consumer that obtained them. Legacy state did not carry that binding;
+  // try it once for compatibility and let Orca's generation fence prove whether it is still usable.
+  const savedAckBelongsHere=!(state.run&&state.from&&(state.run!==run||state.from!==from));
+  const savedAck=savedAckBelongsHere?state.lastDeliveryId:null;
+  const ackId=ack??(noAck?null:savedAck);
   if(ackId)checkParams.ack=ackId;
-  const checked=orca.invoke('check',checkParams,{cwd});
+  let checked=orca.invoke('check',checkParams,{cwd});
+  // A controller generation cannot acknowledge its predecessor's Delivery. Drop only that obsolete token,
+  // then ask Orca to redeliver the still-unread batch to this tick; the kernel must see it before any new
+  // Delivery is acknowledged. Every other check failure remains a visible check-failed boundary.
+  const recoveredFencedDelivery=Boolean(ackId&&checked.outcome!=='ok'&&checked.reason===FENCED_DELIVERY_REASON);
+  if(recoveredFencedDelivery){
+    delete checkParams.ack;
+    checked=orca.invoke('check',checkParams,{cwd});
+  }
   const messages=(getPath(checked.receipt,'result.messages')??[]).map(m=>({id:m.id,type:m.type,subject:m.subject??'',body:m.body??'',createdAt:m.created_at??m.createdAt??null,payload:(()=>{try{return JSON.parse(m.payload??'{}');}catch{return {};}})()}));
   const deliveryId=getPath(checked.receipt,'result.deliveryId')??null;
   // Ping: the latest heartbeat per Dispatch, peeked so nothing is marked read.
@@ -145,6 +158,8 @@ function singleTick(orca,{cwd,run,from,timeoutMs,reportsDir,stalledAfterMs,heart
   }
   const sweep=sweepWorktree(orca,{cwd,from});
   for(const report of reports)state.seenReports[report.dispatch]=now();
+  state.run=run;state.from=from;
+  if(!savedAckBelongsHere||recoveredFencedDelivery)state.lastDeliveryId=null;
   if(deliveryId)state.lastDeliveryId=deliveryId;
   writeJson(stateFile,state);
   // A rate-limited provider is a boundary too: the runtime must be parked now, not when the whole timeout ends.

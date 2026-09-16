@@ -32,7 +32,7 @@ import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGra
 import {machineVerify} from '../kernel/kernel.mjs';
 import {attributedFiles} from '../kernel/verify.mjs';
 import {relocateLauncher,reviveSupervisor} from '../kernel/kernel.mjs';
-import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,LONG_CONTRACT_GRACE_MS,PERCEPTION_GRACE_MS,perceptionProviders,refundRetiredGenerationProbations,noteAnomaly,prepareWorkGate,producedKindVerdict,restoreDurableCheckpoint,recoverSatisfiedDependencyBlocks,sweepResolvedReviewLines,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,runLoop,settleStalled,nativeActivityProof,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
+import {BRAND_DECIDE,BRAND_PAYLOAD,DESIGN_KINDS,DYNAMIC_OPS_BUDGET,RATE_LIMIT_COOLDOWN_MS,SPEC_LIMIT,critiqueRuntimes,operationSpec,queueInbox,credentialNeed,rebindRunIfNeeded,reportAllowlist,sharedCheckCommand,treeForVerdict,treeVerdictFor,TRIAGE_AFTER,TRIAGE_OPTIONS,VALIDATOR_REJECT_LIMIT,VALIDATOR_UNAVAILABLE_LIMIT,applyOpReport,approve,brandPayload,brandSummary,buildScope,changedFiles,createWorkflowState,writesWorkRecords,designRecord,detectLedgerMode,drainSharedQueue,goalPhase,hostDescriptorOf,hostMissing,kernelGuards,kernelMain,laneLine,lanePredicates,launchOperator,launchWithCandidate,LONG_CONTRACT_GRACE_MS,PERCEPTION_GRACE_MS,perceptionProviders,refundRetiredGenerationProbations,noteAnomaly,prepareWorkGate,producedKindVerdict,restoreDurableCheckpoint,recoverSatisfiedDependencyBlocks,sweepResolvedReviewLines,readValidatorMemory,INFRA_RESTART_LIMIT,infrastructureCause,reconcileWithOrca,renderContract,resumePaused,retryableOperation,runLoop,settleStalled,nativeActivityProof,triageAnomaly,validatorRejectLimit,workModule,workOpId,proposeQuota,LAUNCH_DAILY_CAP,decisionAllowlistFor,irreversibleEffect,ownerProvisionNeed,OP_DEADLINE_MS,TAB_STATUSES,ownerItems,sweepStaleLines,sweepStaleTerminals,askFillLine,ownerFillLines} from '../kernel/kernel.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
@@ -477,6 +477,10 @@ test('a named audit contract permits only control transport and requires files e
     assert.match(contract,/omit the `--files` argument/);
     assert.match(contract,/must carry `files: \[\]`/);
     assert.doesNotMatch(contract,/--files <comma-separated changed paths>/);
+    assert.match(contract,/--capability "<your Dispatch capability from the injected Orca preamble>"/);
+    assert.match(contract,/A report file alone does not prove Orca accepted the signal/);
+    const headless=renderContract({template,op,state:{...harness.state,hostAdapter:'headless'},store:harness.store,launcher:'L.mjs',run:'run_wf'});
+    assert.doesNotMatch(headless,/--capability/,'headless reports do not require Orca native custody');
     assert.match(contract,/This `partial` completes the measurement/);
     assert.match(contract,/Unavailable, malformed or failed measurement is not a successful audit/);
     assert.match(contract,/Preserve actual exit codes and all findings/);
@@ -509,6 +513,7 @@ test('the goal phase writes goal.md and goal.json and stops: nothing is launched
     const contract=renderContract({template,op:state.ops[0],state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
     assert.match(contract,/## Cook until done/);assert.match(contract,/## Ping \(mandatory\)/);
     assert.match(contract,/partial` is allowed only when your session budget/,'implementation retains its completion loop');
+    assert.match(contract,/Exclude the exact check control file .*kernel transport, not operation output/);
     assert.match(contract,/## Acceptance/);assert.match(contract,/## Never/);
     // A plan-mode backend.implement op without a Work node still gets the implement.ledger working order.
     assert.match(contract,/## Working order \(mandatory, in this order\)\nSequence `implement\.ledger`\./);
@@ -5318,6 +5323,26 @@ test('public retry reconciles only the exact exited native attempt before releas
   assert.match(reconcileStoppedNativeRetryLease(state,{...tabbed,lease:lease},{orca:{invoke:()=>({outcome:'ok',receipt:{result:stillRunning}})},store,createRuntime(){throw Error('must not');},settleHost(){throw Error('must not');}}).reason,/does not prove/);
   const behind={...op,attempt:2,lease:lease,candidate:{identity},launch:{task:'task-native',dispatch:'ctx-native'}};
   assert.match(reconcileStoppedNativeRetryLease(state,behind,{orca,store,createRuntime(){throw Error('must not');},settleHost(){throw Error('must not');}}).reason,/do not bind the current workflow operation attempt/);
+});
+
+test('public retry settles an answered decision rerun only from exact stopped custody and retains its user-owned tab',()=>{
+  const receipt='owner-receipt',lease={workflowId:'wf',opId:'ask',attempt:3,generation:7,jobId:'operation-ask',leaseToken:'token'},identity={workflowId:'wf',opId:'ask',attempt:3,generation:7,jobId:'operation-ask'},
+    op={id:'ask',kind:'decision.prepare',attempt:3,status:'done',lease,candidate:{identity},dispatch:'ctx-ask',terminal:'term-owner',
+      launch:{task:'task-ask',dispatch:'ctx-ask'},question:{prepared:true},ownerAnswer:{receiptId:receipt},ownerRequestStatus:'answered',ownerContinuationReceipt:receipt},
+    state={id:'wf',run:'run-native',worktree:'C:/repo',engine:{generation:7},ops:[op]},events=[],closes=[];
+  const result={dispatch:{id:'ctx-ask',task_id:'task-ask',run_id:'run-native',status:'completed',completed_at:'2026-09-16T12:00:00Z',capability_revoked_at:'2026-09-16T12:00:00Z'},
+    worker:{dispatch_id:'ctx-ask',state:'succeeded',stage:'settled'},observation:{exactWorker:true,status:'live'},terminal:{handle:'term-owner',connected:true,writable:true,paneRuntimeId:42},
+    terminalResource:{originDispatchId:'ctx-ask',terminalHandle:'term-owner',ownershipState:'USER_OWNED'}};
+  const recovered=reconcileStoppedNativeRetryLease(state,op,{acceptedPreparedDecision:true,store:{appendEvent:event=>events.push(event),saveState(){}},orca:{invoke:()=>({outcome:'ok',receipt:{result}})},
+    settleHost:()=>{closes.push(true);throw Error('a user-owned terminal must not be stopped or released');},
+    createRuntime:()=>({settleStoppedOperation(candidate,input){assert.equal(input.acceptedPreparedDecision,true);assert.equal(input.settlement.schema,'starci/orca-user-takeover-settlement@1');delete candidate.lease;return {ok:true,observedFiles:[],candidateDigest:'empty',acceptedPreparedDecision:true};},close(){}})});
+  assert.equal(recovered.ok,true,recovered.reason);assert.deepEqual(closes,[]);assert.equal(op.terminal,'term-owner');assert.equal(op.dispatch,'ctx-ask');
+  assert.equal(op.ownerAnswer.receiptId,receipt);assert.equal(events.at(-1).event,'prepared-decision-lease-reconciled');
+  assert.equal(retryableOperation({...op,status:'answering',lease:{...lease}}),false,'an authenticated answered decision is never relaunched');
+  assert.equal(retryableOperation({...op,status:'answering',lease:{...lease},ownerAnswer:undefined,ownerContinuationReceipt:undefined,ownerRequestStatus:'waiting-owner'}),false,
+    'an accepted prepared question waits for its owner without relaunching or retaining a new writer');
+  const missingReceipt={...op,lease:{...lease},ownerContinuationReceipt:'different'};
+  assert.match(reconcileStoppedNativeRetryLease(state,missingReceipt,{acceptedPreparedDecision:true,store:{},orca:{},createRuntime(){throw Error('must not');}}).reason,/still active/);
 });
 
 test('a stray is quarantined when git names the file and the validator names the reserved directory above it',()=>{

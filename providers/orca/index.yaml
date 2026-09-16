@@ -214,7 +214,7 @@ operationAgent:
 routing:
   operationToKernel:
     api: report-file
-    cli: 'node <launcher> report --run <workflow-run-id> --from <own-terminal> --task <operation-task-id> --dispatch <operation-dispatch-id> --reports-dir <workflow-reports-dir> --outcome <done|partial|failed|ask|blocked> --summary "<what happened>" --json'
+    cli: 'node <launcher> report --run <workflow-run-id> --from <own-terminal> --task <operation-task-id> --dispatch <operation-dispatch-id> --capability "<own Dispatch capability from injected Orca preamble>" --reports-dir <workflow-reports-dir> --outcome <done|partial|failed|ask|blocked> --summary "<what happened>" --json'
     authority: report-file-then-signal
     onceOnly: true
     reason: One report file per Dispatch is the source of truth; the Orca signal is only the wake-up.

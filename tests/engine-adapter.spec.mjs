@@ -208,6 +208,59 @@ test('a stopped exact native Dispatch freezes and preserves unreported effects b
   const job=runtime.journal.listJobs().find(item=>item.op_id==='native');assert.equal(job.status,'failed');assert.equal(runtime.journal.db.prepare('SELECT count(*) AS n FROM leases WHERE job_id=?').get(job.job_id).n,0);assert.equal(runtime.journal.events({workflowId:'wf'}).some(event=>event.kind==='operation-stopped-effects-preserved'&&event.payload.dispatch==='ctx-native'),true);bridge.close();
 });
 
+test('an authenticated answered decision releases an exact stopped no-change retry without creating another retry',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),
+    op={id:'answered',kind:'decision.prepare',attempt:2,status:'done',allowlist:['decision.yaml'],dispatch:'ctx-answered'};f.state.ops=[op];
+  const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'decide',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});
+  runtime.beginLaunchIntent(op);op.launch={task:'task-answered',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
+  runtime.freezeCandidate=()=>{op.candidateDigest='sealed-empty';return {status:'sealed',observedFiles:[]};};
+  const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-answered',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-answered',effectState:'none'},acceptedPreparedDecision:true});
+  assert.equal(result.ok,true);assert.equal(result.acceptedPreparedDecision,true);assert.equal(op.lease,undefined);assert.equal(op.retryReconciled,undefined);
+  const job=runtime.journal.listJobs().find(item=>item.op_id==='answered');assert.equal(job.status,'succeeded');
+  const next={id:'next',kind:'decision.prepare',attempt:1,status:'ready',allowlist:['decision.yaml']};f.state.ops.push(next);
+  assert.equal(runtime.reserveOperation(next,{role:'decide',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'}).ok,true,'the next writer is admitted after the answered decision settles');
+  runtime.settled(next);bridge.close();
+});
+
+test('an accepted prepared decision releases its writer before the owner answers and the next op is admitted',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),
+    ask={id:'ask',kind:'decision.prepare',attempt:1,status:'running',allowlist:['decision.yaml'],dispatch:'ctx-ask'};f.state.ops=[ask];
+  const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})}),allocation={role:'decide',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'};
+  assert.equal(runtime.reserveOperation(ask,allocation).ok,true);runtime.beginLaunchIntent(ask);ask.launch={task:'task-ask',dispatch:ask.dispatch};runtime.recordLaunchObservation(ask);runtime.launched(ask);
+  assert.equal(runtime.settled(ask,{workerOnly:true,reason:'accepted decision report'}).ok,true,'report acceptance releases only the model capacity first');
+  assert.ok(ask.lease,'the writer remains until the accepted candidate is finalized');
+  ask.question={prepared:true};ask.ownerRequestStatus='waiting-owner';ask.status='done';
+  assert.equal(runtime.settled(ask,{status:'succeeded',reason:'accepted prepared decision'}).ok,true,'accepted preparation finalizes the durable writer before owner input');
+  assert.equal(ask.lease,undefined);
+  ask.ownerAnswer={receiptId:'receipt-owner'};ask.ownerContinuationReceipt='receipt-owner';ask.ownerRequestStatus='answered';
+  const next={id:'next-after-answer',kind:'backend.implement',attempt:1,status:'ready',allowlist:['decision.yaml']};f.state.ops.push(next);
+  assert.equal(runtime.reserveOperation(next,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'}).ok,true,'owner answer does not strand the completed decision writer');
+  runtime.settled(next);bridge.close();
+});
+
+test('a completed user takeover proves the worker capability ended while preserving its live owner terminal',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),
+    op={id:'takeover',kind:'decision.prepare',attempt:2,status:'done',allowlist:['decision.yaml'],dispatch:'ctx-takeover'};f.state.ops=[op];
+  const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'decide',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});
+  runtime.beginLaunchIntent(op);op.launch={task:'task-takeover',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
+  runtime.freezeCandidate=()=>({status:'sealed',observedFiles:[]});
+  const settlement={schema:'starci/orca-user-takeover-settlement@1',dispatchId:'ctx-takeover',effectState:'none',dispatchStatus:'completed',workerState:'succeeded',workerStage:'settled',capabilityRevoked:true,ownershipState:'user_owned'};
+  assert.equal(runtime.settleStoppedOperation(op,{dispatch:'ctx-takeover',settlement,acceptedPreparedDecision:true}).ok,true);assert.equal(op.lease,undefined);
+  const wrong={...settlement,capabilityRevoked:false};op.lease={workflowId:'wf',opId:'takeover',attempt:2,generation:1,jobId:'missing',leaseToken:'x'};
+  assert.equal(runtime.settleStoppedOperation(op,{dispatch:'ctx-takeover',settlement:wrong,acceptedPreparedDecision:true}).ok,false);bridge.close();
+});
+
+test('an answered decision retry with new candidate effects retains its writer for explicit reconciliation',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),
+    op={id:'answered-drift',kind:'decision.prepare',attempt:2,status:'done',allowlist:['decision.yaml'],dispatch:'ctx-answered-drift'};f.state.ops=[op];
+  const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'decide',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});
+  runtime.beginLaunchIntent(op);op.launch={task:'task-answered-drift',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
+  runtime.freezeCandidate=()=>({status:'sealed',observedFiles:['decision.yaml']});
+  const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-answered-drift',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-answered-drift',effectState:'none'},acceptedPreparedDecision:true});
+  assert.equal(result.ok,false);assert.equal(result.effectState,'partial');assert.ok(op.lease,'the writer fence remains while unaccepted bytes exist');
+  assert.equal(runtime.journal.db.prepare("SELECT count(*) n FROM leases WHERE job_id=? AND resource_key LIKE 'canonical-writer:%'").get(op.lease.jobId).n,1);bridge.close();
+});
+
 test('a single unknown-effect failed launch binds its exact settled Dispatch before preserving candidate effects',t=>{
   const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),
     op={id:'failed-native',kind:'frontend.implement',attempt:2,status:'blocked',allowlist:['a.js']};f.state.ops=[op];
