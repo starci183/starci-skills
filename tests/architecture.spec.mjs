@@ -172,6 +172,55 @@ test('frontend catches route drawing, upward tiers, direct/deep data access, bar
   assert.ok(result.violations.find(item => item.ruleId === 'FE_PURE_REACHES_DATA').dependencyChain.some(item => item.endsWith('bridge.ts')));
 });
 
+test('frontend world owners may use resolved same-file, re-exported, and wrapped pure render boundaries', t => {
+  const root = fixture(t, 'frontend', {
+    'src/components/blocks/demo/World/index.tsx': `"use client";
+import { Suspense } from "react";
+import { useThing } from "@/hooks";
+import { DataProvider, ProjectionProvider } from "@/modules/providers";
+import { ResolvedView } from "./views";
+const LoadingView=()=> <span>Loading</span>;
+const renderError=()=> <p>Error</p>;
+export const World=()=>{const state=useThing();if(state==="hidden")return null;if(state==="error")return renderError();return <Suspense fallback={<LoadingView/>}><ResolvedView value={state}/></Suspense>};
+export const OptionalWorld=()=>{const state=useThing();return state&&<ResolvedView value={state}/>};
+export const MappedWorld=()=>{const state=useThing();return [state].map((value)=><ResolvedView key={value} value={value}/>)};
+export const ProjectedWorld=()=>{const state=useThing();return <ProjectionProvider content={state}><ResolvedView value={state}/></ProjectionProvider>};
+export const InjectedWorld=()=>{const state=useThing();return <DataProvider content={ResolvedView} contentProps={{value:state}}/>};
+`,
+    'src/components/blocks/demo/World/views.tsx': 'export { ReadyView as ResolvedView } from "./ready";\n',
+    'src/components/blocks/demo/World/ready.tsx': 'export const ReadyView=({value}:{value:string})=> <div>{value}</div>;\n',
+    'src/components/leaves/Disclosure/index.tsx': 'import { useEffect,useRef,useState } from "react"; export const Disclosure=()=>{const ref=useRef(null);const [open,setOpen]=useState(false);useEffect(()=>{},[]);return <button ref={ref} onClick={()=>setOpen(!open)}>{open}</button>};\n',
+    'src/hooks/index.ts': 'export { useThing } from "./use-thing";\n',
+    'src/hooks/use-thing.ts': 'import { query } from "@/modules/api/query"; export const useThing=()=>query();\n',
+    'src/modules/api/query.ts': 'export const query=()=>"ready";\n',
+    'src/modules/providers.tsx': 'export const ProjectionProvider=({children}:{children:any})=> <section>{children}</section>; export const DataProvider=({content:Content,contentProps}:{content:any,contentProps:any})=> <Content {...contentProps}/>;\n',
+  });
+  const result = check(root);
+  assert.equal(result.violations.some(item => item.ruleId === 'FE_WORLD_OWNER_RENDER_BOUNDARY'), false, JSON.stringify(result, null, 2));
+  assert.ok(result.coverage.checkedRuleIds.includes('FE_WORLD_OWNER_RENDER_BOUNDARY'));
+});
+
+test('frontend world owners cannot draw inline, capture owner state, choose a connected child, or hide a dynamic target', t => {
+  const root = fixture(t, 'frontend', {
+    'src/components/blocks/demo/Inline/index.tsx': 'import { useThing } from "@/hooks"; const read=useThing; export const Inline=()=>{const value=read();return <div>{value}</div>};\n',
+    'src/components/blocks/demo/Captured/index.tsx': 'import { useThing } from "@/hooks"; export const Captured=()=>{const value=useThing();const View=()=> <span>{value}</span>;return <View/>};\n',
+    'src/components/blocks/demo/Child/index.tsx': 'import { useThing } from "@/hooks"; import { ChildView } from "./view"; export const Child=()=>{const value=useThing();return <ChildView value={value}/>};\n',
+    'src/components/blocks/demo/Child/view.tsx': 'export const ChildView=({value}:{value:string})=> <span>{value}</span>;\n',
+    'src/components/blocks/demo/Parent/index.tsx': 'import { useThing } from "@/hooks"; import { Child } from "../Child"; import { ChildView } from "../Child/view"; export const Parent=()=>{const value=useThing();return value==="child"?<Child/>:<ChildView value={value}/>};\n',
+    'src/components/blocks/demo/Dynamic/index.tsx': 'import * as Hooks from "@/hooks"; import { ChildView } from "../Child/view"; const views={ready:ChildView}; export const Dynamic=({kind}:{kind:string})=>{Hooks.useThing();const Target=views[kind as keyof typeof views];return <Target value="ready"/>};\n',
+    'src/components/blocks/demo/DynamicProvider/index.tsx': 'import { useThing } from "@/hooks"; import { DataProvider } from "@/modules/providers"; import { ChildView } from "../Child/view"; const views={ready:ChildView}; export const DynamicProvider=({kind}:{kind:string})=>{const value=useThing();return <DataProvider content={views[kind as keyof typeof views]} contentProps={{value}}/>};\n',
+    'src/hooks/index.ts': 'export { useThing } from "./use-thing";\n',
+    'src/hooks/use-thing.ts': 'export const useThing=()=>"ready";\n',
+    'src/modules/providers.tsx': 'export const DataProvider=({content:Content,contentProps}:{content:any,contentProps:any})=> <Content {...contentProps}/>;\n',
+  });
+  const result = check(root);
+  const findings = result.violations.filter(item => item.ruleId === 'FE_WORLD_OWNER_RENDER_BOUNDARY');
+  for (const owner of ['Inline', 'Captured', 'Parent', 'Dynamic', 'DynamicProvider']) {
+    assert.ok(findings.some(item => item.path.includes(`/${owner}/`)), `${owner}: ${JSON.stringify(result, null, 2)}`);
+  }
+  assert.equal(findings.some(item => item.path.includes('/Child/')), false, JSON.stringify(result, null, 2));
+});
+
 test('unresolved internal aliases fail clearly instead of returning a false green result', t => {
   const root = fixture(t, 'backend', {
     'src/modules/broken.ts': 'import { missing } from "@features/missing"; export const value=missing\n',
