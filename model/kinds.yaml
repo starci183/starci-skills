@@ -51,9 +51,12 @@ vocabularies:
   # names the exact consts of the artifacts it writes as `carries`; an op that writes none of those
   # artifacts declares `carries: []`. The definitions are `.claude`-owned under `schemas/` and enter the op
   # as `stacks` inputs - the const is what the output claims, the file is what the op reads to get there.
-  # Layout definitions (`work-layout`, `source-layout`) and kernel transport (`op-report`) are never
-  # artifact consts, so they are absent here.
-  schemas: [work/workspace@1, work/node@2, work/resource@1, work/evidence@1, work/disposable-accounts@1, starci/source-identity@1, starci/design-review@1, starci/evidence-packet@1, starci/goal@1, starci/application-stacks@1, starci/knowledge-rule@1]
+  # `model/records.yaml` names the const and the validator of each record class, and the declared layout
+  # covers the whole `.starciwork` tree - the `_local/workflows/<id>/` run state (checks, contracts, inbox,
+  # reports) and the `features/<feature>/` record trees - so a write outside it fails checks. Layout
+  # definitions (`work-layout`, `source-layout`) and kernel transport (`op-report`) are never artifact
+  # consts, so they are absent here.
+  schemas: [work/workspace@1, work/node@2, work/resource@1, work/evidence@1, work/disposable-accounts@1, starci/source-identity@1, starci/design-review@1, starci/evidence-packet@1, starci/goal@1, starci/application-stacks@1, starci/knowledge-rule@1, starci/knowledge-source@1]
   # The blocker kinds a report may carry. `interface-gap` is this graph's addition: a frontend build or a UAT
   # walk that finds the interface design silent is not an SDS gap and must not be routed as one. `brand-gap` is
   # that same distinction one layer earlier: a drawing with no settled identity to draw inside - no colour token,
@@ -646,8 +649,8 @@ kinds:
     writes: [code]
     knowledge: [patterns/be/*, patterns/fe/*, code-pattern-enforcement]
     checks: [checks/code-patterns/*.mjs]
-    stacks: [schemas/knowledge-rule.schema.yaml, schemas/source-layout.yaml]
-    carries: [starci/knowledge-rule@1]
+    stacks: [schemas/knowledge-source.schema.yaml, schemas/knowledge-rule.schema.yaml, schemas/source-layout.yaml]
+    carries: [starci/knowledge-source@1]
     purpose: Repair one challenged canonical instruction or rule and the references it affects, from concrete applicability evidence - fixed in its canonical home, never patched around.
     reports:
       outcomes: [done, partial, failed, ask, blocked]

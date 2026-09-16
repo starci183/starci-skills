@@ -13,8 +13,11 @@ shape:
     index.yaml, without an evidence folder.
   evidence: Profiles using execution proof may retain <node>/evidence/<id>/manifest.yaml; this is not
     a required folder for every layer.
-  workflowSession: internal
-    .starciwork/_local/plans/<plan-id>/{index.yaml,goal/index.yaml,approval/index.yaml,run/index.yaml}
+  workflowRunState: internal
+    .starciwork/_local/workflows/<workflow-id>/{state.json,events.jsonl,kernel.lock,stop.flag,checks/**,contracts/**,inbox/**,reports/**};
+    workflow-level files .starciwork/_local/workflows/{supervisor.lock,supervisor.log,runtime-loads.json,runtime-budget.json};
+    staged owner inputs .starciwork/_local/inputs/<workflow-id>/**; run reports .starciwork/_local/runtime/reports/<run>/**;
+    rejected drafts .starciwork/_local/drafts/**
   moduleUI: features/<feature>/ui/**/{index.yaml,assets/**}
   implementation: features/<feature>/implementation/{index.yaml,frontend/**/index.yaml,backend/**/index.yaml}
   frontendCaptures: features/<feature>/implementation/frontend/assets/<running-page-screenshot>
@@ -114,8 +117,8 @@ rules:
     record. refs and dependsOn remain stable technical node IDs for digest propagation.
   - UAT accounts.yaml uses work/disposable-accounts@1 and may contain only synthetic disposable
     local role, username and password values. Images and video remain original binary assets.
-  - Workflow session traces live inside .starciwork/_local/plans and never enter canonical Work
-    hashes.
+  - Workflow run state lives inside .starciwork/_local/workflows and never enters canonical Work
+    hashes; a write outside the declared layout fails checks.
   - interface.draw writes one or more selected nodes at ui/index.yaml or recursively below ui/.
     Store all actual drawings, reference images and motion previews in each owning node assets/**,
     in their original formats. Declare design inputs in ui.assets and top-level assets. Every asset
