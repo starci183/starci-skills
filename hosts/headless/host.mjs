@@ -4,6 +4,7 @@ import {spawn as spawnChild,spawnSync} from 'node:child_process';
 import {RESULT_SCHEMA,buildArgs,classifyReceipt,loadOrcaCalls,verifyLiveSchema} from '../orca/calls.mjs';
 import {hostDescriptor} from '../index.mjs';
 import {HEADLESS_PROVIDERS} from '../../models/functions.mjs';
+import {canonicalTarget} from '../../kernel/chains.mjs';
 import {repositoryRoot} from '../../kernel/reports.mjs';
 
 /**
@@ -54,9 +55,9 @@ export const UNSUPPORTED_CALLS=Object.freeze(['account-list']);
 export const DEFAULT_MAX_WALL_MS=90*60*1000;
 /** The Orca agent ids the launcher hands over, and the headless command family each one is. */
 export const HEADLESS_AGENTS=Object.freeze({
-  claude:{executable:'claude',default:'claude-opus'},
-  codex:{executable:'codex',default:'gpt-5.6-sol'},
-  qwen:{executable:'qwen',default:'qwen3.8-flash'}
+  claude:{executable:'claude',default:'claude-agent'},
+  codex:{executable:'codex',default:'codex-agent'},
+  qwen:{executable:'qwen',default:'qwen-agent'}
 });
 const HEADLESS_TERMINAL_STATUS={live:'running',exited:'exited'};
 
@@ -105,7 +106,9 @@ export function providerFor({agent=null,model=null,command=null}={},providers=HE
   if(!executable)return null;
   const wanted=model??modelOf(words);
   const entries=Object.entries(providers).filter(([,spec])=>spec?.command?.[0]===executable);
-  const hit=wanted?entries.find(([id,spec])=>id===wanted||modelOf(spec.command)===wanted):entries.find(([id])=>id===HEADLESS_AGENTS[family].default);
+  const hit=wanted
+    ?entries.find(([id,spec])=>id===wanted||modelOf(spec.command)===wanted)??entries.find(([id])=>id===canonicalTarget(wanted))
+    :entries.find(([id])=>id===HEADLESS_AGENTS[family].default);
   if(!hit)return null;
   if(wanted)return {id:hit[0],family,executable,model:modelOf(hit[1].command),command:[...hit[1].command]};
   const at=hit[1].command.indexOf('--model');

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../../core/yaml.mjs';
-import {resolveExecutionChain} from '../../kernel/chains.mjs';
+import {canonicalTarget,resolveExecutionChain} from '../../kernel/chains.mjs';
 import {createOrcaCalls} from '../../hosts/orca/calls.mjs';
 import {buildReport} from '../../kernel/reports.mjs';
 
@@ -186,7 +186,7 @@ export function fakeAllocator({maxParallelOps=3,pools={implement:['qwen3.8-flash
     snapshot(){return {busy:[...busy]};},
     serialize(){return {busy:[...busy]};},
     candidateFor(kind,target){
-      const found=resolveExecutionChain({skill:'starci',op:kind}).candidates.find(candidate=>candidate.target===target);
+      const found=resolveExecutionChain({skill:'starci',op:kind}).candidates.find(candidate=>candidate.target===canonicalTarget(target));
       if(!found)throw Error(`Runtime target ${target} is not launchable for ${kind}`);
       return found;
     }

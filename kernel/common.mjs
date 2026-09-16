@@ -3,6 +3,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {skillRoot} from '../core/runtime-root.mjs';
 import {ORCA_HOST} from '../hosts/orca/calls.mjs';
+import {canonicalTarget} from './chains.mjs';
 import {resolveLedgerRoot} from './routing.mjs';
 import * as graph from './graph.mjs';
 import {DECISION_OPERATION} from './io.mjs';
@@ -188,14 +189,17 @@ export function parseQuota(value){
     const [id,rest]=entry.split('=');
     const [capacity,roleText]=String(rest??'').split('@'),[n,tagText]=capacity.split(':');
     need(id&&Number.isFinite(Number(n)),`--allocation entries are <runtime>=<slots>[:<easy+medium+hard>][@<implement+verify+decide+plan+write>]: ${entry}`);
-    const runtime=id.trim();
-    order.push(runtime);slots[runtime]=Number(n);
+    // Quota strings name runtimes; a retired model-pool id resolves to its provider window, so two entries that
+    // spell one window fold together instead of double-counting the same quota.
+    const runtime=canonicalTarget(id.trim());
+    if(!order.includes(runtime))order.push(runtime);
+    slots[runtime]=(slots[runtime]??0)+Number(n);
     const levels=String(tagText??'').split('+').map(level=>level.trim()).filter(Boolean);
     for(const level of levels)need(['easy','medium','hard'].includes(level),`--allocation difficulty tags are easy|medium|hard: ${entry}`);
-    if(levels.length)tags[runtime]=levels;
+    if(levels.length)tags[runtime]=[...new Set([...(tags[runtime]??[]),...levels])];
     const roleNames=String(roleText??'').split('+').map(role=>role.trim()).filter(Boolean);
     for(const role of roleNames)need(['implement','verify','decide','plan','write'].includes(role),`--allocation roles are implement|verify|decide|plan|write: ${entry}`);
-    if(roleNames.length)roles[runtime]=roleNames;
+    if(roleNames.length)roles[runtime]=[...new Set([...(roles[runtime]??[]),...roleNames])];
   }
   // The granted slot count is also the owner's target share (goal §4): `targets` carries the weights the
   // allocator's deficit pick balances in-flight operations against.

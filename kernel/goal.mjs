@@ -869,7 +869,7 @@ export function proposeQuota(state,{runtimes=null,shared=undefined}={}){
   const ops=state.ops.filter(op=>op.status!=='done');
   const hard=ops.filter(op=>op.difficulty==='hard').length,easy=ops.filter(op=>op.difficulty==='easy').length,medium=ops.length-hard-easy;
   const total=Math.min(ops.length||1,profile?.maxParallelOps??10);
-  const order=(profile?.allocation?.preference?.implement??['gpt-5.6-sol','claude-opus','qwen3.8-flash']).filter(id=>profile?.runtimes?.[id]);
+  const order=(profile?.allocation?.preference?.implement??['codex-agent','claude-agent','qwen-agent','devin-agent']).filter(id=>profile?.runtimes?.[id]);
   const weights=order.map((id,index)=>index===0?hard+medium*0.6+easy*0.2:index===1?hard*0.4+medium*0.4+easy*0.3:medium*0.2+easy*0.8);
   const sum=weights.reduce((a,b)=>a+b,0)||1;
   let rows=order.map((id,index)=>({runtime:id,slots:Math.max(index===0?1:0,Math.round(total*weights[index]/sum)),tags:index===0?'hard+medium':index===1?'hard+medium':'easy+medium',why:index===0?'strongest tier: hard and most medium operations':index===1?'second tier: medium operations and overflow':'cheapest tier: easy operations and overflow'}));

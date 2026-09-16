@@ -1,5 +1,5 @@
 import {readDistJson} from '../core/runtime-root.mjs';
-import {resolveExecutionChain} from './chains.mjs';
+import {canonicalTarget,resolveExecutionChain} from './chains.mjs';
 import {roleOf} from './graph.mjs';
 import {SERVICE_OBSERVATION_MS,SHARED_COOLING_KINDS,createLoadsLedger} from './loads.mjs';
 import {budgetVerdict,readRuntimeBudget} from './budget.mjs';
@@ -109,25 +109,34 @@ function adoptState(state,day){
 export function applyQuota(runtimes,quota){
   if(!plain(quota)||(!Array.isArray(quota.order)&&!plain(quota.slots)&&!plain(quota.targets)))return runtimes;
   const copy=structuredClone(runtimes);
-  const order=Array.isArray(quota.order)?quota.order.filter(id=>copy.runtimes?.[id]):[];
+  // Quota documents outlive pool renames: order, slots, roles and tags may still name a retired model pool,
+  // so every quota key is resolved through the registry aliases before it is matched against a runtime.
+  const order=[...new Set((Array.isArray(quota.order)?quota.order:[]).map(id=>canonicalTarget(id)).filter(id=>copy.runtimes?.[id]))];
   const granted={};
-  for(const [id,n] of Object.entries(plain(quota.slots)?quota.slots:{}))if(copy.runtimes?.[id]&&Number.isFinite(Number(n))){
-    copy.runtimes[id].maxParallel=Math.max(0,Number(n));
-    granted[id]=Math.max(0,Number(n));
-    // Some external CLIs expose launch/auth status but no account headroom API. Naming a positive slot is the
-    // owner's explicit capacity decision for this workflow; absence or zero keeps that runtime closed.
-    if(copy.runtimes[id].capacityAuthority==='explicit-workflow-quota')copy.runtimes[id].explicitCapacity=Number(n)>0;
+  for(const [key,n] of Object.entries(plain(quota.slots)?quota.slots:{})){
+    const id=canonicalTarget(key);
+    if(copy.runtimes?.[id]&&Number.isFinite(Number(n))){
+      copy.runtimes[id].maxParallel=Math.max(0,Number(n));
+      granted[id]=Math.max(0,Number(n));
+      // Some external CLIs expose launch/auth status but no account headroom API. Naming a positive slot is the
+      // owner's explicit capacity decision for this workflow; absence or zero keeps that runtime closed.
+      if(copy.runtimes[id].capacityAuthority==='explicit-workflow-quota')copy.runtimes[id].explicitCapacity=Number(n)>0;
+    }
   }
   // A granted slot count is also the owner's target share for that runtime (goal §4): record it on the quota
   // itself and mirror it into the profile so the weights survive the hand to createAllocator either way.
   const targets=Object.fromEntries(Object.entries({...(plain(quota.targets)?quota.targets:{}),...granted})
-    .map(([id,n])=>[id,Number(n)]).filter(([id,n])=>copy.runtimes?.[id]&&Number.isFinite(n)&&n>=0));
+    .map(([key,n])=>[canonicalTarget(key),Number(n)]).filter(([id,n])=>copy.runtimes?.[id]&&Number.isFinite(n)&&n>=0));
   if(Object.keys(targets).length){
     try{quota.targets=targets;}catch{}
     copy.allocation=plain(copy.allocation)?copy.allocation:{};
     copy.allocation.targets={...(plain(copy.allocation.targets)?copy.allocation.targets:{}),...targets};
   }
-  const roleConstraints=plain(quota.roles)?quota.roles:{};
+  const roleConstraints={};
+  for(const [key,roles] of Object.entries(plain(quota.roles)?quota.roles:{})){
+    const id=canonicalTarget(key);
+    roleConstraints[id]=[...new Set([...(Array.isArray(roleConstraints[id])?roleConstraints[id]:[]),...(Array.isArray(roles)?roles:[])])];
+  }
   const constrainedRoles=new Set(Object.values(roleConstraints).flatMap(value=>Array.isArray(value)?value:[]));
   for(const [id,pool] of Object.entries(copy.runtimes??{}))if(Array.isArray(pool.roles))pool.roles=pool.roles.filter(role=>
     !constrainedRoles.has(role)||(Array.isArray(roleConstraints[id])&&roleConstraints[id].includes(role)));
@@ -136,7 +145,11 @@ export function applyQuota(runtimes,quota){
     const roles=new Set(Object.values(copy.runtimes).flatMap(rt=>rt.roles??[]));
     copy.allocation.preference={...(plain(copy.allocation.preference)?copy.allocation.preference:{})};
     for(const role of roles)copy.allocation.preference[role]=[...order.filter(id=>(copy.runtimes[id].roles??[]).includes(role)),...((copy.allocation.preference[role]??[]).filter(id=>!order.includes(id)))];
-    const tags=plain(quota.tags)?quota.tags:{};
+    const tags={};
+    for(const [key,levels] of Object.entries(plain(quota.tags)?quota.tags:{})){
+      const id=canonicalTarget(key);
+      tags[id]=[...new Set([...(Array.isArray(tags[id])?tags[id]:[]),...(Array.isArray(levels)?levels:[])])];
+    }
     if(Object.keys(tags).length){
       // Tags name the difficulty levels a runtime accepts; an untagged runtime in the order accepts every level.
       copy.allocation.tiers=Object.fromEntries(['easy','medium','hard'].map(level=>[level,order.filter(id=>!tags[id]||tags[id].includes(level))]));
@@ -466,6 +479,10 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     review,
     /** Pick the runtime for one operation; `avoid` is absolute, `restrictTo` limits the pools to launchable targets. */
     allocate(kind,{avoid=[],restrictTo=null,difficulty=null,job=null}={}){
+      // Journal and quota references may still name a retired model pool: both limits resolve through the
+      // registry aliases to the provider window that replaced it.
+      avoid=[...new Set((Array.isArray(avoid)?avoid:[]).map(id=>canonicalTarget(id)))];
+      restrictTo=Array.isArray(restrictTo)?[...new Set(restrictTo.map(id=>canonicalTarget(id)))]:restrictTo;
       let evaluated,sharedReservation=null;
       for(let attempt=0;attempt<4;attempt+=1){
         evaluated=review(kind,{avoid,restrictTo,difficulty,job});
@@ -619,7 +636,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     candidateFor(kind,target){
       const chain=resolveExecutionChain({skill:'starci',op:kind}).candidates;
       const supported=chain.filter(candidate=>candidate.executionHosts.includes(executionHost));
-      const found=supported.find(candidate=>candidate.target===target);
+      const found=supported.find(candidate=>candidate.target===canonicalTarget(target));
       need(found,`Runtime target ${target} is not launchable for ${kind} on ${executionHost}; that operation's environments offer ${supported.map(candidate=>candidate.target).join(', ')||'nothing'}. Add the target to the operation's environments in model/registry.yaml, or allocate with restrictTo: launchableTargets('${kind}').`);
       return found;
     }

@@ -267,12 +267,12 @@ test('a command terminal is a handle whose dispatch spawns the qwen headless com
 });
 
 test('providerFor maps the launcher\'s agent and model, or a terminal command line, onto exactly one headless command',()=>{
-  assert.deepEqual(providerFor({agent:'claude'}),{id:'claude-opus',family:'claude',executable:'claude',model:null,command:['claude','-p','--output-format','json']});
-  assert.equal(providerFor({agent:'claude',model:'claude-fable-5-1'}).id,'claude-fable-5.1');
+  assert.deepEqual(providerFor({agent:'claude'}),{id:'claude-agent',family:'claude',executable:'claude',model:null,command:['claude','-p','--output-format','json']});
+  assert.equal(providerFor({agent:'claude',model:'claude-fable-5-1'}).id,'claude-fable');
   assert.equal(providerFor({agent:'claude',model:'claude-fable-5-1'}).model,'claude-fable-5-1');
-  assert.equal(providerFor({agent:'codex',model:'gpt-6-astra'}).id,'gpt-6-astra');
-  assert.equal(providerFor({agent:'codex'}).id,'gpt-5.6-sol');
-  assert.equal(providerFor({command:'unset X; qwen --model qwen3.8-flash --approval-mode yolo'}).id,'qwen3.8-flash');
+  assert.equal(providerFor({agent:'codex',model:'gpt-6-astra'}).id,'codex-agent~gpt-6-astra');
+  assert.equal(providerFor({agent:'codex'}).id,'codex-agent');
+  assert.equal(providerFor({command:'unset X; qwen --model qwen3.8-flash --approval-mode yolo'}).id,'qwen-agent');
   assert.deepEqual(providerFor({agent:'codex',model:'gpt-5.6-sol'}).command,['codex','exec','--json','--model','gpt-5.6-sol']);
   assert.equal(providerFor({agent:'codex',model:'gpt-9'}),null);
   assert.equal(providerFor({agent:'orca'}),null);

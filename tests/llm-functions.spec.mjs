@@ -32,7 +32,7 @@ test('a goal call carries its own twenty-minute window and a killed headless pro
   const result=assessGoal({job:'Prepare an application stack.',providers:['gpt-6-astra'],runHeadless:(_provider,_prompt,options)=>{seen.push(options);return JSON.stringify(goalPlan());}});
   assert.equal(result.ok,true);
   assert.equal(seen[0].timeoutMs,GOAL_CALL_TIMEOUT_MS);
-  assert.throws(()=>runHeadlessWithUsage('claude-fable-5.1','x',{cwd:'.',timeoutMs:1000,spawn:()=>({status:null,signal:'SIGTERM',stdout:'',stderr:''})}),/headless timed out after 1s \(SIGTERM\); nothing was written/);
+  assert.throws(()=>runHeadlessWithUsage('claude-fable','x',{cwd:'.',timeoutMs:1000,spawn:()=>({status:null,signal:'SIGTERM',stdout:'',stderr:''})}),/headless timed out after 1s \(SIGTERM\); nothing was written/);
 });
 
 test('classifyScreen answers one closed verdict from a rendered frame and is unavailable without a provider or a screen',()=>{
@@ -409,7 +409,7 @@ const critiqueCall=(answers,extra={})=>{
     records:[{id:'demo.sales.architecture.sds.ledger',kind:'architecture',title:'Ledger component map',
       statements:['Every write to an order goes through the ledger writer.']}],
     constraints:['the ledger is the authored Work tree and is not yours to change'],
-    providers:['claude-fable-5.1','gpt-6-astra'],
+    providers:['claude-fable','codex-agent'],
     runHeadless:(provider,prompt)=>{seen.push([provider,prompt]);const next=answers.shift();if(next instanceof Error)throw next;return next;},
     ...extra});
   return {result,seen};
@@ -420,7 +420,7 @@ test('critiqueGoal frames the goal against the accepted records, carries its rul
   assert.equal(result.ok,true);
   assert.equal(result.schema,CRITIQUE);
   assert.equal(result.verdict,'sound');
-  assert.equal(result.provider,'claude-fable-5.1');
+  assert.equal(result.provider,'claude-fable');
   assert.deepEqual([result.objections,result.dropped,result.required,result.alternatives],[[],[],[],[]]);
   assert.equal(result.question,null);
   const prompt=seen[0][1];
@@ -484,17 +484,17 @@ test('a critique that costs work must carry something to act on: evidence, requi
   // The chain is walked in the order the caller gave: one retry per provider, then the next one.
   const fallback=critiqueCall(['nonsense','still nonsense',JSON.stringify({verdict:'sound',objections:[]})]);
   assert.equal(fallback.result.verdict,'sound');
-  assert.equal(fallback.result.provider,'gpt-6-astra');
-  assert.deepEqual(fallback.seen.map(item=>item[0]),['claude-fable-5.1','claude-fable-5.1','gpt-6-astra']);
+  assert.equal(fallback.result.provider,'codex-agent');
+  assert.deepEqual(fallback.seen.map(item=>item[0]),['claude-fable','claude-fable','codex-agent']);
   // An exhausted chain is `unavailable` with its attempts on record, exactly as the validator is.
-  const exhausted=critiqueCall(['nonsense','nonsense again',Error('gpt-6-astra headless exited 1: boom')]);
+  const exhausted=critiqueCall(['nonsense','nonsense again',Error('codex-agent headless exited 1: boom')]);
   assert.equal(exhausted.result.ok,false);
   assert.equal(exhausted.result.verdict,'unavailable');
   assert.deepEqual(exhausted.result.objections,[]);
   assert.deepEqual(exhausted.result.attempts.map(item=>[item.provider,item.attempt]),
-    [['claude-fable-5.1',0],['claude-fable-5.1',1],['gpt-6-astra',0]]);
+    [['claude-fable',0],['claude-fable',1],['codex-agent',0]]);
   // Both validator-pool peers are available to the quota-aware selector; configuration order is not a fallback promise.
-  assert.deepEqual(new Set(DEFAULT_CRITIC_RUNTIMES),new Set(['gpt-6-astra','claude-fable-5.1']));
+  assert.deepEqual(new Set(DEFAULT_CRITIC_RUNTIMES),new Set(['claude-fable','codex-agent']));
   // Objections written as sentences or with a kind outside the list are shaped, never sent back: the evidenced ones stay.
   const lenient=critiqueCall([JSON.stringify({verdict:'revise',required:['name the record'],objections:['just a sentence',{kind:'security',claim:'The token is read from a file nobody fills',evidence:'delivery.module.ts',consequence:'Delivery silently disabled.'}]})]);
   assert.equal(lenient.result.verdict,'revise');

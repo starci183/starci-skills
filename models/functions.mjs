@@ -45,6 +45,14 @@ export function headlessProvidersFromRegistry(registry,profiles){
     const model=target.headlessModel??target.requestedModel??profiles[target.runtime]?.profiles?.[profile]?.model;
     if(typeof model!=='string'||!model.trim())continue;
     providers[id]=make(model);
+    // A provider-window pool pins a different model per role (codex-agent decides on gpt-6-astra but implements
+    // on gpt-5.6-sol): every distinct role model gets its own headless line keyed `<target>~<model>` so an
+    // explicit request for that model attests the model it actually launched, not the pool's working model.
+    for(const profileId of Object.values(target.profiles??{})){
+      const roleModel=profiles[target.runtime]?.profiles?.[profileId]?.model;
+      if(typeof roleModel!=='string'||!roleModel.trim()||roleModel===model)continue;
+      providers[`${id}~${roleModel}`]=make(roleModel);
+    }
   }
   return providers;
 }
