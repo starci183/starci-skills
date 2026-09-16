@@ -29,20 +29,22 @@ rules:
     title: Placement
     kind: mandatory
     requirement: |
-      Specs sit beside their subject. A connected block's component.spec.tsx covers its sibling Base
-      contract and index.spec.tsx covers connected mapping. Feature pages/layouts/overlays and reusable
-      composites/branches/leaves keep the one behavior-focused spec their actual responsibility and risk
-      require; no lower-tier twin is manufactured for test symmetry. Hooks and classNames use matching
-      .spec siblings; no __tests__/ folders. The runner is vitest with @testing-library/react.
+      Specs sit beside their subject. Connected-block coverage proves both its sibling render contract and
+      connected mapping; separate component.spec.tsx and index.spec.tsx files may align those responsibilities,
+      while one focused collocated spec may cover both only when it actually exercises both. Feature
+      pages/layouts/overlays and reusable composites/branches/leaves keep the behavior-focused coverage their
+      actual responsibility and risk require; no lower-tier twin or second spec is manufactured for symmetry.
+      Hooks and classNames use matching .spec siblings; no __tests__/ folders. The runner is vitest with
+      @testing-library/react.
     rationale: |
       Colocation makes ownership clear. Tests follow behavior boundaries; file counts never create a
       second component or a redundant spec.
     cases:
       - id: case-1
-        when: "Connected block pure half"
+        when: "The connected block's render responsibility has its own spec"
         write: "component.spec.tsx beside components/blocks/<Block>/component.tsx"
       - id: case-2
-        when: "Connected block owner"
+        when: "The connected block's mapping responsibility has its own spec"
         write: "index.spec.tsx beside components/blocks/<Block>/index.tsx"
       - id: case-3
         when: "Hook"
@@ -57,11 +59,11 @@ rules:
         when: "Runner"
         write: "vitest, @testing-library/react; describe/it/expect/vi imported from \"vitest\""
       - id: case-7
-        when: "A connected block has both sibling responsibilities"
+        when: "A connected block needs proof of both sibling responsibilities"
         write: >
-          Both files above, one per half. Neither stands in for the other: the connected spec replaces
-          the pure half wholesale (FE-TEST-2 Case 4) and the pure spec stubs its child owners
-          (FE-TEST-3 Case 3), so one spec cannot claim both responsibilities.
+          Separate the specs as above when each isolates one responsibility, or keep one collocated spec
+          that directly exercises both connected mapping and render behaviour. A source sibling or file
+          count is not evidence that either responsibility was tested.
       - id: case-8
         kind: exception
         when: "A one-part visual unit"
@@ -263,6 +265,6 @@ openQuestions:
   - id: existing-units-single-spec-backlog
     kind: residual
     summary: |
-      FE-TEST-1 Case 7 binds connected blocks with two real sibling responsibilities. It is not a census
-      of the tree: one-part units legitimately carry one focused spec, and no second half is inferred from
-      a historical file count.
+      FE-TEST-1 Case 7 binds meaningful coverage, not a two-file census. One-part units legitimately carry
+      one focused spec, and a connected block may also carry one spec when it actually covers both mapping
+      and render responsibilities. No second spec is inferred from a historical file count.
