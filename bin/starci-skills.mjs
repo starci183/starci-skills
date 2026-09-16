@@ -84,12 +84,13 @@ the entry routes, and a rule copied here becomes a second home that nobody remem
 // Templates are installed only at the host root, never into routed BE/FE repositories.
 const BOOTSTRAP = readFileSync(path.join(packageRoot, 'init/AGENTS.md'), 'utf8');
 const CLAUDE_BOOTSTRAP = readFileSync(path.join(packageRoot, 'init/CLAUDE.md'), 'utf8');
+const DEVIN_BOOTSTRAP = readFileSync(path.join(packageRoot, 'init/DEVIN.md'), 'utf8');
 const PROMPT_ENTRY = BOOTSTRAP.match(/<!-- starci:prompt-entry -->[\s\S]*?<!-- \/starci:prompt-entry -->/)?.[0];
 const SPLIT_STORAGE_BOOTSTRAP = BOOTSTRAP.replace("The project's backend owns shared `.starciwork`; Plan/run state lives inside `.starciwork/_local/plans` for both backend and frontend.", "The project's backend owns the shared `.starciwork` and sibling `.starcitemp` for both backend and frontend.");
 const SPLIT_STORAGE_ENTRY = SPLIT_STORAGE_BOOTSTRAP.match(/<!-- starci:prompt-entry -->[\s\S]*?<!-- \/starci:prompt-entry -->/)?.[0];
 const PRE_RENAME_BOOTSTRAP = SPLIT_STORAGE_BOOTSTRAP.replaceAll('.starciwork', '.work').replaceAll('.starcitemp', '.starci');
 const PRE_RENAME_ENTRY = PRE_RENAME_BOOTSTRAP.match(/<!-- starci:prompt-entry -->[\s\S]*?<!-- \/starci:prompt-entry -->/)?.[0];
-if (!PROMPT_ENTRY || CLAUDE_BOOTSTRAP !== BOOTSTRAP) throw new Error('Host bootstrap templates must share the same runtime entry');
+if (!PROMPT_ENTRY || CLAUDE_BOOTSTRAP !== BOOTSTRAP || DEVIN_BOOTSTRAP !== BOOTSTRAP) throw new Error('Host bootstrap templates must share the same runtime entry');
 
 const LEGACY_LITE_ENTRY = `${ENTRY_MARKER}
 For every user prompt, enter [StarCi Lite](.claude/skills/starci-lite/SKILL.md) and use its scope classification.
@@ -187,13 +188,13 @@ function safePayloadTarget(target) {
 
 // Plan host changes before any payload mutation. Only exact installer-owned text is replaced.
 function bootstrapPlan(repo, profile) {
-  for (const name of ['CLAUDE.md', 'AGENTS.md', '.gitignore']) {
+  for (const name of ['CLAUDE.md', 'AGENTS.md', 'DEVIN.md', '.gitignore']) {
     const stat = lstatSync(path.join(repo, name), { throwIfNoEntry: false });
     if (stat && (!stat.isFile() || stat.isSymbolicLink())) throw new Error(name + ': bootstrap target must be a regular owned file, not a symlink/junction');
   }
   const entry = PROMPT_ENTRY;
   const bootstrap = BOOTSTRAP;
-  return ['CLAUDE.md', 'AGENTS.md'].map(name => {
+  return ['CLAUDE.md', 'AGENTS.md', 'DEVIN.md'].map(name => {
     const file = path.join(repo, name);
     if (!existsSync(file)) return { name, file, text: bootstrap, action: 'wrote' };
     const current = readFileSync(file, 'utf8');

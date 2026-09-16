@@ -36,7 +36,7 @@ function hostFromGolden(t, { bootstrap = true } = {}) {
   const root = host(t);
   fs.cpSync(path.join(golden, '.claude'), path.join(root, '.claude'), { recursive: true });
   if (bootstrap) {
-    for (const name of ['AGENTS.md', 'CLAUDE.md', '.gitignore']) {
+    for (const name of ['AGENTS.md', 'CLAUDE.md', 'DEVIN.md', '.gitignore']) {
       if (fs.existsSync(path.join(golden, name))) fs.cpSync(path.join(golden, name), path.join(root, name));
     }
   }
@@ -99,7 +99,7 @@ test('host bootstraps use packaged templates and leave bound BE/FE projects unto
     .sort().map(p => [p,fs.readFileSync(path.join(dir,p),'utf8')]);
   const before = [snapshot(backend),snapshot(frontend)];
   init({dir:root,bootstrap:true},quiet);
-  for (const file of ['AGENTS.md','CLAUDE.md']) {
+  for (const file of ['AGENTS.md','CLAUDE.md','DEVIN.md']) {
     assert.equal(read(root,file),read(packageRoot,'init/'+file));
     assert.equal(read(root,'.claude/init/'+file),read(root,file));
     // Every relative Markdown target from the generated bootstrap must actually resolve.
