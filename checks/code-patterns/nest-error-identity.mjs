@@ -269,12 +269,51 @@ function exported(ts, node) {
   return Boolean(ts.getCombinedModifierFlags(node) & ts.ModifierFlags.Export);
 }
 
-function directSuperCalls(ts, constructor) {
-  return constructor.body.statements.flatMap(statement => {
-    if (!ts.isExpressionStatement(statement)) return [];
-    const expression = unwrap(ts, statement.expression);
-    return ts.isCallExpression(expression) && expression.expression.kind === ts.SyntaxKind.SuperKeyword ? [expression] : [];
-  });
+function staticBoolean(ts, input) {
+  const node = unwrap(ts, input);
+  if (node.kind === ts.SyntaxKind.TrueKeyword) return true;
+  if (node.kind === ts.SyntaxKind.FalseKeyword) return false;
+  if (ts.isPrefixUnaryExpression(node) && node.operator === ts.SyntaxKind.ExclamationToken) {
+    const value = staticBoolean(ts, node.operand); return value === null ? null : !value;
+  }
+  return null;
+}
+
+function statementFlow(ts, statement) {
+  if (ts.isReturnStatement(statement) || ts.isThrowStatement(statement)) return 'terminates';
+  if (ts.isBlock(statement)) return statementsFlow(ts, statement.statements);
+  if (ts.isIfStatement(statement)) {
+    const constant = staticBoolean(ts, statement.expression);
+    if (constant !== null) return statementFlow(ts, constant ? statement.thenStatement : statement.elseStatement ?? { kind: ts.SyntaxKind.EmptyStatement });
+    const left = statementFlow(ts, statement.thenStatement), right = statement.elseStatement ? statementFlow(ts, statement.elseStatement) : 'continues';
+    return left === right ? left : 'unknown';
+  }
+  if (ts.isEmptyStatement(statement) || ts.isVariableStatement(statement) || ts.isExpressionStatement(statement)
+    || ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) return 'continues';
+  return 'unknown';
+}
+
+function statementsFlow(ts, statements) {
+  let state = 'continues';
+  for (const statement of statements) {
+    if (state !== 'continues') return state;
+    state = statementFlow(ts, statement);
+  }
+  return state;
+}
+
+function directSuperFlow(ts, constructor) {
+  const calls = [];
+  let state = 'continues', reached = false;
+  for (const statement of constructor.body.statements) {
+    const expression = ts.isExpressionStatement(statement) && unwrap(ts, statement.expression);
+    if (expression && ts.isCallExpression(expression) && expression.expression.kind === ts.SyntaxKind.SuperKeyword) {
+      if (state !== 'continues') return { calls, state };
+      calls.push(expression); reached = true; continue;
+    }
+    if (!reached && state === 'continues') state = statementFlow(ts, statement);
+  }
+  return { calls, state };
 }
 
 function academyCode(name) {
@@ -345,10 +384,11 @@ export function checkNestErrorIdentity({ root, files, ruleIds, architectureConfi
                   const metadataType = declaredType(checker, metadataSymbol);
                   for (const cause of family.causeProperties) if (!metadataType?.getProperty(cause)) add(source, 'NEST_ERROR_DECLARATION_IDENTITY', metadataDeclaration, `Academy metadata interface carries declared cause property ${cause}.`, false);
                 }
-                const supers = directSuperCalls(ts, constructor);
+                const superFlow = directSuperFlow(ts, constructor), supers = superFlow.calls;
                 const code = supers.length === 1 && supers[0].arguments[family.academy.codeArgument];
                 const metadata = supers.length === 1 && supers[0].arguments[family.academy.metadataArgument];
-                if (supers.length !== 1 || !code || !ts.isStringLiteralLike(unwrap(ts, code)) || !unwrap(ts, code).text
+                if (superFlow.state === 'unknown') add(source, 'NEST_ERROR_DECLARATION_IDENTITY', constructor, 'Academy constructor control flow before direct super is not statically provable.', true);
+                if (superFlow.state !== 'continues' || supers.length !== 1 || !code || !ts.isStringLiteralLike(unwrap(ts, code)) || !unwrap(ts, code).text
                   || !metadata || !ts.isObjectLiteralExpression(unwrap(ts, metadata))
                   || unwrap(ts, metadata).properties.some(item => ts.isSpreadAssignment(item) || item.name && ts.isComputedPropertyName(item.name))) {
                   add(source, 'NEST_ERROR_DECLARATION_IDENTITY', constructor, 'Academy constructor directly supplies one literal code and one static metadata object to super at the declared zero-based positions.', false);

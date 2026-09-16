@@ -230,6 +230,27 @@ test('a conditional super call cannot supply mandatory Academy constructor flow'
   assert.ok(result.violations.some(item => item.message.includes('directly supplies')));
 });
 
+test('Academy super reachability handles constant, terminating and unknown preceding branches', t => {
+  const unknown = academyChild.replace('constructor({ id, originalError }: UserMissingExceptionMetadata) {',
+    'constructor({ id, originalError }: UserMissingExceptionMetadata) { const flag = Date.now() > 0; if (flag) return;');
+  let f = fixture(t, { profile: 'academy-abstract-exception', sources: { 'src/errors/user-missing.ts': unknown } });
+  let result = checkNestErrorIdentity(f.input);
+  assert.ok(result.errors.some(item => item.message.includes('control flow before direct super')));
+
+  const terminated = academyChild.replace('constructor({ id, originalError }: UserMissingExceptionMetadata) {',
+    "constructor({ id, originalError }: UserMissingExceptionMetadata) { const flag = Date.now() > 0; if (flag) throw new Error('x'); else return;");
+  f = fixture(t, { profile: 'academy-abstract-exception', sources: { 'src/errors/user-missing.ts': terminated } });
+  result = checkNestErrorIdentity(f.input);
+  assert.ok(result.violations.some(item => item.message.includes('directly supplies')));
+
+  const constant = academyChild.replace('constructor({ id, originalError }: UserMissingExceptionMetadata) {',
+    "constructor({ id, originalError }: UserMissingExceptionMetadata) { if (false) throw new Error('x');");
+  f = fixture(t, { profile: 'academy-abstract-exception', sources: { 'src/errors/user-missing.ts': constant } });
+  result = checkNestErrorIdentity(f.input);
+  assert.ok(!result.errors.some(item => item.ruleId === 'NEST_ERROR_DECLARATION_IDENTITY'));
+  assert.ok(!result.violations.some(item => item.ruleId === 'NEST_ERROR_DECLARATION_IDENTITY'));
+});
+
 test('Academy constructor sites require one object literal and codes stay unique', t => {
   const duplicate = academyChild;
   const f = fixture(t, { profile: 'academy-abstract-exception', sources: {
