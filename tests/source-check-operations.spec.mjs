@@ -5,8 +5,24 @@ import {parseYaml} from '../core/yaml.mjs';
 import {selectOperation} from '../ops/select.mjs';
 import {outputs} from '../ops/generate.mjs';
 import {validateCatalog} from '../ops/validate.mjs';
+import {validateGoal} from '../workflows/lifecycle.mjs';
 
 const contract=parseYaml(fs.readFileSync(new URL('../ops/review.verify/operator.yaml',import.meta.url),'utf8'));
+
+test('review-code goals select delivery, stale, or lint contracts without inventing another job',()=>{
+  const goal={schema:'starci/goal@1',id:'source-audit',originalRequest:'Inspect source freshness',requestId:'source-request',
+    finalOutcome:'A reproducible report for the selected scope',workflow:'review-code',
+    scope:{business:['Source freshness'],paths:[],resources:['audit-report'],exclusions:['Source repair']},
+    criteria:['measured'],businessChanges:['No product behavior change'],impacts:[],
+    resourceEffects:[{target:'audit-report',operation:'write-report',postcondition:'Machine findings retained'}],
+    workTargets:['audit-record'],inputs:{request:'Inspect source freshness'},
+    cells:[{id:'review-code',op:'review.verify',operation:'delivery',purpose:'Measure inputs',finalOutput:'Audit report',
+      criteria:['measured'],outputSchema:{type:'string'},inputs:{request:{from:'request',key:'request'}}}]};
+  for(const operation of ['delivery','stales','lint']){
+    goal.cells[0].operation=operation;assert.equal(validateGoal(goal).ok,true);
+  }
+  goal.cells[0].operation='repair';assert.throws(()=>validateGoal(goal),/supported workflow operation/);
+});
 
 test('script audit and lint selection expose only attempt reports, never producer or completion writes',()=>{
   for(const mode of ['stales','lint']){

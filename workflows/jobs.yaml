@@ -194,6 +194,10 @@ workflows:
       evidence: actual-artifacts-and-selected-work-completion-profile
       dispatch: explicit-coordinator-only
   - id: review-code
+    operations:
+      - delivery
+      - stales
+      - lint
     parameters:
       - request
     matrix:
