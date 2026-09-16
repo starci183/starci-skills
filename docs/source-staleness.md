@@ -1,6 +1,6 @@
 # Deterministic source staleness check
 
-`scripts/check-stales.mjs` is the read-only source/Work/stack freshness gate. Its primary mode reads an existing canonical Work tree, runs the canonical validator, follows only the selected nodes' `dependsOn` and `refs` closure, and compares the resulting current `inputDigest`, completion evidence, `sourceRefs`, and `starci/source-identity@1` coverage with explicitly mapped Git repositories.
+`scripts/check-stales.mjs` is the read-only source/Work/stack freshness gate. It reads an existing canonical Work tree, runs the canonical validator, selects the declared inspection closure, and compares current `inputDigest`, completion evidence, `sourceRefs`, and `starci/source-identity@1` coverage with explicitly mapped Git repositories.
 
 ```text
 node scripts/check-stales.mjs --work <work-root> \
@@ -8,7 +8,7 @@ node scripts/check-stales.mjs --work <work-root> \
   [--target <exact-work-node-id> ...]
 ```
 
-Every repository named by a selected source binding must have an explicit `--repo` mapping. A mapping is an observation boundary, not permission to edit it. Omit `--target` to inspect all canonical nodes. With targets, the scanner includes those exact nodes and their typed upstream closure; unrelated siblings do not become stale merely because another feature or Git path changed.
+Every repository named by a selected source binding must have an explicit `--repo` mapping. A mapping is an observation boundary, not permission to edit it. Omit `--target` to inspect all canonical nodes. With targets, the scanner includes aggregate descendants, ancestor context, `dependsOn`, `refs`, split SRS/SDS semantic inputs and applicable brand context. Ancestors do not by themselves select unrelated siblings. Unrelated Git changes do not invalidate unchanged scoped source coverage.
 
 The command prints `starci/source-staleness-report@1` JSON. Output has no clock value, and stable inputs produce byte-identical output and finding IDs. It exits:
 
@@ -24,7 +24,7 @@ The scanner derives status; input files cannot author it.
 - `verified-conforming` means the canonical validator accepts the selected record and current bytes match its declared source coverage. It is bounded structural freshness, not a new product acceptance claim.
 - `revalidation-needed` means semantic inputs, tested source coverage, or evidence bindings changed. A hash difference alone does not prove code wrong.
 - `known-drift` means a declared Work/specification constraint is currently contradicted.
-- `missing` means a required declared source path is absent.
+- `missing` means a required declared source path or completion proof is absent. `IMPLEMENTATION_PROOF_MISSING` does not assert that implementation code is absent.
 - `unverifiable` means a repository, revision, snapshot comparison, path, or canonical input cannot be resolved safely. Unknown is never treated as fresh.
 
 Findings keep `source-drift`, `stack-drift`, `contract-drift`, `evidence-invalid`, and `input-unavailable` separate. Each finding names the exact subject, references one deduplicated `impactGraph.impactSets` closure, gives its existing operator route, and returns bounded candidate paths with `authorized:false`. The graph keeps typed reasons once instead of repeating transitive edge paths in every finding, so a large Work tree remains machine-readable. The report's `coverage` and `limitations` state the exact selected closure, stored binding types, and static-only proof boundary. The report never grants writes, changes Work, reopens nodes, rewrites SRS/SDS from current source, or replaces historical receipts.
