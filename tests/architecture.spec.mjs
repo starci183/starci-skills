@@ -336,6 +336,22 @@ test('backend direction includes static dynamic imports that use import attribut
   assert.ok(result.violations.some(item => item.ruleId === 'BE_MODULE_IMPORTS_FEATURE'), JSON.stringify(result, null, 2));
 });
 
+test('TypeScript import types join the dependency graph and direct dynamic module names fail coverage', t => {
+  const root = fixture(t, 'backend', {
+    'src/features/private.ts': 'export interface Private { value:string }\n',
+    'src/modules/import-type.ts': 'export type Hidden = import("@features/private").Private\n',
+    'src/modules/dynamic.ts': 'const selected="@features/private"; export const load=()=>import(selected); export const loadCjs=()=>require(selected)\n',
+    'src/modules/shadow.ts': 'const require=(value:string)=>value; const selected="local"; export const local=require(selected)\n',
+  });
+  const result = check(root);
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_MODULE_IMPORTS_FEATURE' && item.path.endsWith('/import-type.ts')), JSON.stringify(result, null, 2));
+  const dynamic = result.errors.filter(item => item.ruleId === 'ARCH_DYNAMIC_DEPENDENCY_UNPROVEN');
+  assert.equal(dynamic.length, 2, JSON.stringify(result, null, 2));
+  assert.ok(dynamic.every(item => item.path.endsWith('/dynamic.ts') && item.line > 0 && item.column > 0));
+  assert.equal(result.errors.some(item => item.path?.endsWith('/shadow.ts')), false, JSON.stringify(result, null, 2));
+  assert.ok(result.coverage.checkedRuleIds.includes('ARCH_DYNAMIC_DEPENDENCY_UNPROVEN'));
+});
+
 test('feature application use cases may use Nest injection but cannot reach transport DTOs or protocol framework surfaces', t => {
   const root = fixture(t, 'backend', {
     'src/modules/orders/service.ts': 'export class OrdersService { create(input: {name:string}) { return input } }\n',

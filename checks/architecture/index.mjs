@@ -8,11 +8,12 @@ import { checkOwners } from './owners.mjs';
 
 const LIMITATIONS = [
   'This is a static TypeScript dependency and source-shape check; it does not prove runtime dependency-injection bindings, global/provider scope, state lifetime, server/client behavior, feature-versus-capability ownership, route behavior, or business correctness.',
-  'Dynamic module names and dependencies constructed outside analyzable string-literal imports require separate review.',
+  'Dependencies hidden behind constructed aliases, reflection, or calls other than direct import()/require() syntax require separate review.',
   'Protocol surfaces selected through reflection, nonliteral computed properties, or aliases constructed beyond static import/re-export bindings require separate review.',
 ];
 
 const COMMON_RULE_IDS = [
+  'ARCH_DYNAMIC_DEPENDENCY_UNPROVEN',
   'ARCH_INTERNAL_IMPORT_OUTSIDE',
   'ARCH_INTERNAL_IMPORT_UNRESOLVED',
   'ARCH_NO_SOURCE',
