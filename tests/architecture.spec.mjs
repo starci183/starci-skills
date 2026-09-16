@@ -307,6 +307,23 @@ test('backend direction includes static dynamic imports that use import attribut
   assert.ok(result.violations.some(item => item.ruleId === 'BE_MODULE_IMPORTS_FEATURE'), JSON.stringify(result, null, 2));
 });
 
+test('feature application use cases may use Nest injection but cannot reach transport DTOs or protocol framework surfaces', t => {
+  const root = fixture(t, 'backend', {
+    'src/modules/orders/service.ts': 'export class OrdersService { create(input: {name:string}) { return input } }\n',
+    'src/features/orders/application/valid.use-case.ts': 'import { Injectable } from "@nestjs/common"; import { OrdersService } from "@modules/orders/service"; @Injectable() export class ValidUseCase { constructor(private readonly orders: OrdersService) {} execute(input:{name:string}) { return this.orders.create(input) } }\n',
+    'src/features/orders/transport/graphql/create.input.ts': 'export class CreateInput { name!: string }\n',
+    'src/features/orders/transport/index.ts': 'export type { CreateInput } from "./graphql/create.input"\n',
+    'src/features/orders/shared/transport-types.ts': 'export type { CreateInput } from "../transport"\n',
+    'src/features/orders/application/invalid.use-case.ts': 'import { Body } from "@nestjs/common"; import { ArgsType } from "@nestjs/graphql"; import type { CreateInput } from "../shared/transport-types"; @ArgsType() export class InvalidUseCase { execute(@Body() input:CreateInput){ return input } }\n',
+  });
+  const result = check(root), rules = result.violations.map(item => item.ruleId);
+  assert.ok(rules.includes('BE_APPLICATION_IMPORTS_TRANSPORT'), JSON.stringify(result, null, 2));
+  assert.ok(rules.filter(item => item === 'BE_APPLICATION_TRANSPORT_FRAMEWORK').length >= 2, JSON.stringify(result, null, 2));
+  assert.equal(result.violations.some(item => item.path.endsWith('/valid.use-case.ts')), false, JSON.stringify(result, null, 2));
+  const dependency = result.violations.find(item => item.ruleId === 'BE_APPLICATION_IMPORTS_TRANSPORT');
+  assert.deepEqual(dependency.dependencyChain.map(item => path.posix.basename(item)), ['invalid.use-case.ts', 'transport-types.ts', 'index.ts']);
+});
+
 test('internal aliases and relative imports cannot resolve outside the checked repository', t => {
   const root = fixture(t, 'backend', {
     'src/modules/alias.ts': 'import { outside } from "@outside/value"; export const alias=outside\n',
