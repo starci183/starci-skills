@@ -154,6 +154,8 @@ targetAliases:
   qwen-qwen3.8-flash-reviewer: qwen3.8-flash
   codex-gpt-5.6-sol: gpt-5.6-sol
   codex-gpt-5.6-sol-reviewer: gpt-5.6-sol
+  codex-gpt-5.6-luna: gpt-5.6-luna
+  codex-gpt-5.6-luna-reviewer: gpt-5.6-luna
   codex-gpt-6-astra: gpt-6-astra
   codex-gpt-6-astra-reviewer: gpt-6-astra
   qwen-qwen3.8-max-worker: qwen3.8-max
@@ -373,11 +375,12 @@ selection: |-
   prompt to Qwen Code 0.23.3. Qwen 3.8 Max and DeepSeek command terminals stay out of automatic
   chains; every command excludes the Qwen `agent` tool.
 costPolicy: |-
-  Execution operations (backend, frontend, UAT, content, release, runtime, retire, task, workspace)
-  run Qwen 3.8 Flash first, Claude Opus second and Codex gpt-5.6-sol third. Deep reasoning
+  General bounded implementation, verification, content and maintenance operations admit Luna as their final
+  capacity candidate after their established Qwen/Claude/Sol order. Workspace management, planning, decisions
+  and ImageGen routes exclude Luna because those routes require a different role or tool. Deep reasoning
   (business.decide, architecture.decide) runs Claude Fable 5.1 first and Codex gpt-6-astra second.
   Independent review runs the Qwen 3.8 Flash reviewer first, Claude Fable 5.1 second and the Codex
-  Sol reviewer third. work.author reads a Work record, its neighbours and the code an implementation would
+  Sol reviewer third, with Opus, Astra and Luna as the declared downgrades. work.author reads a Work record, its neighbours and the code an implementation would
   touch, so it carries the `plan` role and leads with Claude Opus, then Claude Fable 5.1; Codex gpt-5.6-sol
   stays in its chain as the launchable fallback even though the allocator prefers the plan-role runtimes.
   brand.decide is the mirror of that case: it carries the `decide` role, so the allocator prefers Claude Fable
@@ -391,8 +394,8 @@ costPolicy: |-
   slot is exactly what this operation exists to close. grammar.update is the opposite case: it grows the
   installed grammar as code - a typed unit with its stories, its tests, its published version and its canon
   entry - so it carries the execution `implement` role but drops the image model entirely and leads with
-  Claude Opus, then Codex gpt-5.6-sol; nothing in it is drawn, and a publish is irreversible, so the chain is
-  the two runtimes that read a whole repository's conventions before they change one. knowledge.repair edits
+  Claude Opus, then Codex gpt-5.6-sol and bounded Luna capacity; nothing in it is drawn, and a publish is irreversible, so the chain is
+  limited to declared coding runtimes. knowledge.repair edits
   this runtime and therefore leads with Claude Opus. Plan Coordinator and Workflow Monitor supervisors lead with Claude Opus and
   fall back to Codex Sol. Every automatic chain contains only native managed-agent candidates and
   advances only after a verified no-effect failure. DeepSeek V4 Pro and Qwen 3.8 Max remain installed
@@ -421,7 +424,7 @@ examples:
   claudeFrontend:
     runtime: claude
     profile: opus
-    model: null
+    model: claude-opus-5
     imageGenerationAvailable: false
   orcaInterfaceImplementation:
     skill: starci
@@ -431,5 +434,5 @@ examples:
       - claude
       - qwen
 examplesNote: Examples of frontend context.execution only. Set availability from observed host
-  tools, never copy true as proof. Fixed-runtime contexts may omit model to inherit the actual host
-  configuration. Orca resolves ordered skill/operator candidates from observed readiness instead.
+  tools, never copy true as proof. Declared exact models still require effective runtime attestation.
+  Orca resolves ordered skill/operator candidates from observed readiness instead.

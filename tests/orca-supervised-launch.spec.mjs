@@ -22,7 +22,7 @@ after(()=>{
   fs.rmSync(suiteRoot,{recursive:true,force:true});
 });
 const noWait=()=>{};
-// Execution op: qwen command terminal first, then Claude Opus, then Codex Sol.
+// Execution op: qwen command terminal first, then Claude Opus, Codex Sol and bounded Luna capacity.
 const opName='[Op] backend.implement - Sales';
 const input={run:'run_sales',workflowTask:'task_workflow_sales',from:'term_monitor_sales',worktree,
   operation:'backend.implement',scope:'Sales',spec:'Implement the bounded Sales slice and report exactly once.'};
@@ -89,13 +89,14 @@ test('operation request carries the whole chain with its launch kinds and owns t
   const planned=buildOperationLaunch(input);
   assert.equal(planned.schema,'starci/orca-supervised-op-request@2');
   assert.equal(planned.displayName,opName);
-  assert.deepEqual(planned.candidates.map(candidate=>[candidate.selection.target,candidate.launch]),[['qwen3.8-flash','command-terminal'],['claude-opus','managed-agent'],['gpt-5.6-sol','managed-agent']]);
+  assert.deepEqual(planned.candidates.map(candidate=>[candidate.selection.target,candidate.launch]),[['qwen3.8-flash','command-terminal'],['claude-opus','managed-agent'],['gpt-5.6-sol','managed-agent'],['gpt-5.6-luna','managed-agent']]);
   assert.match(planned.candidates[0].terminalParams.command,/^qwen --model qwen3.8-flash .*--exclude-tools agent/);
   assert.equal(planned.candidates[0].terminalParams.title,opName);
   assert.equal(planned.candidates[0].terminalParams.worktree,`path:${worktreePath}`);
   assert.deepEqual(planned.candidates[0].dispatchParams,{task:'$operationTaskId',to:'$terminalHandle',from:'term_monitor_sales',run:'run_sales','return-preamble':true});
-  assert.equal(planned.candidates[1].workerParams.model,undefined);
+  assert.equal(planned.candidates[1].workerParams.model,'claude-opus-5');
   assert.equal(planned.candidates[2].workerParams.model,'gpt-5.6-sol');
+  assert.equal(planned.candidates[3].workerParams.model,'gpt-5.6-luna');
   assert.equal(planned.candidates[1].workerParams['timeout-ms'],300000,'five minutes for the TUI to consume the pasted spec');
   assert.deepEqual(planned.runAttestationParams,{id:'run_sales'});
   assert.equal(planned.taskParams['display-name'],opName);
@@ -106,7 +107,7 @@ test('operation request carries the whole chain with its launch kinds and owns t
 });
 
 test('a supervisor chain resolves from the registry with its model and effort, never from a hardcoded provider',()=>{
-  assert.deepEqual(resolveSupervisorChain('workflowMonitor').map(candidate=>[candidate.target,candidate.model,candidate.effort]),[['claude-opus',null,null],['gpt-5.6-sol','gpt-5.6-sol','high']]);
+  assert.deepEqual(resolveSupervisorChain('workflowMonitor').map(candidate=>[candidate.target,candidate.model,candidate.effort]),[['claude-opus','claude-opus-5','high'],['gpt-5.6-sol','gpt-5.6-sol','high']]);
   assert.throws(()=>resolveSupervisorChain('nobody'),/Supervisor chain is missing/);
 });
 
@@ -141,7 +142,7 @@ test('a Qwen terminal that never renders its prompt is closed with no effects an
   const fake=fakeOrca({
     ...qwenHandlers({reads:[['Welcome','npm view @qwen-code/qwen-code dist-tags.latest']]}),
     'worker-start':(args)=>{assert.ok(has(args,'--agent','claude'));return json(0,started('ctx_claude','task_operation_sales'));},
-    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:opName})),
+    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:'claude-opus-5',title:opName})),
     'terminal-rename':()=>json(0,{ok:true,result:{}})
   });
   const result=startOperation(input,{orca:fake.orca,wait:noWait});
@@ -160,7 +161,7 @@ test('a Qwen prompt that is never consumed is fenced: stop the Dispatch, close e
   const fake=fakeOrca({
     ...qwenHandlers({reads:[qwenReady,qwenStaged,qwenStaged,qwenStaged]}),
     'worker-start':()=>json(0,started('ctx_claude','task_operation_sales')),
-    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:opName})),
+    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:'claude-opus-5',title:opName})),
     'terminal-rename':()=>json(0,{ok:true,result:{}})
   });
   const result=startOperation(input,{orca:fake.orca,wait:noWait});
@@ -179,7 +180,7 @@ test('a Dispatch whose assignee is not the created terminal is fenced, never acc
   const fake=fakeOrca({
     ...qwenHandlers({assignee:'term_other'}),
     'worker-start':()=>json(0,started('ctx_claude','task_operation_sales')),
-    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:opName})),
+    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:'claude-opus-5',title:opName})),
     'terminal-rename':()=>json(0,{ok:true,result:{}})
   });
   const result=startOperation(input,{orca:fake.orca,wait:noWait});
@@ -251,7 +252,7 @@ test('an exhausted chain is a typed failure, never a thrown string',()=>{
   assert.equal(result.exhausted,true);
   assert.equal(result.effectState,'none');
   assert.equal(result.stopReason,'chain-exhausted');
-  assert.deepEqual(result.attempts.map(attempt=>attempt.target),['qwen3.8-flash','claude-opus','gpt-5.6-sol']);
+  assert.deepEqual(result.attempts.map(attempt=>attempt.target),['qwen3.8-flash','claude-opus','gpt-5.6-sol','gpt-5.6-luna']);
   assert.ok(result.attempts.every(attempt=>attempt.effectState==='none'));
   assert.equal(result.recovery,'report-workflow-boundary-worker_failed');
 });
@@ -397,16 +398,16 @@ test('settlement reconciles an unknown stop, closes an unstoppable own terminal,
 
 test('--skip records a verified no-effect failure for a chain target and starts at the next candidate',()=>{
   const planned=buildOperationLaunch({...input,skip:'qwen3.8-flash:unavailable'});
-  assert.deepEqual(planned.candidates.map(candidate=>candidate.selection.target),['claude-opus','gpt-5.6-sol']);
+  assert.deepEqual(planned.candidates.map(candidate=>candidate.selection.target),['claude-opus','gpt-5.6-sol','gpt-5.6-luna']);
   assert.deepEqual(planned.skipped,[{target:'qwen3.8-flash',reason:'unavailable',effectState:'none',source:'monitor-verified-skip'}]);
   assert.throws(()=>buildOperationLaunch({...input,skip:'qwen3.8-flash:permission-denied'}),/reason must be one of/);
   assert.throws(()=>buildOperationLaunch({...input,skip:'gpt-6-astra:unavailable'}),/outside this operation chain/);
-  assert.throws(()=>buildOperationLaunch({...input,skip:'qwen3.8-flash,claude-opus,gpt-5.6-sol'}),/Every candidate/);
+  assert.throws(()=>buildOperationLaunch({...input,skip:'qwen3.8-flash,claude-opus,gpt-5.6-sol,gpt-5.6-luna'}),/Every candidate/);
   const fake=fakeOrca({
     'run-show':()=>json(0,runShow),
     'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
     'worker-start':(args)=>{assert.ok(has(args,'--agent','claude'));return json(0,started('ctx_claude','task_operation_sales'));},
-    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:opName})),
+    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:'claude-opus-5',title:opName})),
     'terminal-rename':()=>json(0,{ok:true,result:{}})
   });
   const result=startOperation({...input,skip:'qwen3.8-flash'},{orca:fake.orca,wait:noWait});
@@ -433,7 +434,7 @@ test('an explicit candidate list replaces chain resolution, so the allocator lau
     'run-show':()=>json(0,runShow),
     'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
     'worker-start':args=>{assert.ok(has(args,'--agent','claude'));return json(0,started('ctx_claude','task_operation_sales'));},
-    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:null,title:opName})),
+    'worker-show':()=>json(0,shown({dispatch:'ctx_claude',agent:'claude',model:'claude-opus-5',title:opName})),
     'terminal-rename':()=>json(0,{ok:true,result:{}})
   });
   const result=startOperation(input,{orca:fake.orca,wait:noWait,candidates:[opus]});
