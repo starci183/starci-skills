@@ -59,7 +59,14 @@ export const GENERATED = Object.freeze([
 const GENERATED_SET = new Set(GENERATED);
 
 /** Local runtime preferences; gitignored; not skill-authored declarative source. */
-const LOCAL_ONLY = new Set(['config.json']);
+const LOCAL_ONLY = new Set(['config.json', 'settings.local.json']);
+
+/**
+ * Runtime-owned storage at the skill root. These exact roots contain workflow state and sealed
+ * runtime packets, not authored declarative source. A same-named directory nested anywhere else
+ * remains part of the authored-source inventory.
+ */
+const ROOT_LOCAL_DIRS = new Set(['.starciwork', 'runtime']);
 
 function loadAllowlist(allowlistFile) {
   if (!fs.existsSync(allowlistFile)) {
@@ -101,6 +108,7 @@ function loadAllowlist(allowlistFile) {
 
 function shouldSkipDir(relativePosix, name) {
   if (SKIP_DIR_NAMES.has(name)) return true;
+  if (relativePosix === '' && ROOT_LOCAL_DIRS.has(name)) return true;
   if (relativePosix.startsWith('sites/') && (name === '.next' || name === 'out')) return true;
   return false;
 }

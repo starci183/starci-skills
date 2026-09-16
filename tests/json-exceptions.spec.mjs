@@ -65,15 +65,71 @@ exceptions:
   assert.deepEqual(result.offenders, [], `unexpected offenders: ${JSON.stringify(result.offenders)}`);
 });
 
-test('checker CLI exits nonzero when the skill tree still has authored JSON offenders', () => {
+test('root-local runtime JSON is excluded without hiding authored JSON or nested lookalikes', async t => {
+  const checkJsonExceptions = await loadChecker();
+  const dir = disposable(t, 'starci-json-local-');
+  fs.mkdirSync(path.join(dir, 'schemas'), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, 'schemas', 'json-exceptions.yaml'),
+    'schema: starci/json-exceptions@1\nexceptions: []\n',
+  );
+  const localFiles = [
+    '.starciwork/_local/workflows/wf/state.json',
+    'runtime/engine/builds/digest/runtime-pin.json',
+    'settings.local.json',
+  ];
+  const authoredFiles = [
+    'packages/app/.starciwork/state.json',
+    'packages/app/runtime/runtime-pin.json',
+    'packages/app/settings.local.json',
+    'unexpected.json',
+  ];
+  for (const relative of [...localFiles, ...authoredFiles]) {
+    const file = path.join(dir, ...relative.split('/'));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, '{}\n');
+  }
+
+  const result = checkJsonExceptions({
+    root: dir,
+    allowlistFile: path.join(dir, 'schemas', 'json-exceptions.yaml'),
+  });
+  assert.deepEqual(result.offenders, authoredFiles, 'only exact root-local storage is excluded');
+  assert.equal(result.ok, false, 'unexpected authored JSON still fails the checker');
+  for (const relative of localFiles) {
+    assert.equal(fs.existsSync(path.join(dir, ...relative.split('/'))), true, `${relative} is preserved`);
+  }
+});
+
+test('a missing allowlisted authored source still fails the checker', async t => {
+  const checkJsonExceptions = await loadChecker();
+  const dir = disposable(t, 'starci-json-missing-');
+  fs.mkdirSync(path.join(dir, 'schemas'), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, 'schemas', 'json-exceptions.yaml'),
+    `schema: starci/json-exceptions@1
+exceptions:
+  - path: package.json
+    reason: npm package manifest
+`,
+  );
+  const result = checkJsonExceptions({
+    root: dir,
+    allowlistFile: path.join(dir, 'schemas', 'json-exceptions.yaml'),
+  });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.offenders, []);
+  assert.deepEqual(result.missingAllowlist, ['package.json']);
+});
+
+test('checker CLI succeeds only when the installed authored source is clean', () => {
   const cli = spawnSync(process.execPath, [checkerFile], {
     cwd: skillRoot,
     encoding: 'utf8',
     timeout: 60000,
   });
-  // During migration the skill root still contains authored JSON outside the post-migration
-  // allowlist (or is already clean). Either nonzero+offender list or OK is acceptable only when
-  // offenders are empty; if status is nonzero, stderr must list paths.
+  // Root-local workflow state, sealed packets and settings are not authored source. Everything
+  // that remains in the authored inventory must be declared before this installed tree is clean.
   assert.equal(cli.status,0,cli.stderr||cli.stdout);
   assert.match(cli.stdout,/OK:/);
 });
