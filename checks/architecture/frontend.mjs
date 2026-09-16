@@ -122,6 +122,18 @@ function routePageRoots(context, sourceFile, componentRoots) {
   return (local.length ? local : componentRoots).map(root => path.join(root, 'pages'));
 }
 
+function routingTermination(ts, statement, navigation) {
+  if (ts.isThrowStatement(statement)) return true;
+  if (ts.isBlock(statement)) return statement.statements.length > 0 && routingTermination(ts, statement.statements.at(-1), navigation);
+  const expression = ts.isExpressionStatement(statement) ? statement.expression : (ts.isReturnStatement(statement) ? statement.expression : null);
+  return Boolean(expression && ts.isCallExpression(expression) && ts.isIdentifier(expression.expression)
+    && ['redirect', 'notFound'].includes(navigation.get(expression.expression.text)));
+}
+
+function routingGuard(ts, node, navigation) {
+  return ts.isIfStatement(node) && !node.elseStatement && routingTermination(ts, node.thenStatement, navigation);
+}
+
 function checkRoute(config, context, sourceFile, roots) {
   const { ts } = context;
   const violations = [];
@@ -136,12 +148,16 @@ function checkRoute(config, context, sourceFile, roots) {
   const jsx = [];
   const navigation = importedNames(ts, sourceFile, 'next/navigation');
   const adapterCalls = [];
-  let decision = null;
-  const visit = node => {
+  const decisions = [];
+  const visit = (node, insideNavigationArgument = false) => {
     if (ts.isJsxSelfClosingElement(node) || ts.isJsxElement(node)) jsx.push(node);
-    if (!decision && (ts.isIfStatement(node) || ts.isSwitchStatement(node) || ts.isConditionalExpression(node))) decision = node;
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && ['redirect', 'notFound'].includes(navigation.get(node.expression.text))) adapterCalls.push(node);
-    ts.forEachChild(node, visit);
+    if (ts.isIfStatement(node) || ts.isSwitchStatement(node) || (ts.isConditionalExpression(node) && !insideNavigationArgument)) decisions.push(node);
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && ['redirect', 'notFound'].includes(navigation.get(node.expression.text))) {
+      adapterCalls.push(node);
+      for (const argument of node.arguments) visit(argument, true);
+      return;
+    }
+    ts.forEachChild(node, child => visit(child, insideNavigationArgument));
   };
   visit(route.fn);
   const pages = routePageRoots(context, sourceFile, roots.components);
@@ -149,13 +165,15 @@ function checkRoute(config, context, sourceFile, roots) {
     const opening = ts.isJsxElement(node) ? node.openingElement : node;
     const local = jsxRootName(ts, opening.tagName);
     const edge = local ? bindings.get(local) : null;
-    return edge && Boolean(reachableViolation(context.edges, edge, target => insideAny(pages, target), { follow: candidate => candidate.reexport }));
+    return edge && Boolean(reachableViolation(context.edges, edge, target => insideAny(pages, target), { follow: candidate => candidate.reexport && candidate.runtime }));
   });
   const navigationOnly = jsx.length === 0 && adapterCalls.length === 1;
   if (!navigationOnly && (mountedPages.length !== 1 || jsx.length !== 1)) {
     violations.push(violation(config, sourceFile, route.fn, 'FE_ROUTE_ONE_PAGE', 'A page.tsx route must mount exactly one pages-tier component, or be a zero-JSX redirect/notFound adapter.', { ts }));
   }
-  if (decision && !navigationOnly) violations.push(violation(config, sourceFile, decision, 'FE_ROUTE_DRAWING_DECISION', 'Visual route files cannot make drawing decisions.', { ts }));
+  if (!navigationOnly) for (const decision of decisions) if (!routingGuard(ts, decision, navigation)) {
+    violations.push(violation(config, sourceFile, decision, 'FE_ROUTE_DRAWING_DECISION', 'Visual route files may use terminal redirect/notFound guards but cannot select or omit visual composition.', { ts }));
+  }
   const clientDirective = hasClientDirective(ts, sourceFile);
   if (clientDirective) violations.push(violation(config, sourceFile, clientDirective, 'FE_ROUTE_CLIENT_BOUNDARY', 'A page.tsx route adapter cannot own the client boundary.', { ts }));
   const forbiddenRouteHooks = new Set(['useRouter', 'usePathname', 'useSearchParams', 'useParams', 'useSelectedLayoutSegment', 'useSelectedLayoutSegments']);
@@ -175,7 +193,7 @@ function checkPureAndData(config, context, sourceFile, roots) {
   const pure = path.basename(fileName).toLowerCase() === 'component.tsx';
   for (const edge of importsForSource(context, fileName)) {
     if (!edge.runtime) continue;
-    const transportChain = reachableViolation(context.edges, edge, target => insideAny(roots.transport, target), { follow: candidate => candidate.reexport });
+    const transportChain = reachableViolation(context.edges, edge, target => insideAny(roots.transport, target), { follow: candidate => candidate.reexport && candidate.runtime });
     if (transportChain) {
       violations.push({ ruleId: 'FE_COMPONENT_IMPORTS_TRANSPORT', path: relativePath(config.root, fileName), line: edge.line, column: edge.column,
         specifier: edge.specifier, resolvedPath: relativePath(config.root, transportChain.at(-1)), dependencyChain: transportChain.map(item => relativePath(config.root, item)),
@@ -183,7 +201,7 @@ function checkPureAndData(config, context, sourceFile, roots) {
     }
     const configuredHookBarrel = insideAny(roots.hooks, edge.to) && /^index\.[cm]?[jt]sx?$/i.test(path.basename(edge.to));
     const hookChain = configuredHookBarrel ? null
-      : reachableViolation(context.edges, edge, target => insideAny(roots.hooks, target), { follow: candidate => candidate.reexport });
+      : reachableViolation(context.edges, edge, target => insideAny(roots.hooks, target), { follow: candidate => candidate.reexport && candidate.runtime });
     if (hookChain) {
       violations.push({ ruleId: 'FE_COMPONENT_DEEP_HOOK_IMPORT', path: relativePath(config.root, fileName), line: edge.line, column: edge.column,
         specifier: edge.specifier, resolvedPath: relativePath(config.root, hookChain.at(-1)), dependencyChain: hookChain.map(item => relativePath(config.root, item)),
@@ -191,7 +209,7 @@ function checkPureAndData(config, context, sourceFile, roots) {
     }
     if (pure) {
       const chain = reachableViolation(context.edges, edge, target => insideAny(roots.hooks, target) || insideAny(roots.transport, target),
-        { follow: candidate => candidate.reexport });
+        { follow: candidate => candidate.reexport && candidate.runtime });
       if (chain) violations.push({ ruleId: 'FE_PURE_REACHES_DATA', path: relativePath(config.root, fileName), line: edge.line, column: edge.column,
         specifier: edge.specifier, resolvedPath: relativePath(config.root, chain.at(-1)), dependencyChain: chain.map(item => relativePath(config.root, item)),
         message: 'Pure component.tsx cannot reach hooks or API transport through an alias, relative import, package, or barrel.' });

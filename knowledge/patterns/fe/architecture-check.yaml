@@ -10,8 +10,17 @@ provenance:
   reviewedAt: 2026-09-16
   sources:
     - https://nextjs.org/docs/app/getting-started/server-and-client-components
+    - https://nextjs.org/docs/app/getting-started/project-structure
+    - https://react.dev/learn/sharing-state-between-components
+    - https://react.dev/learn/keeping-components-pure
     - https://www.typescriptlang.org/docs/handbook/modules/reference.html
+    - https://www.apollographql.com/docs/react/data/typescript
     - starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8/src/app/**/page.tsx
+    - starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8/src/components/pages/AuthenticationPage/**
+    - starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8/src/components/blocks/auth/AuthenticationPanel/**
+    - starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8/src/hooks/auth/useAuthPanel.ts
+    - starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8/src/modules/api/graphql/**
+    - starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8/packages/grammar/package.json
     - starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8/src/components/**
     - nivo-fe@a01a7bd7474fc6b43b831853d9ef870c202f3844/{apps,packages}/**
     - knowledge/patterns/fe/folder.yaml
@@ -121,4 +130,38 @@ rules:
         - ARCH_INTERNAL_IMPORT_UNRESOLVED
       manual:
         - Confirm the public export is semantically stable rather than merely reachable.
+    relatedExamples: []
+  - id: FE-ARCHITECTURE-5
+    title: Features own scenarios and modules own reusable capabilities
+    kind: mandatory
+    requirement: |-
+      A feature owns one product scenario, its connected lifecycle, feature-neutral input/result model,
+      and its transport-to-feature mapping. A module owns one cohesive reusable technical or domain
+      capability and exposes a declared public entry. Framework routes and app providers adapt to a
+      feature; Grammar stays product-agnostic. Wire/schema-generated types remain inside the transport
+      boundary and are mapped before presentation or Grammar.
+    rationale: |-
+      Ownership remains legible without a global hooks/services layer or a mandatory wrapper per file.
+      Transport revisions then affect their adapter and mapper instead of every render contract.
+    cases:
+      - id: case-1
+        when: An authentication journey coordinates browser persistence, redirects and API operations
+        write: Keep the lifecycle under the authentication feature; call shared API/session modules through their public entries.
+      - id: case-2
+        when: A GraphQL document has generated result and variable types
+        write: Keep the generated wire contract at the data adapter and map it to the feature model.
+      - id: case-3
+        when: A presentational action needs a provider choice
+        write: Use a feature/view literal contract and map it to the transport enum at the data boundary.
+      - id: case-4
+        when: A reusable API client owns links, headers and error normalization
+        write: Keep it in a module; do not move product scenario state into that module.
+    verification:
+      automated:
+        - FE_COMPONENT_IMPORTS_TRANSPORT
+        - FE_PURE_WORLD_IMPORT
+        - ARCH_PACKAGE_EXPORT_BYPASS
+      manual:
+        - Confirm generated or handwritten wire types do not become the feature or presentation source of truth.
+        - Confirm a proposed shared module has a cohesive contract or lifecycle, not merely two consumers.
     relatedExamples: []

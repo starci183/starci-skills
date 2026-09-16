@@ -5,6 +5,8 @@ import { reachableViolation, relativePath, sourceLocation } from './typescript.m
 const FORBIDDEN_APP_ROLE = /(?:^|\.)(?:service|provider|providers|resolver|controller|handler|repository|entity|use-case|command|query|listener|consumer|processor)\.[cm]?[jt]sx?$/i;
 const FORBIDDEN_DECLARATION = /(?:Service|Provider|Resolver|Controller|Handler|Repository|Entity|UseCase|Command|Query|Listener|Consumer|Processor)$/;
 const FORBIDDEN_DECORATORS = new Set(['Controller', 'Resolver', 'Injectable', 'Processor', 'WebSocketGateway']);
+const TRANSPORT_PACKAGES = /^(?:@nestjs\/(?:graphql|microservices|platform-[^/]+|websockets)(?:\/|$)|@apollo\/|apollo-server(?:\/|$)|express(?:\/|$)|fastify(?:\/|$)|graphql(?:\/|$)|class-validator(?:\/|$)|class-transformer(?:\/|$))/;
+const NEST_COMMON_TRANSPORT = new Set(['Controller', 'Get', 'Post', 'Put', 'Patch', 'Delete', 'Options', 'Head', 'Body', 'Param', 'Query', 'Req', 'Request', 'Res', 'Response', 'Headers', 'Header', 'HttpCode', 'Redirect', 'Render', 'Sse', 'UploadedFile', 'UploadedFiles', 'UseGuards', 'UseInterceptors', 'UsePipes']);
 
 function absolute(root, relative) {
   return path.resolve(root, ...relative.split('/'));
@@ -18,13 +20,19 @@ function insideAny(candidates, fileName) {
   return candidates.some(root => isInside(root, fileName));
 }
 
+function insideFeatureLayer(featureRoots, fileName, layer) {
+  return featureRoots.some(root => isInside(root, fileName)
+    && relativePath(root, fileName).split('/').some(segment => segment.toLowerCase() === layer));
+}
+
 function appSource(config, fileName) {
   for (const appRoot of roots(config.root, config.backend.apps)) {
     if (!isInside(appRoot, fileName)) continue;
     const parts = relativePath(appRoot, fileName).split('/');
     const sourceIndex = parts.indexOf('src');
-    if (sourceIndex < 1) return null;
-    return { appRoot, relative: parts.slice(sourceIndex + 1).join('/') };
+    if (sourceIndex >= 0) return { appRoot, relative: parts.slice(sourceIndex + 1).join('/') };
+    if (path.basename(appRoot).toLowerCase() === 'src') return { appRoot, relative: parts.join('/') };
+    return null;
   }
   return null;
 }
@@ -66,6 +74,44 @@ function roleEvidence(ts, sourceFile) {
   return found;
 }
 
+function transportFrameworkEvidence(ts, sourceFile) {
+  const found = [];
+  const namespaceUsages = alias => {
+    const usages = [];
+    const visit = node => {
+      if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === alias
+        && NEST_COMMON_TRANSPORT.has(node.name.text)) usages.push({ node: node.name, detail: node.name.text });
+      if (ts.isElementAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === alias) {
+        const selected = ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
+        if (selected === null || NEST_COMMON_TRANSPORT.has(selected)) usages.push({ node: node.argumentExpression, detail: selected ?? 'computed @nestjs/common namespace access' });
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+    return usages;
+  };
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier)) continue;
+    const specifier = statement.moduleSpecifier.text;
+    if (TRANSPORT_PACKAGES.test(specifier)) {
+      found.push({ node: statement.moduleSpecifier, specifier, detail: specifier });
+      continue;
+    }
+    if (specifier !== '@nestjs/common' || !statement.importClause) continue;
+    const bindings = statement.importClause.namedBindings;
+    if (bindings && ts.isNamespaceImport(bindings)) {
+      found.push(...namespaceUsages(bindings.name.text).map(item => ({ ...item, specifier })));
+      continue;
+    }
+    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    for (const element of bindings.elements) {
+      const imported = element.propertyName?.text ?? element.name.text;
+      if (NEST_COMMON_TRANSPORT.has(imported)) found.push({ node: element, specifier, detail: imported });
+    }
+  }
+  return found;
+}
+
 function finding(config, edge, ruleId, message, chain) {
   return {
     ruleId,
@@ -87,7 +133,10 @@ export function checkBackend(config, context) {
   const isApp = file => Boolean(appSource(config, file));
   for (const sourceFile of context.files) {
     const fileName = path.resolve(sourceFile.fileName);
-    const app = appSource(config, fileName);
+    const fromModules = insideAny(moduleRoots, fileName);
+    const fromFeatures = insideAny(featureRoots, fileName);
+    const fromApplication = fromFeatures && insideFeatureLayer(featureRoots, fileName, 'application');
+    const app = !fromModules && !fromFeatures ? appSource(config, fileName) : null;
     if (app) {
       const evidence = roleEvidence(context.ts, sourceFile);
       if (evidence) {
@@ -107,10 +156,21 @@ export function checkBackend(config, context) {
         });
       }
     }
-    const fromModules = insideAny(moduleRoots, fileName);
-    const fromFeatures = insideAny(featureRoots, fileName);
     if (!fromModules && !fromFeatures) continue;
+    if (fromApplication) {
+      for (const evidence of transportFrameworkEvidence(context.ts, sourceFile)) violations.push({
+        ruleId: 'BE_APPLICATION_TRANSPORT_FRAMEWORK',
+        path: relativePath(config.root, fileName),
+        ...sourceLocation(sourceFile, evidence.node),
+        specifier: evidence.specifier,
+        message: `Feature application code imports transport framework surface ${evidence.detail}. Keep protocol decorators, request/response types, validation DTOs, and generated transport types under transport/.`,
+      });
+    }
     for (const edge of context.edges.get(fileName) ?? []) {
+      if (fromApplication) {
+        const transportChain = reachableViolation(context.edges, edge, target => insideFeatureLayer(featureRoots, target, 'transport'));
+        if (transportChain) violations.push(finding(config, edge, 'BE_APPLICATION_IMPORTS_TRANSPORT', 'Feature application code cannot depend on transport adapters or DTOs, including through a type import or barrel.', transportChain));
+      }
       if (fromModules) {
         const featureChain = reachableViolation(context.edges, edge, target => insideAny(featureRoots, target));
         if (featureChain) violations.push(finding(config, edge, 'BE_MODULE_IMPORTS_FEATURE', 'A backend module cannot depend on a feature entry surface, including through a type or barrel.', featureChain));

@@ -85,8 +85,9 @@ function moduleReferences(ts, sourceFile) {
     } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)
       && node.moduleReference.expression && ts.isStringLiteralLike(node.moduleReference.expression)) {
       found.push({ node: node.moduleReference.expression, specifier: node.moduleReference.expression.text, runtime: !node.isTypeOnly, declaration: node });
-    } else if (ts.isCallExpression(node) && node.arguments.length === 1 && ts.isStringLiteralLike(node.arguments[0])
-      && (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === 'require'))) {
+    } else if (ts.isCallExpression(node) && node.arguments.length > 0 && ts.isStringLiteralLike(node.arguments[0])
+      && ((node.expression.kind === ts.SyntaxKind.ImportKeyword && [1, 2].includes(node.arguments.length))
+        || (ts.isIdentifier(node.expression) && node.expression.text === 'require' && node.arguments.length === 1))) {
       found.push({ node: node.arguments[0], specifier: node.arguments[0].text, runtime: true, declaration: node });
     }
     ts.forEachChild(node, visit);
@@ -115,13 +116,18 @@ function canonical(file) {
 
 function workspaceMetadata(config) {
   const backendAppRoots = config.backend.apps.map(item => path.join(config.root, ...item.split('/')));
-  const roots = config.workspaces.map(relative => {
+  const create = relative => {
     const root = path.join(config.root, ...relative.split('/'));
     const pkg = readJson(path.join(root, 'package.json'));
     const routeRoots = config.frontend.routes.map(item => path.join(config.root, ...item.split('/')));
     return { root: canonical(root), relative, name: typeof pkg.name === 'string' ? pkg.name : null, exports: pkg.exports,
-      app: routeRoots.some(route => isInside(root, route)) || backendAppRoots.some(appRoot => isInside(appRoot, root) && path.resolve(appRoot) !== path.resolve(root)) };
-  });
+      app: routeRoots.some(route => isInside(root, route))
+        || backendAppRoots.some(appRoot => isInside(appRoot, root) || isInside(root, appRoot)) };
+  };
+  const roots = config.workspaces.map(create);
+  const rootPackage = readJson(path.join(config.root, 'package.json'));
+  roots.push({ root: canonical(config.root), relative: '.', name: typeof rootPackage.name === 'string' ? rootPackage.name : null, exports: rootPackage.exports,
+    app: config.frontend.routes.some(item => isInside(config.root, path.join(config.root, ...item.split('/')))) || config.kinds.includes('backend') });
   return roots.sort((a, b) => b.root.length - a.root.length);
 }
 
@@ -129,21 +135,44 @@ function workspaceOf(workspaces, file) {
   return workspaces.find(workspace => isInside(workspace.root, file)) ?? null;
 }
 
-function exportPatternMatches(pattern, request) {
-  if (!pattern.includes('*')) return pattern === request;
+function exportPatternCapture(pattern, request) {
+  if (!pattern.includes('*')) return pattern === request ? '' : null;
   const [before, after = ''] = pattern.split('*');
-  return request.startsWith(before) && request.endsWith(after);
+  return request.startsWith(before) && request.endsWith(after) ? request.slice(before.length, request.length - after.length) : null;
 }
 
-function packageExported(workspace, specifier) {
+function exportTargetStrings(value) {
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) return value.flatMap(exportTargetStrings);
+  if (value && typeof value === 'object' && !Object.keys(value).some(key => key.startsWith('.'))) return Object.values(value).flatMap(exportTargetStrings);
+  return [];
+}
+
+function packageExported(workspace, specifier, actualTarget) {
   if (!workspace.name || (specifier !== workspace.name && !specifier.startsWith(`${workspace.name}/`))) return false;
   const request = specifier === workspace.name ? '.' : `.${specifier.slice(workspace.name.length)}`;
   const declaration = workspace.exports;
-  if (typeof declaration === 'string' || Array.isArray(declaration)) return request === '.';
-  if (!declaration || typeof declaration !== 'object') return false;
-  const keys = Object.keys(declaration);
-  if (!keys.some(key => key.startsWith('.'))) return request === '.';
-  return keys.some(key => exportPatternMatches(key, request));
+  let candidates = [];
+  if (typeof declaration === 'string' || Array.isArray(declaration)) {
+    if (request !== '.') return false;
+    candidates = exportTargetStrings(declaration);
+  } else if (declaration && typeof declaration === 'object') {
+    const keys = Object.keys(declaration);
+    if (!keys.some(key => key.startsWith('.'))) {
+      if (request !== '.') return false;
+      candidates = exportTargetStrings(declaration);
+    } else {
+      for (const key of keys) {
+        const capture = exportPatternCapture(key, request);
+        if (capture !== null) candidates.push(...exportTargetStrings(declaration[key]).map(target => target.replaceAll('*', capture)));
+      }
+    }
+  }
+  return candidates.some(target => {
+    if (!target.startsWith('./') || target.includes('..')) return false;
+    const expected = canonical(path.resolve(workspace.root, target));
+    return expected === canonical(actualTarget);
+  });
 }
 
 function boundaryViolation(root, edge, fromWorkspace, toWorkspace, ruleId, message) {
@@ -247,6 +276,19 @@ export function buildTypeScriptContext(config, injectedTypeScript) {
         continue;
       }
       const actualTarget = canonical(resolvedName);
+      const workspaceImport = [...workspaceNames].some(name => reference.specifier === name || reference.specifier.startsWith(`${name}/`));
+      const internal = reference.specifier.startsWith('.') || pathAliasMatches(reference.specifier, project.options.paths) || workspaceImport;
+      if (internal && !isInside(config.root, actualTarget)) {
+        errors.push({
+          ruleId: 'ARCH_INTERNAL_IMPORT_OUTSIDE',
+          project: project.relative,
+          path: relativePath(config.root, sourceFile.fileName),
+          ...sourceLocation(sourceFile, reference.node),
+          specifier: reference.specifier,
+          message: `Internal import ${reference.specifier} resolves outside the checked repository.`,
+        });
+        continue;
+      }
       if (!fileMap.has(actualTarget)) continue;
       const edge = {
         from,
@@ -267,7 +309,7 @@ export function buildTypeScriptContext(config, injectedTypeScript) {
         if (!owningWorkspace.app && targetWorkspace.app) {
           errors.push(boundaryViolation(config.root, edge, owningWorkspace, targetWorkspace, 'ARCH_PACKAGE_IMPORTS_APP', 'A reusable workspace package cannot depend on an application workspace.'));
         }
-        if (!packageExported(targetWorkspace, reference.specifier)) {
+        if (!packageExported(targetWorkspace, reference.specifier, actualTarget)) {
           errors.push(boundaryViolation(config.root, edge, owningWorkspace, targetWorkspace, 'ARCH_PACKAGE_EXPORT_BYPASS', 'Cross-package imports must use the target package name and a declared package export.'));
         }
       }
@@ -289,9 +331,7 @@ export function reachableViolation(edges, firstEdge, forbidden, { follow = () =>
     if (visited.has(current.file)) continue;
     visited.add(current.file);
     if (forbidden(current.file)) return current.chain;
-    for (const edge of edges.get(current.file) ?? []) {
-      if (edge.runtime && follow(edge)) queue.push({ file: edge.to, chain: [...current.chain, edge.to] });
-    }
+    for (const edge of edges.get(current.file) ?? []) if (follow(edge)) queue.push({ file: edge.to, chain: [...current.chain, edge.to] });
   }
   return null;
 }

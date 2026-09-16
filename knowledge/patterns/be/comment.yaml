@@ -1,8 +1,15 @@
 schema: starci/knowledge-source@1
 id: be.comment
 title: Comment
-purpose: |-
+purpose: >-
   Given a backend declaration or statement, does it carry a comment, where does it sit, and what does it say?
+
+
+  Profile scope: these historical Academy forms apply where that existing profile is selected. The revised
+  docs/backend-source-pattern.md and be.folder/function/typing rules take precedence for ownership and code
+  shape. Counts are evidence, not requirements. Do not add obsolete forwarding classes, expose entities,
+  centralize domain policy or mandate process overrides to reproduce an example. Migrate conflicting installed
+  lint coherently under authority; never suppress it to claim conformance.
 appliesTo:
   - backend
 family: be
@@ -17,16 +24,20 @@ provenance:
     - modules/databases/postgresql/primary/enums/locale.ts
     - modules/api/apollo/server/monolithic/monolithic-apollo-server.module.ts
     - eslint.config.mjs
-  limitations: |-
-    Historical reference-source observations preserved at the extraction commit; not a fresh audit of current repository conformance. Counts and file totals cited in rationale or cases are provenance from that extraction, not claims about today. Inspect the selected repository's actual types/APIs, aliases and lint/test setup; verify reference conformance within approved .starciwork scope. Target legacy code does not override the reference. Current business requirements and architecture belong to .starciwork; code patterns do not approve them.
+  limitations: Historical reference-source observations preserved at the extraction commit; not a fresh audit of
+    current repository conformance. Counts and file totals cited in rationale or cases are provenance from
+    that extraction, not claims about today. Inspect the selected repository's actual types/APIs, aliases and
+    lint/test setup; verify reference conformance within approved .starciwork scope. Target legacy code does
+    not override the reference. Current business requirements and architecture belong to .starciwork; code
+    patterns do not approve them.
 rules:
   - id: BE-COMMENT-1
     title: Every export has a docblock, placed after the decorators
     kind: mandatory
-    requirement: |-
-      Every export carries a docblock. On decorated classes the block sits between the class decorators and export class.
-    rationale: |-
-      1676 of 2009 non-spec files under features/api/core/graphql contain a docblock at extraction; lint require-export-jsdoc is at error.
+    requirement: Every export carries a docblock. On decorated classes the block sits between the class decorators
+      and export class.
+    rationale: 1676 of 2009 non-spec files under features/api/core/graphql contain a docblock at extraction; lint
+      require-export-jsdoc is at error.
     cases:
       - id: case-1
         when: Resolver
@@ -83,31 +94,32 @@ rules:
   - id: BE-COMMENT-2
     title: The docblock states responsibility and invariant, not the name
     kind: mandatory
-    requirement: |-
-      Docblocks explain why a declaration exists, what must not happen, who throws it, or why a field is nullable — not a restated name.
-    rationale: |
-
+    requirement: Docblocks explain why a declaration exists, what must not happen, who throws it, or why a field
+      is nullable — not a restated name.
+    rationale: ""
     cases:
       - id: case-1
         when: Why a field is nullable
-        write: |-
-          `data` … is marked `nullable: true` because the transform interceptor sets `data = null` on the error path -- a non-nullable field would crash GraphQL and mask the real error instead of surfacing it. (AddToCartResponse)
+        write: "`data` … is marked `nullable: true` because the transform interceptor sets `data = null` on the error
+          path -- a non-nullable field would crash GraphQL and mask the real error instead of surfacing it.
+          (AddToCartResponse)"
       - id: case-2
         when: Why a class exists
-        write: |-
-          Nest's default filter only maps subclasses of `HttpException` to their status code -- `AbstractException` extends plain `Error`, so without this filter every thrown `AbstractException` falls through to a generic 500. (AbstractExceptionHttpFilter)
+        write: Nest's default filter only maps subclasses of `HttpException` to their status code --
+          `AbstractException` extends plain `Error`, so without this filter every thrown `AbstractException`
+          falls through to a generic 500. (AbstractExceptionHttpFilter)
       - id: case-3
         when: What must not happen
-        write: |-
-          Fails the request when the challenge id is unknown -- downstream must not grade a ghost challenge. (ChallengeNotFoundException)
+        write: Fails the request when the challenge id is unknown -- downstream must not grade a ghost challenge.
+          (ChallengeNotFoundException)
       - id: case-4
         when: Who throws it
-        write: |-
-          Thrown by `AiEntitlementService.consume` when the user has no remaining allowance in one of the sliding windows, …
+        write: Thrown by `AiEntitlementService.consume` when the user has no remaining allowance in one of the sliding
+          windows, …
       - id: case-5
         when: Restated name (residual debt, not the pattern)
-        write: |-
-          /** Constructor. */ still appears in 27 files at extraction (add-to-cart.handler.ts among them); lint no-restated-name-jsdoc names it as debt, not as the pattern
+        write: /** Constructor. */ still appears in 27 files at extraction (add-to-cart.handler.ts among them); lint
+          no-restated-name-jsdoc names it as debt, not as the pattern
     verification:
       automated:
         - no-restated-name-jsdoc
@@ -117,10 +129,9 @@ rules:
   - id: BE-COMMENT-3
     title: Methods and fields
     kind: mandatory
-    requirement: |-
-      Methods, fields and generic templates carry responsibility-focused docs including params/returns and cross-references where useful.
-    rationale: |
-
+    requirement: Methods, fields and generic templates carry responsibility-focused docs including params/returns
+      and cross-references where useful.
+    rationale: ""
     cases:
       - id: case-1
         when: Method
@@ -132,16 +143,15 @@ rules:
            */
       - id: case-2
         when: Field
-        write: |-
-          /** Unique error code for identification */ readonly code: string; /** Id of the course the user wants to place in their cart. */ courseId: string
+        write: "/** Unique error code for identification */ readonly code: string; /** Id of the course the user wants
+          to place in their cart. */ courseId: string"
       - id: case-3
         when: Interface field with a cross-reference
-        write: |-
-          /** Enrollment id for the active course (user x course), injected by {@link GraphQLEnrollmentGuard} from the `x-course-id` header. … */ enrollmentId?: string
+        write: "/** Enrollment id for the active course (user x course), injected by {@link GraphQLEnrollmentGuard}
+          from the `x-course-id` header. … */ enrollmentId?: string"
       - id: case-4
         when: Generic
-        write: |-
-          @template TParams - The parameters type. (ICQRSHandler)
+        write: "@template TParams - The parameters type. (ICQRSHandler)"
     verification:
       automated: []
       manual: []
@@ -150,15 +160,13 @@ rules:
   - id: BE-COMMENT-4
     title: Enum members are each documented
     kind: mandatory
-    requirement: |-
-      Every enum member has a docblock.
-    rationale: |
-
+    requirement: Every enum member has a docblock.
+    rationale: ""
     cases:
       - id: case-1
         when: Locale
-        write: |-
-          /** Serve Vietnamese copy; missing Vi falls through to `fallbackLocale`. */ Vi = "vi", /** Serve English copy; also the usual `defaultLocale` / fallback. */ En = "en"
+        write: /** Serve Vietnamese copy; missing Vi falls through to `fallbackLocale`. */ Vi = "vi", /** Serve
+          English copy; also the usual `defaultLocale` / fallback. */ En = "en"
     verification:
       automated:
         - require-enum-member-jsdoc
@@ -167,15 +175,14 @@ rules:
   - id: BE-COMMENT-5
     title: Line comments are prose about why
     kind: mandatory
-    requirement: |-
-      Line comments sit above the statement, in lowercase sentence form, and give the consequence that motivates the code.
-    rationale: |-
-      9720 // lines in non-spec src/ at extraction; the ` -- ` join appears in 1299 of them; a plain sentence is the majority form.
+    requirement: Line comments sit above the statement, in lowercase sentence form, and give the consequence that
+      motivates the code.
+    rationale: 9720 // lines in non-spec src/ at extraction; the ` -- ` join appears in 1299 of them; a plain
+      sentence is the majority form.
     cases:
       - id: case-1
         when: A guard
-        write: |-
-          // reject unauthenticated callers up front -- cart rows are per-user
+        write: // reject unauthenticated callers up front -- cart rows are per-user
       - id: case-2
         when: A constraint
         write: |-
@@ -188,16 +195,14 @@ rules:
           // only, so a trial/preview row (is_enrolled = false) still allows adding to cart
       - id: case-4
         when: A hand-off
-        write: |-
-          // hand off to the command handler which performs the DB work
+        write: // hand off to the command handler which performs the DB work
       - id: case-5
         when: Error policy
-        write: |-
-          // any OTHER error (graphql-js's own execution errors …) is by definition an UNEXPECTED server bug, never the client's fault -- default it to 500 too
+        write: // any OTHER error (graphql-js's own execution errors …) is by definition an UNEXPECTED server bug,
+          never the client's fault -- default it to 500 too
       - id: case-6
         when: The ` -- ` join
-        write: |-
-          used in a minority of lines; a plain sentence is the majority form
+        write: used in a minority of lines; a plain sentence is the majority form
     verification:
       automated: []
       manual: []
@@ -206,22 +211,21 @@ rules:
   - id: BE-COMMENT-6
     title: Block comments for multi-paragraph reasoning inside a body
     kind: mandatory
-    requirement: |-
-      Multi-paragraph reasoning inside a function body uses /* … */ blocks that open with a capitalised claim, then evidence, then corrected history when applicable.
-    rationale: |
-
+    requirement: Multi-paragraph reasoning inside a function body uses /* … */ blocks that open with a capitalised
+      claim, then evidence, then corrected history when applicable.
+    rationale: ""
     cases:
       - id: case-1
         when: course.handler.ts
-        write: |-
+        write: >-
           /*
            * EITHER IDENTIFIER ADDRESSES THE SAME OBJECT, because the synchronizer writes both.
            * `MaterializeAndUploadService` uploads … It used to refuse anything but a display id, … That reading was wrong about the bucket …
            */ — opens with a capitalised claim, then the evidence, then the corrected history
       - id: case-2
         when: Config
-        write: |-
-          the eslint.config.mjs blocks that record why a rule is at error, with the measured debt (nợ=0 (296/296) in source)
+        write: the eslint.config.mjs blocks that record why a rule is at error, with the measured debt (nợ=0 (296/296)
+          in source)
     verification:
       automated: []
       manual: []
@@ -229,27 +233,23 @@ rules:
   - id: BE-COMMENT-7
     title: What a comment never contains
     kind: mandatory
-    requirement: |-
-      Comments stay ASCII with no emoji or AI symbols. Vietnamese client strings carry a vn-ok reason. No line suppressions; exceptions live in config with a comment. No restated-name docblocks.
-    rationale: |
-
+    requirement: Comments stay ASCII with no emoji or AI symbols. Vietnamese client strings carry a vn-ok reason.
+      No line suppressions; exceptions live in config with a comment. No restated-name docblocks.
+    rationale: ""
     cases:
       - id: case-1
         when: Non-ASCII
-        write: |-
-          lint no-non-ascii-source, no-ai-symbol, no-emoji; comments stay ASCII
+        write: lint no-non-ascii-source, no-ai-symbol, no-emoji; comments stay ASCII
       - id: case-2
         when: Vietnamese (sanctioned exception with reason)
-        write: |-
-          [Locale.Vi]: "Thêm khóa học vào giỏ hàng thành công", // vn-ok: vi-locale string emitted to clients (lint require-vn-ok-reason)
+        write: '[Locale.Vi]: "Thêm khóa học vào giỏ hàng thành công", // vn-ok: vi-locale string emitted to clients
+          (lint require-vn-ok-reason)'
       - id: case-3
         when: A suppression
-        write: |-
-          eslint-disable-next-line (lint no-line-suppression); exceptions live in config with a comment
+        write: eslint-disable-next-line (lint no-line-suppression); exceptions live in config with a comment
       - id: case-4
         when: A restated name
-        write: |-
-          see BE-COMMENT-2 case-5
+        write: see BE-COMMENT-2 case-5
     verification:
       automated:
         - no-non-ascii-source

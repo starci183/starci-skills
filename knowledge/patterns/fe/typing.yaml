@@ -16,6 +16,9 @@ provenance:
     - src/modules/toast/api.ts
     - packages/grammar/src/common/conformance.ts
     - core/primitive/Button/index.tsx
+    - src/components/blocks/auth/AuthenticationPanel/component.tsx
+    - src/hooks/auth/useAuthPanel.ts
+    - src/modules/api/graphql/mutations/types/auth.ts
   limitations: |
     Historical reference-source observations at skill commit
     edf72554425f918e80c9205e9c6db10596e722f0; not a fresh audit. Old counts cannot claim a fresh scan.
@@ -204,8 +207,9 @@ rules:
     title: Enums
     kind: mandatory
     requirement: |
-      Component vocabulary is never an enum; use a string-literal union. The only enums in src/ are
-      GraphQL operation-name enums under modules/api/graphql.
+      Feature and presentation vocabulary uses string-literal unions or discriminated objects. Generated
+      or wire enums remain inside the transport adapter and are mapped to feature/view vocabulary. A
+      presentational props contract does not runtime-import a transport enum.
     rationale: |
       Keeping enums out of components preserves serializable string unions for state and props.
     cases:
@@ -213,11 +217,46 @@ rules:
         when: "Component vocabulary"
         write: "never an enum; a string-literal union"
       - id: case-2
-        when: "GraphQL operation names"
+        when: "A GraphQL/provider enum"
         write: >
-          export enum MutationCvBlocks { Create = "create", … } — the 92 enums in src/ are all in
-          modules/api/graphql
+          Keep the generated/wire enum in modules/api or feature data, then map it to a feature literal
+          before rendering or accepting a user action.
     verification:
       automated: []
-      manual: []
+      manual:
+        - Confirm presentation does not runtime-import a GraphQL response, enum or Apollo error type.
+    relatedExamples: []
+
+  - id: FE-TYPING-8
+    title: Wire, feature and presentation contracts are distinct
+    kind: mandatory
+    requirement: |
+      Schema-derived result/variable types and typed operation documents belong to the transport boundary.
+      A feature owns framework-neutral input, result, failure and view models. A mapper translates wire
+      values to that feature contract. Presentation consumes resolved feature/view types; Grammar consumes
+      only product-agnostic visual contracts. Handwritten wire types identify their schema provenance and
+      drift check when generation is unavailable.
+    rationale: |
+      Separating contracts prevents a schema or client-library revision from becoming a presentation and
+      design-system change. Typed documents bind an operation to both its result and variables.
+    cases:
+      - id: case-1
+        when: "GraphQL code generation is available"
+        write: "Use generated TypedDocumentNode documents and generated result/variable types in data."
+      - id: case-2
+        when: "A feature exposes authentication state"
+        write: "Export feature-owned AuthMode/AuthFailure/view types, not GraphQL response envelopes."
+      - id: case-3
+        when: "Legacy wire types are handwritten from introspection"
+        write: "Record the exact schema source/revision and run a schema-drift contract check."
+      - id: case-4
+        when: "A pure visual needs a provider choice"
+        write: "Accept a feature/view literal union and map it to the provider enum in the data adapter."
+    verification:
+      automated:
+        - FE_COMPONENT_IMPORTS_TRANSPORT
+        - FE_PURE_WORLD_IMPORT
+      manual:
+        - Confirm the operation document, result type and variables type come from one checked source.
+        - Confirm persistence or wire objects are mapped before crossing the feature public contract.
     relatedExamples: []

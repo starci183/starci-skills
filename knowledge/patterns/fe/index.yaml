@@ -35,7 +35,7 @@ topics:
   - path: architecture-check.yaml
     title: Architecture check
     decides: "Enforceable route adapters, responsibility/package direction, and applicable world/presentation boundaries"
-    rules: "FE-ARCHITECTURE-1 … FE-ARCHITECTURE-3"
+    rules: "FE-ARCHITECTURE-1 … FE-ARCHITECTURE-5"
   - path: folder.yaml
     title: Folder
     decides: "Tier directories, the file set of one unit, what a unit folder may not hold"
@@ -46,11 +46,11 @@ topics:
     rules: "FE-NAMING-1 … FE-NAMING-7"
   - path: function.yaml
     title: Function
-    decides: "Component shape, the props parameter, the three-part contract, helpers, route files"
+    decides: "Component shape, useful render contracts, connected ownership, data lifecycle, route files"
     rules: "FE-FUNCTION-1 … FE-FUNCTION-7"
   - path: imports.yaml
     title: Imports
-    decides: "The @/ alias, Grammar entry, import order, responsibility direction, the hooks barrel"
+    decides: "Source/package paths, Grammar entry, responsibility direction, feature and module public entries"
     rules: "FE-IMPORTS-1 … FE-IMPORTS-7"
   - path: comment.yaml
     title: Comment
@@ -58,8 +58,8 @@ topics:
     rules: "FE-COMMENT-1 … FE-COMMENT-5"
   - path: typing.yaml
     title: Typing
-    decides: "type over interface, readonly, literal unions, Array<T>, inferred returns"
-    rules: "FE-TYPING-1 … FE-TYPING-7"
+    decides: "type over interface, readonly, literal unions, arrays, inferred returns, wire/feature/view contracts"
+    rules: "FE-TYPING-1 … FE-TYPING-8"
   - path: error.yaml
     title: Error
     decides: "Failure as a state, the GraphQL envelope, throw new Error, toasts"

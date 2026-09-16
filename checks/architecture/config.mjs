@@ -47,23 +47,65 @@ function readJson(file) {
 }
 
 function workspaceDirectories(root) {
-  const pkg = readJson(path.join(root, 'package.json'));
-  const patterns = Array.isArray(pkg?.workspaces) ? pkg.workspaces : pkg?.workspaces?.packages;
-  if (!Array.isArray(patterns)) return [];
-  const directories = [];
-  for (const pattern of patterns) {
-    if (typeof pattern !== 'string') continue;
-    const normalized = safeRelative(pattern, 'package.json workspace pattern');
-    if (!normalized.endsWith('/*') || normalized.slice(0, -2).includes('*')) continue;
-    const parentRelative = normalized.slice(0, -2);
-    const parent = path.join(root, ...parentRelative.split('/'));
-    if (!existingDirectory(root, parentRelative)) continue;
-    for (const entry of fs.readdirSync(parent, { withFileTypes: true }).filter(item => item.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
-      const relative = slash(path.relative(root, path.join(parent, entry.name)));
-      if (fs.existsSync(path.join(root, relative, 'package.json'))) directories.push(relative);
+  const directories = new Set();
+  const queue = [root];
+  const visited = new Set();
+  const admit = (candidate, label = 'local package', strict = false) => {
+    const absolute = path.resolve(candidate);
+    if (!isInside(root, absolute) || absolute === root || !existingDirectory(root, slash(path.relative(root, absolute)))) {
+      if (strict) throw Error(`${label} must resolve to a package directory inside the repository.`);
+      return;
+    }
+    const manifest = path.join(absolute, 'package.json');
+    try {
+      if (!fs.lstatSync(manifest).isFile() || fs.lstatSync(manifest).isSymbolicLink()) {
+        if (strict) throw Error(`${label} must resolve to a regular package.json inside the repository.`);
+        return;
+      }
+    } catch (error) {
+      if (strict) throw Error(error.message.startsWith(label) ? error.message : `${label} must resolve to a regular package.json inside the repository.`);
+      return;
+    }
+    const relative = slash(path.relative(root, absolute));
+    if (!directories.has(relative)) { directories.add(relative); queue.push(absolute); }
+  };
+  while (queue.length) {
+    const packageRoot = queue.shift();
+    if (visited.has(packageRoot)) continue;
+    visited.add(packageRoot);
+    const pkg = readJson(path.join(packageRoot, 'package.json'));
+    const patterns = Array.isArray(pkg?.workspaces) ? pkg.workspaces : pkg?.workspaces?.packages;
+    for (const pattern of Array.isArray(patterns) ? patterns : []) {
+      if (typeof pattern !== 'string' || !pattern.trim()) throw Error('package.json workspace entries must be non-empty paths.');
+      const normalized = slash(pattern.trim()).replace(/^\.\//, '');
+      const segments = normalized.split('/');
+      if (path.isAbsolute(normalized) || segments.some(segment => segment === '..' || (segment.includes('*') && segment !== '*'))) {
+        throw Error(`Unsupported local workspace pattern: ${normalized}.`);
+      }
+      let candidates = [packageRoot];
+      for (const segment of segments) {
+        const next = [];
+        for (const base of candidates) {
+          if (segment === '*') {
+            if (!fs.existsSync(base) || !fs.lstatSync(base).isDirectory()) continue;
+            next.push(...fs.readdirSync(base, { withFileTypes: true })
+              .filter(item => item.isDirectory())
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map(item => path.join(base, item.name)));
+          } else next.push(path.join(base, segment));
+        }
+        candidates = next;
+      }
+      if (!candidates.length) throw Error(`Workspace pattern matched no package directories: ${normalized}.`);
+      for (const candidate of candidates) admit(candidate, `workspace ${normalized}`, true);
+    }
+    for (const section of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+      for (const [name, value] of Object.entries(pkg?.[section] ?? {})) {
+        if (typeof value === 'string' && value.startsWith('file:')) admit(path.resolve(packageRoot, value.slice('file:'.length)), `${section}.${name} file dependency`, true);
+      }
     }
   }
-  return [...new Set(directories)];
+  return [...directories].sort();
 }
 
 function discoveredProjects(root, workspaces) {

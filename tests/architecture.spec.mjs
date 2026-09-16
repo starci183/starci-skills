@@ -229,11 +229,50 @@ test('monorepo rejects package export aliases, package to app imports, and type-
   assert.ok(rules.has('ARCH_PACKAGE_EXPORT_BYPASS'), JSON.stringify(result, null, 2));
 });
 
+test('single-app file dependencies participate in package export and package-to-app boundaries', t => {
+  const root = fixture(t, 'frontend', {
+    'src/app/page.tsx': 'import { HomePage } from "@/components/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
+    'src/components/pages/HomePage/index.tsx': 'import { Public } from "@fixture/ui/public"; export const HomePage=()=> <Public/>\n',
+    'src/contracts/app.ts': 'export type AppContract = string\n',
+    'packages/ui/package.json': JSON.stringify({ name: '@fixture/ui', private: true, exports: { './public': './src/public/index.tsx' } }),
+    'packages/ui/tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', baseUrl: '../..', paths: { '@fixture/app/*': ['src/*'] }, noEmit: true }, include: ['src/**/*'] }),
+    'packages/ui/src/public/index.tsx': 'export const Public=()=> <span/>\n',
+  });
+  const packageFile = path.join(root, 'package.json');
+  fs.writeFileSync(packageFile, JSON.stringify({ name: '@fixture/app', private: true, dependencies: { '@fixture/ui': 'file:packages/ui' } }));
+  const tsconfigFile = path.join(root, 'tsconfig.json'), config = JSON.parse(fs.readFileSync(tsconfigFile, 'utf8'));
+  Object.assign(config.compilerOptions.paths, { '@fixture/ui/*': ['packages/ui/src/*'], '@fixture/app/*': ['src/*'] });
+  fs.writeFileSync(tsconfigFile, JSON.stringify(config));
+  let result = check(root);
+  assert.equal(result.errors.some(item => item.ruleId.startsWith('ARCH_PACKAGE_')), false, JSON.stringify(result, null, 2));
+  fs.writeFileSync(path.join(root, 'src/components/pages/HomePage/index.tsx'), 'import { Public } from "@fixture/ui/public"; import { Private } from "@fixture/ui/private"; export const HomePage=()=> <><Public/><Private/></>\n');
+  fs.mkdirSync(path.join(root, 'packages/ui/src/private'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'packages/ui/src/private/index.tsx'), 'export const Private=()=> <span/>\n');
+  fs.writeFileSync(path.join(root, 'packages/ui/src/public/index.tsx'), 'export type { AppContract } from "@fixture/app/contracts/app"; export const Public=()=> <span/>\n');
+  result = check(root);
+  const rules = new Set(result.errors.map(item => item.ruleId));
+  assert.ok(rules.has('ARCH_PACKAGE_EXPORT_BYPASS'), JSON.stringify(result, null, 2));
+  assert.ok(rules.has('ARCH_PACKAGE_IMPORTS_APP'), JSON.stringify(result, null, 2));
+});
+
+test('declared package export key must resolve to its declared target rather than a private alias target', t => {
+  const root = monorepoFixture(t, {
+    'apps/web/tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', baseUrl: '../..', paths: { '@/*': ['apps/web/src/*'], '@fixture/ui/public': ['packages/ui/src/private/index.tsx'] }, noEmit: true }, include: ['src/**/*'] }),
+    'apps/web/src/app/page.tsx': 'import { HomePage } from "@/components/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
+    'apps/web/src/components/pages/HomePage/index.tsx': 'import { Public } from "@fixture/ui/public"; export const HomePage=()=> <Public/>\n',
+    'packages/ui/package.json': JSON.stringify({ name: '@fixture/ui', private: true, exports: { './public': './src/Public/index.tsx' } }),
+    'packages/ui/src/Public/index.tsx': 'export const Public=()=> <span/>\n',
+    'packages/ui/src/private/index.tsx': 'export const Public=()=> <span/>\n',
+  });
+  const result = check(root);
+  assert.ok(result.errors.some(item => item.ruleId === 'ARCH_PACKAGE_EXPORT_BYPASS' && item.specifier === '@fixture/ui/public'), JSON.stringify(result, null, 2));
+});
+
 test('backend workspace packages cannot reach executable app packages through type exports', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-architecture-be-workspaces-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   writeFiles(root, {
-    'architecture.json': JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['backend'], projects: ['tsconfig.json'] }),
+    'architecture.json': JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['backend'], projects: ['tsconfig.json'], backend: { apps: 'apps/api/src' } }),
     'package.json': JSON.stringify({ private: true, workspaces: ['apps/*', 'packages/*'] }),
     'tsconfig.json': JSON.stringify({ files: [], references: [{ path: './apps/api' }, { path: './packages/domain' }] }),
     'apps/api/package.json': JSON.stringify({ name: '@fixture/api', private: true, exports: { '.': './src/main.ts', './contract': './src/contract.ts' } }),
@@ -248,14 +287,111 @@ test('backend workspace packages cannot reach executable app packages through ty
   assert.ok(result.errors.some(item => item.ruleId === 'ARCH_PACKAGE_IMPORTS_APP'), JSON.stringify(result, null, 2));
 });
 
+test('backend direction traverses multi-hop type-only imports and barrels', t => {
+  const root = fixture(t, 'backend', {
+    'src/features/orders/contract.ts': 'export type FeatureContract = string\n',
+    'src/shared/barrel.ts': 'export type { FeatureContract } from "../features/orders/contract"\n',
+    'src/modules/catalog/types.ts': 'import type { FeatureContract } from "../../shared/barrel"; export type CatalogContract = FeatureContract\n',
+  });
+  const result = check(root), violation = result.violations.find(item => item.ruleId === 'BE_MODULE_IMPORTS_FEATURE');
+  assert.ok(violation, JSON.stringify(result, null, 2));
+  assert.deepEqual(violation.dependencyChain.map(item => path.posix.basename(item)), ['types.ts', 'barrel.ts', 'contract.ts']);
+});
+
+test('backend direction includes static dynamic imports that use import attributes', t => {
+  const root = fixture(t, 'backend', {
+    'src/features/orders/contract.ts': 'export const feature = 1\n',
+    'src/modules/catalog/load.ts': 'export const load = () => import("@features/orders/contract", { with: { type: "json" } })\n',
+  });
+  const result = check(root);
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_MODULE_IMPORTS_FEATURE'), JSON.stringify(result, null, 2));
+});
+
+test('feature application use cases may use Nest injection but cannot reach transport DTOs or protocol framework surfaces', t => {
+  const root = fixture(t, 'backend', {
+    'src/modules/orders/service.ts': 'export class OrdersService { create(input: {name:string}) { return input } }\n',
+    'src/features/orders/application/valid.use-case.ts': 'import * as Nest from "@nestjs/common"; import { OrdersService } from "@modules/orders/service"; @Nest.Injectable() export class ValidUseCase { constructor(private readonly orders: OrdersService) {} execute(input:{name:string}) { return this.orders.create(input) } }\n',
+    'src/features/orders/transport/graphql/create.input.ts': 'export class CreateInput { name!: string }\n',
+    'src/features/orders/transport/index.ts': 'export type { CreateInput } from "./graphql/create.input"\n',
+    'src/features/orders/shared/transport-types.ts': 'export type { CreateInput } from "../transport"\n',
+    'src/features/orders/application/invalid.use-case.ts': 'import * as Nest from "@nestjs/common"; import { ArgsType } from "@nestjs/graphql"; import type { CreateInput } from "../shared/transport-types"; @ArgsType() export class InvalidUseCase { execute(@Nest.Body() input:CreateInput){ return input } }\n',
+  });
+  const result = check(root), rules = result.violations.map(item => item.ruleId);
+  assert.ok(rules.includes('BE_APPLICATION_IMPORTS_TRANSPORT'), JSON.stringify(result, null, 2));
+  assert.ok(rules.filter(item => item === 'BE_APPLICATION_TRANSPORT_FRAMEWORK').length >= 2, JSON.stringify(result, null, 2));
+  assert.equal(result.violations.some(item => item.path.endsWith('/valid.use-case.ts')), false, JSON.stringify(result, null, 2));
+  const dependency = result.violations.find(item => item.ruleId === 'BE_APPLICATION_IMPORTS_TRANSPORT');
+  assert.deepEqual(dependency.dependencyChain.map(item => path.posix.basename(item)), ['invalid.use-case.ts', 'transport-types.ts', 'index.ts']);
+});
+
+test('internal aliases and relative imports cannot resolve outside the checked repository', t => {
+  const root = fixture(t, 'backend', {
+    'src/modules/alias.ts': 'import { outside } from "@outside/value"; export const alias=outside\n',
+    'src/modules/relative.ts': '',
+    'src/features/present.ts': 'export const present=1\n',
+  });
+  const outside = `${root}-outside`;
+  t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
+  fs.mkdirSync(outside, { recursive: true });
+  fs.writeFileSync(path.join(outside, 'value.ts'), 'export const outside=1\n');
+  fs.writeFileSync(path.join(root, 'src/modules/relative.ts'), `import { outside } from "../../../${path.basename(outside)}/value"; export const relative=outside\n`);
+  let linked = false;
+  try {
+    fs.symlinkSync(outside, path.join(root, 'src/outside-link'), 'junction');
+    fs.writeFileSync(path.join(root, 'src/modules/symlink.ts'), 'import { outside } from "../outside-link/value"; export const symlink=outside\n');
+    linked = true;
+  } catch { /* Link creation can be unavailable on a locked-down Windows host. */ }
+  const configFile = path.join(root, 'tsconfig.json'), config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.compilerOptions.paths['@outside/*'] = [`../${path.basename(outside)}/*`];
+  fs.writeFileSync(configFile, JSON.stringify(config));
+  const result = check(root), outsideErrors = result.errors.filter(item => item.ruleId === 'ARCH_INTERNAL_IMPORT_OUTSIDE');
+  const expected = new Set(['@outside/value', `../../../${path.basename(outside)}/value`]);
+  if (linked) expected.add('../outside-link/value');
+  assert.deepEqual(new Set(outsideErrors.map(item => item.specifier)), expected);
+});
+
+test('workspace discovery supports exact and deep bounded entries and rejects unsupported local patterns', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-architecture-deep-workspaces-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  writeFiles(root, {
+    'architecture.json': JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['frontend'], projects: ['tsconfig.json'] }),
+    'package.json': JSON.stringify({ private: true, workspaces: ['apps/web', 'packages/*/plugins/*'] }),
+    'tsconfig.json': JSON.stringify({ files: [], references: [{ path: './apps/web' }, { path: './packages/domain/plugins/ui' }] }),
+    'apps/web/package.json': JSON.stringify({ name: '@fixture/app', private: true }),
+    'apps/web/tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', baseUrl: '../..', paths: { '@fixture/ui': ['packages/domain/plugins/ui/src/index.tsx'] }, noEmit: true }, include: ['src/**/*'] }),
+    'apps/web/src/app/page.tsx': 'import { HomePage } from "../components/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
+    'apps/web/src/app/components/pages/HomePage.tsx': 'import { Ui } from "@fixture/ui"; export const HomePage=()=> <Ui/>\n',
+    'packages/domain/plugins/ui/package.json': JSON.stringify({ name: '@fixture/ui', private: true, exports: { '.': './src/index.tsx' } }),
+    'packages/domain/plugins/ui/tsconfig.json': JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', noEmit: true }, include: ['src/**/*'] }),
+    'packages/domain/plugins/ui/src/index.tsx': 'export const Ui=()=> <span/>\n',
+  });
+  let result = check(root);
+  assert.equal(result.errors.some(item => item.ruleId.startsWith('ARCH_PACKAGE_')), false, JSON.stringify(result, null, 2));
+  const packageFile = path.join(root, 'package.json'), pkg = JSON.parse(fs.readFileSync(packageFile, 'utf8'));
+  pkg.workspaces = ['packages/**'];
+  fs.writeFileSync(packageFile, JSON.stringify(pkg));
+  result = check(root);
+  assert.equal(result.errors[0]?.ruleId, 'ARCH_CONFIG_INVALID', JSON.stringify(result, null, 2));
+});
+
 test('frontend accepts redirect-only server routes and intrinsic client visual state', t => {
   const root = fixture(t, 'frontend', {
     'src/app/home/page.tsx': 'import { redirect } from "next/navigation"; export default async function Route({params}){const {lang}=await params;redirect(lang === "vi" ? "/next" : `/${lang}/next`)}\n',
     'src/components/pages/HomePage/index.tsx': 'export const HomePage=()=>null\n',
+    'src/app/guarded/page.tsx': 'import { redirect } from "next/navigation"; import { HomePage } from "@/components/pages/HomePage"; export default function Route({session,lang}){if(!session) redirect(lang === "vi" ? "/vi/login" : "/en/login");return <HomePage/>}\n',
     'src/components/leaves/Disclosure/component.tsx': '"use client"; import { useRef,useState,useEffect } from "react"; export const Disclosure=()=>{const r=useRef(null);const [open,setOpen]=useState(false);useEffect(()=>{},[]);return <button ref={r} onClick={()=>setOpen(!open)} /> }\n',
   });
   const result = check(root);
   assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+});
+
+test('frontend rejects a visual branch that selects a page versus no composition', t => {
+  const root = fixture(t, 'frontend', {
+    'src/app/home/page.tsx': 'import { HomePage } from "@/components/pages/HomePage"; export default function Route({show}){return show ? <HomePage/> : null}\n',
+    'src/components/pages/HomePage/index.tsx': 'export const HomePage=()=> <main/>\n',
+  });
+  const result = check(root);
+  assert.ok(result.violations.some(item => item.ruleId === 'FE_ROUTE_DRAWING_DECISION'), JSON.stringify(result, null, 2));
 });
 
 test('backend rejects decorator and declaration roles hidden in config-shaped app files', t => {
@@ -268,6 +404,33 @@ test('backend rejects decorator and declaration roles hidden in config-shaped ap
   });
   const result = check(root);
   assert.ok(result.violations.some(item => item.ruleId === 'BE_APP_BUSINESS_ROLE' && item.path.endsWith('runtime.config.ts')), JSON.stringify(result, null, 2));
+});
+
+test('backend composition roots support standard src and exact app source layouts without swallowing modules or features', t => {
+  const standard = fixture(t, 'backend', {
+    'src/modules/value.ts': 'export const value=1\n',
+    'src/features/feature.ts': 'export const feature=1\n',
+    'src/main.ts': 'void 0\n',
+    'src/app.module.ts': 'export const AppModule=1\n',
+    'src/orders.controller.ts': 'export class OrdersController {}\n',
+  });
+  let config = JSON.parse(fs.readFileSync(path.join(standard, 'architecture.json'), 'utf8'));
+  config.backend = { apps: 'src' };fs.writeFileSync(path.join(standard, 'architecture.json'), JSON.stringify(config));
+  let result = check(standard);
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_APP_BUSINESS_ROLE' && item.path === 'src/orders.controller.ts'), JSON.stringify(result, null, 2));
+  assert.equal(result.violations.some(item => item.path === 'src/modules/value.ts' || item.path === 'src/features/feature.ts'), false, JSON.stringify(result, null, 2));
+
+  const exact = fixture(t, 'backend', {
+    'src/modules/value.ts': 'export const value=1\n',
+    'src/features/feature.ts': 'export const feature=1\n',
+    'apps/core/src/main.ts': 'void 0\n',
+    'apps/core/src/app.module.ts': 'export const AppModule=1\n',
+    'apps/core/src/orders.controller.ts': 'export class OrdersController {}\n',
+  });
+  config = JSON.parse(fs.readFileSync(path.join(exact, 'architecture.json'), 'utf8'));
+  config.backend = { apps: 'apps/core/src' };fs.writeFileSync(path.join(exact, 'architecture.json'), JSON.stringify(config));
+  result = check(exact);
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_APP_BUSINESS_ROLE' && item.path.endsWith('orders.controller.ts')), JSON.stringify(result, null, 2));
 });
 
 test('explicit missing layout roots and empty project programs fail closed', t => {

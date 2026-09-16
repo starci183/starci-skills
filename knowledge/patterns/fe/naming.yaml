@@ -61,13 +61,15 @@ rules:
       - connected-block
 
   - id: FE-NAMING-2
-    title: Props and its parts
+    title: Contracts and their parts
     kind: mandatory
     requirement: |
-      Props, Data, Labels, Actions and State types follow the unit name. Each half may declare its own
-      XProps with a different shape; each file owns its declaration.
+      Public contract names follow their owning feature, module or visual unit. Props, Data, Labels,
+      Actions and State suffixes are available when those parts are real. One public entry does not export
+      two different shapes under the same XProps name; local implementation input stays local.
     rationale: |
-      Stable part suffixes make the three-part contract searchable across units.
+      Stable semantic names make contracts searchable without imposing a three-part envelope or an
+      ambiguous duplicate props type.
     cases:
       - id: case-1
         when: "The props type"
@@ -87,10 +89,11 @@ rules:
           export type StarCiAiChatState = "sessionsPending" | …; export type StarCiAiMode = "general" |
           "history"
       - id: case-6
-        when: "The same name in both halves"
+        kind: residual
+        when: "Legacy connected and render files both declare AuthenticationPageProps"
         write: >
-          AuthenticationPageProps is declared in component.tsx and again in index.tsx with a different
-          shape; each file owns its own XProps
+          Treat the duplicate as Academy source history, not a pattern. A changed unit names the
+          route/connected input separately or keeps it unexported.
     verification:
       automated: []
       manual: []
@@ -130,11 +133,12 @@ rules:
     relatedExamples: []
 
   - id: FE-NAMING-4
-    title: Hooks and keys
+    title: Feature data hooks and cache keys
     kind: mandatory
     requirement: |
-      Read hooks are useQuery…Swr; write hooks are useMutate…Swr; keys are QUERY_/MUTATE_…_SWR_KEY.
-      GraphQL document modules are kebab-case with queryThing / mutationThing functions.
+      Feature hooks start with use and name the lifecycle they own. When SWR is selected, read/write hooks
+      and keys follow the repository's Query/Mutate convention. GraphQL document modules use the owning
+      adapter's basename convention. Generated document names remain generator-owned.
     rationale: |
       Parallel suffixes make cache keys and hook roles obvious at the call site.
     cases:
@@ -156,12 +160,12 @@ rules:
           AddToCartArg, export type AddToCartTrigger
       - id: case-5
         when: "Non-data hooks"
-        write: "useSessionToken, useViewerKey, useAuthPanel under hooks/auth/"
+        write: "useAuthentication under features/authentication/data; useSessionToken under the session module when shared"
       - id: case-6
         when: "GraphQL document module"
         write: >
-          modules/api/graphql/queries/query-course.ts, mutations/mutation-add-to-cart.ts; the document
-          const is query1, the function queryCourse / mutationAddToCart
+          A legacy handwritten adapter may use query-course.ts/queryCourse. A generated operation keeps
+          its generated name and is consumed behind the feature data mapper.
     verification:
       automated: []
       manual: []
@@ -173,8 +177,8 @@ rules:
     kind: mandatory
     requirement: |
       Frozen module values use UPPER_SNAKE. Exported state inventories use UNIT_STATES arrays.
-      Component vocabulary is not an enum; GraphQL operation-name enums live only under
-      modules/api/graphql.
+      Component vocabulary is not an enum; GraphQL/provider enums stay inside the transport adapter
+      and are mapped before presentation.
     rationale: |
       Distinguishing frozen inventories from open props keeps state unions closed and searchable.
     cases:
@@ -193,10 +197,10 @@ rules:
           const VARIANTS = { primary: "primary", … } as const, const SIZES = { sm: "sm", md: "md",
           lg: "lg" } as const, const SKELETON_CLASS_NAME = … (core/primitive/Button/index.tsx)
       - id: case-4
-        when: "Operation-name enums (the only enums in src/)"
+        when: "Legacy operation-name enum"
         write: >
-          export enum MutationCvBlocks { Create = "create", Update = "update", Render = "render",
-          Rewrite = "rewrite" } (92, all in modules/api/graphql)
+          export enum MutationCvBlocks { Create = "create", … } remains inside modules/api/graphql;
+          feature/view code consumes a mapped literal contract.
     verification:
       automated: []
       manual: []
