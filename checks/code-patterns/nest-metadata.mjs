@@ -270,7 +270,7 @@ function checkAliases(root, descriptor, config, result, relatedPath) {
 /** Measure resolved runner configuration and discovery only; no test or setup hook is executed. */
 export function checkNestMetadata({ root, files = [], ruleIds = [], contextFiles = [] } = {}) {
   const result = { schema: 'starci/code-pattern-script@1', repository: '', files: [], checkedRuleIds: [], requestedRuleIds: ruleIds,
-    violations: [], errors: [], compiler: null, tools: [], inputFiles: [], discoveredTests: [], runnerConfigs: [], inputs: null };
+    violations: [], errors: [], compiler: null, tools: [], inputFiles: [], discoveredTests: [], runnerConfigs: [], lifecycleEntries: [], inputs: null };
   try {
     root = fs.realpathSync(path.resolve(root)); result.repository = root;
     if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length
@@ -317,6 +317,16 @@ export function checkNestMetadata({ root, files = [], ruleIds = [], contextFiles
     for (const [name, configs] of configurations) {
       const latest = runJest(root, tool, name === '<root auto>' ? null : name, '--showConfig');
       if (JSON.stringify(latest.configs) !== JSON.stringify(configs)) throw Error('Normalized Jest configuration changed during measurement.');
+      for (const config of configs) for (const field of ['globalSetup', 'globalTeardown']) {
+        if (!config[field]) continue;
+        // Only source-bound local entries can grant a default-export exception. A
+        // dependency-owned hook does not invalidate unrelated alias/discovery proof.
+        if (typeof config[field] !== 'string' || !path.isAbsolute(config[field]) || !inside(root, config[field])) continue;
+        const relative = slash(path.relative(root, config[field]));
+        if (!before.files.includes(relative)) continue;
+        safeFile(root, relative);
+        result.lifecycleEntries.push(relative);
+      }
       result.runnerConfigs.push({ config: name, digest: crypto.createHash('sha256').update(JSON.stringify(configs)).digest('hex'),
         projects: configs.map(config => ({ rootDir: config.rootDir, name: config.displayName?.name ?? null })) });
     }
@@ -330,6 +340,7 @@ export function checkNestMetadata({ root, files = [], ruleIds = [], contextFiles
         message: `Authored spec is not discoverable by any declared Jest lane: ${file}` });
     }
     result.discoveredTests = [...discovered].sort();
+    result.lifecycleEntries = [...new Set(result.lifecycleEntries)].sort();
     const after = discoverNestMetadataInputs({ root, files, contextFiles });
     if (after.errors.length) throw Error('Metadata inputs became unavailable during measurement.');
     const afterDigest = fingerprint(root, after);
