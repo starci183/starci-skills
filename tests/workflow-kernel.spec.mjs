@@ -443,6 +443,19 @@ test('audit failures fail closed without retries or repairs, while legacy review
   }finally{legacy.cleanup();}
 });
 
+test('a named audit contract permits only control transport and requires files empty',()=>{
+  const harness=setup({plan:auditPlan(),scripts:{}});
+  try{
+    const op=harness.state.ops[0],contract=renderContract({template,op,state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
+    assert.match(contract,/## Named audit protocol/);
+    assert.match(contract,/Do not create, edit or delete source, Work, stack, documentation, evidence or allowlist artifacts/);
+    assert.match(contract,/only permitted writes are the exact check control file/);
+    assert.match(contract,/omit the `--files` argument/);
+    assert.match(contract,/must carry `files: \[\]`/);
+    assert.doesNotMatch(contract,/--files <comma-separated changed paths>/);
+  }finally{harness.cleanup();}
+});
+
 test('the goal phase writes goal.md and goal.json and stops: nothing is launched before the approval',()=>{
   const harness=setup({plan:salesPlan,scripts:{}});
   try{

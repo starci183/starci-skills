@@ -281,6 +281,13 @@ test('public retry narrowly re-admits a prelaunch candidate-root refusal and its
   assert.equal(recorded[0].event,'candidate-root-dependent-readmitted');
   for(const unsafe of [{...root,reports:[{outcome:'partial'}]},{...root,files:['src/x']},{...root,head:'abc'},{...root,verdict:'fail'},
     {...root,workerSettled:false},{...root,lease:{jobId:'live'}}])assert.equal(retryableOperation(unsafe),false,JSON.stringify(unsafe));
+  const failedAudit={id:'audit-failed',kind:'review.verify',operation:'stales',status:'blocked',refusal:'audit-measurement-failed',workerSettled:true,
+    audit:{schema:'starci/audit-measurement@1',operation:'stales',outcome:'failed',failures:['worker produced files']},reports:[{outcome:'partial'}],candidate:{status:'quarantine'}};
+  assert.equal(retryableOperation(failedAudit),true,'typed inactive audit failure preserves its history and can rerun');
+  assert.equal(retryableOperation({...failedAudit,workerSettled:null}),true,'a historical task with no active attempt fields is inactive');
+  for(const unsafe of [{...failedAudit,workerSettled:false},{...failedAudit,lease:{jobId:'live'}},{...failedAudit,pending:{kind:'candidate'}},{...failedAudit,dispatch:'ctx_live'},
+    {...failedAudit,terminal:'term_live'},{...failedAudit,audit:{...failedAudit.audit,failures:[]}},{...failedAudit,refusal:'authority'}])
+    assert.equal(retryableOperation(unsafe),false,JSON.stringify(unsafe));
   const noReceipt={...dependent,status:'blocked'};assert.deepEqual(readmitCandidateRootBindingRetry({readEvents:()=>[],appendEvent(){}},{ops:[root,noReceipt],needUser:[]}),{roots:['root'],dependents:[]});
 });
 

@@ -332,6 +332,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
   const checksFile=slash(store.checksPath(op.id));
   const credentialRequestFile=checksFile.replace(/\.json$/,'.credential-request.json');
   const reportsDir=slash(store.paths.reports);
+  const namedAudit=isAuditOperation(op);
   const items=(op.ledgerIds??[]).map(id=>{const item=ledgerItem(state,id);return `- \`${id}\` ${item?.title??'(unknown goal item)'}${item?.inputRef?` - ${item.inputRef}`:''}`;});
   const locks=guards.resourceLocks(op);
   const owned=protectedPaths??op.kernelOwned??[];
@@ -355,6 +356,10 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     ...(items.length?[`## Goal items you close`,...items,``]:[]),
     `## Allowlist`,...op.allowlist.map(entry=>`- \`${entry}\``),
     `Anything else is out of scope. Name the exact paths you need in \`open[]\`, or report \`blocked\` with \`shared-change\` and the exact repository paths in the detail - a \`shared-change\` that names no path is sent straight back to you.`,``,
+    ...(namedAudit?[`## Named audit protocol`,
+      `This operation measures only. Do not create, edit or delete source, Work, stack, documentation, evidence or allowlist artifacts. Run the declared checks against the existing inputs and leave those inputs byte-for-byte unchanged.`,
+      `The only permitted writes are the exact check control file \`${checksFile}\` and the report control file created by the exact report command below. They are kernel transport, not operation output: never include either one in \`files[]\`.`,
+      `Your report must carry \`files: []\`: omit the \`--files\` argument so the report builder uses its empty-list default. The kernel independently reruns the measurement and preserves its own typed result.`,``]:[]),
     ...(owned.length?[`## Never touch (kernel-owned)`,...owned.map(entry=>`- \`${entry}\``),
       `The kernel owns the node's \`state\`, \`completion\`, \`extensions.work3.kernel\` and its evidence. It reverts anything you write here and downgrades your report to \`failed\`.`,``]:[]),
     `## Resources`,...(locks.length?locks.map(entry=>`- \`${entry}\``):['- none: this operation claims no shared resource']),
@@ -380,8 +385,8 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     `The kernel re-runs these exact commands itself after your report and computes your changed files from git: a \`done\` the machine cannot reproduce is downgraded to \`failed\` and comes back to you.`,
     `An error the whole-tree validator reports under a path outside your allowlist is not yours: name it in your summary and report as if that check passed for your files. The kernel judges the tree by what you could have caused, never by a red corner another workflow owns.`,``,
     `## Report (exactly once, at the end)`,
-    `\`node ${launcher} report --run ${run} --from <your terminal> --task <op task> --dispatch <your dispatch> --reports-dir ${reportsDir} --outcome done|partial|failed|ask|blocked --summary "<what you did, what the checks showed, what is left>" --files <comma-separated changed paths> --checks-file ${checksFile} [--open "<item>,<item>"] [--question "<text>" --options "a,b"] [--blocker shared-change|srs-gap|sds-gap|interface-gap|brand-gap|grammar-gap|environment|authority:<detail>] [--credential-request-file <safe JSON>]\``,
-    `- \`--files\` must acknowledge every net changed path. Use source-relative paths for source files; for routed Work files use \`.starciwork/...\` or the displayed absolute path. One relative non-Work name belongs only to source. Unknown or escaping entries authorize nothing; an unchanged touched-and-reverted extra is diagnostic.`,
+    `\`node ${launcher} report --run ${run} --from <your terminal> --task <op task> --dispatch <your dispatch> --reports-dir ${reportsDir} --outcome done|partial|failed|ask|blocked --summary "<what you did, what the checks showed, what is left>" ${namedAudit?'':'--files <comma-separated changed paths> '}--checks-file ${checksFile} [--open "<item>,<item>"] [--question "<text>" --options "a,b"] [--blocker shared-change|srs-gap|sds-gap|interface-gap|brand-gap|grammar-gap|environment|authority:<detail>] [--credential-request-file <safe JSON>]\``,
+    ...(namedAudit?[`- \`--files\` is exactly empty for this named audit. Findings belong in the summary, checks and \`open[]\`; they never become files.`]:[`- \`--files\` must acknowledge every net changed path. Use source-relative paths for source files; for routed Work files use \`.starciwork/...\` or the displayed absolute path. One relative non-Work name belongs only to source. Unknown or escaping entries authorize nothing; an unchanged touched-and-reverted extra is diagnostic.`]),
     `- \`done\` needs every check exiting 0 and no open item; otherwise report \`partial\` (with \`--open\`) or \`failed\`.`,
     `- Only an \`integration.verify\` whose declared live check explicitly rejected a credential as invalid or expired may report \`blocked\` \`environment\` with \`--credential-request-file ${credentialRequestFile}\`. Writing this nonsecret report artifact beside your checks file is permitted. The file is exactly \`{"reason":"invalid|expired","variables":["DECLARED_VARIABLE"],"check":"declared-failed-check"}\`, using one actual reason. The named check must have a nonzero exit and safe observed evidence, with its declared command. Never include values, custody paths or a baseline; the kernel binds the request to the exact tested custody version. Other provider failures keep their actual failure path.`,
     `- \`ask\` pauses you until the kernel answers in this terminal; then continue and report again.`,
@@ -3485,9 +3490,12 @@ export function retryOwnedBaseline(state,op,git=spawnSync){const changed=changed
 export const settledOperation=op=>['done','cancelled'].includes(op?.status)&&!op?.dispatch&&!op?.terminal;
 const candidatePrelaunchInactive=op=>!op?.lease&&!op?.pending&&!op?.dispatch&&!op?.terminal&&!op?.launch&&op?.workerSettled===undefined&&op?.retryReconciled===undefined&&
   !(op?.reports??[]).length&&!(op?.files??[]).length&&!op?.head&&!op?.verdict;
+const retryableAuditFailure=op=>isAuditOperation(op)&&op?.status==='blocked'&&op?.refusal==='audit-measurement-failed'&&op?.workerSettled!==false&&
+  !op?.lease&&!op?.pending&&!op?.dispatch&&!op?.terminal&&op?.audit?.schema==='starci/audit-measurement@1'&&op.audit.operation===op.operation&&op.audit.outcome==='failed'&&
+  Array.isArray(op.audit.failures)&&op.audit.failures.length>0;
 export const retryableOperation=op=>!op?.fill&&!op?.ownerRequest&&!settledOperation(op)&&(['running','answering'].includes(op?.status)||Boolean(op?.retryReconciled)||
   (op?.status==='blocked'&&op?.refusal==='candidate-root-binding'&&candidatePrelaunchInactive(op))||
-  (Boolean(op?.lease)&&(op?.refusal==='runtime-reconciliation'||op?.workerSettled===true)));
+  retryableAuditFailure(op)||(op?.refusal!=='audit-measurement-failed'&&Boolean(op?.lease)&&(op?.refusal==='runtime-reconciliation'||op?.workerSettled===true)));
 
 /** Public retry re-admits only the prelaunch root-binding refusal and dependency-only blocks it created. */
 export function readmitCandidateRootBindingRetry(store,state,{events=null}={}){
@@ -4402,7 +4410,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       op.findings=[];op.priorOpen=[];op.retryFromCanonical=true;
       if(reconciledNative)op.priorStoppedAttempt={attempt:reconciledNative.attempt,dispatch:reconciledNative.dispatch,
         candidateDigest:reconciledNative.candidateDigest??null,observedFiles:[...owned]};
-      if(['runtime-reconciliation','candidate-root-binding'].includes(op.refusal))delete op.refusal;
+      if(['runtime-reconciliation','candidate-root-binding','audit-measurement-failed'].includes(op.refusal))delete op.refusal;
       delete op.quarantineSignature;
       state.needUser=state.needUser.filter(item=>!(item.op===op.id&&['candidate-root-binding','candidate-reconciliation','runtime-reconciliation'].includes(item.code)));
       for(const key of ['lease','pending','workerSettled','retryReconciled','baseHead','kernelOwnedAt','recordBlocks'])delete op[key];
