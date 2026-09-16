@@ -2,7 +2,7 @@
 
 An application stack is the complete deployment description for one application: frontend, APIs, workers, jobs, datastores, ingress, and every required external dependency. A directory or service count does not prove that the application can run. See [Application runtime configuration and health](application-runtime-config-and-health.md) for the source-to-startup contract shared by host, container and remote placements.
 
-The canonical manifest is `.stacks/application-stacks.yaml`, schema `starci/application-stacks@1`. Development uses Docker Compose. An Ubuntu VPS uses Docker Swarm and `docker stack`. Kubernetes is explicitly deferred with a reason. Terraform and provider APIs remain optional provisioning choices rather than runtime requirements.
+The canonical manifest is `.stacks/application-stacks.yaml`, schema `starci/application-stacks@1`. Development uses Docker Compose. An Ubuntu VPS uses Docker Swarm and `docker stack`. Whole-package Kubernetes deployment and cluster administration are explicitly deferred with a reason; a separately owned application workload may still run in Kubernetes or K3s and be consumed through its declared remote API boundary. Terraform and provider APIs remain optional provisioning choices rather than runtime requirements.
 
 ## Ownership and component closure
 
