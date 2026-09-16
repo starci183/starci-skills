@@ -59,6 +59,15 @@ function writeFiles(root, files) {
   }
 }
 
+function installNestTypes(root) {
+  writeFiles(root, {
+    'node_modules/@nestjs/common/package.json': '{"name":"@nestjs/common","types":"index.d.ts"}',
+    'node_modules/@nestjs/common/index.d.ts': 'export declare function Module(metadata: Record<string, unknown>): ClassDecorator;\n',
+    'node_modules/@nestjs/cqrs/package.json': '{"name":"@nestjs/cqrs","types":"index.d.ts"}',
+    'node_modules/@nestjs/cqrs/index.d.ts': 'export declare function CommandHandler(message: unknown): ClassDecorator; export declare function QueryHandler(message: unknown): ClassDecorator;\n',
+  });
+}
+
 function monorepoFixture(t, files = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-architecture-monorepo-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -449,6 +458,88 @@ test('owner entries must be production TypeScript or JavaScript sources', t => {
   assert.equal(result.ok, false);
   assert.equal(result.errors[0].ruleId, 'ARCH_CONFIG_INVALID');
   assert.match(result.errors[0].message, /production TypeScript or JavaScript source file/);
+});
+
+test('Nest registration derives exported class-token ownership and selected CQRS handlers', t => {
+  const root = fixture(t, 'backend', {
+    'src/framework.ts': 'export { Module as NestModule } from "@nestjs/common"; export { CommandHandler as HandlesCommand } from "@nestjs/cqrs";\n',
+    'src/modules/catalog/catalog.service.ts': 'export class CatalogService {}\n',
+    'src/modules/catalog/catalog.module.ts': 'import { NestModule } from "../../framework"; import { CatalogService } from "./catalog.service"; const StaticModule=NestModule; @StaticModule({providers:[CatalogService],exports:[CatalogService]}) export class CatalogModule {}\n',
+    'src/features/orders/create.command.ts': 'export class CreateOrderCommand {}\n',
+    'src/features/orders/create.handler.ts': 'import { HandlesCommand } from "../../framework"; import { CreateOrderCommand } from "./create.command"; const SelectedHandler=HandlesCommand; @SelectedHandler(CreateOrderCommand) export class CreateOrderHandler {}\n',
+    'src/features/orders/orders.module.ts': 'import { NestModule } from "../../framework"; import { CatalogModule } from "@modules/catalog/catalog.module"; import { CatalogService } from "@modules/catalog/catalog.service"; import { CreateOrderHandler } from "./create.handler"; @NestModule({imports:[CatalogModule],providers:[CreateOrderHandler,{provide:"LOCAL_CATALOG",useClass:CatalogService}]}) export class OrdersModule {}\n',
+  });
+  installNestTypes(root);
+  const configFile = path.join(root, 'architecture.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.backend = { moduleRegistration: { providerIdentity: 'exported-class-token', handlerDecorators: ['CommandHandler', 'QueryHandler'] } };
+  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const result = check(root);
+  assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+  assert.deepEqual(result.coverage.moduleRegistration, { status: 'checked', modules: 2, exportedClassTokenProviders: 1,
+    handlers: 1, selectedHandlerDecorators: ['CommandHandler', 'QueryHandler'] });
+  assert.ok(result.coverage.checkedRuleIds.includes('BE_MODULE_PROVIDER_REREGISTRATION'));
+  assert.ok(result.coverage.checkedRuleIds.includes('BE_MODULE_HANDLER_REGISTRATION'));
+});
+
+test('Nest registration rejects same class-token provider duplication and missing handler registration', t => {
+  const root = fixture(t, 'backend', {
+    'src/modules/catalog/catalog.service.ts': 'export class CatalogService {}\n',
+    'src/modules/catalog/catalog.module.ts': 'import { Module } from "@nestjs/common"; import { CatalogService } from "./catalog.service"; @Module({providers:[CatalogService,CatalogService],exports:[CatalogService]}) export class CatalogModule {}\n',
+    'src/features/orders/create.command.ts': 'export class CreateOrderCommand {}\n',
+    'src/features/orders/create.handler.ts': 'import { CommandHandler } from "@nestjs/cqrs"; import { CreateOrderCommand } from "./create.command"; @CommandHandler(CreateOrderCommand) export class CreateOrderHandler {}\n',
+    'src/features/orders/orders.module.ts': 'import { Module } from "@nestjs/common"; import { CatalogService } from "@modules/catalog/catalog.service"; import { CreateOrderHandler } from "./create.handler"; @Module({providers:[{provide:CatalogService as unknown as typeof CatalogService,useClass:CatalogService},CreateOrderHandler,CreateOrderHandler]}) export class OrdersModule {}\n',
+  });
+  installNestTypes(root);
+  const configFile = path.join(root, 'architecture.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.backend = { moduleRegistration: { providerIdentity: 'exported-class-token', handlerDecorators: ['CommandHandler', 'QueryHandler'] } };
+  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const result = check(root);
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_MODULE_PROVIDER_REREGISTRATION'
+    && item.path.endsWith('/orders.module.ts') && item.ownerPath.endsWith('/catalog.module.ts')), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_MODULE_PROVIDER_REREGISTRATION'
+    && item.path.endsWith('/catalog.module.ts') && item.ownerPath.endsWith('/catalog.module.ts')), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_MODULE_HANDLER_REGISTRATION'
+    && item.path.endsWith('/create.handler.ts') && item.modules.length === 2), JSON.stringify(result, null, 2));
+  assert.equal(result.coverage.moduleRegistration.status, 'checked');
+});
+
+test('Nest registration does not force CQRS when no recognized handler exists', t => {
+  const root = fixture(t, 'backend', {
+    'src/modules/plain/plain.module.ts': 'import { Module } from "@nestjs/common"; @Module({}) export class PlainModule {}\n',
+  });
+  installNestTypes(root);
+  const configFile = path.join(root, 'architecture.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.backend = { moduleRegistration: { providerIdentity: 'exported-class-token', handlerDecorators: [] } };
+  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const result = check(root);
+  assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+  assert.equal(result.coverage.moduleRegistration.status, 'checked');
+  assert.equal(result.coverage.moduleRegistration.handlers, 0);
+});
+
+test('Nest registration becomes unavailable for hidden metadata or unselected discovered handlers', t => {
+  const root = fixture(t, 'backend', {
+    'src/features/orders/find.query.ts': 'export class FindOrderQuery {}\n',
+    'src/features/orders/find.handler.ts': 'import { QueryHandler } from "@nestjs/cqrs"; import { FindOrderQuery } from "./find.query"; @QueryHandler(FindOrderQuery) export class FindOrderHandler {}\n',
+    'src/features/orders/orders.module.ts': 'import { Module } from "@nestjs/common"; import { FindOrderHandler } from "./find.handler"; const providers=[FindOrderHandler]; @Module({providers}) export class OrdersModule {}\n',
+    'src/features/orders/legacy.module.ts': 'const {Module}=require("@nestjs/common"); @Module({}) export class LegacyModule {}\n',
+    'src/features/orders/mutable.module.ts': 'import { Module } from "@nestjs/common"; let MutableModule=Module; @MutableModule({}) export class MutableIdentityModule {}\n',
+  });
+  installNestTypes(root);
+  const configFile = path.join(root, 'architecture.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.backend = { moduleRegistration: { providerIdentity: 'exported-class-token', handlerDecorators: ['CommandHandler'] } };
+  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const result = check(root);
+  assert.equal(result.coverage.moduleRegistration.status, 'unavailable', JSON.stringify(result, null, 2));
+  assert.ok(result.coverage.moduleRegistration.details.some(item => /dynamic or unresolvable/.test(item)));
+  assert.ok(result.coverage.moduleRegistration.details.some(item => /unselected QueryHandler/.test(item)));
+  assert.ok(result.coverage.moduleRegistration.details.some(item => /CommonJS Nest framework binding/.test(item)));
+  assert.ok(result.coverage.moduleRegistration.details.some(item => /mutable Module decorator identity/.test(item)));
+  assert.equal(result.coverage.checkedRuleIds.includes('BE_MODULE_HANDLER_REGISTRATION'), false);
 });
 
 test('declared Grammar contract binds public code, style entry, peers, and product imports', t => {
