@@ -32,8 +32,9 @@ function safeFile(root, relative) {
 function authoredFiles(root) {
   const files = [];
   const visit = directory => {
-    if (!fs.existsSync(directory)) return;
-    const directoryStat = fs.lstatSync(directory);
+    let directoryStat;
+    try { directoryStat = fs.lstatSync(directory); }
+    catch (error) { if (error.code === 'ENOENT') return; throw error; }
     if (directoryStat.isSymbolicLink() || !directoryStat.isDirectory()) throw Error(`Authored source root is not a regular directory: ${slash(path.relative(root, directory))}`);
     for (const item of fs.readdirSync(directory, { withFileTypes: true })) {
       if (item.name === 'node_modules' || item.name === '.git') continue;

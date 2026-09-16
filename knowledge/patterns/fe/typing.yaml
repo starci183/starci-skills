@@ -53,7 +53,8 @@ rules:
         when: "Grammar package"
         write: "export type ButtonProps = { … }, export type GrammarRuleConformance = { … } — type throughout"
     verification:
-      automated: []
+      automated:
+        - FE_CONTRACT_NAME_SHAPE
       manual: []
     relatedExamples:
       - connected-block
@@ -80,8 +81,12 @@ rules:
       - id: case-4
         when: "Tuple key"
         write: "_key: readonly [string, string]"
+      - id: case-5
+        when: "Imported or inherited props shape"
+        write: "Resolve the selected alias/interface and require readonly fields at the declaring source; Readonly<T> may make only that object's fields readonly."
     verification:
-      automated: []
+      automated:
+        - FE_READONLY_PROPS_CONTRACT
       manual: []
     relatedExamples:
       - connected-block
@@ -116,7 +121,8 @@ rules:
           export type ButtonVariant = "primary" | "secondary" | "tertiary" | "outline" | "ghost";
           const VARIANTS = { … } as const
     verification:
-      automated: []
+      automated:
+        - FE_CLOSED_VOCABULARY_SHAPE
       manual:
         - Verify Grammar vocabulary types against installed @starci/grammar/common exports.
     relatedExamples:
@@ -174,7 +180,8 @@ rules:
           return { mode: "signIn" as const, step: "code" as const, measure: "form" as const } so a
           switch returns a union, not string
     verification:
-      automated: []
+      automated:
+        - FE_RETURN_TYPE_PROFILE
       manual: []
     relatedExamples:
       - connected-block
@@ -222,7 +229,8 @@ rules:
           Keep the generated/wire enum in modules/api or feature data, then map it to a feature literal
           before rendering or accepting a user action.
     verification:
-      automated: []
+      automated:
+        - FE_CLOSED_VOCABULARY_SHAPE
       manual:
         - Confirm presentation does not runtime-import a GraphQL response, enum or Apollo error type.
     relatedExamples: []
