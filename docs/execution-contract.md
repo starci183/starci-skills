@@ -73,7 +73,9 @@ The functions keep separate typed inputs and independent contexts even when they
 The journal keeps what a workflow needs to continue and nothing it has settled. The bound generation keeps one
 state body, every transition checkpoint (so a replayed transition is recognised, body or not) and the latest
 save checkpoint. A retired generation keeps nothing: no snapshot rows, no settled jobs, none of their events;
-the kernel retires them when it binds the next generation. A finished workflow retires every row it holds.
+the kernel retires them when it binds the next generation. A finished workflow drops its operational jobs and
+history but retains one final state body and only the latest exact runtime-file receipt per path. That bounded
+custody lets a candidate which was already open in the shared store verify the finished kernel's bytes.
 Live reservations, unsettled jobs and their events are never touched, whatever their generation. The policy is
 one record in `kernel/journal.mjs`, and `journal-prune` and `journal-retire` are the only operator commands
 that act on rows a kernel does not own. Workflow state keeps a candidate record - identity, roots and digests -
@@ -97,7 +99,11 @@ preserves only sealed in-scope changes as provenance. Unknown or out-of-scope ef
 A fresh exact native running heartbeat outranks a screen-only stall heuristic; it does not extend the
 operation deadline or certify that a product result is correct.
 
-The kernel collects observed bytes and Git changes; a worker's file list is diagnostic only. Candidates and
+The kernel's canonical byte and Git observations are the change authority. A worker's file list is an untrusted
+completeness acknowledgement: it must name every net observed change, but an extra path that was touched and
+reverted is diagnostic and does not reject valid work. Source-relative names route only to the source root;
+`.starciwork/...` and the displayed absolute spelling route to the accepted Work root. An unknown or escaping
+name authorizes nothing, and one ambiguous relative name never acknowledges two roots. Candidates and
 protected oracles carry digests, accepted-head identity, dependency inputs and environment binding. Required
 gates have four states: pass, fail, inconclusive and unavailable. Only complete, independently resolved and
 current pass evidence admits integration. A setup failure on base code does not prove a behavioral fix.
@@ -110,6 +116,23 @@ separate read-only input root whose complete sealed manifest is verified before 
 again before integration, including files the operation did not reference. Work-relative, repository-relative,
 absolute and node-id references resolve only through these accepted bindings, retain their authored provenance
 and are checked for containment and links. Historical single-root candidate records remain valid.
+
+Ignored `.starciwork/_local` bytes never enter a candidate or model snapshot, but their file states are still
+inventoried on every writable Git root. Only exact current-workflow report/check/controller paths and exact
+global runtime bookkeeping are intrinsic housekeeping. When another workflow legitimately projects
+`state.json`, appends `events.jsonl` or finishes its controller in the same Git common-directory store, the
+exception requires the latest post-baseline journal receipt for those exact resulting bytes (or exact deletion),
+bound to that workflow, generation, journal and central-store routing. The same rule covers exact persisted
+operation contracts, checks and reports; the kernel receipts native file-first outputs after reading them.
+Public retry receipts the new generation's projection and requires its verified sealed pin. A live PID,
+well-formed event text, path-only operation ownership, an older matching receipt or a receipt followed by
+tampering is not custody. New, modified or deleted local inputs, evidence and other workflow state without that
+custody remain observable and quarantine the candidate.
+
+A newly sealed runtime manifest also binds the real authored source-root identity into its digest. A verified
+pin may therefore translate a retained pre-pin authored canon reference into the sealed read-only canon after
+the authoring checkout moves or disappears. Legacy pins keep their live-host/existence rule, and neither form
+trusts a suffix match, an arbitrary `sourceRoot` field or an unrelated root.
 
 The integrator checks expected Git head and candidate/canonical drift immediately before promotion/commit.
 Files, Git and an external provider cannot join one SQLite transaction: record intent and receipts, reconcile

@@ -76,10 +76,21 @@ export function liveRows(db,workflowId){
  * Remove every row of a workflow that holds nothing live. Refuses - and removes nothing - while the workflow
  * still holds a lease or an unsettled job: those are what the next kernel or retry reconciles, on the record.
  */
-export function retireWorkflow(db,workflowId){
+export function retireWorkflow(db,workflowId,{preserveRuntimeCustody=false}={}){
   need(workflowId,'retireWorkflow needs a workflow id');
   const live=liveRows(db,workflowId);
   if(live.leases.length||live.jobs.length)return {ok:false,workflowId,live,reason:'the workflow still holds live reservations or unsettled jobs'};
+  if(preserveRuntimeCustody){
+    const latest=db.prepare("SELECT snapshot_id,generation FROM state_snapshots WHERE workflow_id=? AND state_json<>'' ORDER BY generation DESC,snapshot_id DESC LIMIT 1").get(workflowId),
+      receipts=latest?db.prepare("SELECT max(seq) seq FROM events WHERE workflow_id=? AND generation=? AND entity_type='runtime-file' AND kind='runtime-file-written' GROUP BY entity_id").all(workflowId,latest.generation).map(row=>row.seq):[],
+      keep=receipts.length?receipts.map(()=>'?').join(','):null;
+    const removed={
+      snapshots:latest?db.prepare('DELETE FROM state_snapshots WHERE workflow_id=? AND snapshot_id<>?').run(workflowId,latest.snapshot_id).changes:db.prepare('DELETE FROM state_snapshots WHERE workflow_id=?').run(workflowId).changes,
+      jobs:db.prepare('DELETE FROM jobs WHERE workflow_id=?').run(workflowId).changes,
+      events:keep?db.prepare(`DELETE FROM events WHERE workflow_id=? AND seq NOT IN (${keep})`).run(workflowId,...receipts).changes:db.prepare('DELETE FROM events WHERE workflow_id=?').run(workflowId).changes,
+      incidents:db.prepare('DELETE FROM incidents WHERE workflow_id=?').run(workflowId).changes};
+    return {ok:true,workflowId,removed,retained:{snapshots:latest?1:0,runtimeFileReceipts:receipts.length,generation:latest?.generation??null}};
+  }
   const removed={
     snapshots:db.prepare('DELETE FROM state_snapshots WHERE workflow_id=?').run(workflowId).changes,
     jobs:db.prepare('DELETE FROM jobs WHERE workflow_id=?').run(workflowId).changes,
@@ -172,7 +183,7 @@ export function openJournal({file,now=Date.now,busyTimeoutMs=5000,journalMode='D
     /** The rows of a workflow that are only history now: retired generations go, then freed pages are given back. */
     retireGenerations({workflowId,generation}){const pruned=transaction(inner=>pruneRetiredGenerations(inner,{workflowId,generation}));reclaimSpace(db);return pruned;},
     /** Everything of a workflow, when nothing of it is live. */
-    retireWorkflow(workflowId){const result=transaction(inner=>retireWorkflow(inner,workflowId));if(result.ok)reclaimSpace(db);return result;},
+    retireWorkflow(workflowId,options={}){const result=transaction(inner=>retireWorkflow(inner,workflowId,options));if(result.ok)reclaimSpace(db);return result;},
     liveRows(workflowId){return liveRows(db,workflowId);},
     workflows(){return journalWorkflows(db);},
     close(){db.close();}

@@ -82,6 +82,19 @@ test('a workflow is retired whole only when nothing of it is live; a finished wo
   journal.close();
 });
 
+test('finished shared-store custody keeps one final state and only the latest exact receipt per runtime file',t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const journal=openJournal({file:path.join(dir,'journal.sqlite')});
+  snapshot(journal,{generation:2,checkpoint:'save:wf:2:old',body:'{"phase":"run"}'});snapshot(journal,{generation:2,checkpoint:'save:wf:2:final',body:'{"phase":"done"}'});
+  job(journal,{jobId:'settled',generation:2});journal.appendEvent({eventId:'workflow-history',workflowId:'wf',entityType:'workflow',entityId:'wf',generation:2,kind:'finished'});
+  for(const [eventId,entityId,sha256] of [['state-old','state.json','old'],['state-final','state.json','final'],['events-final','events.jsonl','events']])journal.appendEvent({eventId,workflowId:'wf',entityType:'runtime-file',entityId,generation:2,kind:'runtime-file-written',payload:{relative:entityId,sha256}});
+  const retired=journal.retireWorkflow('wf',{preserveRuntimeCustody:true});
+  assert.equal(retired.ok,true);assert.deepEqual(retired.retained,{snapshots:1,runtimeFileReceipts:2,generation:2});
+  assert.equal(journal.listJobs().length,0);assert.deepEqual(journal.events({workflowId:'wf'}).map(event=>event.event_id).sort(),['events-final','state-final']);
+  assert.deepEqual(journal.db.prepare('SELECT state_json FROM state_snapshots WHERE workflow_id=?').all('wf').map(row=>row.state_json),['{"phase":"done"}']);
+  journal.close();
+});
+
 test('a journal created by this build gives freed pages back on its own',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const file=path.join(dir,'journal.sqlite'),journal=openJournal({file});

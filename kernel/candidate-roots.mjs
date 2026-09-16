@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {parseRef,plain,slash,unique} from './common.mjs';
+import {verifyRuntimePin} from './runtime-pin.mjs';
 
 const sha256=value=>crypto.createHash('sha256').update(value).digest('hex');
 const absolute=value=>path.isAbsolute(String(value??''))||/^[A-Za-z]:[\\/]/.test(String(value??''));
@@ -11,6 +12,7 @@ const fragmentOf=literal=>{const at=literal.indexOf('#');return {key:at<0?litera
 const bindingShape=binding=>({id:binding.id,role:binding.role,repoRoot:slash(path.resolve(binding.repoRoot)),
   workRoot:binding.workRoot?slash(path.resolve(binding.workRoot)):null,
   sourceRoot:binding.sourceRoot?slash(path.resolve(binding.sourceRoot)):null,
+  sourceRootTrust:binding.sourceRootTrust??null,
   runtimePin:binding.runtimePin?{schema:binding.runtimePin.schema??null,digest:binding.runtimePin.digest??null,version:binding.runtimePin.version??null}:null,
   primary:Boolean(binding.primary),nonGit:Boolean(binding.nonGit),readOnly:Boolean(binding.readOnly),
   workerWritable:Boolean(binding.workerWritable),runtimeWritable:Boolean(binding.runtimeWritable),
@@ -30,11 +32,13 @@ export function candidateAcceptedRoots(state,work=null){
   if(shared)roots.push({id:'work',role:'work',repoRoot:owner,workRoot:path.resolve(work?.ledger?.workRoot??path.join(owner,'.starciwork')),primary:false});
   else roots[0]={...roots[0],role:'source+work',workRoot:path.resolve(work?.ledger?.workRoot??path.join(source,'.starciwork'))};
   const runtimeRoot=state.engine?.runtimePin?.root;
-  if(runtimeRoot&&fs.existsSync(runtimeRoot))roots.push({id:'runtime',role:'runtime-input',repoRoot:path.resolve(runtimeRoot),
-    // The explicit pin source identity (or the workflow-bound `host` used by historical pins) is the only
-    // authored runtime whose pre-pin references may translate to the sealed payload. Matching suffixes do not.
-    sourceRoot:state.engine?.runtimePin?.sourceRoot?path.resolve(state.engine.runtimePin.sourceRoot):(state.host?path.resolve(state.host):null),
+  if(runtimeRoot&&fs.existsSync(runtimeRoot)){const checked=verifyRuntimePin(state.engine.runtimePin),sealedSource=checked.ok&&checked.sourceRoot?path.resolve(checked.sourceRoot):null;
+    roots.push({id:'runtime',role:'runtime-input',repoRoot:path.resolve(runtimeRoot),
+    // New pins bind the original authored root inside their verified manifest, so its authored references remain
+    // meaningful after relocation. Historical pins retain the live workflow host fallback and its existence check.
+    sourceRoot:sealedSource??(state.host?path.resolve(state.host):null),sourceRootTrust:sealedSource?'sealed-runtime-pin':'legacy-live-host',
     runtimePin:{schema:state.engine.runtimePin.schema,digest:state.engine.runtimePin.digest,version:state.engine.runtimePin.version},primary:false,nonGit:true});
+  }
   return roots;
 }
 
@@ -51,6 +55,7 @@ const routePath=(value,roots,{workRelative=false}={})=>{
     return matches[0];
   }
   const normalized=clean(literal),work=roots.find(root=>root.id==='work');
+  if(!normalized||normalized==='..'||normalized.startsWith('../')||normalized.includes('/../'))throw new Error(`candidate path is outside the accepted routed roots: ${slash(literal)}`);
   if(work&&(workRelative||normalized==='.starciwork'||normalized.startsWith('.starciwork/')))return {root:work,relative:normalized};
   return {root:roots[0],relative:normalized};
 };
@@ -109,7 +114,8 @@ export function resolveCandidateReferences(op,state,ctx){
       catch(error){
         const sourceRoot=runtimeBinding?.sourceRoot,sourceRelative=sourceRoot?rootRelative(sourceRoot,target):null,
           compiled=sourceRelative===null?null:compiledCanonRelative(sourceRelative);
-        if(!runtimeBinding||!sourceRoot||!compiled||!fs.existsSync(target))throw error;
+        const trustedRelocation=runtimeBinding?.sourceRootTrust==='sealed-runtime-pin';
+        if(!runtimeBinding||!sourceRoot||!compiled||(!trustedRelocation&&!fs.existsSync(target)))throw error;
         target=sealedCanonFile(runtimeBinding.repoRoot,compiled);
         if(!target)throw error;
         routed={root:runtimeBinding,relative:rootRelative(runtimeBinding.repoRoot,target)};

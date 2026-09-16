@@ -77,6 +77,12 @@ reinstates the operations the dynamic-op gate refused. Re-approving is how a use
 All runtime state of one workflow lives in one directory (`kernel/store.mjs`):
 `state.json` (atomic snapshot), `events.jsonl` (append-only audit), `goal.md` / `goal.json`, `contracts/`,
 `reports/`, `checks/`, `validator/` (the validator's memory and verdict log), `final-report.json`.
+For enrolled workflows, each completed state projection, event append and exact kernel/native operation artifact
+records a byte/size receipt in that workflow's operational journal. Linked branch checkouts can keep their
+authored Work root on the branch while their store resolves through Git's common directory; candidates recognize
+concurrent foreign runtime writes only through the latest exact post-baseline receipts, not through a live
+process, plausible event JSON or an operation-shaped filename. Completion deletes operational jobs/history but
+keeps one final state and the latest receipt per runtime path for candidates which were already open.
 
 ## Two ledgers
 
@@ -418,6 +424,13 @@ op's contract** in the worktree (`spawnSync`, shell, 30 min default), computes t
 `git status --porcelain` filtered to the op's allowlist, and commits them as `feat(<opId>): <goal>`.
 A check the kernel cannot reproduce downgrades the report to `failed` with the failing check as the
 finding, and the op comes back. The job **gates** are run the same way, by the kernel, never by an agent.
+
+For an enrolled candidate, the complete observed net delta is authoritative and the report file list must
+acknowledge it. A source-relative path belongs only to the source root; `.starciwork/...` or the displayed
+absolute path names the routed Work root. Missing observations quarantine, while unknown/escaping names cannot
+authorize effects and unchanged touched-and-reverted extras remain diagnostic. Git-ignored `_local` state is
+inventoried by hash without being copied into the candidate: only exact housekeeping or journal-receipted
+foreign runtime projections are removed from the worker-caused delta.
 
 A project has one Work tree and the backend repository owns it, so a frontend workflow writes its records
 into the backend's worktree, beside whatever the backend is building at that moment. A file dirty in that

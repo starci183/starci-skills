@@ -42,7 +42,7 @@ and `supervisor.log` is the supervisor's round log.
 
 `kernel/store.mjs` owns the whole of it. `createStore({repoRoot, id})` creates the directory and the four
 subdirectories, then exposes those paths plus `appendEvent`, `readEvents`,
-`saveState`, `loadState`, `reportPath`, `readReports`, `contractPath` and
+`saveState`, `loadState`, `acknowledgeRuntimeFile`, `reportPath`, `readReports`, `contractPath` and
 `checksPath`. `listWorkflows(repoRoot)` lists every workflow newest first with
 its loaded state.
 
@@ -60,6 +60,15 @@ generation it retires (`rotateEvents`); the next event opens a fresh live log an
 without replaying the log, and it is written atomically (a sibling tmp file, then
 a rename), so a crash leaves either the previous state or the new one, never a
 half file. If the snapshot and the log disagree, the log wins.
+
+After an enrolled store completes a state replacement, event append or bounded runtime artifact write, its
+operational journal records a `starci/runtime-file-write@1` receipt with the exact path, resulting state, byte
+digest and size. Controller locks, generation rotation, contracts and kernel/native reports and checks use the
+same store API. Candidate change detection accepts only the latest receipt for that exact path and bytes, so an
+older receipted body, path-only ownership or tampering after a receipt cannot regain trust. Normal completion
+drops jobs and non-custody history while retaining one final state snapshot and the latest receipt per runtime
+path; this bounded residue lets an already-open candidate recognize the finished kernel without retaining its
+whole operational history.
 
 ## What is not stored
 

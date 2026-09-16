@@ -12,11 +12,13 @@ import {compactSnapshots} from './journal.mjs';
  * rewritten); `state.json` is a derived snapshot written atomically so a crash never leaves a half file.
  */
 export const WORKFLOW_STATE='starci/workflow-state@1';
+export const RUNTIME_FILE_WRITE='starci/runtime-file-write@1';
 const UNREADABLE='unreadable report file';
 
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const required=(value,label)=>{need(typeof value==='string'&&value.trim(),`Missing ${label}`);return value.trim();};
+const slash=value=>String(value??'').replaceAll('\\','/');
 const stamp=ms=>{const iso=new Date(ms).toISOString();return [iso.slice(0,10).replaceAll('-',''),iso.slice(11,19).replaceAll(':','')];};
 
 export {repositoryRoot};
@@ -88,11 +90,19 @@ export function createStore({repoRoot,id}){
   let durable=null;
   // The tab speaks the host's configured language; the events it renders stay as recorded.
   const reportProgress=createProgressReporter({language:configuredProgressLanguage(),debug:configuredProgressDebug()});
+  const acknowledgeFile=(file,name,mode)=>{
+    if(!durable)return null;
+    let bytes=null;try{bytes=fs.readFileSync(file);}catch(error){if(error?.code!=='ENOENT')throw error;}
+    const state=bytes!==null?'file':'absent',sha256=bytes!==null?crypto.createHash('sha256').update(bytes).digest('hex'):null,size=bytes?.length??0;
+    return durable.journal.appendEvent({eventId:`runtime-file:${workflowId}:${durable.generation}:${name}:${Date.now()}:${crypto.randomBytes(8).toString('hex')}`,workflowId,
+      entityType:'runtime-file',entityId:name,generation:durable.generation,kind:'runtime-file-written',
+      payload:{schema:RUNTIME_FILE_WRITE,file,relative:name,mode,state,sha256,size}});
+  };
   const nextSeq=()=>{
     if(seq===null)seq=lastSeq(paths.events,dir);
     seq+=1;return seq;
   };
-  const project=state=>{const tmp=`${paths.state}.${process.pid}.tmp`;fs.writeFileSync(tmp,`${JSON.stringify(state,null,2)}\n`);replaceStateSnapshot(tmp,paths.state);return state;};
+  const project=state=>{const tmp=`${paths.state}.${process.pid}.tmp`;fs.writeFileSync(tmp,`${JSON.stringify(state,null,2)}\n`);replaceStateSnapshot(tmp,paths.state);acknowledgeFile(paths.state,'state.json','replace');return state;};
   const api={
     schema:WORKFLOW_STATE,id:workflowId,dir,paths,
     /** Append one audit line. The log is never rewritten, so a reader can replay a workflow from seq 0. */
@@ -101,6 +111,7 @@ export function createStore({repoRoot,id}){
       need(event.seq===undefined,'seq is assigned by the log, never by the caller');
       const line={at:Date.now(),seq:nextSeq(),...event};
       fs.appendFileSync(paths.events,`${JSON.stringify(line)}\n`);
+      acknowledgeFile(paths.events,'events.jsonl','append');
       reportProgress(line);
       return line;
     },
@@ -116,6 +127,8 @@ export function createStore({repoRoot,id}){
       need(!fs.existsSync(target),`event segment already exists: ${target}`);
       if(seq===null)seq=lastSeq(paths.events,dir);
       fs.renameSync(paths.events,target);
+      acknowledgeFile(target,`events.g${generation}.jsonl`,'rename');
+      acknowledgeFile(paths.events,'events.jsonl','delete');
       return {rotated:target};
     },
     /** Atomic: write a sibling tmp file, then rename over state.json, so no reader ever sees a partial state. */
@@ -131,6 +144,14 @@ export function createStore({repoRoot,id}){
     bindJournal(journal,generation,{goalIdentity=null,state=null}={}){need(journal?.transaction,'bindJournal needs an operational journal');need(Number.isInteger(generation)&&generation>0,'bindJournal needs a positive generation');const seed=state??readJson(paths.state,null);durable={journal,generation,goalIdentity:goalIdentity??stateGoalIdentity(seed)};const any=journal.db.prepare('SELECT goal_identity FROM state_snapshots WHERE workflow_id=? AND generation=? ORDER BY snapshot_id DESC LIMIT 1').get(workflowId,generation);need(!any||any.goal_identity===durable.goalIdentity,'Durable workflow snapshot belongs to a different approved goal');const found=journal.db.prepare('SELECT 1 FROM state_snapshots WHERE workflow_id=? AND generation=? AND goal_identity=? LIMIT 1').get(workflowId,generation,durable.goalIdentity);if(!found&&plain(seed)){assertNoRawSecrets(seed);journal.transaction(db=>db.prepare('INSERT OR IGNORE INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at) VALUES(?,?,?,?,?,?)').run(`bind:${workflowId}:${generation}:${digest(seed)}`,workflowId,generation,durable.goalIdentity,JSON.stringify(seed),Date.now()));}
       // The generations this binding retires keep one body each; the bound one keeps its latest few.
       journal.transaction(db=>compactSnapshots(db,{workflowId,generation,goalIdentity:durable.goalIdentity}));return api;},
+    unbindJournal(journal=null){if(!journal||durable?.journal===journal)durable=null;return api;},
+    /** Bind one exact runtime-owned projection after the runtime has completed its file effect. */
+    acknowledgeRuntimeFile(file,name,mode='replace'){
+      const target=path.resolve(file),relative=slash(path.relative(dir,target)),expected=slash(required(name,'runtime file name'));
+      need(relative&&relative!=='..'&&!relative.startsWith('../')&&!path.isAbsolute(relative),'runtime file acknowledgement escapes its workflow store');
+      need(relative===expected,'runtime file acknowledgement name does not match its workflow-store path');
+      return acknowledgeFile(target,expected,mode);
+    },
     transition(state,{transitionId,event,apply,projectState=true}={}){need(durable,'transition needs a bound journal');need(typeof transitionId==='string'&&transitionId,'transition needs a stable id');need(typeof apply==='function','transition needs an apply function');const checkpoint=`transition:${workflowId}:${durable.generation}:${transitionId}`;const existing=durable.journal.db.prepare('SELECT 1 FROM state_snapshots WHERE checkpoint_id=?').get(checkpoint);if(existing){const latest=durable.journal.db.prepare('SELECT state_json FROM state_snapshots WHERE workflow_id=? AND generation=? AND goal_identity=? ORDER BY snapshot_id DESC LIMIT 1').get(workflowId,durable.generation,durable.goalIdentity);return JSON.parse(latest.state_json);}const next=structuredClone(state);apply(next);assertNoRawSecrets(next);need(stateGoalIdentity(next)===durable.goalIdentity,'Transition changed the workflow goal identity');durable.journal.transaction(db=>{db.prepare('INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at) VALUES(?,?,?,?,?,?)').run(checkpoint,workflowId,durable.generation,durable.goalIdentity,JSON.stringify(next),Date.now());if(event)db.prepare('INSERT OR IGNORE INTO events(event_id,workflow_id,entity_type,entity_id,generation,kind,payload_json,created_at) VALUES(?,?,?,?,?,?,?,?)').run(`transition:${transitionId}`,workflowId,'workflow',workflowId,durable.generation,event.kind??'state-transition',JSON.stringify(event.payload??event),Date.now());compactSnapshots(db,{workflowId,generation:durable.generation,goalIdentity:durable.goalIdentity});});if(projectState)project(next);return next;},
     reportPath(dispatchOrKey){return path.join(paths.reports,`${required(dispatchOrKey,'dispatch id')}.json`);},
     readReports(){return readReportFiles(paths.reports).filter(report=>report?.error!==UNREADABLE);},

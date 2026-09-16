@@ -376,6 +376,7 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     `An error the whole-tree validator reports under a path outside your allowlist is not yours: name it in your summary and report as if that check passed for your files. The kernel judges the tree by what you could have caused, never by a red corner another workflow owns.`,``,
     `## Report (exactly once, at the end)`,
     `\`node ${launcher} report --run ${run} --from <your terminal> --task <op task> --dispatch <your dispatch> --reports-dir ${reportsDir} --outcome done|partial|failed|ask|blocked --summary "<what you did, what the checks showed, what is left>" --files <comma-separated changed paths> --checks-file ${checksFile} [--open "<item>,<item>"] [--question "<text>" --options "a,b"] [--blocker shared-change|srs-gap|sds-gap|interface-gap|brand-gap|grammar-gap|environment|authority:<detail>] [--credential-request-file <safe JSON>]\``,
+    `- \`--files\` must acknowledge every net changed path. Use source-relative paths for source files; for routed Work files use \`.starciwork/...\` or the displayed absolute path. One relative non-Work name belongs only to source. Unknown or escaping entries authorize nothing; an unchanged touched-and-reverted extra is diagnostic.`,
     `- \`done\` needs every check exiting 0 and no open item; otherwise report \`partial\` (with \`--open\`) or \`failed\`.`,
     `- Only an \`integration.verify\` whose declared live check explicitly rejected a credential as invalid or expired may report \`blocked\` \`environment\` with \`--credential-request-file ${credentialRequestFile}\`. Writing this nonsecret report artifact beside your checks file is permitted. The file is exactly \`{"reason":"invalid|expired","variables":["DECLARED_VARIABLE"],"check":"declared-failed-check"}\`, using one actual reason. The named check must have a nonzero exit and safe observed evidence, with its declared command. Never include values, custody paths or a baseline; the kernel binds the request to the exact tested custody version. Other provider failures keep their actual failure path.`,
     `- \`ask\` pauses you until the kernel answers in this terminal; then continue and report again.`,
@@ -550,7 +551,7 @@ export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost
       proof:'exact Orca worker exited; typed process settlement succeeded; candidate bytes were sealed while its writer fence remained held'});
     store.saveState(state);
     return {ok:true,dispatch:dispatchId,observedFiles:reconciled.observedFiles??[],candidateDigest:reconciled.candidateDigest??null};
-  }finally{runtime.close();}
+  }finally{store.unbindJournal?.(runtime.journal);runtime.close();}
 }
 /**
  * The probation an owner-directed retry gives back. Every attempt of an unfinished operation that a retired
@@ -612,6 +613,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
   op.kernelOwned=kernelOwnedPaths(state,op,ctx);
   const contract=renderContract({template:ctx.template,op,state,store,guards:ctx.guards,protectedPaths:op.kernelOwned});
   fs.writeFileSync(store.contractPath(op.id),contract);
+  store.acknowledgeRuntimeFile?.(store.contractPath(op.id),`contracts/${op.id}.md`,'replace');
   op.contractFile=store.contractPath(op.id);
   // How much the agent is told to read before it may do anything: the grace before the first stall verdict.
   op.contractBytes=Buffer.byteLength(contract,'utf8');
@@ -1412,6 +1414,7 @@ export function reconcileContinuationPreflight(store,state,{now=Date.now}={}){
   const runtime=createEngineRuntime({store,state,now});
   try{
     store.bindJournal?.(runtime.journal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
+    store.acknowledgeRuntimeFile?.(path.join(store.dir,'kernel.lock'),'kernel.lock','replace');
     const durable=store.loadState();
     need(plain(durable)&&durable.id===state.id&&durable.engine?.generation===state.engine.generation,
       `Workflow ${state.id} has no matching durable continuation checkpoint for generation ${state.engine.generation}`);
@@ -1421,7 +1424,7 @@ export function reconcileContinuationPreflight(store,state,{now=Date.now}={}){
     store.saveState(state);
     const boundary=continuationBoundary(state,{controller:{alive:true,pid:process.pid,startupTokenDigest:'held-by-this-process'}});
     return {recovered:true,released:released?.released??[],boundary};
-  }finally{runtime.close();}
+  }finally{store.unbindJournal?.(runtime.journal);runtime.close();}
 }
 
 /**
@@ -1664,6 +1667,11 @@ function authorSharedNode(store,state,op,ctx,{paths,detail,open}){
   return author;
 }
 
+const archiveOpReport=(store,op)=>{const dispatch=op.dispatch,file=store.reportPath(dispatch);if(!fs.existsSync(file))return null;
+  const target=`${file}.answered-${op.reports.length}`;fs.renameSync(file,target);
+  store.acknowledgeRuntimeFile?.(file,`reports/${dispatch}.json`,'delete');
+  store.acknowledgeRuntimeFile?.(target,`reports/${dispatch}.json.answered-${op.reports.length}`,'rename');return target;};
+
 /** One shared request: merge into an existing shared op, create one, or queue it for the next iteration. */
 function requestSharedChange(store,state,op,{paths,detail,open=[]},ctx=null){
   // The Work tree is the kernel's record, never an operation's: a shared change that names a ledger path is
@@ -1673,8 +1681,7 @@ function requestSharedChange(store,state,op,{paths,detail,open=[]},ctx=null){
   // told so and reports again - what it needs from another repository is a source or an open gap in its record.
   const foreign=paths.filter(entry=>!insideWorktree(state,entry));
   if(foreign.length&&!ledgerPaths.length){
-    const file=store.reportPath(op.dispatch);
-    if(fs.existsSync(file))fs.renameSync(file,`${file}.answered-${op.reports.length}`);
+    archiveOpReport(store,op);
     op.answer=`The path(s) ${foreign.join(', ')} are not in this repository (${slash(state.worktree)}); a shared change reaches only this worktree. Record what you need from another repository in your own record - as a source it is traced to, or as an open gap - and report again without naming it as a change.`;
     op.status='answering';
     store.appendEvent({event:'shared-change-refused',op:op.id,kind:op.kind,paths:foreign,reason:'outside this repository'});
@@ -1691,8 +1698,7 @@ function requestSharedChange(store,state,op,{paths,detail,open=[]},ctx=null){
     store.appendEvent({event:'ledger-path-refused',op:op.id,kind:op.kind,paths:ledgerPaths,
       continued:ledgerPaths.length&&codePaths.length?codePaths:[],reason});
     if(!ledgerPaths.length||!codePaths.length){
-      const file=store.reportPath(op.dispatch);
-      if(fs.existsSync(file))fs.renameSync(file,`${file}.answered-${op.reports.length}`);
+      archiveOpReport(store,op);
       op.answer=`The Work tree is the kernel's own record: ${ledgerPaths.length?`${ledgerPaths.join(', ')} is not a change any operation may ask for`:`a ${op.kind} operation reads the tree and never changes it`}. The kernel writes \`state\`, \`completion\` and the kernel block itself. Report again naming only repository paths, or report what the record should say in \`open[]\` and let the kernel route it.`;
       op.status='answering';
       store.appendEvent({event:'shared-change-refused',op:op.id,kind:op.kind,paths,reason});
@@ -1928,8 +1934,7 @@ export function handleBlocked(store,state,op,report,ctx){
     const paths=unique(named.map(normalize)).filter(file=>!inside(file,op.allowlist));
     if(!paths.length){
       // No path, no shared op: this is a question to the kernel, and the kernel answers it in the terminal.
-      const file=store.reportPath(op.dispatch);
-      if(fs.existsSync(file))fs.renameSync(file,`${file}.answered-${op.reports.length}`);
+      archiveOpReport(store,op);
       op.answer=`Your shared-change block named no repository path outside your allowlist. Name the exact paths you need changed, repository-relative, one per line, then report again.`;
       op.status='answering';
       store.appendEvent({event:'shared-change-unnamed',op:op.id,detail:blocker.detail});
@@ -2056,6 +2061,11 @@ export function applyOpReport(orca,store,state,op,report,ctx){
   op.reports.push({attempt:op.attempt,runtime:op.runtime,outcome:report.outcome,summary:report.summary,
     files:report.files,open:report.open,checks:report.checks,blocker:report.blocker,question:report.question,
     ...(checked.ok&&report.credentialRequest?{credentialRequest:report.credentialRequest}:{}),valid:checked.ok});
+  if(ctx.engine&&typeof store.acknowledgeRuntimeFile==='function'){
+    const reportDispatch=[op.dispatch,report.dispatch].find(item=>typeof item==='string'&&item.length>0&&!/[\\/]/.test(item))??null;
+    if(reportDispatch&&fs.existsSync(store.reportPath(reportDispatch)))store.acknowledgeRuntimeFile?.(store.reportPath(reportDispatch),`reports/${reportDispatch}.json`,'replace');
+    if(fs.existsSync(store.checksPath(op.id)))store.acknowledgeRuntimeFile?.(store.checksPath(op.id),`checks/${op.id}.json`,'replace');
+  }
   if(!checked.ok){
     store.appendEvent({event:'report-rejected',op:op.id,errors:checked.errors});
     return retryOp(store,state,op,checked.errors.map(error=>`your previous report was rejected: ${error}`),ctx,'report-rejected');
@@ -2139,6 +2149,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     }
     writeJson(store.checksPath(`${op.id}-kernel`),{schema:'starci/workflow-kernel-checks@1',op:op.id,attempt:op.attempt,
       runtime:op.runtime,checks:verified.checks,verifiedAt:Date.now()});
+    store.acknowledgeRuntimeFile?.(store.checksPath(`${op.id}-kernel`),`checks/${op.id}-kernel.json`,'replace');
     if(!verified.ok){
       op.reports.at(-1).downgradedTo='failed';
       store.appendEvent({event:'machine-verify-failed',op:op.id,failed:verified.failed.map(check=>`${check.name}=${check.exitCode}`)});
@@ -2892,7 +2903,7 @@ function settleFromTab(orca,store,state,op,ctx,observed){
   const report=tabReport(state,op,read,text);
   if(!report)return null;
   const dispatch=op.dispatch,runtime=op.runtime,terminal=op.terminal;
-  try{fs.writeFileSync(store.reportPath(dispatch),JSON.stringify(report,null,2));}catch{}
+  try{fs.writeFileSync(store.reportPath(dispatch),JSON.stringify(report,null,2));store.acknowledgeRuntimeFile?.(store.reportPath(dispatch),`reports/${dispatch}.json`,'replace');}catch{}
   applyOpReport(orca,store,state,op,report,{...ctx,orca});
   // Exactly what an accepted report releases - unless the kernel answered the question, in which case the tab
   // is still the only place that answer can be typed.
@@ -3498,6 +3509,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     exec:(command,options)=>ctx.engine.check(command,options,ctx.currentOp??null)}):null);
   if(ctx.engine){
     store.bindJournal?.(ctx.engine.journal,state.engine.generation,{state});
+    store.acknowledgeRuntimeFile?.(path.join(store.dir,'kernel.lock'),'kernel.lock','replace');
     const retired=ctx.engine.journal.retireGenerations?.({workflowId:state.id,generation:state.engine.generation})??null;
     if(retired&&(retired.jobs||retired.events))store.appendEvent({event:'journal-generations-retired',before:state.engine.generation,jobs:retired.jobs,events:retired.events});
     const checkpoint=store.loadState();
@@ -3928,7 +3940,7 @@ function acquireKernelLock(store,{launchToken=null}={}){
   const owner=acquireStartup(store.dir,{launchToken,pid:process.pid});
   try{fs.writeFileSync(lock,JSON.stringify({pid:process.pid,startedAt:Date.now(),startupToken:owner.token}));}
   catch(error){releaseStartup(store.dir,owner);throw error;}
-  return ()=>{releaseStartup(store.dir,owner);try{const now=JSON.parse(fs.readFileSync(lock,'utf8'));if(now.pid===process.pid&&now.startupToken===owner.token)fs.rmSync(lock);}catch{}};
+  return ()=>{releaseStartup(store.dir,owner);try{const now=JSON.parse(fs.readFileSync(lock,'utf8'));if(now.pid===process.pid&&now.startupToken===owner.token){fs.rmSync(lock);store.acknowledgeRuntimeFile?.(lock,'kernel.lock','delete');}}catch{}};
 }
 export function stopRequested(store){return fs.existsSync(path.join(store.dir,'stop.flag'));}
 /** Whether a command waits in the inbox: the wait between ticks ends for it. */
@@ -4035,13 +4047,17 @@ export function assertHeadroom(store,state,{measure=measureHeadroom}={}){
   try{store.appendEvent({event:'disk-headroom-exhausted',thresholdBytes:found.thresholdBytes,volumes:found.exhausted.map(item=>({path:item.path,freeBytes:item.freeBytes}))});}catch{}
   throw headroomError(found);
 }
-/** A finished workflow binds nothing: its rows leave the journal, unless a reservation is still live - then they stay, and the log says so. */
+/** A finished workflow binds no operational work; its final state and latest exact runtime-file receipts remain
+ * just long enough for already-open candidates in the shared store to verify the bytes they observed. */
 export function retireFinishedWorkflowRows(store,state){
   let journal;
-  try{journal=openJournal({file:state.engine.journalFile});const result=journal.retireWorkflow(state.id);
-    store.appendEvent(result.ok?{event:'journal-workflow-retired',removed:result.removed}:{event:'journal-workflow-retained',reason:result.reason,live:result.live});return result;}
+  try{store.unbindJournal?.();journal=openJournal({file:state.engine.journalFile});store.bindJournal?.(journal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
+    const live=journal.liveRows(state.id);if(live.leases.length||live.jobs.length){store.appendEvent({event:'journal-workflow-retained',reason:'the workflow still holds live reservations or unsettled jobs',live});return {ok:false,workflowId:state.id,live,reason:'the workflow still holds live reservations or unsettled jobs'};}
+    store.acknowledgeRuntimeFile?.(store.paths.state,'state.json','replace');
+    store.appendEvent({event:'journal-workflow-custody-retained',policy:'final state plus latest exact runtime-file receipt per path; operational jobs and history retired'});
+    return journal.retireWorkflow(state.id,{preserveRuntimeCustody:true});}
   catch(error){store.appendEvent({event:'journal-workflow-retained',reason:String(error?.message??error).slice(0,240)});return {ok:false,reason:String(error?.message??error)};}
-  finally{journal?.close();}
+  finally{store.unbindJournal?.(journal);journal?.close();}
 }
 export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleepSync,functions={}}={}){
   const worktree=path.resolve(cwd);
@@ -4131,10 +4147,14 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
   }
   if(command==='workflow-stop'){
     const {store,state}=open(options.id);
-    fs.writeFileSync(path.join(store.dir,'stop.flag'),String(Date.now()));
-    const continuation=exportContinuationBrief(store,state);
-    store.appendEvent({event:'continuation-exported',file:slash(continuation.file),stateDigest:continuation.stateDigest,
-      boundaryFindings:continuation.boundary.findings.map(item=>item.code)});
+    let stopJournal=null,continuation;
+    try{
+      if(isEnrolled(state)){stopJournal=openJournal({file:state.engine.journalFile});store.bindJournal(stopJournal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});}
+      const stopFile=path.join(store.dir,'stop.flag');fs.writeFileSync(stopFile,String(Date.now()));store.acknowledgeRuntimeFile?.(stopFile,'stop.flag','replace');
+      continuation=exportContinuationBrief(store,state);
+      store.appendEvent({event:'continuation-exported',file:slash(continuation.file),stateDigest:continuation.stateDigest,
+        boundaryFindings:continuation.boundary.findings.map(item=>item.code)});
+    }finally{store.unbindJournal?.(stopJournal);stopJournal?.close();}
     return {schema:WORKFLOW_KERNEL,command,id:options.id,dir:store.dir,stopRequested:true,
       continuation:continuation.file,boundary:continuation.boundary.findings,
       next:'the running kernel exits at its next iteration (at most one wait tick); workflow-run resumes from the same journal/state checkpoint and exact live identities'};
@@ -4155,6 +4175,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       if(enrolled){
         amendmentJournal=openJournal({file:state.engine.journalFile});
         store.bindJournal(amendmentJournal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
+        store.acknowledgeRuntimeFile?.(path.join(store.dir,'kernel.lock'),'kernel.lock','replace');
       }
       const durable=store.loadState();
       need(plain(durable)&&durable.id===state.id,
@@ -4166,7 +4187,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       continuation=exportContinuationBrief(store,state);
       if(!applied.replayed)store.appendEvent({event:'continuation-exported',file:slash(continuation.file),stateDigest:continuation.stateDigest,
         boundaryFindings:continuation.boundary.findings.map(item=>item.code),afterAmendment:applied.amendment.digest});
-    }finally{amendmentJournal?.close();releaseAmendment();}
+    }finally{releaseAmendment();store.unbindJournal?.(amendmentJournal);amendmentJournal?.close();}
     const next=continuation.boundary.findings.length
       ?'reconcile the exact boundary identities before any resume; the amendment did not clear unknown effects or writers'
       :state.finished?.outcome==='blocked'
@@ -4272,20 +4293,29 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     if(rotated?.rotated)store.appendEvent({event:'events-rotated',generation:priorGeneration,segment:path.basename(rotated.rotated)});
     const journalChosen=Boolean(options['journal-file'])||state.engine?.journalChosen===true;
     const engine=enrollEngine(store,state,{runtimePin:pin,journalFile:targetJournal});state.launcher=checked.launcher;
-    if(journalChosen)state.engine.journalChosen=true;
-    if(relocation)store.appendEvent({event:'journal-relocated',from:relocation.from,to:relocation.to,retired:relocation.retired,copied:relocation.copied});
-    // The generations this retry retires give back the probation their unfinished attempts consumed.
-    if(state.modelEligibility?.probationScopes){
-      const runtimeRoot=path.dirname(state.engine.journalFile),runtimeProfile=workflowRuntimeProfile(state),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
-        policyFile:path.join(skillRoot,'.dist','model','capabilities.json'),qualificationsFile:path.join(runtimeRoot,'model-qualifications.json'),probationsFile:path.join(runtimeRoot,'model-probations.json'),root:runtimeRoot});
-      const refundRuntime=createEngineRuntime({store,state,modelPolicy:policy,eligibility:()=>({eligible:false,reasons:['refund-only runtime']})});
-      try{refundRetiredGenerationProbations(store,state,refundRuntime,{generation:engine.generation});}finally{refundRuntime.close();}
-    }
-    store.appendEvent({event:'workflow-retried',engine:ENGINE_VERSION,generation:engine.generation,ops:retry,context:'fresh agents from canonical approved inputs and Work'});
-    store.saveState(state);
-    fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});
-    return {schema:WORKFLOW_KERNEL,command,ok:true,id:state.id,engine:ENGINE_VERSION,generation:engine.generation,retried:retry,
-      next:'The supervisor starts the approved workflow on its sealed runtime. This is a resumed workflow trial, not a clean end-to-end trial.'};
+    const retryJournal=openJournal({file:targetJournal});
+    try{
+      store.bindJournal(retryJournal,engine.generation,{state,goalIdentity:state.goalDigest??undefined});
+      // Enrollment and rotation happen before the new generation can be bound. Bind their exact resulting bytes
+      // now, so a concurrently running candidate can distinguish this public retry from an arbitrary rewrite.
+      store.acknowledgeRuntimeFile?.(store.paths.state,'state.json','replace');
+      store.acknowledgeRuntimeFile?.(store.paths.events,'events.jsonl','replace');
+      if(rotated?.rotated)store.acknowledgeRuntimeFile?.(rotated.rotated,path.basename(rotated.rotated),'rename');
+      if(journalChosen)state.engine.journalChosen=true;
+      if(relocation)store.appendEvent({event:'journal-relocated',from:relocation.from,to:relocation.to,retired:relocation.retired,copied:relocation.copied});
+      // The generations this retry retires give back the probation their unfinished attempts consumed.
+      if(state.modelEligibility?.probationScopes){
+        const runtimeRoot=path.dirname(state.engine.journalFile),runtimeProfile=workflowRuntimeProfile(state),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
+          policyFile:path.join(skillRoot,'.dist','model','capabilities.json'),qualificationsFile:path.join(runtimeRoot,'model-qualifications.json'),probationsFile:path.join(runtimeRoot,'model-probations.json'),root:runtimeRoot});
+        const refundRuntime=createEngineRuntime({store,state,modelPolicy:policy,eligibility:()=>({eligible:false,reasons:['refund-only runtime']})});
+        try{refundRetiredGenerationProbations(store,state,refundRuntime,{generation:engine.generation});}finally{refundRuntime.close();}
+      }
+      store.appendEvent({event:'workflow-retried',engine:ENGINE_VERSION,generation:engine.generation,ops:retry,context:'fresh agents from canonical approved inputs and Work'});
+      store.saveState(state);
+      const stopFile=path.join(store.dir,'stop.flag');fs.rmSync(stopFile,{force:true});store.acknowledgeRuntimeFile?.(stopFile,'stop.flag','delete');
+      return {schema:WORKFLOW_KERNEL,command,ok:true,id:state.id,engine:ENGINE_VERSION,generation:engine.generation,retried:retry,
+        next:'The supervisor starts the approved workflow on its sealed runtime. This is a resumed workflow trial, not a clean end-to-end trial.'};
+    }finally{store.unbindJournal?.(retryJournal);retryJournal.close();}
   }
   if(command==='workflow-answer'){
     const {store,state}=open(options.id);
@@ -4404,7 +4434,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     // rebuild leaves it for the next start to reuse (a new tab would have to re-bind the Run and fence every live
     // Dispatch). A finished workflow closes it: nobody reads it any more.
     if(finished.finished&&state.kernelTerminalOwned&&state.from){try{orca.invoke('terminal-close',{terminal:state.from},{cwd:worktree});}catch{}store.appendEvent({event:'kernel-terminal-closed',terminal:state.from});state.from=null;state.kernelTerminalOwned=false;store.saveState(state);}
-    if(finished.finished&&isEnrolled(state))retireFinishedWorkflowRows(store,state);
+    if(finished.finished&&isEnrolled(state)){releaseKernel();retireFinishedWorkflowRows(store,state);}
     return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,phase:finished.phase,ledgerMode:finished.ledgerMode,
       finished:finished.finished,lane:laneView(finished),ledger:finished.ledger.map(item=>`${item.id}=${item.status}`),
       ledgerSummary:finished.ledgerSummary,needUser:finished.needUser,head:finished.head,iterations:finished.iterations,

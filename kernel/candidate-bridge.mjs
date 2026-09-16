@@ -4,7 +4,9 @@ import path from 'node:path';
 import {CANDIDATE_PACKET,CANDIDATE_SNAPSHOT,bindRuntimeInputs,createCandidateSnapshot,sealCandidate,verifyCandidateIdentity} from './candidates.mjs';
 import {parseRef} from './common.mjs';
 import {candidateDisplayPath,candidateRootBindingDigest,pathInCandidateRoots} from './candidate-roots.mjs';
+import {inspectJournal} from './journal.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
+import {RUNTIME_FILE_WRITE} from './store.mjs';
 
 export const DETECTION_BRIDGE='starci/candidate-bridge@1';
 export const ROOT_DETECTION_BRIDGE='starci/candidate-root-bridge@1';
@@ -124,6 +126,101 @@ const DEFAULT_EXCLUDED=[/(^|\/)\.git(\/|$)/,/(^|\/)node_modules(\/|$)/,/(^|\/)(d
   /(^|\/)\.env([^/]*)$/,/(^|\/)(secrets?|credentials?)(\.|\/|$)/,/\.(pem|p12|pfx|key|enc)$/i,/(^|\/)\.starciwork\/_(local|resources)(\/|$)/];
 const safeTracked=file=>!DEFAULT_EXCLUDED.some(pattern=>pattern.test(clean(file)));
 const runtimeInternal=file=>/(^|\/)\.starciwork\/_local(\/|$)/.test(clean(file));
+// Local workflow state is intentionally absent from candidate/model payloads, but it is still inventoried here.
+// This walk includes Git-ignored files and hashes only their state; it never copies their bytes into a snapshot.
+const runtimeLocalPaths=root=>{
+  const base=path.join(path.resolve(root),'.starciwork','_local'),found=[];
+  const walk=at=>{let entries=[];try{entries=fs.readdirSync(at,{withFileTypes:true});}catch{return;}
+    for(const item of entries){const absolute=path.join(at,item.name),relative=clean(path.relative(root,absolute));
+      if(item.isDirectory()&&!item.isSymbolicLink())walk(absolute);else found.push(relative);}};
+  walk(base);return found.sort();
+};
+const readJson=file=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}};
+const stable=value=>Array.isArray(value)?value.map(stable):value&&typeof value==='object'
+  ?Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])])):value;
+const jsonDigest=value=>sha256(JSON.stringify(stable(value)));
+const durableProjection=(workflowId,generation,journalFile)=>{let journal;try{
+    journal=inspectJournal({file:journalFile});
+    const row=journal.db.prepare('SELECT goal_identity,state_json FROM state_snapshots WHERE workflow_id=? AND generation=? AND state_json<>\'\' ORDER BY snapshot_id DESC LIMIT 1').get(workflowId,generation);
+    if(!row?.state_json)return null;const state=JSON.parse(row.state_json);return {state,goalIdentity:row.goal_identity};
+  }catch{return null;}finally{journal?.close();}};
+const samePath=(a,b)=>{try{return slash(fs.realpathSync(path.resolve(a))).toLowerCase()===slash(fs.realpathSync(path.resolve(b))).toLowerCase();}catch{return false;}};
+const commonStoreOwner=(git,worktree)=>{try{const result=git('git',['rev-parse','--git-common-dir'],{cwd:worktree,encoding:'utf8',windowsHide:true});if(result?.status!==0)return null;
+    const common=path.resolve(worktree,String(result.stdout??'').trim());return path.basename(common).toLowerCase()==='.git'?path.dirname(common):null;}catch{return null;}};
+const lastCustodySeq=(workflowId,generation,journalFile)=>{let journal;try{journal=inspectJournal({file:journalFile});
+    return Number(journal.db.prepare("SELECT COALESCE(max(seq),0) AS seq FROM events WHERE workflow_id=? AND generation=? AND entity_type='runtime-file' AND kind='runtime-file-written'").get(workflowId,generation)?.seq??0);
+  }catch{return null;}finally{journal?.close();}};
+const safeSegment=value=>typeof value==='string'&&value.length>0&&!value.includes('/')&&!value.includes('\\')?value:null;
+const runtimePinDigest=state=>/^[a-f0-9]{64}$/.test(String(state?.engine?.runtimePin?.digest??''))?state.engine.runtimePin.digest:null;
+// A foreign workflow may legitimately project state into a shared Git common-dir store while its source and
+// authored Work stay in a branch checkout. The journal and common-dir routing are captured before launch; later
+// exceptions require an exact post-baseline byte receipt written by the store, never a live pid or event shape.
+const runtimeWriters=(root,ownWorkflow,git)=>{
+  const workflows=path.join(path.resolve(root),'.starciwork','_local','workflows'),records=[];let entries=[];
+  try{entries=fs.readdirSync(workflows,{withFileTypes:true});}catch{return records;}
+  for(const entry of entries){if(!entry.isDirectory()||entry.isSymbolicLink()||entry.name===String(ownWorkflow))continue;
+    const prefix=`.starciwork/_local/workflows/${entry.name}`,statePath=`${prefix}/state.json`,eventsPath=`${prefix}/events.jsonl`,lockPath=`${prefix}/kernel.lock`,
+      state=readJson(path.join(root,...statePath.split('/'))),generation=Number(state?.engine?.generation),journalGiven=state?.engine?.journalFile;
+    if(state?.schema!=='starci/workflow-state@1'||state.id!==entry.name||!Number.isInteger(generation)||generation<1||typeof journalGiven!=='string'||!journalGiven||
+      typeof state.worktree!=='string'||!samePath(commonStoreOwner(git,state.worktree),root))continue;
+    let journalFile;try{journalFile=fs.realpathSync(path.resolve(journalGiven));}catch{continue;}
+    const durable=durableProjection(entry.name,generation,journalFile);if(!durable||jsonDigest(durable.state)!==jsonDigest(state))continue;
+    const custodySeq=lastCustodySeq(entry.name,generation,journalFile);if(custodySeq===null)continue;
+    records.push({workflowId:entry.name,generation,goalIdentity:durable.goalIdentity,journalFile:slash(journalFile),storeRoot:slash(fs.realpathSync(root)),
+      sourceRoot:slash(fs.realpathSync(state.worktree)),runtimePinDigest:runtimePinDigest(state),prefix,statePath,eventsPath,lockPath,custodyAfterSeq:custodySeq});
+  }
+  return records.sort((a,b)=>a.workflowId.localeCompare(b.workflowId));
+};
+const currentRuntimeWriter=(bridge,writer,git)=>{
+  const state=readJson(path.join(bridge.repoRoot,...writer.statePath.split('/'))),generation=Number(state?.engine?.generation),journalGiven=state?.engine?.journalFile;
+  if(state?.schema!=='starci/workflow-state@1'||state.id!==writer.workflowId||!Number.isInteger(generation)||generation<writer.generation||
+    typeof state.worktree!=='string'||!samePath(state.worktree,writer.sourceRoot)||!samePath(commonStoreOwner(git,state.worktree),bridge.repoRoot))return null;
+  let journalFile;try{journalFile=slash(fs.realpathSync(path.resolve(journalGiven??'')));}catch{return null;}
+  const transition=generation!==writer.generation||journalFile!==writer.journalFile,pinDigest=runtimePinDigest(state);
+  if(!transition&&journalFile!==writer.journalFile)return null;
+  if(transition&&!verifyRuntimePin(state?.engine?.runtimePin).ok)return null;
+  if(!transition&&writer.runtimePinDigest&&pinDigest!==writer.runtimePinDigest)return null;
+  const durable=durableProjection(writer.workflowId,generation,journalFile);
+  if(!durable||durable.goalIdentity!==writer.goalIdentity||jsonDigest(durable.state)!==jsonDigest(state))return null;
+  return {...writer,state,generation,journalFile,pinDigest,transition,custodyAfterSeq:transition?0:writer.custodyAfterSeq};
+};
+const operationArtifacts=(writer,state)=>{
+  const names=new Map(),add=(name,authority)=>{if(name)names.set(`${writer.prefix}/${name}`,{name,authority});};
+  for(const op of state?.ops??[]){const id=safeSegment(op?.id);if(!id)continue;
+    add(`contracts/${id}.md`,'receipt');add(`checks/${id}.json`,'receipt');add(`checks/${id}-kernel.json`,'receipt');add(`checks/${id}.credential-request.json`,'receipt');
+    const dispatches=new Set([op.dispatch,op.launch?.dispatch,op.priorStoppedAttempt?.dispatch,...(op.launchAttempts??[]).map(item=>item?.dispatchId)].map(safeSegment).filter(Boolean));
+    for(const dispatch of dispatches){add(`reports/${dispatch}.json`,'receipt');for(let index=0;index<=(op.reports?.length??0);index+=1)add(`reports/${dispatch}.json.answered-${index}`,'receipt');}
+  }
+  return names;
+};
+const runtimeAuthority=(writer,artifacts,relative)=>{
+  const name=relative.startsWith(`${writer.prefix}/`)?relative.slice(writer.prefix.length+1):null;
+  if(!name)return null;
+  if(['state.json','events.jsonl','kernel.lock','stop.flag'].includes(name)||/^events\.g\d+\.jsonl$/.test(name))return {name,authority:'receipt'};
+  return artifacts.get(relative)??null;
+};
+const custodyReceipt=(bridge,writer,relative,name)=>{const current=fileState(bridge.repoRoot,relative);if(!['file','absent'].includes(current.state))return null;let journal;
+  try{journal=inspectJournal({file:writer.journalFile});const rows=journal.db.prepare("SELECT seq,event_id,payload_json FROM events WHERE workflow_id=? AND generation=? AND entity_type='runtime-file' AND kind='runtime-file-written' AND seq>? ORDER BY seq DESC").all(writer.workflowId,writer.generation,writer.custodyAfterSeq),target=path.join(bridge.repoRoot,...relative.split('/'));
+    for(const row of rows){let payload;try{payload=JSON.parse(row.payload_json);}catch{continue;}
+      const pathMatches=current.state==='absent'?slash(path.resolve(payload?.file??'')).toLowerCase()===slash(path.resolve(target)).toLowerCase():samePath(payload?.file,target);
+      if(payload?.schema!==RUNTIME_FILE_WRITE||payload.relative!==name||!pathMatches)continue;
+      if(payload.state!==current.state||payload.sha256!==(current.sha256??null)||payload.size!==(current.size??0))return null;
+      return {journalSeq:row.seq,eventId:row.event_id,state:current.state,sha256:current.sha256??null,size:current.size??0};
+    }
+  }catch{return null;}finally{journal?.close();}return null;};
+const acknowledgedForeignRuntime=(bridge,observed,{git}={})=>{
+  const changed=new Set(observed),paths=[],records=[];
+  for(const baseline of bridge.runtimeWriters??[]){const writer=currentRuntimeWriter(bridge,baseline,git);if(!writer)continue;
+    const artifacts=operationArtifacts(writer,writer.state),relevant=[...changed].map(relative=>({relative,rule:runtimeAuthority(writer,artifacts,relative)})).filter(item=>item.rule);
+    if(!relevant.length)continue;
+    const receipts=relevant.map(item=>({...item,receipt:custodyReceipt(bridge,writer,item.relative,item.rule.name)}));
+    if(receipts.some(item=>!item.receipt))continue;
+    paths.push(...relevant.map(item=>item.relative));records.push({workflowId:writer.workflowId,generation:writer.generation,journalFile:writer.journalFile,
+      previousGeneration:writer.transition?baseline.generation:null,previousJournalFile:writer.transition?baseline.journalFile:null,
+      runtimePinDigest:writer.pinDigest,custodyAfterSeq:writer.custodyAfterSeq,paths:receipts.map(item=>({path:item.relative,...item.receipt}))});
+  }
+  return {paths:[...new Set(paths)],records};
+};
 const headOf=(git,root)=>execGit(git,root,['rev-parse','HEAD']).trim();
 const same=(a,b)=>a?.state===b?.state&&a?.sha256===b?.sha256;
 // Only two well-formed managed sections can authorize ignoring their interior bytes. Malformed states carry no
@@ -152,7 +249,7 @@ export function runtimeWriterHint({host='orca-native',repoRoot}={}){
 function beginSingleDetectionCandidate({identity,repoRoot,workerRoot,controlRoot,allowlist=[],references=[],inputPaths=[],oraclePaths=[],git,
   dependencyDigests={},environmentDigest='runtime-unpinned',ownedDirtyPaths=[],runtimeManagedFiles=[],dependencyInstall=null,nonGit=false,runtimePin=null,now=Date.now}={}){
   if(runtimePin){const checked=verifyRuntimePin({...runtimePin,root:repoRoot});if(!checked.ok)throw new Error(`candidate runtime pin is invalid before snapshot: ${checked.reason}`);}
-  const dirty=nonGit?[]:statusPaths(git,repoRoot).filter(file=>!runtimeInternal(file)),allTracked=nonGit?[]:trackedFor(git,repoRoot,['.']);
+  const dirty=nonGit?[]:statusPaths(git,repoRoot).filter(file=>!runtimeInternal(file)),local=nonGit?[]:runtimeLocalPaths(repoRoot),allTracked=nonGit?[]:trackedFor(git,repoRoot,['.']);
   if(typeof environmentDigest!=='string'||!environmentDigest.trim())throw new TypeError('candidate environmentDigest must be a nonempty string');
   const resolveOnDisk=value=>{const reference=resolveCandidateReference(value),target=path.join(repoRoot,...reference.path.split('/'));
     try{if(fs.lstatSync(target).isDirectory()){const index=['index.yaml','index.yml','index.json','index.md'].find(name=>fs.existsSync(path.join(target,name)));if(index)return {...reference,path:`${reference.path.replace(/\/$/,'')}/${index}`};}}catch{}
@@ -181,6 +278,7 @@ function beginSingleDetectionCandidate({identity,repoRoot,workerRoot,controlRoot
     .map(item=>({path:clean(item.path),start:item.start,end:item.end}));
   const bridge={schema:DETECTION_BRIDGE,identity,snapshot,repoRoot:path.resolve(repoRoot),nonGit:Boolean(nonGit),runtimePin:runtimePin?{...runtimePin}:null,allowlist:[...allowlist],references:[...references],resolvedReferences,inputPaths:[...inputPaths],
     acceptedHead,sourceBaseline:states(repoRoot,sourcePaths),dirtyBaseline:states(repoRoot,dirty),dirtyBaselinePaths:dirty,
+    localBaseline:states(repoRoot,local),runtimeWriters:nonGit?[]:runtimeWriters(repoRoot,identity.workflowId,git),
     runtimeManagedFiles:managed,runtimeManagedBaseline:managed.map(item=>managedOutside(repoRoot,item)),
     ownedDirtyPaths:[...owned].sort(),droppedOwnedPaths,dependency:{mode:'isolated-artifact',command:dependencyInstall,
       root:path.join(controlRoot,'dependencies'),externalCache:'forbidden',symlinkedDependencies:'forbidden',assurance:'detection-only',ready:dependencyInstall===null},
@@ -222,6 +320,7 @@ export function beginDetectionCandidate(options={}){
     const bridge={schema:ROOT_DETECTION_BRIDGE,identity:identityFields(options.identity),bindingDigest,rootBindings:roots.map(binding=>({
       id:binding.id,role:binding.role,repoRoot:path.resolve(binding.repoRoot),workRoot:binding.workRoot?path.resolve(binding.workRoot):null,
       sourceRoot:binding.sourceRoot?path.resolve(binding.sourceRoot):null,
+      sourceRootTrust:binding.sourceRootTrust??null,
       runtimePin:binding.runtimePin?{...binding.runtimePin}:null,
       primary:Boolean(binding.primary),nonGit:Boolean(binding.nonGit),workerWritable:Boolean(binding.workerWritable),runtimeWritable:Boolean(binding.runtimeWritable),readOnly:Boolean(binding.readOnly),
       allowlist:[...(binding.allowlist??[])],runtimePaths:[...(binding.runtimePaths??[])],references:(binding.references??[]).map(item=>({...item})),
@@ -270,24 +369,27 @@ export function acknowledgeRuntimeBaseline(bridge,paths=[]){
 }
 
 /** After confirmed worker settlement, copy the complete observed delta into the verifier snapshot and seal it. */
-function freezeSingleDetectionCandidate(bridge,{git,reportedFiles=[],now=Date.now}={}){
+function freezeSingleDetectionCandidate(bridge,{git,reportedFiles=[],housekeepingPaths=[],now=Date.now}={}){
   if(bridge.runtimePin){const checked=verifyRuntimePin({...bridge.runtimePin,root:bridge.repoRoot});if(!checked.ok)return {schema:DETECTION_BRIDGE,status:'quarantine',reasons:[`runtime-pin-drift:${checked.reason}`],observedFiles:[],assurance:bridge.writer};}
-  const {repoRoot,snapshot}=bridge,postDirty=bridge.nonGit?[]:statusPaths(git,repoRoot).filter(file=>!runtimeInternal(file)),before=new Map([...(bridge.sourceBaseline??[]),...bridge.dirtyBaseline,...(bridge.runtimeBaseline??[])].map(item=>[item.path,item]));
-  const candidates=[...new Set([...before.keys(),...postDirty])].sort(),after=new Map(states(repoRoot,candidates).map(item=>[item.path,item]));
+  const {repoRoot,snapshot}=bridge,postDirty=bridge.nonGit?[]:statusPaths(git,repoRoot).filter(file=>!runtimeInternal(file)),postLocal=bridge.nonGit?[]:runtimeLocalPaths(repoRoot),
+    before=new Map([...(bridge.sourceBaseline??[]),...bridge.dirtyBaseline,...(bridge.localBaseline??[]),...(bridge.runtimeBaseline??[])].map(item=>[item.path,item]));
+  const candidates=[...new Set([...before.keys(),...postDirty,...postLocal])].sort(),after=new Map(states(repoRoot,candidates).map(item=>[item.path,item]));
   const observed=candidates.filter(file=>!same(before.get(file)??{path:file,state:'absent'},after.get(file)??{path:file,state:'absent'}));
+  const runtimeAcknowledgement=acknowledgedForeignRuntime(bridge,observed,{git}),housekeeping=new Set([...housekeepingPaths.map(clean),...runtimeAcknowledgement.paths]),
+    housekeepingObserved=observed.filter(file=>housekeeping.has(file)),observable=observed.filter(file=>!housekeeping.has(file));
   const owned=new Set(bridge.ownedDirtyPaths??[]),dirtyAtStart=new Set(bridge.dirtyBaselinePaths??bridge.dirtyBaseline.map(item=>item.path));
-  const runtimeOwned=new Set(bridge.runtimeOwnedPaths??[]),runtimeDrift=observed.filter(file=>runtimeOwned.has(file));
+  const runtimeOwned=new Set(bridge.runtimeOwnedPaths??[]),runtimeDrift=observable.filter(file=>runtimeOwned.has(file));
   const managedByPath=new Map((bridge.runtimeManagedFiles??[]).map(item=>[clean(item.path),item])),managedBaseline=new Map((bridge.runtimeManagedBaseline??[]).map(item=>[clean(item.path),item]));
-  const managedOnly=new Set(observed.filter(file=>{const record=managedByPath.get(file);return record&&sameManagedOutside(managedBaseline.get(file),managedOutside(repoRoot,record));}));
+  const managedOnly=new Set(observable.filter(file=>{const record=managedByPath.get(file);return record&&sameManagedOutside(managedBaseline.get(file),managedOutside(repoRoot,record));}));
   // A public brief may already be tracked-dirty or untracked when an attempt starts. Prove its surrounding
   // human bytes first, then remove that exact managed-only change from both collision checks. Missing,
   // duplicated or malformed markers cannot enter managedOnly and remain an ordinary full-file delta.
-  const baselineTouched=observed.filter(file=>dirtyAtStart.has(file)&&!owned.has(file)&&!managedOnly.has(file));
-  const candidateObserved=observed.filter(file=>!runtimeOwned.has(file)&&!managedOnly.has(file)),outside=candidateObserved.filter(file=>!matches(file,bridge.allowlist));
+  const baselineTouched=observable.filter(file=>dirtyAtStart.has(file)&&!owned.has(file)&&!managedOnly.has(file));
+  const candidateObserved=observable.filter(file=>!runtimeOwned.has(file)&&!managedOnly.has(file)),outside=candidateObserved.filter(file=>!matches(file,bridge.allowlist));
   const reasons=[...baselineTouched.map(file=>`pre-existing-user-work-modified:${file}`),...runtimeDrift.map(file=>`kernel-owned-write-drift:${file}`),...outside.map(file=>`outside-allowlist:${file}`)];
   const currentHead=bridge.nonGit?contentHead(repoRoot,snapshot.source.entries.map(item=>item.path)):headOf(git,repoRoot);
   if(currentHead!==bridge.acceptedHead)reasons.push('canonical-head-drift');
-  if(reasons.length)return {schema:DETECTION_BRIDGE,status:'quarantine',reasons,observedFiles:observed,assurance:bridge.writer};
+  if(reasons.length)return {schema:DETECTION_BRIDGE,status:'quarantine',reasons,observedFiles:observable,housekeepingObserved,runtimeAcknowledgements:runtimeAcknowledgement.records,assurance:bridge.writer};
   const alreadySealed=fs.existsSync(path.join(snapshot.controlRoot,CANDIDATE_FILES.packet));
   // Runtime-managed-only bytes are rebound into both verifier views before the first seal. This is the same
   // narrow mechanism as other kernel-owned writes, but selected only after proving the surrounding human bytes
@@ -298,7 +400,7 @@ function freezeSingleDetectionCandidate(bridge,{git,reportedFiles=[],now=Date.no
   for(const file of alreadySealed?[]:candidateObserved){
     const source=path.join(repoRoot,...file.split('/')),target=path.join(snapshot.workerRoot,...file.split('/'));
     if(after.get(file)?.state==='absent'){if(fs.existsSync(target))fs.rmSync(target);continue;}
-    if(after.get(file)?.state!=='file')return {schema:DETECTION_BRIDGE,status:'quarantine',reasons:[`unsupported-observed-path:${file}`],observedFiles:observed,assurance:bridge.writer};
+    if(after.get(file)?.state!=='file')return {schema:DETECTION_BRIDGE,status:'quarantine',reasons:[`unsupported-observed-path:${file}`],observedFiles:observable,housekeepingObserved,runtimeAcknowledgements:runtimeAcknowledgement.records,assurance:bridge.writer};
     fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(source,target);
   }
   const packet=sealCandidate(snapshot,{allowedWrites:candidateObserved,reportedFiles,now});
@@ -317,63 +419,83 @@ function freezeSingleDetectionCandidate(bridge,{git,reportedFiles=[],now=Date.no
   for(const change of packet.changes)if(change.afterSha256===null&&fileState(repoRoot,change.path).state!=='absent'){
     frozen.ok=false;frozen.mismatches.push(`canonical-deletion-drift:${change.path}`);
   }
-  return frozen.ok?{schema:DETECTION_BRIDGE,status:'sealed',packet,snapshot,observedFiles:candidateObserved,assurance:bridge.writer}:
-    {schema:DETECTION_BRIDGE,status:'quarantine',reasons:frozen.mismatches,observedFiles:observed,assurance:bridge.writer};
+  return frozen.ok?{schema:DETECTION_BRIDGE,status:'sealed',packet,snapshot,observedFiles:candidateObserved,housekeepingObserved,runtimeAcknowledgements:runtimeAcknowledgement.records,assurance:bridge.writer}:
+    {schema:DETECTION_BRIDGE,status:'quarantine',reasons:frozen.mismatches,observedFiles:observable,housekeepingObserved,runtimeAcknowledgements:runtimeAcknowledgement.records,assurance:bridge.writer};
 }
 
-// A relative report path belongs to the primary source root. Requiring the displayed absolute path for every
-// other root prevents one same-named relative file from accidentally reporting changes in two repositories.
-const reportVariants=(binding,relative)=>new Set(binding?.primary||binding?.id==='source'
-  ?[candidateDisplayPath(binding,relative),clean(relative)]:[candidateDisplayPath(binding,relative)]);
 function reportMismatch(bindings,observed,reported){
-  const normalized=new Set((reported??[]).map(clean)),missing=[],extra=[];
-  for(const item of observed){const binding=bindings.find(root=>root.id===item.rootId),variants=reportVariants(binding,item.path);if(![...variants].some(value=>normalized.has(value)))missing.push(item.displayPath);}
-  for(const given of normalized){
-    let matched=false;for(const item of observed){const binding=bindings.find(root=>root.id===item.rootId);if(reportVariants(binding,item.path).has(given)){matched=true;break;}}
-    if(!matched)extra.push(given);
-  }
-  return {missing,extra};
+  const routed=new Map(),unmatched=[];
+  for(const raw of [...new Set(reported??[])]){const given=clean(raw);try{const found=pathInCandidateRoots(given,bindings),key=`${found.rootId}:${found.relative}`;
+      routed.set(key,given);}catch{unmatched.push(given);}}
+  const observedKeys=new Set(observed.map(item=>`${item.rootId}:${item.path}`)),missing=observed.filter(item=>!routed.has(`${item.rootId}:${item.path}`)).map(item=>item.displayPath);
+  for(const [key,given] of routed)if(!observedKeys.has(key))unmatched.push(given);
+  return {missing,extra:[...new Set(unmatched)].sort()};
 }
+const housekeepingIdentity=(bridge,value)=>{
+  if(!value)return null;
+  const workflowId=String(value.workflowId??''),opId=String(value.opId??''),dispatch=value.dispatch===null||value.dispatch===undefined?'':String(value.dispatch);
+  if(workflowId!==String(bridge.identity.workflowId)||opId!==String(bridge.identity.opId)||[workflowId,opId,dispatch].some(item=>item.includes('/')||item.includes('\\')))
+    throw new Error('candidate housekeeping identity does not match the trusted candidate identity');
+  return {workflowId,opId,dispatch:dispatch||null};
+};
+const housekeepingFiles=identity=>{if(!identity)return [];const root=`.starciwork/_local/workflows/${identity.workflowId}`,files=[`${root}/state.json`,`${root}/events.jsonl`,`${root}/kernel.lock`,`${root}/stop.flag`,
+    `${root}/checks/${identity.opId}.json`,`${root}/checks/${identity.opId}.credential-request.json`,`${root}/reports/wait-state.json`,'.starciwork/_local/workflows/supervisor.lock',
+    '.starciwork/_local/workflows/runtime-loads.json','.starciwork/_local/workflows/runtime-budget.json'];
+  if(identity.dispatch)files.push(`${root}/reports/${identity.dispatch}.json`);return files;};
 const aggregatePacketFile=packet=>({...packet,roots:(packet.roots??[]).map(({packet:ignored,...root})=>root)});
 
 /** Freeze every bound root under one immutable aggregate identity; old one-root callers retain the v1 packet. */
-export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],requireReported=false,now=Date.now}={}){
+export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],requireReported=false,housekeeping=null,now=Date.now}={}){
+  const housekeepingRecord=housekeepingIdentity(bridge,housekeeping),trustedHousekeeping=housekeepingFiles(housekeepingRecord);
   if(bridge.schema!==ROOT_DETECTION_BRIDGE){
-    const frozen=freezeSingleDetectionCandidate(bridge,{git,reportedFiles,now});
+    const frozen=freezeSingleDetectionCandidate(bridge,{git,reportedFiles,housekeepingPaths:trustedHousekeeping,now});
     if(requireReported&&frozen.status==='sealed'){
       const observed=frozen.observedFiles.map(file=>({rootId:'source',path:file,displayPath:file})),mismatch=reportMismatch([{id:'source',primary:true,repoRoot:bridge.repoRoot}],observed,reportedFiles);
-      if(mismatch.missing.length||mismatch.extra.length)return {...frozen,status:'quarantine',reasons:[...mismatch.missing.map(file=>`unreported-changed-file:${file}`),...mismatch.extra.map(file=>`reported-file-not-changed:${file}`)]};
+      const reportDiagnostics={unmatched:mismatch.extra};
+      if(mismatch.missing.length)return {...frozen,status:'quarantine',reasons:mismatch.missing.map(file=>`unreported-changed-file:${file}`),reportDiagnostics};
+      return {...frozen,reportDiagnostics};
     }
     return frozen;
   }
   const bindingDigest=candidateRootBindingDigest(bridge.rootBindings);
   if(bindingDigest!==bridge.bindingDigest)return {schema:ROOT_DETECTION_BRIDGE,status:'quarantine',reasons:['candidate-root-binding-drift'],observedFiles:[],assurance:bridge.writer};
-  const roots=[],observed=[];let quarantined=false;
+  const housekeepingByRoot=new Map(bridge.roots.map(root=>[root.id,[]]));
+  for(const file of trustedHousekeeping){const routed=pathInCandidateRoots(file,bridge.rootBindings);housekeepingByRoot.get(routed.rootId)?.push(routed.relative);}
+  const roots=[],observed=[],housekeepingObserved=[],runtimeAcknowledgements=[];let quarantined=false;
   for(const root of bridge.roots){
-    const frozen=freezeSingleDetectionCandidate(root.bridge,{git,reportedFiles:[],now});
+    const frozen=freezeSingleDetectionCandidate(root.bridge,{git,reportedFiles:[],housekeepingPaths:housekeepingByRoot.get(root.id)??[],now});
     if(frozen.status!=='sealed')quarantined=true;
     const changed=(frozen.observedFiles??[]).map(file=>({rootId:root.id,rootRole:root.role,path:file,displayPath:candidateDisplayPath(root,file)}));observed.push(...changed);
+    housekeepingObserved.push(...(frozen.housekeepingObserved??[]).map(file=>({rootId:root.id,path:file,displayPath:candidateDisplayPath(root,file)})));
+    runtimeAcknowledgements.push(...(frozen.runtimeAcknowledgements??[]).map(record=>({rootId:root.id,...record})));
     roots.push({id:root.id,role:root.role,repoRoot:root.repoRoot,controlRoot:root.controlRoot,runtimePin:root.runtimePin?{...root.runtimePin}:null,workerWritable:Boolean(root.workerWritable),
       runtimeWritable:Boolean(root.runtimeWritable),readOnly:Boolean(root.readOnly),status:frozen.status,reasons:[...(frozen.reasons??[])],observedFiles:changed,
+      runtimeAcknowledgements:(frozen.runtimeAcknowledgements??[]).map(record=>({...record})),
       ...(frozen.status==='sealed'?{acceptedHead:frozen.packet.acceptedHead,snapshotDigest:frozen.packet.snapshotDigest,candidateDigest:frozen.packet.candidateDigest,
         oracleDigest:frozen.packet.oracleDigest,environmentDigest:frozen.packet.environmentDigest,files:frozen.packet.files,changes:frozen.packet.changes}:{}),packet:frozen.packet});
   }
-  if(quarantined)return {schema:ROOT_DETECTION_BRIDGE,status:'quarantine',reasons:roots.flatMap(root=>root.reasons.map(reason=>`${root.id}:${reason}`)),observedFiles:observed.map(item=>item.displayPath),roots,assurance:bridge.writer};
+  if(quarantined)return {schema:ROOT_DETECTION_BRIDGE,status:'quarantine',reasons:roots.flatMap(root=>root.reasons.map(reason=>`${root.id}:${reason}`)),observedFiles:observed.map(item=>item.displayPath),housekeepingObserved:housekeepingObserved.map(item=>item.displayPath),runtimeAcknowledgements,roots,assurance:bridge.writer};
   const mismatch=requireReported?reportMismatch(bridge.rootBindings,observed,reportedFiles):{missing:[],extra:[]};
-  if(mismatch.missing.length||mismatch.extra.length)return {schema:ROOT_DETECTION_BRIDGE,status:'quarantine',reasons:[...mismatch.missing.map(file=>`unreported-changed-file:${file}`),...mismatch.extra.map(file=>`reported-file-not-changed:${file}`)],observedFiles:observed.map(item=>item.displayPath),roots,assurance:bridge.writer};
+  const reportDiagnostics={unmatched:mismatch.extra};
+  if(mismatch.missing.length)return {schema:ROOT_DETECTION_BRIDGE,status:'quarantine',reasons:mismatch.missing.map(file=>`unreported-changed-file:${file}`),reportDiagnostics,
+    observedFiles:observed.map(item=>item.displayPath),housekeepingObserved:housekeepingObserved.map(item=>item.displayPath),runtimeAcknowledgements,roots,assurance:bridge.writer};
   const primary=roots.find(root=>root.id==='source')??roots[0],packet={schema:ROOT_CANDIDATE_PACKET,...identityFields(bridge.identity),bindingDigest,
     acceptedHead:primary.acceptedHead,snapshotDigest:sha256(JSON.stringify({bindingDigest,roots:roots.map(root=>({id:root.id,digest:root.snapshotDigest}))})),
     candidateDigest:sha256(JSON.stringify({bindingDigest,roots:roots.map(root=>({id:root.id,digest:root.candidateDigest}))})),
     oracleDigest:sha256(JSON.stringify(roots.map(root=>({id:root.id,digest:root.oracleDigest})))),environmentDigest:primary.environmentDigest,
-    dependencyDigests:primary.packet.dependencyDigests,reportedFiles:[...reportedFiles],roots:roots.map(root=>{const {packet:ignored,...record}=root;return record;}),
+    dependencyDigests:primary.packet.dependencyDigests,reportedFiles:[...reportedFiles],reportDiagnostics,housekeeping:housekeepingRecord,
+    runtimeHousekeepingWriters:bridge.roots.flatMap(root=>(root.bridge.runtimeWriters??[]).map(writer=>({rootId:root.id,workflowId:writer.workflowId,
+      generation:writer.generation,goalIdentity:writer.goalIdentity,journalFile:writer.journalFile,storeRoot:writer.storeRoot,sourceRoot:writer.sourceRoot,
+      runtimePinDigest:writer.runtimePinDigest,prefix:writer.prefix,custodyAfterSeq:writer.custodyAfterSeq,statePath:writer.statePath,eventsPath:writer.eventsPath,lockPath:writer.lockPath}))),runtimeAcknowledgements,
+    roots:roots.map(root=>{const {packet:ignored,runtimeAcknowledgements:diagnostic,...record}=root;return record;}),
     files:roots.flatMap(root=>root.files.map(file=>({...file,rootId:root.id,rootRole:root.role,displayPath:candidateDisplayPath(root,file.path)}))),
     changes:roots.flatMap(root=>root.changes.map(change=>({...change,rootId:root.id,rootRole:root.role,displayPath:candidateDisplayPath(root,change.path)}))),
     assurance:bridge.writer,sealedAt:new Date(now()).toISOString()};
   const packetFile=path.join(bridge.snapshot.controlRoot,CANDIDATE_FILES.packet);
   try{fs.writeFileSync(packetFile,`${JSON.stringify(aggregatePacketFile(packet),null,2)}\n`,{flag:'wx'});}
-  catch(error){if(error?.code!=='EEXIST')throw error;const existing=readJsonFile(packetFile,ROOT_CANDIDATE_PACKET),withoutTime=value=>{const {sealedAt,reportedFiles:diagnostic,...bound}=value;return bound;};if(JSON.stringify(withoutTime(existing))!==JSON.stringify(withoutTime(aggregatePacketFile(packet))))throw new Error('sealed multi-root candidate conflicts with current bytes, roots or identity; preserve it for reconciliation');return {schema:ROOT_DETECTION_BRIDGE,status:'sealed',packet:readCandidatePacket(bridge.snapshot.controlRoot),snapshot:bridge.snapshot,observedFiles:observed.map(item=>item.displayPath),observedByRoot:observed,roots,assurance:bridge.writer};}
+  catch(error){if(error?.code!=='EEXIST')throw error;const existing=readJsonFile(packetFile,ROOT_CANDIDATE_PACKET),withoutTime=value=>{const {sealedAt,reportedFiles:diagnostic,reportDiagnostics:diagnosticMismatch,runtimeAcknowledgements:runtimeDiagnostics,...bound}=value;return bound;};if(JSON.stringify(withoutTime(existing))!==JSON.stringify(withoutTime(aggregatePacketFile(packet))))throw new Error('sealed multi-root candidate conflicts with current bytes, roots or identity; preserve it for reconciliation');return {schema:ROOT_DETECTION_BRIDGE,status:'sealed',packet:readCandidatePacket(bridge.snapshot.controlRoot),snapshot:bridge.snapshot,reportDiagnostics,housekeepingObserved:housekeepingObserved.map(item=>item.displayPath),runtimeAcknowledgements,observedFiles:observed.map(item=>item.displayPath),observedByRoot:observed,roots,assurance:bridge.writer};}
   return {schema:ROOT_DETECTION_BRIDGE,status:'sealed',packet:readCandidatePacket(bridge.snapshot.controlRoot),snapshot:bridge.snapshot,
-    observedFiles:observed.map(item=>item.displayPath),observedByRoot:observed,roots,assurance:bridge.writer};
+    reportDiagnostics,housekeepingObserved:housekeepingObserved.map(item=>item.displayPath),runtimeAcknowledgements,observedFiles:observed.map(item=>item.displayPath),observedByRoot:observed,roots,assurance:bridge.writer};
 }
 
 /** Build an isolated dependency artifact. Checks keep candidate cwd and receive PATH/NODE_PATH explicitly. */

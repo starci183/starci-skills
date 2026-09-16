@@ -26,6 +26,14 @@ const acceptAll=()=>({ok:true,verdict:'accept',summary:'stub validator: accepted
 const RECEIPT='demo.sales.implementation.frontend.receipt';
 const INTAKE='demo.sales.implementation.backend.intake';
 const PAGE='app/receipt/page.tsx';
+const slash=value=>String(value).replaceAll('\\','/');
+const stageSealableRuntime=(sourceRoot,target)=>{
+  const required=['.dist','bin/starci.mjs','bin/starci-skills.mjs','scripts/config.mjs','config.json','core/runtime-root.mjs','core/yaml.mjs',
+    'init/AGENTS.md','init/CLAUDE.md','package.json','SKILL.md','docs/supervision-templates/op.md','knowledge/grammars'];
+  for(const relative of required){const source=path.join(sourceRoot,...relative.split('/')),destination=path.join(target,...relative.split('/'));
+    fs.mkdirSync(path.dirname(destination),{recursive:true});fs.cpSync(source,destination,{recursive:true});}
+  return target;
+};
 
 const BRAND=`schema: work/node@2
 id: demo.brand
@@ -457,14 +465,24 @@ test('public retry and pinned enrolled run preserve accepted history while settl
     allowlist:['src/accepted.ts'],acceptance:['the accepted backend contract remains accepted']},0);
   Object.assign(accepted,{status:'done',attempt:1,head:git(run.code,'rev-parse','HEAD'),files:[],reports:[{outcome:'done',summary:'accepted before shared-root retry'}]});
   run.state.ops.unshift(accepted);run.state.decisions=[{id:'accepted-direction',choice:1,answer:'keep the accepted frontend direction'}];
-  const pin={...sealRuntime({sourceRoot:process.cwd(),buildsRoot:path.join(run.root,'builds'),version:'1.0.0'}),sourceRoot:process.cwd()},journalFile=path.join(run.root,'runtime','journal.sqlite');
+  const authoredRuntime=stageSealableRuntime(process.cwd(),path.join(run.root,'authored-runtime')),authoredPrefix=slash(authoredRuntime),currentPrefix=slash(process.cwd());let relocatedReferences=0;
+  for(const op of run.state.ops)op.references=(op.references??[]).map(reference=>{if(typeof reference!=='string')return reference;const normalized=slash(reference);
+    if(!normalized.startsWith(`${currentPrefix}/knowledge/`))return reference;relocatedReferences+=1;return `${authoredPrefix}${normalized.slice(currentPrefix.length)}`;});
+  assert.ok(relocatedReferences>0,'the pre-pin operation carries authored runtime provenance before sealing');
+  const pin=sealRuntime({sourceRoot:authoredRuntime,buildsRoot:path.join(run.root,'builds'),version:'1.0.0'}),pinFile=path.join(run.root,'accepted-runtime-pin.json'),journalFile=path.join(run.root,'runtime','journal.sqlite');
+  assert.equal(pin.sourceRoot,slash(fs.realpathSync(authoredRuntime)));fs.writeFileSync(pinFile,`${JSON.stringify(pin,null,2)}\n`);
+  fs.renameSync(authoredRuntime,path.join(run.root,'relocated-authored-runtime'));
+  assert.equal(fs.existsSync(authoredRuntime),false,'the original authored runtime is absent before public retry');
   Object.assign(run.state,{approved:true,phase:'run',run:'run-shared-enrolled',from:'term-shared',goalDigest:'f'.repeat(64),
     definitionOfDone:['backend-owned design and evidence are accepted','frontend source is accepted'],head:accepted.head,
     engine:{schema:'starci/engine@1',version:'1.0.0',generation:1,journalFile,journalChosen:true,runtimePin:pin,coordination:'kernel-v0'}});
   run.store.saveState(run.state);openJournal({file:journalFile}).close();
   const stopped=kernelMain('workflow-stop',{id:run.state.id,host:run.host},{orca:{},cwd:run.code});assert.equal(stopped.id,run.state.id);
-  const retried=kernelMain('workflow-retry',{id:run.state.id,host:run.host},{orca:{},cwd:run.code});assert.equal(retried.ok,true);assert.equal(retried.generation,2);
+  const retried=kernelMain('workflow-retry',{id:run.state.id,host:run.host,'runtime-pin':pinFile},{orca:{},cwd:run.code});assert.equal(retried.ok,true);assert.equal(retried.generation,2);
   const afterRetry=run.store.loadState();assert.equal(afterRetry.ops.find(op=>op.id===accepted.id).status,'done');assert.deepEqual(afterRetry.decisions,run.state.decisions);
+  const retryReceiptJournal=openJournal({file:journalFile});try{const names=retryReceiptJournal.events({workflowId:run.state.id}).filter(event=>event.generation===2&&event.kind==='runtime-file-written').map(event=>event.payload?.relative);
+    for(const name of ['state.json','events.jsonl','stop.flag'])assert.ok(names.includes(name),`public retry receipts ${name}`);
+  }finally{retryReceiptJournal.close();}
 
   const nonce=`shared-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const pinnedKernel=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','kernel.mjs')).href}?${nonce}`),
@@ -472,6 +490,10 @@ test('public retry and pinned enrolled run preserve accepted history while settl
     pinnedStoreModule=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','store.mjs')).href}?${nonce}`);
   const pinnedStore=pinnedStoreModule.createStore({repoRoot:run.owner,id:run.state.id}),engineState=pinnedStore.loadState(),
     gitAdapter=(executable,args,options={})=>spawnSync(executable,args,{encoding:'utf8',windowsHide:true,...options});
+  const foreign=path.join(run.root,'unrelated','knowledge','grammars','index.yaml');fs.mkdirSync(path.dirname(foreign),{recursive:true});fs.writeFileSync(foreign,'schema: grammar/index@1\n');
+  const prePinOp=engineState.ops.find(op=>op.kind==='interface.draw');
+  assert.throws(()=>pinnedKernel.candidateReferences({...prePinOp,references:[foreign]},engineState,{work:{ledger:{repoRoot:run.owner,workRoot:run.work},loaded:{nodes:new Map(),list:[]}}}),
+    /outside the accepted routed roots/,'a real verified pin never grants trust to an unrelated authored suffix');
   runtime=pinnedEngine.createEngineRuntime({store:pinnedStore,state:engineState,git:gitAdapter,candidateBase:path.join(run.root,'candidates'),
     eligibility:()=>({eligible:true,mode:'qualified'}),spawnChild:()=>{throw Error('the fake host owns native execution in this fixture');}});
   runtime.model=name=>name==='validateOp'?{ok:true,verdict:'accept',summary:'both routed roots satisfy the bounded operation',findings:[],dropped:[],
@@ -480,12 +502,13 @@ test('public retry and pinned enrolled run preserve accepted history while settl
     digest:snapshot.digest,decisionId:snapshot.decisionId,basisDigest:snapshot.basisDigest,orderedActionIds:snapshot.actions.map(action=>action.id),rationale:'continue accepted remaining shared-root work'});
   runtime.check=(command,options={})=>({status:0,stdout:`${command} passed`,stderr:'',...options.result});
   runtime.candidateCheck=(command,options={},op)=>runtime.check(command,{...options,cwd:runtime.candidateCwd(op)});
-  const candidateRoots=new Map(),writerRows=new Map(),settle=runtime.settled.bind(runtime);let activeOp=null,activeJob=null;
+  const candidateRoots=new Map(),writerRows=new Map(),observedReceiptNames=new Set(),settle=runtime.settled.bind(runtime);let activeOp=null,activeJob=null;
   const begin=runtime.beginCandidate.bind(runtime);runtime.beginCandidate=(op,options)=>{if(op.kind==='uat.verify'&&!op.checks?.length)op.checks=[{name:'unit-tests-pass',command:'npx vitest run receipt'}];
     activeOp=op;activeJob=op.lease.jobId;const bridge=begin(op,options);
     candidateRoots.set(op.id,bridge.rootBindings.map(root=>root.id));return bridge;};
-  runtime.settled=(op,options={})=>{const result=settle(op,options);if(result.ok&&activeJob){const count=runtime.journal.db.prepare("SELECT count(*) AS n FROM leases WHERE job_id=? AND resource_key LIKE 'canonical-writer:%'").get(activeJob).n;
-    writerRows.set(`${op.id}:${options.workerOnly===true?'worker':'final'}`,count);}return result;};
+  runtime.settled=(op,options={})=>{const result=settle(op,options);for(const event of runtime.journal.events({workflowId:run.state.id}).filter(event=>event.generation===2&&event.kind==='runtime-file-written'))observedReceiptNames.add(event.payload?.relative);
+    if(result.ok&&activeJob){const count=runtime.journal.db.prepare("SELECT count(*) AS n FROM leases WHERE job_id=? AND resource_key LIKE 'canonical-writer:%'").get(activeJob).n;
+      writerRows.set(`${op.id}:${options.workerOnly===true?'worker':'final'}`,count);}return result;};
   const allocator={maxParallelOps:1,allocate:()=>({ok:true,runtime:'gpt-5.6-sol',target:'gpt-5.6-sol',role:'implement',candidate:{selection:{target:'gpt-5.6-sol',orcaLaunch:{agent:'codex',model:'gpt-5.6-sol'}}}}),
     release(){},failed(){},launched(){},deferred(){},snapshot:()=>({}),serialize:()=>({}),sharedSync:()=>({dropped:[]})};
   let workerLive=false,deliverPending=false,counter=0;const dispatches=new Map();
@@ -501,7 +524,7 @@ test('public retry and pinned enrolled run preserve accepted history while settl
       files=[PAGE,path.join(assets,'receipt-resting.png'),path.join(assets,'receipt-resting.html')];
     }
     const checks=(op.checks??[]).map(check=>({name:check.name,command:check.command,exitCode:0,evidence:'fixture pass'})),report=buildReport({outcome:'done',run:'run-shared-enrolled',task:`task-${op.id}`,dispatch,from:'term-worker',summary:`${op.id} complete`,files,checks});
-    fs.writeFileSync(pinnedStore.reportPath(dispatch),`${JSON.stringify(report)}\n`);deliverPending=false;};
+    fs.writeFileSync(pinnedStore.checksPath(op.id),`${JSON.stringify(checks)}\n`);fs.writeFileSync(pinnedStore.reportPath(dispatch),`${JSON.stringify(report)}\n`);deliverPending=false;};
   const receipt=result=>({outcome:'ok',effectState:'none',receipt:{ok:true,result}}),orca={host:{name:'orca',capabilities:['design-tool'],sequential:false},invoke(name,args={}){
     if(name==='run-show')return receipt({run:{id:'run-shared-enrolled',coordinator_handle:'term-shared'}});
     if(name==='worker-list')return receipt({workers:workerLive?[...dispatches].map(([id,value])=>({dispatchId:id,taskId:value.task,workerState:'unsupervised',dispatchStatus:'dispatched',agentTerminalHandle:'term-worker'})):[]});
@@ -521,12 +544,23 @@ test('public retry and pinned enrolled run preserve accepted history while settl
   assert.equal(final.ops.find(op=>op.id===accepted.id).reports[0].summary,'accepted before shared-root retry');assert.deepEqual(final.decisions,run.state.decisions);
   const drawn=final.ops.find(op=>op.kind==='interface.draw');assert.deepEqual(candidateRoots.get(drawn.id),['source','work','runtime']);
   assert.equal(drawn.candidate.roots.find(root=>root.id==='runtime').acceptedHead.startsWith('content:'),true,'the pinned Grammar canon is an explicit protected content root');
-  assert.ok(runtime.candidateBridge(drawn).rootBindings.find(root=>root.id==='runtime').references.some(reference=>reference.sourceRef.includes('/knowledge/grammars/')),
+  assert.ok(runtime.candidateBridge(drawn).rootBindings.find(root=>root.id==='runtime').references.some(reference=>reference.sourceRef.includes('/knowledge/grammars/')&&!reference.sourceRef.includes('/.dist/')),
     'the pre-pin drawing retains its authored canon provenance');
   assert.deepEqual(candidateRoots.get(implemented.id),['source','work','runtime']);assert.equal(implemented.candidate?.status,'sealed');
   assert.ok(runtime.candidateBridge(implemented).rootBindings.find(root=>root.id==='runtime').references.some(reference=>reference.sourceRef.includes('/.dist/knowledge/grammars/')),
     'the frontend operation derived by the pinned kernel retains compiled canon');
   assert.equal(writerRows.get(`${implemented.id}:worker`),2);assert.equal(writerRows.get(`${implemented.id}:final`),0);
+  for(const op of final.ops.filter(item=>item.status==='done'&&item.id!==accepted.id)){
+    assert.ok(observedReceiptNames.has(`contracts/${op.id}.md`),`contract receipt for ${op.id}; found ${JSON.stringify([...observedReceiptNames])}`);
+    assert.ok(observedReceiptNames.has(`checks/${op.id}.json`),`worker checks receipt for ${op.id}`);
+    assert.ok(observedReceiptNames.has(`checks/${op.id}-kernel.json`),`kernel checks receipt for ${op.id}`);
+    assert.ok(observedReceiptNames.has(`reports/${op.launch.dispatch}.json`),`report receipt for ${op.id}`);
+  }
+  const retainedReceiptNames=new Set(runtime.journal.events({workflowId:run.state.id}).filter(event=>event.kind==='runtime-file-written').map(event=>event.payload?.relative));
+  for(const name of observedReceiptNames)assert.ok(retainedReceiptNames.has(name),`normal finish retained latest custody for ${name}`);
+  assert.equal(runtime.journal.db.prepare('SELECT count(*) n FROM state_snapshots WHERE workflow_id=?').get(run.state.id).n,1,'normal finish retains one final state projection');
+  assert.equal(runtime.journal.db.prepare('SELECT count(*) n FROM jobs WHERE workflow_id=?').get(run.state.id).n,0,'normal finish drops completed operational jobs');
+  assert.equal(runtime.journal.db.prepare("SELECT count(*) n FROM events WHERE workflow_id=? AND kind<>'runtime-file-written'").get(run.state.id).n,0,'normal finish drops non-custody journal history');
   assert.equal(fs.existsSync(path.join(run.code,'.starciwork')),false);assert.match(fs.readFileSync(path.join(run.code,PAGE),'utf8'),/Receipt/);
   assert.ok(fs.existsSync(run.evidence(RECEIPT,`${RECEIPT}-verify`)));assert.equal(run.read(RECEIPT).state,'done');
   assert.equal(git(run.code,'status','--porcelain'),'');assert.equal(git(run.owner,'status','--porcelain','--','.starciwork/features'),'');

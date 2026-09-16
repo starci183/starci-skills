@@ -112,7 +112,7 @@ const walkFiles=(root,current=root,out=[])=>{
   return out;
 };
 
-/** Seal exact candidate bytes. `reportedFiles` is retained only as untrusted diagnostic data. */
+/** Seal exact candidate bytes. The bridge checks `reportedFiles` as an untrusted completeness acknowledgement; this packet retains it for diagnosis. */
 export function sealCandidate(snapshot,{candidatePaths,allowedWrites=[],reportedFiles=[],now=Date.now}={}){
   if(snapshot?.schema!==CANDIDATE_SNAPSHOT)throw new TypeError('a candidate snapshot is required');
   const allowed=new Set(allowedWrites.map(cleanRelative));

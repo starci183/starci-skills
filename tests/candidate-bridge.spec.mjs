@@ -163,3 +163,17 @@ test('kernel runtime bytes are copied into frozen worker and base views without 
   assert.equal(fs.readFileSync(path.join(f.bridge.snapshot.workerRoot,'src','runtime.js'),'utf8'),'kernel mark\n');
   assert.equal(fs.readFileSync(path.join(f.bridge.snapshot.baseRoot,'src','runtime.js'),'utf8'),'kernel mark\n');assert.equal(f.bridge.snapshot.oracle.digest,oracle);
 });
+
+test('runtime acknowledgement rebaselines an allowlisted path but protects an acknowledged path outside the allowlist',t=>{
+  const allowed=fixture(t);fs.writeFileSync(path.join(allowed.root,'src','runtime.js'),'kernel baseline\n');
+  const rebound=acknowledgeRuntimeBaseline(allowed.bridge,['src/runtime.js']);assert.deepEqual(rebound.protectedPaths,[]);
+  fs.writeFileSync(path.join(allowed.root,'src','runtime.js'),'worker change\n');
+  const accepted=freezeDetectionCandidate(allowed.bridge,{git,reportedFiles:['src/runtime.js'],requireReported:true});
+  assert.equal(accepted.status,'sealed',JSON.stringify(accepted.reasons));
+
+  const protectedFixture=fixture(t);const protectedPath='keep.txt';
+  const protectedResult=acknowledgeRuntimeBaseline(protectedFixture.bridge,[protectedPath]);assert.deepEqual(protectedResult.protectedPaths,[protectedPath]);
+  fs.writeFileSync(path.join(protectedFixture.root,protectedPath),'worker drift\n');
+  const refused=freezeDetectionCandidate(protectedFixture.bridge,{git,reportedFiles:[protectedPath],requireReported:true});
+  assert.equal(refused.status,'quarantine');assert.ok(refused.reasons.includes(`kernel-owned-write-drift:${protectedPath}`),JSON.stringify(refused.reasons));
+});

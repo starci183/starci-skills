@@ -340,9 +340,12 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
     },
     freezeCandidate(op,{reportedFiles=[],requireReported=false}={}){
       if(op.candidate?.status==='sealed')return op.candidate;
-      const frozen=freezeDetectionCandidate(this.candidateBridge(op),{git,reportedFiles,requireReported,now});
+      const frozen=freezeDetectionCandidate(this.candidateBridge(op),{git,reportedFiles,requireReported,
+        housekeeping:{workflowId:state.id,opId:op.id,dispatch:op.dispatch??op.launch?.dispatch??null},now});
       const {packet}=frozen;
       op.candidate={...op.candidate,status:frozen.status,observedFiles:[...(frozen.observedFiles??[])],assurance:frozen.assurance,
+        reportDiagnostics:{unmatched:[...(frozen.reportDiagnostics?.unmatched??[])]},housekeepingObserved:[...(frozen.housekeepingObserved??[])],
+        runtimeAcknowledgements:(frozen.runtimeAcknowledgements??[]).map(record=>({...record,paths:(record.paths??[]).map(item=>typeof item==='object'?{...item}:item)})),
         ...(frozen.observedByRoot?{observedByRoot:frozen.observedByRoot.map(item=>({...item}))}:{}),
         ...(frozen.roots?{roots:frozen.roots.map(root=>({id:root.id,role:root.role,repoRoot:root.repoRoot,status:root.status,
           acceptedHead:root.acceptedHead??null,candidateDigest:root.candidateDigest??null,snapshotDigest:root.snapshotDigest??null,

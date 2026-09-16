@@ -15,20 +15,20 @@ const filesUnder=(root,at=root)=>fs.readdirSync(at,{withFileTypes:true}).flatMap
 
 /** Seal an already-built payload. Building and testing are separate prerequisites, never implicit live effects. */
 export function sealRuntime({sourceRoot,buildsRoot,version}={}){
-  const root=path.resolve(sourceRoot);
+  const root=fs.realpathSync(path.resolve(sourceRoot)),authoredSourceRoot=slash(root);
   const paths=[...filesUnder(path.join(root,'.dist')).map(file=>`.dist/${file}`),'bin/starci.mjs','bin/starci-skills.mjs',
     'scripts/config.mjs','config.json','core/runtime-root.mjs','core/yaml.mjs','init/AGENTS.md','init/CLAUDE.md',
     'package.json','SKILL.md','docs/supervision-templates/op.md'];
   const entries=paths.sort().map(file=>({path:file,sha256:hash(fs.readFileSync(path.join(root,file)))}));
-  const digest=hash(JSON.stringify({version,entries})),target=path.resolve(buildsRoot,digest);
-  if(fs.existsSync(target)){const pin={schema:RUNTIME_PIN,root:target,digest,version};const checked=verifyRuntimePin(pin);if(!checked.ok)throw Error(checked.reason);return pin;}
+  const digest=hash(JSON.stringify({version,sourceRoot:authoredSourceRoot,entries})),target=path.resolve(buildsRoot,digest);
+  if(fs.existsSync(target)){const pin={schema:RUNTIME_PIN,root:target,digest,version,sourceRoot:authoredSourceRoot};const checked=verifyRuntimePin(pin);if(!checked.ok)throw Error(checked.reason);return pin;}
   fs.mkdirSync(path.dirname(target),{recursive:true});
   const stage=`${target}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`;
   fs.mkdirSync(stage);
   for(const entry of entries){const out=path.join(stage,entry.path);fs.mkdirSync(path.dirname(out),{recursive:true});fs.copyFileSync(path.join(root,entry.path),out);}
-  fs.writeFileSync(path.join(stage,'runtime-pin.json'),JSON.stringify({schema:RUNTIME_PIN,version,digest,entries}));
+  fs.writeFileSync(path.join(stage,'runtime-pin.json'),JSON.stringify({schema:RUNTIME_PIN,version,digest,sourceRoot:authoredSourceRoot,entries}));
   fs.renameSync(stage,target);
-  return {schema:RUNTIME_PIN,root:target,digest,version};
+  return {schema:RUNTIME_PIN,root:target,digest,version,sourceRoot:authoredSourceRoot};
 }
 
 export function verifyRuntimePin(pin){
@@ -36,7 +36,11 @@ export function verifyRuntimePin(pin){
     if(pin?.schema!==RUNTIME_PIN||!pin.root||!/^[a-f0-9]{64}$/.test(pin.digest))throw Error('Invalid runtime pin identity');
     const root=fs.realpathSync(pin.root),manifest=JSON.parse(fs.readFileSync(path.join(root,'runtime-pin.json'),'utf8'));
     if(manifest.schema!==RUNTIME_PIN||manifest.digest!==pin.digest||manifest.version!==pin.version||!Array.isArray(manifest.entries)||!manifest.entries.length)throw Error('Runtime pin manifest mismatch');
-    if(hash(JSON.stringify({version:manifest.version,entries:manifest.entries}))!==pin.digest)throw Error('Runtime pin digest mismatch');
+    const sourceRoot=typeof manifest.sourceRoot==='string'&&manifest.sourceRoot.trim()?slash(manifest.sourceRoot):null;
+    if(sourceRoot&&(!path.isAbsolute(sourceRoot)&&!/^[A-Za-z]:\//.test(sourceRoot)))throw Error('Runtime pin authored source identity is invalid');
+    if(sourceRoot&&pin.sourceRoot!==undefined&&slash(path.resolve(pin.sourceRoot))!==slash(path.resolve(sourceRoot)))throw Error('Runtime pin authored source identity mismatch');
+    const digestInput=sourceRoot?{version:manifest.version,sourceRoot,entries:manifest.entries}:{version:manifest.version,entries:manifest.entries};
+    if(hash(JSON.stringify(digestInput))!==pin.digest)throw Error('Runtime pin digest mismatch');
     const seen=new Set();
     for(const entry of manifest.entries){
       if(typeof entry.path!=='string'||path.isAbsolute(entry.path)||entry.path.split(/[\\/]/).includes('..')||seen.has(entry.path))throw Error('Unsafe runtime pin entry');
@@ -47,6 +51,6 @@ export function verifyRuntimePin(pin){
     }
     const actual=filesUnder(root).filter(file=>file!=='runtime-pin.json');
     if(actual.some(file=>!seen.has(file))||actual.length!==seen.size)throw Error('Runtime pin contains unsealed files');
-    return {ok:true,launcher:path.join(root,'bin','starci.mjs')};
+    return {ok:true,launcher:path.join(root,'bin','starci.mjs'),sourceRoot};
   }catch(error){return {ok:false,reason:error.message};}
 }
