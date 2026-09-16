@@ -174,7 +174,8 @@ rules:
         when: "Intrinsic visual interaction without product-world or transport ownership"
         write: "Keep one client component; a missing component.tsx/Base twin is not a violation."
     verification:
-      automated: []
+      automated:
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
       manual:
         - Confirm an actual Base never imports world hooks, and require a split only for a real boundary.
     relatedExamples:
@@ -247,9 +248,11 @@ rules:
         when: "Key"
         write: "null when the input is missing; the viewer identity is part of a read key"
     verification:
-      automated: []
+      automated:
+        - FE_SWR_KEY_IDENTITY
+        - FE_SWR_MUTATION_RESOURCE_IDENTITY
       manual:
-        - Confirm missing inputs null the key and viewer identity participates in read keys.
+        - Confirm the declared identity set includes every domain input that can change the result.
         - Confirm wire errors and response envelopes stop at the data boundary.
     relatedExamples:
       - connected-block

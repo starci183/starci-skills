@@ -142,7 +142,7 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
     ...(coverage.backendSourceShape.naming?.status === 'checked' ? [SOURCE_NAME_RULE_ID] : []),
     ...(coverage.backendContractTypeForm.publicContracts?.status === 'checked' ? [PUBLIC_CONTRACT_RULE_ID] : []),
     ...(coverage.backendContractTypeForm.readonlyBoundaries?.status === 'checked' ? [READONLY_BOUNDARY_RULE_ID] : []),
-    ...(coverage.frontendDataLifecycle.status === 'checked' ? SWR_DATA_RULE_IDS : []),
+    ...(config.kinds.includes('frontend') && ['checked', 'not-applicable'].includes(coverage.frontendDataLifecycle.status) ? SWR_DATA_RULE_IDS : []),
   ])].sort();
   return {
     schema: 'starci/architecture-check@1',

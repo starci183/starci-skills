@@ -103,6 +103,7 @@ rules:
         - FE_PURE_WORLD_IMPORT
         - FE_PURE_REACHES_DATA
         - FE_FETCH_OUTSIDE_TRANSPORT
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
       manual:
         - Distinguish intrinsic browser interaction from product-world ownership before requiring a split.
     relatedExamples: []

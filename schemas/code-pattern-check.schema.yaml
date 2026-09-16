@@ -69,6 +69,7 @@ properties:
             files: {$ref: '#/$defs/strings'}
             checkedRuleIds: {$ref: '#/$defs/strings'}
             compiler: {type: [object, 'null']}
+            execution: {type: object}
   coverage:
     type: object
     additionalProperties: false

@@ -7,6 +7,7 @@ checks/code-patterns/nest-metadata.mjs
 checks/code-patterns/nest-boundaries.mjs
 checks/code-patterns/nest-tests.mjs
 checks/code-patterns/nest-errors.mjs
+checks/code-patterns/grammar-guards.mjs
 
 core/identity.mjs
 core/index.mjs

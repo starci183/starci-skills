@@ -50,6 +50,10 @@ CommonJS/dynamic-import SWR bindings, spreads/computed keys, and global `mutate`
 calls without a declared resource-matching contract make coverage unavailable.
 The rule IDs are then absent from
 `coverage.checkedRuleIds`; an empty violation list is not a pass.
+When no production source selects SWR and no lifecycle is declared, the
+architecture report records `not-applicable` with the examined rule IDs. The
+aggregate accepts this explicit absence and rejects missing or unavailable
+lifecycle coverage even if a result lists the rule IDs.
 
 SWR documents `null`/falsy conditional keys in
 [Conditional Fetching](https://swr.vercel.app/docs/conditional-fetching), and

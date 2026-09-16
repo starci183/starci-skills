@@ -81,13 +81,22 @@ rules that contradict the adopted standard must be off while their replacement
 obligations remain required. That migration does not waive an unimplemented
 replacement.
 
-Remaining `missing` or `conflict` obligations still block conformance. In
-particular the conditional FE world-owner/render boundary, framework-specific
-error/data lifecycles and remaining declared source/contract/test forms require
-their exact implementations. Private Academy env/cache/default-export rules do
-not become shared canon merely because their names occur in a local config.
-This implementation queue does not authorize product rewrites or lint-package
-publication.
+Remaining `missing` or `conflict` obligations still block conformance. The
+conditional FE world-owner/render boundary, SWR key lifecycle, selected Next
+error-state contracts, Nest boundary/test/error forms and Grammar guard vectors
+have separate adapters. Their declarations and coverage must match the target;
+the presence of a registered adapter never certifies an unsupported target form.
+Private Academy rules do not become shared canon merely because their names
+occur in a local config. This inventory does not authorize product rewrites or
+lint-package publication.
+
+The aggregate records `frontendDataLifecycle` coverage independently of its rule
+IDs. A proven absence of SWR is not applicable; selecting SWR without a supported
+contract is unavailable. Next error-state adapters receive the same canonical
+architecture config and full bound source/configuration context as other
+scripts. Grammar guard results retain their Node execution and exact package
+input identity in `machineResults[].execution`; a static import-boundary check
+does not substitute for these finite behavior vectors.
 
 ## Evidence limits
 

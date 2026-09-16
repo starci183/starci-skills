@@ -159,7 +159,7 @@ profiles:
         semantic:
           guidance: knowledge/patterns/be/error.yaml
           review: Keep typed business dispositions as outcomes and map private causes without leaking them.
-        status: implemented
+        status: conflict
       - id: NEST-OBSERVABILITY
         sourceRuleIds: [BE-ERROR-7, BE-IMPORTS-6]
         applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.spec.ts', 'src/tests/**', 'libs/*/src/tests/**'] }
@@ -507,6 +507,11 @@ profiles:
       - packages/*/tsconfig*.json
       - package.json
       - packages/grammar/package.json
+      - packages/*/package.json
+      - package-lock.json
+      - npm-shrinkwrap.json
+      - pnpm-lock.yaml
+      - yarn.lock
     obligations:
       - id: NEXT-ROUTE-COMPOSITION
         sourceRuleIds: [FE-ARCHITECTURE-1, FE-FOLDER-3, FE-FUNCTION-7]
@@ -681,7 +686,7 @@ profiles:
           review: Typecheck actual component props and render states; static package identity cannot prove behavior.
         status: implemented
       - id: NEXT-CONDITIONAL-RENDER-BOUNDARY
-        sourceRuleIds: [FE-ARCHITECTURE-3, FE-FOLDER-2, FE-FUNCTION-4, FE-NAMING-1, FE-TEST-1]
+        sourceRuleIds: [FE-ARCHITECTURE-3, FE-FUNCTION-4]
         applicability: { include: ['**/*.tsx'], exclude: ['**/*.spec.tsx'] }
         mechanical:
           requirement: A product-world owner uses an explicit resolved render boundary; intrinsic-only client state does not require a Base twin.
@@ -694,25 +699,48 @@ profiles:
           review: Decide whether the state is product-world lifecycle or intrinsic browser interaction before applying the check.
         status: implemented
       - id: NEXT-ERROR-STATE-MAPPING
-        sourceRuleIds: [FE-ERROR-1, FE-ERROR-2, FE-ERROR-3, FE-ERROR-4, FE-ERROR-5]
-        applicability: { include: ['src/**/*.{ts,tsx}', 'apps/*/src/**/*.{ts,tsx}', 'packages/grammar/src/**/*.{ts,tsx}'] }
+        sourceRuleIds: [FE-ERROR-1, FE-ERROR-2, FE-ERROR-4]
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx', '**/*.test.ts', '**/*.test.tsx', '**/__tests__/**', 'test/**', 'tests/**'] }
         mechanical:
-          requirement: Check adopted GraphQL envelope selection/unwrapping, write wrapper use and owned error-boundary locations.
-          check: { kind: eslint, ruleIds: [starci-fe/graphql-envelope-shape, starci-fe/write-feedback-boundary, starci-fe/error-owner-location] }
+          requirement: Bind declared world failure to closed render state, selected envelope unwrapping, action feedback ownership and installed Next recovery boundaries across the selected production programs.
+          check: { kind: script, ruleIds: [FE_ERROR_WORLD_STATE_MAPPING, FE_ERROR_ENVELOPE_POLICY, FE_WRITE_FEEDBACK_OWNER, FE_NEXT_ERROR_BOUNDARY_LOCATION] }
         semantic:
           guidance: knowledge/patterns/fe/error.yaml
           review: Verify retry eligibility, copy, redaction and valid recovery behavior.
+        status: implemented
+      - id: NEXT-REQUIRED-VALUE-FAILURE
+        sourceRuleIds: [FE-ERROR-3]
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx', '**/*.test.ts', '**/*.test.tsx', '**/__tests__/**', 'test/**', 'tests/**'] }
+        mechanical:
+          requirement: Once an owner declares a required payload or context value, its absent-value path terminates with an actual Error before unsafe continuation.
+          check: { kind: script, ruleIds: [FE_REQUIRED_VALUE_FAILURE] }
+        semantic:
+          guidance: knowledge/patterns/fe/error.yaml
+          review: Decide which values are required and preserve typed normal business dispositions; verify recovery and user-facing behavior separately.
         status: missing
+      - id: NEXT-GRAMMAR-GUARD-BEHAVIOR
+        sourceRuleIds: [FE-ERROR-5]
+        applicability: { include: ['package.json'] }
+        mechanical:
+          requirement: Execute the selected public Grammar conformance and presentation-state guard vectors with exact package and input binding.
+          check: { kind: script, ruleIds: [FE_GRAMMAR_GUARD_BEHAVIOR] }
+        semantic:
+          guidance: docs/grammar-guard-checks.md
+          review: Finite public guard vectors do not prove rendering, every JavaScript value or product recovery behavior.
+        status: implemented
       - id: NEXT-DATA-LIFECYCLE-KEYS
         sourceRuleIds: [FE-FUNCTION-6, FE-NAMING-4, FE-TYPING-8]
-        applicability: { include: ['src/features/**/*.{ts,tsx}', 'src/hooks/**/*.{ts,tsx}', 'apps/*/src/features/**/*.{ts,tsx}'] }
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx', '**/*.test.ts', '**/*.test.tsx', '**/__tests__/**', 'test/**', 'tests/**'] }
         mechanical:
           requirement: Selected SWR hooks use null for unavailable inputs, include all result identities in keys and keep mutation identity tied to the resource.
-          check: { kind: eslint, ruleIds: [starci-fe/swr-key-identity, starci-fe/transport-through-owner] }
+          check:
+            kind: architecture
+            ruleIds: [FE_SWR_KEY_IDENTITY, FE_SWR_MUTATION_RESOURCE_IDENTITY]
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci architecture check' }
         semantic:
           guidance: knowledge/patterns/fe/function.yaml
           review: Exercise identity changes and stale-result boundaries; syntax cannot prove key completeness without domain meaning.
-        status: missing
+        status: implemented
       - id: NEXT-READONLY-PROPS-CONTRACT
         sourceRuleIds: [FE-TYPING-2]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx'] }
