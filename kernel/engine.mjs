@@ -6,7 +6,7 @@ import {hasReplayableStagedResult} from './job-worker.mjs';
 import {createJobs} from './jobs.mjs';
 import {rankJobs,updateProgressBudget,progressExhausted} from './scheduler.mjs';
 import {ADAPTIVE_CAPACITY,OWNER_PREFERENCE_MULTIPLIER,loadRuntimes} from './schedule.mjs';
-import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateRecord,candidateWriterResource,freezeDetectionCandidate,prepareCandidateDependencies,readCandidateBridge,readCandidatePacket,readCandidateSnapshot} from './candidate-bridge.mjs';
+import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateBindingWriterResource,candidateRecord,candidateWriterResource,freezeDetectionCandidate,prepareCandidateDependencies,readCandidateBridge,readCandidatePacket,readCandidateSnapshot} from './candidate-bridge.mjs';
 import {candidateRootBindingDigest} from './candidate-roots.mjs';
 import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
 import {reconcilePureModelJobs} from './job-reconcile.mjs';
@@ -262,7 +262,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       const pool=runtimeProfile.runtimes?.[allocated.runtime]??{};
       const existing=journal.getJob(bound.jobId);
       const bindings=op.candidateRootBindings?.bindings,rootWriters=Array.isArray(bindings)
-        ?bindings.filter(binding=>binding.workerWritable||binding.runtimeWritable).map(binding=>candidateWriterResource(binding.repoRoot))
+        ?bindings.filter(binding=>binding.workerWritable||binding.runtimeWritable).map(candidateBindingWriterResource)
         :((op.allowlist??[]).length?[writer]:[]);
       for(const resource of rootWriters)admission.setCapacity(resource.key,1);
       const provider=pool.provider,machineResources=declareMachineResources(op),resources=[{key:GLOBAL_AI_RESOURCE,units:1},...(provider?[{key:providerResource(provider),units:1}]:[]),...rootWriters,...machineResources]

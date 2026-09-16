@@ -6,6 +6,7 @@ import {RESTART_LIMIT,firstLine,need,plain,sleepSync} from './common.mjs';
 import {buildReport} from './reports.mjs';
 import {redactSecrets} from './owner.mjs';
 import {closeStaleCoordinatorTerminals,pruneClosedCoordinatorTerminals,readClosedCoordinatorTerminals,seedCoordinatorTerminalsFromLog} from './coordinator-terminals.mjs';
+import {inspectStartup,startupRowHolds} from './startup-lock.mjs';
 
 /**
  * Tabs and the Run they hang from. The rule is one sentence - a tab exists only while somebody reads it - and
@@ -141,7 +142,7 @@ export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Dat
     // The kernel tab of a sibling workflow of this repository that finished, or whose kernel is gone, has no reader.
     const sibling=title.startsWith('[Kernel] ')?title.slice(9).trim():null;
     if(sibling&&sibling!==state.id){
-      if(siblingKernelGone(store,sibling)&&tryClose(item.handle))closed.push({terminal:item.handle,workflow:sibling,reason:'kernel tab of a workflow that is not running'});
+      if(siblingKernelGone(store,sibling,{terminal:item.handle,now})&&tryClose(item.handle))closed.push({terminal:item.handle,workflow:sibling,reason:'kernel tab of a workflow that is not running'});
       continue;
     }
     const opId=title.startsWith('[Op] ')?title.slice(title.lastIndexOf(' - ')+3).trim():null;
@@ -157,13 +158,21 @@ export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Dat
   return closed;
 }
 /** Whether a sibling workflow of this store root is finished or has no live kernel: its `[Kernel]` tab is then nobody's. */
-export function siblingKernelGone(store,id){
+export function siblingKernelGone(store,id,{terminal=null,now=Date.now,alive=pid=>{try{process.kill(pid,0);return true;}catch{return false;}}}={}){
   const dir=path.join(path.dirname(store.dir),id);
   let sibling=null;
   // A workflow this store root does not know is not this kernel's to judge: its tab is left alone.
   try{sibling=JSON.parse(fs.readFileSync(path.join(dir,'state.json'),'utf8'));}catch{return false;}
   if(sibling?.finished)return true;
-  try{const lock=JSON.parse(fs.readFileSync(path.join(dir,'kernel.lock'),'utf8'));process.kill(Number(lock.pid),0);return false;}catch{return true;}
+  try{const lock=JSON.parse(fs.readFileSync(path.join(dir,'kernel.lock'),'utf8'));if(alive(Number(lock.pid)))return false;}catch{}
+  // A native supervisor first reserves startup while creating/reading/sending to the coordinator terminal, then
+  // binds its exact handle. Closing either window can kill a kernel between command delivery and lock creation.
+  // Age alone is not worker-stop proof; the supervisor owns reconciliation of an expired launch reservation.
+  try{const startup=inspectStartup(dir),standing=startupRowHolds(startup,{now,alive,kernelAlive:()=>false});
+    if(startup?.phase==='launching'&&standing.holds)return false;
+    if(startup?.phase==='launching-native'&&startup.terminal===terminal)return false;
+    if(startup?.phase==='running'&&startup.terminal===terminal&&alive(Number(startup.pid)))return false;}catch{}
+  return true;
 }
 /** The kernel's own tab is released when the kernel leaves without finishing: the next start opens one and re-binds the Run. */
 export function releaseKernelTab(orca,store,state,{cwd,reason}){

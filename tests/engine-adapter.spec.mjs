@@ -183,6 +183,22 @@ test('cross-root admission acquires both writers atomically and retains both thr
   assert.equal(runtime.settled(first).ok,true);assert.equal(runtime.reserveOperation(second,allocation).ok,true);runtime.settled(second);bridge.close();
 });
 
+test('three workflows sharing one canonical store fence exact continuation projections without sharing a product writer',t=>{
+  const f=fixture(t),storeRoot=path.join(f.dir,'canonical-store');fs.mkdirSync(storeRoot);
+  const source=(name)=>{const root=path.join(f.dir,name);fs.mkdirSync(root);return {id:'source',role:'source',repoRoot:root,allowlist:['src/**'],runtimePaths:[],workerWritable:true,runtimeWritable:false};};
+  const projection=id=>({id:'store',role:'workflow-store',repoRoot:storeRoot,allowlist:[],runtimePaths:[`workflows/${id}.md`],workerWritable:false,runtimeWritable:true,
+    runtimeManagedFiles:[{path:`workflows/${id}.md`,start:'start',end:'end'}]});
+  const ops=['business','backend','frontend'].map(id=>({id,kind:'backend.implement',attempt:1,status:'ready',allowlist:['src/**'],
+    candidateRootBindings:{bindings:[source(`${id}-worktree`),projection(id)]}}));f.state.ops=ops;
+  const bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),
+    runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})}),allocation={role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'};
+  const leases=ops.map(op=>runtime.reserveOperation(op,allocation));assert.equal(leases.every(item=>item.ok),true,JSON.stringify(leases));
+  const resources=leases.map(lease=>runtime.journal.db.prepare('SELECT resource_key FROM leases WHERE job_id=? ORDER BY resource_key').all(lease.jobId).map(row=>row.resource_key));
+  assert.equal(new Set(resources.flat().filter(key=>key.startsWith('runtime-projection:'))).size,3);
+  assert.equal(resources.every(keys=>keys.filter(key=>key.startsWith('canonical-writer:')).length===1),true,'each operation retains only its own product-root mutex');
+  for(const op of ops)assert.equal(runtime.settled(op).ok,true);bridge.close();
+});
+
 test('a stopped exact native Dispatch freezes and preserves unreported effects before releasing its writer',t=>{
   const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'native',kind:'backend.implement',attempt:1,status:'running',allowlist:['a.js'],dispatch:'ctx-native'};f.state.ops=[op];
   const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-native',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);

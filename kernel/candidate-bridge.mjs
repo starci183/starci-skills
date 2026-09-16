@@ -240,6 +240,14 @@ const managedOutside=(root,record)=>{
 export function candidateWriterResource(repoRoot){
   const real=fs.realpathSync(repoRoot);return {key:`canonical-writer:${sha256(slash(real).toLowerCase())}`,units:1};
 }
+/** Runtime-only public projections fence their exact file, while product roots retain repository-wide fencing. */
+export function candidateBindingWriterResource(binding){
+  if(binding?.role==='workflow-store'&&!binding.workerWritable&&(binding.runtimeManagedFiles??[]).length===1){
+    const relative=clean(binding.runtimeManagedFiles[0].path),real=fs.realpathSync(binding.repoRoot);
+    return {key:`runtime-projection:${sha256(`${slash(real).toLowerCase()}\n${relative.toLowerCase()}`)}`,units:1};
+  }
+  return candidateWriterResource(binding.repoRoot);
+}
 export function runtimeWriterHint({host='orca-native',repoRoot}={}){
   return {host,assurance:'detection-only',maxWriters:1,resource:candidateWriterResource(repoRoot),
     limitation:'the current native worker runs in an Orca worktree without an attested filesystem sandbox; serialization and drift checks detect contamination but do not prevent absolute-path writes'};
@@ -331,7 +339,7 @@ export function beginDetectionCandidate(options={}){
       runtimeManagedFiles:(binding.runtimeManagedFiles??[]).map(item=>({...item}))})),
       roots:begun.map(({binding,bridge:child})=>rootBridgeRecord(binding,child)),snapshot,dependency:primary.bridge.dependency,
       writer:{host:'orca-native',assurance:'detection-only',maxWriters:roots.filter(root=>root.workerWritable||root.runtimeWritable).length,
-        resources:roots.filter(root=>root.workerWritable||root.runtimeWritable).map(root=>candidateWriterResource(root.repoRoot))},
+        resources:roots.filter(root=>root.workerWritable||root.runtimeWritable).map(candidateBindingWriterResource)},
       beganAt:new Date(options.now?.()??Date.now()).toISOString()};
     writeJsonAtomic(path.join(options.controlRoot,CANDIDATE_FILES.bridge),bridge);
     return readCandidateBridge(options.controlRoot);

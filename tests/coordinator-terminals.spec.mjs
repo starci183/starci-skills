@@ -6,6 +6,7 @@ import path from 'node:path';
 import {closeStaleCoordinatorTerminals,readClosedCoordinatorTerminals,readCoordinatorTerminals,recordCoordinatorTerminal} from '../kernel/coordinator-terminals.mjs';
 import {startKernel} from '../kernel/supervisor.mjs';
 import {UNCLOSABLE_RETRY_MS,sweepStaleTerminals} from '../kernel/terminals.mjs';
+import {LAUNCH_WINDOW_MS,bindStartupTerminal,reserveStartup} from '../kernel/startup-lock.mjs';
 
 const tmp=t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-coordinator-terminals-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:10,retryDelay:100}));return dir;};
 
@@ -77,6 +78,31 @@ test('a running kernel sweep also seeds the record from the supervisor log, so t
   const orca={invoke:(name,params)=>{if(name==='terminal-list')return {outcome:'ok',receipt:{result:{terminals:[{handle:'term_before_record',title:'powershell.exe'},{handle:'term_live',title:'[Kernel] wf'}]}}};if(name==='terminal-close'){closes.push(params.terminal);return {outcome:'ok'};}throw Error(name);}};
   sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now:()=>5});
   assert.deepEqual(closes,['term_before_record']);assert.deepEqual(readCoordinatorTerminals(dir),[],'the closed tab leaves the record; the kernel never recorded its own');
+});
+
+test('a sibling native startup reservation protects only its attested terminal through command delivery and expiry',t=>{
+  const root=tmp(t),current=path.join(root,'current'),sibling=path.join(root,'business');fs.mkdirSync(current);fs.mkdirSync(sibling);
+  fs.writeFileSync(path.join(sibling,'state.json'),JSON.stringify({id:'business',finished:null}));
+  const launch=reserveStartup(sibling,{pid:999999,now:()=>1,alive:()=>false});
+  assert.equal(bindStartupTerminal(sibling,{token:launch.token,terminal:'term_business',now:()=>2}).ok,true);
+  const events=[],closed=[],store={dir:current,appendEvent:event=>events.push(event)},state={id:'current',worktree:'D:/repo',from:'term_current',ops:[]};
+  const orca={invoke:(name,params)=>{if(name==='terminal-list')return {outcome:'ok',receipt:{result:{terminals:[
+    {handle:'term_current',title:'[Kernel] current'},{handle:'term_business',title:'[Kernel] business'},{handle:'term_unattested',title:'[Kernel] business'}]}}};
+    if(name==='terminal-close'){closed.push(params.terminal);return {outcome:'ok'};}throw Error(name);}};
+  sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now:()=>LAUNCH_WINDOW_MS+10});
+  assert.deepEqual(closed,['term_unattested'],'the exact startup terminal survives; another same-title terminal has no startup identity');
+  assert.equal(events.at(-1).closed[0].terminal,'term_unattested');
+});
+
+test('a sibling launch reservation defers kernel-tab cleanup only through its live creation-to-binding window',t=>{
+  const root=tmp(t),current=path.join(root,'current'),sibling=path.join(root,'business');fs.mkdirSync(current);fs.mkdirSync(sibling);
+  fs.writeFileSync(path.join(sibling,'state.json'),JSON.stringify({id:'business',finished:null}));
+  reserveStartup(sibling,{pid:999999,now:()=>1,alive:()=>false});
+  const closed=[],store={dir:current,appendEvent(){}},state={id:'current',worktree:'D:/repo',from:'term_current',ops:[]},orca={invoke:(name,params)=>{
+    if(name==='terminal-list')return {outcome:'ok',receipt:{result:{terminals:[{handle:'term_current',title:'[Kernel] current'},{handle:'term_business',title:'[Kernel] business'}]}}};
+    if(name==='terminal-close'){closed.push(params.terminal);return {outcome:'ok'};}throw Error(name);}};
+  sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now:()=>LAUNCH_WINDOW_MS-1});assert.deepEqual(closed,[]);
+  sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now:()=>LAUNCH_WINDOW_MS+2});assert.deepEqual(closed,['term_business'],'expired launch with no holder no longer protects an unattested tab');
 });
 
 test('a tab Orca answers a close for but still lists is reported unclosable once and not asked again for half an hour',t=>{
