@@ -435,6 +435,16 @@ executionModes:
             dirty/untracked/ignored files and unreachable commits need independently verified
             recoverable preservation. Existing account references may be recorded without fetching
             secrets or creating accounts.
+      - id: application-stacks
+        path: knowledge/application-stacks.json + docs/application-stacks.md +
+          docs/application-stacks-vps.md + schemas/application-stacks.schema.json
+        purpose:
+          en: When the imported source contains application deployment, .stacks compose material or
+            bootstrap/recovery declarations, load the whole-application dev/VPS contract and its
+            .starciwork schema so deployment files are classified and mapped as stack material -
+            observed facts with provenance - never silently dropped as clutter and never promoted
+            to accepted deployment authority. This conditional read grants no extra deployment or
+            source scope.
       - id: matrix
         path: selected complete-job matrix request + workflows/jobs.json
         purpose:
@@ -590,12 +600,14 @@ executionModes:
           - repo
           - inventory
           - intent
+          - application-stacks
         writes:
           - evidence
         action:
           en: Read the bounded source and tests; map routes/actions/data/rules to source facts at actual
-            commits. Report contradictions and missing behavior. Label inferred business as
-            candidate, never approved intent; old checkmarks and test file existence prove no
+            commits, and map .stacks compose/bootstrap material against the declared stack contract
+            where it is present. Report contradictions and missing behavior. Label inferred business
+            as candidate, never approved intent; old checkmarks and test file existence prove no
             current execution.
       - reads:
           - inventory

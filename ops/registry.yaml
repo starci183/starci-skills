@@ -4,21 +4,29 @@ ops:
   - backend.implement
   - brand.decide
   - business.decide
+  - code.refactor
   - content.generate
+  - docs.author
   - e2e.verify
+  - goal.revise
   - grammar.update
   - integration.verify
   - interface.asset
   - interface.draw
   - interface.implement
   - knowledge.repair
+  - perf.verify
   - decision.prepare
   - provision.ask
   - release.deliver
+  - request.analyze
   - review.verify
   - runtime.operate
+  - scope.define
   - scope.retire
+  - security.verify
   - task.execute
+  - test.author
   - uat.verify
   - work.author
   - workspace.manage
@@ -26,11 +34,14 @@ consolidation:
   schema: starci/op-consolidation@1
   principle: One operator owns one complete selected job, including preparation and proof.
   basic:
+    - request.analyze
+    - scope.define
     - business.decide
     - architecture.decide
     - interface.draw
     - interface.implement
     - backend.implement
+    - test.author
     - uat.verify
   supporting:
     - e2e.verify
@@ -49,6 +60,11 @@ consolidation:
     - knowledge.repair
     - scope.retire
     - task.execute
+    - code.refactor
+    - security.verify
+    - perf.verify
+    - docs.author
+    - goal.revise
   mappings:
     - from: owner.ask
       to:
@@ -194,3 +210,11 @@ consolidation:
     - grammar.update
     - decision.prepare
     - provision.ask
+    - request.analyze
+    - scope.define
+    - code.refactor
+    - test.author
+    - security.verify
+    - perf.verify
+    - docs.author
+    - goal.revise
