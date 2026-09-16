@@ -95,7 +95,8 @@ rules:
           Treat the duplicate as Academy source history, not a pattern. A changed unit names the
           route/connected input separately or keeps it unexported.
     verification:
-      automated: []
+      automated:
+        - FE_CONTRACT_NAME_SHAPE
       manual: []
     relatedExamples:
       - connected-block

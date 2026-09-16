@@ -210,13 +210,197 @@ test('snapshot rule ignores a local same-spelling expect helper', t => {
   assert.deepEqual(result.violations, []);
 });
 
-test('semantic-role rules fail unavailable instead of being relabeled clean', t => {
-  const context = fixture(t, { 'src/value.ts': 'export const value = 1\n' });
-  const ruleIds = ['FE_RETURN_TYPE_PROFILE', 'FE_CLOSED_VOCABULARY_SHAPE'];
-  const result = checkNextPatterns({ ...context, ruleIds });
+test('return profile classifies components, hooks, async utilities and primitive helpers', t => {
+  const context = fixture(t, {
+    'src/components/Card.tsx': `import { memo } from "react"
+export const Card = (): null => { const isVisible = () => true; return null }
+export const Wrapped = memo((_props: {}): null => null)
+export const useRows = (): ReadonlyArray<string> => []
+export const isReady = () => true
+export const readyLabel = (): string => "ready"
+export const save = async () => true
+export const persist = async (): Promise<boolean> => true
+`,
+    'src/app/page.tsx': 'export default async function Page(){ return null }\n',
+    'src/app/legacy/page.tsx': 'const LegacyRoute = async () => null; export default LegacyRoute\n',
+    'src/app/api/health/route.ts': 'export async function GET(){ return new Response() }\n',
+    'src/factories.ts': 'export const WidgetFactory = (): string => "widget"\n',
+  });
+  const result = checkNextPatterns({ ...context, ruleIds: ['FE_RETURN_TYPE_PROFILE'] });
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.checkedRuleIds, ['FE_RETURN_TYPE_PROFILE']);
+  assert.equal(result.violations.length, 6, JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => /Component Card/.test(item.message)));
+  assert.ok(result.violations.some(item => /Component Wrapped/.test(item.message)));
+  assert.ok(result.violations.some(item => /Hook useRows/.test(item.message)));
+  assert.ok(result.violations.some(item => /Primitive helper isReady/.test(item.message)));
+  assert.ok(result.violations.some(item => /Primitive helper isVisible/.test(item.message)));
+  assert.ok(result.violations.some(item => /Async utility save/.test(item.message)));
+});
+
+test('return profile refuses overloaded and unresolved dynamic returns', t => {
+  const context = fixture(t, {
+    'src/helpers.ts': `export function parse(value: string): string
+export function parse(value: number): number
+export function parse(value: unknown){ return value }
+export const dynamic = (): any => 1
+`,
+  });
+  const result = checkNextPatterns({ ...context, ruleIds: ['FE_RETURN_TYPE_PROFILE'] });
+  assert.ok(result.errors.some(item => /Overloaded function parse/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.errors.some(item => /dynamic.*any\/unknown/.test(item.message)), JSON.stringify(result, null, 2));
   assert.deepEqual(result.checkedRuleIds, []);
-  assert.deepEqual(new Set(result.errors.map(item => item.ruleId)), new Set(ruleIds));
-  assert.ok(result.errors.every(item => item.code === 'FE_PATTERN_CONTRACT_REQUIRED'));
+});
+
+test('closed vocabularies bind exact inventories and boolean prop names', t => {
+  const context = fixture(t, {
+    'src/components/chat/state.ts': `export type ChatState = "pending" | "failed"
+export const CHAT_STATES: ReadonlyArray<ChatState> = ["pending", "failed"] as const
+export type ChatProps = { readonly loading: boolean; readonly isReady?: boolean }
+`,
+    'packages/grammar/src/Button/index.ts': `export type ButtonVariant = "primary" | "secondary"
+const VARIANTS = { primary: "primary", secondary: "secondary" } as const
+export type ButtonProps = { readonly variant: ButtonVariant }
+`,
+  });
+  const result = checkNextPatterns({ ...context, ruleIds: ['FE_CLOSED_VOCABULARY_SHAPE'] });
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.checkedRuleIds, ['FE_CLOSED_VOCABULARY_SHAPE']);
+  assert.equal(result.violations.length, 1, JSON.stringify(result, null, 2));
+  assert.match(result.violations[0].message, /Boolean prop loading/);
+});
+
+test('closed vocabularies reject missing members, shadowed inventory types and presentation enums', t => {
+  const context = fixture(t, {
+    'src/components/chat/state.ts': `type ReadonlyArray<T> = T[]
+export type ChatState = "pending" | "failed"
+export const CHAT_STATES: ReadonlyArray<ChatState> = ["pending"] as const
+export enum ChatMode { General = "general", History = "history" }
+`,
+    'packages/grammar/src/Button/index.ts': 'const SIZES = { sm: "sm", md: "md" } as const\n',
+  });
+  const result = checkNextPatterns({ ...context, ruleIds: ['FE_CLOSED_VOCABULARY_SHAPE'] });
+  assert.ok(result.violations.some(item => /exactly one beside-it/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => /instead of enum/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.errors.some(item => /SIZES.*exact union binding/.test(item.message)), JSON.stringify(result, null, 2));
+});
+
+test('closed vocabulary metadata binds nonconventional project roles and validates exact declarations', t => {
+  const packageJson = {
+    private: true,
+    starci: { codePatterns: { next: { schema: 'starci/next-code-pattern-contract@1', owners: [], closedVocabularies: [
+      { path: 'src/features/auth/phase.ts', type: 'AuthenticationPhase', inventory: 'AUTH_MODES', role: 'mode' },
+    ] } } },
+  };
+  const context = fixture(t, {
+    'package.json': JSON.stringify(packageJson),
+    'src/features/auth/phase.ts': `export type AuthenticationPhase = "signIn" | "verify"
+export const AUTH_MODES: ReadonlyArray<AuthenticationPhase> = ["signIn", "verify"] as const
+`,
+  });
+  const result = checkNextPatterns({ ...context, files: ['src/features/auth/phase.ts'], ruleIds: ['FE_CLOSED_VOCABULARY_SHAPE'] });
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.violations, []);
+  packageJson.starci.codePatterns.next.closedVocabularies[0].type = 'MissingPhase';
+  fs.writeFileSync(path.join(context.root, 'package.json'), JSON.stringify(packageJson));
+  const missing = checkNextPatterns({ ...context, files: ['src/features/auth/phase.ts'], ruleIds: ['FE_CLOSED_VOCABULARY_SHAPE'] });
+  assert.ok(missing.errors.some(item => /MissingPhase.*not one exported type alias/.test(item.message)), JSON.stringify(missing, null, 2));
+});
+
+test('closed vocabulary coverage permits feature discriminated state but refuses undeclared unions and export wrappers', t => {
+  const context = fixture(t, {
+    'src/features/auth/state.ts': `export type AuthenticationState = { readonly status: "ready"; readonly id: string }
+export type AuthenticationMode = "signIn" | "verify"
+`,
+    'src/features/auth/index.ts': 'export { type AuthenticationMode as PublicMode } from "./state"\n',
+  });
+  const result = checkNextPatterns({ ...context, ruleIds: ['FE_CLOSED_VOCABULARY_SHAPE'] });
+  assert.ok(result.errors.some(item => /AuthenticationMode.*must be declared/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.errors.some(item => /Aliased closed-vocabulary export PublicMode/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.errors.every(item => !/AuthenticationState/.test(item.message)), JSON.stringify(result, null, 2));
+  const outside = checkNextPatterns({ root: context.root, files: ['src/features/auth/index.ts'], ruleIds: ['FE_CLOSED_VOCABULARY_SHAPE'] });
+  assert.ok(outside.errors.some(item => /outside the exact selected file set/.test(item.message)), JSON.stringify(outside, null, 2));
+  fs.writeFileSync(path.join(context.root, 'src/features/auth/index.ts'), 'export type { MissingState } from "./missing"\n');
+  const unresolved = checkNextPatterns({ root: context.root, files: ['src/features/auth/index.ts'], ruleIds: ['FE_CLOSED_VOCABULARY_SHAPE'] });
+  assert.ok(unresolved.errors.some(item => /MissingState.*outside the exact selected file set/.test(item.message)), JSON.stringify(unresolved, null, 2));
+});
+
+test('closed vocabulary follows checked public re-exports and same-file export lists', t => {
+  const context = fixture(t, {
+    'src/components/chat/state.ts': `export type ChatState = "pending" | "ready"
+export const CHAT_STATES: ReadonlyArray<ChatState> = ["pending", "ready"] as const
+`,
+    'src/components/chat/index.ts': 'export type { ChatState } from "./state"\n',
+    'src/components/card/state.ts': `type CardState = "idle" | "active"
+export type { CardState }
+`,
+  });
+  const result = checkNextPatterns({ ...context, ruleIds: ['FE_CLOSED_VOCABULARY_SHAPE'] });
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.violations.length, 1, JSON.stringify(result, null, 2));
+  assert.match(result.violations[0].message, /CardState has exactly one beside-it/);
+});
+
+test('contract names use type aliases, their visual owner and one symbol through re-exports', t => {
+  const context = fixture(t, {
+    'src/components/pages/CardPage/component.tsx': `export interface CardPageProps { readonly title: string }
+export type WrongData = { readonly value: string }
+export const CardPageBase = (_props: CardPageProps) => null
+`,
+    'src/components/pages/CardPage/index.tsx': `export { CardPageBase, type CardPageProps } from "./component"
+export const CardPage = () => null
+`,
+  });
+  const result = checkNextPatterns({ ...context, ruleIds: ['FE_CONTRACT_NAME_SHAPE'] });
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.violations.length, 2, JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => /CardPageProps uses export type/.test(item.message)));
+  assert.ok(result.violations.some(item => /WrongData follows its owning unit/.test(item.message)));
+});
+
+test('contract names reject distinct duplicate owner contracts and unselected re-export targets', t => {
+  const context = fixture(t, {
+    'src/components/pages/CardPage/component.tsx': 'export type CardPageProps = { readonly title: string }; export const CardPageBase=()=>null\n',
+    'src/components/pages/CardPage/index.tsx': 'export type CardPageProps = { readonly id: string }; export const CardPage=()=>null\n',
+  });
+  const duplicate = checkNextPatterns({ ...context, ruleIds: ['FE_CONTRACT_NAME_SHAPE'] });
+  assert.ok(duplicate.errors.some(item => /multiple distinct exported CardPageProps/.test(item.message)), JSON.stringify(duplicate, null, 2));
+  fs.writeFileSync(path.join(context.root, 'src/components/pages/CardPage/index.tsx'), 'export { type CardPageProps } from "./component"\n');
+  const outside = checkNextPatterns({ root: context.root, files: ['src/components/pages/CardPage/index.tsx'], ruleIds: ['FE_CONTRACT_NAME_SHAPE'] });
+  assert.ok(outside.errors.some(item => /outside the exact selected file set/.test(item.message)), JSON.stringify(outside, null, 2));
+});
+
+test('contract owner metadata covers nonvisual contracts and Grammar rejects interfaces', t => {
+  const packageJson = {
+    private: true,
+    starci: { codePatterns: { next: { schema: 'starci/next-code-pattern-contract@1', owners: [
+      { root: 'src/features/auth', name: 'Authentication' },
+    ], closedVocabularies: [] } } },
+  };
+  const context = fixture(t, {
+    'package.json': JSON.stringify(packageJson),
+    'src/features/auth/contracts.ts': 'export type AuthenticationState = { readonly status: string }\n',
+    'packages/grammar/src/Button/contracts.ts': 'export interface ButtonRule { readonly id: string }\n',
+  });
+  const result = checkNextPatterns({ ...context, files: ['packages/grammar/src/Button/contracts.ts', 'src/features/auth/contracts.ts'],
+    ruleIds: ['FE_CONTRACT_NAME_SHAPE'] });
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.violations.length, 1, JSON.stringify(result, null, 2));
+  assert.match(result.violations[0].message, /Grammar contract ButtonRule/);
+});
+
+test('contract owner identity uses its declared root when names repeat', t => {
+  const contract = { schema: 'starci/next-code-pattern-contract@1', owners: [
+    { root: 'packages/a/src', name: 'Shared' }, { root: 'packages/b/src', name: 'Shared' },
+  ], closedVocabularies: [] };
+  const context = fixture(t, {
+    'package.json': JSON.stringify({ private: true, starci: { codePatterns: { next: contract } } }),
+    'packages/a/src/state.ts': 'export type SharedState = { readonly source: "a" }\n',
+    'packages/b/src/state.ts': 'export type SharedState = { readonly source: "b" }\n',
+  });
+  const result = checkNextPatterns({ ...context, files: ['packages/a/src/state.ts', 'packages/b/src/state.ts'], ruleIds: ['FE_CONTRACT_NAME_SHAPE'] });
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.violations, []);
 });
 
 test('adapter rejects malformed, missing, redirected, duplicate and unsupported input', t => {
