@@ -29,7 +29,7 @@ topics:
     title: Architecture check
     path: architecture-check.yaml
     decides: Enforceable modules/features/apps dependency direction and thin application composition roots
-    rules: BE-ARCHITECTURE-1 … BE-ARCHITECTURE-3
+    rules: BE-ARCHITECTURE-1 … BE-ARCHITECTURE-4
   - id: be.folder
     title: Folder
     path: folder.yaml

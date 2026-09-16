@@ -93,3 +93,18 @@ rules:
       manual:
         - Review provider token, scope, configuration, lifetime, and duplicate registration with a meaningful boot/DI test.
     relatedExamples: []
+  - id: BE-ARCHITECTURE-4
+    title: Application contracts do not depend on transport adapters
+    kind: mandatory
+    requirement: |-
+      In the adopted feature/application layout, use cases and their plain contracts do not import feature/transport DTOs or protocol framework surfaces. Transport adapters import application contracts and project results. Nest injection alone is allowed in the concrete Nest profile; a namespace alias must not hide protocol decorators. Legacy transport-first source is mapped explicitly and is not silently reclassified or declared migrated.
+    rationale: |-
+      Multiple protocols can reuse a scenario only when its contract does not depend on one protocol's request or response representation.
+    verification:
+      automated:
+        - BE_APPLICATION_IMPORTS_TRANSPORT
+        - BE_APPLICATION_TRANSPORT_FRAMEWORK
+      manual:
+        - Check generated wire types and same-source public API leaks outside recognizable configured paths.
+        - Review semantic DTO mapping and actual input validation; static dependencies do not prove either.
+    relatedExamples: []
