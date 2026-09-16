@@ -35,6 +35,6 @@ communication:
     - parent-plan-coordinator-to-operation
 identity:
   role: immutable-task-display-name
-  provider: native-agent-icon-and-supervised-worker-receipt
+  provider: native-agent-icon-or-command-terminal-rendered-identity-plus-supervised-dispatch-receipt
   terminalTitle: mutable-ui-metadata-canonicalized-after-readiness-and-before-release
   activity: sidebar-subtitle-or-native-activity-title

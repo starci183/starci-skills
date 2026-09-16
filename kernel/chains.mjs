@@ -47,7 +47,8 @@ export function resolveExecutionChain({skill='starci',op}){
     // A reasoning role runs the analysis-only command when the target declares one (review must not repair).
     if(orcaLaunch.kind==='command-terminal'&&role==='reasoning'&&orcaLaunch.reasoningCommand)orcaLaunch.command=orcaLaunch.reasoningCommand;
     delete orcaLaunch.reasoningCommand;
-    return {priority,target,runtime,provider:runtimes[runtime].provider,profile:profileId,role,model:selected.model,orcaLaunch};
+    return {priority,target,runtime,provider:runtimes[runtime].provider,profile:profileId,role,model:selected.model,
+      executionHosts:Array.isArray(route.executionHosts)?[...route.executionHosts]:['orca','headless'],orcaLaunch};
   });
   return {schema:'starci/execution-chain@1',skill,op,role,candidates};
 }
@@ -81,6 +82,10 @@ export function selectExecutionTarget({skill='starci',op,inventory,attempts=[],c
   }
   const skipped=[];
   for(const candidate of chain.candidates){
+    if(candidate.orcaLaunch?.capacityGate==='explicit-workflow-quota'){
+      skipped.push({target:candidate.target,reason:'unavailable'});
+      continue;
+    }
     if(attempted.has(candidate.target)){skipped.push({target:candidate.target,reason:attempted.get(candidate.target).reason});continue;}
     const observed=available.get(candidate.runtime);
     if(!observed||observed.status!=='ready'){skipped.push({target:candidate.target,reason:'unavailable'});continue;}

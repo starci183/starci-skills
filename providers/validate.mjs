@@ -86,8 +86,24 @@ export function validateProviderContracts(){
   add(errors,qwen?.forbidden?.includes('qwen-agent-tool')&&qwen?.forbidden?.includes('dispatch-inject')&&qwen?.forbidden?.includes('reuse-existing-terminal'),'Qwen adapter does not forbid nested agents, inject or terminal reuse');
   add(errors,orca.index?.operationAgent?.qwen38Flash?.launch==='command-terminal','Orca index must launch Qwen as a command terminal');
   add(errors,orca.index?.operationAgent?.qwen38Flash?.agent===qwen?.agent&&orca.index?.operationAgent?.qwen38Flash?.model===qwen?.model,'Orca index and Qwen adapter identities disagree');
+  const devin=orca.adapters?.devin;
+  add(errors,devin?.agent==='devin'&&devin?.kind==='command-terminal-agent','Missing Orca Devin command-terminal adapter');
+  add(errors,devin?.model==='devin-agent'&&devin?.modelAuthority==='configured-logical-runtime','Devin must not infer the account-selected underlying model');
+  add(errors,typeof devin?.commandPrefix?.win32==='string'&&typeof devin?.commandPrefix?.posix==='string'&&!/cog_|Bearer|DEVIN_API_KEY=/.test(devin.commandPrefix.win32+devin.commandPrefix.posix),'Devin auth preflight must use stored CLI credentials and never embed a token');
+  add(errors,typeof devin?.readiness?.screenPattern==='string'&&typeof devin?.readiness?.identityPattern==='string'&&devin?.readiness?.timeoutMs>=30000,'Devin readiness contract is invalid');
+  add(errors,devin?.forbidden?.includes('provider-native-subagent')&&devin?.forbidden?.includes('cloud-handoff')&&devin?.forbidden?.includes('inferred-underlying-model'),'Devin adapter must forbid nested/cloud handoff and inferred model identity');
+  add(errors,orca.index?.operationAgent?.devin?.launch==='command-terminal'&&orca.index?.operationAgent?.devin?.capacityAuthority==='explicit-workflow-quota'&&orca.index?.operationAgent?.devin?.quotaTelemetry==='launch-status','Orca index must keep Devin closed until explicit workflow capacity exists');
+  add(errors,orca.index?.operationAgent?.devin?.agent===devin?.agent&&orca.index?.operationAgent?.devin?.model===devin?.model,'Orca index and Devin adapter identities disagree');
   for(const [name,target] of Object.entries(readDistJson('model','registry.json').targets||{})){
-    if(target?.orcaLaunch?.kind==='command-terminal')add(errors,/--exclude-tools agent\b/.test(target.orcaLaunch.command||''),`Command terminal ${name} must exclude the provider agent tool`);
+    if(target?.orcaLaunch?.kind!=='command-terminal')continue;
+    const adapterName=target.orcaLaunch.adapter,adapter=orca.adapters?.[adapterName];
+    add(errors,typeof adapterName==='string'&&plain(adapter),`Command terminal ${name} must name a declared Orca adapter`);
+    add(errors,target.orcaLaunch.nestedAgents==='forbidden',`Command terminal ${name} must forbid provider-native nested agents`);
+    if(adapterName==='devin'){
+      add(errors,target.orcaLaunch.capacityGate==='explicit-workflow-quota',`Command terminal ${name} must require explicit workflow capacity`);
+      add(errors,Array.isArray(target.executionHosts)&&target.executionHosts.length===1&&target.executionHosts[0]==='orca',`Command terminal ${name} must be confined to the Orca host`);
+    }
+    for(const required of adapter?.commandRequirements??[])add(errors,typeof required==='string'&&(target.orcaLaunch.command||'').includes(required),`Command terminal ${name} is missing required command fragment: ${required}`);
   }
   const workerStartTemplates=[
     orca.index?.operationAgent?.managedFallback?.calls?.startAgent?.cli,

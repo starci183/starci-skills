@@ -3,12 +3,14 @@ runtimes:
   - codex
   - claude
   - qwen
+  - devin
 aliases:
   openai: codex
   anthropic: claude
   qwencloud: qwen
   alibaba: qwen
   deepseek: qwen
+  cognition: devin
 executionModes:
   solo:
     hosts: [codex, claude, orca]
@@ -25,7 +27,7 @@ executionModes:
     bootstrapRole: retain-user-designated-coordinator
     coordinatorAgent: current-user-designated-session
     coordinatorAuthority: owns-approved-boundaries-and-review
-    workers: [codex, claude, qwen]
+    workers: [codex, claude, qwen, devin]
     workflowWrapperAgent: deterministic-workflow-kernel
     workflowManagerAuthority: sole-state-writer-and-operation-dag
     workflowManagerReportsTo: active-user-designated-coordinator
@@ -67,6 +69,9 @@ defaults:
   qwen:
     working: qwen3.8-flash-worker
     reasoning: qwen3.8-flash-reviewer
+  devin:
+    working: devin-worker
+    reasoning: devin-reviewer
 reasoningOps:
   - decision.prepare
   - provision.ask
@@ -130,6 +135,8 @@ targets:
       command: qwen --model qwen3.8-flash --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
       reasoningCommand: qwen --model qwen3.8-flash --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
       dispatch: return-preamble-and-send
+      adapter: qwen
+      nestedAgents: forbidden
   qwen3.8-max:
     runtime: qwen
     requestedModel: qwen3.8-max
@@ -140,6 +147,8 @@ targets:
       kind: command-terminal
       command: qwen --model qwen3.8-max --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
       dispatch: return-preamble-and-send
+      adapter: qwen
+      nestedAgents: forbidden
   deepseek-v4-pro:
     runtime: qwen
     requestedModel: deepseek-v4-pro
@@ -150,6 +159,23 @@ targets:
       kind: command-terminal
       command: qwen --model deepseek-v4-pro --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false
       dispatch: return-preamble-and-send
+      adapter: qwen
+      nestedAgents: forbidden
+  devin-agent:
+    runtime: devin
+    requestedModel: null
+    executionHosts: [orca]
+    profiles:
+      working: devin-worker
+      reasoning: devin-reviewer
+    orcaLaunch:
+      kind: command-terminal
+      command: devin --permission-mode accept-edits --respect-workspace-trust false
+      reasoningCommand: devin --permission-mode accept-edits --respect-workspace-trust false
+      dispatch: return-preamble-and-send
+      adapter: devin
+      nestedAgents: forbidden
+      capacityGate: explicit-workflow-quota
 targetAliases:
   qwen-qwen3.8-flash-worker: qwen3.8-flash
   qwen-qwen3.8-flash-reviewer: qwen3.8-flash
@@ -163,11 +189,14 @@ targetAliases:
   qwen-qwen3.8-max-reviewer: qwen3.8-max
   qwen-deepseek-v4-pro-worker: deepseek-v4-pro
   qwen-deepseek-v4-pro-reviewer: deepseek-v4-pro
+  devin-devin-worker: devin-agent
+  devin-devin-reviewer: devin-agent
 skills:
   starci:
     chains:
       working:
         - qwen3.8-flash
+        - devin-agent
         - claude-opus
         - gpt-5.6-sol
       reasoning:
@@ -194,9 +223,10 @@ operators:
       - {environment: codex, profiles: [gpt-6-astra, gpt-5.6-sol]}
   backend.implement:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
+    chain: [qwen3.8-flash, devin-agent, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
+      - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   brand.decide:
@@ -234,35 +264,39 @@ operators:
       - {environment: codex, profiles: [gpt-6-astra, gpt-5.6-sol]}
   content.generate:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
+    chain: [qwen3.8-flash, devin-agent, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
+      - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   e2e.verify:
     skill: starci
-    chain: [gpt-5.6-sol, claude-opus, qwen3.8-flash, gpt-5.6-luna]
+    chain: [gpt-5.6-sol, claude-opus, qwen3.8-flash, devin-agent, gpt-5.6-luna]
     environments:
       - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: qwen, profiles: [qwen3.8-flash]}
+      - {environment: devin, profiles: [devin-agent]}
   integration.verify:
     skill: starci
     # A live call to a real provider is the same kind of work as the API proof: run code, read the response
     # back, keep the output. So it carries the same verify-role chain e2e.verify does.
-    chain: [gpt-5.6-sol, claude-opus, qwen3.8-flash, gpt-5.6-luna]
+    chain: [gpt-5.6-sol, claude-opus, qwen3.8-flash, devin-agent, gpt-5.6-luna]
     environments:
       - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: qwen, profiles: [qwen3.8-flash]}
+      - {environment: devin, profiles: [devin-agent]}
   grammar.update:
     skill: starci
     # Growing the installed grammar is code, stories, tests, a published version and a canon entry, so it runs on
     # the strongest coding runtimes first and never on the image model: nothing here is drawn.
-    chain: [claude-opus, gpt-5.6-sol, gpt-5.6-luna]
+    chain: [claude-opus, gpt-5.6-sol, devin-agent, gpt-5.6-luna]
     environments:
       - {environment: claude, profiles: [claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
+      - {environment: devin, profiles: [devin-agent]}
   interface.asset:
     skill: starci
     # Generating the artwork a candidate embeds needs the same image model the drawing used, so the chain is
@@ -279,58 +313,66 @@ operators:
       - {environment: codex, profiles: [gpt-5.6-sol]}
   interface.implement:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
+    chain: [qwen3.8-flash, devin-agent, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
+      - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   knowledge.repair:
     skill: starci
-    chain: [claude-opus, gpt-5.6-sol, qwen3.8-flash, gpt-5.6-luna]
+    chain: [claude-opus, gpt-5.6-sol, qwen3.8-flash, devin-agent, gpt-5.6-luna]
     environments:
       - {environment: claude, profiles: [claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
       - {environment: qwen, profiles: [qwen3.8-flash]}
+      - {environment: devin, profiles: [devin-agent]}
   release.deliver:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
+    chain: [qwen3.8-flash, devin-agent, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
+      - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   review.verify:
     skill: starci
-    chain: [qwen3.8-flash, claude-fable-5.1, gpt-5.6-sol, claude-opus, gpt-6-astra, gpt-5.6-luna]
+    chain: [qwen3.8-flash, devin-agent, claude-fable-5.1, gpt-5.6-sol, claude-opus, gpt-6-astra, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
+      - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-fable-5.1, claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol, gpt-6-astra, gpt-5.6-luna]}
   runtime.operate:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
+    chain: [qwen3.8-flash, devin-agent, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
+      - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   scope.retire:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
+    chain: [qwen3.8-flash, devin-agent, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
+      - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   task.execute:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
+    chain: [qwen3.8-flash, devin-agent, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
+      - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   uat.verify:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
+    chain: [qwen3.8-flash, devin-agent, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
+      - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   work.author:
@@ -344,9 +386,10 @@ operators:
       - {environment: codex, profiles: [gpt-6-astra, gpt-5.6-sol]}
   workspace.manage:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
+    chain: [qwen3.8-flash, devin-agent, claude-opus, gpt-5.6-sol]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
+      - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: codex, profiles: [gpt-5.6-sol]}
 fallback:

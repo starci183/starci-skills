@@ -48,6 +48,26 @@ recipes:
     dispatchCardinality: one
     agentCardinality: one
     environmentBinding: current-runtime-by-omitting---on
+  start-devin-operation:
+    mode: orchestrated
+    actor: canonical-launcher
+    precondition: owner-assigned-positive-devin-agent-slot
+    sequence:
+      - assert-expected-active-dag-operation
+      - assert-explicit-capacity-gated-candidate
+      - orchestration.task-create
+      - assert-canonical-task-display-name
+      - terminal.create-devin-read-only-auth-preflight-then-declared-command
+      - terminal.read-screen-until-input-prompt-and-devin-identity
+      - orchestration.dispatch-return-preamble
+      - terminal.send-preamble-with-enter
+      - terminal.read-screen-verify-submission-or-one-more-enter
+      - orchestration.dispatch-show-attest-assignee-and-logical-runtime
+    terminalName: "[Op] <operation> - <scope>"
+    taskCardinality: one
+    dispatchCardinality: one
+    agentCardinality: one
+    quotaTelemetry: launch-status
   start-managed-operation:
     mode: orchestrated
     actor: workflow-monitor
@@ -121,6 +141,9 @@ forbiddenSequences:
   - plan-coordinator-calls-operation
   - workflow-coordinator-implements-op
   - qwen-op-uses-agent-tool
+  - devin-op-uses-provider-native-subagent-or-cloud-handoff
+  - devin-op-launched-without-explicit-workflow-slot
+  - devin-underlying-model-inferred-from-account-default
   - terminal-send-outside-canonical-launcher
   - dispatch-to-reused-terminal-operation
   - dispatch-inject-operation

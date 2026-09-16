@@ -7,13 +7,13 @@
  * park a runtime the moment its provider starts refusing.
  */
 export const DEFAULT_STALLED_AFTER_MS=20*60*1000;
-export const PROVIDER_FAMILIES=['claude','codex','qwen','shell'];
+export const PROVIDER_FAMILIES=['claude','codex','qwen','devin','shell'];
 /**
  * Families scanned when neither the caller, the screen nor the title names one. `shell` is excluded on
  * purpose: its signatures are a bare prompt character and a `(y/n)` tail, too common to classify an unknown
  * agent screen by, so a shell family is only ever used when it was selected explicitly or by title.
  */
-export const SCAN_ORDER=['claude','codex','qwen'];
+export const SCAN_ORDER=['claude','codex','qwen','devin'];
 
 /** One row per family: what its screen looks like in each phase, what accepts a dialog, how it is recognized. */
 export const SCREENS={
@@ -52,6 +52,14 @@ export const SCREENS={
     answer:'1',
     detect:[/qwen3[\w.-]*/i,/Token Plan/i],
     title:[/\bqwen\b/i]
+  },
+  devin:{
+    busy:[/esc to (?:cancel|interrupt)/i,/\b(?:Thinking|Working|Running)\b[^\n]*(?:…|\.\.\.)/i,/\btool\b[^\n]*\brunning\b/i],
+    idle:[/Ask Devin/i,/Message Devin/i,/Type your message/i,/Enter a prompt/i],
+    prompt:[/Allow .+\?/i,/Do you want to (?:run|proceed)/i,/\(y\/n\)/i],
+    answer:'y',
+    detect:[/\bDevin CLI\b/i,/\bDevin\b[^\n]*(?:session|model|usage|authenticated)/i],
+    title:[/\bdevin\b/i]
   },
   shell:{
     busy:[],

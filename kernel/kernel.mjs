@@ -20,6 +20,7 @@ import {TAB_READ_LIMIT,classifyTab} from './tab.mjs';
 import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot,workflowsRoot} from './store.mjs';
 import {grammarRepository,resolveLedgerRoot,sharedLedgerStatus} from './routing.mjs';
 import {createAllocator,loadRuntimes,withProviderPreference} from './schedule.mjs';
+import {resolveExecutionChain} from './chains.mjs';
 import {loadsFileFor} from './loads.mjs';
 import {planProtectedProof,proofApplies,proofFinding,proofPlan,protectedProofFinding,runAtBase,runProtectedProof} from '../checks/proof.mjs';
 import {evaluateAcceptance,kernelVerificationReceipt,resolveEvidencePacket} from '../checks/acceptance.mjs';
@@ -413,7 +414,10 @@ export function launchWithCandidate(orca,{cwd,run,workflowTask,from,worktree,ope
   const input={run,workflowTask,from,worktree,operation,scope,spec};
   const target=required(candidate?.target,'allocated runtime target');
   const chain=build(input).candidates.map(item=>item.selection.target);
-  need(chain.includes(target),`The allocated target ${target} is not in the ${operation} chain (${chain.join(', ')})`);
+  const canonical=resolveExecutionChain({skill:'starci',op:operation}).candidates.find(item=>item.target===target);
+  need(canonical,`The allocated target ${target} is not declared for ${operation}`);
+  need(JSON.stringify(canonical)===JSON.stringify(candidate),`The allocated target ${target} does not match its declared launch candidate`);
+  need(chain.includes(target)||canonical.orcaLaunch?.capacityGate==='explicit-workflow-quota',`The allocated target ${target} is not in the ${operation} chain (${chain.join(', ')})`);
   const notAllocated=chain.filter(item=>item!==target);
   const request=build({...input,candidates:[candidate]});
   need(request.candidates.length===1,`The allocated candidate list built ${request.candidates.length} candidates`);
@@ -4558,7 +4562,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       // Every kernel of this repository shares one runtime ledger beside the workflow directories, so an
       // expensive runtime another workflow is on is load here too and a provider cooldown is seen by all.
       // A sequential host (headless) caps the allocator at one operation whatever the approved quota says.
-      allocator:createAllocator({runtimes:runtimeProfile,state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:loadsFileFor(store.dir),workflow:state.id},budget:{path:path.dirname(store.dir)},sequential:host.sequential,eligibility}),template:templateOf(isEnrolled(state)?state.engine.runtimePin.root:state.host),host,
+      allocator:createAllocator({runtimes:runtimeProfile,state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:loadsFileFor(store.dir),workflow:state.id},budget:{path:path.dirname(store.dir)},sequential:host.sequential,executionHost:host.name,eligibility}),template:templateOf(isEnrolled(state)?state.engine.runtimePin.root:state.host),host,
       modelEligibility:eligibility,modelPolicy,runtimeBinding,
       ledgerRoot:options['ledger-root']??null,
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});

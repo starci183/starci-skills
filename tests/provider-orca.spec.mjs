@@ -28,6 +28,9 @@ test('Orca provider contract fixes hierarchy names and exact native API calls',(
   assert.equal(contract.operationAgent.qwen38Flash.agent,'qwen');
   assert.equal(contract.operationAgent.qwen38Flash.model,'qwen3.8-flash');
   assert.equal(contract.operationAgent.qwen38Flash.nestedAgents,'forbidden');
+  assert.equal(contract.operationAgent.devin.launch,'command-terminal');
+  assert.equal(contract.operationAgent.devin.capacityAuthority,'explicit-workflow-quota');
+  assert.equal(contract.operationAgent.devin.quotaTelemetry,'launch-status');
   assert.equal(contract.operationAgent.admission.expectedOperation,'approved-goal-operation');
   assert.equal(contract.operationAgent.admission.providerSelection,'profiles-registry-resolver-output');
   assert.equal(contract.operationAgent.admission.afterWorkerStart.api,'orchestration.worker-show');
@@ -119,4 +122,11 @@ test('provider catalog exposes explicit API and validation contracts',()=>{
   assert.doesNotMatch(qwen.credentialRefresh.win32+qwen.credentialRefresh.posix,/sk-/);
   assert.ok(qwen.forbidden.includes('dispatch-inject'));
   assert.ok(qwen.forbidden.includes('qwen-agent-tool'));
+  const devin=loadProviderContract('orca').adapters.devin;
+  assert.equal(devin.kind,'command-terminal-agent');
+  assert.equal(devin.modelAuthority,'configured-logical-runtime');
+  assert.match(devin.commandPrefix.win32,/models list --format json/);
+  assert.doesNotMatch(devin.commandPrefix.win32+devin.commandPrefix.posix,/cog_|Bearer|DEVIN_API_KEY=/);
+  assert.ok(devin.forbidden.includes('cloud-handoff'));
+  assert.ok(devin.forbidden.includes('inferred-underlying-model'));
 });

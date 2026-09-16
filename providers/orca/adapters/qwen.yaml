@@ -3,6 +3,8 @@ agent: qwen
 kind: command-terminal-agent
 model: qwen3.8-flash
 modelAuthority: rendered-terminal-footer
+commandRequirements:
+  - '--exclude-tools agent'
 why: |-
   Orca 1.4.188's native qwen-code adapter cannot deliver a Task prompt to Qwen Code 0.23.3
   (agent_prompt_stalled, agent_readiness timeout). A terminal created with the declared qwen command
@@ -15,6 +17,7 @@ credentialRefresh:
   posix: 'unset BAILIAN_TOKEN_PLAN_API_KEY; '
 readiness:
   screenPattern: 'Type your message'
+  identityPattern: 'qwen3.8-flash'
   timeoutMs: 120000
   intervalMs: 5000
 delivery:

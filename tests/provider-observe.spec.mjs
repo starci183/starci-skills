@@ -25,17 +25,23 @@ const QWEN={
   idle:'*   Type your message or @path/to/file\nqwen3.8-flash (Token Plan Singapore)',
   prompt:'Allow execution of: orca?\n› 1. Yes, allow once\n⠏ Waiting for user confirmation...'
 };
+const DEVIN={
+  busy:'Devin CLI\nWorking... (esc to interrupt)',
+  idle:'Devin CLI\nMessage Devin',
+  prompt:'Devin CLI\nDo you want to run npm test? (y/n)'
+};
 const SHELL={idle:'npm run build\n\nPS D:\\Repositories\\sales>',prompt:'Overwrite apps/sales/intake.ts? [y/N]'};
 
 test('a family is named by its own footer, and a canonical title names it when the footer is off screen',()=>{
-  assert.deepEqual(PROVIDER_FAMILIES,['claude','codex','qwen','shell']);
-  assert.deepEqual(SCAN_ORDER,['claude','codex','qwen']);
+  assert.deepEqual(PROVIDER_FAMILIES,['claude','codex','qwen','devin','shell']);
+  assert.deepEqual(SCAN_ORDER,['claude','codex','qwen','devin']);
   assert.equal(detect(CLAUDE.busy),'claude');
   assert.equal(detect(CLAUDE.idle),'claude');
   assert.equal(detect(CODEX.idle),'codex');
   assert.equal(detect(CODEX.busy),'codex');
   assert.equal(detect(QWEN.busy),'qwen');
   assert.equal(detect(QWEN.idle),'qwen');
+  assert.equal(detect(DEVIN.idle),'devin');
   // A screen that says nothing about its agent claims no family; a tail array is the same text as a string.
   assert.equal(detect('Reading files...'),null);
   assert.equal(detect(['*   Type your message or @path','qwen3.8-flash']),'qwen');
@@ -43,6 +49,7 @@ test('a family is named by its own footer, and a canonical title names it when t
   assert.equal(detectFromTitle('Report task outcome'),'codex');
   assert.equal(detectFromTitle('Codex - [Op] backend.implement'),'codex');
   assert.equal(detectFromTitle('Claude Code - sales'),'claude');
+  assert.equal(detectFromTitle('Devin - sales'),'devin');
   assert.equal(detectFromTitle('PowerShell - sales'),'shell');
   assert.equal(detectFromTitle('[Op] backend.implement - Sales'),null);
   assert.equal(detectFromTitle(''),null);
@@ -61,7 +68,7 @@ test('a Claude turn past its first minute is working, and the footer alone never
 });
 
 test('every family classifies its own busy, idle and confirmation screens and accepts with its own keystroke',()=>{
-  for(const [family,screens] of [['claude',CLAUDE],['codex',CODEX],['qwen',QWEN],['shell',SHELL]]){
+  for(const [family,screens] of [['claude',CLAUDE],['codex',CODEX],['qwen',QWEN],['devin',DEVIN],['shell',SHELL]]){
     const answer=SCREENS[family].answer;
     for(const [phase,liveness] of [['busy','working'],['idle','stalled-idle'],['prompt','stalled-prompt']]){
       if(!screens[phase])continue;
@@ -70,7 +77,7 @@ test('every family classifies its own busy, idle and confirmation screens and ac
       assert.deepEqual([verdict.liveness,verdict.provider,verdict.answer],[liveness,family,answer],`${family} ${phase}`);
     }
   }
-  assert.deepEqual([SCREENS.claude.answer,SCREENS.codex.answer,SCREENS.qwen.answer,SCREENS.shell.answer],['1','y','1','y']);
+  assert.deepEqual([SCREENS.claude.answer,SCREENS.codex.answer,SCREENS.qwen.answer,SCREENS.devin.answer,SCREENS.shell.answer],['1','y','1','y','y']);
 });
 
 test('an untitled screen is scanned over the agent families, prompt before busy before idle',()=>{

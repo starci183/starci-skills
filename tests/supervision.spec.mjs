@@ -134,7 +134,7 @@ test('Qwen operation launch is one command terminal per attempt fed by dispatch 
   const command='qwen --model qwen3.8-flash --approval-mode yolo --exclude-tools agent --max-session-turns 240 --max-wall-time 90m --max-tool-calls 600 --chat-recording false';
   const launch=planOperationAgentLaunch({
     taskId:'task-1',worktree:'path:C:/work/chatbot',operation:'backend.implement',scope:'Chatbot',
-    selection:{model:'qwen3.8-flash',orcaLaunch:{kind:'command-terminal',command,dispatch:'return-preamble-and-send'}}
+    selection:{model:'qwen3.8-flash',orcaLaunch:{kind:'command-terminal',command,dispatch:'return-preamble-and-send',adapter:'qwen',nestedAgents:'forbidden'}}
   });
   assert.equal(launch.mode,'command-terminal');
   assert.equal(launch.displayName,'[Op] backend.implement - Chatbot');
@@ -143,7 +143,7 @@ test('Qwen operation launch is one command terminal per attempt fed by dispatch 
   assert.deepEqual(launch.steps[2].args,{task:'task-1',to:'$terminalHandle','return-preamble':true});
   assert.ok(launch.forbidden.includes('dispatch-inject'));
   assert.ok(launch.forbidden.includes('reuse-existing-terminal'));
-  assert.throws(()=>planOperationAgentLaunch({taskId:'task-1',worktree:'path:C:/work/chatbot',operation:'backend.implement',scope:'Chatbot',selection:{model:'qwen3.8-flash',orcaLaunch:{kind:'command-terminal',command:'qwen --approval-mode yolo',dispatch:'return-preamble-and-send'}}}),/exclude the provider agent tool/);
+  assert.throws(()=>planOperationAgentLaunch({taskId:'task-1',worktree:'path:C:/work/chatbot',operation:'backend.implement',scope:'Chatbot',selection:{model:'qwen3.8-flash',orcaLaunch:{kind:'command-terminal',command:'qwen --approval-mode yolo',dispatch:'return-preamble-and-send',adapter:'qwen',nestedAgents:'forbidden'}}}),/missing required command fragment/);
   assert.throws(()=>planOperationAgentLaunch({taskId:'task-1',worktree:'path:C:/work/chatbot',operation:'backend.implement',scope:'Chatbot',selection:{model:'qwen3.8-flash',orcaLaunch:{kind:'managed-agent',agent:'qwen-code'}}}),/retired/);
 });
 

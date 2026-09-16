@@ -89,11 +89,11 @@ test('agent-route exposes the first ready external worker for Orca without execu
   assert.equal(fallback.status,0,fallback.stderr);
   const fallbackResult=JSON.parse(fallback.stdout);
   assert.equal(fallbackResult.selected.target,'claude-opus');
-  assert.deepEqual(fallbackResult.skipped.map(x=>x.target),['qwen3.8-flash']);
+  assert.deepEqual(fallbackResult.skipped.map(x=>x.target),['qwen3.8-flash','devin-agent']);
   const exhausted=run('agent-route','starci','business.decide','qwen');
   assert.equal(exhausted.status,0,exhausted.stderr);
   assert.equal(JSON.parse(exhausted.stdout).selected,null);
-  // A decide chain is four links now - Fable, Astra and the downgrade under them - and Qwen is in none of them.
+  // A decide chain is four links - Fable, Astra and the downgrade under them - and Qwen is in none of them.
   assert.equal(JSON.parse(exhausted.stdout).skipped.length,4);
 });
 

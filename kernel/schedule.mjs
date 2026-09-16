@@ -99,7 +99,12 @@ export function applyQuota(runtimes,quota){
   if(!plain(quota)||(!Array.isArray(quota.order)&&!plain(quota.slots)))return runtimes;
   const copy=structuredClone(runtimes);
   const order=Array.isArray(quota.order)?quota.order.filter(id=>copy.runtimes?.[id]):[];
-  for(const [id,n] of Object.entries(plain(quota.slots)?quota.slots:{}))if(copy.runtimes?.[id]&&Number.isFinite(Number(n)))copy.runtimes[id].maxParallel=Math.max(0,Number(n));
+  for(const [id,n] of Object.entries(plain(quota.slots)?quota.slots:{}))if(copy.runtimes?.[id]&&Number.isFinite(Number(n))){
+    copy.runtimes[id].maxParallel=Math.max(0,Number(n));
+    // Some external CLIs expose launch/auth status but no account headroom API. Naming a positive slot is the
+    // owner's explicit capacity decision for this workflow; absence or zero keeps that runtime closed.
+    if(copy.runtimes[id].capacityAuthority==='explicit-workflow-quota')copy.runtimes[id].explicitCapacity=Number(n)>0;
+  }
   const roleConstraints=plain(quota.roles)?quota.roles:{};
   const constrainedRoles=new Set(Object.values(roleConstraints).flatMap(value=>Array.isArray(value)?value:[]));
   for(const [id,pool] of Object.entries(copy.runtimes??{}))if(Array.isArray(pool.roles))pool.roles=pool.roles.filter(role=>
@@ -161,7 +166,7 @@ export function sequentialRuntimes(runtimes){
   for(const pool of Object.values(plain(copy.runtimes)?copy.runtimes:{}))if(plain(pool))pool.maxParallel=Math.min(1,Math.max(0,finite(pool.maxParallel,1)));
   return copy;
 }
-export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null,quota=null,shared=null,budget=null,sequential=false,eligibility=null,providerAdmission=null}={}){
+export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null,quota=null,shared=null,budget=null,sequential=false,executionHost='orca',eligibility=null,providerAdmission=null}={}){
   runtimes=applyQuota(runtimes,quota);
   // The cap is applied after the quota on purpose: a quota widens slots, and a sequential host never lets it.
   if(sequential)runtimes=sequentialRuntimes(runtimes);
@@ -308,6 +313,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     for(const id of ids){
       const pool=pools[id],provider=providerOf(id),providerUse=admission.providers[provider]??null,cool=cooling(id),parked=sharedCooling(id),held=elsewhere(id),
         providerFree=providerUse?providerUse.capacity-providerUse.used:Infinity,free=Math.min(slots(id)-load(id)-held,providerFree),window=verdictOf(id);
+      const launchStatusCapacity=pool?.quotaTelemetry==='launch-status'&&pool?.capacityAuthority==='explicit-workflow-quota'&&pool?.explicitCapacity===true;
       let qualification=null;
       if(typeof eligibility==='function')try{qualification=eligibility(job??{kind,role,difficulty},{id,...pool,model:pool.model??pool.target??id});}catch(error){qualification={eligible:false,reasons:[error?.message??'model eligibility unavailable']};}
       const reason=!Array.isArray(pool?.roles)||!pool.roles.includes(role)?`no ${role} role`
@@ -317,7 +323,8 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
         :qualification&&!qualification.eligible?`model ineligible: ${(qualification.reasons??['model eligibility unavailable']).join('; ')}`
         :cool?`cooling after ${cool.kind} until ${new Date(cool.until).toISOString()}`
         :parked?`cooling after a shared ${parked.kind??'provider limit'} until ${new Date(parked.until).toISOString()}, seen by ${parked.workflow??'another workflow'}`
-        :adaptive&&!window.known?'provider quota is unknown or stale for adaptive allocation'
+        :pool?.capacityAuthority==='explicit-workflow-quota'&&!pool?.explicitCapacity?'requires an explicit workflow quota slot'
+        :adaptive&&!window.known&&!launchStatusCapacity?'provider quota is unknown or stale for adaptive allocation'
         :window.exhausted?`provider window exhausted until ${new Date(window.until??now()).toISOString()}`
         :providerFree<=0?'no provider family capacity in authoritative admission'
         :free<=0?'no free slot'
@@ -326,7 +333,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
         :null;
       // The shared detail travels beside the reason, never inside it: the kernel reads these reasons by shape.
       if(reason){blocked.push({runtime:id,reason,...(providerUse?{admission:{used:providerUse.used,capacity:providerUse.capacity}}:{}),...(held?{sharedLoad:held}:{}),...(parked&&!cool?{shared:true,from:parked.workflow??null}:{}),...(window.exhausted?{budget:{remaining:window.remaining,until:window.until}}:{})});continue;}
-      ready.push({runtime:id,provider,providerRank:providerRankOf(id),target:pool.target??id,load:load(id),free,slots:slots(id),ratio:load(id)/slots(id),opsLeft:opsLeft(id),tokensLeft:tokensLeft(id),rotation:rotation(id),preference:order?rank(order,id):null,sharedLoad:held,remainingShare:window.remaining,windows:window.windows,band:budgetBand(window.remaining),eligibility:qualification,
+      ready.push({runtime:id,provider,providerRank:providerRankOf(id),target:pool.target??id,load:load(id),free,slots:slots(id),ratio:load(id)/slots(id),opsLeft:opsLeft(id),tokensLeft:tokensLeft(id),rotation:rotation(id),preference:order?rank(order,id):null,sharedLoad:held,remainingShare:window.remaining,quotaTelemetry:launchStatusCapacity?'launch-status':'provider-window',windows:window.windows,band:budgetBand(window.remaining),eligibility:qualification,
         admission:providerUse?{used:providerUse.used,capacity:providerUse.capacity}:null});
     }
     // prefer-then-overflow: the first eligible runtime of the role's order wins, so a saturated or cooling
@@ -353,18 +360,22 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     if(adaptive&&ready.length){
       const families=[];
       for(const provider of [...new Set(ready.map(item=>item.provider))]){
-        const candidates=ready.filter(item=>item.provider===provider).sort((a,b)=>cmp(b.remainingShare,a.remainingShare)||locally(a,b));
+        const headroom=item=>Number.isFinite(item.remainingShare)?item.remainingShare:-1;
+        const candidates=ready.filter(item=>item.provider===provider).sort((a,b)=>cmp(headroom(b),headroom(a))||locally(a,b));
         const runtime=candidates[0],pressure=familyPressure(provider,role,difficulty??'medium',view,runtime.windows,admission.providers[provider]);
-        const preferred=provider===preferredProvider,weight=(runtime.remainingShare/100)*(preferred?preferenceMultiplier:1);
+        const preferred=provider===preferredProvider;
+        // A launch-status provider has real owner-assigned slots but no comparable percentage. It is a strict
+        // fallback while any metered provider has headroom, and becomes first only when the owner prefers it.
+        const metered=Number.isFinite(runtime.remainingShare),weight=metered?(runtime.remainingShare/100)*(preferred?preferenceMultiplier:1):(preferred?preferenceMultiplier:Number.EPSILON);
         const score=weight/(pressure.observedCost+pressure.reservedCost+pressure.estimateCost);
-        families.push({provider,runtime:runtime.runtime,headroom:runtime.remainingShare,preferred,preferenceMultiplier:preferred?preferenceMultiplier:1,
+        families.push({provider,runtime:runtime.runtime,headroom:runtime.remainingShare,quotaTelemetry:runtime.quotaTelemetry,preferred,preferenceMultiplier:preferred?preferenceMultiplier:1,
           score,...pressure,candidates:candidates.map(item=>item.runtime),rotation:providerRotation(provider)});
       }
       families.sort((a,b)=>cmp(b.score,a.score)||cmp(a.rotation,b.rotation)||a.provider.localeCompare(b.provider));
       const ordered=[];
       for(const family of families)ordered.push(...ready.filter(item=>item.provider===family.provider).sort((a,b)=>a.runtime===family.runtime?-1:b.runtime===family.runtime?1:locally(a,b)));
       ready.splice(0,ready.length,...ordered);
-      adaptiveDecision={mode:'adaptive',heuristic:'weighted-observed-headroom',observationWindowMs:SERVICE_OBSERVATION_MS,
+      adaptiveDecision={mode:'adaptive',heuristic:'weighted-observed-headroom-with-explicit-launch-status-fallback',observationWindowMs:SERVICE_OBSERVATION_MS,
         preferredProvider,preferenceMultiplier,families:families.map(({rotation,...family})=>family),chosenProvider:families[0].provider,
         chosenRuntime:families[0].runtime,reason:'highest usable headroom per observed and reserved service after bounded owner preference'};
     }else ready.sort(ledger?(a,b)=>chosenFirst(a,b)||cmp(a.sharedLoad,b.sharedLoad)||cmp(b.band,a.band)||locally(a,b)
@@ -534,12 +545,13 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
       };
     },
     /** The targets this operation may actually launch; pass as `restrictTo` to keep allocation launchable. */
-    launchableTargets(kind){return resolveExecutionChain({skill:'starci',op:kind}).candidates.map(candidate=>candidate.target);},
+    launchableTargets(kind){return resolveExecutionChain({skill:'starci',op:kind}).candidates.filter(candidate=>candidate.executionHosts.includes(executionHost)).map(candidate=>candidate.target);},
     /** The launch candidate for a runtime: the chain resolver supplies the provider launch shape for that target. */
     candidateFor(kind,target){
       const chain=resolveExecutionChain({skill:'starci',op:kind}).candidates;
-      const found=chain.find(candidate=>candidate.target===target);
-      need(found,`Runtime target ${target} is not launchable for ${kind}; that operation's environments offer ${chain.map(candidate=>candidate.target).join(', ')||'nothing'}. Add the target to the operation's environments in model/registry.yaml, or allocate with restrictTo: launchableTargets('${kind}').`);
+      const supported=chain.filter(candidate=>candidate.executionHosts.includes(executionHost));
+      const found=supported.find(candidate=>candidate.target===target);
+      need(found,`Runtime target ${target} is not launchable for ${kind} on ${executionHost}; that operation's environments offer ${supported.map(candidate=>candidate.target).join(', ')||'nothing'}. Add the target to the operation's environments in model/registry.yaml, or allocate with restrictTo: launchableTargets('${kind}').`);
       return found;
     }
   };

@@ -2,7 +2,8 @@ language: vi
 model: null
 effort: medium
 # Adaptive mode combines fresh quota, live reservations and task/model suitability. Set preferredProvider to a
-# provider id such as codex for a bounded owner bias; it is not a fallback chain.
+# provider id such as codex or devin for a bounded owner bias; it is not a fallback chain. Devin also requires
+# an explicit workflow allocation such as `devin-agent=2@implement+verify+write` before it has any capacity.
 allocation: {mode: adaptive, preferredProvider: null}
 # Non-operation models are quota-aware peer pools. Eligibility and qualification still admit every actual call.
 models:

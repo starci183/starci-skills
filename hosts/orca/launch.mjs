@@ -158,7 +158,9 @@ export function buildOperationLaunch({run,workflowTask,from,worktree,operation,s
     need(skip===undefined||skip===null||skip==='','An explicit candidate list already is the decision: --skip cannot narrow it further');
     for(const selection of allocated)need(plain(selection)&&plain(selection.orcaLaunch)&&typeof selection.target==='string'&&selection.target.trim(),'Each explicit candidate must be a resolved selection with a target and an Orca launch shape');
   }
-  const fullChain=allocated??resolveExecutionChain({skill:'starci',op}).candidates;
+  // Capacity-gated targets are valid allocator destinations but never implicit launcher fallbacks. The workflow
+  // must hand one in explicitly after its quota opened the runtime.
+  const fullChain=allocated??resolveExecutionChain({skill:'starci',op}).candidates.filter(candidate=>candidate.orcaLaunch?.capacityGate!=='explicit-workflow-quota');
   need(fullChain.length,'Operation provider chain is empty');
   const skipped=allocated?[]:parseSkip(skip,fullChain);
   const chain=fullChain.filter(candidate=>!skipped.some(item=>item.target===candidate.target));
@@ -406,8 +408,10 @@ export function notifyTerminal(orca,{cwd,terminal,file,text,wait=sleepSync}){
 
 /** Command-terminal launch: one terminal per attempt, Task delivered by dispatch --return-preamble + terminal send. */
 function launchCommandTerminalCandidate(orca,{cwd,candidate,taskId,displayName,wait=sleepSync}){
-  const adapter=readDistJson('providers','orca','adapters','qwen.json');
-  const prefix=process.platform==='win32'?adapter.credentialRefresh.win32:adapter.credentialRefresh.posix;
+  const adapterName=required(candidate.selection?.orcaLaunch?.adapter,'command-terminal adapter');
+  const adapter=readDistJson('providers','orca','adapters',`${adapterName}.json`);
+  const prefixContract=adapter.commandPrefix??adapter.credentialRefresh??{};
+  const prefix=process.platform==='win32'?(prefixContract.win32??''):(prefixContract.posix??'');
   const created=orca.invoke('terminal-create',{...candidate.terminalParams,command:`${prefix}${candidate.terminalParams.command}`},{cwd});
   if(created.outcome!=='ok')return {ok:false,dispatchId:null,effectState:created.effectState==='unknown'?'unknown':'none',reason:`terminal create: ${created.reason}`,call:created,settlement:null};
   const handle=getPath(created.receipt,'result.terminal.handle');
@@ -447,8 +451,9 @@ function launchCommandTerminalCandidate(orca,{cwd,candidate,taskId,displayName,w
   const dispatch=getPath(shown.receipt,'result.dispatch');
   if(shown.outcome!=='ok'||dispatch?.id!==dispatchId||dispatch?.assignee_handle!==handle)return fenceTerminal(`dispatch assignee attestation failed: expected ${handle} for ${dispatchId}`,dispatchId);
   const model=candidate.selection.model??candidate.selection.requestedModel??adapter.model;
-  if(!screen.includes(adapter.modelMarker))return fenceTerminal(`rendered model attestation failed: ${adapter.modelMarker} not shown`,dispatchId);
-  const attestation={schema:'starci/orca-command-terminal-attestation@1',ok:true,supervision:'command-terminal',taskId,dispatchId,terminalHandle:handle,displayName,target:candidate.selection.target??null,agent:adapter.agent,model,submitEnters:enters,delivery:text.startsWith('@')?'file-reference':'inline',terminalTitle:{observed:displayName,canonical:true,mutableUiMetadata:true,action:'none'}};
+  const identityPattern=adapter.readiness?.identityPattern??adapter.modelMarker;
+  if(typeof identityPattern!=='string'||!identityPattern.trim()||!new RegExp(identityPattern,'i').test(screen))return fenceTerminal(`rendered provider attestation failed: ${identityPattern??'no identity pattern'} not shown`,dispatchId);
+  const attestation={schema:'starci/orca-command-terminal-attestation@1',ok:true,supervision:'command-terminal',taskId,dispatchId,terminalHandle:handle,displayName,target:candidate.selection.target??null,adapter:adapterName,agent:adapter.agent,model,modelAuthority:adapter.modelAuthority,submitEnters:enters,delivery:text.startsWith('@')?'file-reference':'inline',terminalTitle:{observed:displayName,canonical:true,mutableUiMetadata:true,action:'none'}};
   return {ok:true,dispatchId,terminal:handle,attestation,titleDrift:false,call:created,launch:'command-terminal'};
 }
 

@@ -45,6 +45,19 @@ function assertSingleLineJson(file) {
   JSON.parse(body);
 }
 
+function stagePackageSource(t) {
+  const staged = disposable(t, 'starci-pack-source-');
+  const pkg = JSON.parse(fs.readFileSync(path.join(skillRoot, 'package.json'), 'utf8'));
+  for (const entry of ['package.json', 'LICENSE', 'THIRD_PARTY_NOTICES.md', '.gitignore', ...pkg.files]) {
+    const relative = entry.replace(/[\\/]$/, '');
+    if (!relative || relative === '.dist') continue;
+    const source = path.join(skillRoot, relative);
+    if (!fs.existsSync(source)) continue;
+    fs.cpSync(source, path.join(staged, relative), { recursive: true });
+  }
+  return staged;
+}
+
 test('npm pack includes compiled .dist and can rebuild it without checkout imports', t => {
   t.diagnostic('stays slow on purpose: real npm pack (prepack build+check), a real tarball extract, and a ' +
     'real isolated npm install + build outside the checkout are what this test is proving; faking any leg ' +
@@ -64,9 +77,12 @@ test('npm pack includes compiled .dist and can rebuild it without checkout impor
 
   const packDir = disposable(t, 'starci-pack-out-');
   const extractDir = disposable(t, 'starci-pack-extract-');
+  // npm pack runs prepack (`build && build:check`), which publishes .dist. Run that mutation in a disposable
+  // source tree so this test cannot race another test that is reading the checkout's compiled runtime.
+  const packageSource = stagePackageSource(t);
 
   const pack = run('npm', ['pack', '--json', '--pack-destination', packDir], {
-    cwd: skillRoot,
+    cwd: packageSource,
     timeout: 600000,
   });
   assert.equal(pack.status, 0, `npm pack failed: ${pack.stderr || pack.stdout}`);

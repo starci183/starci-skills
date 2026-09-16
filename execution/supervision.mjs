@@ -32,7 +32,10 @@ export function planOperationAgentLaunch({taskId,worktree,selection,operation,sc
   if(selection.orcaLaunch.kind==='command-terminal'){
     need(selection.orcaLaunch.dispatch==='return-preamble-and-send','Command-terminal launch must deliver the Task with dispatch --return-preamble');
     const command=text(selection.orcaLaunch.command,'command-terminal command');
-    need(/--exclude-tools agent\b/.test(command),'Command-terminal launch must exclude the provider agent tool');
+    const adapterName=text(selection.orcaLaunch.adapter,'command-terminal adapter');
+    need(selection.orcaLaunch.nestedAgents==='forbidden','Command-terminal launch must forbid provider-native nested agents');
+    const adapter=readDistJson('providers','orca','adapters',`${adapterName}.json`);
+    for(const required of adapter.commandRequirements??[])need(command.includes(required),`Command-terminal launch is missing required command fragment: ${required}`);
     return {
       schema:'starci/orca-operation-launch@1',mode:'command-terminal',displayName,
       steps:[

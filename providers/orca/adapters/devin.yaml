@@ -1,0 +1,54 @@
+schema: starci/orca-agent-adapter@1
+agent: devin
+kind: command-terminal-agent
+model: devin-agent
+modelAuthority: configured-logical-runtime
+why: |-
+  Orca has no native Devin worker adapter. The official local Devin CLI can run in the exact workflow
+  worktree, so Orca owns a fresh terminal and Dispatch for each attempt and observes the same report boundary
+  as every other operation agent. The underlying account-selected model is deliberately not inferred.
+commandPrefix:
+  win32: '$devinExe=(Get-Command devin -ErrorAction SilentlyContinue).Source; if (-not $devinExe) { $devinExe=Join-Path $env:LOCALAPPDATA ''devin\cli\bin\devin.exe'' }; if (-not (Test-Path -LiteralPath $devinExe)) { Write-Error ''Devin CLI is not installed''; exit 127 }; & $devinExe models list --format json *> $null; if ($LASTEXITCODE -ne 0) { Write-Error ''Devin CLI is not authenticated''; exit $LASTEXITCODE }; Set-Alias -Name devin -Value $devinExe; '
+  posix: 'command -v devin >/dev/null 2>&1 && devin models list --format json >/dev/null && '
+  reason: Fail before Task delivery when the official CLI is absent or the owner is not authenticated; auth status alone exits zero while logged out, so the read-only model inventory is the probe. No token is copied into commands or receipts.
+commandRequirements:
+  - '--permission-mode accept-edits'
+  - '--respect-workspace-trust false'
+readiness:
+  screenPattern: '(?:Ask Devin|Message Devin|Type your message|Enter a prompt|(^|\n)\s*[>❯]\s*$)'
+  identityPattern: 'Devin'
+  timeoutMs: 120000
+  intervalMs: 5000
+delivery:
+  mode: file-reference-above-inline-limit
+  maxInlineChars: 3000
+  fileDirectory: .starciwork/_local/runtime
+  fileName: orca-dispatch-<dispatch>.md
+  prompt: 'Read <file> completely. It is your dispatched Task preamble and operation contract. Follow it exactly and report worker_done exactly once as specified.'
+submission:
+  stagedPattern: 'Pasted Content|<file>|orca-dispatch-'
+  activityPattern: 'Thinking|Working|Running|esc to (?:cancel|interrupt)|tokens'
+  settleMs: 3000
+  timeoutMs: 45000
+  maxEnter: 2
+approvalMode:
+  working: accept-edits
+  reasoning: accept-edits
+  reason: File edits are automatic inside the isolated workflow worktree; command execution still follows Devin normal permission checks and the operation contract.
+start:
+  - {api: terminal.create, binding: declared-target-command-after-auth-status}
+  - {api: terminal.read, phase: readiness}
+  - {api: orchestration.dispatch, binding: return-preamble}
+  - {api: terminal.send, phase: submit}
+  - {api: terminal.read, phase: submission}
+  - {api: orchestration.dispatch-show, phase: assignee-attestation}
+release:
+  api: orchestration.worker-stop
+  then: terminal.close
+forbidden:
+  - provider-native-subagent
+  - cloud-handoff
+  - dispatch-inject
+  - reuse-existing-terminal
+  - unsupervised-retain-as-success
+  - inferred-underlying-model

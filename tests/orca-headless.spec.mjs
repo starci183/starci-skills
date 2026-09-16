@@ -276,10 +276,12 @@ test('providerFor maps the launcher\'s agent and model, or a terminal command li
   assert.deepEqual(providerFor({agent:'codex',model:'gpt-5.6-sol'}).command,['codex','exec','--json','--model','gpt-5.6-sol']);
   assert.equal(providerFor({agent:'codex',model:'gpt-9'}),null);
   assert.equal(providerFor({agent:'orca'}),null);
+  assert.equal(providerFor({command:'devin --permission-mode accept-edits'}),null);
   assert.equal(providerFor({command:'powershell -NoLogo'}),null);
-  // Every managed target of the registry that the allocator may hand the launcher has a headless line.
+  // Every target the registry admits on the headless host has exactly one headless line. Orca-only targets
+  // remain absent instead of being mapped to an invented local provider command.
   for(const op of ['backend.implement','architecture.decide','review.verify']){
-    for(const candidate of resolveExecutionChain({skill:'starci',op}).candidates){
+    for(const candidate of resolveExecutionChain({skill:'starci',op}).candidates.filter(item=>item.executionHosts.includes('headless'))){
       const request=candidate.orcaLaunch.kind==='managed-agent'?{agent:candidate.orcaLaunch.agent,model:candidate.model}:{command:candidate.orcaLaunch.command};
       assert.ok(providerFor(request),`${op}: ${candidate.target} has no headless command`);
     }

@@ -11,6 +11,7 @@ files:
     codex: adapters/codex.json
     claude: adapters/claude.json
     qwen: adapters/qwen.json
+    devin: adapters/devin.json
 purpose: |-
   Canonical Orca API call templates for StarCi orchestrated execution. These calls are the
   only supported construction path; prompts may fill placeholders but may not invent a
@@ -146,6 +147,33 @@ operationAgent:
       createTerminal:
         api: terminal.create
         cli: 'orca terminal create --worktree <exact-workflow-worktree-selector> --title "[Op] <operation> - <scope>" --command "<credential-refresh><declared-qwen-command>" --json'
+      awaitPrompt:
+        api: terminal.read
+        cli: 'orca terminal read --terminal <terminal-handle> --screen --json'
+      returnPreamble:
+        api: orchestration.dispatch
+        cli: 'orca orchestration dispatch --task <operation-task-id> --to <terminal-handle> --from <kernel-terminal> --run <workflow-run-id> --return-preamble --json'
+      submitPrompt:
+        api: terminal.send
+        cli: 'orca terminal send --terminal <terminal-handle> --text "<preamble>" --enter --json'
+      attestAssignee:
+        api: orchestration.dispatch-show
+        cli: 'orca orchestration dispatch-show --task <operation-task-id> --json'
+      restoreName:
+        api: terminal.rename
+        cli: 'orca terminal rename --terminal <terminal-handle> --title "[Op] <operation> - <scope>" --json'
+  devin:
+    agent: devin
+    model: devin-agent
+    modelAuthority: configured-logical-runtime
+    launch: command-terminal
+    nestedAgents: forbidden
+    capacityAuthority: explicit-workflow-quota
+    quotaTelemetry: launch-status
+    calls:
+      createTerminal:
+        api: terminal.create
+        cli: 'orca terminal create --worktree <exact-workflow-worktree-selector> --title "[Op] <operation> - <scope>" --command "<read-only-auth-preflight><declared-devin-command>" --json'
       awaitPrompt:
         api: terminal.read
         cli: 'orca terminal read --terminal <terminal-handle> --screen --json'

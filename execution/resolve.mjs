@@ -81,6 +81,7 @@ export function flattenOperationCandidates({operation, registry}) {
       runtime: environment,
       profile: configured.profile,
       requestedModel: configured.requestedModel,
+      executionHosts: Array.isArray(configured.executionHosts) ? [...configured.executionHosts] : ['orca', 'headless'],
       orcaLaunch: clone(configured.orcaLaunch)
     };
   });
@@ -142,11 +143,13 @@ export function resolveOperation({workflowRequest, operationId, registry, invent
       const match = Object.entries(registry.targets).find(([, target]) => canonicalEnvironment(registry, target.runtime) === soloHost && target.profiles?.[role] === profile);
       if (match) {
         const [target, configured] = match;
-        candidates = [{priority:0,environmentPriority:0,profilePriority:0,target,environment:soloHost,runtime:soloHost,profile,requestedModel:configured.requestedModel,orcaLaunch:clone(configured.orcaLaunch)}];
+        candidates = [{priority:0,environmentPriority:0,profilePriority:0,target,environment:soloHost,runtime:soloHost,profile,
+          requestedModel:configured.requestedModel,executionHosts:Array.isArray(configured.executionHosts)?[...configured.executionHosts]:['orca','headless'],orcaLaunch:clone(configured.orcaLaunch)}];
       }
     }
   }
   if (!candidates.length) throw Error(`No execution candidates for operation ${operationId} in requested mode`);
+  const executionHost = workflowRequest.spec.mode === 'solo' && workflowRequest.spec.soloHost !== 'orca' ? 'headless' : 'orca';
   const observed = inventoryByEnvironment(inventory, registry);
   registryAliases = new Map(Object.entries(registry.targetAliases ?? {}));
   const attempted = attemptsByTarget(attempts, candidates, registry.fallback);
@@ -154,13 +157,15 @@ export function resolveOperation({workflowRequest, operationId, registry, invent
     const environmentObservation = observed.get(candidate.environment);
     const profile = profileObservation(environmentObservation, candidate);
     const attempt = attempted.get(candidate.target);
-    const ready = !attempt && environmentObservation?.status === 'ready' && profile?.status === 'ready';
+    const hostSupported = candidate.executionHosts.includes(executionHost);
+    const explicitlyGated = candidate.orcaLaunch?.capacityGate === 'explicit-workflow-quota';
+    const ready = !attempt && hostSupported && !explicitlyGated && environmentObservation?.status === 'ready' && profile?.status === 'ready';
     return {
       ...candidate,
       status: attempt ? 'failed' : ready ? 'ready' : 'unavailable',
       requestedModel: candidate.requestedModel,
       observedModel: profile?.observedModel ?? null,
-      reason: ready ? null : attempt?.reason ?? (environmentObservation?.status === 'unknown' ? 'unavailable' : environmentObservation?.reason ?? profile?.reason ?? 'unavailable'),
+      reason: ready ? null : attempt?.reason ?? (!hostSupported ? `unsupported on ${executionHost}` : explicitlyGated ? 'explicit workflow quota required' : (environmentObservation?.status === 'unknown' ? 'unavailable' : environmentObservation?.reason ?? profile?.reason ?? 'unavailable')),
       observation: environmentObservation ? clone(environmentObservation) : null
     };
   });
@@ -175,6 +180,7 @@ export function resolveOperation({workflowRequest, operationId, registry, invent
     profile: selectedObservation.profile,
     requestedModel: selectedObservation.requestedModel,
     observedModel: selectedObservation.observedModel,
+    executionHosts: [...selectedObservation.executionHosts],
     orcaLaunch: clone(selectedObservation.orcaLaunch)
   } : null;
   return {

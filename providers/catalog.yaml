@@ -13,6 +13,7 @@ providers:
       codex: orca/adapters/codex.json
       claude: orca/adapters/claude.json
       qwen: orca/adapters/qwen.json
+      devin: orca/adapters/devin.json
   codex:
     index: codex/index.json
     capabilities: codex/capabilities.json

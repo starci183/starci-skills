@@ -22,6 +22,29 @@ test('owner allocation preserves adaptive policy and may constrain exact operati
   assert.deepEqual(Object.entries(applied.runtimes).filter(([,pool])=>pool.roles.includes('plan')).map(([id])=>id),['claude-opus']);
   assert.throws(()=>parseQuota('gpt-5.6-luna=10@implement+owner'),/allocation roles/);
 });
+
+test('Devin stays closed without an owner slot and an explicit slot admits it without inventing quota headroom',()=>{
+  const at=Date.UTC(2026,8,16,9),adaptive=withProviderPreference(profile,{mode:'adaptive',preferredProvider:'devin'});
+  const closed=createAllocator({runtimes:adaptive,now:()=>at});
+  assert.equal(closed.review('backend.implement').blocked.find(item=>item.runtime==='devin-agent')?.reason,'requires an explicit workflow quota slot');
+  const quota=parseQuota('devin-agent=1@implement');
+  const opened=createAllocator({runtimes:adaptive,quota,now:()=>at});
+  const first=opened.allocate('backend.implement',{job:{opId:'op-devin-1'}});
+  assert.equal(first.ok,true);
+  assert.equal(first.runtime,'devin-agent');
+  assert.equal(first.adaptive.families[0].provider,'devin');
+  assert.equal(first.adaptive.families[0].headroom,null);
+  assert.equal(first.adaptive.families[0].quotaTelemetry,'launch-status');
+  const second=opened.allocate('backend.implement',{job:{opId:'op-devin-2'}});
+  assert.equal(second.ok,false);
+  assert.equal(second.blocked.find(item=>item.runtime==='devin-agent')?.reason,'no free slot');
+});
+
+test('the headless host never exposes the Orca-only Devin target even when the owner assigns a slot',()=>{
+  const allocator=createAllocator({runtimes:profile,quota:parseQuota('devin-agent=1@implement'),executionHost:'headless',now:()=>0});
+  assert.equal(allocator.launchableTargets('backend.implement').includes('devin-agent'),false);
+  assert.throws(()=>allocator.candidateFor('backend.implement','devin-agent'),/not launchable.*headless/);
+});
 /**
  * A throwaway workflows root: the shared runtime ledger beside the workflow directories, each of which may hold
  * a `kernel.lock` - the one thing that says whether the workflow that wrote an entry is still alive.
@@ -56,7 +79,7 @@ test('prefer-then-overflow fills the preferred runtime before it offers the next
   assert.equal(allocator.maxParallelOps,10);
   assert.equal(allocator.policy,PREFER_THEN_OVERFLOW);
   assert.equal(profile.allocation.policy,PREFER_THEN_OVERFLOW);
-  assert.deepEqual(profile.allocation.preference.implement,['gpt-5.6-sol','claude-opus','qwen3.8-flash','gpt-5.6-luna']);
+  assert.deepEqual(profile.allocation.preference.implement,['gpt-5.6-sol','claude-opus','qwen3.8-flash','devin-agent','gpt-5.6-luna']);
   assert.equal(profile.runtimes['gpt-5.6-sol'].maxParallel,5);
   const picked=[];
   for(let index=0;index<6;index+=1){
@@ -75,7 +98,7 @@ test('prefer-then-overflow fills the preferred runtime before it offers the next
   assert.equal(allocator.allocate('backend.implement').runtime,'gpt-5.6-sol');
   const snapshot=allocator.snapshot();
   assert.equal(snapshot.policy,PREFER_THEN_OVERFLOW);
-  assert.deepEqual(snapshot.preference.verify,['gpt-5.6-sol','claude-fable-5.1','gpt-6-astra','claude-opus','qwen3.8-flash','gpt-5.6-luna']);
+  assert.deepEqual(snapshot.preference.verify,['gpt-5.6-sol','claude-fable-5.1','gpt-6-astra','claude-opus','qwen3.8-flash','devin-agent','gpt-5.6-luna']);
   assert.equal(snapshot.inFlight,6);
   // No pool declares a daily budget any more - the probed provider window is the only one - so nothing is left to count.
   assert.equal(profile.runtimes['claude-opus'].budget,undefined);
@@ -302,7 +325,7 @@ test('difficulty routes inside the quota: hard work to the strongest tier, easy 
   assert.equal(allocator.allocate('backend.implement',{difficulty:'hard'}).runtime,'gpt-5.6-sol');
   const quota=applyQuota(profile,{order:['claude-opus','qwen3.8-flash','gpt-5.6-sol'],slots:{'claude-opus':2,'qwen3.8-flash':1,'gpt-5.6-sol':1}});
   assert.equal(quota.runtimes['claude-opus'].maxParallel,2);
-  assert.deepEqual(quota.allocation.preference.implement,['claude-opus','qwen3.8-flash','gpt-5.6-sol','gpt-5.6-luna']);
+  assert.deepEqual(quota.allocation.preference.implement,['claude-opus','qwen3.8-flash','gpt-5.6-sol','devin-agent','gpt-5.6-luna']);
   const quoted=createAllocator({runtimes:profile,quota:{order:['claude-opus','qwen3.8-flash','gpt-5.6-sol'],slots:{'claude-opus':2,'qwen3.8-flash':1,'gpt-5.6-sol':1}},now:()=>0});
   assert.deepEqual([1,2,3,4].map(()=>quoted.allocate('backend.implement').runtime),['claude-opus','claude-opus','qwen3.8-flash','gpt-5.6-sol']);
 });
@@ -467,7 +490,7 @@ test('a decide operation whose reasoning windows are exhausted downgrades on the
   assert.equal(hard.review('decision.prepare',{difficulty:'hard'}).blocked.some(item=>/outside the hard tier/.test(item.reason)),false);
   assert.equal(hard.allocate('decision.prepare',{difficulty:'hard'}).runtime,'claude-fable-5.1');
   // The coding roles keep the order they always had inside that same tier.
-  assert.deepEqual(hard.review('backend.implement',{difficulty:'hard'}).preference,['gpt-5.6-sol','claude-opus']);
+  assert.deepEqual(hard.review('backend.implement',{difficulty:'hard'}).preference,['gpt-5.6-sol','claude-opus','devin-agent']);
   assert.equal(hard.allocate('backend.implement',{difficulty:'easy'}).runtime,'qwen3.8-flash');
 });
 
@@ -514,7 +537,7 @@ test('fan-out is bounded per cut group: the seam runs alone and one parent never
   // heavy node fans out wide and still leaves the rest of the tree a slot to run in.
   assert.deepEqual(profile.allocation.fanOut,{seamFirst:true,maxPerGroup:9});
   assert.equal(profile.maxParallelOps,10);
-  assert.deepEqual(profile.allocation.preference.implement,['gpt-5.6-sol','claude-opus','qwen3.8-flash','gpt-5.6-luna']);
+  assert.deepEqual(profile.allocation.preference.implement,['gpt-5.6-sol','claude-opus','qwen3.8-flash','devin-agent','gpt-5.6-luna']);
   const allocator=createAllocator({runtimes:profile,now:()=>0});
   assert.deepEqual(allocator.fanOut,{seamFirst:true,maxPerGroup:9});
   assert.equal(allocator.maxParallelOps,10);

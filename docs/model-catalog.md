@@ -15,6 +15,15 @@ Sol, Astra and Luna consume the same observed Codex provider capacity/quota. The
 
 The stable `claude-opus` runtime ID names the exact `claude-opus-5` model for both operation profiles and non-operation calls. Effective worker model attestation must match; an unversioned host default is not proof of Opus 5. Existing sealed pins retain their original bytes and require an explicit workflow retry to adopt this version.
 
+Devin (`devin-agent`) is an Orca-only command-terminal operation runtime for implementation, verification and
+writing. It is not a manager, planner, business/architecture decision runtime or ImageGen route. The logical
+model identity is `devin-agent`: the local CLI may use an account-selected underlying model, and StarCi does not
+rename or infer it. The runtime starts closed (`maxParallel: 0`) and requires explicit workflow slots. Its
+adapter runs the read-only `devin models list --format json` before the interactive CLI (because `auth status`
+exits zero even while logged out), uses `accept-edits`, disables the workspace-trust
+dialog for the already isolated worktree, forbids Devin subagents/cloud handoff, and keeps Task delivery and
+settlement under Orca's Dispatch.
+
 ## Adding a model
 
 1. Verify its exact launch ID and observed identity with the intended provider/host. Availability is not qualification.

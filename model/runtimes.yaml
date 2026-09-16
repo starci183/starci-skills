@@ -16,21 +16,21 @@ allocation:
   # hard decide or plan operation is no longer "outside the hard tier" and never lands on the cheap pool.
   tiers:
     hard:
-      default: [gpt-5.6-sol, claude-opus]
+      default: [gpt-5.6-sol, claude-opus, devin-agent]
       decide: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
       plan: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
     medium:
-      default: [gpt-5.6-sol, claude-opus, qwen3.8-flash, gpt-5.6-luna]
+      default: [gpt-5.6-sol, claude-opus, qwen3.8-flash, devin-agent, gpt-5.6-luna]
       decide: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
       plan: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
-    easy: [qwen3.8-flash, gpt-5.6-luna, claude-opus, gpt-5.6-sol]
+    easy: [qwen3.8-flash, devin-agent, gpt-5.6-luna, claude-opus, gpt-5.6-sol]
   preference:
-    implement: [gpt-5.6-sol, claude-opus, qwen3.8-flash, gpt-5.6-luna]
-    verify: [gpt-5.6-sol, claude-fable-5.1, gpt-6-astra, claude-opus, qwen3.8-flash, gpt-5.6-luna]
+    implement: [gpt-5.6-sol, claude-opus, qwen3.8-flash, devin-agent, gpt-5.6-luna]
+    verify: [gpt-5.6-sol, claude-fable-5.1, gpt-6-astra, claude-opus, qwen3.8-flash, devin-agent, gpt-5.6-luna]
     # Fable overflows to Opus, Astra to Sol: the reasoning roles end on the coding runtimes instead of stalling.
     decide: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
     plan: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
-    write: [gpt-5.6-sol, claude-opus, qwen3.8-flash, gpt-5.6-luna]
+    write: [gpt-5.6-sol, claude-opus, qwen3.8-flash, devin-agent, gpt-5.6-luna]
   # Heavy work fans out: a big node is cut into children with disjoint write scopes, the seam every other child
   # would touch is built first and alone, then the rest run at once - bounded here so one parent never takes
   # every slot of the pool and leaves the rest of the tree waiting behind it.
@@ -79,6 +79,16 @@ runtimes:
     provider: qwen
     roles: [implement, verify, write]
     maxParallel: 2
+  # Devin has no machine-readable account headroom equivalent to Orca's provider windows. It therefore starts
+  # closed and is admitted only when the workflow owner explicitly assigns slots (`devin-agent=N`). The CLI's
+  # auth/readiness and observed launch/refusal status are then the live capacity signal.
+  devin-agent:
+    target: devin-agent
+    provider: devin
+    roles: [implement, verify, write]
+    maxParallel: 0
+    capacityAuthority: explicit-workflow-quota
+    quotaTelemetry: launch-status
 roleOfKind:
   backend.implement: implement
   frontend.implement: implement

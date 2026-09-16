@@ -138,6 +138,35 @@ test('a Qwen operation runs in one command terminal: create, wait for the prompt
   assert.equal(fake.spawned.filter(args=>args[1]==='worker-start').length,0);
 });
 
+test('an explicitly allocated Devin operation runs through its own auth-gated command-terminal adapter',()=>{
+  const frames=[
+    ['Authenticated with Devin','Devin CLI','Message Devin'],
+    ['Devin CLI','[Pasted Content 740 chars]'],
+    ['Devin CLI','Working... (esc to interrupt)']
+  ];
+  let readIndex=0;
+  const fake=fakeOrca({
+    'run-show':()=>json(0,runShow),
+    'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
+    'terminal-create':()=>json(0,{ok:true,result:{terminal:{handle:'term_devin'}}}),
+    'terminal-read':()=>json(0,{ok:true,result:{terminal:{handle:'term_devin',status:'running',tail:frames[Math.min(readIndex++,frames.length-1)],source:'screen'}}}),
+    'dispatch':()=>json(0,{ok:true,result:{dispatch:{id:'ctx_devin',task_id:'task_operation_sales'},injected:false,preamble:'=== PREAMBLE ===\nreport worker_done once\n=== TASK ===\nImplement'}}),
+    'terminal-send':()=>json(0,{ok:true,result:{}}),
+    'dispatch-show':()=>json(0,{ok:true,result:{dispatch:{id:'ctx_devin',task_id:'task_operation_sales',assignee_handle:'term_devin',status:'dispatched'}}}),
+    'terminal-close':()=>json(0,{ok:true,result:{}}),
+    'worker-stop':()=>json(0,{ok:true,result:{dispatchId:'ctx_devin',state:'fenced'}}),
+    'worker-release':()=>json(0,{ok:true,result:{dispatchId:'ctx_devin',state:'retained',reason:'no_owned_resource',processAction:'none'}})
+  });
+  const candidate=resolveExecutionChain({op:'backend.implement'}).candidates.find(item=>item.target==='devin-agent');
+  const result=startOperation(input,{orca:fake.orca,wait:noWait,candidates:[candidate]});
+  assert.equal(result.ok,true);
+  assert.equal(result.selection.target,'devin-agent');
+  assert.deepEqual([result.attestation.adapter,result.attestation.agent,result.attestation.model,result.attestation.modelAuthority],['devin','devin','devin-agent','configured-logical-runtime']);
+  const create=fake.spawned.find(args=>args[0]==='terminal'&&args[1]==='create');
+  assert.match(value(create,'--command'),/models list --format json.*devin --permission-mode accept-edits --respect-workspace-trust false/);
+  assert.doesNotMatch(value(create,'--command'),/cog_|DEVIN_API_KEY=/);
+});
+
 test('a Qwen terminal that never renders its prompt is closed with no effects and the chain continues to Claude',()=>{
   const fake=fakeOrca({
     ...qwenHandlers({reads:[['Welcome','npm view @qwen-code/qwen-code dist-tags.latest']]}),

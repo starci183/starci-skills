@@ -10,7 +10,9 @@ not walk an ordered provider chain. Every runtime is a pool declared in
 each assignment the allocator filters role, tier, tool/host launchability,
 model qualification or bounded probation, independent review, cooldown, slot
 capacity and fresh provider quota. Only those candidates enter allocation.
-Unknown or stale quota is unknown and does not authorize an adaptive launch.
+Unknown or stale quota is unknown and does not authorize an adaptive launch. The sole declared exception is a
+`launch-status` provider whose account exposes no comparable headroom metric: it starts at zero slots and becomes
+eligible only when the owner explicitly assigns a positive workflow slot.
 
 `allocation.fanOut` is the one bound the allocator answers but does not apply
 itself: `{seamFirst: true, maxPerGroup: 9}`. When a heavy node has been cut into
@@ -86,6 +88,21 @@ Existing difficulty tags remain between capacity and the role suffix, such as
 `claude-opus=3:medium+hard@verify`. Role constraints narrow catalog
 qualification; they never add a role, bypass tool/model eligibility, or raise
 the workflow-wide ten-job ceiling.
+
+Devin is intentionally capacity-gated:
+
+```text
+--allocation devin-agent=2@implement+verify+write
+```
+
+Without that entry `devin-agent` remains at zero slots and is excluded with
+`requires an explicit workflow quota slot`. Once admitted, Orca starts the official local Devin CLI in a fresh
+operation terminal after a read-only `devin models list --format json` auth probe, attests the rendered Devin identity, and treats auth, startup,
+rate-limit and terminal failure as observed capacity signals. Devin currently exposes session usage but no CLI
+account-headroom percentage comparable to Orca's provider windows, so the scheduler records
+`quotaTelemetry: launch-status` and `headroom: null` rather than manufacturing a percentage. It remains behind
+metered families by default; `{"allocation":{"mode":"adaptive","preferredProvider":"devin"}}` moves an
+explicitly admitted Devin pool ahead through the owner's bounded preference.
 
 Every answer carries alternatives, explicit candidate exclusions and an
 `adaptive` receipt containing quota headroom, observation window, observed and
@@ -196,6 +213,9 @@ the launchable set. That is why every runtime carrying a role in
 operations of that role in `model/registry.yaml`; a runtime whose role has no
 profile for that operation (Astra has no working profile, so it cannot take a
 `uat.verify`) is excluded by `restrictTo` instead of failing at launch.
+An environment may additionally declare `capacityGate: explicit-workflow-quota`. It remains visible to the
+allocator and to `candidateFor`, but the launcher's implicit compatibility chain filters it out; only the exact
+candidate already chosen from an owner-opened pool can launch it.
 
 `serialize()` returns a plain object — day, loads, used counters, streaks,
 cooldowns and the last allocated runtime — and `createAllocator({runtimes,
