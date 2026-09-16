@@ -15,6 +15,30 @@ import {persistPrelaunchReservation,retryOwnedBaseline,retryableOperation} from 
 
 const fixture=t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-engine-adapter-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const state={id:'wf',worktree:dir,head:'a'.repeat(40),createdAt:1,engine:{schema:'starci/engine@1',generation:2,journalFile:path.join(dir,'journal.sqlite')},ops:[]};const store={dir:path.join(dir,'workflow'),appendEvent(){},saveState(){}},modelBudget={schema:'starci/runtime-budget@1',at:Date.now(),providers:{codex:{status:'ok',windows:{weekly:{usedPercent:10,resetsAt:null}}},claude:{status:'ok',windows:{weekly:{usedPercent:20,resetsAt:null}}},qwen:{status:'ok',windows:{weekly:{usedPercent:30,resetsAt:null}}}}};return {dir,state,store,modelBudget};};
 
+test('durable validator excludes cooling choices before selecting its single provider and replays across skip changes',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});
+  const args={providers:['gpt-6-astra','claude-fable-5.1'],skip:['gpt-6-astra'],diff:{files:['a.js']}},op={id:'review',attempt:1};
+  assert.throws(()=>runtime.model('validateOp',args,op),error=>error.code==='STARCI_JOB_PENDING');
+  const first=runtime.journal.listJobs()[0];assert.deepEqual(first.payload.args.providers,['claude-fable-5.1'],'filter cooldown before narrowing the peer pool');
+  assert.throws(()=>runtime.model('validateOp',{...args,skip:[]},op),error=>error.code==='STARCI_JOB_PENDING');
+  assert.equal(runtime.journal.listJobs().length,1,'routing cooldown changes cannot duplicate a launched semantic job');bridge.close();
+});
+
+test('model calls respect shared and local cooldown and admit the same waiting job after expiry',t=>{
+  const f=fixture(t);let stamp=Date.now();const now=()=>stamp;
+  f.state.allocation={cooling:{'gpt-5.6-sol':{until:stamp+1000,kind:'rate-limited'}}};
+  fs.writeFileSync(path.join(f.dir,'runtime-loads.json'),JSON.stringify({schema:'starci/runtime-loads@1',runtimes:{'claude-opus':{cooling:{until:stamp+1000,kind:'quota',workflow:'peer'}}}}));
+  const bridge=createJobBridge({journalFile:f.state.engine.journalFile,now,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),runtime=createEngineRuntime({...f,now,bridge,eligibility:()=>({eligible:true})}),args={providers:['gpt-5.6-sol','claude-opus'],situation:'route',options:['a']},op={id:'manager',attempt:1};
+  assert.throws(()=>runtime.model('decide',args,op),error=>error.code==='STARCI_MODEL_QUOTA_WAIT'&&error.waitKind==='provider-cooldown');assert.equal(runtime.journal.listJobs().length,0);
+  stamp+=1001;assert.throws(()=>runtime.model('decide',args,op),error=>error.code==='STARCI_JOB_PENDING');assert.equal(runtime.journal.listJobs().length,1);bridge.close();
+});
+
+test('an in-process allocator cooldown routes a new model job to its healthy peer',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true}),modelCooling:()=>[{runtime:'gpt-5.6-sol',until:Date.now()+60_000}]});
+  assert.throws(()=>runtime.model('decide',{providers:['gpt-5.6-sol','claude-opus'],situation:'next',options:['a']},{id:'next',attempt:1}),error=>error.code==='STARCI_JOB_PENDING');
+  assert.deepEqual(runtime.journal.listJobs()[0].payload.args.providers,['claude-opus']);bridge.close();
+});
+
 test('prelaunch persistence failure retains one resumable reservation while launch intent remains effect-unknown',t=>{
   const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>{throw Error('native launch must not run');}}),runtime=createEngineRuntime({...f,eligibility:()=>({eligible:true}),bridge}),allocated={runtime:'gpt-5.6-sol',target:'gpt-5.6-sol',role:'implement'};
   const safe={id:'safe',kind:'backend.implement',attempt:1,allowlist:[]};assert.equal(runtime.reserveOperation(safe,allocated).ok,true);assert.equal(runtime.reservationPhase(safe).phase,'reserved');

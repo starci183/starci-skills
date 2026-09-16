@@ -16,6 +16,7 @@ import {resourceLocks} from './guards.mjs';
 import {ENGINE_SCHEMA,isEnrolled,kindRole,predatesEngineSchema,sealedRuntimeOf} from './common.mjs';
 import {nonOperationModels} from '../scripts/config.mjs';
 import {budgetVerdict,readRuntimeBudget} from './budget.mjs';
+import {loadsFileFor,readLoads} from './loads.mjs';
 import {readDistJson} from '../core/runtime-root.mjs';
 
 /** The engine version is the package version: one build, one name. */
@@ -32,6 +33,8 @@ export const journalFileFor=(env=process.env)=>path.join(runtimeRootFor(env),'jo
 const opIdentity=(state,op)=>({workflowId:state.id,opId:op?.id??null,attempt:op?.attempt??1,generation:state.engine.generation});
 const modelInput=input=>{
   const copy=structuredClone(input);
+  // Cooldown is a routing observation, not semantic input: changing it must not duplicate a durable job.
+  delete copy.skip;
   if(copy.op)copy.op=Object.fromEntries(['id','kind','goal','attempt','acceptance','allowlist'].filter(key=>copy.op[key]!==undefined).map(key=>[key,copy.op[key]]));
   if(Array.isArray(copy.resolvedReferences)){const normalized=normalizeResolvedReferences(copy.resolvedReferences);copy.resolvedReferences=normalized.entries;copy.resolvedReferencesTruncated=normalized.truncated;copy.resolvedReferenceBytes=normalized.bytes;}
   return copy;
@@ -133,7 +136,7 @@ export function prepareGenerationRetry({journalFile,workflowId,generation,now=Da
 const modelRole=name=>['critiqueGoal','validateOp','classifyScreen'].includes(name)?'verify':['assessGoal','planOp','presentOwnerQuestion'].includes(name)?'plan':'decide';
 const configuredModelRole=name=>['assessGoal','planOp','presentOwnerQuestion'].includes(name)?'planner':['critiqueGoal','validateOp','classifyScreen'].includes(name)?'validator':'kernelManager';
 const machineResource=key=>({key:`machine:${key}`,units:1});
-function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadRuntimes(),identity={},budget=null,now=Date.now,providerAdmission={}){
+function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadRuntimes(),identity={},budget=null,now=Date.now,providerAdmission={},cooling=[]){
   if(typeof eligibility!=='function')throw Error(`Model eligibility is required for ${name}`);
   const at=now(),role=modelRole(name),requested=Array.isArray(args?.providers)?args.providers:Object.keys(runtimes.runtimes??{});
   const job={kind:name==='validateOp'?'judge':'model',role,input:{functionName:name,args:modelInput(args)},...identity};
@@ -142,9 +145,10 @@ function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadR
   const eligible=candidates.map((candidate,index)=>({...candidate,index,decision:eligibility(job,candidate.runtime),budget:budgetVerdict(candidate.runtime,budget,{now:at,requireFresh:true})})).filter(item=>item.decision?.eligible===true);
   const adaptive=runtimes.allocation?.policy===ADAPTIVE_CAPACITY,owner=runtimes.allocation?.ownerPolicy??{},preferred=owner.preferredProvider??null;
   const admitted=provider=>providerAdmission?.[provider]??null;
+  const parked=new Set([...(Array.isArray(args?.skip)?args.skip:[]),...cooling.filter(item=>item.until>at).map(item=>item.runtime)]);
   const recentSettled=item=>{const starts=item.budget.windows.map(window=>Number.isFinite(window.resetsAt)&&Number.isFinite(window.minutes)?window.resetsAt-window.minutes*60_000:null).filter(Number.isFinite),since=Math.max(at-6*60*60*1000,...starts);
     return (admitted(item.runtime.provider)?.recentSettlements??[]).filter(entry=>entry.at>=since).length;};
-  const available=eligible.filter(item=>item.budget.known&&!item.budget.exhausted&&(!admitted(item.runtime.provider)||admitted(item.runtime.provider).used<admitted(item.runtime.provider).capacity));
+  const available=eligible.filter(item=>!parked.has(item.id)&&item.budget.known&&!item.budget.exhausted&&(!admitted(item.runtime.provider)||admitted(item.runtime.provider).used<admitted(item.runtime.provider).capacity));
   if(adaptive)available.sort((a,b)=>{
     const score=item=>(item.budget.remaining/100)*(item.runtime.provider===preferred?(owner.preferenceMultiplier??OWNER_PREFERENCE_MULTIPLIER):1)
       /(1+(admitted(item.runtime.provider)?.used??0)+recentSettled(item));
@@ -152,9 +156,9 @@ function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadR
   });
   else available.sort((a,b)=>b.budget.remaining-a.budget.remaining||a.index-b.index);
   const providers=available.slice(0,1).map(item=>item.id);
-  if(!providers.length){const quotaReady=eligible.filter(item=>item.budget.known&&!item.budget.exhausted),capacityBlocked=quotaReady.length>0&&quotaReady.every(item=>{const view=admitted(item.runtime.provider);return view&&view.used>=view.capacity;});
-    const error=Error(eligible.length?(capacityBlocked?`No eligible ${name} model has provider admission capacity`:`No eligible ${name} model has known available provider quota`):`No evaluated model is eligible for ${name}`);
-    if(eligible.length){error.code='STARCI_MODEL_QUOTA_WAIT';error.waitKind=capacityBlocked?'provider-capacity':'provider-quota';error.reasons=eligible.map(item=>({runtime:item.id,known:item.budget.known,exhausted:item.budget.exhausted,until:item.budget.until,
+  if(!providers.length){const quotaReady=eligible.filter(item=>item.budget.known&&!item.budget.exhausted),cooldownBlocked=quotaReady.length>0&&quotaReady.every(item=>parked.has(item.id)),capacityBlocked=quotaReady.length>0&&quotaReady.every(item=>{const view=admitted(item.runtime.provider);return view&&view.used>=view.capacity;});
+    const error=Error(eligible.length?(cooldownBlocked?`Every eligible ${name} model with available quota is cooling`:capacityBlocked?`No eligible ${name} model has provider admission capacity`:`No eligible ${name} model has known available provider quota`):`No evaluated model is eligible for ${name}`);
+    if(eligible.length){error.code='STARCI_MODEL_QUOTA_WAIT';error.waitKind=cooldownBlocked?'provider-cooldown':capacityBlocked?'provider-capacity':'provider-quota';error.reasons=eligible.map(item=>({runtime:item.id,known:item.budget.known,exhausted:item.budget.exhausted,until:item.budget.until,cooling:parked.has(item.id),
       admitted:admitted(item.runtime.provider)?.used??null,capacity:admitted(item.runtime.provider)?.capacity??null}));}throw error;}
   const selected=available[0];return {args:{...modelInput(args),providers},runtime:selected.runtime,decision:selected.decision,job,
     considered:available.map(item=>({runtime:item.id,provider:item.runtime.provider,remaining:item.budget.remaining,active:admitted(item.runtime.provider)?.used??0,
@@ -175,7 +179,7 @@ export function enrollEngine(store,state,{journalFile=journalFileFor(),runtimePi
 }
 
 /** Runtime bridge used by the real kernel. The kernel remains the only workflow state writer. */
-export function createEngineRuntime({store,state,now=Date.now,eligibility,modelPolicy=null,bridge=null,spawnChild=null,candidateBase=null,git=null,exec=null,modelBudget=null,runtimeProfile=null}={}){
+export function createEngineRuntime({store,state,now=Date.now,eligibility,modelPolicy=null,bridge=null,spawnChild=null,candidateBase=null,git=null,exec=null,modelBudget=null,modelCooling=null,runtimeProfile=null}={}){
   if(!isEnrolled(state))return null;
   const owned=!bridge;
   bridge??=createJobBridge({journalFile:state.engine.journalFile,now,...(spawnChild?{spawnChild}:{}),eligibility:job=>job.kind==='model'||job.kind==='judge'?{eligible:Array.isArray(job.input?.args?.providers)&&job.input.args.providers.length>0,reasons:['no evaluated provider in durable model job']}:{eligible:false,reasons:['operation eligibility must name its selected runtime']},beforeSpawn:({job})=>{const meta=job.payload?.admission;if(meta?.mode!=='probation')return {ok:true,code:'qualified'};const consumed=modelPolicy?.consumeProbation?.({kind:job.kind,role:job.role,input:job.payload,workflowId:job.workflow_id,opId:job.op_id,attempt:job.attempt,generation:job.generation,jobId:job.job_id},meta.runtime);if(!consumed?.ok)return {ok:false,code:consumed?.code??'probation-unavailable'};store.saveState(state);return consumed;}});
@@ -221,7 +225,10 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
     if(saved){const replayArgs={...base,providers:[saved.provider]},kind=name==='validateOp'?'judge':'model',role=modelRole(name),input={handler:'model-function',functionName:name,args:replayArgs,admission:{runtime:saved.runtime,mode:saved.mode}},jobId=bridgeJobId({...bound,kind,input}),existing=journal.getJob(jobId);if(existing&&existing.status!=='queued')selected={args:replayArgs,runtime:{id:saved.runtime},decision:{mode:saved.mode},job:{kind,role}};}
     if(!selected){const budget=typeof modelBudget==='function'?modelBudget():modelBudget??readRuntimeBudget(path.dirname(store.dir));
       const providerAdmission=providerAdmissionView().providers;
-      selected=eligibleModelSelection(name,args,eligibility,modelPolicy,runtimeProfile,bound,budget,now,providerAdmission);saved={provider:selected.args.providers[0],runtime:selected.runtime.id,mode:selected.decision.mode??'qualified'};state.engine.modelSelections[selectionKey]=saved;
+      const cooling=[...Object.entries(state.allocation?.cooling??{}),...Object.entries(readLoads({path:loadsFileFor(store.dir),workflow:state.id,now}).cooling)]
+        .map(([runtime,value])=>({runtime,until:value?.until}));
+      if(typeof modelCooling==='function')cooling.push(...modelCooling());
+      selected=eligibleModelSelection(name,args,eligibility,modelPolicy,runtimeProfile,bound,budget,now,providerAdmission,cooling);saved={provider:selected.args.providers[0],runtime:selected.runtime.id,mode:selected.decision.mode??'qualified'};state.engine.modelSelections[selectionKey]=saved;
       store.appendEvent?.({event:'model-selected',function:name,op:bound.opId??null,runtime:saved.runtime,provider:saved.provider,mode:saved.mode,considered:selected.considered??[],refused:selected.refused??[]});store.saveState(state);}
     const kind=selected.job?.kind??(name==='validateOp'?'judge':'model'),role=selected.job?.role??modelRole(name),provider=runtimeProfile.runtimes?.[saved.runtime]?.provider;
     const input={handler:'model-function',functionName:name,args:selected.args,admission:{runtime:saved.runtime,mode:saved.mode}};

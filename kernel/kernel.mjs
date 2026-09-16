@@ -3508,6 +3508,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     supervisor:supervisor??supervisorRuntimes(workflowModelConfigRoot(state)),validator:validator??validatorRuntimes(workflowModelConfigRoot(state))};
   ctx.engine=engineRuntime??(isEnrolled(state)?createEngineRuntime({store,state,now,eligibility:modelEligibility,modelPolicy,git,
     runtimeProfile:workflowRuntimeProfile(state),
+    modelCooling:()=>ctx.allocator.snapshot?.()?.cooling??[],
     exec:(command,options)=>ctx.engine.check(command,options,ctx.currentOp??null)}):null);
   if(ctx.engine){
     // The allocator is constructed before the engine opens SQLite. Bind it now so operation scoring sees the

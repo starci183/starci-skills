@@ -128,6 +128,13 @@ clears the streak. A cooling pool is simply not a candidate, and `snapshot()`
 lists it with its `wakeAt`, so a 429 parks one provider for ten minutes while
 the other pools keep working.
 
+Enrolled model and judge calls apply the same local and repository-shared
+cooldowns before choosing their single provider. A validator's explicit skip
+list is also filtered at selection time. If every feasible peer is cooling,
+the call waits without launching a model job and is reconsidered after expiry.
+Cooldown observations are not part of a semantic job's identity: an already
+launched or completed job replays its durable result even when that list changes.
+
 ## One ledger per repository
 
 A workflow is not alone on its runtimes. Every kernel of a repository shares one
