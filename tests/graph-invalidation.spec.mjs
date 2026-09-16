@@ -19,21 +19,22 @@ const clone=()=>structuredClone(profile);
  */
 const extended=()=>{
   const fixture=clone();
-  fixture.vocabularies.blockers=[...fixture.vocabularies.blockers,'test-gap'];
+  if(!fixture.vocabularies.blockers.includes('test-gap'))
+    fixture.vocabularies.blockers=[...fixture.vocabularies.blockers,'test-gap'];
   fixture.predicates={...fixture.predicates,
     'goal.requiresSecurity':'The goal metrics block declares a security requirement the workflow must prove.',
     'goal.requiresPerf':'The goal metrics block declares a performance requirement the workflow must prove.'};
-  Object.assign(fixture.kinds,{
+  for(const [name,kind] of Object.entries({
     'code.refactor':{family:'build',role:'implement',readOnly:false,reads:['sds','code'],writes:['code'],
       purpose:'Restructure code with behaviour invariant; reports test-gap when no regression coverage exists.',
       reports:{outcomes:['done','partial','failed','ask','blocked'],blockers:['test-gap','environment','authority']}},
     'test.author':{family:'build',role:'implement',readOnly:false,reads:['sds','code'],writes:['code'],
       purpose:'Author the test files of a bounded slice; writes tests, never judges them.',
       reports:{outcomes:['done','partial','failed','ask','blocked'],blockers:['environment','authority']}},
-    'security.verify':{family:'prove',role:'verify',readOnly:false,reads:['code'],writes:['evidence'],
+    'security.verify':{family:'prove',role:'verify',readOnly:false,reads:['code','asset'],writes:['evidence'],
       purpose:'Inspect code and config for vulnerabilities and leave the findings as evidence.',
       reports:{outcomes:['done','partial','failed','blocked'],blockers:['environment','authority']}},
-    'perf.verify':{family:'prove',role:'verify',readOnly:false,reads:['code'],writes:['evidence'],
+    'perf.verify':{family:'prove',role:'verify',readOnly:false,reads:['code','asset'],writes:['evidence'],
       purpose:'Observe performance on the running product and leave the evidence.',
       reports:{outcomes:['done','partial','failed','blocked'],blockers:['environment','authority']}},
     'goal.revise':{family:'design',role:'decide',readOnly:false,reads:['record'],writes:['record'],
@@ -41,10 +42,11 @@ const extended=()=>{
       reports:{outcomes:['done','partial','failed','ask','blocked'],blockers:['authority']}},
     'goal.validate':{family:'prove',role:'verify',readOnly:true,reads:['record'],writes:[],
       purpose:'Check a proposed goal revision against the goal contract.',
-      reports:{outcomes:['done','failed'],blockers:[]}}});
-  fixture.routes.push({id:'test-gap-authors-the-tests',on:{blocker:'test-gap'},from:'any',
-    to:{kind:'test.author',origin:'gate'},limit:2,then:'reopen',
-    purpose:'A behaviour-invariant change with no regression coverage gets the tests it needs first.'});
+      reports:{outcomes:['done','failed'],blockers:[]}}}))if(!fixture.kinds[name])fixture.kinds[name]=kind;
+  if(!fixture.routes.some(route=>route.id==='test-gap-authors-the-tests'))
+    fixture.routes.push({id:'test-gap-authors-the-tests',on:{blocker:'test-gap'},from:'any',
+      to:{kind:'test.author',origin:'gate'},limit:2,then:'reopen',
+      purpose:'A behaviour-invariant change with no regression coverage gets the tests it needs first.'});
   fixture.lanes.push({id:'fixture/goal-gated',match:[{kind:'fixture-node'}],
     purpose:'A lane whose two goal-gated proofs exist only when the goal asks for them.',
     steps:[{kind:'backend.implement'},
