@@ -223,6 +223,13 @@ sections:
         evidence-content hash or update its semantic observation pointer after freezing proof. If
         relevant source, resource or spec changes during checks, rerun affected verification against
         the new actual inputs; never just replace a digest to clear a stale result."
+      - "Choose tests from the changed behavior and affected dependencies, following docs/work-verification.md.
+        Edits, retries and polling use relevant partial tests and applicable static/build checks, not a
+        full repository run each time. A required full suite belongs at the main-publication checkpoint
+        after integration. Reuse a passing run only with verified unchanged covered inputs, its original
+        tested revision and explicit limits; check documentation-only deltas separately. Installing the
+        same artifact uses relevant installation/build/import smoke checks unless changed inputs or a
+        failure justify broader testing. Preserve required CI gates and never claim a partial run is full."
       - Completion writes `completion.inputDigest`, `completion.evidence` (evidence IDs) and
         `completion.codeRefs:[{repository,commit}]` for implementation/release profiles, with
         repository resource IDs and full actual Git SHAs. Every selected evidence bundle also

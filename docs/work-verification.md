@@ -76,6 +76,24 @@ delete actual test output, screenshots or videos to satisfy a naming preference.
 
 ## Identify what was actually checked
 
+### Select tests by change and checkpoint
+
+- During development, run the smallest meaningful set that covers the changed behavior and affected
+  consumers, plus applicable lint, typecheck or build checks. Record why those checks cover the change.
+- A routine operation, retry, polling tick, documentation edit or installation of identical code does not
+  trigger the complete repository suite. Expand the selection only for a concrete dependency impact,
+  observed failure or unresolved concern; a larger count is not better evidence by itself.
+- Run a required full suite at the main-publication checkpoint after the changes are integrated. Honor
+  any required CI gate. Do not repeat a passing full run for the same tested inputs merely because the
+  branch, checkout path or packaging phase changed.
+- Reuse is explicit and scoped: retain the original tested revision, command and result; compare actual
+  code, test, dependency and configuration inputs with the delivered revision. Ancestry or the same
+  version string alone is insufficient. For a documentation/policy-only follow-up, review its exact
+  diff and run its relevant build/schema/contract checks while retaining the earlier code-suite identity.
+- After installing the same verified artifact, check installation, generated-build parity and relevant
+  import/runtime smoke paths. Rerun broader behavior tests only if installation changes relevant inputs
+  or exposes a failure. Never call partial testing a full-suite pass or static checks product UAT.
+
 For committed source, bind the exact repository and revision. Explain what was
 delivered and why it matters; do not repeat the Git changed-file inventory.
 Optional source anchors are useful only when they clarify a non-obvious boundary
