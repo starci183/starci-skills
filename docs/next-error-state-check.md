@@ -64,7 +64,9 @@ The target `package.json` owns `starci.codePatterns.next.errorState`:
 }
 ```
 
-Paths are normalized repository-relative regular files and every named export is resolved through the owning TypeScript program. The parent supplies the canonical architecture config. All owning-program sources below `sourceRoots` must appear in the exact selected/context set; otherwise omission detection is unavailable and the check fails closed. `transports` records whether a selected root uses a typed envelope or throws transport failures. It does not turn all negative business outcomes into exceptions.
+Paths are normalized repository-relative regular files and every named export is resolved through the owning TypeScript program. The parent may supply the canonical architecture config; direct invocation may use inferred project authority, which is recorded with a null config path and the resolved project list. `contextFiles` accepts the aggregate's exact mixed source/metadata inventory and may overlap selected source; the checker validates every path, forms one deduplicated source context internally, and preserves `files` as the exact requested result set. All owning-program sources below `sourceRoots` must appear in that selected/context source set; otherwise omission detection is unavailable and the check fails closed.
+
+`transports` records whether a selected root uses a typed envelope or throws transport failures. A throwing-only inventory needs no invented envelope. Empty world-state, feedback-write, or Next-boundary declarations are checked only when source inventory supports absence: resolved world/transport calls or an undeclared reserved `error.tsx`/`global-error.tsx` make coverage unavailable. This absence proof does not decide whether an existing write deserves user feedback; that selection remains design review. The checker binds whichever feedback helper the project declares and does not require a generic `runGraphQL` name, GraphQL, a toast, or an additional network wrapper.
 
 The uniform adapter is:
 

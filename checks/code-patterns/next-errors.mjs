@@ -165,18 +165,26 @@ function parseContract(repository, bound) {
     if (!['reset', 'unstable_retry'].includes(entry.recoveryProp)) throw Error(`${label}.recoveryProp must name a supported installed Next recovery callback.`);
     return { ...source, role: entry.role, routeRoot, recoveryProp: entry.recoveryProp };
   });
+  const transports = array(contract.transports, 'errorState.transports').map((transport, index) => {
+    const label = `errorState.transports[${index}]`;
+    exactKeys(transport, ['root', 'mode', 'envelopeIds'], label);
+    const root = exactRelative(transport.root, `${label}.root`);
+    if (!sourceRoots.some(sourceRoot => root === sourceRoot || root.startsWith(`${sourceRoot}/`))) throw Error('Each transport root belongs to a sourceRoot.');
+    if (transport.mode === 'envelope') {
+      const ids = array(transport.envelopeIds, `${label}.envelopeIds`);
+      if (new Set(ids).size !== ids.length || ids.some(id => !envelopeIds.has(id))) throw Error('Envelope transports name unique declared envelope IDs.');
+      return { root, mode: transport.mode, envelopeIds: ids };
+    }
+    if (transport.mode !== 'throwing' || transport.envelopeIds !== undefined) throw Error('A transport mode is envelope with envelopeIds or throwing without them.');
+    return { root, mode: transport.mode };
+  });
   {
-    const transports = array(contract.transports, 'errorState.transports');
     const roots = new Set(), mappedEnvelopes = new Set();
-    for (const [index, transport] of transports.entries()) {
-      exactKeys(transport, ['root', 'mode', 'envelopeIds'], `errorState.transports[${index}]`);
-      const root = exactRelative(transport.root, `errorState.transports[${index}].root`);
-      if (roots.has(root) || !sourceRoots.some(sourceRoot => root === sourceRoot || root.startsWith(`${sourceRoot}/`))) throw Error('Each transport root is unique and belongs to a sourceRoot.');
-      roots.add(root);
+    for (const transport of transports) {
+      if (roots.has(transport.root)) throw Error('Each transport root is unique and belongs to a sourceRoot.');
+      roots.add(transport.root);
       if (transport.mode === 'envelope') {
-        const ids = array(transport.envelopeIds, `errorState.transports[${index}].envelopeIds`);
-        if (new Set(ids).size !== ids.length || ids.some(id => !envelopeIds.has(id))) throw Error('Envelope transports name unique declared envelope IDs.');
-        for (const id of ids) {
+        for (const id of transport.envelopeIds) {
           if (mappedEnvelopes.has(id)) throw Error(`Envelope ${id} is mapped by more than one transport root.`);
           mappedEnvelopes.add(id);
         }
@@ -195,7 +203,7 @@ function parseContract(repository, bound) {
   if (new Set(worldMappings.map(item => item.id)).size !== worldMappings.length) throw Error('errorState.worldMappings IDs must be unique.');
   const worldKeys = worldMappings.map(item => `${item.owner.path}\0${item.owner.export}\0${item.source.path}\0${item.source.export}\0${item.failurePath}`);
   if (new Set(worldKeys).size !== worldKeys.length) throw Error('errorState.worldMappings contains a duplicate owner/source/failure path.');
-  return { sourceRoots, worldMappings, envelopes, writes, boundaries };
+  return { sourceRoots, transports, worldMappings, envelopes, writes, boundaries };
 }
 
 function projectFor(context, repository, relative) {
@@ -820,6 +828,76 @@ function checkWrite(entry, env, result) {
   }
 }
 
+function declarationInside(repository, roots, declaration) {
+  const file = path.resolve(declaration.getSourceFile().fileName);
+  return roots.some(root => isInside(path.resolve(repository, root), file));
+}
+
+function importedCallIdentity(ts, checker, expression) {
+  const selected = unwrap(ts, expression);
+  const declarationFor = node => checker.getSymbolAtLocation(node)?.declarations?.find(declaration =>
+    ts.isImportSpecifier(declaration) || ts.isImportClause(declaration) || ts.isNamespaceImport(declaration));
+  let declaration = null, imported = null;
+  if (ts.isIdentifier(selected)) {
+    declaration = declarationFor(selected);
+    imported = declaration && ts.isImportSpecifier(declaration) ? declaration.propertyName?.text ?? declaration.name.text
+      : declaration && ts.isImportClause(declaration) ? 'default' : null;
+  } else if (ts.isPropertyAccessExpression(selected) && ts.isIdentifier(selected.expression)) {
+    declaration = declarationFor(selected.expression);
+    imported = selected.name.text;
+  }
+  if (!declaration || !imported) return null;
+  let statement = declaration;
+  while (statement && !ts.isImportDeclaration(statement)) statement = statement.parent;
+  return statement?.moduleSpecifier && ts.isStringLiteralLike(statement.moduleSpecifier)
+    ? { specifier: statement.moduleSpecifier.text, imported } : null;
+}
+
+function knownFailureLifecycleCall(identity) {
+  if (!identity) return false;
+  if (['swr', 'swr/immutable', 'swr/mutation'].includes(identity.specifier)) {
+    return ['default', 'useSWR', 'useSWRConfig', 'useSWRImmutable', 'useSWRMutation'].includes(identity.imported);
+  }
+  return false;
+}
+
+function sourceSurfaceInventory(env) {
+  const configuredWorldRoots = [...new Set([
+    ...env.config.frontend.transport,
+    ...env.contract.transports.map(item => item.root),
+  ])];
+  const configuredTransportRoots = [...new Set([
+    ...env.config.frontend.transport,
+    ...env.contract.transports.map(item => item.root),
+  ])];
+  const world = [], transport = [];
+  for (const relative of [...env.bound].filter(file => SOURCE.test(file) && !TEST_SOURCE.test(file))) {
+    const { source, checker, ts } = projectFor(env.context, env.repository, relative);
+    const sourceInTransport = configuredTransportRoots.some(root => isInside(path.resolve(env.repository, root), path.resolve(source.fileName)));
+    const visit = node => {
+      if (ts.isCallExpression(node)) {
+        const target = symbolOf(ts, checker, unwrap(ts, node.expression));
+        const declarations = target?.declarations ?? target?.getDeclarations?.() ?? [];
+        const worldRoot = declarations.some(declaration => declarationInside(env.repository, configuredWorldRoots, declaration));
+        const transportRoot = declarations.some(declaration => declarationInside(env.repository, configuredTransportRoots, declaration));
+        const externalWorld = knownFailureLifecycleCall(importedCallIdentity(ts, checker, node.expression));
+        const item = { path: relative, ...location(source, node) };
+        if (worldRoot || externalWorld || sourceInTransport) world.push(item);
+        if (transportRoot || sourceInTransport) transport.push(item);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return { world, transport };
+}
+
+function reservedBoundaryFiles(env) {
+  return [...env.bound].filter(relative => SOURCE.test(relative) && !TEST_SOURCE.test(relative)
+    && /(?:^|\/)(?:global-error|error)\.tsx$/.test(relative)
+    && env.config.frontend.routes.some(root => relative === root || relative.startsWith(`${root}/`)));
+}
+
 function installedNext(repository, ts) {
   const manifest = path.join(repository, 'node_modules', 'next', 'package.json');
   if (!fs.existsSync(manifest) || !fs.statSync(manifest).isFile()) throw Error('Installed Next package is required to validate boundary recovery props.');
@@ -937,14 +1015,22 @@ export function checkNextErrors({ root, files, ruleIds, contextFiles = [], archi
   try {
     const repository = fs.realpathSync(path.resolve(root)); result.repository = repository;
     if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length || files.some(file => !SOURCE.test(file))) throw Error('Exact unique selected Next source files are required.');
-    if (!Array.isArray(contextFiles) || new Set(contextFiles).size !== contextFiles.length || contextFiles.some(file => !SOURCE.test(file))) throw Error('Exact unique Next context source files are required.');
+    if (!Array.isArray(contextFiles) || new Set(contextFiles).size !== contextFiles.length) throw Error('Next context files must be an exact unique array.');
     if (!Array.isArray(ruleIds) || !ruleIds.length || new Set(ruleIds).size !== ruleIds.length || ruleIds.some(id => !NEXT_ERROR_RULES.includes(id))) throw Error('Unique supported Next error-state rule IDs are required.');
-    const bound = new Set([...files, ...contextFiles]);
-    if (bound.size !== files.length + contextFiles.length) throw Error('Selected and context files cannot overlap.');
-    for (const relative of bound) regular(repository, relative, 'Next error-state source');
+    for (const relative of files) regular(repository, relative, 'Selected Next error-state source');
+    for (const relative of contextFiles) regular(repository, relative, 'Next error-state context');
+    const bound = new Set([...files, ...contextFiles.filter(file => SOURCE.test(file))]);
     const contract = parseContract(repository, bound), config = loadArchitectureConfig(repository, architectureConfig), context = buildTypeScriptContext(config);
     if (context.errors.length) throw Error(context.errors.map(error => error.message).join('; '));
-    result.compiler = { version: context.loaded.version, resolved: context.loaded.resolved, architectureConfig: exactRelative(architectureConfig, 'architectureConfig') };
+    const explicitArchitectureConfig = architectureConfig === undefined || architectureConfig === null ? null : exactRelative(architectureConfig, 'architectureConfig');
+    if (explicitArchitectureConfig) regular(repository, explicitArchitectureConfig, 'Architecture config authority');
+    result.compiler = {
+      version: context.loaded.version,
+      resolved: context.loaded.resolved,
+      architectureConfig: explicitArchitectureConfig,
+      projects: [...config.projects].sort(),
+      metadataFiles: [...new Set(contextFiles.filter(file => !SOURCE.test(file)))].sort(),
+    };
     const covered = new Set();
     for (const project of context.projects) for (const file of project.program.getRootFileNames()) {
       const relative = slash(path.relative(repository, file));
@@ -952,25 +1038,36 @@ export function checkNextErrors({ root, files, ruleIds, contextFiles = [], archi
     }
     const missing = [...covered].filter(relative => !bound.has(relative));
     if (missing.length) throw Error(`errorState.sourceRoots coverage is incomplete; bind every owning-program source (${missing.slice(0, 4).join(', ')}${missing.length > 4 ? ', …' : ''}).`);
-    const env = { repository, bound, contract, context };
+    const env = { repository, bound, contract, config, context };
+    const surfaceInventory = sourceSurfaceInventory(env);
+    const unavailable = (ruleId, message) => result.errors.push({ ruleId, path: null, line: null, column: null, message });
     if (ruleIds.includes('FE_ERROR_WORLD_STATE_MAPPING')) {
-      if (!contract.worldMappings.length) throw Error('FE_ERROR_WORLD_STATE_MAPPING needs at least one declared world-state mapping.');
-      for (const entry of contract.worldMappings) checkWorldMapping(entry, env, result);
-      checkWorldCoverage(contract.worldMappings, env, result);
+      if (!contract.worldMappings.length && surfaceInventory.world.length) unavailable('FE_ERROR_WORLD_STATE_MAPPING',
+        `Cannot prove an absent world-state surface; resolved world calls exist at ${surfaceInventory.world.slice(0, 3).map(item => `${item.path}:${item.line}`).join(', ')}.`);
+      if (contract.worldMappings.length) {
+        for (const entry of contract.worldMappings) checkWorldMapping(entry, env, result);
+        checkWorldCoverage(contract.worldMappings, env, result);
+      }
     }
     if (ruleIds.includes('FE_ERROR_ENVELOPE_POLICY')) {
-      if (!contract.envelopes.length) throw Error('FE_ERROR_ENVELOPE_POLICY needs at least one selected envelope contract.');
+      if (!contract.envelopes.length && contract.transports.some(item => item.mode !== 'throwing')) unavailable('FE_ERROR_ENVELOPE_POLICY',
+        'Declared envelopes are required for every selected envelope transport.');
       for (const entry of contract.envelopes) checkEnvelope(entry, env, result);
     }
     if (ruleIds.includes('FE_WRITE_FEEDBACK_OWNER')) {
-      if (!contract.writes.length) throw Error('FE_WRITE_FEEDBACK_OWNER needs at least one selected write contract.');
+      if (!contract.writes.length && surfaceInventory.transport.length) unavailable('FE_WRITE_FEEDBACK_OWNER',
+        `Cannot prove an absent write-feedback surface while resolved transport calls exist at ${surfaceInventory.transport.slice(0, 3).map(item => `${item.path}:${item.line}`).join(', ')}.`);
       for (const entry of contract.writes) checkWrite(entry, env, result);
     }
     if (ruleIds.includes('FE_NEXT_ERROR_BOUNDARY_LOCATION')) {
-      if (!contract.boundaries.length) throw Error('FE_NEXT_ERROR_BOUNDARY_LOCATION needs at least one selected boundary contract.');
-      const next = installedNext(repository, context.ts);
-      for (const entry of contract.boundaries) checkBoundary(entry, env, result, next);
-      result.compiler.next = { ...next, recoveryProps: [...next.recoveryProps].sort() };
+      const undeclaredBoundaries = reservedBoundaryFiles(env).filter(relative => !contract.boundaries.some(entry => entry.path === relative));
+      if (undeclaredBoundaries.length) unavailable('FE_NEXT_ERROR_BOUNDARY_LOCATION',
+        `Undeclared reserved boundaries exist: ${undeclaredBoundaries.slice(0, 4).join(', ')}.`);
+      if (contract.boundaries.length) {
+        const next = installedNext(repository, context.ts);
+        for (const entry of contract.boundaries) checkBoundary(entry, env, result, next);
+        result.compiler.next = { ...next, recoveryProps: [...next.recoveryProps].sort() };
+      }
     }
     result.files = [...files].sort();
     if (!result.errors.length) result.checkedRuleIds = [...ruleIds].sort();

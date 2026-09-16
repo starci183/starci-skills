@@ -143,6 +143,58 @@ test('source-root omission and undeclared contract paths fail closed', t => {
   assert.ok(result.errors.some(item => item.message.includes('normalized repository-relative')));
 });
 
+test('aggregate-shaped mixed context may overlap selected source while preserving requested files and metadata authority', t => {
+  const f = fixture(t);
+  f.write('package-lock.json', { lockfileVersion: 3 });
+  const contextFiles = [...f.input.contextFiles, ...f.input.files, 'package.json', 'package-lock.json', 'architecture.json', 'tsconfig.json'];
+  const result = checkNextErrors({ ...f.input, contextFiles });
+  assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
+  assert.deepEqual(result.files, [...f.input.files].sort());
+  assert.equal(result.compiler.architectureConfig, 'architecture.json');
+  assert.deepEqual(result.compiler.projects, ['tsconfig.json']);
+  assert.deepEqual(result.compiler.metadataFiles, ['architecture.json', 'package-lock.json', 'package.json', 'tsconfig.json']);
+});
+
+test('default architecture authority remains valid when no explicit config path is supplied', t => {
+  const f = fixture(t);
+  f.write('src/components/static.tsx', 'export const Static = () => <p>static</p>;');
+  const result = checkNextErrors({ ...f.input, contextFiles: [...f.input.contextFiles, 'src/components/static.tsx', 'package.json', 'tsconfig.json'], architectureConfig: undefined });
+  assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
+  assert.equal(result.compiler.architectureConfig, null);
+  assert.deepEqual(result.compiler.projects, ['tsconfig.json']);
+});
+
+test('throwing-only and static inventories prove conditional error surfaces absent without invented owners', t => {
+  const f = fixture(t);
+  f.write('src/static/api/client.ts', `export const staticValue = 'ready' as const;`);
+  f.write('src/static/app/page.tsx', `export default function StaticPage(){return <p>ready</p>}`);
+  f.contract.sourceRoots = ['src/static'];
+  f.contract.transports = [{ root: 'src/static/api', mode: 'throwing' }];
+  f.contract.worldMappings = [];
+  f.contract.envelopes = [];
+  f.contract.writes = [];
+  f.contract.boundaries = [];
+  f.write('package.json', { private: true, starci: { codePatterns: { next: { errorState: f.contract } } } });
+  const input = { ...f.input, files: ['src/static/app/page.tsx'], contextFiles: ['src/static/api/client.ts', 'package.json', 'architecture.json', 'tsconfig.json'] };
+  const result = checkNextErrors(input);
+  assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
+  assert.deepEqual(result.checkedRuleIds, [...NEXT_ERROR_RULES].sort());
+  assert.equal(result.compiler.next, undefined);
+});
+
+test('empty surface declarations cannot hide resolved world/write calls or reserved Next boundaries', t => {
+  const f = fixture(t);
+  f.contract.worldMappings = [];
+  f.contract.writes = [];
+  f.contract.boundaries = [];
+  f.write('package.json', { private: true, starci: { codePatterns: { next: { errorState: f.contract } } } });
+  const result = checkNextErrors(f.input);
+  assert.ok(result.errors.some(item => /absent world-state surface/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.errors.some(item => /absent write-feedback surface/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.errors.some(item => /undeclared reserved boundaries/i.test(item.message)), JSON.stringify(result, null, 2));
+  assert.deepEqual(result.checkedRuleIds, []);
+});
+
 test('local lookalikes do not satisfy resolved action, feedback or recovery identities', t => {
   const f = fixture(t, files => { files['src/features/save.ts'] = `import { saveCourse } from '../api/write';
 import { withFeedback as importedFeedback } from '../ui/feedback';
