@@ -9,9 +9,11 @@ import {resolveLedgerRoot} from './routing.mjs';
 import {loadRuntimes} from './schedule.mjs';
 import {loadsFileFor,readLoads} from './loads.mjs';
 import {resolveExecutionChain} from './chains.mjs';
-import {GOAL_RECORD,WORK_LEDGER,allowlistsOverlap,byId,describeNode,dynamicBudget,firstLine,hostMissing,kindRole,
-  launchOperator,ledgerBinding,ledgerItem,locateSharedTreePaths,need,parseGate,parseQuota,plain,required,slash,tail,toOp,
+import {GOAL_RECORD,WORK_LEDGER,addOp,allowlistsOverlap,byId,describeNode,dynamicBudget,firstLine,hostMissing,kindRole,
+  launchOperator,ledgerBinding,ledgerItem,liveStatus,locateSharedTreePaths,need,parseGate,parseQuota,parseRef,plain,readJson,required,slash,tail,toOp,
   unique,workModule,workOpId,writeJson} from './common.mjs';
+import {recordDigests} from './reconciliation.mjs';
+import {stateGoalIdentity} from './store.mjs';
 import {decisionKindFor} from './io.mjs';
 import {isAsk,openOwnerAsk} from './owner.mjs';
 import {loadConfig,nonOperationModels} from '../scripts/config.mjs';
@@ -465,6 +467,14 @@ export function planGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
     for(const id of op.ledgerIds)need(ledgerItem(state,id),`Operation ${op.id} claims the unknown ledger item ${id}`);
   }
   if(plan.gates&&!state.gates.length)state.gates=plan.gates.map(parseGate);
+  // A plan may declare its own `done:` block. It is a checkable contract or it is refused: every metric
+  // must name a subject - ledger item, operation or gate - this goal actually holds.
+  if(plan.done!==undefined){
+    state.doneMetrics=normalizeDoneMetrics(plan.done);
+    need(state.doneMetrics,'The plan `done` block is a nonempty list of checkable metrics (kind ledger/operation/gate with a ref)');
+    const unresolvable=unresolvedDoneMetrics(state,state.doneMetrics);
+    need(!unresolvable.length,`The plan \`done\` block names what this goal does not hold: ${unresolvable.join(', ')}`);
+  }
   // Overlapping allowlists are not fatal: the scheduler never runs two overlapping operations at once.
   const overlaps=[];
   for(const [index,op] of state.ops.entries())for(const other of state.ops.slice(index+1)){
@@ -482,8 +492,8 @@ export function planGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   // from the assessment or from nowhere. The phase already refuses an assessment that failed; this is what the
   // approval gate reads when a model answered with an empty one.
   goalGrounds(state,{assessed,fallback:'none'});
-  writeJson(store.paths.goalJson,{schema:GOAL_RECORD,id:state.id,job:state.job,inputs:state.inputs,ledgerMode:state.ledgerMode,
-    definitionOfDone:state.definitionOfDone,risks:state.risks,questions:state.questions,critique:state.critique??null,
+  writeJson(store.paths.goalJson,{schema:GOAL_RECORD,id:state.id,rev:goalRevOf(state),job:state.job,inputs:state.inputs,ledgerMode:state.ledgerMode,
+    definitionOfDone:state.definitionOfDone,done:goalMetricsOf(state),risks:state.risks,questions:state.questions,critique:state.critique??null,
     ledger:state.ledger,ops:state.ops.map(op=>({id:op.id,kind:op.kind,goal:op.goal,
       ledgerIds:op.ledgerIds,allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn})),
     gates:state.gates,serializedOverlaps:overlaps,assessedBy:assessed.provider??null,provisions:state.provisions??[],
@@ -706,6 +716,13 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
     for(const op of state.ops){op.difficulty=rated.get(op.id)??rated.get(op.nodeId)??op.difficulty??'medium';}
     state.risks=[...(assessed.value.risks??[])];
     state.questions=[...(assessed.value.questions??[])];
+    // A declared `done:` block is adopted the same way as on a plan ledger: checkable or refused.
+    if(assessed.value.done!==undefined){
+      state.doneMetrics=normalizeDoneMetrics(assessed.value.done);
+      need(state.doneMetrics,'The assessed `done` block is a nonempty list of checkable metrics (kind ledger/operation/gate with a ref)');
+      const unresolvable=unresolvedDoneMetrics(state,state.doneMetrics);
+      need(!unresolvable.length,`The assessed \`done\` block names what this goal does not hold: ${unresolvable.join(', ')}`);
+    }
   }else{
     // The TODO list is a fact of the tree, so a model that cannot answer does not block the goal: the
     // definition of done falls back to the ledger itself and the failure is recorded as such. The operations the
@@ -739,10 +756,10 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   // repair settles it when an operation actually hits it.
   planCritiqueDecisions(store,state,{ctx:critiqueCtx});
   need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Work operation ids are not unique');
-  writeJson(store.paths.goalJson,{schema:GOAL_RECORD,id:state.id,job:state.job,inputs:state.inputs,
+  writeJson(store.paths.goalJson,{schema:GOAL_RECORD,id:state.id,rev:goalRevOf(state),job:state.job,inputs:state.inputs,
     ledgerMode:state.ledgerMode,scope:state.scope,workRoot:slash(loaded.workRoot),ledgerValid:loaded.ok,
     ledgerSource:binding.source,ledgerShared:binding.sharedLedger,ledgerOwner:state.ledgerOwner,codeRepository:repository,codeSide:binding.side??null,
-    definitionOfDone:state.definitionOfDone,risks:state.risks,questions:state.questions,critique:state.critique??null,
+    definitionOfDone:state.definitionOfDone,done:goalMetricsOf(state),risks:state.risks,questions:state.questions,critique:state.critique??null,
     ledger:state.ledger,decisions:state.decisions,ledgerSummary:state.ledgerSummary,brand:state.brand??null,
     lanes:Object.fromEntries(Object.entries(state.lanes??{}).map(([node,entry])=>[node,[...entry.lane]])),
     ops:state.ops.map(op=>({id:op.id,nodeId:op.nodeId,kind:op.kind,goal:op.goal,ledgerIds:op.ledgerIds,
@@ -978,6 +995,19 @@ export function approve(store,state,{allocation=null,allowDynamic=null,acceptCri
   // with no operation is an empty plan and stays unapprovable.
   const toAuthor=state.ledgerMode===WORK_LEDGER?state.needUser.filter(item=>item.kind==='ledger'&&item.node).length:0;
   need(state.ops.length||toAuthor,`Workflow ${state.id} has no plan to approve; run workflow-goal first`);
+  // The goal freezes at approval with a revision and a `done` contract. A goal that cannot evaluate its
+  // completion metrics is refused here, at enroll, rather than discovered when the run should finish; and
+  // every derivation already made - operation, question, decision - names the rev it was made under.
+  if(!state.approved){
+    state.goalRev=goalRevOf(state);
+    const evaluation=evaluateGoalMetrics(state);
+    // `toAuthor` entries are evaluable subjects too: each is an incomplete node whose author op the first
+    // ledger sync derives, and whose ledger item then carries the completion check.
+    need(evaluation.metrics.length>0||toAuthor>0,`Workflow ${state.id} carries no evaluable done metric; there is nothing to check completion against`);
+    need(!evaluation.unevaluable.length,`Workflow ${state.id} cannot be approved: its done metrics cannot be evaluated (${evaluation.unevaluable.map(metric=>metric.id).join(', ')})`);
+    for(const op of state.ops){op.goalRev??=state.goalRev;if(plain(op.question))op.question.goalRev??=state.goalRev;}
+    for(const decision of state.decisions)decision.goalRev??=state.goalRev;
+  }
   state.approved=true;
   if(state.phase!=='finished')state.phase='run';
   store.appendEvent({event:'approved',ops:state.ops.length,toAuthor,quota:state.quota,dynamicOpsBudget:dynamicBudget(state),
@@ -986,4 +1016,435 @@ export function approve(store,state,{allocation=null,allowDynamic=null,acceptCri
   return {ok:true,id:state.id,phase:state.phase,approved:true,ops:state.ops.length,ledger:state.ledger.length,
     quota:state.quota,dynamicOpsBudget:dynamicBudget(state),
     ...(plain(state.critique)?{critique:critiqueView(state)}:{})};
+}
+
+/* --------------------------------------------------------------- goal revisions and done metrics
+ *
+ * The goal is frozen with a revision at approval. Every operation, question, decision and report derived
+ * from it names the `goalRev` it was made under, and the only way the goal moves afterwards is the typed,
+ * validated `goal.revise` transition: a supplied body is checked (a `done:` block of checkable metrics,
+ * stable ids), persisted as `goal.json` rev N+1, and `propagateInvalidation` marks every derivation of the
+ * changed sections stale. An op dispatched under rev N that reports under rev N+1 is adopted only while
+ * the digests of the inputs it was derived from still read the same; otherwise its report is stale, does
+ * not count, and work still owed by the metrics reopens.
+ */
+
+/** Settled dispatches that may change no goal metric before the loop declares itself a spin. */
+export const GOAL_SPIN_LIMIT=5;
+export const GOAL_REVISION='starci/goal-revision@1';
+const GOAL_METRIC_KINDS=['ledger','operation','gate'];
+/** The rev a state without one runs under: goals were unversioned before, and rev 1 is what they were. */
+export const goalRevOf=state=>Number.isInteger(state?.goalRev)&&state.goalRev>0?state.goalRev:1;
+
+/** One `done:` entry made checkable: a kind the kernel can evaluate, the subject ref and the satisfying statuses. */
+const normalizeDoneMetric=entry=>{
+  if(!plain(entry)||!GOAL_METRIC_KINDS.includes(entry.kind)||typeof entry.ref!=='string'||!entry.ref.trim())return null;
+  const declared=entry.expect===undefined?null:(Array.isArray(entry.expect)?entry.expect:[entry.expect]).map(String).filter(Boolean);
+  const fallback=entry.kind==='gate'?['passed']:entry.kind==='ledger'?['verified','preexisting','out-of-repository']:['done','skipped','cancelled'];
+  return {id:String(entry.id??`${entry.kind}:${entry.ref}`).trim(),kind:entry.kind,ref:entry.ref.trim(),expect:declared?.length?declared:fallback};
+};
+/** The `done:` block is a nonempty list of checkable metrics; anything else is not a block at all. */
+export function normalizeDoneMetrics(value){
+  if(!Array.isArray(value)||!value.length)return null;
+  const metrics=value.map(normalizeDoneMetric);
+  return metrics.every(Boolean)?metrics:null;
+}
+/** The metric ids a state cannot answer for: refs to no ledger item, operation or gate the goal holds. */
+const unresolvedDoneMetrics=(state,metrics)=>{
+  const ledgerIds=new Set((state?.ledger??[]).map(item=>item.id)),opIds=new Set((state?.ops??[]).map(op=>op.id)),
+    gates=new Set((state?.gates??[]).map(gate=>gate.name));
+  return (metrics??[]).filter(metric=>!(metric.kind==='ledger'?ledgerIds.has(metric.ref)
+    :metric.kind==='operation'?opIds.has(metric.ref):gates.has(metric.ref))).map(metric=>metric.id);
+};
+/**
+ * The metrics a goal owes when it declares no `done:` block of its own: every ledger item verified (or
+ * proven preexisting/out-of-repository), every gate passed, and every kernel-derived goal item - an
+ * intake or a cut, which owns no ledger entry - settled. Derived per read, so ids never go stale.
+ */
+export function deriveGoalMetrics(state){
+  const metrics=[];
+  for(const item of state?.ledger??[])metrics.push({id:`ledger:${item.id}`,kind:'ledger',ref:item.id,expect:['verified','preexisting','out-of-repository']});
+  for(const gate of state?.gates??[])metrics.push({id:`gate:${gate.name}`,kind:'gate',ref:gate.name,expect:['passed']});
+  // Kernel-derived ops that own no ledger entry: an intake or a cut, and a node-bound op (a `work.author`
+  // completing an incomplete record) whose node has not landed in the ledger yet. A superseded op owes
+  // nothing: it was withdrawn, so no metric of it can hold the goal open.
+  for(const op of (state?.ops??[]).filter(op=>op.refusal!=='superseded'
+    &&(op.intake||op.cut||(op.nodeId&&!ledgerItem(state,op.nodeId)))))
+    metrics.push({id:`operation:${op.id}`,kind:'operation',ref:op.id,expect:['done','skipped','cancelled']});
+  return metrics;
+}
+export const goalMetricsOf=(state,goal=null)=>normalizeDoneMetrics(goal?.done)??normalizeDoneMetrics(state?.doneMetrics)??deriveGoalMetrics(state);
+
+function evaluateMetric(state,metric){
+  const base={id:metric.id,kind:metric.kind,ref:metric.ref,expect:[...metric.expect]};
+  if(metric.kind==='ledger'){
+    const item=ledgerItem(state,metric.ref);
+    if(!item)return {...base,met:false,status:'absent',detail:`the goal names ledger item ${metric.ref} but the state holds none`};
+    // An item whose derivation a goal revision marked stale is not met until a rev>=that rev op proves it again.
+    return {...base,met:metric.expect.includes(item.status)&&!item.goalStale,status:item.status,
+      ...(item.goalStale?{detail:`verified under an older goal revision; rev ${item.goalStale.rev} changed its inputs`}:{})};
+  }
+  if(metric.kind==='operation'){
+    const op=byId(state,metric.ref);
+    if(!op)return {...base,met:false,status:'absent',detail:`the goal names operation ${metric.ref} but the state holds none`};
+    return {...base,met:metric.expect.includes(op.status)&&!op.goalStale,status:op.status,
+      ...(op.goalStale?{detail:`settled under an older goal revision; rev ${op.goalStale.rev} changed its inputs`}:{})};
+  }
+  if(metric.kind==='gate'){
+    const result=(state?.gateResults??[]).find(entry=>entry.name===metric.ref);
+    if(!result)return {...base,met:false,status:'pending',detail:`gate ${metric.ref} has not run yet`};
+    return {...base,met:metric.expect.includes(result.status),status:result.status};
+  }
+  return {...base,met:false,status:'unevaluable',detail:`metric kind ${metric.kind} cannot be evaluated`};
+}
+/**
+ * The pure question the whole loop asks: does every metric of this goal hold against this state right now?
+ * `gaps` are the unmet metrics and `unevaluable` the ones the kernel cannot even check - a goal enrolled
+ * with either of the latter was refused at approval, so seeing them here means the contract moved.
+ */
+export function evaluateGoalMetrics(state,goal=null){
+  const metrics=goalMetricsOf(state,goal);
+  const evaluated=metrics.map(metric=>evaluateMetric(state,metric));
+  const gaps=evaluated.filter(metric=>!metric.met);
+  return {rev:goalRevOf(state),ok:gaps.length===0,metrics:evaluated,gaps,
+    unevaluable:evaluated.filter(metric=>['absent','unevaluable'].includes(metric.status))};
+}
+
+/** The metrics one operation is answerable for: itself, and the ledger items its `ledgerIds` serve. */
+export const metricBindsOp=(metric,op)=>metric&&(metric.kind==='operation'&&metric.ref===op.id
+  ||metric.kind==='ledger'&&(op.ledgerIds??[]).includes(metric.ref));
+export function metricsBindingOp(state,op,goal=null){
+  return goalMetricsOf(state,goal).filter(metric=>metricBindsOp(metric,op)).map(metric=>evaluateMetric(state,metric));
+}
+
+/* Stable JSON for input digests: key order must not decide whether an input "changed". */
+const canonical=value=>{
+  if(Array.isArray(value))return `[${value.map(canonical).join(',')}]`;
+  if(plain(value))return `{${Object.keys(value).sort().map(key=>`${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`;
+  const json=JSON.stringify(value);return json===undefined?'null':json;
+};
+const digestOf=value=>crypto.createHash('sha256').update(canonical(value)).digest('hex');
+
+/** The goal content an operation was derived from: the metrics it serves, the assessed fields of its items,
+ * and the goal-wide contract (definition of done, scope) every derivation reads. */
+const goalInputFor=(state,op)=>canonical({
+  definitionOfDone:state?.definitionOfDone??[],
+  scope:state?.scope??[],
+  metrics:goalMetricsOf(state).filter(metric=>metricBindsOp(metric,op)),
+  ledger:(op.ledgerIds??[]).map(id=>{const item=ledgerItem(state,id);
+    return item?{id:item.id,title:item.title,inputRef:item.inputRef??null,kind:item.kind??null,assessed:item.assessed??null}:null;}).filter(Boolean),
+});
+/** The operation's own contract fields - the spec a revision may have re-derived under it. */
+const specInputFor=op=>canonical({
+  kind:op.kind,nodeId:op.nodeId??null,goal:op.goal??null,acceptance:op.acceptance??[],checks:op.checks??[],
+  ledgerIds:op.ledgerIds??[],allowlist:op.allowlist??[],references:op.references??[],
+  question:plain(op.question)?{text:op.question.text??null,record:op.question.record??null}:null,
+});
+/** Where a `references:` entry resolves on disk: absolute, inside the Work tree, or inside the worktree. */
+const refFileFor=(state,ctx,ref)=>{
+  const file=String(ref).split('#')[0];
+  if(!file)return null;
+  for(const candidate of [path.isAbsolute(file)?file:null,
+    file.startsWith('.starciwork/')&&ctx?.work?.workRoot?path.join(ctx.work.workRoot,file):null,
+    file.startsWith('.starciwork/')&&ctx?.work?.at?.workRoot?path.join(ctx.work.at.workRoot,file):null,
+    state?.worktree?path.join(state.worktree,file):null].filter(Boolean)){
+    try{if(fs.statSync(candidate).isFile())return candidate;}catch{}
+  }
+  return null;
+};
+/**
+ * The input digests a dispatch is derived from, captured at launch and compared at settle when the goal
+ * has since moved: the op spec, the goal content it binds, and the bytes of every record it reads.
+ */
+export function opInputDigests(state,op,ctx=null){
+  const digests={spec:digestOf(specInputFor(op)),goal:digestOf(goalInputFor(state,op))};
+  const records={};
+  if(ctx?.work?.loaded){
+    let tree=null;try{tree=recordDigests(ctx.work.loaded);}catch{tree=null;}
+    if(tree)for(const id of unique([op.nodeId,...(op.ledgerIds??[])].filter(Boolean)))if(tree[id])records[id]=tree[id];
+  }
+  for(const ref of op.references??[]){
+    const file=refFileFor(state,ctx,ref);
+    if(file)try{records[`ref:${slash(ref)}`]=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');}catch{}
+  }
+  if(Object.keys(records).length)digests.records=records;
+  return digests;
+}
+const diffDigestKeys=(before,after)=>{
+  const changed=[];
+  for(const key of new Set([...Object.keys(before??{}),...Object.keys(after??{})])){
+    if(key==='records'){
+      const left=before.records??{},right=after.records??{};
+      for(const id of new Set([...Object.keys(left),...Object.keys(right)]))if(left[id]!==right[id])changed.push(`records:${id}`);
+    }else if(before[key]!==after[key])changed.push(key);
+  }
+  return changed;
+};
+
+/**
+ * Settle-time adoption. An op dispatched under rev N reporting under rev N+1: identical input digests
+ * adopt the report into the new rev (the op now counts as a rev-N+1 derivation); any difference marks
+ * the report stale. The report record keeps `stale` and the log names what changed - never a silent drop.
+ */
+export function adoptReportRev(store,state,op,ctx=null){
+  const rev=goalRevOf(state);
+  const derived=Number.isInteger(op.goalRev)&&op.goalRev>0?op.goalRev:rev;
+  if(derived>=rev)return {stale:false,adopted:false,rev:derived};
+  const before=plain(op.inputDigests)?op.inputDigests:null;
+  const current=opInputDigests(state,op,ctx);
+  if(before&&canonical(before)===canonical(current)){
+    op.goalRev=rev;delete op.goalStale;delete op.inputsHeld;
+    store.appendEvent({event:'goal-rev-adopted',op:op.id,fromRev:derived,toRev:rev,attempt:op.attempt});
+    return {stale:false,adopted:true,rev};
+  }
+  const changed=before?diffDigestKeys(before,current):['no recorded input digests'];
+  const latest=op.reports?.at(-1);
+  if(latest)latest.stale={fromRev:derived,toRev:rev,changed};
+  store.appendEvent({event:'goal-rev-stale',op:op.id,fromRev:derived,toRev:rev,attempt:op.attempt,changed});
+  return {stale:true,fromRev:derived,toRev:rev,changed};
+}
+/**
+ * What a stale report leaves behind: if every metric the op serves already holds under the new rev the
+ * work is provably unneeded and the op is skipped; anything else re-queues the op under the current rev
+ * so it re-derives against the goal as it now reads.
+ */
+export function reopenStaleOp(store,state,op,ctx=null){
+  const bound=metricsBindingOp(state,op);
+  const unmet=bound.filter(metric=>!metric.met);
+  op.dispatch=null;op.terminal=null;op.nudged=false;op.waitingFor=null;
+  if(bound.length&&!unmet.length){
+    op.status='skipped';op.verdict='stale';
+    store.appendEvent({event:'goal-rev-settled-stale',op:op.id,note:'the stale report does not count and every metric it serves already holds'});
+    return 'goal-rev-stale';
+  }
+  op.status='ready';op.attempt+=1;
+  op.findings=unique([...(op.findings??[]),
+    `the goal moved to rev ${goalRevOf(state)} while this attempt ran and the inputs it was derived from changed; read the current goal and report again`]);
+  store.appendEvent({event:'goal-rev-reopened',op:op.id,attempt:op.attempt,unmet:unmet.map(metric=>metric.id)});
+  return 'goal-rev-stale';
+}
+
+/**
+ * The invalidation seam a goal revision calls: every derivation of a changed section is marked stale with
+ * the rev it staled under - operations, their questions and report records, ledger items and decision
+ * records. `changed` names sections (`done`, `definitionOfDone`, `questions`, `decisions`, `ledger`, `ops`,
+ * `*` for all), the record ids whose content moved, the op ids whose spec moved, and the metric ids that
+ * changed. Marking is all this pass does: the metric evaluation decides who must run again, at settle
+ * time for ops in flight and at the finish boundary for ones already settled. When the shared
+ * source-staleness machinery lands, this is the seam it plugs into.
+ */
+export function propagateInvalidation(state,changed,{toRev=null}={}){
+  const rev=toRev??goalRevOf(state);
+  const sections=new Set(changed?.sections??[]),records=new Set(changed?.records??[]),
+    ops=new Set(changed?.ops??[]),metrics=new Set(changed?.metrics??[]);
+  const stale=[];
+  for(const op of state?.ops??[]){
+    const hits=[];
+    if(sections.has('*'))hits.push('sections:*');
+    for(const id of [op.nodeId,...(op.ledgerIds??[])].filter(Boolean))if(records.has(id))hits.push(`record:${id}`);
+    if(ops.has(op.id))hits.push(`op:${op.id}`);
+    // Only a metric that binds this op and itself moved stales the derivation: adding metrics for other
+    // subjects, or dropping one the op never counted toward, leaves its inputs intact.
+    for(const metric of goalMetricsOf(state).filter(entry=>metricBindsOp(entry,op)))
+      if(metrics.has(metric.id))hits.push(`metric:${metric.id}`);
+    if(sections.has('definitionOfDone'))hits.push('section:definitionOfDone');
+    if(sections.has('scope'))hits.push('section:scope');
+    if(sections.has('questions')&&plain(op.question))hits.push('section:questions');
+    // A derivation this revision itself made belongs to the new rev: it is not stale.
+    if(!hits.length||op.goalRev===rev)continue;
+    op.goalStale={rev,changed:unique(hits)};stale.push(op.id);
+    for(const report of op.reports??[])report.goalStale??={rev,changed:unique(hits)};
+    if(plain(op.question)&&sections.has('questions'))op.question.goalStale={rev};
+    if(!['done','skipped','cancelled'].includes(op.status))
+      op.findings=unique([...(op.findings??[]),
+        `the goal moved to rev ${rev} and the inputs this operation was derived from changed (${unique(hits).join(', ')}); read the current goal`]);
+  }
+  for(const item of state?.ledger??[])if((records.has(item.id)||sections.has('*'))&&item.goalRev!==rev){item.goalStale={rev};stale.push(`ledger:${item.id}`);}
+  for(const decision of state?.decisions??[])if((sections.has('*')||sections.has('decisions')||records.has(decision.id))&&decision.goalRev!==rev){decision.goalStale={rev};stale.push(`decision:${decision.id}`);}
+  return {rev,stale:unique(stale)};
+}
+
+/** The goal field a revision may replace, mapped to the state field it lands on. */
+const GOAL_REVISION_FIELDS={job:'job',scope:'scope',definitionOfDone:'definitionOfDone',risks:'risks',questions:'questions',
+  inputs:'inputs',outOfScope:'outOfScope'};
+
+/**
+ * The contract a `goal.revise` body must satisfy: the workflow identity is stable, the `done:` block is
+ * present and every metric in it is checkable against the revised goal, and no existing ledger, decision
+ * or operation id is dropped. The return is the normalized body, never a mutation of state.
+ */
+export function validateGoalRevision(state,body){
+  if(!plain(body))throw Error('A goal revision is a typed goal object');
+  if(body.id!==undefined&&body.id!==state.id)throw Error(`A goal revision cannot change the workflow identity ${state.id}`);
+  const done=normalizeDoneMetrics(body.done);
+  if(!done)throw Error('A goal must carry a `done` block: a nonempty list of checkable metrics (kind ledger/operation/gate with a ref)');
+  const normalized={done};
+  for(const field of Object.keys(GOAL_REVISION_FIELDS))if(body[field]!==undefined)
+    normalized[field]=field==='inputs'?(Array.isArray(body.inputs)?body.inputs.map(parseRef):body.inputs):body[field];
+  const stable=(label,existing,incoming)=>{
+    if(incoming===undefined)return;
+    if(!Array.isArray(incoming))throw Error(`goal.${label} must be a list`);
+    const held=new Set((existing??[]).map(item=>item.id)),seen=new Set();
+    for(const item of incoming){
+      if(!plain(item)||typeof item.id!=='string'||!item.id.trim())throw Error(`every ${label} entry in a goal revision needs its stable id`);
+      seen.add(item.id);
+    }
+    const dropped=[...held].filter(id=>!seen.has(id));
+    if(dropped.length)throw Error(`a goal revision cannot drop ${label} ids: ${dropped.join(', ')}`);
+  };
+  stable('ledger',state.ledger,body.ledger);
+  stable('op',state.ops,body.ops);
+  stable('decisions',state.decisions,body.decisions);
+  for(const key of ['ledger','ops','decisions'])if(body[key]!==undefined)normalized[key]=body[key];
+  // Every metric must resolve against the revised goal - the union of what it keeps and what it adds.
+  const unresolvable=unresolvedDoneMetrics({...state,ledger:normalized.ledger??state.ledger,ops:normalized.ops??state.ops},done);
+  if(unresolvable.length)throw Error(`goal done metrics ${unresolvable.join(', ')} name subjects the revised goal does not hold`);
+  return normalized;
+}
+
+/** Which goal content a normalized revision actually moves: the input propagateInvalidation reads. */
+function diffGoalSections(state,next){
+  const changed={sections:[],records:[],ops:[],metrics:[]};
+  for(const field of Object.keys(GOAL_REVISION_FIELDS))
+    if(next[field]!==undefined&&canonical(next[field])!==canonical(state[GOAL_REVISION_FIELDS[field]]))changed.sections.push(field);
+  if(next.ledger!==undefined){
+    const before=new Map((state.ledger??[]).map(item=>[item.id,item]));
+    for(const item of next.ledger){
+      const held=before.get(item.id);
+      if(!held||canonical({title:held.title,inputRef:held.inputRef??null,kind:held.kind??null,assessed:held.assessed??null})
+        !==canonical({title:item.title,inputRef:item.inputRef??null,kind:item.kind??null,assessed:item.assessed??null}))changed.records.push(item.id);
+    }
+    if(changed.records.length)changed.sections.push('ledger');
+  }
+  if(next.ops!==undefined){
+    for(const entry of next.ops){
+      const held=byId(state,entry.id);
+      if(!held||['kind','goal','acceptance','checks','ledgerIds','allowlist','references','nodeId']
+        .some(field=>entry[field]!==undefined&&canonical(entry[field])!==canonical(held[field])))changed.ops.push(entry.id);
+    }
+    if(changed.ops.length)changed.sections.push('ops');
+  }
+  if(next.decisions!==undefined){
+    const before=new Map((state.decisions??[]).map(item=>[item.id,item]));
+    // A held record carries kernel fields the body never names; only the fields the body supplies can differ.
+    let moved=false;
+    for(const entry of next.decisions){const held=before.get(entry.id);
+      if(!held||!Object.keys(entry).every(key=>canonical(entry[key])===canonical(held[key]))){changed.records.push(entry.id);moved=true;}}
+    if(moved)changed.sections.push('decisions');
+  }
+  const beforeMetrics=new Map(goalMetricsOf(state).map(metric=>[metric.id,metric]));
+  for(const metric of next.done){const held=beforeMetrics.get(metric.id);if(!held||canonical(held)!==canonical(metric))changed.metrics.push(metric.id);}
+  for(const metric of beforeMetrics.values())if(!next.done.some(entry=>entry.id===metric.id))changed.metrics.push(metric.id);
+  if(changed.metrics.length)changed.sections.push('done');
+  return changed;
+}
+
+/**
+ * The typed `goal.revise` transition - the only way a live goal moves. The supplied body is validated
+ * (`done` block present, ids stable), persisted as `goal.json` rev N+1, and `propagateInvalidation` marks
+ * every derivation of the changed sections stale. In-flight ops are re-validated on the spot: each is
+ * recorded held-or-changed so the settle path knows which reports a new rev may still adopt.
+ */
+export function reviseGoal(store,state,body,{ctx=null,source='owner',now=Date.now}={}){
+  need(state.approved===true,`Workflow ${state.id} has no approved goal to revise; run workflow-approve first`);
+  const prior=goalRevOf(state);
+  const next=validateGoalRevision(state,body);
+  // Everything derived before this transition belongs to the rev it was made under; goal content added by
+  // the revision itself lands with the new rev so propagation never marks fresh material stale.
+  for(const op of state.ops??[]){op.goalRev??=prior;if(plain(op.question))op.question.goalRev??=prior;for(const report of op.reports??[])report.goalRev??=prior;}
+  for(const decision of state.decisions??[])decision.goalRev??=prior;
+  for(const item of state.ledger??[])item.goalRev??=prior;
+  const changed=diffGoalSections(state,next);
+  // Freeze the derived goal identity before the revision moves it: the durable journal binding attests this
+  // exact goal, and a revision is recorded beside it - never by rewriting what the binding bound.
+  if(!state.goalDigest)state.goalDigest=stateGoalIdentity(state);
+  const at=typeof now==='function'?now():now;
+  state.goalRev=prior+1;
+  state.goalRevisions=[...(state.goalRevisions??[]),{schema:GOAL_REVISION,rev:state.goalRev,at,source,changed}];
+  for(const [field,key] of Object.entries(GOAL_REVISION_FIELDS))
+    if(next[field]!==undefined)state[key]=Array.isArray(next[field])?[...next[field]]:next[field];
+  state.doneMetrics=next.done.map(metric=>({...metric}));
+  if(next.ledger!==undefined)for(const item of next.ledger){
+    const held=ledgerItem(state,item.id);
+    if(held){for(const field of ['title','inputRef','kind','assessed'])if(item[field]!==undefined)held[field]=item[field];}
+    else state.ledger.push({id:item.id,title:item.title??item.id,inputRef:item.inputRef??null,kind:item.kind??'feature',status:'planned',evidence:[],goalRev:state.goalRev,...(item.assessed!==undefined?{assessed:item.assessed}:{})});
+  }
+  if(next.decisions!==undefined){
+    state.decisions??=[];
+    for(const entry of next.decisions){
+      const held=state.decisions.find(item=>item.id===entry.id);
+      if(held)Object.assign(held,entry);else state.decisions.push({...entry,goalRev:state.goalRev});
+    }
+  }
+  if(next.ops!==undefined)for(const entry of next.ops){
+    const held=byId(state,entry.id);
+    if(held){
+      // Only an op that has not launched may be re-derived in place; a live or settled op keeps the spec it
+      // ran under and the invalidation pass marks it stale instead of rewriting history beneath it.
+      if(['pending','ready'].includes(held.status)){
+        for(const field of ['kind','goal','acceptance','checks','ledgerIds','allowlist','references','nodeId'])if(entry[field]!==undefined)held[field]=entry[field];
+        delete held.goalStale;held.goalRev=state.goalRev;
+      }
+    }else{
+      const op=addOp(store,state,{origin:'plan',...entry},`goal revision ${state.goalRev}`);
+      op.goalRev=state.goalRev;
+    }
+  }
+  const invalidation=propagateInvalidation(state,changed,{toRev:state.goalRev});
+  // Re-validate every in-flight operation against the revised inputs: the report names which derivations
+  // still hold, and the settle path enforces the answer.
+  const revalidated={held:[],changed:[]};
+  for(const op of (state.ops??[]).filter(op=>liveStatus.includes(op.status)&&plain(op.inputDigests))){
+    const held=canonical(opInputDigests(state,op,ctx))===canonical(op.inputDigests);
+    op.inputsHeld=held;
+    (held?revalidated.held:revalidated.changed).push(op.id);
+  }
+  const file=readJson(store.paths.goalJson)??{schema:GOAL_RECORD,id:state.id};
+  writeJson(store.paths.goalJson,{...file,rev:state.goalRev,revisedAt:new Date(at).toISOString(),
+    ...(next.job!==undefined?{job:state.job}:{}),
+    ...(next.scope!==undefined?{scope:state.scope}:{}),
+    ...(next.definitionOfDone!==undefined?{definitionOfDone:state.definitionOfDone}:{}),
+    done:state.doneMetrics,
+    ...(next.risks!==undefined?{risks:state.risks}:{}),
+    ...(next.questions!==undefined?{questions:state.questions}:{}),
+    ...(next.inputs!==undefined?{inputs:state.inputs}:{}),
+    ...(next.outOfScope!==undefined?{outOfScope:state.outOfScope}:{}),
+    ...(next.ledger!==undefined?{ledger:state.ledger}:{}),
+    ...(next.decisions!==undefined?{decisions:state.decisions}:{}),
+    ops:state.ops.map(op=>({id:op.id,nodeId:op.nodeId??null,kind:op.kind,goal:op.goal,ledgerIds:op.ledgerIds,
+      allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn,goalRev:op.goalRev}))});
+  store.appendEvent({event:'goal-revised',rev:state.goalRev,fromRev:prior,source,changed,stale:invalidation.stale,revalidated});
+  store.saveState(state);
+  return {ok:true,rev:state.goalRev,fromRev:prior,changed,stale:invalidation.stale,revalidated};
+}
+
+/**
+ * The tick's read of the goal: evaluate the metrics, keep `state.goalStatus` current, and count the
+ * settled dispatches since the metric signature last moved. `limit` settled dispatches that changed
+ * nothing surfaces one classified `stall` item and a `goal-stall` event; the signature moving again -
+ * progress in either direction - clears it. The finish boundary turns the record into the final block.
+ */
+export function noteGoalMetrics(store,state,{limit=GOAL_SPIN_LIMIT}={}){
+  state.needUser??=[];
+  const result=evaluateGoalMetrics(state);
+  const signature=result.metrics.map(metric=>`${metric.id}:${metric.met?1:0}`).join('|');
+  const reports=(state.ops??[]).reduce((count,op)=>count+(op.reports?.length??0),0);
+  const spin=plain(state.metricSpin)?state.metricSpin:{signature:null,reportsAtChange:0,stalled:false};
+  if(spin.signature!==signature){
+    spin.signature=signature;spin.reportsAtChange=reports;spin.stalled=false;
+    state.needUser=(state.needUser??[]).filter(item=>item.code!=='goal-metric-spin');
+  }
+  state.metricSpin=spin;
+  const noProgress=reports-spin.reportsAtChange;
+  state.goalStatus={rev:result.rev,ok:result.ok,met:result.metrics.length-result.gaps.length,total:result.metrics.length,
+    gaps:result.gaps.map(metric=>metric.id),dispatchesWithoutProgress:noProgress};
+  if(noProgress>=limit&&!spin.stalled){
+    spin.stalled=true;
+    const gaps=result.gaps.map(metric=>metric.id).join(', ')||'no metrics recorded';
+    if(!state.needUser.some(item=>item.code==='goal-metric-spin'))
+      state.needUser.push({kind:'stall',code:'goal-metric-spin',
+        detail:`${noProgress} settled dispatches changed no goal metric; unmet: ${gaps}`});
+    store.appendEvent({event:'goal-stall',kind:'stall',dispatches:noProgress,limit,gaps:result.gaps.map(metric=>metric.id)});
+  }
+  return result;
 }
