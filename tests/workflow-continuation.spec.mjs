@@ -8,10 +8,11 @@ import {pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import {createStore,WORKFLOW_STATE} from '../kernel/store.mjs';
 import {buildContinuationBrief,continuationBoundary,exportContinuationBrief} from '../kernel/continuation.mjs';
-import {createWorkflowState,kernelMain} from '../kernel/kernel.mjs';
+import {createWorkflowState,kernelMain,reconcileContinuationPreflight} from '../kernel/kernel.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {buildReport} from '../kernel/reports.mjs';
 import {openJournal} from '../kernel/journal.mjs';
+import {createEngineRuntime} from '../kernel/engine.mjs';
 import {stagedResultFile} from '../kernel/job-worker.mjs';
 import {sealRuntime} from '../kernel/runtime-pin.mjs';
 
@@ -100,6 +101,26 @@ test('public same-ID stop, run recovery and retry use a real journal without dis
   assert.equal(fs.existsSync(stagedFile),true);after.close();
   assert.throws(()=>kernelMain('workflow-retry',{id:state.id},{orca:{},cwd:root}),/durable model\/check jobs must settle/);
   const retryJournal=openJournal({file:journalFile});assert.equal(retryJournal.getJob('judge-queued').status,'cancelled');assert.equal(retryJournal.getJob('model-staged').status,'effect_unknown');retryJournal.close();
+});
+
+test('public retry durably stages same-generation late-report recovery before its early return',t=>{
+  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-continuation-late-save-')),root=path.join(temp,'repo');fs.mkdirSync(root);t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+  assert.equal(spawnSync('git',['init','-q'],{cwd:root,windowsHide:true}).status,0);assert.equal(spawnSync('git',['config','user.email','fixture@example.test'],{cwd:root}).status,0);assert.equal(spawnSync('git',['config','user.name','Fixture'],{cwd:root}).status,0);
+  fs.writeFileSync(path.join(root,'decision.yaml'),'author: attempt-10\n');spawnSync('git',['add','.'],{cwd:root});spawnSync('git',['commit','-qm','base'],{cwd:root});
+  const store=createStore({repoRoot:root,id:'wf-late-save'}),journalFile=path.join(temp,'runtime','journal.sqlite'),pin=sealRuntime({sourceRoot:process.cwd(),buildsRoot:path.join(temp,'builds'),version:'1.0.0'}),pinFile=path.join(temp,'pin.json');fs.writeFileSync(pinFile,JSON.stringify(pin));
+  const current=createWorkflowState({job:'Recover the exact answered decision report',worktree:root,branch:'main',store}),op=toOp({id:'ask-3',kind:'decision.prepare',goal:'Prepare the platform ledger decision.',allowlist:['decision.yaml'],checks:[],acceptance:['the exact decision draft is preserved']},0);
+  Object.assign(current,{approved:true,phase:'run',run:'run-late',from:'term-kernel',goalDigest:'f'.repeat(64),amendments:[{digest:'owner-amendment',authority:{source:'owner'}}],ops:[op],engine:{schema:'starci/engine@1',version:'1.0.0',generation:29,journalFile,runtimePin:{...pin,digest:'a'.repeat(64),root:path.join(temp,'old-build')},coordination:'agent-v1'}});
+  Object.assign(op,{attempt:11,status:'running',runtime:'claude-opus',dispatch:'ctx-late',terminal:'term-owner',question:{kind:'decision',text:'Which ledger?',options:[{id:'1',label:'Customer'},{id:'2',label:'Platform'}],prepared:true},ownerRequestStatus:'answered',ownerAnswer:{receiptId:'receipt-owner',value:'2'},ownerContinuationReceipt:'receipt-owner'});
+  const git=(executable,args,options={})=>spawnSync(executable,args,{encoding:'utf8',windowsHide:true,...options}),runtime=createEngineRuntime({store,state:current,git,candidateBase:path.join(temp,'runtime','candidates'),eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})});
+  assert.equal(runtime.reserveOperation(op,{role:'decide',runtime:'claude-opus',target:'claude-opus'}).ok,true);runtime.beginCandidate(op,{environmentDigest:current.engine.runtimePin.digest});runtime.beginLaunchIntent(op);op.launch={ok:true,task:'task-late',dispatch:op.dispatch,effectState:'partial',attempts:[]};runtime.recordLaunchObservation(op);runtime.launched(op);
+  fs.writeFileSync(path.join(root,'decision.yaml'),'author: attempt-11\n');op.status='done';
+  const report=buildReport({outcome:'done',run:current.run,task:'task-late',dispatch:op.dispatch,from:op.terminal,summary:'decision: demo.ledger recommended: 2',files:['decision.yaml'],checks:[{name:'decision-shape',command:'node -e "process.exit(0)"',exitCode:0,evidence:'valid'}]});report.sent={messageId:'msg-late',sentAt:2,type:'worker_done'};fs.writeFileSync(store.reportPath(op.dispatch),`${JSON.stringify(report,null,2)}\n`);
+  store.bindJournal(runtime.journal,29,{state:current,goalIdentity:current.goalDigest});store.saveState(current);store.unbindJournal(runtime.journal);const before=structuredClone(current);runtime.close();fs.writeFileSync(path.join(store.dir,'stop.flag'),'stopped');
+  const calls=[],orca={invoke(name){calls.push(name);if(name!=='worker-show')throw Error(`unexpected native mutation ${name}`);return {outcome:'ok',receipt:{result:{dispatch:{id:'ctx-late',task_id:'task-late',run_id:'run-late',status:'completed',completed_at:1,capability_revoked_at:2},worker:{dispatch_id:'ctx-late',state:'succeeded',stage:'settled'},observation:{exactWorker:true,status:'live'},terminal:{handle:'term-owner',connected:true,writable:true},terminalResource:{ownershipState:'USER_OWNED',originDispatchId:'ctx-late',terminalHandle:'term-owner'}}}};}};
+  const result=kernelMain('workflow-retry',{id:current.id,'runtime-pin':pinFile},{orca,cwd:root});assert.equal(result.recoveryPending,true);assert.deepEqual(calls,['worker-show']);assert.equal(fs.existsSync(path.join(store.dir,'stop.flag')),false);
+  fs.writeFileSync(store.paths.state,`${JSON.stringify(before,null,2)}\n`,'utf8');const reloaded=store.loadState();assert.equal(reloaded.engine.runtimePin.digest,'a'.repeat(64));
+  const recovered=reconcileContinuationPreflight(store,reloaded);assert.equal(recovered.recovered,true);assert.equal(reloaded.engine.runtimePin.digest,pin.digest);assert.equal(reloaded.ops[0].lateReportRecovery.dispatch,'ctx-late');assert.equal(reloaded.ops[0].workerSettled,true);
+  assert.equal(reloaded.ops[0].lease.jobId,op.lease.jobId);assert.equal(reloaded.ops[0].candidate.identity.jobId,op.lease.jobId);assert.equal(reloaded.ops[0].terminal,'term-owner');assert.equal(reloaded.amendments[0].digest,'owner-amendment');
 });
 
 test('public stop, valid-pin retry and pinned same-ID run preserve accepted history while completing remaining work',async t=>{

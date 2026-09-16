@@ -4495,6 +4495,12 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const retryJobs=isEnrolled(state)?prepareGenerationRetry({journalFile:state.engine.journalFile,workflowId:state.id,generation:state.engine.generation}):{cancelled:[],unsettled:[]};
     if(retryJobs.cancelled.length)store.appendEvent({event:'retry-queued-jobs-cancelled',generation:state.engine.generation,jobs:retryJobs.cancelled,proof:'queued, unleased, and no job-spawned receipt'});
     need(!retryJobs.unsettled.length,`Current-generation durable model/check jobs must settle before retry: ${retryJobs.unsettled.join(', ')}`);
+    let reconciliationJournal=null;
+    if(isEnrolled(state)){
+      reconciliationJournal=openJournal({file:state.engine.journalFile});
+      store.bindJournal(reconciliationJournal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
+    }
+    try{
     readmitCandidateRootBindingRetry(store,state);
     // A lease field the journal no longer backs is a stale field, not a reservation: it is cleared on the record
     // with the journal's own proof, and the operation is retried like any other unfinished one.
@@ -4540,6 +4546,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&!settledOperation(item)&&item.launch?.stopReason===LEGACY_COORDINATOR_ERROR)){
       const reconciled=reconcileLegacyCoordinatorLease(state,op,{orca,store});need(reconciled.ok,`Legacy coordinator lease ${op.lease?.jobId??op.id} cannot be proved no-effect: ${reconciled.reason}`);
     }
+    }finally{store.unbindJournal?.(reconciliationJournal);reconciliationJournal?.close();}
     // A settled operation was proved by its own acceptance: none of the stop-receipt reconciliations above apply to
     // it, and its lease is settled with the skipped ones here.
     settleSkippedGenerationLeases(state);
