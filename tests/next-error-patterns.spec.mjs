@@ -251,7 +251,7 @@ test('default architecture authority remains valid when no explicit config path 
 });
 
 test('throwing-only and static inventories prove conditional error surfaces absent without invented owners', t => {
-  const f = fixture(t);
+  const f = fixture(t, files => { for (const file of Object.keys(files)) delete files[file]; });
   f.write('src/static/api/client.ts', `export const staticValue = 'ready' as const;`);
   f.write('src/static/app/page.tsx', `export default function StaticPage(){return <p>ready</p>}`);
   f.contract.sourceRoots = ['src/static'];
