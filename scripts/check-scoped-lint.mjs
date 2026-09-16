@@ -141,11 +141,19 @@ const baseReport=(profile,repository)=>({schema:CODE_PATTERN_REPORT,profile,repo
   limitations:['This gate proves only authored machine obligations and actual static ESLint execution; it does not prove business meaning, design quality, runtime behavior or UAT.','Semantic-only obligations remain agent-guided Markdown review and cannot satisfy a mechanical code rule.']});
 
 async function defaultScriptChecker(profileName,input){
-  const metadataRules=new Set(['NEST_JEST_ALIAS_PARITY','NEST_TEST_DISCOVERY']),boundaryRules=new Set(['NEST_ENV_ACCESS','NEST_CACHE_TOKEN_BOUNDARY','NEST_NAMED_EXPORTS']),requested=Array.isArray(input?.ruleIds)?input.ruleIds:[],metadata=requested.length>0&&requested.every(id=>metadataRules.has(id)),boundary=requested.length>0&&requested.every(id=>boundaryRules.has(id));
-  if((requested.some(id=>metadataRules.has(id))&&!metadata)||(requested.some(id=>boundaryRules.has(id))&&!boundary))throw Object.assign(Error('Nest metadata and boundary rules cannot be mixed with another script adapter in one obligation.'),{code:'SCRIPT_CHECKER_UNAVAILABLE'});
-  const moduleName=profileName==='nest'?(metadata?'nest-metadata':boundary?'nest-boundaries':'nest'):profileName==='next'?'next':null;if(!moduleName)throw Object.assign(Error(`No static code-pattern checker is registered for ${profileName}.`),{code:'SCRIPT_CHECKER_UNAVAILABLE'});
+  const requested=Array.isArray(input?.ruleIds)?input.ruleIds:[];
+  const adapters=[
+    {profile:'nest',module:'nest-metadata',entry:'checkNestMetadata',rules:['NEST_JEST_ALIAS_PARITY','NEST_TEST_DISCOVERY']},
+    {profile:'nest',module:'nest-boundaries',entry:'checkNestBoundaries',rules:['NEST_ENV_ACCESS','NEST_CACHE_TOKEN_BOUNDARY','NEST_NAMED_EXPORTS']},
+    {profile:'nest',module:'nest-tests',entry:'checkNestTests',rules:['NEST_TEST_SUBJECT_FORM','NEST_TEST_NAME_FORM']},
+  ];
+  const selected=adapters.filter(adapter=>adapter.profile===profileName&&requested.some(id=>adapter.rules.includes(id)));
+  if(selected.length>1||(selected.length===1&&!requested.every(id=>selected[0].rules.includes(id))))throw Object.assign(Error('One script obligation must select supported rules from exactly one adapter.'),{code:'SCRIPT_CHECKER_UNAVAILABLE'});
+  const fallback=profileName==='nest'?{module:'nest',entry:'checkNestPatterns'}:profileName==='next'?{module:'next',entry:'checkNextPatterns'}:null;
+  const adapter=selected[0]??fallback,moduleName=adapter?.module;
+  if(!moduleName)throw Object.assign(Error(`No static code-pattern checker is registered for ${profileName}.`),{code:'SCRIPT_CHECKER_UNAVAILABLE'});
   let loaded;try{loaded=await import(new URL(`../checks/code-patterns/${moduleName}.mjs`,import.meta.url));}catch(error){throw Object.assign(Error(`Static code-pattern checker ${moduleName} is unavailable: ${error.message??error}`),{code:'SCRIPT_CHECKER_UNAVAILABLE'});}
-  const checker=moduleName==='nest'?loaded.checkNestPatterns:moduleName==='nest-metadata'?loaded.checkNestMetadata:moduleName==='nest-boundaries'?loaded.checkNestBoundaries:loaded.checkNextPatterns;if(typeof checker!=='function')throw Object.assign(Error(`Static code-pattern checker ${moduleName} does not expose the canonical adapter.`),{code:'SCRIPT_CHECKER_UNAVAILABLE'});
+  const checker=loaded[adapter.entry];if(typeof checker!=='function')throw Object.assign(Error(`Static code-pattern checker ${moduleName} does not expose the canonical adapter.`),{code:'SCRIPT_CHECKER_UNAVAILABLE'});
   return checker(input);
 }
 
@@ -199,7 +207,7 @@ export async function checkScopedLint(root,inputs,{profile:profileName,profileCa
         item.coverage=complete?'covered':'uncovered';}}
   }
   const scriptObligations=report.obligations.filter(item=>item.coverage==='pending'&&item.machine.kind==='script');
-  for(const item of scriptObligations){const ruleIds=item.rules.map(rule=>rule.id),boundary=profileName==='nest'&&ruleIds.every(id=>['NEST_ENV_ACCESS','NEST_CACHE_TOKEN_BOUNDARY','NEST_NAMED_EXPORTS'].includes(id)),input={root:repository,files:[...item.files],ruleIds,contextFiles:[...new Set([...expected,...architectureSelection.contextFiles])].sort(),...(profileName==='next'&&architectureSelection.value?{architectureProjects:architectureSelection.value}:{}),...(boundary?{architectureConfig}: {})};let result;
+  for(const item of scriptObligations){const ruleIds=item.rules.map(rule=>rule.id),input={root:repository,files:[...item.files],ruleIds,contextFiles:[...new Set([...expected,...architectureSelection.contextFiles])].sort(),...(profileName==='next'&&architectureSelection.value?{architectureProjects:architectureSelection.value}:{}),...(profileName==='nest'?{architectureConfig}: {})};let result;
     try{result=await scriptChecker(profileName,input);}catch(error){result={schema:null,repository,files:item.files,checkedRuleIds:ruleIds,violations:[],errors:[{message:String(error.message??error)}],compiler:{version:null,resolved:false}};}
     const inspected=inspectScriptResult(result,{repository,files:item.files,ruleIds});report.machineResults.push({kind:'script',obligation:item.id,schema:result?.schema??null,digest:sha256(canonicalJSON(result??null)),ok:inspected.valid&&!inspected.unavailable&&!inspected.violations.length,files:inspected.valid?[...result.files]:[],checkedRuleIds:inspected.valid?[...result.checkedRuleIds]:[],compiler:inspected.valid?structuredClone(result.compiler):null});
     if(!inspected.valid){unavailable=true;item.coverage='uncovered';report.issues.push({code:'SCRIPT_RESULT_INVALID',obligation:item.id});continue;}

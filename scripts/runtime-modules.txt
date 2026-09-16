@@ -5,6 +5,7 @@
 checks/code-patterns/nest.mjs
 checks/code-patterns/nest-metadata.mjs
 checks/code-patterns/nest-boundaries.mjs
+checks/code-patterns/nest-tests.mjs
 
 core/identity.mjs
 core/index.mjs

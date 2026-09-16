@@ -365,14 +365,14 @@ profiles:
         status: implemented
       - id: NEST-TEST-CODE-FORM
         sourceRuleIds: [BE-TEST-2, BE-TEST-3, BE-TEST-4, BE-TEST-6]
-        applicability: { include: ['**/*.spec.ts'] }
+        applicability: { include: ['**/*.spec.{ts,mts,cts,tsx}'] }
         mechanical:
-          requirement: Enforce selected subject construction, execute entry, describe/it naming and formatting forms.
-          check: { kind: eslint, ruleIds: [starci-be/spec-subject-shape, starci-be/spec-name-shape] }
+          requirement: Check selected real subject construction and public entry source form, named suites, lexical action-title prefixes and callback layout; opaque proof remains unavailable.
+          check: { kind: script, ruleIds: [NEST_TEST_SUBJECT_FORM, NEST_TEST_NAME_FORM] }
         semantic:
           guidance: knowledge/patterns/be/test.yaml
-          review: Verify assertions prove effects and ordering rather than calls alone.
-        status: missing
+          review: Verify actual test execution, assertions, effects and ordering; static call form does not establish behavior.
+        status: implemented
       - id: NEST-CONTRACT-TYPE-FORM
         sourceRuleIds: [BE-TYPING-1, BE-TYPING-2, BE-TYPING-3, BE-TYPING-4, BE-NAMING-7]
         applicability: { include: ['src/**/*.ts', 'apps/*/src/**/*.ts', 'libs/*/src/**/*.ts'], exclude: ['**/*.spec.ts'] }
@@ -689,7 +689,7 @@ profiles:
         semantic:
           guidance: docs/portable-source-architecture.md
           review: Decide whether the state is product-world lifecycle or intrinsic browser interaction before applying the check.
-        status: missing
+        status: implemented
       - id: NEXT-ERROR-STATE-MAPPING
         sourceRuleIds: [FE-ERROR-1, FE-ERROR-2, FE-ERROR-3, FE-ERROR-4, FE-ERROR-5]
         applicability: { include: ['src/**/*.{ts,tsx}', 'apps/*/src/**/*.{ts,tsx}', 'packages/grammar/src/**/*.{ts,tsx}'] }
