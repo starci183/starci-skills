@@ -8,6 +8,16 @@ const stable=value=>Array.isArray(value)?value.map(stable):plain(value)?Object.f
 const hash=value=>crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
 const label=value=>clean(plain(value)?value.label??value.text:value).replace(/^\d+\.\s*/, '').replace(/\s+/g,' ');
 const sameLabel=(left,right)=>label(left).toLocaleLowerCase('en-US')===label(right).toLocaleLowerCase('en-US');
+const normalizedLabel=value=>label(value).toLocaleLowerCase('en-US');
+const uniqueLabels=values=>{const normalized=values.map(normalizedLabel);return normalized.length>=2&&normalized.every(Boolean)&&new Set(normalized).size===normalized.length;};
+const sameLabelSet=(left,right)=>left.length===right.length&&uniqueLabels(left)&&uniqueLabels(right)
+  &&left.every(value=>right.some(candidate=>sameLabel(value,candidate)));
+const escapeRegex=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function authorityRefBinds(ref,askId,receiptId){
+  if(!/\bowner-answer history\s*:/i.test(ref)||!/\bdid not settle\b/i.test(ref))return false;
+  const identifier='A-Za-z0-9._:-',separator='[\\s()\\[\\]{},;]+';
+  return new RegExp(`(?:^|[^${identifier}])${escapeRegex(askId)}(?=[^${identifier}]|$)${separator}receipt${separator}${escapeRegex(receiptId)}(?=[^${identifier}]|$)${separator}selected${separator}topic(?=[^${identifier}]|$)`,'i').test(ref);
+}
 function validDecisionRecord(raw,recordId){
   const payload=raw?.extensions?.work3?.srs;
   return plain(raw)&&raw.schema==='work/node@2'&&clean(raw.id)===recordId&&raw.kind==='business'&&plain(payload)
@@ -44,23 +54,26 @@ function legacyTopicSelection(state,ask,ctx){
   const answer=ask.ownerAnswer,receiptId=clean(answer?.receiptId);
   if(answer?.via!=='owner'||answer?.type!=='choose'||!receiptId||clean(ask.ownerContinuationReceipt)!==receiptId)return null;
   const record=readDecisionRecord(state,ask,ctx);if(!record.ok)return null;
-  const topics=list(record.payload.requiredDecisions).map(label).filter(Boolean),oldOptions=list(ask.question?.options).map(label).filter(Boolean);
+  const topics=list(record.payload.requiredDecisions).map(label),oldOptions=list(ask.question?.options).map(label);
   const chosen=oldOptions[Number(answer.value)-1]??'';
-  const exactAgenda=topics.length>0&&oldOptions.every(option=>topics.some(topic=>sameLabel(option,topic)))&&topics.some(topic=>sameLabel(topic,answer.selectedLabel));
-  const canonicalInvalidation=list(record.payload.authorityRefs).map(clean).some(ref=>ref.includes(receiptId)&&ref.includes(ask.id)
-    &&/\bselected topic\b/i.test(ref)&&/\bdid not settle\b/i.test(ref));
+  if(!uniqueLabels(topics)||!uniqueLabels(oldOptions))return null;
+  const exactAgenda=sameLabelSet(oldOptions,topics)&&topics.some(topic=>sameLabel(topic,answer.selectedLabel));
+  const canonicalInvalidation=list(record.payload.authorityRefs).map(clean).some(ref=>authorityRefBinds(ref,ask.id,receiptId));
   const questionAgenda=oldOptions.every(option=>/^(whether|which|what|who|where|when|how)\b/i.test(option));
-  if(oldOptions.length<2||!sameLabel(chosen,answer.selectedLabel)||(!exactAgenda&&!(canonicalInvalidation&&questionAgenda)))return null;
+  if(!sameLabel(chosen,answer.selectedLabel)||(!exactAgenda&&!(canonicalInvalidation&&questionAgenda)))return null;
   const explicit=normalizePolicyOptions(record.payload.options);
   if(explicit?.some(option=>sameLabel(option,answer.selectedLabel)))return null;
-  const requesters=list(ask.requesters).map(id=>state.ops.find(item=>item.id===id)).filter(Boolean);
-  const linked=requesters.filter(item=>list(item.ownerContinuationReceipts).includes(receiptId));
-  if(!linked.length||linked.some(item=>!['ready','pending','paused','blocked'].includes(item.status)))return null;
-  return {...record,answer,receiptId,requesters:linked};
+  const requesterIds=list(ask.requesters).map(clean),requesters=requesterIds.map(id=>state.ops.find(item=>item.id===id));
+  const requesterBindingValid=requesterIds.length>0&&new Set(requesterIds).size===requesterIds.length&&requesters.every(Boolean)
+    &&requesters.every(item=>list(item.ownerContinuationReceipts).includes(receiptId))
+    &&requesters.every(item=>['ready','pending','paused','blocked'].includes(item.status));
+  if(!requesterBindingValid)return {...record,outcome:'hold',code:'legacy-decision-requester-binding-invalid',answer,receiptId,
+    reason:'Every declared requester must exist, carry the exact owner continuation receipt, and remain unfinished before legacy semantics can be withdrawn.'};
+  return {...record,outcome:'withdraw',answer,receiptId,requesters};
 }
 
 function withdrawLegacyTopicSelection(store,state,ask,ctx){
-  const legacy=legacyTopicSelection(state,ask,ctx);if(!legacy)return false;
+  const legacy=legacyTopicSelection(state,ask,ctx);if(!legacy||legacy.outcome!=='withdraw')return {outcome:legacy?.outcome??'none',code:legacy?.code??null};
   const snapshot={schema:'starci/legacy-owner-decision-history@1',reason:'agenda-topic-was-not-a-policy-outcome',record:legacy.recordId,
     receiptId:legacy.receiptId,ownerAnswer:structuredClone(ask.ownerAnswer),
     ...(ask.answer!==undefined?{answer:structuredClone(ask.answer)}:{}),ownerContinuationReceipt:ask.ownerContinuationReceipt,
@@ -87,14 +100,14 @@ function withdrawLegacyTopicSelection(store,state,ask,ctx){
   if(!state.needUser.some(item=>item.op===ask.id&&item.kind==='decision'))state.needUser.push({op:ask.id,kind:'decision',record:legacy.recordId,options:[],requesters:legacy.requesters.map(item=>item.id)});
   store.appendEvent({event:'legacy-decision-semantics-withdrawn',ask:ask.id,record:legacy.recordId,receiptId:legacy.receiptId,
     requesters:legacy.requesters.map(item=>item.id),reason:'authenticated receipt selected a requiredDecisions agenda topic rather than a canonical policy option'});
-  return true;
+  return {outcome:'withdrawn'};
 }
 
 /** Refresh unanswered owner decisions from canonical Work without writing a Work byte. */
 export function reconcileCanonicalDecisionInputs(store,state,ctx){
   const changed=new Set();
   for(const ask of (state.ops??[]).filter(op=>op.kind==='decision.prepare'&&op.refusal!=='superseded')){
-    const withdrawn=withdrawLegacyTopicSelection(store,state,ask,ctx);if(withdrawn)changed.add(ask.id);
+    const legacy=withdrawLegacyTopicSelection(store,state,ask,ctx),withdrawn=legacy.outcome==='withdrawn';if(withdrawn)changed.add(ask.id);
     if(ask.answer||ask.ownerAnswer)continue;
     const marker=(state.needUser??[]).find(item=>item.op===ask.id&&item.kind==='decision'&&clean(item.record));if(!marker)continue;
     const resolved=canonicalDecisionInput(state,ask,ctx),before=ask.decisionOptionsDigest??null;

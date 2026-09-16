@@ -168,7 +168,15 @@ const legacySavedStateFixture=({explicit=false}={})=>{
   ]};
   const events=[],nodes=new Map([...raws.keys()].map(id=>[id,{id,path:`features/login/${id}/index.yaml`,inputDigest:'c'.repeat(64)}]));
   const ctx={work:{node:id=>nodes.get(id)??null,at:{},api:{readNode:(_at,node)=>raws.get(node.id)}}},store={appendEvent:event=>events.push(event)};
-  return {state,raws,ctx,store,events,unrelated:structuredClone(unrelated)};
+  return {state,raws,ctx,store,events,registrationTopics,suspensionTopics,registrationReceipt,suspensionReceipt,unrelated:structuredClone(unrelated)};
+};
+
+const registrationOnlyFixture=()=>{
+  const result=legacySavedStateFixture();
+  result.state.ops=result.state.ops.filter(op=>op.id!=='ask-2');
+  const login=result.state.ops.find(op=>op.id==='login-intake');
+  login.ownerContinuationReceipts=[result.registrationReceipt];delete login.answer;
+  return result;
 };
 
 test('saved malformed topic receipts become immutable history and stop satisfying the requester',()=>{
@@ -220,4 +228,72 @@ test('canonical authority can withdraw the exact historical topic receipt after 
   assert.deepEqual(reconcileCanonicalDecisionInputs(store,state,ctx),['ask-1']);
   const ask=state.ops.find(op=>op.id==='ask-1');assert.equal(ask.ownerAnswer,undefined);assert.equal(ask.ownerDecisionHistory[0].receiptId,'receipt-registration-topic');
   assert.equal(deriveOwnerRequests(state)[0].status,'preparing');
+});
+
+test('legacy agenda withdrawal requires the complete normalized unique topic set',()=>{
+  {
+    const {state,raws,ctx,store,events,registrationTopics}=registrationOnlyFixture();
+    raws.get('decision.registration').extensions.work3.srs.requiredDecisions=[...registrationTopics,'Which identity proof is retained?'];
+    const before=structuredClone(state);assert.deepEqual(reconcileCanonicalDecisionInputs(store,state,ctx),[]);assert.deepEqual(state,before);assert.deepEqual(events,[]);
+  }
+  for(const duplicate of ['saved','canonical']){
+    const {state,raws,ctx,store,events,registrationTopics}=registrationOnlyFixture(),ask=state.ops.find(op=>op.id==='ask-1');
+    if(duplicate==='saved')ask.question.options=[registrationTopics[0],registrationTopics[0],registrationTopics[1]].map((label,index)=>({id:String(index+1),label}));
+    else raws.get('decision.registration').extensions.work3.srs.requiredDecisions=[registrationTopics[0],registrationTopics[0],registrationTopics[1]];
+    const before=structuredClone(state);assert.deepEqual(reconcileCanonicalDecisionInputs(store,state,ctx),[]);assert.deepEqual(state,before);assert.deepEqual(events,[]);
+  }
+  {
+    const {state,ctx,store,events}=registrationOnlyFixture(),ask=state.ops.find(op=>op.id==='ask-1');
+    ask.question.options.push({id:'3',label:'   '});const before=structuredClone(state);
+    assert.deepEqual(reconcileCanonicalDecisionInputs(store,state,ctx),[]);assert.deepEqual(state,before);assert.deepEqual(events,[]);
+  }
+  {
+    const {state,raws,ctx,store,registrationTopics}=registrationOnlyFixture(),ask=state.ops.find(op=>op.id==='ask-1');
+    raws.get('decision.registration').extensions.work3.srs.requiredDecisions=[`1. ${registrationTopics[0].toUpperCase()}`,`2.   ${registrationTopics[1]}`];
+    ask.question.options=[{id:'1',label:`  ${registrationTopics[1]}  `},{id:'2',label:registrationTopics[0].toLowerCase()}];
+    ask.ownerAnswer.value='2';ask.ownerAnswer.selectedLabel=registrationTopics[0];
+    assert.deepEqual(reconcileCanonicalDecisionInputs(store,state,ctx),['ask-1']);assert.equal(ask.ownerAnswer,undefined);
+  }
+});
+
+test('canonical invalidation binds exact structured ask and receipt tokens',()=>{
+  const setup=()=>{const result=registrationOnlyFixture(),payload=result.raws.get('decision.registration').extensions.work3.srs;
+    payload.requiredDecisions=['Choose purchaser admission.','Name the feature that owns registration.'];return {...result,payload};};
+  {
+    const {state,ctx,store,payload,registrationReceipt}=setup();
+    payload.authorityRefs=[`owner-answer history: workflow (ask-1), receipt [${registrationReceipt}], selected topic value 1; its frozen label did not settle one policy.`];
+    assert.deepEqual(reconcileCanonicalDecisionInputs(store,state,ctx),['ask-1']);assert.equal(state.ops.find(op=>op.id==='ask-1').ownerAnswer,undefined);
+  }
+  {
+    const {state,ctx,store,events,payload}=setup();
+    payload.authorityRefs=['owner-answer history: workflow ask-10 receipt receipt-registration-topic-10 selected topic value 1; its frozen label did not settle one policy.'];
+    const before=structuredClone(state);assert.deepEqual(reconcileCanonicalDecisionInputs(store,state,ctx),[]);assert.deepEqual(state,before);assert.deepEqual(events,[]);
+  }
+});
+
+test('legacy withdrawal holds without mutation unless every declared requester has exact unfinished provenance',()=>{
+  const cases={
+    missing:({ask})=>ask.requesters.push('missing-requester'),
+    unlinked:({state,ask})=>{state.ops.push({id:'unlinked',kind:'work.author',status:'ready'});ask.requesters.push('unlinked');},
+    done:({state,ask,receipt})=>{state.ops.push({id:'settled',kind:'work.author',status:'done',ownerContinuationReceipts:[receipt]});ask.requesters.push('settled');},
+    running:({state,ask,receipt})=>{state.ops.push({id:'running',kind:'work.author',status:'running',ownerContinuationReceipts:[receipt]});ask.requesters.push('running');},
+    mixed:({state,ask})=>{state.ops.push({id:'done-unlinked',kind:'work.author',status:'done'});ask.requesters.push('done-unlinked');},
+  };
+  for(const [name,alter] of Object.entries(cases)){
+    const {state,ctx,store,events,registrationReceipt}=registrationOnlyFixture(),ask=state.ops.find(op=>op.id==='ask-1');
+    alter({state,ask,receipt:registrationReceipt});const before=structuredClone(state);
+    assert.deepEqual(reconcileCanonicalDecisionInputs(store,state,ctx),[],name);assert.deepEqual(state,before,name);assert.deepEqual(events,[],name);
+  }
+});
+
+test('all linked unfinished requesters withdraw together while unrelated state remains',()=>{
+  const {state,ctx,store,registrationReceipt}=registrationOnlyFixture(),ask=state.ops.find(op=>op.id==='ask-1'),login=state.ops.find(op=>op.id==='login-intake');
+  login.ownerContinuationReceipts=['keep-login',registrationReceipt];login.answer='accepted independent login preparation';login.dependsOn=['keep-login-dependency'];
+  const second={id:'second-intake',kind:'work.author',status:'paused',ownerContinuationReceipts:[registrationReceipt,'keep-second'],answer:'accepted independent second preparation',dependsOn:['keep-second-dependency']};
+  state.ops.push(second);ask.requesters.push(second.id);
+  assert.deepEqual(reconcileCanonicalDecisionInputs(store,state,ctx),['ask-1']);
+  assert.deepEqual(login.ownerContinuationReceipts,['keep-login']);assert.equal(login.answer,'accepted independent login preparation');
+  assert.deepEqual(new Set(login.dependsOn),new Set(['keep-login-dependency','ask-1']));
+  assert.deepEqual(second.ownerContinuationReceipts,['keep-second']);assert.equal(second.answer,'accepted independent second preparation');
+  assert.deepEqual(new Set(second.dependsOn),new Set(['keep-second-dependency','ask-1']));assert.equal(second.status,'paused');
 });
