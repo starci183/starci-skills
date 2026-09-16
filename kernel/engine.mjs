@@ -41,6 +41,16 @@ const modelInput=input=>{
 };
 /** Release old-generation leases only after the native dispatches named by the caller were proven stopped. */
 export function settleGenerationLeases({journalFile,leases=[],reason='fresh workflow generation after confirmed native stop'}={}){const journal=openJournal({file:journalFile}),admission=createAdmission({journal}),jobs=createJobs({journal,admission});try{return leases.map(lease=>jobs.complete({...lease,eventId:`${lease.jobId}:generation-settled`,status:'cancelled',result:{reason}}));}finally{journal.close();}}
+/** Event kinds that prove a durable operation job reached a launch boundary or produced an effect. */
+const OPERATION_EFFECT_EVENTS=new Set(['operation-launch-intent','operation-launched','operation-launch-observed','operation-worker-stopped','job-spawned','job-completion-replay-spawned','job-succeeded','job-failed']);
+/**
+ * A cancelled job that never held a lease and has no launch or effect receipt provably never ran: an aborted
+ * retry leaves such rows behind, and the live operation re-derives their deterministic job id forever. Its id
+ * may be re-keyed; a cancelled job WITH launch evidence keeps its fence for reconciliation instead.
+ */
+const neverLaunchedCancelledJob=(journal,job)=>job?.status==='cancelled'
+  &&(journal.db.prepare('SELECT COUNT(*) AS n FROM leases WHERE job_id=?').get(job.job_id)?.n??0)===0
+  &&!journal.events({workflowId:job.workflow_id}).some(event=>event.entity_id===job.job_id&&OPERATION_EFFECT_EVENTS.has(event.kind));
 /**
  * Whether a lease an operation still carries is a stale field rather than a live reservation: the journal holds
  * neither the job nor a lease row for it, or holds the job in a terminal state with no lease row. The proof is the
@@ -270,11 +280,19 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
     check(command,options={},op=null){const resources=declareMachineResources({kind:op?.kind,checks:[{command}],resources:options.resources});return unwrap(bridge.request({...identity(op),kind:'check',role:'machine-check',...(resources.length?{resources}:{}),input:{handler:'command',shellCommand:command,cwd:options.cwd??state.worktree,timeoutMs:options.timeoutMs??1800000,
       candidate:op?.candidateDigest??state.head??null,...(options.env?{env:options.env}:{})}}));},
     reserveOperation(op,allocated){
-      const bound={...identity(op),jobId:`operation-${inputDigest({...identity(op),dispatchAttempt:op.launchFailures??0}).slice(0,32)}`};
+      // Each dispatch attempt owns a distinct durable job row. Rows cancelled before they ever launched (an
+      // aborted retry's sweep proves this) must not trap the operation on their deterministic id: re-key.
+      let dispatchAttempt=op.launchFailures??0,bound,existing,skipped=[];
+      for(let guard=0;guard<64;guard++){
+        bound={...identity(op),jobId:`operation-${inputDigest({...identity(op),dispatchAttempt}).slice(0,32)}`};
+        existing=journal.getJob(bound.jobId);
+        if(!existing||!neverLaunchedCancelledJob(journal,existing))break;
+        skipped.push(existing.job_id);dispatchAttempt++;
+      }
+      if(skipped.length)journal.appendEvent({eventId:`${bound.jobId}:rekeyed`,workflowId:bound.workflowId,entityType:'job',entityId:bound.jobId,generation:bound.generation,kind:'operation-job-rekeyed',payload:{opId:bound.opId,attempt:bound.attempt,dispatchAttempt,skipped,proof:'predecessor rows were cancelled with no lease and no launch or effect receipt'}});
       const effectiveRole=allocated.role??kindRole(op.kind),job={kind:'operation',role:effectiveRole,input:{op,runtime:allocated.runtime,target:allocated.target},...bound};
       const probationJob={...bound,kind:op.kind,role:effectiveRole,input:{op}};
       const pool=runtimeProfile.runtimes?.[allocated.runtime]??{};
-      const existing=journal.getJob(bound.jobId);
       const bindings=op.candidateRootBindings?.bindings,rootWriters=Array.isArray(bindings)
         ?bindings.filter(binding=>binding.workerWritable||binding.runtimeWritable).map(candidateBindingWriterResource)
         :((op.allowlist??[]).length?[writer]:[]);

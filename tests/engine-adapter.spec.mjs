@@ -475,3 +475,26 @@ test('missing model output is not proof of a never-started worker',t=>{
     'spawned, unobserved and bound jobs all retain their capacity until real reconciliation');
   bridge.close();
 });
+test('a cancelled never-launched reservation re-keys to a fresh durable job; a launched-cancelled job keeps its fence',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>{throw Error('native launch must not run');}}),runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})}),allocated={runtime:'gpt-5.6-sol',target:'gpt-5.6-sol',role:'decide'};
+  const staleJobId=op=>`operation-${inputDigest({workflowId:'wf',opId:op.id,attempt:op.attempt,generation:2,dispatchAttempt:op.launchFailures??0}).slice(0,32)}`;
+  const op={id:'ask-1',kind:'decision.prepare',attempt:14,status:'ready',allowlist:[]},stale=staleJobId(op);
+  runtime.journal.enqueueJob({jobId:stale,workflowId:'wf',opId:'ask-1',attempt:14,generation:2,kind:'operation',role:'decide'});
+  runtime.journal.db.prepare("UPDATE jobs SET status='cancelled',result_json=? WHERE job_id=?").run(JSON.stringify({reason:'workflow retry cancelled a proven never-launched queued job'}),stale);
+  const reserved=runtime.reserveOperation(op,allocated);
+  assert.equal(reserved.ok,true,JSON.stringify(reserved));
+  assert.notEqual(reserved.jobId,stale,'the live operation must not inherit the cancelled job id');
+  assert.equal(runtime.journal.getJob(stale).status,'cancelled','the cancelled predecessor stays on the record');
+  assert.equal(runtime.journal.events({workflowId:'wf'}).some(event=>event.kind==='operation-job-rekeyed'&&event.entity_id===reserved.jobId),true);
+  delete op.lease;
+  assert.equal(runtime.reserveOperation(op,allocated).jobId,reserved.jobId,'re-derivation is deterministic: the live reservation reattaches');
+  assert.equal(runtime.journal.listJobs().filter(job=>job.op_id==='ask-1').length,2);
+  const launched={id:'ask-2',kind:'decision.prepare',attempt:1,status:'ready',allowlist:[]},held=staleJobId(launched);
+  runtime.journal.enqueueJob({jobId:held,workflowId:'wf',opId:'ask-2',attempt:1,generation:2,kind:'operation',role:'decide'});
+  runtime.journal.appendEvent({eventId:`${held}:launched`,workflowId:'wf',entityType:'job',entityId:held,generation:2,kind:'operation-launched',payload:{dispatch:'ctx_prior'}});
+  runtime.journal.db.prepare("UPDATE jobs SET status='cancelled' WHERE job_id=?").run(held);
+  const refused=runtime.reserveOperation(launched,allocated);
+  assert.equal(refused.ok,false);assert.match(refused.reasons.join(' '),/cancelled/,'a job cancelled after launch evidence keeps its fence for reconciliation');
+  assert.equal(runtime.journal.listJobs().filter(job=>job.op_id==='ask-2').length,1,'no silent re-dispatch of an effect-bound job');
+  bridge.close();
+});
