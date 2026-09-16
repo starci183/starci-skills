@@ -153,7 +153,7 @@ test('the contract prints the declaration under the goal, so an operation knows 
 test('the kernel asks the catalog instead of keeping its own sets of kinds',()=>{
   // This replaces the hard-coded DESIGN_KINDS: the brand payload goes to the kinds that declare they read it.
   assert.deepEqual([...kindsReadingBrand({profile})].sort(),
-    ['interface.draw','interface.asset','frontend.implement','uat.verify','grammar.update'].sort());
+    ['interface.draw','interface.asset','frontend.implement','uat.verify','grammar.update','content.generate'].sort());
   // The product's identity is authored by the one kind that settles it; every other scope is authored as Work.
   assert.equal(intakeKindFor('brand'),'brand.decide');
   assert.equal(intakeKindFor('collab'),'work.author');

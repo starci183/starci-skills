@@ -351,6 +351,8 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
   /** Rank every pool for one kind: ready candidates in allocation order plus why each other was skipped. */
   const review=(kind,{avoid=[],restrictTo=null,difficulty=null,job=null}={})=>{
     rollDay();
+    avoid=[...new Set((Array.isArray(avoid)?avoid:[]).map(id=>canonicalTarget(id)))];
+    restrictTo=Array.isArray(restrictTo)?[...new Set(restrictTo.map(id=>canonicalTarget(id)))]:restrictTo;
     const role=roleFor(kind),ready=[],blocked=[],order=preferenceOf(role,difficulty),tier=tierFor(difficulty,role);
     const view=outside();
     let admission={source:null,providers:{}};if(readProviderAdmission)try{const value=readProviderAdmission();if(plain(value)&&plain(value.providers))admission=value;}catch{}

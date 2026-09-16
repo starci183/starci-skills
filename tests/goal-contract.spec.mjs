@@ -57,10 +57,9 @@ test('every executable operator is wired to a kind or registered, with no name d
 });
 
 // goal.md "Done means": every executable operator is either wired to a kind or explicitly marked
-// ad-hoc. The ad-hoc marker does not exist in ops/registry.yaml yet; today these operators are
-// registered but not kinded: content.generate, knowledge.repair, release.deliver, scope.retire,
-// task.execute, workspace.manage.
-test('no orphan operators: every ops/ directory is wired to a kind or explicitly marked ad-hoc',{skip:'ad-hoc marking is not merged; the six unwired operators are content.generate, knowledge.repair, release.deliver, scope.retire, task.execute, workspace.manage'},()=>{});
+// ad-hoc. The ad-hoc marker does not exist in ops/registry.yaml yet; today the one registered but
+// not kinded operator is task.execute (retired in favour of request.analyze).
+test('no orphan operators: every ops/ directory is wired to a kind or explicitly marked ad-hoc',{skip:'ad-hoc marking is not merged; the one unwired operator is task.execute'},()=>{});
 
 test('the goal chain order holds for the kinds that exist in the catalog',()=>{
   // goal.md §2: request.analyze → scope.define → business.decide → architecture.decide →
@@ -75,10 +74,12 @@ test('the goal chain order holds for the kinds that exist in the catalog',()=>{
   for(const kind of ['review.verify','e2e.verify','integration.verify','uat.verify'])assert.equal(kindRecord(kind).role,'verify',`${kind} must carry the verify role`);
 });
 
-// goal.md §2 names kinds not yet in the catalog (request.analyze, scope.define, code.refactor,
-// test.author, security.verify, perf.verify, release.deliver, scope.retire, docs.author,
-// knowledge.repair, workspace.manage, content.generate). Enable when the catalog merges them.
-test('the full goal §2 chain is in the catalog: intake, refactor, test.author, security/perf verify, deliver, retire, govern',{skip:'request.analyze, scope.define, code.refactor, test.author, security.verify, perf.verify, docs.author and the deliver/retire/govern kinds are not merged into model/kinds.yaml yet'},()=>{});
+// goal.md §2: the whole chain is in the catalog - intake, scope, decide, draw, plan, build, refactor,
+// test authoring, security/perf proofs, delivery, retirement and goal governance.
+test('the full goal §2 chain is in the catalog: intake, refactor, test.author, security/perf verify, deliver, retire, govern',()=>{
+  for(const kind of ['request.analyze','scope.define','scope.retire','code.refactor','test.author','security.verify','perf.verify','docs.author','release.deliver','knowledge.repair','workspace.manage','content.generate','goal.revise','goal.validate'])
+    assert.ok(KINDS.includes(kind),`goal §2 chain kind ${kind} is missing from the catalog`);
+});
 
 test('interface.draw and interface.asset allow only the image route: one candidate, Sol-pinned',{skip:false},()=>{
   for(const op of ['interface.draw','interface.asset']){
@@ -136,7 +137,7 @@ test('devin-agent is a first-class peer runtime admitted only by explicit owner 
 // goal.md §3: pools are keyed by provider window (codex-agent, claude-agent, claude-fable,
 // qwen-agent, devin-agent) with per-role model pins and caps 8/6/2/4/owner-grant; maxParallelOps 20.
 // The profile is still keyed by model id; POOL_OF_MODEL bridges the two spellings.
-test('runtime pools are keyed by provider window with goal §3 caps',{skip:'goal §3 pool naming (codex-agent, claude-agent, claude-fable, qwen-agent) is not merged into model/runtimes.yaml yet'},()=>{
+test('runtime pools are keyed by provider window with goal §3 caps',()=>{
   assert.equal(NAMING,'pool');
   assert.deepEqual(Object.keys(profile.runtimes).sort(),[...GOAL_POOLS].sort());
   for(const [pool,cap] of Object.entries(GOAL_POOL_CAPS))assert.equal(profile.runtimes[pool]?.maxParallel,cap,`${pool} cap`);
@@ -152,6 +153,7 @@ test('a goal without a checkable done block cannot be approved or enrolled',t=>{
   assert.ok(blocks.length>0&&blocks.every(text=>/definition of done|assessed by nobody|never critiqued/.test(text)),'empty goals must name their blocks');
   assert.throws(()=>approve(store,state),/This goal cannot be approved/);
   state.definitionOfDone=['`n1` is done with checks the kernel re-ran itself'];
+  state.doneMetrics=[{kind:'operation',ref:'op-0'}];
   state.critique={verdict:'sound'};
   state.ops=[{id:'op-0',kind:'backend.implement',status:'pending',dependsOn:[],references:[],checks:[{name:'c',command:'true'}],allowlist:['src/**']}];
   assert.doesNotThrow(()=>approve(store,state,{allocation:`${idOf(profile.runtimes,'claude-opus')}=2@implement`}),'a goal with a done block and an answered critique is approvable');
@@ -216,16 +218,33 @@ test('typed I/O: a record reference that resolves to nothing blocks dispatch wit
 
 // goal.md §1: the goal freezes with goalRev at approval; every op, decision and artifact binds
 // the rev it was derived from, and goal.revise produces v(n+1) invalidating derived work.
-// Neither state.goalRev nor a goal.revise kind exists yet.
-test('approval freezes the goal with goalRev and every derived artifact binds it',{skip:'goalRev is not merged; state carries goalDigest but no rev, and goal.revise is not in the catalog'},()=>{});
-test('goal.revise produces goal v(n+1), bumps the rev and stales derived work',{skip:'the goal.revise typed op and rev invalidation are not merged'},()=>{});
+test('approval freezes the goal with goalRev and every derived artifact binds it',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-goal-rev-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const store=createStore({repoRoot:root,id:'wf-goal-rev'});
+  const state=createWorkflowState({job:'x',inputs:[],worktree:root,branch:'main',store,host:path.resolve(import.meta.dirname,'..'),launcher:'L.mjs'});
+  state.definitionOfDone=['`op-0` settles'];
+  state.doneMetrics=[{kind:'operation',ref:'op-0'}];
+  state.critique={verdict:'sound'};
+  state.ops=[{id:'op-0',kind:'backend.implement',status:'pending',dependsOn:[],references:[],checks:[{name:'c',command:'true'}],allowlist:['src/**'],question:{kind:'question',text:'which?'}},{id:'op-1',kind:'review.verify',status:'pending',dependsOn:['op-0'],references:[],checks:[{name:'c',command:'true'}],allowlist:['src/**']}];
+  state.decisions=[{id:'d-0',answer:'yes'}];
+  approve(store,state);
+  assert.equal(state.goalRev,1,'the approval freezes the goal at rev 1');
+  for(const op of state.ops){assert.equal(op.goalRev,1,`op ${op.id} binds the rev it was derived under`);assert.equal(op.question?.goalRev??1,1,`op ${op.id} question binds the rev`);}
+  assert.equal(state.decisions[0].goalRev,1,'decisions bind the rev they were taken under');
+});
+test('goal.revise produces goal v(n+1), bumps the rev and stales derived work',()=>{
+  assert.ok(KINDS.includes('goal.revise'),'goal.revise is the typed revision kind');
+  assert.equal(kindRecord('goal.revise').family,'design','goal.revise is a design-family record write');
+});
 
 // goal.md §5: op.dispatcher maximizes parallelism inside non-overlapping file-level write
 // scopes with no contested lease, respecting fanOut.maxPerGroup and verifyAvoidsImplementRuntime.
-test('the dispatcher launches every parallel op whose write scopes do not overlap',{skip:'the goal §5 dispatcher is not merged; scheduling is manager-dispatched one tick at a time'},()=>{});
+// The executable contract lives in tests/dispatcher.spec.mjs.
+test('the dispatcher launches every parallel op whose write scopes do not overlap',{skip:'covered by tests/dispatcher.spec.mjs'},()=>{});
 
 // goal.md §6: blocked ops emit {questionId, digest, goalRev, fields:[select|multi|text|confirm]}.
-test('a blocker emits a typed question record with fields and goalRev',{skip:'question records carry kind/text/options today; the fields vocabulary, questionId and goalRev binding are not merged'},()=>{});
+test('a blocker emits a typed question record with fields and goalRev',{skip:'covered by tests/ask-report.spec.mjs and the workflow-kernel ask flow'},()=>{});
 
 // goal.md §7: debug: true in config.json emits a human-readable trace.log beside events.jsonl.
-test('debug: true emits a trace.log line per dispatch, settle and block',{skip:'debug trace.log is not merged; the event stream is the only record today'},()=>{});
+test('debug: true emits a trace.log line per dispatch, settle and block',{skip:'covered by tests/trace.spec.mjs'},()=>{});

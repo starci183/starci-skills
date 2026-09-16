@@ -6,6 +6,7 @@ import {hasReplayableStagedResult} from './job-worker.mjs';
 import {createJobs} from './jobs.mjs';
 import {rankJobs,updateProgressBudget,progressExhausted} from './scheduler.mjs';
 import {ADAPTIVE_CAPACITY,OWNER_PREFERENCE_MULTIPLIER,loadRuntimes} from './schedule.mjs';
+import {canonicalTarget} from './chains.mjs';
 import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateBindingWriterResource,candidateRecord,candidateWriterResource,freezeDetectionCandidate,prepareCandidateDependencies,readCandidateBridge,readCandidatePacket,readCandidateSnapshot} from './candidate-bridge.mjs';
 import {candidateRootBindingDigest} from './candidate-roots.mjs';
 import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
@@ -165,15 +166,15 @@ function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadR
   if(typeof eligibility!=='function')throw Error(`Model eligibility is required for ${name}`);
   const at=now(),role=modelRole(name),requested=Array.isArray(args?.providers)?args.providers:Object.keys(runtimes.runtimes??{});
   const job={kind:name==='validateOp'?'judge':'model',role,input:{functionName:name,args:modelInput(args)},...identity};
-  const policyTargets=typeof modelPolicy?.providerFilter==='function'?new Set(modelPolicy.providerFilter(job)):null;
-  const candidates=requested.map(id=>({id,runtime:{id,...runtimes.runtimes?.[id],model:runtimes.runtimes?.[id]?.target}})).filter(({runtime})=>runtime.target&&(runtime.roles??[]).includes(role)&&(!policyTargets||policyTargets.has(runtime.target)));
+  const policyTargets=typeof modelPolicy?.providerFilter==='function'?new Set(modelPolicy.providerFilter(job).map(canonicalTarget)):null;
+  const candidates=requested.map(id=>{const pool=canonicalTarget(id),def=runtimes.runtimes?.[pool];return {id,runtime:{id,pool,...def,model:def?.target}};}).filter(({runtime})=>runtime.target&&(runtime.roles??[]).includes(role)&&(!policyTargets||policyTargets.has(runtime.target)));
   const eligible=candidates.map((candidate,index)=>({...candidate,index,decision:eligibility(job,candidate.runtime),budget:budgetVerdict(candidate.runtime,budget,{now:at,requireFresh:true})})).filter(item=>item.decision?.eligible===true);
   const adaptive=runtimes.allocation?.policy===ADAPTIVE_CAPACITY,owner=runtimes.allocation?.ownerPolicy??{},preferred=owner.preferredProvider??null;
   const admitted=provider=>providerAdmission?.[provider]??null;
-  const parked=new Set([...(Array.isArray(args?.skip)?args.skip:[]),...cooling.filter(item=>item.until>at).map(item=>item.runtime)]);
+  const parked=new Set([...(Array.isArray(args?.skip)?args.skip.map(canonicalTarget):[]),...cooling.filter(item=>item.until>at).map(item=>canonicalTarget(item.runtime))]);
   const recentSettled=item=>{const starts=item.budget.windows.map(window=>Number.isFinite(window.resetsAt)&&Number.isFinite(window.minutes)?window.resetsAt-window.minutes*60_000:null).filter(Number.isFinite),since=Math.max(at-6*60*60*1000,...starts);
     return (admitted(item.runtime.provider)?.recentSettlements??[]).filter(entry=>entry.at>=since).length;};
-  const available=eligible.filter(item=>!parked.has(item.id)&&item.budget.known&&!item.budget.exhausted&&(!admitted(item.runtime.provider)||admitted(item.runtime.provider).used<admitted(item.runtime.provider).capacity));
+  const available=eligible.filter(item=>!parked.has(canonicalTarget(item.id))&&item.budget.known&&!item.budget.exhausted&&(!admitted(item.runtime.provider)||admitted(item.runtime.provider).used<admitted(item.runtime.provider).capacity));
   if(adaptive)available.sort((a,b)=>{
     const score=item=>(item.budget.remaining/100)*(item.runtime.provider===preferred?(owner.preferenceMultiplier??OWNER_PREFERENCE_MULTIPLIER):1)
       /(1+(admitted(item.runtime.provider)?.used??0)+recentSettled(item));
@@ -181,9 +182,9 @@ function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadR
   });
   else available.sort((a,b)=>b.budget.remaining-a.budget.remaining||a.index-b.index);
   const providers=available.slice(0,1).map(item=>item.id);
-  if(!providers.length){const quotaReady=eligible.filter(item=>item.budget.known&&!item.budget.exhausted),cooldownBlocked=quotaReady.length>0&&quotaReady.every(item=>parked.has(item.id)),capacityBlocked=quotaReady.length>0&&quotaReady.every(item=>{const view=admitted(item.runtime.provider);return view&&view.used>=view.capacity;});
+  if(!providers.length){const quotaReady=eligible.filter(item=>item.budget.known&&!item.budget.exhausted),cooldownBlocked=quotaReady.length>0&&quotaReady.every(item=>parked.has(canonicalTarget(item.id))),capacityBlocked=quotaReady.length>0&&quotaReady.every(item=>{const view=admitted(item.runtime.provider);return view&&view.used>=view.capacity;});
     const error=Error(eligible.length?(cooldownBlocked?`Every eligible ${name} model with available quota is cooling`:capacityBlocked?`No eligible ${name} model has provider admission capacity`:quotaReady.length?`Eligible ${name} models are waiting for cooldown or provider admission capacity`:`No eligible ${name} model has known available provider quota`):`No evaluated model is eligible for ${name}`);
-    if(eligible.length){error.code='STARCI_MODEL_QUOTA_WAIT';error.waitKind=cooldownBlocked?'provider-cooldown':capacityBlocked?'provider-capacity':quotaReady.length?'provider-availability':'provider-quota';error.reasons=eligible.map(item=>({runtime:item.id,known:item.budget.known,exhausted:item.budget.exhausted,until:item.budget.until,cooling:parked.has(item.id),
+    if(eligible.length){error.code='STARCI_MODEL_QUOTA_WAIT';error.waitKind=cooldownBlocked?'provider-cooldown':capacityBlocked?'provider-capacity':quotaReady.length?'provider-availability':'provider-quota';error.reasons=eligible.map(item=>({runtime:item.id,known:item.budget.known,exhausted:item.budget.exhausted,until:item.budget.until,cooling:parked.has(canonicalTarget(item.id)),
       admitted:admitted(item.runtime.provider)?.used??null,capacity:admitted(item.runtime.provider)?.capacity??null}));}throw error;}
   const selected=available[0];return {args:{...modelInput(args),providers},runtime:selected.runtime,decision:selected.decision,job,
     considered:available.map(item=>({runtime:item.id,provider:item.runtime.provider,remaining:item.budget.remaining,active:admitted(item.runtime.provider)?.used??0,
@@ -249,7 +250,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
     const since=now()-6*60*60*1000;
     for(const row of journal.db.prepare("SELECT j.kind,j.payload_json,(SELECT MAX(s.created_at) FROM events s WHERE s.workflow_id=j.workflow_id AND s.entity_id=j.job_id AND s.kind IN ('job-succeeded','job-failed','job-cancelled','operation-worker-stopped')) AS service_at FROM jobs j WHERE j.kind IN ('model','judge','operation') AND EXISTS (SELECT 1 FROM events l WHERE l.workflow_id=j.workflow_id AND l.entity_id=j.job_id AND l.kind IN ('job-spawned','operation-launched')) AND EXISTS (SELECT 1 FROM events s WHERE s.workflow_id=j.workflow_id AND s.entity_id=j.job_id AND s.kind IN ('job-succeeded','job-failed','job-cancelled','operation-worker-stopped') AND s.created_at>=?) ORDER BY service_at,j.job_id").all(since)){
       let payload={};try{payload=JSON.parse(row.payload_json??'{}')??{};}catch{}
-      const runtime=payload?.admission?.runtime??payload?.runtime??null,provider=runtimeProfile.runtimes?.[runtime]?.provider;
+      const runtime=payload?.admission?.runtime??payload?.runtime??null,provider=runtimeProfile.runtimes?.[canonicalTarget(runtime)]?.provider;
       if(!provider)continue;const entry=providers[provider]??=emptyProvider();
       entry.recentSettled+=1;entry.recentSettlements.push({at:row.service_at,kind:row.kind});if(row.kind==='operation')entry.recentOperationSettled+=1;else entry.recentNonOperationSettled+=1;
     }
@@ -268,9 +269,9 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       const cooling=[...Object.entries(state.allocation?.cooling??{}),...Object.entries(readLoads({path:loadsFileFor(store.dir),workflow:state.id,now}).cooling)]
         .map(([runtime,value])=>({runtime,until:value?.until}));
       if(typeof modelCooling==='function')cooling.push(...modelCooling());
-      selected=eligibleModelSelection(name,args,eligibility,modelPolicy,runtimeProfile,bound,budget,now,providerAdmission,cooling);saved={provider:selected.args.providers[0],runtime:selected.runtime.id,mode:selected.decision.mode??'qualified'};state.engine.modelSelections[selectionKey]=saved;
+      selected=eligibleModelSelection(name,args,eligibility,modelPolicy,runtimeProfile,bound,budget,now,providerAdmission,cooling);saved={provider:selected.args.providers[0],runtime:selected.runtime.pool??selected.runtime.id,mode:selected.decision.mode??'qualified'};state.engine.modelSelections[selectionKey]=saved;
       store.appendEvent?.({event:'model-selected',function:name,op:bound.opId??null,runtime:saved.runtime,provider:saved.provider,mode:saved.mode,considered:selected.considered??[],refused:selected.refused??[]});store.saveState(state);}
-    const kind=selected.job?.kind??(name==='validateOp'?'judge':'model'),role=selected.job?.role??modelRole(name),provider=runtimeProfile.runtimes?.[saved.runtime]?.provider;
+    const kind=selected.job?.kind??(name==='validateOp'?'judge':'model'),role=selected.job?.role??modelRole(name),provider=runtimeProfile.runtimes?.[canonicalTarget(saved.runtime)]?.provider;
     const input={handler:'model-function',functionName:name,args:selected.args,admission:{runtime:saved.runtime,mode:saved.mode}};
     return unwrap(bridge.request({...bound,kind,role,input,resources:[{key:GLOBAL_AI_RESOURCE,units:1},...(provider?[{key:providerResource(provider),units:1}]:[])]}));};
   return {
@@ -292,7 +293,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       if(skipped.length)journal.appendEvent({eventId:`${bound.jobId}:rekeyed`,workflowId:bound.workflowId,entityType:'job',entityId:bound.jobId,generation:bound.generation,kind:'operation-job-rekeyed',payload:{opId:bound.opId,attempt:bound.attempt,dispatchAttempt,skipped,proof:'predecessor rows were cancelled with no lease and no launch or effect receipt'}});
       const effectiveRole=allocated.role??kindRole(op.kind),job={kind:'operation',role:effectiveRole,input:{op,runtime:allocated.runtime,target:allocated.target},...bound};
       const probationJob={...bound,kind:op.kind,role:effectiveRole,input:{op}};
-      const pool=runtimeProfile.runtimes?.[allocated.runtime]??{};
+      const pool=runtimeProfile.runtimes?.[canonicalTarget(allocated.runtime)]??{};
       const bindings=op.candidateRootBindings?.bindings,rootWriters=Array.isArray(bindings)
         ?bindings.filter(binding=>binding.workerWritable||binding.runtimeWritable).map(candidateBindingWriterResource)
         :((op.allowlist??[]).length?[writer]:[]);

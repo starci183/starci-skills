@@ -20,7 +20,7 @@ import {isAsk,openOwnerAsk} from './owner.mjs';
 import {loadConfig,nonOperationModels} from '../scripts/config.mjs';
 import {laneView} from './lanes.mjs';
 import {featureScope,intakeOp,narrowIntakeScopes,scopeNames} from './intake.mjs';
-import {cutOpFor,cutPlanned,cutReason,deriveWorkOp,designGate,laneOf,laneText,laneWalked} from './sync.mjs';
+import {cutOpFor,cutPlanned,cutReason,deriveWorkOp,designGate,laneGoal,laneOf,laneText,laneWalked} from './sync.mjs';
 import {noteBrand} from './verify.mjs';
 import {freshRuntimeBudget,quotaAwarePeers} from './budget.mjs';
 
@@ -695,7 +695,7 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   const cuts=launchable.filter(node=>measured.has(node.id))
     .map(node=>cutOpFor(node,{workRoot:binding.ledgerRoot,found:measured.get(node.id),id:workOpId(`${node.id}-cut`,taken)}));
   state.ops=[...built.map((node,index)=>deriveWorkOp(ledgerApi,at,node,
-    {id:opOfNode.get(node.id),opOfNode,index,lane:state.lanes[node.id]?.lane??null,done:[],loaded})),
+    {id:opOfNode.get(node.id),opOfNode,index,lane:state.lanes[node.id]?.lane??null,done:[],loaded,goal:laneGoal(state)})),
     ...cuts.map((raw,index)=>{const op=toOp(raw,built.length+index);op.cut=raw.cut;op.difficulty='hard';
       state.lanes[op.nodeId].cut=op.id;return op;}),
     ...intake.map((raw,index)=>{const op=toOp(raw,built.length+cuts.length+index);op.intake=raw.intake;op.difficulty='hard';return op;})];

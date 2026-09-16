@@ -82,7 +82,7 @@ $defs:
     properties:
       id: {type: string, minLength: 1}
       kind:
-        enum: [provision.ask, e2e.verify, frontend.implement, backend.implement, runtime.operate, uat.verify, integration.verify, review.verify]
+        enum: [provision.ask, frontend.implement, backend.implement, runtime.operate, uat.verify, e2e.verify, integration.verify, review.verify, code.refactor, test.author, security.verify, perf.verify, goal.validate, knowledge.repair]
       operation: {enum: [stales, lint]}
       goal: {type: string, minLength: 1}
       ledgerIds: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}

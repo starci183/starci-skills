@@ -73,10 +73,10 @@ test('profile registry accepts only a nonempty explicit headless model override'
   const registry = parseYaml(fs.readFileSync(new URL('../model/registry.yaml', import.meta.url), 'utf8'));
   const validate = new Ajv2020({strict: true}).compile(schema);
   assert.equal(validate(registry), true, JSON.stringify(validate.errors));
-  assert.equal(registry.targets['claude-fable-5.1'].headlessModel, 'claude-fable-5-1');
+  assert.equal(registry.targets['claude-fable'].headlessModel, 'claude-fable-5-1');
   for (const invalid of ['', null]) {
     const candidate = structuredClone(registry);
-    candidate.targets['claude-fable-5.1'].headlessModel = invalid;
+    candidate.targets['claude-fable'].headlessModel = invalid;
     assert.equal(validate(candidate), false, `headlessModel ${JSON.stringify(invalid)} must fail`);
     assert.ok(validate.errors.some(error => error.instancePath.endsWith('/headlessModel')), JSON.stringify(validate.errors));
   }

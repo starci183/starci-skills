@@ -304,7 +304,7 @@ test('a frontend workflow binds the Work tree its backend owns and takes only th
   assert.deepEqual(run.state.ops[0].allowlist,[`${owner}/.starciwork/features/sales/ui/**`,`${owner}/.starciwork/features/sales/ui/index.yaml`]);
   assert.ok(run.state.ops[0].references.includes(`${owner}/.starciwork/features/sales/ui/index.yaml`));
   // The receipt page waits for the drawing: it has a lane, no op yet, and the wait is recorded once.
-  assert.deepEqual(run.state.lanes[RECEIPT].lane,['frontend.implement','uat.verify']);
+  assert.deepEqual(run.state.lanes[RECEIPT].lane,['frontend.implement','uat.verify','security.verify','perf.verify']);
   assert.deepEqual(run.store.readEvents().filter(event=>event.event==='lane-waits-design').map(event=>[event.node,event.design]),[[RECEIPT,UI]]);
   assert.deepEqual(run.state.ledger.map(item=>[item.id,item.status]),[[RECEIPT,'planned'],[UI,'planned']],'the held page is still a goal item');
   assert.deepEqual(run.state.needUser,[]);
@@ -546,7 +546,7 @@ test('public retry and pinned enrolled run preserve accepted history while settl
     {orca,cwd:run.code,wait,functions:{engineRuntime:runtime,allocator,launch,guards,git:gitAdapter,reconcileInputs:()=>{},refreshPreparation:()=>{},deferPreparation:()=>false,now,wait,waitTimeoutMs:5000,tickMs:1000,pollMs:1000}});
   const final=pinnedStore.loadState(),implemented=final.ops.find(op=>op.kind==='frontend.implement');
   assert.equal(finished.finished?.outcome,'done',JSON.stringify({finished,needUser:final.needUser,ops:final.ops.map(op=>[op.id,op.kind,op.status,op.pending,op.refusal,op.findings,op.checks,op.verifiedChecks]),events:pinnedStore.readEvents().slice(-30)}));
-  assert.equal(final.ops.find(op=>op.id===accepted.id).reports[0].summary,'accepted before shared-root retry');assert.deepEqual(final.decisions,run.state.decisions);
+  assert.equal(final.ops.find(op=>op.id===accepted.id).reports[0].summary,'accepted before shared-root retry');assert.deepEqual(final.decisions,run.state.decisions.map(decision=>({...decision,goalRev:1})));
   const drawn=final.ops.find(op=>op.kind==='interface.draw');assert.deepEqual(candidateRoots.get(drawn.id),['source','work','runtime']);
   assert.equal(drawn.candidate.roots.find(root=>root.id==='runtime').acceptedHead.startsWith('content:'),true,'the pinned Grammar canon is an explicit protected content root');
   assert.ok(runtime.candidateBridge(drawn).rootBindings.find(root=>root.id==='runtime').references.some(reference=>reference.sourceRef.includes('/knowledge/grammars/')&&!reference.sourceRef.includes('/.dist/')),

@@ -239,7 +239,7 @@ test('public stop, valid-pin retry and pinned same-ID run preserve accepted hist
   assert.equal(final.ops.find(op=>op.id==='accepted').reports[0].summary,'accepted before checkpoint');
   const completed=final.ops.find(op=>op.id==='remaining');assert.equal(completed.status,'done',JSON.stringify({finished,remaining:completed,needUser:final.needUser,events:pinnedStore.readEvents().slice(-40)}));
   assert.equal(completed.dispatch,dispatch);assert.equal(completed.terminal,null);assert.equal(completed.lease,undefined);assert.equal(workerLive,false);
-  assert.equal(completed.candidate?.status,'sealed');assert.equal(completed.candidate?.identity?.jobId,operationJobId);assert.deepEqual(final.decisions,current.decisions);
+  assert.equal(completed.candidate?.status,'sealed');assert.equal(completed.candidate?.identity?.jobId,operationJobId);assert.deepEqual(final.decisions,current.decisions.map(decision=>({...decision,goalRev:1})));
   assert.deepEqual(durableSettlement,{jobId:operationJobId,status:'succeeded',leaseToken:null,leases:0});
   const settledJournal=openJournal({file:journalFile});
   try{

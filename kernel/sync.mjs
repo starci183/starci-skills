@@ -57,17 +57,19 @@ export function laneOf(state,node){
     ...(existing?.authored?{authored:existing.authored}:{}),
     head:existing?.head??state.ops.find(op=>op.nodeId===id&&op.status==='done'&&op.head&&!authorsRecord(op.kind))?.head??null};
 }
-export const laneNext=(entry,predicates=null)=>{
-  try{return graph.nextKind(entry?.lane??[],entry?.done??[],{predicates:predicates??{}});}catch{return null;}
+/** The goal block `goal.*` lane predicates read: the frozen done metrics of the workflow's state. */
+export const laneGoal=state=>state?{metrics:state.doneMetrics??null,done:state.definitionOfDone??[]}:null;
+export const laneNext=(entry,predicates=null,goal=null)=>{
+  try{return graph.nextKind(entry?.lane??[],entry?.done??[],{predicates:predicates??{},goal});}catch{return null;}
 };
 export const laneText=lane=>(lane??[]).join(' -> ');
 /**
  * The optional steps the node's own design record retires right now, kept on the lane entry so every line the
  * user reads - the contract, the status view, the goal table - prints the lane as it is walked, not the template.
  */
-export const laneSkip=(entry,predicates=null)=>{
+export const laneSkip=(entry,predicates=null,goal=null)=>{
   if(!entry?.lane?.length)return [];
-  try{entry.skipped=graph.skippedKinds(entry.lane,entry.done??[],{predicates:predicates??{}});}catch{entry.skipped=Array.isArray(entry.skipped)?entry.skipped:[];}
+  try{entry.skipped=graph.skippedKinds(entry.lane,entry.done??[],{predicates:predicates??{},goal});}catch{entry.skipped=Array.isArray(entry.skipped)?entry.skipped:[];}
   return entry.skipped;
 };
 /** The lane as the node walks it: every mandatory step and every optional step its record did not retire. */
@@ -225,11 +227,11 @@ function designReferenceOf(access,node){
 
 /* ------------------------------------------------------------------ one node, one operation */
 
-export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0,lane=null,done=[],loaded=null}){
+export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0,lane=null,done=[],loaded=null,goal=null}){
   // Lane-aware: the kind of this operation is the node's next lane step, not a fixed map of the node kind.
   const template=lane?.length?lane:(()=>{try{return graph.laneFor({kind:node.kind,layout:nodeLayout(node),repositoryRole:node.repository??null});}catch{return [];}})();
   const access={api,at:repoRoot,loaded};
-  const step=(()=>{try{return graph.nextKind(template,done,{predicates:lanePredicates(access,node)});}catch{return null;}})();
+  const step=(()=>{try{return graph.nextKind(template,done,{predicates:lanePredicates(access,node),goal});}catch{return null;}})();
   const design=kindsReadingBrand().includes(step??'');
   // A ui node's drawing and artwork steps author the design body of the node's own record - the `ui:` spec
   // and the candidates and artwork under its assets - so the exact record path is granted, the way a decision
@@ -376,8 +378,8 @@ export function syncLedgerOps(store,state,ctx){
       if(cut){added.push(cut.id);continue;}
     }
     const predicates=lanePredicates({api:ctx.work.api,at:ctx.work.at,loaded},node);
-    laneSkip(entry,predicates);
-    const next=laneNext(entry,predicates);
+    laneSkip(entry,predicates,laneGoal(state));
+    const next=laneNext(entry,predicates,laneGoal(state));
     // No next step means the lane is walked; `review.verify` is the kernel's own (planVerifyOps), not the node's.
     const onDisk=(()=>{try{return ctx.work.api.readNode(ctx.work.at,node)?.state??node.state;}catch{return node.state;}})();
     if(!next&&laneOps.length&&onDisk==='todo'&&!entry.recordedAttempt){
@@ -393,7 +395,7 @@ export function syncLedgerOps(store,state,ctx){
     // A cut child never plans its own prove step: `e2e.verify` and `review.verify` are planned once per parent.
     if(!next||KERNEL_PLANNED_KINDS.includes(next)||cutChildDefers(state,node.id,next)||mine.some(op=>op.kind===next))continue;
     const id=laneOpId(node.id,next,!laneOps.length,taken);opOfNode.set(node.id,id);
-    const op=deriveWorkOp(ctx.work.api,ctx.work.at,node,{id,opOfNode,index:state.ops.length,lane:entry.lane,done:entry.done,loaded});
+    const op=deriveWorkOp(ctx.work.api,ctx.work.at,node,{id,opOfNode,index:state.ops.length,lane:entry.lane,done:entry.done,loaded,goal:laneGoal(state)});
     bindPlannedAmendmentEffects(state,op,node);
     locateSharedTreePaths(op,ctx);
     op.difficulty=op.difficulty??'medium';
@@ -627,7 +629,13 @@ export const cutChildDefers=(state,nodeId,kind)=>Boolean(cutParentOf(state,nodeI
  */
 export function groupVerifyKind(state,ledgerIds=[]){
   const entries=ledgerIds.map(id=>state?.lanes?.[id]).filter(entry=>entry?.lane?.length);
-  const proves=unique(entries.flatMap(entry=>entry.lane.filter(kind=>kindRole(kind)==='verify')));
+  // Goal-gated proofs are skipped the same way the lane walk skips them: a goal silent on the metric retires
+  // the step, a goal that names it keeps it. `skipped` may be stale between laneSkip passes, so evaluate fresh.
+  const proves=unique(entries.flatMap(entry=>{
+    let skipped=new Set(entry.skipped??[]);
+    try{skipped=new Set([...skipped,...graph.skippedKinds(entry.lane,entry.done??[],{goal:laneGoal(state)})]);}catch{}
+    return entry.lane.filter(kind=>kindRole(kind)==='verify'&&!skipped.has(kind));
+  }));
   return proves.find(kind=>entries.some(entry=>!(entry.done??[]).includes(kind)))??'review.verify';
 }
 
@@ -1135,8 +1143,8 @@ export function advanceLanes(store,state,op,ctx,verified){
     entry.checks=mergeProven([...(entry.checks??[]),...provenChecks(verified.checks)]);
     entry.head=op.head??entry.head??null;
     const predicates=lanePredicates(ctx,ctx.work.node(nodeId));
-    laneSkip(entry,predicates);
-    const next=laneNext(entry,predicates);
+    laneSkip(entry,predicates,laneGoal(state));
+    const next=laneNext(entry,predicates,laneGoal(state));
     store.appendEvent({event:'lane-step',op:op.id,node:nodeId,kind:op.kind,
       step:laneProgress(entry),lane:entry.lane,skipped:[...(entry.skipped??[])],next:next??null});
     if(next){

@@ -127,7 +127,7 @@ test('agent manager uses its semantic decision id for durable replay and the glo
 test('non-operation peer pools choose known quota after eligibility and wait when every quota is unknown',t=>{
   const f=fixture(t);f.state.engine.coordination='agent-v1';const snapshot={schema:'starci/manager-snapshot@1',workflowId:'wf',decisionId:'manager-quota',generation:2,version:1,digest:'d',basisDigest:'b',goal:{job:'finish',definitionOfDone:['done']},progress:{},ops:[],blockers:[],actions:[{id:'act',type:'plan-verification',opId:'op',preconditions:[],summary:'plan',contextRefIds:[]}],contextCatalog:[],noProgress:{round:0,budget:2}};
   f.modelBudget.providers.claude.windows.weekly.usedPercent=80;f.modelBudget.providers.codex.windows.weekly.usedPercent=10;const bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});
-  assert.throws(()=>runtime.manageWorkflow(snapshot),error=>error.code==='STARCI_JOB_PENDING');assert.deepEqual(runtime.journal.listJobs()[0].payload.args.providers,['gpt-5.6-sol'],'the second peer wins because it has more known quota');bridge.close();
+  assert.throws(()=>runtime.manageWorkflow(snapshot),error=>error.code==='STARCI_JOB_PENDING');assert.deepEqual(runtime.journal.listJobs()[0].payload.args.providers,['codex-agent'],'the second peer wins because it has more known quota');bridge.close();
   const unknown=fixture(t),other=createJobBridge({journalFile:unknown.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>{throw Error('must not launch');}});unknown.state.engine.coordination='agent-v1';unknown.modelBudget={schema:'starci/runtime-budget@1',at:Date.now(),providers:{}};const waiting=createEngineRuntime({...unknown,bridge:other,eligibility:()=>({eligible:true})});assert.throws(()=>waiting.manageWorkflow({...snapshot,decisionId:'manager-unknown'}),error=>error.code==='STARCI_MODEL_QUOTA_WAIT'&&error.reasons.every(item=>item.known===false));assert.equal(waiting.journal.listJobs().length,0);other.close();
 });
 
@@ -363,27 +363,27 @@ test('a non-operation model call combines fresh quota, admitted family load and 
   const richBridge=createJobBridge({journalFile:rich.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:spawn});
   const chooser=createEngineRuntime({...rich,bridge:richBridge,eligibility:()=>({eligible:true}),runtimeProfile:preferring()});
   assert.throws(()=>chooser.manageWorkflow(snapshot('manager-prefers-codex')),error=>error.code==='STARCI_JOB_PENDING');
-  assert.deepEqual(chooser.journal.listJobs()[0].payload.args.providers,['claude-opus'],'a bounded preference does not override a much healthier family');
+  assert.deepEqual(chooser.journal.listJobs()[0].payload.args.providers,['claude-agent'],'a bounded preference does not override a much healthier family');
   richBridge.close();
 
   const close=fixture(t);close.state.engine.coordination='agent-v1';close.modelBudget.providers.claude.windows.weekly.usedPercent=35;close.modelBudget.providers.codex.windows.weekly.usedPercent=40;
   const closeBridge=createJobBridge({journalFile:close.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:spawn});
   const closeChoice=createEngineRuntime({...close,bridge:closeBridge,eligibility:()=>({eligible:true}),runtimeProfile:preferring()});
   assert.throws(()=>closeChoice.manageWorkflow(snapshot('manager-close')),error=>error.code==='STARCI_JOB_PENDING');
-  assert.deepEqual(closeChoice.journal.listJobs()[0].payload.args.providers,['gpt-5.6-sol'],'the bounded preference decides a close feasible choice');closeBridge.close();
+  assert.deepEqual(closeChoice.journal.listJobs()[0].payload.args.providers,['codex-agent'],'the bounded preference decides a close feasible choice');closeBridge.close();
 
   const drained=fixture(t);drained.state.engine.coordination='agent-v1';
   drained.modelBudget.providers.codex.windows.weekly.usedPercent=99;drained.modelBudget.providers.claude.windows.weekly.usedPercent=10;
   const drainedBridge=createJobBridge({journalFile:drained.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:spawn});
   const overflow=createEngineRuntime({...drained,bridge:drainedBridge,eligibility:()=>({eligible:true}),runtimeProfile:preferring()});
   assert.throws(()=>overflow.manageWorkflow(snapshot('manager-codex-drained')),error=>error.code==='STARCI_JOB_PENDING');
-  assert.deepEqual(overflow.journal.listJobs()[0].payload.args.providers,['claude-opus'],'a preference never starves: an exhausted window overflows to the other member');
+  assert.deepEqual(overflow.journal.listJobs()[0].payload.args.providers,['claude-agent'],'a preference never starves: an exhausted window overflows to the other member');
   drainedBridge.close();
 });
 
 test('provider-family admission is atomic for concurrent model selections and unknown effects retain the slot',t=>{
   const f=fixture(t),profile=withProviderPreference(loadRuntimes(),{mode:'adaptive',preferredProvider:'codex'});
-  for(const runtime of Object.values(profile.runtimes))if(runtime.provider==='codex')runtime.maxParallel=runtime.target==='gpt-5.6-sol'?1:0;
+  for(const runtime of Object.values(profile.runtimes))if(runtime.provider==='codex')runtime.maxParallel=runtime.target==='codex-agent'?1:0;
   const bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),runtime=createEngineRuntime({...f,bridge,runtimeProfile:profile,eligibility:()=>({eligible:true})});
   assert.throws(()=>runtime.model('decide',{providers:['gpt-5.6-sol'],situation:'a',options:['x']},{id:'a',attempt:1}),error=>error.code==='STARCI_JOB_PENDING'&&error.job.status==='running');
   const first=runtime.journal.listJobs()[0];runtime.journal.db.prepare("UPDATE jobs SET status='effect_unknown' WHERE job_id=?").run(first.job_id);
@@ -393,7 +393,7 @@ test('provider-family admission is atomic for concurrent model selections and un
   const view=runtime.providerAdmissionView();assert.equal(view.providers.codex.capacity,1,'extra Codex model names do not add family capacity');assert.equal(view.providers.codex.used,1);
   const allocator=createAllocator({runtimes:profile,budget:f.modelBudget});allocator.bindProviderAdmission(()=>runtime.providerAdmissionView());
   const reviewed=allocator.review('backend.implement',{restrictTo:['gpt-5.6-sol','claude-opus']});
-  assert.match(reviewed.blocked.find(item=>item.runtime==='gpt-5.6-sol').reason,/authoritative admission/);
+  assert.match(reviewed.blocked.find(item=>item.runtime==='codex-agent').reason,/authoritative admission/);
   const operation=allocator.allocate('backend.implement',{restrictTo:['gpt-5.6-sol','claude-opus'],job:{opId:'native-after-unknown'}});
   assert.equal(operation.ok,true);assert.equal(profile.runtimes[operation.runtime].provider,'claude','operation scoring sees the model lease even after its controller became unknown');bridge.close();
 });

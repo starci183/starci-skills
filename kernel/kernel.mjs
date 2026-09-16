@@ -67,7 +67,7 @@ import {BRAND_PAYLOAD,attributedFiles,brandAware,brandFields,brandOf,brandPayloa
   rereadBrand,sharedCheckCommand,treeForVerdict,treeVerdictFor,validateAccepted,validatorRejectLimit} from './verify.mjs';
 import {KERNEL_PLANNED_KINDS,LANE_LAYOUTS,advanceLanes,authorRecordOp,commitLedgerWrite,cutParentOf,deriveWorkOp,designGate,
   designNodeOf,designRecord,fanOutDeferral,groupIncomplete,groupVerifyKind,guardKernelPaths,guardRecordBlocks,kernelOwnedPaths,
-  laneNext,laneOf,lanePredicates,
+  laneGoal,laneNext,laneOf,lanePredicates,
   laneProgress,laneSkip,laneText,laneWalked,ledgerWrite,markLedger,nodeLayout,protectedFingerprint,pruneAnsweredQuestions,
   CUT_OWNED,quarantineStrays,recordBlocks,recordDone,recordPath,repairKernelRecords,repairTarget,retemplateLanes,settleCut,
   sweepTreeStrays,syncLedgerOps} from './sync.mjs';
@@ -2921,7 +2921,7 @@ function verifyComponents(state,ready){
 const laneWantsReview=(state,id,ctx=null)=>{
   const entry=state?.lanes?.[id];
   if(!entry?.lane?.length)return true;
-  const next=laneNext(entry,lanePredicates(ctx,ctx?.work?.node?.(id)??null));
+  const next=laneNext(entry,lanePredicates(ctx,ctx?.work?.node?.(id)??null),laneGoal(state));
   // A cut child proves nothing on its own: every prove step of its lane is planned once, for its parent's group.
   if(cutParentOf(state,id))return Boolean(next)&&kindRole(next)==='verify';
   return entry.lane.includes('review.verify')&&next==='review.verify';

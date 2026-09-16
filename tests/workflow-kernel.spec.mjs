@@ -299,7 +299,7 @@ function setup({job='Implement the sales slice',plan,scripts,dirty=[],exec,alloc
     validateOp:acceptAll,
     waitTimeoutMs:2000,tickMs:1000,maxIterations:12,...options});
   return {repo,store,state,goal,fake,git,run,runs,allocator,clock,
-    cleanup:()=>fs.rmSync(path.dirname(repo),{recursive:true,force:true})};
+    cleanup:()=>fs.rmSync(repo,{recursive:true,force:true})};
 }
 
 const salesPlan={
@@ -734,7 +734,7 @@ test('the four launcher commands drive one workflow directory: goal, approve, st
     assert.deepEqual(after.events.map(event=>event.event),['created','goal-critiqued','goal','approved']);
     assert.throws(()=>kernelMain('workflow-status',{id:'20260912-000000-missing'},{orca,cwd:repo}),/No workflow kernel state/);
     assert.throws(()=>kernelMain('workflow-nope',{},{orca,cwd:repo}),/Unsupported workflow kernel command/);
-  }finally{fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
+  }finally{fs.rmSync(repo,{recursive:true,force:true});}
 });
 
 // Before the 5-plus ruling this test ended with a `review` item on the owner's list after three rounds. The
@@ -1259,7 +1259,7 @@ function setupWork({nodes=WORK_NODES,scope=[],reintake=[],migrate=[],scripts={},
     validateOp,
     ...(binding?{resolveLedger:bindingRoles(binding)}:{}),
     waitTimeoutMs:2000,tickMs:1000,maxIterations:12,...options});
-  return {...tree,api,store,state,goal,fake,git,run,commits,allocator,clock,cleanup:()=>fs.rmSync(path.dirname(tree.repo),{recursive:true,force:true})};
+  return {...tree,api,store,state,goal,fake,git,run,commits,allocator,clock,cleanup:()=>fs.rmSync(tree.repo,{recursive:true,force:true})};
 }
 
 test('a launched audit with a Work node leaves every canonical Work byte unchanged through its finding report',()=>{
@@ -2537,10 +2537,10 @@ test('on the Work ledger the goal is derived from the authored nodes, and a node
     assert.deepEqual(harness.state.decisions.map(item=>[item.id,item.operation]),[['demo.payments.business.overview','business.decide']]);
     // The lane is part of what the user approves: the node's template, per node, in goal.md.
     assert.deepEqual(harness.state.lanes['demo.sales.implementation.backend.intake'],
-      {lane:['backend.implement','e2e.verify','review.verify'],done:[],checks:[],head:null});
+      {lane:['backend.implement','e2e.verify','security.verify','perf.verify','review.verify'],done:[],checks:[],head:null});
     const markdown=fs.readFileSync(harness.store.paths.goal,'utf8');
     assert.match(markdown,/## Work nodes this workflow executes/);
-    assert.match(markdown,/backend\.implement.*e2e\.verify.*review\.verify \(this op: step 1 of 3\)/);
+    assert.match(markdown,/backend\.implement.*e2e\.verify.*security\.verify.*perf\.verify.*review\.verify \(this op: step 1 of 5\)/);
     assert.match(markdown,/`demo\.sales\.implementation\.backend\.intake`/);
     assert.match(markdown,/## Decisions still open in scope/);
     assert.match(markdown,/## Needs you first/);
@@ -2616,7 +2616,7 @@ test('an accepted slice is written back into its Work node: in-progress, done, e
     // Five launches write `in-progress`: three lane steps of the intake node, and the author op of the receipt node.
     assert.deepEqual(events.filter(event=>event.event==='ledger-write').map(event=>event.step),['in-progress','in-progress','in-progress','in-progress','in-progress','done']);
     assert.equal(events.find(event=>event.event==='ledger-write'&&event.step==='done').op,'verify-1');
-    assert.deepEqual(state.lanes['demo.sales.implementation.backend.intake'].lane,['backend.implement','e2e.verify','review.verify']);
+    assert.deepEqual(state.lanes['demo.sales.implementation.backend.intake'].lane,['backend.implement','e2e.verify','security.verify','perf.verify','review.verify']);
     assert.deepEqual(state.lanes['demo.sales.implementation.backend.intake'].done,['backend.implement','e2e.verify','review.verify']);
     assert.deepEqual(events.filter(event=>event.event==='lane-step').map(event=>[event.kind,event.step,event.next]),
       [['backend.implement','1/3','e2e.verify'],['e2e.verify','2/3','review.verify'],['review.verify','3/3',null]]);
@@ -2894,8 +2894,8 @@ test('the kind graph is the lane and route authority: it validates, and the kern
   assert.deepEqual(validateGraph(),[]);
   // The ui node is the design record and walks its own lane; the implementation node builds against it.
   assert.deepEqual(laneFor({kind:'ui'}),['interface.draw','interface.asset']);
-  assert.deepEqual(laneFor({kind:'implementation',layout:'frontend'}),['frontend.implement','uat.verify']);
-  assert.deepEqual(laneFor({kind:'implementation',layout:null}),['backend.implement','e2e.verify','review.verify']);
+  assert.deepEqual(laneFor({kind:'implementation',layout:'frontend'}),['frontend.implement','uat.verify','security.verify','perf.verify']);
+  assert.deepEqual(laneFor({kind:'implementation',layout:null}),['backend.implement','e2e.verify','security.verify','perf.verify','review.verify']);
   assert.deepEqual(laneFor({kind:'operations'}),['runtime.operate','review.verify']);
   assert.equal(nextKind(laneFor({kind:'ui'}),['interface.draw']),'interface.asset','with no record read the artwork step is mandatory');
   assert.equal(nextKind(laneFor({kind:'ui'}),['interface.draw'],{predicates:{'node.hasNoArtworkSlots':true}}),null);
@@ -2924,7 +2924,7 @@ test('a frontend Work node travels its lane: interface.draw, then frontend.imple
     const markdown=fs.readFileSync(harness.store.paths.goal,'utf8');
     assert.match(markdown,/interface\.draw.*interface\.asset \(this op: step 1 of 2\)/);
     assert.deepEqual(harness.state.lanes[UI].lane,['interface.draw','interface.asset']);
-    assert.deepEqual(harness.state.lanes[CART].lane,['frontend.implement','uat.verify']);
+    assert.deepEqual(harness.state.lanes[CART].lane,['frontend.implement','uat.verify','security.verify','perf.verify']);
     // The implementation waits for the drawing: its first op exists only once the ui node is done.
     assert.deepEqual(harness.state.ops.map(op=>[op.id,op.kind]),[[UI,'interface.draw']]);
     assert.deepEqual(events(harness.store).filter(event=>event.event==='lane-waits-design').map(event=>[event.node,event.design]),[[CART,UI]]);
@@ -2943,7 +2943,7 @@ test('a frontend Work node travels its lane: interface.draw, then frontend.imple
     const log=events(harness.store);
     // The drawing's record declares no artwork slot, so the asset step is retired and the ui lane is walked as one.
     assert.deepEqual(log.filter(event=>event.event==='lane-step').map(event=>[event.kind,event.step,event.skipped,event.next]),
-      [['interface.draw','1/1',['interface.asset'],null],['frontend.implement','1/2',[],'uat.verify'],['uat.verify','2/2',[],null]]);
+      [['interface.draw','1/1',['interface.asset'],null],['frontend.implement','1/2',['security.verify','perf.verify'],'uat.verify'],['uat.verify','2/2',['security.verify','perf.verify'],null]]);
     // Each node hears `done` exactly once, from the step that closes its lane; the build step only reports progress.
     const writes=log.filter(event=>event.event==='ledger-write');
     assert.deepEqual(writes.filter(event=>event.step==='done').map(event=>[event.op,event.node]),[[UI,UI],[`${CART}-verify`,CART]]);
@@ -2966,7 +2966,7 @@ test('a frontend Work node travels its lane: interface.draw, then frontend.imple
     // The status command prints the lane per node.
     const status=kernelMain('workflow-status',{id:harness.store.id},{orca:{invoke:()=>{throw Error('status makes no Orca call');}},cwd:harness.repo});
     assert.deepEqual(status.lanes[UI],{lane:'interface.draw',done:['interface.draw'],skipped:['interface.asset'],progress:'1/1'});
-    assert.deepEqual(status.lanes[CART],{lane:'frontend.implement -> uat.verify',done:['frontend.implement','uat.verify'],skipped:[],progress:'2/2'});
+    assert.deepEqual(status.lanes[CART],{lane:'frontend.implement -> uat.verify',done:['frontend.implement','uat.verify'],skipped:['security.verify','perf.verify'],progress:'2/2'});
     assert.deepEqual(status.workNodes.map(item=>[item.op,item.progress]),
       [[UI,'1/1'],[CART,'2/2'],[`${CART}-verify`,'2/2']]);
   }finally{harness.cleanup();}
@@ -3032,7 +3032,7 @@ test('a design operation carries the brand record and its assets, prints the Bra
     // `grammar.update` is in the list from the other end: it grows the language every drawing reads, so it gets
     // the whole canon and the identity the new unit has to live inside before it adds a word to either.
     // The set is what the catalog derives from `reads: [brand]`, in catalog order, so only membership is pinned here.
-    assert.deepEqual([...DESIGN_KINDS].sort(),['frontend.implement','grammar.update','interface.asset','interface.draw','uat.verify']);
+    assert.deepEqual([...DESIGN_KINDS].sort(),['content.generate','frontend.implement','grammar.update','interface.asset','interface.draw','uat.verify']);
     assert.match(renderContract({template,op:{...op,kind:'grammar.update'},state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'}),/## Brand/);
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
@@ -3441,7 +3441,7 @@ test('a ledger-incomplete node becomes exactly one work.author op on its own rec
     assert.match(contract,/`state`, `completion`, `extensions\.work3\.kernel` stay the kernel's/);
     assert.match(contract,/## Never touch \(kernel-owned\)\n- `\.starciwork\/features\/sales\/implementation\/backend\/refund\/evidence\/\*\*`/);
     assert.doesNotMatch(contract,/## Never touch \(kernel-owned\)\n- `\.starciwork\/features\/sales\/implementation\/backend\/refund\/index\.yaml`/);
-    assert.match(contract,/Lane: this op precedes backend\.implement -> e2e\.verify -> review\.verify, which the kernel launches itself once this record is complete/);
+    assert.match(contract,/Lane: this op precedes backend\.implement -> e2e\.verify -> security\.verify -> perf\.verify -> review\.verify, which the kernel launches itself once this record is complete/);
     assert.match(contract,/Sequence `work\.author`/);
     // The record it wrote is committed, and the kernel measured the result against the tree, not against the report.
     assert.match(commits[0],/^feat\(demo\.sales\.implementation\.backend\.refund-author\): Complete the Work record/);
@@ -3456,7 +3456,7 @@ test('a ledger-incomplete node becomes exactly one work.author op on its own rec
     assert.equal(first.id,REFUND);
     assert.deepEqual(first.allowlist,['apps/agentos-controlplane/src/sales/refund.ts']);
     assert.deepEqual(first.checks,[{name:'refund-restores-balance',command:'npx vitest run refund'}]);
-    assert.deepEqual(state.lanes[REFUND].lane,['backend.implement','e2e.verify','review.verify']);
+    assert.deepEqual(state.lanes[REFUND].lane,['backend.implement','e2e.verify','security.verify','perf.verify','review.verify']);
     assert.deepEqual(state.lanes[REFUND].done,[],'authoring the record walked no step of the lane');
     assert.deepEqual(state.ledger.map(item=>item.id),[REFUND]);
     // Authoring is not completion: the node keeps todo and has no proof of anything.
@@ -3995,7 +3995,7 @@ test('a second workflow-run process is refused before run binding or terminal ef
     const before=fake.terminals.size;assert.throws(()=>kernelMain('workflow-run',{id:created.id,'max-iterations':'0'},{orca:fake.orca,cwd:repo,functions}),/another kernel or unresolved launch/);
     assert.equal(fake.terminals.size,before,'no coordinator terminal was created or native worker swept');assert.equal(fake.terminals.has('term_live_worker'),true);
     assert.equal(store.readEvents().some(event=>['run-bound','run-resumed'].includes(event.event)),false);
-  }finally{if(child)try{child.kill();}catch{}fs.rmSync(path.dirname(repo),{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+  }finally{if(child)try{child.kill();}catch{}fs.rmSync(repo,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 });
 
 test('a kernel that already has its run records run-resumed; only a real bind records run-bound',()=>{
@@ -4025,7 +4025,7 @@ test('a kernel that already has its run records run-resumed; only a real bind re
     const boundEvents=createStore({repoRoot:repo,id:boundGoal.id}).readEvents().map(event=>event.event);
     assert.ok(boundEvents.includes('run-bound'));
     assert.equal(boundEvents.includes('run-resumed'),false);
-  }finally{fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
+  }finally{fs.rmSync(repo,{recursive:true,force:true});}
 });
 
 /**
@@ -5224,7 +5224,7 @@ test('a node too big for one operation gets a cut op before its lane, and its ch
     assert.equal(state.ops.filter(op=>op.kind==='review.verify').length,1);
     // Each child's prove steps were recorded when the parent's proof was accepted.
     for(const id of CHILDREN){
-      assert.deepEqual(state.lanes[id].lane,['backend.implement','e2e.verify','review.verify']);
+      assert.deepEqual(state.lanes[id].lane,['backend.implement','e2e.verify','security.verify','perf.verify','review.verify']);
       assert.deepEqual(state.lanes[id].done,['backend.implement','e2e.verify','review.verify']);
       assert.equal(harness.read(id).state,'done');
       assert.equal(state.ledger.find(item=>item.id===id).status,'verified');
@@ -5271,7 +5271,7 @@ test('a node the planning operation did not split reports cut: none and the kern
     const build=state.ops.find(op=>op.id===CHECKOUT);
     assert.equal(build.kind,'backend.implement');
     assert.deepEqual(build.allowlist,BIG_FILES);
-    assert.deepEqual(state.lanes[CHECKOUT].lane,['backend.implement','e2e.verify','review.verify']);
+    assert.deepEqual(state.lanes[CHECKOUT].lane,['backend.implement','e2e.verify','security.verify','perf.verify','review.verify']);
     assert.deepEqual(state.lanes[CHECKOUT].done,[],'the cut walked no step of the lane');
   }finally{harness.cleanup();}
 });
