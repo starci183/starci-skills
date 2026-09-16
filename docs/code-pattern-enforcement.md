@@ -2,6 +2,23 @@
 
 `model/code-patterns.yaml` is the executable inventory for the fixed StarCi NestJS and Next.js code profiles. The authored manifest, not every rule exported by an installed lint package, decides which code obligations apply. Generated `.dist/model/code-patterns.json` is the runtime form.
 
+## Public command and operation
+
+Run `starci code-patterns check --profile nest --root <repository> --all` for a Nest
+source repository; use `--profile next` for a Next repository. Add
+`--architecture-config <repository-relative.json>` when the layout/public-owner
+contract needs explicit binding. The single `bin/starci.mjs` entry forwards to
+the sealed compiled checker; consumers do not need internal module paths.
+
+The command prints one `starci/code-pattern-check@1` JSON report. Exit `0` means
+complete clean declared coverage, `1` means measured findings, and `2` means
+invalid or unavailable coverage. Explicit file arguments remain available after
+`--`, but omitting an applicable file fails completeness rather than certifying a
+partial sample. `review.verify` in `lint` mode invokes this aggregate plus the
+selected Work/stack checks and any additional project checks. Finding an issue
+settles only a measurement; repairing source and completing delivery retain their
+own authority and evidence.
+
 ## Result contract
 
 Each obligation has a stable ID, source knowledge rule IDs, path applicability, a mechanical requirement, its exact machine, and any remaining semantic review. `status` has only three values:
@@ -28,18 +45,23 @@ Architecture obligations bind a `starci/architecture-check@1` result from `starc
 
 Repository audits use a stable script rule ID and a typed result binding. A generic command exit code, a package script with the same name, or prose saying that a check ran is insufficient. Missing tools/configuration are unavailable coverage, not a pass.
 
-## Current blocking gaps
+## Coverage and remaining work
 
-The manifest deliberately remains non-green. The principal gaps are:
+The manifest is the current implementation inventory; inspect each obligation's
+status and actual result instead of treating this prose as a frozen count.
+Explicit owner/public-entry and Grammar boundaries, Nest documentation/import
+syntax, and the implemented Next syntax clauses have executable checks. Legacy
+rules that contradict the adopted standard must be off while their replacement
+obligations remain required. That migration does not waive an unimplemented
+replacement.
 
-1. Same-source cross-owner public entries and export-star need `ARCH_OWNER_EXPORT_BYPASS` and `ARCH_OWNER_EXPORT_STAR` for both profiles.
-2. The selected Grammar export/peer/style family needs `ARCH_GRAMMAR_EXPORT_BYPASS` and `ARCH_GRAMMAR_CONTRACT_INVALID`.
-3. The conditional frontend world-owner/render boundary needs type-resolved coverage beyond the legacy block/name heuristic. Intrinsic browser state must stay valid.
-4. Nest provider re-registration and selected handler/module registration need static coverage plus a separate boot test for real tokens and lifetime.
-5. Both profiles retain syntax gaps in names, member comments, public contract forms, tests and framework-specific data/error lifecycles, listed as `missing` obligations rather than manual review.
-6. Legacy BE deep-import/no-folder-barrel rules conflict with explicit owner public entries. The legacy FE block-twin rule cannot certify the adopted conditional boundary. Private Academy rules for env/cache/default exports are not shared canon rules.
-
-These gaps are an implementation queue for the owning checker/runtime work. They do not authorize product rewrites or lint-package publication.
+Remaining `missing` or `conflict` obligations still block conformance. In
+particular the conditional FE world-owner/render boundary, framework-specific
+error/data lifecycles and remaining declared source/contract/test forms require
+their exact implementations. Private Academy env/cache/default-export rules do
+not become shared canon merely because their names occur in a local config.
+This implementation queue does not authorize product rewrites or lint-package
+publication.
 
 ## Evidence limits
 
