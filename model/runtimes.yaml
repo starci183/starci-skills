@@ -20,17 +20,17 @@ allocation:
       decide: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
       plan: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
     medium:
-      default: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
+      default: [gpt-5.6-sol, claude-opus, qwen3.8-flash, gpt-5.6-luna]
       decide: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
       plan: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
-    easy: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
+    easy: [qwen3.8-flash, gpt-5.6-luna, claude-opus, gpt-5.6-sol]
   preference:
-    implement: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
-    verify: [gpt-5.6-sol, claude-fable-5.1, gpt-6-astra, claude-opus, qwen3.8-flash]
+    implement: [gpt-5.6-sol, claude-opus, qwen3.8-flash, gpt-5.6-luna]
+    verify: [gpt-5.6-sol, claude-fable-5.1, gpt-6-astra, claude-opus, qwen3.8-flash, gpt-5.6-luna]
     # Fable overflows to Opus, Astra to Sol: the reasoning roles end on the coding runtimes instead of stalling.
     decide: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
     plan: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
-    write: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
+    write: [gpt-5.6-sol, claude-opus, qwen3.8-flash, gpt-5.6-luna]
   # Heavy work fans out: a big node is cut into children with disjoint write scopes, the seam every other child
   # would touch is built first and alone, then the rest run at once - bounded here so one parent never takes
   # every slot of the pool and leaves the rest of the tree waiting behind it.
@@ -42,6 +42,13 @@ allocation:
   backoffFactor: 2
   maxCooldownMs: 3600000
 runtimes:
+  # Luna shares one provider budget with Sol and Astra. Role/tier/tool/quality gates still
+  # apply; an owner allocation changes capacity, never qualification or effect authority.
+  gpt-5.6-luna:
+    target: gpt-5.6-luna
+    provider: codex
+    roles: [implement, verify, write]
+    maxParallel: 2
   # No pool declares a budget: the probed provider window is the whole of it.
   gpt-5.6-sol:
     target: gpt-5.6-sol

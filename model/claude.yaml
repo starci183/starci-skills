@@ -2,12 +2,12 @@ schema: starci/execution-profiles@1
 runtime: claude
 provider: anthropic
 source: legacy/resources/agents/model/claude.json
-modelPolicy: use-current-host-configuration; legacy model preferences are historical, never availability proof
+modelPolicy: use-declared-profile-model-and-attest-effective-runtime; undeclared-models-inherit-current-host-configuration
 profiles:
   opus:
     role: working
     legacyModelPreference: claude-opus-5
-    model: null
+    model: claude-opus-5
     imageGeneration: false
     roleDescription: "Heavy authoring and high-stakes mutation inside a frozen boundary: source apply,
       backend implementation, release and platform operations."
@@ -15,7 +15,7 @@ profiles:
   opus-reviewer:
     role: reasoning
     legacyModelPreference: claude-opus-5
-    model: null
+    model: claude-opus-5
     imageGeneration: false
     roleDescription: "Judge, decide and verify on the evidence without repairing the product under
       review: the reasoning half of the Opus pool, so allocation may hand Opus a review or a decision

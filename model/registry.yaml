@@ -75,6 +75,15 @@ reasoningOps:
   - review.verify
   - work.author
 targets:
+  gpt-5.6-luna:
+    runtime: codex
+    requestedModel: gpt-5.6-luna
+    profiles:
+      working: gpt-5.6-luna
+      reasoning: gpt-5.6-luna-reviewer
+    orcaLaunch:
+      kind: managed-agent
+      agent: codex
   gpt-5.6-sol:
     runtime: codex
     requestedModel: gpt-5.6-sol
@@ -94,7 +103,7 @@ targets:
       agent: codex
   claude-opus:
     runtime: claude
-    requestedModel: null
+    requestedModel: claude-opus-5
     profiles:
       working: opus
       reasoning: opus-reviewer
@@ -182,11 +191,11 @@ operators:
       - {environment: codex, profiles: [gpt-6-astra, gpt-5.6-sol]}
   backend.implement:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
+    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   brand.decide:
     skill: starci
     # A decide operation that also produces bytes: when the product has no mascot, this op generates one
@@ -222,35 +231,35 @@ operators:
       - {environment: codex, profiles: [gpt-6-astra, gpt-5.6-sol]}
   content.generate:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
+    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   e2e.verify:
     skill: starci
-    chain: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
+    chain: [gpt-5.6-sol, claude-opus, qwen3.8-flash, gpt-5.6-luna]
     environments:
-      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: qwen, profiles: [qwen3.8-flash]}
   integration.verify:
     skill: starci
     # A live call to a real provider is the same kind of work as the API proof: run code, read the response
     # back, keep the output. So it carries the same verify-role chain e2e.verify does.
-    chain: [gpt-5.6-sol, claude-opus, qwen3.8-flash]
+    chain: [gpt-5.6-sol, claude-opus, qwen3.8-flash, gpt-5.6-luna]
     environments:
-      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
       - {environment: claude, profiles: [claude-opus]}
       - {environment: qwen, profiles: [qwen3.8-flash]}
   grammar.update:
     skill: starci
     # Growing the installed grammar is code, stories, tests, a published version and a canon entry, so it runs on
     # the strongest coding runtimes first and never on the image model: nothing here is drawn.
-    chain: [claude-opus, gpt-5.6-sol]
+    chain: [claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   interface.asset:
     skill: starci
     # Generating the artwork a candidate embeds needs the same image model the drawing used, so the chain is
@@ -267,60 +276,60 @@ operators:
       - {environment: codex, profiles: [gpt-5.6-sol]}
   interface.implement:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
+    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   knowledge.repair:
     skill: starci
-    chain: [claude-opus, gpt-5.6-sol, qwen3.8-flash]
+    chain: [claude-opus, gpt-5.6-sol, qwen3.8-flash, gpt-5.6-luna]
     environments:
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
       - {environment: qwen, profiles: [qwen3.8-flash]}
   release.deliver:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
+    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   review.verify:
     skill: starci
-    chain: [qwen3.8-flash, claude-fable-5.1, gpt-5.6-sol, claude-opus, gpt-6-astra]
+    chain: [qwen3.8-flash, claude-fable-5.1, gpt-5.6-sol, claude-opus, gpt-6-astra, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
       - {environment: claude, profiles: [claude-fable-5.1, claude-opus]}
-      - {environment: codex, profiles: [gpt-5.6-sol, gpt-6-astra]}
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-6-astra, gpt-5.6-luna]}
   runtime.operate:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
+    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   scope.retire:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
+    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   task.execute:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
+    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   uat.verify:
     skill: starci
-    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol]
+    chain: [qwen3.8-flash, claude-opus, gpt-5.6-sol, gpt-5.6-luna]
     environments:
       - {environment: qwen, profiles: [qwen3.8-flash]}
       - {environment: claude, profiles: [claude-opus]}
-      - {environment: codex, profiles: [gpt-5.6-sol]}
+      - {environment: codex, profiles: [gpt-5.6-sol, gpt-5.6-luna]}
   work.author:
     skill: starci
     # Authoring the Work records - a node's scope and checks, a whole feature's drafts - is the work that every

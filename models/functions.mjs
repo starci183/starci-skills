@@ -31,7 +31,7 @@ const unique=list=>[...new Set(list)];
 
 /** Headless provider commands. The prompt goes on stdin; the JSON answer is extracted from the provider's own envelope. */
 export const HEADLESS_PROVIDERS={
-  'claude-opus':{command:['claude','-p','--output-format','json','--model','opus'],extract:extractClaude,usage:usageClaude},
+  'claude-opus':{command:['claude','-p','--output-format','json','--model','claude-opus-5'],extract:extractClaude,usage:usageClaude},
   'claude-fable-5.1':{command:['claude','-p','--output-format','json','--model','claude-fable-5-1'],extract:extractClaude,usage:usageClaude},
   'qwen3.8-flash':{command:['qwen','--model','qwen3.8-flash','--approval-mode','yolo','--output-format','json','--exclude-tools','agent'],extract:extractQwen,usage:usageQwen},
   'gpt-5.6-sol':{command:['codex','exec','--json','--model','gpt-5.6-sol'],extract:extractCodex,usage:usageCodex},

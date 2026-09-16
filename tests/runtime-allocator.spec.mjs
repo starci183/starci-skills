@@ -43,7 +43,7 @@ test('prefer-then-overflow fills the preferred runtime before it offers the next
   assert.equal(allocator.maxParallelOps,10);
   assert.equal(allocator.policy,PREFER_THEN_OVERFLOW);
   assert.equal(profile.allocation.policy,PREFER_THEN_OVERFLOW);
-  assert.deepEqual(profile.allocation.preference.implement,['gpt-5.6-sol','claude-opus','qwen3.8-flash']);
+  assert.deepEqual(profile.allocation.preference.implement,['gpt-5.6-sol','claude-opus','qwen3.8-flash','gpt-5.6-luna']);
   assert.equal(profile.runtimes['gpt-5.6-sol'].maxParallel,5);
   const picked=[];
   for(let index=0;index<6;index+=1){
@@ -62,7 +62,7 @@ test('prefer-then-overflow fills the preferred runtime before it offers the next
   assert.equal(allocator.allocate('backend.implement').runtime,'gpt-5.6-sol');
   const snapshot=allocator.snapshot();
   assert.equal(snapshot.policy,PREFER_THEN_OVERFLOW);
-  assert.deepEqual(snapshot.preference.verify,['gpt-5.6-sol','claude-fable-5.1','gpt-6-astra','claude-opus','qwen3.8-flash']);
+  assert.deepEqual(snapshot.preference.verify,['gpt-5.6-sol','claude-fable-5.1','gpt-6-astra','claude-opus','qwen3.8-flash','gpt-5.6-luna']);
   assert.equal(snapshot.inFlight,6);
   // No pool declares a daily budget any more - the probed provider window is the only one - so nothing is left to count.
   assert.equal(profile.runtimes['claude-opus'].budget,undefined);
@@ -95,10 +95,10 @@ test('a rate-limited preference overflows to the next runtime and is taken up ag
   assert.equal(allocator.allocate('backend.implement').runtime,'gpt-5.6-sol');
   // The preference order is the allocation order; a role with no list falls back to least loaded.
   const fresh=createAllocator({runtimes:profile,now:time.now});
-  assert.deepEqual(fresh.review('backend.implement').ready.map(item=>item.runtime),['gpt-5.6-sol','claude-opus','qwen3.8-flash']);
+  assert.deepEqual(fresh.review('backend.implement').ready.map(item=>item.runtime),['gpt-5.6-sol','claude-opus','qwen3.8-flash','gpt-5.6-luna']);
   const unranked=createAllocator({runtimes:{...profile,allocation:{...profile.allocation,preference:{verify:profile.allocation.preference.verify}}},now:time.now});
   assert.equal(unranked.review('backend.implement').preference,null);
-  assert.deepEqual(unranked.review('backend.implement').ready.map(item=>item.runtime),['gpt-5.6-sol','claude-opus','qwen3.8-flash']);
+  assert.deepEqual(unranked.review('backend.implement').ready.map(item=>item.runtime),['gpt-5.6-sol','claude-opus','gpt-5.6-luna','qwen3.8-flash']);
   assert.equal(unranked.allocate('backend.implement').overflowed,false);
   assert.equal(unranked.allocate('review.verify').runtime,'gpt-5.6-sol');
 });
@@ -289,7 +289,7 @@ test('difficulty routes inside the quota: hard work to the strongest tier, easy 
   assert.equal(allocator.allocate('backend.implement',{difficulty:'hard'}).runtime,'gpt-5.6-sol');
   const quota=applyQuota(profile,{order:['claude-opus','qwen3.8-flash','gpt-5.6-sol'],slots:{'claude-opus':2,'qwen3.8-flash':1,'gpt-5.6-sol':1}});
   assert.equal(quota.runtimes['claude-opus'].maxParallel,2);
-  assert.deepEqual(quota.allocation.preference.implement,['claude-opus','qwen3.8-flash','gpt-5.6-sol']);
+  assert.deepEqual(quota.allocation.preference.implement,['claude-opus','qwen3.8-flash','gpt-5.6-sol','gpt-5.6-luna']);
   const quoted=createAllocator({runtimes:profile,quota:{order:['claude-opus','qwen3.8-flash','gpt-5.6-sol'],slots:{'claude-opus':2,'qwen3.8-flash':1,'gpt-5.6-sol':1}},now:()=>0});
   assert.deepEqual([1,2,3,4].map(()=>quoted.allocate('backend.implement').runtime),['claude-opus','claude-opus','qwen3.8-flash','gpt-5.6-sol']);
 });
@@ -501,7 +501,7 @@ test('fan-out is bounded per cut group: the seam runs alone and one parent never
   // heavy node fans out wide and still leaves the rest of the tree a slot to run in.
   assert.deepEqual(profile.allocation.fanOut,{seamFirst:true,maxPerGroup:9});
   assert.equal(profile.maxParallelOps,10);
-  assert.deepEqual(profile.allocation.preference.implement,['gpt-5.6-sol','claude-opus','qwen3.8-flash']);
+  assert.deepEqual(profile.allocation.preference.implement,['gpt-5.6-sol','claude-opus','qwen3.8-flash','gpt-5.6-luna']);
   const allocator=createAllocator({runtimes:profile,now:()=>0});
   assert.deepEqual(allocator.fanOut,{seamFirst:true,maxPerGroup:9});
   assert.equal(allocator.maxParallelOps,10);
