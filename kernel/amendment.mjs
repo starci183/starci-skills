@@ -55,11 +55,12 @@ const checks=(value,label)=>{need(Array.isArray(value)&&value.length,`Workflow a
   const seen=new Set();return value.map((item,index)=>{exactKeys(item,['name','command'],`${label}[${index}]`);
     const check={name:text(item.name,`${label}[${index}].name`),command:text(item.command,`${label}[${index}].command`)};
     need(!seen.has(check.name),`Workflow amendment ${label} must use unique check names`);seen.add(check.name);return check;});};
+const checkKey=value=>`${value?.name??''}\0${value?.command??''}`;
 const checkReplacements=value=>{if(value===undefined)return {};need(plain(value),'Workflow amendment changes.supersedeOperationChecks must be an object keyed by exact operation id');
   return Object.fromEntries(Object.entries(value).map(([opId,items])=>{need(Array.isArray(items)&&items.length,`Workflow amendment changes.supersedeOperationChecks.${opId} must be a nonempty array`);const seen=new Set();
     return [text(opId,'operation check replacement id'),items.map((item,index)=>{const label=`changes.supersedeOperationChecks.${opId}[${index}]`;exactKeys(item,['from','to','reason'],label);
-      const from=checks([item.from],`${label}.from`)[0],to=checks([item.to],`${label}.to`)[0],reason=text(item.reason,`${label}.reason`),key=JSON.stringify(from);
-      need(key!==JSON.stringify(to),`Workflow amendment ${label} must change the check`);need(!seen.has(key),`Workflow amendment ${label} repeats an original check`);seen.add(key);return {from,to,reason};})];}));};
+      const from=checks([item.from],`${label}.from`)[0],to=checks([item.to],`${label}.to`)[0],reason=text(item.reason,`${label}.reason`),key=checkKey(from);
+      need(key!==checkKey(to),`Workflow amendment ${label} must change the check`);need(!seen.has(key),`Workflow amendment ${label} repeats an original check`);seen.add(key);return {from,to,reason};})];}));};
 function addedOperation(value,index){
   const label=`changes.addOperations[${index}]`;
   exactKeys(value,['id','kind','operation','goal','ledgerIds','allowlist','references','checks','acceptance','dependsOn'],label);
@@ -190,7 +191,7 @@ export function readWorkflowAmendment(file){
     'Workflow amendment that adds scope must carry a nonempty changes.effectCeiling.paths owner grant');
   const normalized={schema:WORKFLOW_AMENDMENT,workflowId,baseGoalIdentity,authority,coordinator,
     changes:{clarifications,addScope,scopeBindings:boundScopes,addDefinitionOfDone,supersedeDefinitionOfDone,operationFindings:findings,operationEffects:effects,
-      addOperations,operationDependencies,supersedeOperationChecks,effectCeiling}};
+      addOperations,operationDependencies,...(Object.hasOwn(record.changes,'supersedeOperationChecks')?{supersedeOperationChecks}:{}),effectCeiling}};
   return {file:resolved,record:normalized,digest:digest(normalized)};
 }
 
@@ -211,14 +212,14 @@ export function applyWorkflowAmendment(store,state,file,{now=Date.now}={}){
   need(!reusedGrant,
     `Owner grant ${sourceKey(parsed.record.authority.source)} is already bound to amendment ${reusedGrant?.digest}`);
   const prepared=prepareOperationChanges(state,parsed.record,parsed.digest),targets=new Map([...(state.ops??[]),...prepared.added].map(op=>[op.id,op]));
-  for(const [opId,replacements] of Object.entries(parsed.record.changes.supersedeOperationChecks)){
+  for(const [opId,replacements] of Object.entries(parsed.record.changes.supersedeOperationChecks??{})){
     const op=targets.get(opId);need(op,`Amendment check replacement names unknown operation ${opId}`);
     need(prepared.existingIds.has(opId),`Amendment checks for added operation ${opId} must be declared by addOperations.checks`);
     need(DEPENDENCY_EDITABLE.has(op.status)&&!liveIdentity(op),`Amendment cannot replace checks of accepted or live operation ${opId} (${op.status})`);
     const active=[...(op.checks??[])];
-    for(const replacement of replacements)need(active.filter(check=>check.name===replacement.from.name&&check.command===replacement.from.command).length===1,
+    for(const replacement of replacements)need(active.filter(check=>checkKey(check)===checkKey(replacement.from)).length===1,
       `Amendment check to supersede is not exactly active once on ${opId}: ${replacement.from.name}`);
-    const fromKeys=new Set(replacements.map(item=>JSON.stringify(item.from))),effective=active.filter(item=>!fromKeys.has(JSON.stringify(item))).concat(replacements.map(item=>item.to));
+    const fromKeys=new Set(replacements.map(item=>checkKey(item.from))),effective=active.filter(item=>!fromKeys.has(checkKey(item))).concat(replacements.map(item=>item.to));
     need(new Set(effective.map(item=>item.name)).size===effective.length,`Amendment check replacements create duplicate check names on ${opId}`);
   }
   for(const opId of unique([...Object.keys(parsed.record.changes.operationFindings),...Object.keys(parsed.record.changes.operationEffects)])){
@@ -248,10 +249,10 @@ export function applyWorkflowAmendment(store,state,file,{now=Date.now}={}){
     }
     op.dependsOn=[...prepared.prospective.get(opId)];
   }
-  for(const [opId,replacements] of Object.entries(parsed.record.changes.supersedeOperationChecks)){
-    const op=state.ops.find(item=>item.id===opId),prior=structuredClone(op.checks??[]),mapping=new Map(replacements.map(item=>[JSON.stringify(item.from),item.to]));
+  for(const [opId,replacements] of Object.entries(parsed.record.changes.supersedeOperationChecks??{})){
+    const op=state.ops.find(item=>item.id===opId),prior=structuredClone(op.checks??[]),mapping=new Map(replacements.map(item=>[checkKey(item.from),item.to]));
     op.checkHistory=[...(op.checkHistory??[]),{amendment:parsed.digest,checks:prior,replacements:structuredClone(replacements)}];
-    op.checks=prior.map(item=>mapping.get(JSON.stringify(item))??item);
+    op.checks=prior.map(item=>mapping.get(checkKey(item))??item);
   }
   for(const [opId,items] of Object.entries(parsed.record.changes.operationFindings)){
     const op=state.ops.find(item=>item.id===opId);
@@ -281,7 +282,7 @@ export function applyWorkflowAmendment(store,state,file,{now=Date.now}={}){
     addScope:amendment.changes.addScope,scopeBindings:amendment.changes.scopeBindings,addDefinitionOfDone:amendment.changes.addDefinitionOfDone,
     supersedeDefinitionOfDone:amendment.changes.supersedeDefinitionOfDone,
     operationFindings:Object.keys(amendment.changes.operationFindings),addOperations:amendment.changes.addOperations.map(op=>op.id),
-    operationDependencies:Object.keys(amendment.changes.operationDependencies),supersedeOperationChecks:Object.keys(amendment.changes.supersedeOperationChecks),effectCeiling:amendment.changes.effectCeiling});
+    operationDependencies:Object.keys(amendment.changes.operationDependencies),supersedeOperationChecks:Object.keys(amendment.changes.supersedeOperationChecks??{}),effectCeiling:amendment.changes.effectCeiling});
   return {ok:true,replayed:false,amendment,file:parsed.file};
 }
 

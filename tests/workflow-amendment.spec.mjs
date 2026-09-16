@@ -115,14 +115,14 @@ test('same owner source cannot drift and an amendment cannot reopen accepted wor
 
 test('an owner maps each superseded unfinished check exactly and history stays immutable',t=>{
   const f=fixture(t),op=f.state.ops[1];op.status='pending';delete op.lease;
-  op.checks=[{name:'component-path',command:'node --test components/old.spec.mjs'},{name:'integration',command:'npm test'}];f.store.saveState(f.state);
+  op.checks=[{command:'node --test components/old.spec.mjs',name:'component-path',timeoutMs:120000},{name:'integration',command:'npm test'}];f.store.saveState(f.state);
   f.amendment.changes.supersedeOperationChecks={'remaining-1':[
     {from:{name:'component-path',command:'node --test components/old.spec.mjs'},to:{name:'feature-path',command:'node --test features/new.spec.mjs'},reason:'The source moved from components to features.'},
     {from:{name:'integration',command:'npm test'},to:{name:'slice-integration',command:'node --test tests/slice.spec.mjs'},reason:'The publication gate owns the full suite.'}
   ]};fs.writeFileSync(f.amendmentFile,stringifyYaml(f.amendment));
   const applied=applyWorkflowAmendment(f.store,f.state,f.amendmentFile),current=f.state.ops[1];
   assert.deepEqual(current.checks,[{name:'feature-path',command:'node --test features/new.spec.mjs'},{name:'slice-integration',command:'node --test tests/slice.spec.mjs'}]);
-  assert.deepEqual(current.checkHistory[0].checks,[{name:'component-path',command:'node --test components/old.spec.mjs'},{name:'integration',command:'npm test'}]);
+  assert.deepEqual(current.checkHistory[0].checks,[{command:'node --test components/old.spec.mjs',name:'component-path',timeoutMs:120000},{name:'integration',command:'npm test'}]);
   assert.equal(current.checkHistory[0].amendment,applied.amendment.digest);
   assert.match(amendmentContractLines(f.state,current).join('\n'),/publication gate owns the full suite/);
   const invalid=fixture(t);invalid.state.ops[1].status='pending';delete invalid.state.ops[1].lease;invalid.state.ops[1].checks=[{name:'only',command:'npm test'}];invalid.store.saveState(invalid.state);
@@ -141,6 +141,15 @@ test('public amendment reclaims a dead running startup row but refuses a live on
   const liveReservation=reserveStartup(live.store.dir),liveRunning=acquireStartup(live.store.dir,{launchToken:liveReservation.token});
   fs.writeFileSync(path.join(live.store.dir,'kernel.lock'),JSON.stringify({pid:process.pid,startedAt:Date.now(),startupToken:liveRunning.token}));
   assert.throws(()=>publicCommand(live,'workflow-amend','--id',live.state.id,'--amendment',live.amendmentFile),/still running/);
+});
+
+test('an amendment without check supersession keeps its pre-extension digest for replay',t=>{
+  const f=fixture(t),parsed=readWorkflowAmendment(f.amendmentFile);
+  assert.equal(Object.hasOwn(parsed.record.changes,'supersedeOperationChecks'),false);
+  const first=applyWorkflowAmendment(f.store,f.state,f.amendmentFile);
+  assert.equal(first.amendment.digest,parsed.digest);
+  assert.equal(applyWorkflowAmendment(f.store,f.state,f.amendmentFile).replayed,true);
+  assert.equal(f.store.loadState().amendments.length,1);
 });
 
 test('an authorized amendment atomically inserts pre-audit and post-review operations into the existing DAG',t=>{
