@@ -17,7 +17,7 @@ const filesUnder=(root,at=root)=>fs.readdirSync(at,{withFileTypes:true}).flatMap
 export function sealRuntime({sourceRoot,buildsRoot,version}={}){
   const root=fs.realpathSync(path.resolve(sourceRoot)),authoredSourceRoot=slash(root);
   const paths=[...filesUnder(path.join(root,'.dist')).map(file=>`.dist/${file}`),'bin/starci.mjs','bin/starci-skills.mjs',
-    'scripts/config.mjs','config.json','core/runtime-root.mjs','core/yaml.mjs','init/AGENTS.md','init/CLAUDE.md',
+    'scripts/config.mjs','config.json','core/runtime-root.mjs','core/yaml.mjs','init/AGENTS.md','init/CLAUDE.md','init/DEVIN.md',
     'package.json','SKILL.md','docs/supervision-templates/op.md'];
   const entries=paths.sort().map(file=>({path:file,sha256:hash(fs.readFileSync(path.join(root,file)))}));
   const digest=hash(JSON.stringify({version,sourceRoot:authoredSourceRoot,entries})),target=path.resolve(buildsRoot,digest);

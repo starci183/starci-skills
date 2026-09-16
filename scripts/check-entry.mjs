@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 /** Diagnose the explicitly supplied host, not the current FE directory. Read-only. */
 export function checkEntry(host,{claimedEntry}={}) {
  const source=path.resolve(host),entry=path.join(source,'.claude','SKILL.md');
- const bootstraps=['AGENTS.md','CLAUDE.md'].map(name=>{
+ const bootstraps=['AGENTS.md','CLAUDE.md','DEVIN.md'].map(name=>{
   const file=path.join(source,name);
   return {file,exists:fs.existsSync(file),text:fs.existsSync(file)?fs.readFileSync(file,'utf8'):''};
  });

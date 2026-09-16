@@ -43,7 +43,7 @@ import {superviseOnce} from '../kernel/supervisor.mjs';
 const fixture=t=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-engine-life-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return root;};
 function pinAt(root){
   const sourceRoot=path.join(root,'source');
-  for(const file of ['.dist/kernel/kernel.mjs','bin/starci.mjs','bin/starci-skills.mjs','scripts/config.mjs','config.json','core/runtime-root.mjs','core/yaml.mjs','init/AGENTS.md','init/CLAUDE.md','package.json','SKILL.md','docs/supervision-templates/op.md']){
+  for(const file of ['.dist/kernel/kernel.mjs','bin/starci.mjs','bin/starci-skills.mjs','scripts/config.mjs','config.json','core/runtime-root.mjs','core/yaml.mjs','init/AGENTS.md','init/CLAUDE.md','init/DEVIN.md','package.json','SKILL.md','docs/supervision-templates/op.md']){
     const target=path.join(sourceRoot,file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,'synthetic pin fixture\n');
   }
   return sealRuntime({sourceRoot,buildsRoot:path.join(root,'builds'),version:'1.0.0'});

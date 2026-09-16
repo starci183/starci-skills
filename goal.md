@@ -144,15 +144,30 @@ qwen-agent:    {provider: qwen,   maxParallel: 4,  models: {implement/verify/wri
    avoid/restrictTo → quota slot free → cooling. Among `ready`, pick the largest
    `targetShare − inFlight` deficit; tie → adaptive score → round-robin.
 
-## 5. op.dispatcher — maximize parallel, never conflict
+## 5. op.dispatcher — parallel ASAP, never conflict
 
-Each tick asks: how many ops can launch right now without touching each other?
+Objective: minimize wall-clock to `done`. Each tick the dispatcher admits the **maximal safe
+set greedily** — every op whose prerequisites are met and conflicts are clear launches
+immediately; nothing waits for a batch or a phase boundary. When structure blocks
+parallelism, the dispatcher creates it: decompose (`implementation.plan` cut) rather than
+serialize.
 
-- Different tasks, non-overlapping **file-level write scopes**, no contested lease, slots free,
-  `fanOut.maxPerGroup` respected → parallel.
-- One task too big → `implementation.plan` cut: the seam op runs alone first (module wiring, DI,
-  shared contracts), then children fan out parallel.
-- `verifyAvoidsImplementRuntime`: a verify op never runs on the runtime that implemented the slice.
+- Different tasks, non-overlapping **file-level write scopes** AND no write↔read crossing
+  (a writer's files vs another op's declared reads), no contested lease, slots free,
+  `fanOut.maxPerGroup` respected → parallel now.
+- One task too big → `implementation.plan` cut: the seam op runs alone first (module
+  wiring, DI, shared contracts), then children fan out parallel.
+- `verifyAvoidsImplementRuntime`: a verify op never runs on the runtime that implemented
+  the slice.
+- **Saturate across providers, not within one.** Maximal width means filling every eligible
+  pool concurrently up to its own cap — e.g. a 20-wide refactor runs `10 devin-agent +
+  5 codex-agent + 4 claude-agent + 1 qwen-agent`, not 20 of one runtime. Owner weights set
+  the split; capacity rebalance shifts share when a pool degrades; the global ceiling is
+  `maxParallelOps` (20) and each pool's own `maxParallel` is its ceiling — hit them.
+- The lane count is an output of independence structure, not a target. Parallel width is
+  bounded by live provider capacity, `maxParallelOps` (20 global), verify bandwidth and
+  merge throughput — never by an arbitrary fixed number, and never past a guard.
+- Every admission/deferral carries a human-readable reason (debug trace §7).
 
 ## 6. Ask — typed record, terminal renderer
 
@@ -179,6 +194,32 @@ existing event stream, unchanged.
 - **Typed I/O, never repo-scan.** The kernel hands an op exactly its declared inputs: record refs
   resolved to concrete file paths + digests, a bound file allowlist, the rendered prompt. Context
   is input, not something the model goes looking for.
+- **Four typed input classes.** Every op declares concrete refs, resolved to paths + digests:
+  - `records` — SRS/SDS/design/brand/Work node refs in scope.
+  - `knowledge` — records under `knowledge/`: `patterns/{fe,be}/*`, `architecture-rules`,
+    `design-patterns`, `code-pattern-enforcement`, `grammars/<name>`, `ui/*`,
+    `application-stacks`, `coding-reference`. Implement ops consume the patterns of their lane;
+    verify ops consume the same records as the standard they check against.
+  - `checks` — executable commands the op must run and record with exit codes:
+    `scripts/check-scoped-lint.mjs`, `checks/code-patterns/*.mjs`, `checks/architecture/*.mjs`,
+    `checks/acceptance.mjs`, `checks/proof.mjs`. `code.refactor` must declare the regression
+    suite + architecture check it runs before and after (invariant evidence).
+  - `stacks` — `.stacks/<env>/infra/compose/*` service defs and `.starciwork` schemas
+    (`goal-plan`, `execution-request`, `execution-receipt`) for `runtime.operate`,
+    `integration.verify`, `work.author`, `workspace.manage`.
+- **`.claude` owns the layout of `.starciwork` and `.stacks`.** The canonical trees are
+  `schemas/work-layout.yaml` (`.starciwork/features/<feature>/{business,architecture,ui,
+  uat,implementation,integration}` + `brand/` + `_local/workflows/<id>/`) and
+  `schemas/source-layout.yaml` (Work root binding). Every YAML carries a `schema:` const
+  and every folder pattern in those files is fixed — ops fill `<id>` segments only, never
+  invent paths. An op that writes at the wrong path/name/schema fails `checks:`
+  immediately — layout is op input. Coverage: every node type in `work-layout.yaml` and
+  every `.starciwork` record class needs a `*.schema.yaml` + runnable validator; every
+  `.stacks` env/service file must conform to the declared topology (`checks/stacks.mjs`).
+- **Pattern coverage parity.** Every record under `knowledge/patterns/{fe,be}/` must have an
+  executable check under `checks/code-patterns/` (or an explicit `check: manual` marker with a
+  reason). Current gap: comment/folder/function/naming/typing/imports/test patterns lack
+  dedicated scripts — the tests workstream closes this matrix.
 - **Per-op allow override.** `allows(op)` defaults to the role set and may only narrow.
 - **Pool = quota window.** Runtime pools model real capacity boundaries; models are pinned and
   attested inside.
