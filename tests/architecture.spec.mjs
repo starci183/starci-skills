@@ -361,7 +361,7 @@ test('frontend accepts redirect-only server routes and intrinsic client visual s
   const root = fixture(t, 'frontend', {
     'src/app/home/page.tsx': 'import { redirect } from "next/navigation"; export default async function Route({params}){const {lang}=await params;redirect(lang === "vi" ? "/next" : `/${lang}/next`)}\n',
     'src/components/pages/HomePage/index.tsx': 'export const HomePage=()=>null\n',
-    'src/app/guarded/page.tsx': 'import { redirect } from "next/navigation"; import { HomePage } from "@/components/pages/HomePage"; export default function Route({session}){if(!session) redirect("/login");return <HomePage/>}\n',
+    'src/app/guarded/page.tsx': 'import { redirect } from "next/navigation"; import { HomePage } from "@/components/pages/HomePage"; export default function Route({session,lang}){if(!session) redirect(lang === "vi" ? "/vi/login" : "/en/login");return <HomePage/>}\n',
     'src/components/leaves/Disclosure/component.tsx': '"use client"; import { useRef,useState,useEffect } from "react"; export const Disclosure=()=>{const r=useRef(null);const [open,setOpen]=useState(false);useEffect(()=>{},[]);return <button ref={r} onClick={()=>setOpen(!open)} /> }\n',
   });
   const result = check(root);

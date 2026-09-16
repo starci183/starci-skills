@@ -149,11 +149,15 @@ function checkRoute(config, context, sourceFile, roots) {
   const navigation = importedNames(ts, sourceFile, 'next/navigation');
   const adapterCalls = [];
   const decisions = [];
-  const visit = node => {
+  const visit = (node, insideNavigationArgument = false) => {
     if (ts.isJsxSelfClosingElement(node) || ts.isJsxElement(node)) jsx.push(node);
-    if (ts.isIfStatement(node) || ts.isSwitchStatement(node) || ts.isConditionalExpression(node)) decisions.push(node);
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && ['redirect', 'notFound'].includes(navigation.get(node.expression.text))) adapterCalls.push(node);
-    ts.forEachChild(node, visit);
+    if (ts.isIfStatement(node) || ts.isSwitchStatement(node) || (ts.isConditionalExpression(node) && !insideNavigationArgument)) decisions.push(node);
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && ['redirect', 'notFound'].includes(navigation.get(node.expression.text))) {
+      adapterCalls.push(node);
+      for (const argument of node.arguments) visit(argument, true);
+      return;
+    }
+    ts.forEachChild(node, child => visit(child, insideNavigationArgument));
   };
   visit(route.fn);
   const pages = routePageRoots(context, sourceFile, roots.components);

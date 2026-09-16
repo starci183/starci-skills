@@ -33,11 +33,12 @@ function validateSchema(value){
   const errors=[],isObject=value=>value!==null&&typeof value==='object'&&!Array.isArray(value),resolve=ref=>ref.slice(2).split('/').reduce((node,key)=>node?.[key],manifestSchema);
   const check=(node,shape,at)=>{
     if(shape?.$ref)return check(node,resolve(shape.$ref),at);
-    const typed=shape?.type==='object'?isObject(node):shape?.type==='array'?Array.isArray(node):shape?.type?typeof node===shape.type:true;
+    const typed=shape?.type==='object'?isObject(node):shape?.type==='array'?Array.isArray(node):shape?.type==='integer'?Number.isInteger(node):shape?.type?typeof node===shape.type:true;
     if(!typed){errors.push({path:at,message:`expected ${shape.type}`});return;}
     if(Object.hasOwn(shape??{},'const')&&node!==shape.const)errors.push({path:at,message:'const mismatch'});
     if(Array.isArray(shape?.enum)&&!shape.enum.includes(node))errors.push({path:at,message:'value outside enum'});
     if(typeof node==='string'){if(shape.minLength&&node.length<shape.minLength)errors.push({path:at,message:'string too short'});if(shape.pattern&&!new RegExp(shape.pattern,'u').test(node))errors.push({path:at,message:'pattern mismatch'});}
+    if(typeof node==='number'){if(shape.minimum!==undefined&&node<shape.minimum)errors.push({path:at,message:'number below minimum'});if(shape.maximum!==undefined&&node>shape.maximum)errors.push({path:at,message:'number above maximum'});}
     if(Array.isArray(node)){if(shape.minItems&&node.length<shape.minItems)errors.push({path:at,message:'array too short'});node.forEach((item,index)=>shape.items&&check(item,shape.items,`${at}/${index}`));return;}
     if(!isObject(node))return;
     if(shape.minProperties&&Object.keys(node).length<shape.minProperties)errors.push({path:at,message:'object has too few properties'});
@@ -98,6 +99,15 @@ function validateEnvironmentPolicies(manifest,add){
         if(binding?.mode==='docker-service'&&!nonempty(binding.service))add('schema-policy-invalid',`${bat}.service`,'docker-service mode requires a service');
         if(binding?.mode==='host-process'&&(!nonempty(binding.source)||!nonempty(binding.sourceRoot)||!nonempty(binding.command)||!nonempty(binding.envFile)||!object(binding.readiness)))add('schema-policy-invalid',bat,'host-process mode requires source, sourceRoot, command, envFile and readiness');
         if(binding?.mode==='external'&&(!nonempty(binding.owner)||!nonempty(binding.failureDomain)||!nonempty(binding.endpointRef)))add('schema-policy-invalid',bat,'external mode requires owner, failureDomain and endpointRef');
+        if(binding?.remoteApi!==undefined){
+          if(binding.mode!=='external'||!['frontend','backend','worker'].includes(catalog.get(id)?.role))add('schema-policy-invalid',`${bat}.remoteApi`,'remoteApi is explicit only for an external application API component');
+          const callers=Array.isArray(binding.remoteApi?.callers)?binding.remoteApi.callers:[],seenCallers=new Set();
+          for(const [index,caller] of callers.entries()){
+            const cat=`${bat}.remoteApi.callers[${index}]`,hasSecret=nonempty(caller?.authRef),hasPublic=nonempty(caller?.publicAuthRationale);
+            if(seenCallers.has(caller?.component))add('schema-policy-invalid',`${cat}.component`,'remote API callers must be unique');else seenCallers.add(caller?.component);
+            if(hasSecret===hasPublic)add('schema-policy-invalid',cat,'remote API caller requires exactly one declared-secret authRef or publicAuthRationale');
+          }
+        }
         if(binding?.mode==='excluded'&&(!nonempty(binding.reason)||catalog.get(id)?.required!==false))add('schema-policy-invalid',bat,'only optional components may be excluded with a reason');
         for(const [index,port] of (Array.isArray(binding?.ports)?binding.ports:[]).entries())if(object(port)){
           if(!validPort(port.host)||(binding?.mode==='docker-service'&&!validPort(port.container))||(binding?.mode==='host-process'&&port.container!==undefined))add('schema-policy-invalid',`${bat}.ports[${index}]`,'ports require host integer 1..65535; docker-service also requires container, while host-process forbids it');
@@ -126,6 +136,15 @@ function resolvedPath(base,relative){
   if(!nonempty(relative)||path.isAbsolute(relative)||String(relative).split(/[\\/]/).includes('..'))return null;
   const target=path.resolve(base,String(relative));return inside(base,target)&&safeAncestors(base,target)?target:null;
 }
+function regularRepoRef(root,value,{stacksOnly=false}={}){
+  const named=slash(value);
+  if(!nonempty(value)||named.includes('#')||named==='.stacks/staging'||named.startsWith('.stacks/staging/'))return false;
+  if(stacksOnly&&!named.startsWith('.stacks/'))return false;
+  const base=stacksOnly?path.join(root,'.stacks'):root;
+  const relative=stacksOnly?String(value).replace(/^\.stacks[\\/]/,''):String(value);
+  const target=resolvedPath(base,relative);
+  try{return Boolean(target&&regular(target,{root:base})&&fs.statSync(target).size<=MAX_INPUT_BYTES);}catch{return false;}
+}
 const loopback=host=>['localhost','127.0.0.1','::1'].includes(String(host??'').toLowerCase());
 const immutableImage=value=>typeof value==='string'&&/@sha256:[a-f0-9]{64}$/i.test(value);
 const validPort=value=>Number.isInteger(value)&&value>=1&&value<=65535;
@@ -138,6 +157,9 @@ function enabledHealthcheck(service){
   const health=service?.healthcheck;if(!object(health)||health.disable===true)return false;
   const test=health.test;if(typeof test==='string')return nonempty(test)&&test.trim().toUpperCase()!=='NONE';
   return Array.isArray(test)&&test.length>0&&String(test[0]).toUpperCase()!=='NONE';
+}
+function serviceHasSecret(service,name){
+  return (Array.isArray(service?.secrets)?service.secrets:[]).some(item=>(typeof item==='string'?item:item?.source)===name);
 }
 
 function validateProfileSources({root,manifest,model,profile,profileName,components,add}){
@@ -200,6 +222,39 @@ function renderedPorts(service){
   }return ports;
 }
 
+function validateRemoteApis({root,spec,model,components,bindings,add}){
+  const secretNames=new Set((Array.isArray(spec.secrets)?spec.secrets:[]).map(item=>item?.name).filter(nonempty));
+  const nativeSecretRefs=new Set();
+  for(const [id,binding] of Object.entries(bindings)){
+    if(!object(binding?.remoteApi))continue;
+    const at=`environments.dev.profiles.${model['x-starci-profile']}.components.${id}`,api=binding.remoteApi;
+    const role=components.find(item=>item?.id===id)?.role;
+    const canonical=spec.components?.[id];
+    if(binding.mode!=='external'||!['frontend','backend','worker'].includes(role))add('remote-api-placement-invalid',`${at}.remoteApi`,'remoteApi is explicit only for an external application API component');
+    if(binding.service!==undefined)add('remote-api-local-service-conflict',`${at}.service`,'a remote application API cannot also name a local Compose service');
+    for(const field of ['owner','failureDomain','endpointRef'])if(!object(canonical)||canonical.ownership!=='external'||binding[field]!==canonical[field])add('remote-api-authority-mismatch',`${at}.${field}`,'selected remote API authority must exactly match the canonical environment component binding');
+    if(!/^[A-Z][A-Z0-9_]*$/.test(String(binding.endpointRef??'')))add('remote-api-endpoint-ref-invalid',`${at}.endpointRef`,'remote API endpointRef must name a caller configuration key');
+    if(!regularRepoRef(root,api.deploymentRef,{stacksOnly:true}))add('remote-api-deployment-ref-unavailable',`${at}.remoteApi.deploymentRef`,'deploymentRef must resolve to a bounded regular non-link file below .stacks');
+    if(!regularRepoRef(root,api.contractRef))add('remote-api-contract-ref-unavailable',`${at}.remoteApi.contractRef`,'contractRef must resolve to a bounded regular non-link repository file');
+    if(!object(api.readiness)||!['http','https'].includes(api.readiness.scheme)||!/^\/(?!\/)[^?#]*$/.test(String(api.readiness.path??'')))add('remote-api-readiness-invalid',`${at}.remoteApi.readiness`,'remote API readiness requires HTTP(S) and one absolute path without authority, query, or fragment');
+    if(!regularRepoRef(root,api.readiness?.verificationRef))add('remote-api-verification-ref-unavailable',`${at}.remoteApi.readiness.verificationRef`,'verificationRef must resolve to a bounded regular non-link repository script, test, or runbook');
+    const callers=Array.isArray(api.callers)?api.callers:[],seen=new Set();
+    for(const [index,caller] of callers.entries()){
+      const cat=`${at}.remoteApi.callers[${index}]`,callerBinding=bindings[caller?.component],callerRole=components.find(item=>item?.id===caller?.component)?.role;
+      if(seen.has(caller?.component))add('remote-api-caller-duplicate',`${cat}.component`,'remote API callers must be unique');else seen.add(caller?.component);
+      if(caller?.component===id||!object(callerBinding)||!['docker-service','host-process'].includes(callerBinding.mode)||!['frontend','backend','worker'].includes(callerRole))add('remote-api-caller-invalid',`${cat}.component`,'remote API caller must resolve to a different selected application process component');
+      if(!Number.isInteger(caller?.timeoutMs)||caller.timeoutMs<1||caller.timeoutMs>300000)add('remote-api-timeout-invalid',`${cat}.timeoutMs`,'remote API timeoutMs must be an integer from 1 through 300000');
+      const hasSecret=nonempty(caller?.authRef),hasPublic=nonempty(caller?.publicAuthRationale);
+      if(hasSecret===hasPublic)add('remote-api-auth-invalid',cat,'remote API caller requires exactly one declared-secret authRef or publicAuthRationale');
+      else if(hasSecret&&!secretNames.has(caller.authRef))add('remote-api-auth-ref-unbound',`${cat}.authRef`,'authRef must resolve to this environment secret custody inventory');
+      else if(hasSecret&&callerBinding?.mode==='docker-service'&&!serviceHasSecret(model.services?.[callerBinding.service],caller.authRef))add('remote-api-auth-not-granted',`${cat}.authRef`,'Docker caller must receive the declared remote API secret grant');
+      else if(hasSecret&&callerBinding?.mode==='host-process')nativeSecretRefs.add(caller.authRef);
+      if(callerBinding?.mode==='docker-service'&&!envEntries(model.services?.[callerBinding.service]?.environment).some(([key])=>key===binding.endpointRef))add('remote-api-endpoint-not-bound',`${cat}.component`,'Docker caller environment must declare the exact remote API endpointRef key; value is not returned');
+    }
+  }
+  return nativeSecretRefs;
+}
+
 function validateDevProfile({root,manifest,model,spec,components,ids,requiredComponents,add}){
   if(!object(spec?.profiles))return null;
   const profileName=model?.['x-starci-profile'];
@@ -236,6 +291,7 @@ function validateDevProfile({root,manifest,model,spec,components,ids,requiredCom
     }
     if(role==='stateful'&&binding.mode==='docker-service'&&(!Array.isArray(binding.storage)||!binding.storage.length))add('stateful-custody-missing',`${at}.storage`,'stateful service needs named storage custody and backup references');
   }
+  const nativeSecretRefs=validateRemoteApis({root,spec,model,components,bindings,add});
   const sources=validateProfileSources({root,manifest,model,profile,profileName,components,add});
   for(const [id,binding] of Object.entries(bindings)){
     if(!object(binding))continue;const at=`environments.dev.profiles.${profileName}.components.${id}`;
@@ -277,7 +333,7 @@ function validateDevProfile({root,manifest,model,spec,components,ids,requiredCom
       if(nonempty(source)&&Object.hasOwn(volumes,source)&&!custodied.has(source))add('stateful-volume-uncustodied',`services.${binding.service}.volumes[${index}]`,'every named stateful volume must have an explicit storage custody and backup declaration');
     }
   }
-  return {name:profileName,profile,components:bindings,managed,sources};
+  return {name:profileName,profile,components:bindings,managed,sources,nativeSecretRefs};
 }
 
 export function checkApplicationStacks({repoRoot,environment,deploymentModelFile}={}){
@@ -403,7 +459,7 @@ export function checkApplicationStacks({repoRoot,environment,deploymentModelFile
       if(!match||!targets.has(match[1]))add('service-secret-file-mismatch',`services.${service}.environment.${key}`,'sensitive file pointer must name /run/secrets/<target> granted to this service; value redacted');
     }
   }
-  for(const name of Object.keys(modelSecrets))if(!grantedSecrets.has(name))add('compose-secret-ungranted',`secrets.${name}`,'rendered Compose secret is not granted to any managed service');
+  for(const name of Object.keys(modelSecrets))if(!grantedSecrets.has(name)&&!activeProfile?.nativeSecretRefs?.has(name))add('compose-secret-ungranted',`secrets.${name}`,'rendered Compose secret is not granted to a container or declared native remote-API caller');
   return {schema:RESULT,ok:errors.length===0,environment,profile:activeProfile?.name??null,manifest:manifestFile,deploymentModel:path.resolve(String(deploymentModelFile??'')),errors,
-    limitations:['static conformance only; Docker was not invoked and host application processes were not started','the deployment model must be rendered by Docker Compose or Docker Stack tooling; provenance is supplied by the caller and is not independently authenticated','legacy manifests without dev profiles are checked against the original single-mode contract and are not claimed dual-mode capable','inventory, source revisions and external ownership declarations are author assertions checked for consistency, not independently discovered Git or provider facts','SOPS envelope recognition is structural, not cryptographic verification or decryption','readiness syntax, health, migration, mutual-exclusion enforcement, backup and restore commands are declared but not executed']};
+    limitations:['static conformance only; Docker was not invoked, host application processes were not started, and remote APIs were not called','the deployment model must be rendered by Docker Compose or Docker Stack tooling; provenance is supplied by the caller and is not independently authenticated','legacy manifests without dev profiles are checked against the original single-mode contract and are not claimed dual-mode capable','inventory, source revisions and external ownership declarations are author assertions checked for consistency, not independently discovered Git or provider facts','remote API contract, deployment, and verification references are bounded opaque file bindings; their coverage, authenticity, rollout, cluster state, and live behavior are not proven','SOPS envelope recognition is structural, not cryptographic verification or decryption','readiness syntax, health, migration, mutual-exclusion enforcement, backup and restore commands are declared but not executed']};
 }

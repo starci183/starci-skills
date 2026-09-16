@@ -61,6 +61,28 @@ function dualProfileFixture(t,selected='docker-apps'){
   return {...f,sourceRoot,revision,dbImage};
 }
 
+function addRemoteApi(f,{publicApi=false}={}){
+  const token='controlplane-api-token',enc='.stacks/dev/controlplane-api-token.enc',plain='.stacks/dev/runtime/controlplane-api-token';
+  fs.mkdirSync(path.join(f.root,'.stacks','deployments'),{recursive:true});fs.mkdirSync(path.join(f.root,'contracts'),{recursive:true});fs.mkdirSync(path.join(f.root,'scripts'),{recursive:true});
+  fs.writeFileSync(path.join(f.root,'.stacks','deployments','controlplane.json'),JSON.stringify({component:'controlplane',placement:'external-application-workload'}));
+  fs.writeFileSync(path.join(f.root,'contracts','controlplane.openapi.yaml'),'openapi: 3.1.0\ninfo: {title: Fixture, version: 1.0.0}\n');
+  fs.writeFileSync(path.join(f.root,'scripts','verify-controlplane.mjs'),'export {}\n');
+  f.manifest.components.push({id:'controlplane',role:'backend',required:true});
+  f.manifest.environments.dev.components.controlplane={ownership:'external',owner:'controlplane-application-owner',failureDomain:'remote-application-deployment',endpointRef:'CONTROLPLANE_API_URL'};
+  f.manifest.environments.vps.components.controlplane={ownership:'external',owner:'controlplane-application-owner',failureDomain:'remote-application-deployment',endpointRef:'CONTROLPLANE_API_URL'};
+  const remoteApi={deploymentRef:'.stacks/deployments/controlplane.json',contractRef:'contracts/controlplane.openapi.yaml',readiness:{scheme:'https',path:'/health/ready',verificationRef:'scripts/verify-controlplane.mjs'},callers:[{component:'api',timeoutMs:15000,...(publicApi?{publicAuthRationale:'published anonymous status API'}:{authRef:token})}]};
+  for(const profile of Object.values(f.manifest.environments.dev.profiles))profile.components.controlplane={mode:'external',owner:'controlplane-application-owner',failureDomain:'remote-application-deployment',endpointRef:'CONTROLPLANE_API_URL',remoteApi:structuredClone(remoteApi)};
+  if(!publicApi){
+    fs.writeFileSync(path.join(f.root,...enc.split('/')),'data: ENC[AES256_GCM,data:cipher,iv:a,tag:b,type:str]\nsops:\n  age: []\n');
+    f.manifest.environments.dev.secrets.push({name:token,source:'provider-issued',sourceOwner:'controlplane-application-owner',encryptedRef:enc,materializedPath:plain,recipientPolicy:'policy:owner-age',keyCustody:'custody:owner-password-manager'});
+    f.model.secrets[token]={file:path.join(f.root,...plain.split('/'))};
+    if(f.model['x-starci-profile']==='docker-apps'){
+      f.model.services.api.secrets.push(token);f.model.services.api.environment.CONTROLPLANE_TOKEN_FILE=`/run/secrets/${token}`;f.model.services.api.environment.CONTROLPLANE_API_URL='https://redacted.invalid';
+    }
+  }
+  f.write();return remoteApi;
+}
+
 test('accepts an exact static dev inventory and states its non-live limits',t=>{
   const f=fixture(t),result=f.check();assert.equal(result.ok,true,result.errors.map(x=>x.code).join(','));assert.match(result.limitations.join(' '),/Docker was not invoked/);
 });
@@ -240,4 +262,27 @@ test('ports and readiness syntax fail closed and Docker applications expose a re
   codes=f.check().errors.map(item=>item.code);assert.ok(codes.includes('docker-readiness-missing'),codes.join(','));
   f.model.services.api.healthcheck={test:['CMD','node','health.js']};f.write();
   assert.equal(f.check().errors.some(item=>item.code==='docker-readiness-missing'),false);
+});
+
+test('explicit remote application API binds caller policy, custody, and opaque repository evidence without a local duplicate',t=>{
+  const f=dualProfileFixture(t,'native-apps');addRemoteApi(f);
+  const result=f.check();assert.equal(result.ok,true,JSON.stringify(result.errors,null,2));
+  assert.match(result.limitations.join(' '),/remote API contract.*opaque/i);
+  assert.equal(JSON.stringify(result).includes('cipher'),false);
+  const publicFixture=dualProfileFixture(t,'native-apps');addRemoteApi(publicFixture,{publicApi:true});
+  assert.equal(publicFixture.check().ok,true,JSON.stringify(publicFixture.check().errors,null,2));
+});
+
+test('remote application API fails unresolved evidence, caller, auth, and local-service conflicts',t=>{
+  const f=dualProfileFixture(t,'docker-apps');addRemoteApi(f);const selected=f.manifest.environments.dev.profiles['docker-apps'].components.controlplane,api=selected.remoteApi;
+  f.model.services.api.secrets=[];delete f.model.services.api.environment.CONTROLPLANE_TOKEN_FILE;f.write();
+  assert.ok(f.check().errors.some(item=>item.code==='remote-api-auth-not-granted'));
+  f.model.services.api.secrets=['controlplane-api-token'];f.model.services.api.environment.CONTROLPLANE_TOKEN_FILE='/run/secrets/controlplane-api-token';
+  delete f.model.services.api.environment.CONTROLPLANE_API_URL;f.write();assert.ok(f.check().errors.some(item=>item.code==='remote-api-endpoint-not-bound'));
+  f.model.services.api.environment.CONTROLPLANE_API_URL='https://redacted.invalid';selected.owner='different-owner';api.readiness.path='//unexpected-host/ready';
+  fs.rmSync(path.join(f.root,'contracts','controlplane.openapi.yaml'));
+  api.callers[0].component='controlplane';api.callers[0].publicAuthRationale='conflicting public mode';selected.service='controlplane';
+  f.model.services.controlplane={image:`example/controlplane@sha256:${'c'.repeat(64)}`};f.write();
+  const codes=new Set(f.check().errors.map(item=>item.code));
+  for(const code of ['remote-api-contract-ref-unavailable','remote-api-caller-invalid','remote-api-auth-invalid','remote-api-local-service-conflict','remote-api-authority-mismatch','remote-api-readiness-invalid'])assert.ok(codes.has(code),`${code}: ${[...codes].join(',')}`);
 });

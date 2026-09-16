@@ -4,7 +4,7 @@ title: Complete application stacks for development and Ubuntu VPS
 purpose: |
   Author a reproducible deployment of the whole selected application, with encrypted
   credentials and verified lifecycle. Accepted architecture decides its components.
-  This knowledge does not authorize app changes or deployment. Kubernetes is deferred.
+  This knowledge does not authorize app changes, remote API calls, workload rollout or cluster administration.
 appliesTo: [backend, frontend, runtime]
 family: cross-cutting
 provenance:
@@ -69,6 +69,32 @@ guidance:
       locally owned secrets with a cryptographic RNG and the consumer's format; separate dev
       from production values and preserve them on retries. File encryption does not rotate
       an already configured database account or restore an old archive without its original key.
+  - id: STACK-REMOTE-API
+    requirement: |
+      Declare a remote application API only where a selected caller actually consumes it; do not
+      infer the boundary from every external component. Keep the target owner, failure domain and
+      endpoint configuration reference separate from each caller's timeout and authentication.
+      Bind the target to its existing owner contract, a separate deployment record and a named
+      readiness verifier through bounded regular repository files. Treat those refs as opaque identity
+      pointers unless an independent checker understands their format. Each caller is a selected host
+      or Docker application process and uses exactly one declared-custody secret or a documented public
+      API rationale. Docker receives the named secret grant; native env binding remains later runtime
+      evidence because static checks do not read private env contents. Never start a local duplicate or
+      infer Kubernetes rollout/cluster authority from caller-side API conformance. See
+      docs/remote-application-api.md.
+  - id: STACK-RUNTIME-CONFIG-HEALTH
+    requirement: |
+      Bind each runnable component's source/package identity to its actual config schema, startup
+      adapter, placement and verification entry points. Validate typed config before listeners,
+      migrations, workers or outbound effects; reject missing, malformed and conflicting critical
+      fields without echoing values. Keep startup, liveness, readiness and functional verification
+      distinct. Readiness follows required dependency and compatibility policy; liveness remains
+      process-local enough to avoid provider-outage restart churn. Classify dependencies as required,
+      degraded or optional by behavior. Host, Docker and remote-API placements change endpoint and
+      custody bindings, not application responsibility. Bind static provenance first, then collect
+      live health, migration, remote-contract and caller-journey evidence separately. Project folder
+      examples guide inquiry and are not a forced universal layout. See
+      docs/application-runtime-config-and-health.md.
   - id: STACK-MATERIALIZE
     requirement: |
       Compose secrets bind-mount runtime files; they are not encrypted storage or protection
