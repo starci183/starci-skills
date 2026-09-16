@@ -6,13 +6,17 @@ import {parseYaml} from '../core/yaml.mjs';
 
 export const configRoot=skillRoot;
 export const NON_OPERATION_ROLES={planner:'plan',kernelManager:'decide',validator:'verify'};
-export const DEFAULT_MODEL_POOLS={'fable-astra':['claude-fable-5.1','gpt-6-astra'],'opus-sol':['claude-opus','gpt-5.6-sol']};
+export const DEFAULT_MODEL_POOLS={'fable-astra':['claude-fable','codex-agent'],'opus-sol':['claude-agent','codex-agent']};
 export const DEFAULT_NON_OPERATION_MODELS={planner:'fable-astra',kernelManager:'opus-sol',validator:'fable-astra'};
 export const ADAPTIVE_ALLOCATION_MODE='adaptive';
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const defaults=()=>({pools:structuredClone(DEFAULT_MODEL_POOLS),nonOperation:{...DEFAULT_NON_OPERATION_MODELS},selection:'quota-aware'});
 function runtimeProfile(){const source=fileURLToPath(new URL('../model/runtimes.yaml',import.meta.url));return fs.existsSync(source)?parseYaml(fs.readFileSync(source,'utf8')):readDistJson('model','runtimes.json');}
-const poolFor=(values,pools)=>Object.entries(pools).find(([,members])=>Array.isArray(values)&&values.length===members.length&&values.every(id=>members.includes(id)))?.[0]??null;
+function targetAliases(){const source=fileURLToPath(new URL('../model/registry.yaml',import.meta.url));try{const registry=fs.existsSync(source)?parseYaml(fs.readFileSync(source,'utf8')):readDistJson('model','registry.json');return registry?.targetAliases??{};}catch{return {};}}
+// A legacy config names the retired per-model pools; each id resolves to the provider-window pool that carries
+// it now, so `critique.runtimes: [claude-opus, gpt-5.6-sol]` still identifies the opus-sol pair.
+const canonical=id=>targetAliases()[id]??id;
+const poolFor=(values,pools)=>Object.entries(pools).find(([,members])=>Array.isArray(values)&&values.length===members.length&&values.every(id=>members.includes(canonical(id))))?.[0]??null;
 function migrateLegacy(config){
   const current=config?.models,keys=plain(current?.nonOperation)?Object.keys(current.nonOperation):[],sixRoles=['goalAssessment','operationPlanner','kernelManager','technicalDecision','goalCritic','validator'];
   if(plain(current?.pools)&&plain(current?.nonOperation)&&keys.every(key=>Object.hasOwn(NON_OPERATION_ROLES,key)))return config;

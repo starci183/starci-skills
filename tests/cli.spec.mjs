@@ -83,18 +83,19 @@ test('agent-route exposes the first ready external worker for Orca without execu
   const selected=run('agent-route','starci','interface.implement','codex,claude,qwen');
   assert.equal(selected.status,0,selected.stderr);
   const result=JSON.parse(selected.stdout);
-  assert.equal(result.selected.target,'qwen3.8-flash');
+  assert.equal(result.selected.target,'qwen-agent');
   assert.equal(result.selected.model,'qwen3.8-flash');
   const fallback=run('agent-route','starci','interface.implement','claude');
   assert.equal(fallback.status,0,fallback.stderr);
   const fallbackResult=JSON.parse(fallback.stdout);
-  assert.equal(fallbackResult.selected.target,'claude-opus');
-  assert.deepEqual(fallbackResult.skipped.map(x=>x.target),['qwen3.8-flash','devin-agent']);
+  assert.equal(fallbackResult.selected.target,'claude-agent');
+  assert.deepEqual(fallbackResult.skipped.map(x=>x.target),['qwen-agent','devin-agent']);
   const exhausted=run('agent-route','starci','business.decide','qwen');
   assert.equal(exhausted.status,0,exhausted.stderr);
   assert.equal(JSON.parse(exhausted.stdout).selected,null);
-  // A decide chain is four links - Fable, Astra and the downgrade under them - and Qwen is in none of them.
-  assert.equal(JSON.parse(exhausted.stdout).skipped.length,4);
+  // A decide chain is three links - Fable, the Codex window's reasoning model and the Claude pool - and Qwen
+  // is in none of them.
+  assert.equal(JSON.parse(exhausted.stdout).skipped.length,3);
 });
 
 test('legacy audit inventories credentials without echoing values and does not execute scripts', t => {

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {canonicalTarget} from './chains.mjs';
 
 /**
  * The shared runtime ledger of one repository: `<workflowsRoot>/runtime-loads.json`. Several workflows run at
@@ -77,7 +78,16 @@ function adopt(raw,{now,own,alive}){
       .map(item=>({workflow:text(item.workflow,120),op:text(item.op,160),at:item.at,durationMs:item.durationMs,
         role:text(item.role,40),difficulty:text(item.difficulty,20)}))
       .sort((a,b)=>a.at-b.at).slice(-MAX_SERVICE_OBSERVATIONS);
-    runtimes[id]={live,history,cooling:cool,usedToday:day===today&&Number.isFinite(entry.usedToday)?Math.max(0,entry.usedToday):0,day:day===today?day:today};
+    // A ledger another kernel wrote may still name a retired model pool; fold it into the provider window it
+    // is an alias of, so the busy/cooling signal lands on the pool the entry really ran on.
+    const canonical=canonicalTarget(id);
+    const next={live,history,cooling:cool,usedToday:day===today&&Number.isFinite(entry.usedToday)?Math.max(0,entry.usedToday):0,day:day===today?day:today};
+    const merged=runtimes[canonical];
+    runtimes[canonical]=merged?{
+      live:[...merged.live,...next.live],
+      history:[...merged.history,...next.history].sort((a,b)=>a.at-b.at).slice(-MAX_SERVICE_OBSERVATIONS),
+      cooling:[merged.cooling,next.cooling].filter(Boolean).sort((a,b)=>b.until-a.until)[0]??null,
+      usedToday:merged.usedToday+next.usedToday,day:next.day}:next;
   }
   return {schema:RUNTIME_LOADS,revision:Number.isInteger(raw?.revision)?raw.revision:0,at,runtimes};
 }

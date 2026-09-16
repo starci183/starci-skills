@@ -7,7 +7,7 @@ test('Luna headless dispatch preserves the explicitly selected registered model'
   const provider=providerFor({agent:'codex',model:'gpt-5.6-luna'});
   assert.equal(provider.id,'gpt-5.6-luna');assert.equal(provider.model,'gpt-5.6-luna');
   assert.deepEqual(provider.command,['codex','exec','--json','--model','gpt-5.6-luna']);
-  assert.equal(HEADLESS_PROVIDERS['claude-opus'].command.at(-1),'claude-opus-5');
+  assert.equal(HEADLESS_PROVIDERS['claude-agent'].command.at(-1),'claude-opus-5');
 });
 
 test('a newly registered model uses its provider adapter without adding a model-specific code branch',()=>{

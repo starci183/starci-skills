@@ -5,12 +5,13 @@ effort: medium
 # provider id such as codex or devin for a bounded owner bias; it is not a fallback chain. Devin also requires
 # an explicit workflow allocation such as `devin-agent=2@implement+verify+write` before it has any capacity.
 allocation: {mode: adaptive, preferredProvider: null}
-# Non-operation models are quota-aware peer pools. Eligibility and qualification still admit every actual call.
+# Non-operation models are quota-aware peer pools over the provider-window runtime pools of
+# model/runtimes.yaml. Eligibility and qualification still admit every actual call.
 models:
   selection: quota-aware
   pools:
-    fable-astra: [claude-fable-5.1, gpt-6-astra]
-    opus-sol: [claude-opus, gpt-5.6-sol]
+    fable-astra: [claude-fable, codex-agent]
+    opus-sol: [claude-agent, codex-agent]
   nonOperation:
     planner: fable-astra
     kernelManager: opus-sol

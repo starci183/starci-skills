@@ -22,7 +22,7 @@ test('the real workflow profile binds adaptive config and treats a legacy provid
   try{
     fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));
     const automatic=workflowRuntimeProfile({host:root});assert.equal(automatic.allocation.policy,ADAPTIVE_CAPACITY);assert.equal(automatic.allocation.ownerPolicy.preferredProvider,null);
-    const base={language:'vi',model:null,effort:'medium',models:{selection:'quota-aware',pools:{'fable-astra':['claude-fable-5.1','gpt-6-astra'],'opus-sol':['claude-opus','gpt-5.6-sol']},nonOperation:{planner:'fable-astra',kernelManager:'opus-sol',validator:'fable-astra'}},providers:['codex','qwen','claude']};
+    const base={language:'vi',model:null,effort:'medium',models:{selection:'quota-aware',pools:{'fable-astra':['claude-fable','codex-agent'],'opus-sol':['claude-agent','codex-agent']},nonOperation:{planner:'fable-astra',kernelManager:'opus-sol',validator:'fable-astra'}},providers:['codex','qwen','claude']};
     fs.writeFileSync(path.join(root,'config.json'),JSON.stringify(base));const legacy=workflowRuntimeProfile({host:root});
     assert.equal(legacy.allocation.policy,ADAPTIVE_CAPACITY);assert.equal(legacy.allocation.ownerPolicy.preferredProvider,'codex');assert.equal(legacy.allocation.providerOrder,undefined);
     fs.writeFileSync(path.join(root,'config.json'),JSON.stringify({...base,allocation:{mode:'adaptive',preferredProvider:null}}));

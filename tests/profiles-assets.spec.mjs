@@ -47,17 +47,17 @@ test('every operator has an ordered external-agent chain and skill-level default
   assert.equal(registry.executionModes.orchestrated.maxConcurrentOperationAgents,3);
   assert.deepEqual(Object.keys(registry.operators).sort(),[...ops].sort());
   // An operator declares every runtime that carries its role, so runtime allocation always resolves a
-  // launch shape: the decide and plan ops carry their whole downgrade - Opus under Fable, Sol under Astra -
-  // and review.verify gained Opus and Astra.
+  // launch shape: the decide and plan ops carry their whole downgrade - the Claude pool under Fable and the
+  // Codex pool's reasoning model - and review.verify spans all five pools.
   // interface.draw invokes built-in ImageGen, so it has one Codex route. The route is not a claim about the hidden tool model.
-  // brand.decide also generates a placeholder mascot, so it runs on the working chain (Codex, then Opus); interface.asset
+  // brand.decide also generates a placeholder mascot, so it runs on the working chain (Codex, then Claude); interface.asset
   // re-renders the artwork the candidates embed, so it needs the same image model and the same one link as interface.draw.
   // grammar.update writes code, stories, tests and a published version, so it drops the image model entirely and
-  // carries the two runtimes that read a whole repository's conventions before changing one.
+  // carries the runtimes that read a whole repository's conventions before changing one.
   // integration.verify runs code against a real provider exactly as e2e.verify runs it against a real stack,
-  // so it carries the same verify-role runtimes, including the final bounded Luna capacity candidate.
-  const expectedCounts={'business.decide':4,'architecture.decide':4,'decision.prepare':4,'provision.ask':4,'brand.decide':2,'review.verify':7,'interface.draw':1,'interface.asset':1,'grammar.update':4,'work.author':4,'integration.verify':5,
-    'backend.implement':5,'content.generate':5,'e2e.verify':5,'interface.implement':5,'knowledge.repair':5,'release.deliver':5,'runtime.operate':5,'scope.retire':5,'task.execute':5,'uat.verify':5,'workspace.manage':4};
+  // so it carries the same verify-role runtimes.
+  const expectedCounts={'business.decide':3,'architecture.decide':3,'decision.prepare':3,'provision.ask':3,'brand.decide':2,'review.verify':5,'interface.draw':1,'interface.asset':1,'grammar.update':3,'work.author':3,'integration.verify':4,
+    'backend.implement':4,'content.generate':4,'e2e.verify':4,'interface.implement':4,'knowledge.repair':4,'release.deliver':4,'runtime.operate':4,'scope.retire':4,'task.execute':4,'uat.verify':4,'workspace.manage':4};
   for(const op of ops){
     const route=resolveExecutionChain({skill:'starci',op});
     const expectedCount=expectedCounts[op]??3;
@@ -65,99 +65,106 @@ test('every operator has an ordered external-agent chain and skill-level default
     assert.equal(new Set(route.candidates.map(x=>x.target)).size,expectedCount);
     assert.ok(route.candidates.every(candidate=>candidate.orcaLaunch.kind==='managed-agent'||(candidate.orcaLaunch.kind==='command-terminal'&&candidate.orcaLaunch.dispatch==='return-preamble-and-send')),op);
   }
-  assert.deepEqual(resolveExecutionChain({op:'interface.draw'}).candidates.map(x=>x.target),['gpt-5.6-sol']);
+  assert.deepEqual(resolveExecutionChain({op:'interface.draw'}).candidates.map(x=>x.target),['codex-agent']);
   assert.equal(resolveExecutionChain({op:'interface.draw'}).candidates[0].model,'gpt-5.6-sol');
   // Generating the declared artwork is the same image-model requirement, so it cannot fall through to a runtime
   // that would defer the slot: a deferred slot is exactly what this operation exists to close.
-  assert.deepEqual(resolveExecutionChain({op:'interface.asset'}).candidates.map(x=>x.target),['gpt-5.6-sol']);
+  assert.deepEqual(resolveExecutionChain({op:'interface.asset'}).candidates.map(x=>x.target),['codex-agent']);
   assert.equal(resolveExecutionChain({op:'interface.asset'}).candidates[0].model,'gpt-5.6-sol');
   assert.equal(resolveExecutionChain({op:'interface.asset'}).role,'working');
-  assert.equal(selectExecutionTarget({op:'interface.asset',inventory:['codex','claude','qwen']}).selected.target,'gpt-5.6-sol');
+  assert.equal(selectExecutionTarget({op:'interface.asset',inventory:['codex','claude','qwen']}).selected.target,'codex-agent');
   // Growing the grammar is a code-and-publish job: the strongest coding runtimes, and never the image model.
-  assert.deepEqual(resolveExecutionChain({op:'grammar.update'}).candidates.map(x=>x.target),['claude-opus','gpt-5.6-sol','devin-agent','gpt-5.6-luna']);
+  assert.deepEqual(resolveExecutionChain({op:'grammar.update'}).candidates.map(x=>x.target),['claude-agent','codex-agent','devin-agent']);
   assert.equal(resolveExecutionChain({op:'grammar.update'}).role,'working');
-  assert.deepEqual(resolveExecutionChain({op:'grammar.update'}).candidates.map(x=>x.profile),['opus','gpt-5.6-sol','devin-worker','gpt-5.6-luna']);
-  assert.deepEqual(resolveExecutionChain({op:'interface.implement'}).candidates.map(x=>x.target),['qwen3.8-flash','devin-agent','claude-opus','gpt-5.6-sol','gpt-5.6-luna']);
+  assert.deepEqual(resolveExecutionChain({op:'grammar.update'}).candidates.map(x=>x.profile),['opus','gpt-5.6-sol','devin-worker']);
+  assert.deepEqual(resolveExecutionChain({op:'interface.implement'}).candidates.map(x=>x.target),['qwen-agent','devin-agent','claude-agent','codex-agent']);
   assert.deepEqual(resolveExecutionChain({op:'interface.implement'}).candidates[0].orcaLaunch,qwenLaunch);
-  assert.equal(registry.orchestration.defaultOperationTarget,'qwen3.8-flash');
-  assert.deepEqual(resolveExecutionChain({op:'backend.implement'}).candidates.map(x=>x.target),['qwen3.8-flash','devin-agent','claude-opus','gpt-5.6-sol','gpt-5.6-luna']);
+  assert.equal(registry.orchestration.defaultOperationTarget,'qwen-agent');
+  assert.deepEqual(resolveExecutionChain({op:'backend.implement'}).candidates.map(x=>x.target),['qwen-agent','devin-agent','claude-agent','codex-agent']);
   assert.deepEqual(resolveExecutionChain({op:'backend.implement'}).candidates[0].orcaLaunch,qwenLaunch);
   assert.deepEqual(resolveExecutionChain({op:'review.verify'}).candidates[0].orcaLaunch,{...qwenLaunch,command:qwenLaunch.command.replace('--approval-mode yolo','--approval-mode yolo')});
   assert.equal(resolveExecutionChain({op:'review.verify'}).candidates[0].profile,'qwen3.8-flash-reviewer');
   assert.equal(resolveExecutionChain({op:'backend.implement'}).candidates[0].profile,'qwen3.8-flash-worker');
   assert.equal(resolveExecutionChain({op:'review.verify'}).candidates[2].profile,'fable-5.1');
-  assert.equal(registry.targetAliases['qwen-qwen3.8-flash-worker'],'qwen3.8-flash');
-  assert.equal(registry.targetAliases['codex-gpt-5.6-luna-reviewer'],'gpt-5.6-luna');
-  assert.deepEqual(resolveExecutionChain({op:'review.verify'}).candidates.map(x=>x.target),['qwen3.8-flash','devin-agent','claude-fable-5.1','gpt-5.6-sol','claude-opus','gpt-6-astra','gpt-5.6-luna']);
+  assert.equal(registry.targetAliases['qwen-qwen3.8-flash-worker'],'qwen-agent');
+  assert.equal(registry.targetAliases['codex-gpt-5.6-luna-reviewer'],'codex-agent');
+  // Retired per-model pool ids resolve to the provider-window pool that carries them now.
+  assert.equal(registry.targetAliases['gpt-5.6-luna'],'codex-agent');
+  assert.equal(registry.targetAliases['gpt-5.6-sol'],'codex-agent');
+  assert.equal(registry.targetAliases['gpt-6-astra'],'codex-agent');
+  assert.equal(registry.targetAliases['claude-opus'],'claude-agent');
+  assert.equal(registry.targetAliases['claude-fable-5.1'],'claude-fable');
+  assert.equal(registry.targetAliases['qwen3.8-flash'],'qwen-agent');
+  assert.deepEqual(resolveExecutionChain({op:'review.verify'}).candidates.map(x=>x.target),['qwen-agent','devin-agent','claude-fable','codex-agent','claude-agent']);
+  assert.equal(resolveExecutionChain({op:'review.verify'}).candidates[3].profile,'gpt-6-astra');
   assert.equal(resolveExecutionChain({op:'review.verify'}).candidates[4].profile,'opus-reviewer');
-  assert.equal(resolveExecutionChain({op:'review.verify'}).candidates[6].profile,'gpt-5.6-luna-reviewer');
-  assert.deepEqual(resolveExecutionChain({op:'knowledge.repair'}).candidates.map(x=>x.target),['claude-opus','gpt-5.6-sol','qwen3.8-flash','devin-agent','gpt-5.6-luna']);
-  // API end-to-end proof runs code, so its chain is the verify-role runtimes that can: Sol first, then Opus, Flash and Luna.
-  assert.deepEqual(resolveExecutionChain({op:'e2e.verify'}).candidates.map(x=>x.target),['gpt-5.6-sol','claude-opus','qwen3.8-flash','devin-agent','gpt-5.6-luna']);
+  assert.deepEqual(resolveExecutionChain({op:'knowledge.repair'}).candidates.map(x=>x.target),['claude-agent','codex-agent','qwen-agent','devin-agent']);
+  // API end-to-end proof runs code, so its chain is the verify-role runtimes that can: the Codex pool first, then Claude, Qwen and Devin.
+  assert.deepEqual(resolveExecutionChain({op:'e2e.verify'}).candidates.map(x=>x.target),['codex-agent','claude-agent','qwen-agent','devin-agent']);
   // It runs code rather than reasoning about it, so the working profile applies, not the reviewer one.
   assert.equal(resolveExecutionChain({op:'e2e.verify'}).candidates[0].profile,'gpt-5.6-sol');
   // A live call to a declared provider is the same work against a different surface, so it is the same chain.
-  assert.deepEqual(resolveExecutionChain({op:'integration.verify'}).candidates.map(x=>x.target),['gpt-5.6-sol','claude-opus','qwen3.8-flash','devin-agent','gpt-5.6-luna']);
+  assert.deepEqual(resolveExecutionChain({op:'integration.verify'}).candidates.map(x=>x.target),['codex-agent','claude-agent','qwen-agent','devin-agent']);
   assert.equal(resolveExecutionChain({op:'integration.verify'}).candidates[0].profile,'gpt-5.6-sol');
   // Completing a Work record is reading work, so it runs on the plan-role runtimes with the reasoning profiles.
   // Authoring records leads with the strongest reasoning runtimes and never the cheap pool, and carries the
   // downgrade under them so a spent week hands the authoring on instead of holding it.
-  assert.deepEqual(resolveExecutionChain({op:'work.author'}).candidates.map(x=>x.target),['claude-fable-5.1','gpt-6-astra','claude-opus','gpt-5.6-sol']);
+  assert.deepEqual(resolveExecutionChain({op:'work.author'}).candidates.map(x=>x.target),['claude-fable','codex-agent','claude-agent']);
   assert.match(resolveExecutionChain({op:'work.author'}).candidates[1].profile,/astra/);
   assert.equal(resolveExecutionChain({op:'work.author'}).role,'reasoning');
   // Settling an identity is reasoning, so the chain carries the reasoning profiles; the Codex target leads it
   // because only that runtime carries an image generator for the placeholder mascot, and the decide-role
   // runtimes follow as the candidates the allocator actually prefers.
-  assert.deepEqual(resolveExecutionChain({op:'brand.decide'}).candidates.map(x=>x.target),['gpt-5.6-sol','claude-opus']);
+  assert.deepEqual(resolveExecutionChain({op:'brand.decide'}).candidates.map(x=>x.target),['codex-agent','claude-agent']);
   assert.equal(resolveExecutionChain({op:'brand.decide'}).role,'working','it generates the placeholder mascot, so it runs on the working profiles where image generation is');
   assert.deepEqual(resolveExecutionChain({op:'brand.decide'}).candidates.map(x=>x.profile),['gpt-5.6-sol','opus']);
-  assert.deepEqual(registry.skills.starci.chains.working,['qwen3.8-flash','devin-agent','claude-opus','gpt-5.6-sol']);
-  assert.deepEqual(registry.skills.starci.chains.reasoning,['claude-fable-5.1','gpt-6-astra']);
+  assert.deepEqual(registry.skills.starci.chains.working,['qwen-agent','devin-agent','claude-agent','codex-agent']);
+  assert.deepEqual(registry.skills.starci.chains.reasoning,['claude-fable','codex-agent']);
   assert.equal(registry.supervisors.schema,'starci/supervisor-chains@1');
   for(const role of ['planCoordinator','workflowMonitor']){
-    assert.deepEqual(registry.supervisors[role].chain,['claude-opus','gpt-5.6-sol']);
+    assert.deepEqual(registry.supervisors[role].chain,['claude-agent','codex-agent']);
     for(const target of registry.supervisors[role].chain)assert.equal(registry.targets[target].orcaLaunch.kind,'managed-agent');
   }
 });
 test('Orca selects the first ready candidate and only falls through after verified no-effect failures',()=>{
   const backend=selectExecutionTarget({op:'backend.implement',inventory:['codex','claude','qwen']});
-  assert.equal(backend.selected.target,'qwen3.8-flash');
+  assert.equal(backend.selected.target,'qwen-agent');
   assert.deepEqual(backend.selected.orcaLaunch,qwenLaunch);
   let selected=selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen']});
-  assert.equal(selected.selected.target,'qwen3.8-flash');
+  assert.equal(selected.selected.target,'qwen-agent');
   assert.deepEqual(selected.selected.orcaLaunch,qwenLaunch);
   selected=selectExecutionTarget({op:'interface.implement',inventory:['codex','claude']});
-  assert.equal(selected.selected.target,'claude-opus');
+  assert.equal(selected.selected.target,'claude-agent');
   selected=selectExecutionTarget({op:'interface.implement',inventory:['devin','claude']});
-  assert.equal(selected.selected.target,'claude-opus','direct chain selection cannot bypass Devin workflow capacity');
+  assert.equal(selected.selected.target,'claude-agent','direct chain selection cannot bypass Devin workflow capacity');
   assert.ok(selected.skipped.some(item=>item.target==='devin-agent'&&item.reason==='unavailable'));
   selected=selectExecutionTarget({op:'interface.implement',inventory:['codex']});
-  assert.equal(selected.selected.target,'gpt-5.6-sol');
-  assert.deepEqual(selected.skipped.map(x=>x.target),['qwen3.8-flash','devin-agent','claude-opus']);
+  assert.equal(selected.selected.target,'codex-agent');
+  assert.deepEqual(selected.skipped.map(x=>x.target),['qwen-agent','devin-agent','claude-agent']);
   selected=selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen3.8-flash',reason:'rate-limited',effectState:'none'}]});
-  assert.equal(selected.selected.target,'claude-opus');
-  assert.equal(selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen-qwen3.8-flash-worker',reason:'rate-limited',effectState:'none'}]}).selected.target,'claude-opus');
+  assert.equal(selected.selected.target,'claude-agent');
+  assert.equal(selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen-qwen3.8-flash-worker',reason:'rate-limited',effectState:'none'}]}).selected.target,'claude-agent');
   selected=selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[
     {target:'qwen3.8-flash',reason:'rate-limited',effectState:'none'},
     {target:'claude-opus',reason:'startup-failure',effectState:'none'}
   ]});
-  assert.equal(selected.selected.target,'gpt-5.6-sol');
+  assert.equal(selected.selected.target,'codex-agent');
   assert.throws(()=>selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen3.8-flash',reason:'rate-limited',effectState:'unknown'}]}),/Unsafe fallback/);
   assert.throws(()=>selectExecutionTarget({op:'interface.implement',inventory:['codex','claude','qwen'],attempts:[{target:'qwen3.8-flash',reason:'permission-denied',effectState:'none'}]}),/reconciliation/);
 });
-test('general execution adds Luna after the established chain; Sol draws, Fable and Astra reason, Max and DeepSeek stay out',()=>{
+test('general execution runs the Qwen/Devin/Claude/Codex pool order; the Codex pool draws, Fable and the Codex reasoning model decide, Max and DeepSeek stay out',()=>{
   const backend=resolveExecutionChain({op:'backend.implement'}).candidates;
   const frontend=resolveExecutionChain({op:'interface.implement'}).candidates;
   const uat=resolveExecutionChain({op:'uat.verify'}).candidates;
   const review=resolveExecutionChain({op:'review.verify'}).candidates;
   for(const chain of [backend,frontend,uat]){
-    assert.deepEqual(chain.map(candidate=>candidate.target),['qwen3.8-flash','devin-agent','claude-opus','gpt-5.6-sol','gpt-5.6-luna']);
+    assert.deepEqual(chain.map(candidate=>candidate.target),['qwen-agent','devin-agent','claude-agent','codex-agent']);
     assert.deepEqual(chain[0].orcaLaunch,qwenLaunch);
   }
-  assert.equal(review[0].target,'qwen3.8-flash');
-  // Fable, then Astra, then the downgrade each of them has: Opus and, last of all, Sol.
-  assert.deepEqual(resolveExecutionChain({op:'business.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra','claude-opus','gpt-5.6-sol']);
-  assert.deepEqual(resolveExecutionChain({op:'architecture.decide'}).candidates.map(candidate=>candidate.target),['claude-fable-5.1','gpt-6-astra','claude-opus','gpt-5.6-sol']);
+  assert.equal(review[0].target,'qwen-agent');
+  // Fable first, then the Codex pool's reasoning model, then the downgrade each of them has: the Claude pool.
+  assert.deepEqual(resolveExecutionChain({op:'business.decide'}).candidates.map(candidate=>candidate.target),['claude-fable','codex-agent','claude-agent']);
+  assert.deepEqual(resolveExecutionChain({op:'architecture.decide'}).candidates.map(candidate=>candidate.target),['claude-fable','codex-agent','claude-agent']);
   const ops=Object.keys(readPublicJson('model/registry.json').operators);
   for(const op of ops){
     const chain=resolveExecutionChain({op}).candidates;

@@ -14,7 +14,7 @@ import {reserveStartup} from '../kernel/startup-lock.mjs';
 import {reconcileWorkflowInputs} from '../kernel/inputs.mjs';
 import {credentialFields} from '../kernel/inputs-model.mjs';
 import {inputFiles,privateJson} from '../kernel/inputs-server.mjs';
-import {resolveExecutionChain} from '../kernel/chains.mjs';
+import {canonicalTarget,resolveExecutionChain} from '../kernel/chains.mjs';
 import {ORCA_HOST,createOrcaCalls} from '../hosts/orca/calls.mjs';
 import {HEADLESS_HOST,createHeadlessHost} from '../hosts/headless/host.mjs';
 import {reportOutcome} from '../hosts/orca/protocol.mjs';
@@ -190,7 +190,7 @@ function scriptedOrca({reportsDir,scripts,run='run_wf'}){
 }
 
 /** Pools instead of a chain: least-index-free runtime per role, honouring `avoid`. */
-function fakeAllocator({maxParallelOps=3,pools={implement:['qwen3.8-flash','claude-opus','gpt-5.6-sol'],verify:['qwen3.8-flash','claude-fable-5.1','gpt-5.6-sol'],decide:['claude-fable-5.1','gpt-6-astra'],write:['gpt-5.6-sol','claude-opus','qwen3.8-flash'],plan:['claude-fable-5.1','gpt-6-astra']}}={}){
+function fakeAllocator({maxParallelOps=3,pools={implement:['qwen-agent','claude-agent','codex-agent'],verify:['qwen-agent','claude-fable','codex-agent'],decide:['claude-fable','codex-agent'],write:['codex-agent','claude-agent','qwen-agent'],plan:['claude-fable','codex-agent']}}={}){
   const busy=new Set(),requests=[];
   // The kind graph is the role authority, exactly as the real allocator reads it; the rest is the 4.x guess.
   // A kind the graph does not carry yet is not fatal for the allocator, exactly as in the real one: the role is
@@ -220,7 +220,7 @@ function fakeAllocator({maxParallelOps=3,pools={implement:['qwen3.8-flash','clau
     snapshot(){return {busy:[...busy]};},
     serialize(){return {busy:[...busy]};},
     candidateFor(kind,target){
-      const found=resolveExecutionChain({skill:'starci',op:kind}).candidates.find(candidate=>candidate.target===target);
+      const found=resolveExecutionChain({skill:'starci',op:kind}).candidates.find(candidate=>candidate.target===canonicalTarget(target));
       if(!found)throw Error(`Runtime target ${target} is not launchable for ${kind}`);
       return found;
     }
@@ -260,7 +260,7 @@ function stubGuards(overrides={}){
     parseSharedChangePaths:detail=>[...new Set(String(detail??'').match(/[A-Za-z0-9_@.][A-Za-z0-9_@.*/-]*\/[A-Za-z0-9_@.*/-]+/g)??[])],
     ...overrides};
 }
-const running=(state,id,dispatch,runtime='qwen3.8-flash')=>{
+const running=(state,id,dispatch,runtime='qwen-agent')=>{
   const op=state.ops.find(item=>item.id===id);
   Object.assign(op,{status:'running',dispatch,runtime,terminal:`term_${dispatch}`});
   return op;
@@ -586,7 +586,7 @@ test('after the approval three independent operations launch in one iteration on
     const firstRound=launches.filter((event,index)=>log.indexOf(event)<firstWait);
     assert.deepEqual(log.slice(0,firstWait).filter(e=>e.event==='launched').map(e=>e.op).sort(),['op-catalog','op-intake','op-pricing']);
     assert.equal(new Set(firstRound.map(event=>event.runtime)).size,3);
-    assert.deepEqual(firstRound.map(event=>event.runtime).sort(),['claude-opus','gpt-5.6-sol','qwen3.8-flash']);
+    assert.deepEqual(firstRound.map(event=>event.runtime).sort(),['claude-agent','codex-agent','qwen-agent']);
     // Every launch names the one candidate the allocator decided, with no faked skip attempts.
     for(const event of firstRound){
       assert.equal(event.allocation.override,undefined);
@@ -1888,12 +1888,13 @@ test('approving a workflow that finished blocked resumes it, and questions whose
 test('the quota proposal gives every role the plan needs a runtime with a slot',()=>{
   const harness=setupWork({scope:['collab']});
   try{
-    // The one op is a work.author (plan role). Sol carries plan now - it is the last tier of the downgrade - so the
-    // strongest runtime covers the role; the head of the chain, Fable, is what no implement order ever names.
+    // The one op is a work.author (plan role). The Codex window carries plan - it is the middle tier of the
+    // downgrade - so the strongest runtime covers the role; the head of the chain, Fable, is what no implement
+    // order ever names.
     const proposal=harness.state.quotaProposal;
-    const sol=proposal.rows.find(row=>row.runtime==='gpt-5.6-sol');
+    const sol=proposal.rows.find(row=>row.runtime==='codex-agent');
     assert.ok(sol&&sol.slots>=1,`a runtime with the plan role has a slot: ${proposal.text}`);
-    const fable=proposal.rows.find(row=>row.runtime==='claude-fable-5.1');
+    const fable=proposal.rows.find(row=>row.runtime==='claude-fable');
     assert.ok(fable&&fable.slots>=1,`the preferred plan runtime has a slot: ${proposal.text}`);
     assert.match(fable.why,/launch chain of work\.author/);
   }finally{harness.cleanup();}
@@ -1930,10 +1931,12 @@ test('a command for a running kernel is an inbox file the loop applies at its ne
     assert.deepEqual(applied.map(event=>[event.kind,event.budget.to,event.quotaChanged]),[['approve',64,false]]);
     assert.equal(fs.readdirSync(store.paths.inbox).length,0,'the command was consumed');
     // A new allocation cannot take effect in the running allocator: the loop ends and says why.
+    // Retired pool ids in an owner allocation still resolve to their provider windows.
     queueInbox(store,{kind:'approve',allocation:'claude-opus=2:hard+medium,gpt-5.6-sol=1:hard+medium'});
     const restarted=harness.run({maxIterations:3});
     assert.deepEqual(events(store).filter(event=>event.event==='stopped').map(event=>event.reason).slice(-1),['restart: allocation changed']);
-    assert.equal(restarted.quota.slots['claude-opus'],2);
+    assert.equal(restarted.quota.slots['claude-agent'],2);
+    assert.equal(restarted.quota.slots['codex-agent'],1);
   }finally{harness.cleanup();}
 });
 
@@ -2443,7 +2446,7 @@ test('the decision folder of an owner question comes from the feature folder in 
 
 test('the kernel operation deadline reaches the host through the allocated launcher',()=>{
   const plan=structuredClone(salesPlan);plan.ops[0].timeoutMs=47*60*1000;
-  const harness=setup({plan,scripts:{},allocator:fakeAllocator({pools:{implement:['claude-opus']}})});
+  const harness=setup({plan,scripts:{},allocator:fakeAllocator({pools:{implement:['claude-agent']}})});
   try{
     approve(harness.store,harness.state);harness.state.run='run_wf';harness.state.from='term_kernel';
     const received=[];
@@ -3246,9 +3249,9 @@ const GRAMMAR_ROOT=path.resolve(os.tmpdir(),'starci-grammar-spec','starci-gramma
 const grammarBinding={grammar:{role:'grammar',directory:GRAMMAR_ROOT,origin:'https://github.com/demo/starci-grammar.git',
   declared:'https://github.com/demo/starci-grammar.git',package:'@starci/grammar'}};
 /** The grammar op's chain is Opus then Sol, so the implement pool must lead with a runtime that can launch it. */
-const grammarAllocator=()=>fakeAllocator({pools:{implement:['claude-opus','gpt-5.6-sol','qwen3.8-flash'],
-  verify:['qwen3.8-flash','claude-fable-5.1','gpt-5.6-sol'],decide:['claude-fable-5.1','gpt-6-astra'],
-  write:['gpt-5.6-sol','claude-opus','qwen3.8-flash'],plan:['claude-opus','claude-fable-5.1']}});
+const grammarAllocator=()=>fakeAllocator({pools:{implement:['claude-agent','codex-agent','qwen-agent'],
+  verify:['qwen-agent','claude-fable','codex-agent'],decide:['claude-fable','codex-agent'],
+  write:['codex-agent','claude-agent','qwen-agent'],plan:['claude-agent','claude-fable']}});
 const grammarGap={outcome:'blocked',summary:'The accepted design needs a stepped progress rail the grammar has no contract for.',
   files:[],checks:[],blocker:{kind:'grammar-gap',detail:'no contract renders a stepped progress rail for the cart checkout'}};
 
@@ -4292,12 +4295,12 @@ test('two silent stalls of one runtime inside half an hour are inferred as a rat
     assert.deepEqual(failed,[],'one silence is a stall, not a rate limit');
     clock=10*60*1000;
     silence('ctx_s2');
-    assert.deepEqual(failed,[['qwen3.8-flash','rate-limited (inferred from repeated silence)']]);
+    assert.deepEqual(failed,[['qwen-agent','rate-limited (inferred from repeated silence)']]);
     const inferred=events(harness.store).find(event=>event.event==='rate-limit-inferred');
-    assert.equal(inferred.runtime,'qwen3.8-flash');
+    assert.equal(inferred.runtime,'qwen-agent');
     assert.equal(inferred.windowMs,30*60*1000);
-    assert.deepEqual(harness.state.silences['qwen3.8-flash'],[],'the window is cleared, so the inference needs two fresh silences');
-    assert.ok(harness.state.ops[0].avoidRuntimes.includes('qwen3.8-flash'));
+    assert.deepEqual(harness.state.silences['qwen-agent'],[],'the window is cleared, so the inference needs two fresh silences');
+    assert.ok(harness.state.ops[0].avoidRuntimes.includes('qwen-agent'));
     clock=60*60*1000;
     silence('ctx_s3');
     assert.equal(failed.length,1,'a silence outside the window does not infer a second rate limit');
@@ -4334,7 +4337,7 @@ test('reconcile settles a live dispatch no operation names, and a repeated anoma
     const released=[];
     const dead=reconcileWithOrca(harness.fake.orca,harness.store,harness.state,{cwd,wait:noWait,allocator:{release:runtime=>released.push(runtime)}});
     assert.deepEqual(dead.dead.map(item=>[item.op,item.restarts]),[['op-ship',1]]);
-    assert.deepEqual(released,['qwen3.8-flash']);
+    assert.deepEqual(released,['qwen-agent']);
     const ship=harness.state.ops.find(op=>op.id==='op-ship');
     assert.equal(ship.status,'ready');assert.equal(ship.dispatch,null);
     assert.equal(harness.state.ops.find(op=>op.id==='op-intake').status,'running','a dispatch Orca still lists is alive');
@@ -4345,12 +4348,12 @@ test('reconcile settles a live dispatch no operation names, and a repeated anoma
     const parked=[];
     const ctx={cwd,allocator:{...harness.allocator,failed:(runtime,info)=>parked.push([runtime,info.reason])},guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>0,work:null,decide,orca:harness.fake.orca};
     for(let count=1;count<=TRIAGE_AFTER;count+=1){
-      noteAnomaly(harness.store,harness.state,'settled:op-intake:dead',{op:'op-intake',runtime:'qwen3.8-flash',liveness:'dead'});
+      noteAnomaly(harness.store,harness.state,'settled:op-intake:dead',{op:'op-intake',runtime:'qwen-agent',liveness:'dead'});
       assert.equal(triageAnomaly(harness.store,harness.state,'settled:op-intake:dead',ctx),count<TRIAGE_AFTER?null:'park-runtime');
     }
     assert.equal(asked.length,1,'the model is asked exactly once per signature');
     assert.deepEqual(asked[0].options,TRIAGE_OPTIONS);
-    assert.deepEqual(parked,[['qwen3.8-flash','triage: settled:op-intake:dead']]);
+    assert.deepEqual(parked,[['qwen-agent','triage: settled:op-intake:dead']]);
     noteAnomaly(harness.store,harness.state,'settled:op-intake:dead',{});
     assert.equal(triageAnomaly(harness.store,harness.state,'settled:op-intake:dead',ctx),null,'a triaged signature is a rule now, not another call');
     const triaged=events(harness.store).find(event=>event.event==='triage');
@@ -4597,7 +4600,7 @@ test('an unavailable validator never blocks a commit, is counted, and three in a
     assert.equal(state.validatorUnavailable,VALIDATOR_UNAVAILABLE_LIMIT);
     const asked=state.needUser.filter(item=>item.kind==='validator');
     assert.equal(asked.length,1,'the outage is one item, not one per op');
-    assert.match(asked[0].detail,/the validator answered nothing usable for 3 op results in a row \(claude-fable-5.1, gpt-6-astra\)/);
+    assert.match(asked[0].detail,/the validator answered nothing usable for 3 op results in a row \(claude-fable, codex-agent\)/);
     assert.equal(state.finished.outcome,'blocked');
     const verdicts=fs.readFileSync(path.join(harness.store.dir,'validator','verdicts.jsonl'),'utf8').trim().split('\n').map(line=>JSON.parse(line));
     assert.deepEqual(verdicts.map(item=>item.verdict),['unavailable','unavailable','unavailable']);
@@ -4657,19 +4660,22 @@ test('the quota proposal opens the next chain runtime when the first one is busy
   fs.writeFileSync(path.join(root,other,'kernel.lock'),JSON.stringify({pid:process.pid,startedAt:1}));
   const state={id:'20260912-104251-mine',dir:path.join(root,'20260912-104251-mine'),
     ops:[{id:'op-decide',kind:'architecture.decide',status:'pending',difficulty:'hard'}]};
-  // Alone in the repository the proposal names Fable, the first runtime of the decide chain, and nothing else.
+  // Alone in the repository the proposal names the Fable window, the first runtime of the decide chain, and
+  // marks nothing busy.
   const alone=proposeQuota(state);
-  assert.equal(alone.rows.some(row=>row.runtime==='gpt-6-astra'),false);
-  assert.equal(alone.rows.find(row=>row.runtime==='claude-fable-5.1').slots,1);
+  assert.equal(alone.rows.some(row=>row.runtime==='claude-fable-5.1'),false,'a retired pool id never names a row');
+  assert.equal(alone.rows.find(row=>row.runtime==='claude-fable').slots,1);
+  assert.doesNotMatch(alone.text,/busy with/);
+  // A ledger another kernel wrote still names the retired pool id; it folds into the claude-fable window.
   fs.writeFileSync(loadsFileFor(state.dir),JSON.stringify({schema:'starci/runtime-loads@1',
     runtimes:{'claude-fable-5.1':{live:[{workflow:other,op:'op-other',since:1}],cooling:null,usedToday:1,day:new Date().toISOString().slice(0,10)}}}));
   const shared=proposeQuota(state);
-  const astra=shared.rows.find(row=>row.runtime==='gpt-6-astra');
+  const astra=shared.rows.find(row=>row.runtime==='codex-agent');
   assert.equal(astra.slots,1);
-  assert.match(astra.why,/claude-fable-5\.1 is busy with 20260912-100000-other/);
-  assert.match(shared.text,/gpt-6-astra=1/);
+  assert.match(astra.why,/claude-fable is busy with 20260912-100000-other/);
+  assert.match(shared.text,/codex-agent=1/);
   // A lane is added, never taken away: the busy runtime keeps the slot this workflow's own quota gives it.
-  assert.equal(shared.rows.find(row=>row.runtime==='claude-fable-5.1').slots,1);
+  assert.equal(shared.rows.find(row=>row.runtime==='claude-fable').slots,1);
 });
 
 /* ------------------------------------------------------------------ the critique of the goal */
@@ -4696,7 +4702,7 @@ test('the goal is critiqued before the approval: a sound verdict stands above th
     assert.deepEqual(asked[0].decisions.map(item=>item.id),['demo.payments.business.overview']);
     assert.deepEqual(asked[0].records,[{id:'demo.sales.architecture.sds.intake',kind:'architecture',
       title:'The accepted intake design.',statements:[]}]);
-    assert.deepEqual(new Set(asked[0].providers),new Set(['gpt-6-astra','claude-fable-5.1']),'the injected critic sees both configured validator peers without a fallback-order promise');
+    assert.deepEqual(new Set(asked[0].providers),new Set(['claude-fable','codex-agent']),'the injected critic sees both configured validator peers without a fallback-order promise');
     assert.ok(asked[0].constraints.some(item=>/may not add, drop or rewrite a node/.test(item)));
     assert.deepEqual(harness.goal.critique,{verdict:'sound',objections:0,required:0,provider:'stub-critic'});
     assert.equal(harness.state.critique.verdict,'sound');
@@ -4753,9 +4759,11 @@ test('the critics use the canonical validator pool and invalid configuration fai
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-critics-'));
   try{
     fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));
-    assert.deepEqual(new Set(critiqueRuntimes(root)),new Set(['gpt-6-astra','claude-fable-5.1']));
+    assert.deepEqual(new Set(critiqueRuntimes(root)),new Set(['claude-fable','codex-agent']));
+    // A legacy critique.runtimes list still names the retired model pools; each resolves to its window, so the
+    // pair identifies the opus-sol pool.
     fs.writeFileSync(path.join(root,'config.json'),JSON.stringify({language:'vi',model:null,effort:'medium',critique:{runtimes:['claude-opus','gpt-5.6-sol']}}));
-    assert.deepEqual(new Set(critiqueRuntimes(root)),new Set(['claude-opus','gpt-5.6-sol']));
+    assert.deepEqual(new Set(critiqueRuntimes(root)),new Set(['claude-agent','codex-agent']));
     fs.writeFileSync(path.join(root,'config.json'),'{not json');
     assert.throws(()=>critiqueRuntimes(root));
   }finally{fs.rmSync(root,{recursive:true,force:true});}

@@ -89,21 +89,21 @@ test('operation request carries the whole chain with its launch kinds and owns t
   const planned=buildOperationLaunch(input);
   assert.equal(planned.schema,'starci/orca-supervised-op-request@2');
   assert.equal(planned.displayName,opName);
-  assert.deepEqual(planned.candidates.map(candidate=>[candidate.selection.target,candidate.launch]),[['qwen3.8-flash','command-terminal'],['claude-opus','managed-agent'],['gpt-5.6-sol','managed-agent'],['gpt-5.6-luna','managed-agent']]);
+  assert.deepEqual(planned.candidates.map(candidate=>[candidate.selection.target,candidate.launch]),[['qwen-agent','command-terminal'],['claude-agent','managed-agent'],['codex-agent','managed-agent']]);
   assert.match(planned.candidates[0].terminalParams.command,/^qwen --model qwen3.8-flash .*--exclude-tools agent/);
   assert.equal(planned.candidates[0].terminalParams.title,opName);
   assert.equal(planned.candidates[0].terminalParams.worktree,`path:${worktreePath}`);
   assert.deepEqual(planned.candidates[0].dispatchParams,{task:'$operationTaskId',to:'$terminalHandle',from:'term_monitor_sales',run:'run_sales','return-preamble':true});
   assert.equal(planned.candidates[1].workerParams.model,'claude-opus-5');
   assert.equal(planned.candidates[2].workerParams.model,'gpt-5.6-sol');
-  assert.equal(planned.candidates[3].workerParams.model,'gpt-5.6-luna');
   assert.equal(planned.candidates[1].workerParams['timeout-ms'],45*60*1000,'the native worker receives the operation execution deadline');
   assert.deepEqual(planned.runAttestationParams,{id:'run_sales'});
   assert.equal(planned.taskParams['display-name'],opName);
   assert.throws(()=>buildOperationLaunch({...input,worktree:'current'}),/filesystem-relative path/);
   assert.throws(()=>buildOperationLaunch({...input,worktree:worktreePath}),/must be relative/);
-  // The reasoning chain carries its downgrade now: Opus under Fable, Sol under Astra, all four managed agents.
-  assert.deepEqual(buildOperationLaunch(reasonInput).candidates.map(candidate=>[candidate.selection.target,candidate.launch]),[['claude-fable-5.1','managed-agent'],['gpt-6-astra','managed-agent'],['claude-opus','managed-agent'],['gpt-5.6-sol','managed-agent']]);
+  // The reasoning chain carries its downgrade now: the Fable window, then the Codex window's reasoning model,
+  // then the Claude window - all three managed agents.
+  assert.deepEqual(buildOperationLaunch(reasonInput).candidates.map(candidate=>[candidate.selection.target,candidate.launch]),[['claude-fable','managed-agent'],['codex-agent','managed-agent'],['claude-agent','managed-agent']]);
   const defaultReview=buildOperationLaunch({...reasonInput,operation:'review.verify',kind:'review.verify',timeoutMs:null});
   assert.ok(defaultReview.candidates.filter(candidate=>candidate.launch==='managed-agent').every(candidate=>candidate.workerParams['timeout-ms']===3*60*60*1000),'review fallback stays finite at the kernel verify deadline');
   const defaultBuild=buildOperationLaunch({...input,timeoutMs:null});
@@ -112,7 +112,7 @@ test('operation request carries the whole chain with its launch kinds and owns t
 });
 
 test('a supervisor chain resolves from the registry with its model and effort, never from a hardcoded provider',()=>{
-  assert.deepEqual(resolveSupervisorChain('workflowMonitor').map(candidate=>[candidate.target,candidate.model,candidate.effort]),[['claude-opus','claude-opus-5','high'],['gpt-5.6-sol','gpt-5.6-sol','high']]);
+  assert.deepEqual(resolveSupervisorChain('workflowMonitor').map(candidate=>[candidate.target,candidate.model,candidate.effort]),[['claude-agent','claude-opus-5','high'],['codex-agent','gpt-5.6-sol','high']]);
   assert.throws(()=>resolveSupervisorChain('nobody'),/Supervisor chain is missing/);
 });
 
@@ -123,7 +123,7 @@ test('a Qwen operation runs in one command terminal: create, wait for the prompt
   assert.equal(result.launch,'command-terminal');
   assert.equal(result.dispatchId,'ctx_qwen');
   assert.equal(result.terminal,'term_qwen');
-  assert.equal(result.selection.target,'qwen3.8-flash');
+  assert.equal(result.selection.target,'qwen-agent');
   assert.equal(result.attestation.supervision,'command-terminal');
   assert.equal(result.attestation.model,'qwen3.8-flash');
   assert.equal(result.attestation.submitEnters,2);
@@ -181,7 +181,7 @@ test('a Qwen terminal that never renders its prompt is closed with no effects an
   });
   const result=startOperation(input,{orca:fake.orca,wait:noWait});
   assert.equal(result.ok,true);
-  assert.equal(result.selection.target,'claude-opus');
+  assert.equal(result.selection.target,'claude-agent');
   assert.equal(result.launch,'managed-agent');
   assert.equal(result.attempts.length,1);
   assert.equal(result.attempts[0].effectState,'none');
@@ -200,7 +200,7 @@ test('a Qwen prompt that is never consumed is fenced: stop the Dispatch, close e
   });
   const result=startOperation(input,{orca:fake.orca,wait:noWait});
   assert.equal(result.ok,true);
-  assert.equal(result.selection.target,'claude-opus');
+  assert.equal(result.selection.target,'claude-agent');
   assert.equal(result.attempts[0].dispatchId,'ctx_qwen');
   assert.equal(result.attempts[0].effectState,'none');
   assert.match(result.attempts[0].reason,/not consumed/);
@@ -218,7 +218,7 @@ test('a Dispatch whose assignee is not the created terminal is fenced, never acc
     'terminal-rename':()=>json(0,{ok:true,result:{}})
   });
   const result=startOperation(input,{orca:fake.orca,wait:noWait});
-  assert.equal(result.selection.target,'claude-opus');
+  assert.equal(result.selection.target,'claude-agent');
   assert.match(result.attempts[0].reason,/assignee attestation failed/);
 });
 
@@ -232,9 +232,9 @@ test('a managed candidate stall is classified as no-effect and the launcher fall
   });
   const result=startOperation(reasonInput,{orca:fake.orca,wait:noWait});
   assert.equal(result.ok,true);
-  assert.equal(result.selection.target,'gpt-6-astra');
+  assert.equal(result.selection.target,'codex-agent');
   assert.equal(result.attempts.length,1);
-  assert.equal(result.attempts[0].target,'claude-fable-5.1');
+  assert.equal(result.attempts[0].target,'claude-fable');
   assert.equal(result.attempts[0].effectState,'none');
   assert.equal(result.attempts[0].settlement,null);
   assert.equal(fake.spawned.filter(args=>args[1]==='task-update').length,0);
@@ -256,7 +256,7 @@ test('provider mismatch fences and settles the exact managed dispatch; a pending
   });
   const result=startOperation(reasonInput,{orca:fake.orca,wait:noWait});
   assert.equal(result.ok,true);
-  assert.equal(result.selection.target,'gpt-6-astra');
+  assert.equal(result.selection.target,'codex-agent');
   assert.match(result.attempts[0].reason,/expected agent claude/);
   assert.equal(result.attempts[0].settlement.release.state,'released');
   const reissue=fake.spawned.find(args=>args[1]==='task-update');
@@ -286,7 +286,7 @@ test('an exhausted chain is a typed failure, never a thrown string',()=>{
   assert.equal(result.exhausted,true);
   assert.equal(result.effectState,'none');
   assert.equal(result.stopReason,'chain-exhausted');
-  assert.deepEqual(result.attempts.map(attempt=>attempt.target),['qwen3.8-flash','claude-opus','gpt-5.6-sol','gpt-5.6-luna']);
+  assert.deepEqual(result.attempts.map(attempt=>attempt.target),['qwen-agent','claude-agent','codex-agent']);
   assert.ok(result.attempts.every(attempt=>attempt.effectState==='none'));
   assert.equal(result.recovery,'report-workflow-boundary-worker_failed');
 });
@@ -457,10 +457,10 @@ test('settlement reconciles an unknown stop, closes an unstoppable own terminal,
 
 test('--skip records a verified no-effect failure for a chain target and starts at the next candidate',()=>{
   const planned=buildOperationLaunch({...input,skip:'qwen3.8-flash:unavailable'});
-  assert.deepEqual(planned.candidates.map(candidate=>candidate.selection.target),['claude-opus','gpt-5.6-sol','gpt-5.6-luna']);
-  assert.deepEqual(planned.skipped,[{target:'qwen3.8-flash',reason:'unavailable',effectState:'none',source:'monitor-verified-skip'}]);
+  assert.deepEqual(planned.candidates.map(candidate=>candidate.selection.target),['claude-agent','codex-agent']);
+  assert.deepEqual(planned.skipped,[{target:'qwen-agent',reason:'unavailable',effectState:'none',source:'monitor-verified-skip'}]);
   assert.throws(()=>buildOperationLaunch({...input,skip:'qwen3.8-flash:permission-denied'}),/reason must be one of/);
-  assert.throws(()=>buildOperationLaunch({...input,skip:'gpt-6-astra:unavailable'}),/outside this operation chain/);
+  assert.throws(()=>buildOperationLaunch({...input,skip:'claude-fable-5.1:unavailable'}),/outside this operation chain/);
   assert.throws(()=>buildOperationLaunch({...input,skip:'qwen3.8-flash,claude-opus,gpt-5.6-sol,gpt-5.6-luna'}),/Every candidate/);
   const fake=fakeOrca({
     'run-show':()=>json(0,runShow),
@@ -471,24 +471,24 @@ test('--skip records a verified no-effect failure for a chain target and starts 
   });
   const result=startOperation({...input,skip:'qwen3.8-flash'},{orca:fake.orca,wait:noWait});
   assert.equal(result.ok,true);
-  assert.equal(result.selection.target,'claude-opus');
-  assert.deepEqual(result.attempts.map(attempt=>[attempt.target,attempt.reason,attempt.effectState]),[['qwen3.8-flash','unavailable','none']]);
+  assert.equal(result.selection.target,'claude-agent');
+  assert.deepEqual(result.attempts.map(attempt=>[attempt.target,attempt.reason,attempt.effectState]),[['qwen-agent','unavailable','none']]);
   assert.equal(fake.spawned.filter(args=>args[0]==='terminal'&&args[1]==='create').length,0);
   assert.deepEqual(parseSkip('',[]),[]);
 });
 
 test('an explicit candidate list replaces chain resolution, so the allocator launches exactly one runtime',()=>{
   const chain=resolveExecutionChain({skill:'starci',op:'backend.implement'}).candidates;
-  const opus=chain.find(candidate=>candidate.target==='claude-opus');
+  const opus=chain.find(candidate=>candidate.target==='claude-agent');
   const planned=buildOperationLaunch({...input,candidates:[opus]});
-  assert.deepEqual(planned.candidates.map(candidate=>candidate.selection.target),['claude-opus']);
+  assert.deepEqual(planned.candidates.map(candidate=>candidate.selection.target),['claude-agent']);
   assert.deepEqual(planned.selection,opus);
   assert.deepEqual(planned.skipped,[]);
   assert.equal(planned.candidates[0].launch,'managed-agent');
   // The list is the decision: it cannot be combined with --skip and it cannot be empty or unresolved.
   assert.throws(()=>buildOperationLaunch({...input,candidates:[opus],skip:'qwen3.8-flash:unavailable'}),/cannot narrow it further/);
   assert.throws(()=>buildOperationLaunch({...input,candidates:[]}),/at least one resolved selection/);
-  assert.throws(()=>buildOperationLaunch({...input,candidates:[{target:'claude-opus'}]}),/resolved selection with a target and an Orca launch shape/);
+  assert.throws(()=>buildOperationLaunch({...input,candidates:[{target:'claude-agent'}]}),/resolved selection with a target and an Orca launch shape/);
   const fake=fakeOrca({
     'run-show':()=>json(0,runShow),
     'task-create':()=>json(0,taskCreated('task_operation_sales',opName)),
@@ -498,7 +498,7 @@ test('an explicit candidate list replaces chain resolution, so the allocator lau
   });
   const result=startOperation(input,{orca:fake.orca,wait:noWait,candidates:[opus]});
   assert.equal(result.ok,true);
-  assert.equal(result.selection.target,'claude-opus');
+  assert.equal(result.selection.target,'claude-agent');
   // Qwen leads this chain, yet no terminal was created and no attempt was recorded against it.
   assert.deepEqual(result.attempts,[]);
   assert.equal(fake.spawned.filter(args=>args[0]==='terminal'&&args[1]==='create').length,0);
