@@ -5,6 +5,7 @@ import {readDistJson} from '../core/runtime-root.mjs';
 import {normalizeResolvedReferences} from './validator-transport.mjs';
 import {nonOperationModels} from '../scripts/config.mjs';
 import {KINDS as OPERATION_KINDS,writesOf} from '../kernel/graph.mjs';
+import {AUDIT_OPERATIONS,auditDefinitionErrors} from '../kernel/audit.mjs';
 /**
  * The kinds a plan ledger may plan: those whose writes are code, the runtime or evidence. A plan ledger binds no
  * canonical Work, so a kind that authors or decides a Work record (decision.prepare, work.author,
@@ -215,7 +216,7 @@ export const GOAL_FORM={
   ledger:{type:'object[]',minItems:1,each:{id:{type:'string'},title:{type:'string'},inputRef:{type:'string'},status:{type:'string',enum:['absent','partial','done','unknown']}}},
   ops:{type:'object[]',minItems:1,each:{id:{type:'string'},kind:{type:'string',enum:[...PLAN_OP_KINDS]},goal:{type:'string'},ledgerIds:{type:'string[]',minItems:1},
     allowlist:{type:'string[]',minItems:1},references:{type:'string[]'},checks:{type:'object[]',minItems:1,each:{name:{type:'string'},command:{type:'string'}}},
-    acceptance:{type:'string[]',minItems:1},dependsOn:{type:'string[]'},difficulty:{type:'string',enum:['easy','medium','hard'],optional:true}}},
+    acceptance:{type:'string[]',minItems:1},dependsOn:{type:'string[]'},operation:{type:'string',enum:[...AUDIT_OPERATIONS],optional:true},difficulty:{type:'string',enum:['easy','medium','hard'],optional:true}}},
   risks:{type:'string[]',optional:true},questions:{type:'string[]',optional:true}
 };
 
@@ -334,6 +335,7 @@ export function goalPlanRules(plan){
   // The worktree is the only place an op may write or read from: an absolute allowlist cannot be enforced and an
   // absolute reference cannot be bound to the candidate. A declared input is referenced by the exact ref listed.
   for(const op of ops){
+    errors.push(...auditDefinitionErrors(op).map(error=>`op ${op.id}: ${error}`));
     for(const entry of op.allowlist??[])if(outsideWorktree(entry))errors.push(`op ${op.id} allowlist entry ${entry} is not a path relative to the worktree; every allowlist and reference is worktree-relative`);
     for(const entry of op.references??[])if(outsideWorktree(entry))errors.push(`op ${op.id} reference ${entry} is not a path relative to the worktree; a declared input is referenced by the exact ref listed under inputs`);
   }

@@ -11,6 +11,7 @@ import {kindsReadingBrand} from './io.mjs';
 import {brandReferencesOf,kernelProof,noteBrand,provenChecks,rereadBrand,treeVerdictFor} from './verify.mjs';
 import {retemplateIntakeOps} from './intake.mjs';
 import {bindPlannedAmendmentEffects} from './amendment.mjs';
+import {isAuditOperation} from './audit.mjs';
 
 /**
  * The Work tree, read and written. One concern, two directions.
@@ -327,7 +328,9 @@ export function syncLedgerOps(store,state,ctx){
   reopenStaleProofs(store,state,ctx,loaded);
   const scope=state.scope.length?state.scope:null;
   const taken=new Set(state.ops.map(op=>op.id));
-  const opOfNode=new Map(state.ops.filter(op=>op.nodeId).map(op=>[op.nodeId,op.id]));
+  // A measurement names a node only as its inspection subject. It is neither that node's delivery lane nor a
+  // prerequisite which a later delivery operation may inherit.
+  const opOfNode=new Map(state.ops.filter(op=>op.nodeId&&!isAuditOperation(op)).map(op=>[op.nodeId,op.id]));
   const added=[];
   pruneAnsweredQuestions(store,state,loaded);
   // A migration (`--migrate`) executes no node: its intakes are the whole workflow, at goal time and on every re-read.
@@ -352,7 +355,11 @@ export function syncLedgerOps(store,state,ctx){
       continue;
     }
     const entry=laneOf(state,node);
-    const mine=state.ops.filter(op=>op.nodeId===node.id);
+    const inspections=state.ops.filter(op=>op.nodeId===node.id&&isAuditOperation(op));
+    const mine=state.ops.filter(op=>op.nodeId===node.id&&!isAuditOperation(op));
+    // A report-only audit workflow must not silently turn its stale subject into a delivery operation after the
+    // measurement settles. Existing delivery lanes remain independent and continue normally.
+    if(inspections.length&&!mine.length)continue;
     // The op that completed this node's record is not a step of its lane: it precedes the lane, so the lane's
     // first step is still the first step and still carries the node's own id.
     const laneOps=mine.filter(op=>!authorsRecord(op.kind));
@@ -913,6 +920,10 @@ export function guardRecordBlocks(store,state,op,ctx){
  * the user instead of reporting a green slice over a ledger that does not say so.
  */
 export function ledgerWrite(store,state,op,ctx,step,action,nodeId=op.nodeId){
+  if(isAuditOperation(op)){
+    store.appendEvent({event:'audit-ledger-write-skipped',op:op.id,operation:op.operation,node:nodeId??null,step});
+    return null;
+  }
   if(!ctx.work||!nodeId)return null;
   const node=ctx.work.node(nodeId);
   if(!node){

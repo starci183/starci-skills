@@ -1199,7 +1199,7 @@ executionModes:
     proofs:
       - id: executed-checks
         requirement:
-          en: Every requested static check actually executes with declared coverage; required exit codes are zero, and reports contain no unresolved required-input failures.
+          en: Every requested static check actually executes with declared coverage. A read-only lint measurement may complete with typed violations retained as findings; a delivery/static-conformance gate passes only when every required exit code is zero. Missing, malformed or unavailable inputs fail the audit and never become findings or clean coverage.
       - id: bounded-meaning
         requirement:
           en: The result explicitly separates static architecture/metadata conformance from runtime, behavioral and deployment proof. It grants no source repair or product completion authority.

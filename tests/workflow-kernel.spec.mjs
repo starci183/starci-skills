@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
+import {canonicalJSON,sha256} from '../core/index.mjs';
 import {EventEmitter} from 'node:events';
 import {preparedEntry,inputAsk} from './helpers/input-fixture.mjs';
 import {encodePng,screen} from './helpers/png.mjs';
@@ -21,10 +22,11 @@ import {buildReport} from '../kernel/reports.mjs';
 import {spawn,spawnSync} from 'node:child_process';
 import {validateGoalPlan,validateOp} from '../models/functions.mjs';
 import {createStore} from '../kernel/store.mjs';
+import {openJournal} from '../kernel/journal.mjs';
 import {createAllocator} from '../kernel/schedule.mjs';
 import {loadsFileFor} from '../kernel/loads.mjs';
 import {resolveLedgerRoot} from '../kernel/routing.mjs';
-import {RESTART_LIMIT} from '../kernel/common.mjs';
+import {RESTART_LIMIT,toOp} from '../kernel/common.mjs';
 import * as work from '../kernel/ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../kernel/graph.mjs';
 import {machineVerify} from '../kernel/kernel.mjs';
@@ -305,6 +307,141 @@ const salesPlan={
     allowlist:['apps/agentos-controlplane/src/sales/intake.ts'],references:['.starciwork/features/sales/sds.md#3'],
     checks:[{name:'unit',command:'npx vitest run sales'}],acceptance:['intake persists an order'],dependsOn:[]}]
 };
+
+const auditPlan=(operation='stales',command='node bin/starci.mjs check-stales --work .starciwork --repo source=. ' )=>({
+  definitionOfDone:['the selected source state is measured without repair'],
+  ledger:[{id:'audit-scope',title:'Read-only source audit',inputRef:'source:current',status:'absent'}],
+  ops:[{id:'audit-source',kind:'review.verify',operation,goal:'Measure the selected source state without changing it.',ledgerIds:['audit-scope'],
+    allowlist:['runtime/audit/**'],references:['src/**'],checks:[{name:'source-staleness',command:command.trim()}],
+    acceptance:['the typed current finding report is retained without delivery acceptance'],dependsOn:[]}]
+});
+const stalenessReport=(findings=[{id:'finding-1',bindingId:'source:audit-scope',nodeId:'audit-scope',category:'source-drift',
+  status:'revalidation-needed',layer:'source',code:'SOURCE_IDENTITY_CHANGED',detail:'The declared source identity changed.',expected:'accepted revision',
+  observed:'current revision',route:'review.verify',operator:'review.verify',impactSetId:'impact-audit-scope',repairCandidate:null}])=>{
+  const report={schema:'starci/source-staleness-report@1',workRoot:'C:/fixture/.starciwork',targets:['audit-scope'],
+    baselineDigest:'b'.repeat(64),clean:findings.length===0,
+    coverage:{mode:'canonical-work',closure:'synthetic exact target closure',selectedNodeIds:['audit-scope'],sourceBindings:[]},
+    limitations:['Synthetic structural fixture; no semantic or runtime proof.'],impactGraph:{edges:[],impactSets:[{id:'impact-audit-scope',rootNodeId:'audit-scope',affectedNodeIds:['audit-scope']}]},
+    currentInputs:{work:{ok:true,selectedNodes:1,snapshotDigest:'c'.repeat(64)},repositories:[{id:'source',root:'C:/fixture',head:'d'.repeat(40),
+      dirty:false,originDigest:'e'.repeat(64),credentialFreeOrigin:true,snapshotDigest:'f'.repeat(64)}]},
+    subjects:[{id:'audit-scope',path:'audit/index.yaml',kind:'implementation',inputDigest:'1'.repeat(64),effectiveState:'todo',
+      status:'revalidation-needed',findingIds:findings.map(item=>item.id)}],findings};
+  return {...report,reportDigest:sha256(canonicalJSON(report))};
+};
+
+test('typed stale findings settle a real report and durable journal as measurement without delivery or repair',()=>{
+  const harness=setup({plan:auditPlan(),scripts:{}});let journal=null;
+  try{
+    approve(harness.store,harness.state);harness.state.run='run_wf';harness.state.from='term_kernel';
+    journal=openJournal({file:path.join(harness.repo,'runtime','audit.sqlite')});
+    harness.store.bindJournal(journal,1,{state:harness.state});harness.store.saveState(harness.state);
+    const op=running(harness.state,'audit-source','ctx_audit'),report=buildReport({outcome:'partial',run:'run_wf',task:'task_audit',
+      dispatch:'ctx_audit',from:'term_ctx_audit',summary:'The exact scanner measured one current stale binding.',files:[],
+      checks:[{name:'source-staleness',command:op.checks[0].command,exitCode:1,evidence:'typed source-staleness report contains one finding'}],
+      open:['SOURCE_IDENTITY_CHANGED audit-record requires revalidation']});
+    report.sent={messageId:'msg_audit',sentAt:1,type:report.signal.type};
+    fs.writeFileSync(harness.store.reportPath(report.dispatch),`${JSON.stringify(report,null,2)}\n`);
+    const persisted=harness.store.readReports().find(item=>item.dispatch===report.dispatch);
+    const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>1234,work:null,
+      exec:()=>({status:1,stdout:JSON.stringify(stalenessReport()),stderr:''})};
+    assert.equal(applyOpReport(harness.fake.orca,harness.store,harness.state,op,persisted,ctx),'audit-measured');
+    harness.store.saveState(harness.state);
+    assert.equal(op.status,'done');assert.equal(op.verdict,'findings');assert.equal(op.audit.outcome,'findings');
+    assert.equal(op.audit.findingCount,1);assert.deepEqual(op.files,[]);
+    assert.equal(harness.state.ledger[0].status,'planned','measurement is not delivery or ledger completion');
+    assert.equal(harness.state.ops.length,1,'a finding never creates a repair operation');
+    const log=events(harness.store);assert.equal(log.filter(event=>event.event==='audit-measured').length,1);
+    assert.equal(log.some(event=>['op-done','verify-findings','retry'].includes(event.event)),false);
+    const saved=journal.db.prepare("SELECT state_json FROM state_snapshots WHERE workflow_id=? AND generation=1 AND state_json<>'' ORDER BY snapshot_id DESC LIMIT 1")
+      .get(harness.state.id);
+    const durable=JSON.parse(saved.state_json),durableOp=durable.ops.find(item=>item.id==='audit-source');
+    assert.equal(durableOp.operation,'stales');assert.equal(durableOp.audit.outcome,'findings');
+    assert.equal(durable.ledger[0].status,'planned');
+  }finally{journal?.close();harness.cleanup();}
+});
+
+test('typed architecture violations are findings while architecture input errors fail the audit',()=>{
+  const plan=auditPlan('lint','starci architecture check .'),harness=setup({plan,scripts:{}});
+  try{
+    approve(harness.store,harness.state);const op=running(harness.state,'audit-source','ctx_arch_findings');
+    const report=buildReport({outcome:'partial',run:'run_wf',task:'task_arch',dispatch:op.dispatch,from:'term_arch',summary:'Static architecture finding measured.',
+      files:[],checks:[{name:op.checks[0].name,command:op.checks[0].command,exitCode:1,evidence:'ARCH_APP_IMPORT'}],open:['ARCH_APP_IMPORT apps/api/main.ts']});
+    report.sent={messageId:'msg_arch',sentAt:1,type:report.signal.type};
+    const output={schema:'starci/architecture-check@1',ok:false,repository:'C:/fixture',kinds:['backend'],files:1,compiler:{version:'fixture'},
+      violations:[{ruleId:'ARCH_APP_IMPORT',path:'apps/api/main.ts'}],errors:[],limitations:['static only']};
+    const action=applyOpReport(harness.fake.orca,harness.store,harness.state,op,report,{cwd,allocator:harness.allocator,guards:stubGuards(),
+      git:harness.git.git,wait:noWait,now:()=>1234,work:null,exec:()=>({status:1,stdout:JSON.stringify(output),stderr:''})});
+    assert.equal(action,'audit-measured');assert.equal(op.verdict,'findings');assert.equal(op.audit.findingCount,1);
+    assert.equal(harness.state.ledger[0].status,'planned');assert.equal(harness.state.ops.length,1);
+  }finally{harness.cleanup();}
+});
+
+test('audit failures fail closed without retries or repairs, while legacy review behavior stays unchanged',()=>{
+  for(const scenario of [
+    {name:'malformed stale output',plan:auditPlan(),result:{status:1,stdout:'not json',stderr:''}},
+    {name:'wrong stale protocol',plan:auditPlan(),result:{status:1,stdout:JSON.stringify({...stalenessReport(),schema:'other/report@1'}),stderr:''}},
+    {name:'stale report digest mismatch',plan:auditPlan(),result:{status:1,stdout:JSON.stringify({...stalenessReport(),reportDigest:'0'.repeat(64)}),stderr:''}},
+    {name:'lint has no exact checks',plan:auditPlan('lint','npm run lint'),mutate:op=>{op.checks=[];},result:{status:0,stdout:'clean',stderr:''}},
+    {name:'architecture input unavailable',plan:auditPlan('lint','starci architecture check .'),result:{status:1,stdout:JSON.stringify({schema:'starci/architecture-check@1',ok:false,
+      violations:[],errors:[{ruleId:'ARCH_CONFIG_INVALID',message:'missing config'}]}),stderr:''}},
+    {name:'stack input unavailable',plan:auditPlan('lint','starci stacks check . --environment dev --deployment-model missing.yaml'),result:{status:1,
+      stdout:JSON.stringify({schema:'starci/application-stacks-check@1',ok:false,errors:[{code:'deployment-model-unavailable'}]}),stderr:''}},
+    {name:'Work input malformed',plan:auditPlan('lint','starci validate .starciwork'),result:{status:1,
+      stdout:JSON.stringify({ok:false,errors:[{code:'UNSUPPORTED_METADATA'}]}),stderr:''}},
+    {name:'unstructured lint exit',plan:auditPlan('lint','npm run lint'),result:{status:1,stdout:'lint failed',stderr:''}}
+  ]){
+    const harness=setup({plan:scenario.plan,scripts:{}});
+    try{
+      approve(harness.store,harness.state);const op=running(harness.state,'audit-source',`ctx_${scenario.name.replaceAll(' ','_')}`);scenario.mutate?.(op);
+      const report=buildReport({outcome:'failed',run:'run_wf',task:'task_audit',dispatch:op.dispatch,from:`term_${op.dispatch}`,
+        summary:scenario.name,files:[],checks:op.checks.length?[{name:op.checks[0].name,command:op.checks[0].command,exitCode:1,evidence:scenario.name}]:[]});
+      report.sent={messageId:`msg_${op.dispatch}`,sentAt:1,type:report.signal.type};
+      const before=harness.state.ops.length,ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,
+        now:()=>1234,work:null,exec:()=>scenario.result};
+      assert.equal(applyOpReport(harness.fake.orca,harness.store,harness.state,op,report,ctx),'audit-failed',scenario.name);
+      assert.equal(op.status,'blocked',scenario.name);assert.equal(op.refusal,'audit-measurement-failed',scenario.name);
+      assert.equal(harness.state.ops.length,before,scenario.name);assert.equal(harness.state.ledger[0].status,'planned',scenario.name);
+      assert.equal(events(harness.store).some(event=>['verify-findings','retry','op-done'].includes(event.event)),false,scenario.name);
+    }finally{harness.cleanup();}
+  }
+  const invalid=setup({plan:auditPlan(),scripts:{}});
+  try{
+    approve(invalid.store,invalid.state);const op=running(invalid.state,'audit-source','ctx_invalid_audit');
+    const report=buildReport({outcome:'partial',run:'run_wf',task:'task_invalid',dispatch:op.dispatch,from:'term_invalid',summary:'Invalid worker report.',
+      files:[],checks:[{name:op.checks[0].name,command:op.checks[0].command,exitCode:1,evidence:'finding'}],open:['measured finding']});
+    report.open=[];report.sent={messageId:'msg_invalid',sentAt:1,type:report.signal.type};
+    assert.equal(applyOpReport(invalid.fake.orca,invalid.store,invalid.state,op,report,{cwd,allocator:invalid.allocator,guards:stubGuards(),
+      git:invalid.git.git,wait:noWait,now:()=>1234,work:null,exec:()=>({status:1,stdout:JSON.stringify(stalenessReport()),stderr:''})}),'audit-failed');
+    assert.equal(op.status,'blocked');assert.equal(invalid.state.ops.length,1);
+    assert.equal(events(invalid.store).some(event=>event.event==='retry'||event.event==='verify-findings'),false);
+  }finally{invalid.cleanup();}
+  const protectedWrite=setup({plan:auditPlan(),scripts:{}});
+  try{
+    approve(protectedWrite.store,protectedWrite.state);const op=running(protectedWrite.state,'audit-source','ctx_protected_audit');
+    op.kernelOwned=['.starciwork/features/audit/index.yaml'];op.kernelOwnedAt='before-worker-write';
+    const report=buildReport({outcome:'partial',run:'run_wf',task:'task_protected',dispatch:op.dispatch,from:'term_protected',
+      summary:'Finding plus an invalid protected write.',files:[],checks:[{name:op.checks[0].name,command:op.checks[0].command,exitCode:1,evidence:'finding'}],open:['measured finding']});
+    report.sent={messageId:'msg_protected',sentAt:1,type:report.signal.type};
+    const guards=stubGuards({revertProtected:()=>({reverted:['.starciwork/features/audit/index.yaml'],removed:[]})});
+    assert.equal(applyOpReport(protectedWrite.fake.orca,protectedWrite.store,protectedWrite.state,op,report,{cwd,allocator:protectedWrite.allocator,
+      guards,git:protectedWrite.git.git,wait:noWait,now:()=>1234,work:null,
+      exec:()=>({status:1,stdout:JSON.stringify(stalenessReport()),stderr:''})}),'audit-failed');
+    assert.equal(op.status,'blocked');assert.equal(op.refusal,'audit-measurement-failed');assert.equal(protectedWrite.state.ops.length,1);
+    assert.equal(events(protectedWrite.store).some(event=>event.event==='retry'||event.event==='verify-findings'),false);
+  }finally{protectedWrite.cleanup();}
+  const legacyPlan=auditPlan();delete legacyPlan.ops[0].operation;
+  legacyPlan.ops[0].checks=[{name:'review',command:'node --test tests/review.spec.mjs'}];
+  const legacy=setup({plan:legacyPlan,scripts:{}});
+  try{
+    approve(legacy.store,legacy.state);const op=running(legacy.state,'audit-source','ctx_legacy');
+    const report=buildReport({outcome:'partial',run:'run_wf',task:'task_legacy',dispatch:'ctx_legacy',from:'term_ctx_legacy',summary:'Delivery review found a defect.',
+      files:[],checks:[{name:'review',command:op.checks[0].command,exitCode:1,evidence:'defect'}],open:['repair the reviewed delivery']});
+    report.sent={messageId:'msg_legacy',sentAt:1,type:report.signal.type};
+    const action=applyOpReport(legacy.fake.orca,legacy.store,legacy.state,op,report,{cwd,allocator:legacy.allocator,guards:stubGuards(),git:legacy.git.git,
+      wait:noWait,now:()=>1234,work:null,exec:()=>({status:1,stdout:'',stderr:''})});
+    assert.notEqual(action,'audit-measured');assert.ok(legacy.state.ops.length>1,'legacy review still routes a repair');
+  }finally{legacy.cleanup();}
+});
 
 test('the goal phase writes goal.md and goal.json and stops: nothing is launched before the approval',()=>{
   const harness=setup({plan:salesPlan,scripts:{}});
@@ -1073,6 +1210,32 @@ function setupWork({nodes=WORK_NODES,scope=[],reintake=[],migrate=[],scripts={},
     waitTimeoutMs:2000,tickMs:1000,maxIterations:12,...options});
   return {...tree,api,store,state,goal,fake,git,run,commits,allocator,clock,cleanup:()=>fs.rmSync(path.dirname(tree.repo),{recursive:true,force:true})};
 }
+
+test('a launched audit with a Work node leaves every canonical Work byte unchanged through its finding report',()=>{
+  const subject={...structuredClone(WORK_NODES[1]),dependsOn:[]},script={outcome:'partial',summary:'The exact scanner measured one current finding.',files:[],
+    checks:[{name:'source-staleness',command:auditPlan().ops[0].checks[0].command,exitCode:1,evidence:'typed source-staleness finding'}],
+    open:['SOURCE_IDENTITY_CHANGED requires revalidation']};
+  const auditId=`${subject.id}-implement`;
+  const harness=setupWork({nodes:[subject],scripts:{[auditId]:[script]},exec:()=>({status:1,stdout:JSON.stringify(stalenessReport()),stderr:''})});
+  try{
+    const raw=auditPlan().ops[0];harness.state.ops=[toOp({...raw,id:auditId,nodeId:subject.id,ledgerIds:[subject.id]},0)];
+    approve(harness.store,harness.state);harness.state.run='run_wf';harness.state.from='term_kernel';
+    const workRoot=path.join(harness.repo,'.starciwork'),snapshot=()=>{
+      const rows=[];const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){
+        if(dir===workRoot&&entry.name==='_local')continue;
+        const file=path.join(dir,entry.name);if(entry.isDirectory())walk(file);else rows.push([path.relative(workRoot,file).replaceAll('\\','/'),fs.readFileSync(file).toString('base64')]);}};
+      walk(workRoot);return rows;
+    };
+    const before=snapshot(),state=harness.run({maxIterations:8}),after=snapshot(),op=state.ops.find(item=>item.id===auditId);
+    assert.deepEqual(after,before,'launch, settlement and final reporting do not mark the inspected Work node in progress or done');
+    assert.equal(op.status,'done');assert.equal(op.verdict,'findings');assert.equal(op.audit.outcome,'findings');
+    assert.equal(state.ledger[0].status,'planned');
+    const log=events(harness.store);assert.deepEqual(log.filter(event=>event.event==='launched').map(event=>[event.op,event.operation]),[[auditId,'stales']]);
+    assert.ok(log.some(event=>event.event==='audit-ledger-write-skipped'&&event.step==='in-progress'&&event.node===subject.id));
+    assert.equal(log.some(event=>event.event==='ledger-write'&&event.op===auditId),false);
+    assert.equal(log.some(event=>['verify-findings','retry'].includes(event.event)&&event.op===auditId),false);
+  }finally{harness.cleanup();}
+});
 
 /**
  * A scope the tree does not know yet is not an error and not a guess: the workflow begins with the one op that

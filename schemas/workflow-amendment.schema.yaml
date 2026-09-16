@@ -77,6 +77,7 @@ $defs:
       id: {type: string, minLength: 1}
       kind:
         enum: [provision.ask, e2e.verify, frontend.implement, backend.implement, runtime.operate, uat.verify, integration.verify, review.verify]
+      operation: {enum: [stales, lint]}
       goal: {type: string, minLength: 1}
       ledgerIds: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}
       allowlist: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}
@@ -93,6 +94,14 @@ $defs:
             command: {type: string, minLength: 1}
       acceptance: {type: array, minItems: 1, uniqueItems: true, items: {type: string, minLength: 1}}
       dependsOn: {type: array, uniqueItems: true, items: {type: string, minLength: 1}}
+    allOf:
+      - if:
+          properties:
+            operation: {}
+          required: [operation]
+        then:
+          properties:
+            kind: {const: review.verify}
   effectCeiling:
     type: object
     additionalProperties: false
