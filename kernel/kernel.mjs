@@ -122,7 +122,7 @@ export {LANE_LAYOUTS,KERNEL_PLANNED_KINDS,nodeLayout,laneOf,lanePredicates,desig
 export {CUT_ASSERTIONS,CUT_COMPONENTS,CUT_FILES,FAN_OUT,childOwning,cutGroup,cutOp,cutParentOf,cutReason,fanOutDeferral,
   groupIncomplete,groupVerifyKind,repairTarget,sdsComponents,settleCut} from './sync.mjs';
 export {CRITIQUE_HEADING,GOAL_SPIN_LIMIT,adoptReportRev,approve,critiqueGoalPhase,critiqueLines,critiqueRuntimes,decidedRecords,
-  deriveGoalMetrics,evaluateGoalMetrics,goalMetricsOf,goalPhase,goalRevOf,metricsBindingOp,normalizeDoneMetrics,noteGoalMetrics,
+  deriveGoalMetrics,evaluateGoalMetrics,goalMetricsOf,goalPhase,metricsBindingOp,normalizeDoneMetrics,noteGoalMetrics,
   opInputDigests,propagateInvalidation,reopenStaleOp,reviseGoal,validateGoalRevision,
   laneHeaderLines,planGoalPhase,proposeQuota,recordStatements,stageExternalInputs,validateWorkTree,workGoalPhase} from './goal.mjs';
 export {ioBlock,ioPayload,kindsReadingBrand,intakeKindFor,decisionKindFor,recordKindOfPath,undeclaredWrites,writesWorkRecords} from './io.mjs';

@@ -7,6 +7,7 @@ import * as llm from '../models/functions.mjs';
 import * as work from './ledger.mjs';
 import {resolveLedgerRoot} from './routing.mjs';
 import {loadRuntimes} from './schedule.mjs';
+import {goalRevOf} from './ask.mjs';
 import {loadsFileFor,readLoads} from './loads.mjs';
 import {resolveExecutionChain} from './chains.mjs';
 import {GOAL_RECORD,WORK_LEDGER,addOp,allowlistsOverlap,byId,describeNode,dynamicBudget,firstLine,hostMissing,kindRole,
@@ -1034,7 +1035,7 @@ export const GOAL_SPIN_LIMIT=5;
 export const GOAL_REVISION='starci/goal-revision@1';
 const GOAL_METRIC_KINDS=['ledger','operation','gate'];
 /** The rev a state without one runs under: goals were unversioned before, and rev 1 is what they were. */
-export const goalRevOf=state=>Number.isInteger(state?.goalRev)&&state.goalRev>0?state.goalRev:1;
+export {goalRevOf};
 
 /** One `done:` entry made checkable: a kind the kernel can evaluate, the subject ref and the satisfying statuses. */
 const normalizeDoneMetric=entry=>{
