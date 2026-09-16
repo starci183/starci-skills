@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml} from '../core/yaml.mjs';
+import {PLAN_OP_KINDS} from '../models/functions.mjs';
 import {
   createWorkflowReceipt,
   recordOperationReceipt,
@@ -42,8 +43,13 @@ test('workflow amendment schema and runtime validator accept the same bounded ov
     coordinator:{actor:'coordinator',source:{threadId:'run',messageId:'m1',messageIdAvailability:'available',quote:'apply',assurance:'conversation-context-not-authenticated',at:'2026-09-16T00:01:00Z'},decision:'apply-same-id',rationale:'bounded'},
     changes:{clarifications:['repair the selected index'],addScope:['features/login/index.yaml'],scopeBindings:{'features/login/index.yaml':['.starciwork/features/login/index.yaml']},addDefinitionOfDone:[],
       supersedeDefinitionOfDone:[{from:'No index writes',to:'Only the owned login index may be repaired'}],operationFindings:{login:['repair']},
+      addOperations:[{id:'audit-login',kind:'review.verify',goal:'Audit the bounded login repair.',ledgerIds:['login-ledger'],
+        allowlist:['.starciwork/features/login/index.yaml'],references:['.starciwork/features/login/index.yaml'],
+        checks:[{name:'validate-login',command:'node bin/starci.mjs validate .starciwork'}],acceptance:['The login repair is independently checked.'],dependsOn:[]}],
+      operationDependencies:{login:['audit-login']},
       operationEffects:{login:{paths:['.starciwork/features/login/index.yaml'],resources:[],external:[]}},effectCeiling:{paths:['.starciwork/features/login/index.yaml'],resources:[],external:[]}}};
   assert.equal(validate(record),true,JSON.stringify(validate.errors));
+  assert.deepEqual(schema.$defs.operation.properties.kind.enum,[...PLAN_OP_KINDS]);
   const {stringifyYaml}=await import('../core/yaml.mjs'),{readWorkflowAmendment}=await import('../kernel/amendment.mjs');const file=path.join(dir,'valid.yaml');fs.writeFileSync(file,stringifyYaml(record));
   assert.equal(readWorkflowAmendment(file).record.changes.operationEffects.login.paths[0],'.starciwork/features/login/index.yaml');
   const invalid=structuredClone(record);invalid.changes.operationEffects.login.paths=['.starciwork/features/outside/index.yaml'];
