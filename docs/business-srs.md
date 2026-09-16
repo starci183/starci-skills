@@ -80,6 +80,14 @@ Each NFR states its business reason, exact FR/flow/journey scope, measurement bo
 
 Business rules state reusable invariants and link acceptance. Data definitions own meaning, fields, validation, sensitivity, state transitions, invariants, relations and privacy handling. Policy decisions name the accountable role, open question, required decisions, safe behavior while open, affected FR/data/NFR IDs and evidence that closes the decision.
 
+`requiredDecisions` lists the unresolved questions or dimensions; it is not a list of answers.
+Before presenting a numbered owner choice, author `options` as at least two distinct concrete,
+mutually exclusive policy outcomes, with tradeoffs in the description. An unprepared draft may
+omit `options`, but cannot become an actionable choice from its agenda, report text or old UI labels.
+The canonical `question` and `options` bind the owner request together. A receipt selecting a topic
+such as "Whether notice is required" does not establish a yes/no policy. Preserve that receipt
+as history and return the unresolved policy to its owner; never reinterpret or rewrite the receipt.
+
 ## Customer journeys
 
 `customer-journeys/<journey>/index.yaml` connects a real actor need to an observable result across one or more FRs. Each ordered stage references the owning FR, flow and acceptance IDs. Significant waiting, cancellation, denial and recovery paths reference the matching FR branch; the journey does not restate that flow.

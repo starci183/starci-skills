@@ -4,6 +4,7 @@
 
 core/identity.mjs
 core/index.mjs
+core/policy-options.mjs
 core/runtime-root.mjs
 core/yaml.mjs
 cli/main.mjs

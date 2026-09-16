@@ -1,4 +1,5 @@
 import {readDistJson} from '../core/runtime-root.mjs';
+import {normalizePolicyOptions} from '../core/policy-options.mjs';
 
 export const SRS_AGGREGATE_SCHEMA='starci/srs-aggregate@1';
 export const SRS_SECTION_CONTRACT=readDistJson('specifications','srs-sections.json');
@@ -80,6 +81,7 @@ function localValidation(payload,type){
  if(type==='policy-decision'){
   if(Object.hasOwn(payload,'closureEvidence'))fail('Policy decisions use closureCriteria; evidence fields do not belong in SRS.');
   if(!text(payload.accountableRole)||!text(payload.question)||!texts(payload.requiredDecisions)||!text(payload.safeDisposition)||!text(payload.closureCriteria)||!['open','accepted','deferred','rejected'].includes(payload.decisionStatus))fail('Policy decision needs status, accountable role, question, required decisions, safe disposition and closure criteria.');
+  if(Object.hasOwn(payload,'options')&&!normalizePolicyOptions(payload.options))fail('Policy decision options, when prepared, must contain at least two distinct concrete policy alternatives; requiredDecisions is the unresolved agenda, not selectable answers.');
  }
  return errors;
 }

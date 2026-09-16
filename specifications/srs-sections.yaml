@@ -67,6 +67,12 @@ sections:
   policy-decisions:
     type: policy-decision
     schema: starci/srs-policy-decision@1
+    choiceContract:
+      agendaField: requiredDecisions
+      optionsField: options
+      optionsOptionalUntilOwnerPresentation: true
+      minimumOptions: 2
+      meaning: Each option is a concrete mutually exclusive policy outcome, not a question or decision topic.
     required:
       - id
       - title

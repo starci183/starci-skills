@@ -37,6 +37,15 @@ function fixture(t){
 }
 
 test('split SRS validates separate FR, NFR, rule, data, decision and journey owners',t=>{const f=fixture(t),result=validateWorkspace(f.root);assert.equal(result.ok,true,JSON.stringify(result.errors));});
+test('policy agendas remain valid drafts while prepared options require distinct alternatives',t=>{
+ const f=fixture(t),decision='features/chatbot/business/srs/business-rules/policy-decisions/chat-policy/index.yaml';
+ for(const options of [[],['Only one'],['Same',' Same '],[{question:'Which policy?'}]]){
+  f.mutate(decision,value=>{value.extensions.work3.srs.options=options;});
+  assert.ok(validateWorkspace(f.root).errors.some(error=>error.code==='SRS_SECTION'&&error.message.includes('options')));
+ }
+ f.mutate(decision,value=>{value.extensions.work3.srs.options=['Permit curated sources only.','Permit curated and independently verified public sources.'];});
+ assert.equal(validateWorkspace(f.root).ok,true);
+});
 test('split SRS rejects wrong section schema, broken flow acceptance and missing journey coverage',t=>{const f=fixture(t),fr='features/chatbot/business/srs/functional-requirements/answer-question/index.yaml';f.mutate(fr,value=>{value.extensions.work3.srs.schema='starci/srs-data-definition@1';value.extensions.work3.srs.mainFlow.steps[0].acceptanceRefs=['missing'];});f.mutate('features/chatbot/business/srs/customer-journeys/customer-gets-help/index.yaml',value=>{value.extensions.work3.srs.stages=[];});const result=validateWorkspace(f.root);assert.equal(result.ok,false);assert.ok(result.errors.some(error=>error.code==='SRS_SECTION'));assert.ok(result.errors.some(error=>error.code==='SRS_JOURNEY_COVERAGE'));});
 test('split SRS rejects code-derived provenance',t=>{const f=fixture(t),fr='features/chatbot/business/srs/functional-requirements/answer-question/index.yaml';f.mutate(fr,value=>{value.extensions.work3.srs.sourceRefs=[{repositoryRole:'be',revision:'a'.repeat(40),path:'src/chat.ts'}];});const result=validateWorkspace(f.root);assert.ok(result.errors.some(error=>error.code==='SRS_SECTION'&&error.message.includes('independent of source code')));});
 test('split SRS rejects evidence fields in source-of-truth sections',t=>{const f=fixture(t);f.mutate('features/chatbot/business/srs/non-functional-requirements/response-progress/index.yaml',value=>{value.extensions.work3.srs.measurement.evidenceRequired='Runtime capture.';});f.mutate('features/chatbot/business/srs/business-rules/policy-decisions/chat-policy/index.yaml',value=>{value.extensions.work3.srs.closureEvidence='Approval log.';});const result=validateWorkspace(f.root);assert.ok(result.errors.filter(error=>error.code==='SRS_SECTION'&&error.message.includes('evidence')).length>=2);});

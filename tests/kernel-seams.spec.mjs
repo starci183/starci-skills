@@ -882,7 +882,7 @@ test('a retry brings the journal to the build default unless the operator chose 
   assert.equal(retryJournalTarget({option:null,previous:null,chosen:false,fallback}),path.resolve(fallback));
 });
 
-test('an enrolled ask keeps its recommendation and its presentation for the page while the record options stay English',()=>{
+test('an enrolled ask retains its authored presentation but exposes no choice before canonical reconciliation',()=>{
   const events=[],store={appendEvent:event=>events.push(event)};
   const ask={id:'ask-1',kind:'decision.prepare',status:'running',requesters:[],question:{kind:'decision',text:'Which registration path?'}};
   const state={id:'wf',approved:true,engine:{schema:'starci/engine@1',generation:1},ops:[ask],needUser:[]};
@@ -891,8 +891,7 @@ test('an enrolled ask keeps its recommendation and its presentation for the page
   assert.equal(ask.question.recommended,2);
   assert.deepEqual(ask.question.presentation,{language:'vi',text:'Đường đăng ký nào trước khi thanh toán?',options:['Mở đăng ký tự phục vụ','Chỉ đăng ký theo lời mời']});
   const request=deriveOwnerRequests(state)[0];
-  assert.deepEqual(request.options.map(option=>[option.id,option.label,option.recommended]),[['1','Open self-service registration',false],['2','Invitation-only registration',true]]);
-  assert.deepEqual(request.presentation,{language:'vi',text:'Đường đăng ký nào trước khi thanh toán?',options:[{id:'1',label:'Mở đăng ký tự phục vụ'},{id:'2',label:'Chỉ đăng ký theo lời mời'}]});
+  assert.equal(request.status,'preparing');assert.deepEqual(request.options,[]);assert.equal(request.presentation,null);
 });
 
 test('every open question is presented in the configured language once, again when its options arrive, and an ask that reports its own presentation keeps it',()=>{
@@ -935,7 +934,7 @@ test('every open question is presented in the configured language once, again wh
   }finally{fs.rmSync(host,{recursive:true,force:true});}
 });
 
-test('an ask that already wrote its decision record puts the question on the owner page with its options instead of attempting the same refusal again',()=>{
+test('an ask that wrote a decision record stops retrying but waits for canonical options before owner action',()=>{
   const summary=['decision: nivo.login.business.srs.decision.d-login-purchaser-registration recommended: 1',
     'BLOCKED shared-change: four Login ancestry paths outside this allowlist must change first.',
     '1. OPEN SELF-SERVICE REGISTRATION BEFORE CHECKOUT - any verified person may buy.',
@@ -966,7 +965,8 @@ test('an ask that already wrote its decision record puts the question on the own
   assert.equal(item.record,'nivo.login.business.srs.decision.d-login-purchaser-registration');
   assert.equal(item.options.length,4,'the owner page receives the four options, not an empty text box');
   assert.equal(ask.question.recommended,1);
-  assert.deepEqual(deriveOwnerRequests(state).find(request=>request.opId==='ask-1').options.map(option=>option.recommended),[true,false,false,false]);
+  const request=deriveOwnerRequests(state).find(request=>request.opId==='ask-1');
+  assert.equal(request.status,'preparing');assert.deepEqual(request.options,[]);
   assert.ok(events.some(event=>event.event==='decision-published-unfinished'));
   assert.equal(handleBlocked(store,state,ask,report,ctx)!=='decision-published-unfinished',true,'a question already on the owner page is not published twice');
 });

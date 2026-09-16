@@ -6,6 +6,9 @@ const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const clean=value=>typeof value==='string'?value.trim():'';
 const list=value=>Array.isArray(value)?value:[];
 const digest=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0,24);
+const enrolled=state=>state?.engine?.schema==='starci/engine@1';
+const canonicalDecisionReady=(ask,marker)=>Boolean(marker&&clean(marker.record)&&!ask?.decisionInputError&&clean(ask?.decisionOptionsDigest)
+  &&clean(ask?.question?.record)===clean(marker.record)&&list(ask?.question?.options).length>=2);
 const askKind=ask=>{
   const raw=clean(ask?.question?.kind||ask?.question?.stop);
   if(OWNER_REQUEST_KINDS.includes(raw))return raw;
@@ -43,16 +46,19 @@ export function deriveOwnerRequests(state,{now=Date.now}={}){
       ||(!ask.ownerAnswer&&['running','waiting-owner','blocked','ready','pending'].includes(ask.status)&&(ask.kind==='provision.ask'||ask.kind==='decision.prepare')));
   }).map(ask=>{
     const decisionMarker=decisionMarkers.get(clean(ask.id)),kind=decisionMarker?'business-decision':askKind(ask),answer=plain(ask.ownerAnswer)?ask.ownerAnswer:null,verification=plain(ask.ownerVerification)?ask.ownerVerification:null;
+    const settledReceipt=Boolean(answer)&&!['preparing','waiting-owner','needs-correction'].includes(clean(ask.ownerRequestStatus));
+    const decisionReady=kind!=='business-decision'||!enrolled(state)||settledReceipt||canonicalDecisionReady(ask,decisionMarker);
     let status=clean(ask.ownerRequestStatus);
     if(!OWNER_REQUEST_STATES.includes(status))status=answer?(kind==='credential'?'saved':'answered'):['ready','pending'].includes(ask.status)?'preparing':'waiting-owner';
+    if(kind==='business-decision'&&!decisionReady)status='preparing';
     if(verification?.status==='verified')status='verified';
     else if(verification?.status==='rejected')status='needs-correction';
     const subject=clean(ask?.question?.subject||ask?.credential?.provider||ask?.question?.text||ask.id);
-    const base={workflowId,opId:clean(ask.id),attempt:Number(ask.attempt??ask.restarts??0),generation,jobId:clean(ask.jobId)||workflowJobId,kind,subject,optionsDigest:clean(ask.decisionOptionsDigest)||null};
-    const optionSource=list(ask?.question?.options).length?ask.question.options:list(ask?.options).length?ask.options:list(decisionMarker?.options);
+    const base={workflowId,opId:clean(ask.id),attempt:Number(ask.attempt??ask.restarts??0),generation,jobId:clean(ask.jobId)||workflowJobId,kind,subject,optionsDigest:decisionReady?(clean(ask.decisionOptionsDigest)||null):null};
+    const optionSource=!decisionReady||ask.decisionInputError?[]:list(ask?.question?.options).length?ask.question.options:list(ask?.options).length?ask.options:list(decisionMarker?.options);
     return {...base,id:requestKey(base),status,revision:Number(ask.ownerRequestRevision??0),guidance:guidance(ask),decisionRecord:clean(decisionMarker?.record||ask?.question?.record)||null,
       options:optionSource.map((value,index)=>plain(value)?{id:clean(value.id)||String(index+1),label:clean(value.label||value.text)}:{id:String(index+1),label:clean(value)}).filter(item=>item.label).map((item,index)=>({...item,recommended:Number(ask?.question?.recommended)===index+1})),
-      presentation:plain(ask?.question?.presentation)?{language:clean(ask.question.presentation.language),text:clean(ask.question.presentation.text),options:list(ask.question.presentation.options).map((label,index)=>({id:String(index+1),label:clean(plain(label)?label.label:label)})).filter(item=>item.label)}:null,
+      presentation:decisionReady&&plain(ask?.question?.presentation)?{language:clean(ask.question.presentation.language),text:clean(ask.question.presentation.text),options:list(ask.question.presentation.options).map((label,index)=>({id:String(index+1),label:clean(plain(label)?label.label:label)})).filter(item=>item.label)}:null,
       credential:kind==='credential'?{custody:clean(ask?.credential?.custody),variables:list(ask?.credential?.variables).map(clean).filter(Boolean)}:null,
       updatedAt:Number(ask.ownerRequestUpdatedAt??now())};
   });
@@ -75,6 +81,11 @@ export function applyOwnerAction(state,action,{now=Date.now,verificationReceipts
   const ask=list(state.ops).find(item=>item.id===current.opId);
   if(!ask)return {ok:false,code:'request-stale'};
   const type=clean(action.type),value=action.value;
+  const choosesDecision=current.kind==='business-decision'&&['answer','choose','confirm'].includes(type);
+  if(choosesDecision&&(ask.decisionInputError||!['waiting-owner','needs-correction'].includes(current.status)
+    ||(enrolled(state)&&(!current.optionsDigest||!canonicalDecisionReady(ask,(state.needUser??[]).find(item=>item.op===ask.id&&item.kind==='decision'&&clean(item.record))))))){
+    return {ok:false,code:'decision-input-unavailable',reason:ask.decisionInputError?.reason??'The canonical decision question and options are not ready for an owner answer.'};
+  }
   if(type==='credential-saved'){
     if(current.kind!=='credential'||!plain(action.storageReceipt)||action.storageReceipt.status!=='present'||clean(action.storageReceipt.custody)!==current.credential?.custody)return {ok:false,code:'custody-receipt-required'};
     const names=list(action.storageReceipt.variables).map(clean).sort();

@@ -23,7 +23,7 @@ reads:
         authority, credential), what it blocks - before anything is written. A question of business, design,
         authority, security, money or customer data is the owner's to answer; only a mechanical one is not.
   - id: decided
-    path: ".starciwork/<feature>/business/**/index.yaml + .starciwork/<feature>/architecture/**/index.yaml (done)"
+    path: ".starciwork/features/<feature>/business/**/index.yaml + .starciwork/features/<feature>/architecture/**/index.yaml (done)"
     purpose:
       en: Read every decided business (SRS) and architecture (SDS) record the question touches. A decided
         record that already settles the question is the answer, named by id; the owner is not asked twice.
@@ -35,10 +35,10 @@ reads:
         (.starciwork/_resources/identity/<slug>/) holds it. Never the value itself.
 writes:
   - id: decision
-    path: .starciwork/<feature>/business/srs/business-rules/policy-decisions/<slug>/index.yaml
+    path: .starciwork/features/<feature>/business/srs/business-rules/policy-decisions/<slug>/index.yaml
     fields:
       - description
-      - extensions.work3.decision
+      - extensions.work3.srs
       - refs
     content:
       en: One policy-decision record draft (kind business, an srs-policy-decision section with decisionStatus
@@ -47,7 +47,10 @@ writes:
         for the architecture, the user stories, the security and authority, the business rules and the
         quality limits, and what it costs; the decided records each option agrees or conflicts with, by id;
         and exactly one recommendation with its reason. Real product-shaped content, no placeholder, no
-        secret value.
+        secret value. The srs.requiredDecisions array lists unresolved topics, never selectable answers.
+        Before owner presentation, srs.options contains at least two distinct concrete mutually exclusive
+        policy outcomes in the exact presentation order. Questions beginning with Whether are agenda topics,
+        not yes/no decisions. Repair an unprepared options array in this operation before requesting an answer.
 steps:
   - reads:
       - question
@@ -93,6 +96,7 @@ proofs:
     requirement:
       en: Otherwise exactly one policy-decision record draft exists with the question, the numbered options
         analysed per side, the touched records by id and one recommendation, and the workspace validates.
+        The explicit srs.options array contains outcomes separate from the requiredDecisions agenda.
   - id: asked-in-the-terminal
     requirement:
       en: The question and its numbered options were printed in this operation's own terminal, with both ways
