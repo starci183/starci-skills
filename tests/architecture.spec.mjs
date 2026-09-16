@@ -313,6 +313,9 @@ test('feature application use cases may use Nest injection but cannot reach tran
     'src/features/orders/application/valid.use-case.ts': 'import * as Nest from "@nestjs/common"; import { OrdersService } from "@modules/orders/service"; @Nest.Injectable() export class ValidUseCase { constructor(private readonly orders: OrdersService) {} execute(input:{name:string}) { return this.orders.create(input) } }\n',
     'src/features/orders/application/valid-cjs.use-case.ts': 'import Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidCjsUseCase {}\n',
     'src/features/orders/application/valid-require.use-case.ts': 'const Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidRequireUseCase {}\n',
+    'src/features/orders/application/valid-shadow-es.use-case.ts': 'import * as Nest from "@nestjs/common"; @Nest.Injectable() export class ValidShadowEsUseCase { execute(value:unknown){ function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
+    'src/features/orders/application/valid-shadow-cjs.use-case.ts': 'import Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidShadowCjsUseCase { execute(value:unknown){ function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
+    'src/features/orders/application/valid-shadow-require.use-case.ts': 'const Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidShadowRequireUseCase { execute(value:unknown){ function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
     'src/features/orders/transport/graphql/create.input.ts': 'export class CreateInput { name!: string }\n',
     'src/features/orders/transport/index.ts': 'export type { CreateInput } from "./graphql/create.input"\n',
     'src/features/orders/shared/transport-types.ts': 'export type { CreateInput } from "../transport"\n',
@@ -329,6 +332,7 @@ test('feature application use cases may use Nest injection but cannot reach tran
   assert.equal(result.violations.some(item => item.path.endsWith('/valid.use-case.ts')), false, JSON.stringify(result, null, 2));
   assert.equal(result.violations.some(item => item.path.endsWith('/valid-cjs.use-case.ts')), false, JSON.stringify(result, null, 2));
   assert.equal(result.violations.some(item => item.path.endsWith('/valid-require.use-case.ts')), false, JSON.stringify(result, null, 2));
+  assert.equal(result.violations.some(item => item.path.includes('/valid-shadow-')), false, JSON.stringify(result, null, 2));
   const dependency = result.violations.find(item => item.ruleId === 'BE_APPLICATION_IMPORTS_TRANSPORT');
   assert.deepEqual(dependency.dependencyChain.map(item => path.posix.basename(item)), ['invalid.use-case.ts', 'transport-types.ts', 'index.ts']);
 });

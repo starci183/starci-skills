@@ -74,18 +74,22 @@ function roleEvidence(ts, sourceFile) {
   return found;
 }
 
-function transportFrameworkEvidence(ts, sourceFile) {
+function transportFrameworkEvidence(ts, sourceFile, checker) {
   const found = [];
-  const namespaceUsages = alias => {
+  const namespaceUsages = binding => {
     const usages = [];
+    const alias = binding.text;
+    const bindingSymbol = checker?.getSymbolAtLocation(binding);
+    const isAlias = node => ts.isIdentifier(node) && node.text === alias
+      && (!bindingSymbol || checker?.getSymbolAtLocation(node) === bindingSymbol);
     const visit = node => {
-      if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === alias
+      if (ts.isPropertyAccessExpression(node) && isAlias(node.expression)
         && NEST_COMMON_TRANSPORT.has(node.name.text)) usages.push({ node: node.name, detail: node.name.text });
-      if (ts.isElementAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === alias) {
+      if (ts.isElementAccessExpression(node) && isAlias(node.expression)) {
         const selected = ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
         if (selected === null || NEST_COMMON_TRANSPORT.has(selected)) usages.push({ node: node.argumentExpression, detail: selected ?? 'computed @nestjs/common namespace access' });
       }
-      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.initializer) && node.initializer.text === alias) {
+      if (ts.isVariableDeclaration(node) && isAlias(node.initializer)) {
         if (!ts.isObjectBindingPattern(node.name)) {
           usages.push({ node: node.name, detail: 'escaped @nestjs/common namespace access' });
         } else {
@@ -126,13 +130,13 @@ function transportFrameworkEvidence(ts, sourceFile) {
     }
     if (specifier !== '@nestjs/common') continue;
     if (ts.isImportEqualsDeclaration(statement)) {
-      found.push(...namespaceUsages(statement.name.text).map(item => ({ ...item, specifier })));
+      found.push(...namespaceUsages(statement.name).map(item => ({ ...item, specifier })));
       continue;
     }
     if (!statement.importClause) continue;
     const bindings = statement.importClause.namedBindings;
     if (bindings && ts.isNamespaceImport(bindings)) {
-      found.push(...namespaceUsages(bindings.name.text).map(item => ({ ...item, specifier })));
+      found.push(...namespaceUsages(bindings.name).map(item => ({ ...item, specifier })));
       continue;
     }
     if (!bindings || !ts.isNamedImports(bindings)) continue;
@@ -165,7 +169,7 @@ function transportFrameworkEvidence(ts, sourceFile) {
         found.push({ node: node.initializer.arguments[0], specifier, detail: specifier });
       } else if (specifier === '@nestjs/common') {
         if (ts.isIdentifier(node.name)) {
-          found.push(...namespaceUsages(node.name.text).map(item => ({ ...item, specifier })));
+          found.push(...namespaceUsages(node.name).map(item => ({ ...item, specifier })));
         } else if (ts.isObjectBindingPattern(node.name)) {
           for (const element of node.name.elements) {
             const selected = element.dotDotDotToken
@@ -328,7 +332,7 @@ export function checkBackend(config, context) {
     }
     if (!fromModules && !fromFeatures) continue;
     if (fromApplication) {
-      for (const evidence of transportFrameworkEvidence(context.ts, sourceFile)) violations.push({
+      for (const evidence of transportFrameworkEvidence(context.ts, sourceFile, context.checkerFor(fileName))) violations.push({
         ruleId: 'BE_APPLICATION_TRANSPORT_FRAMEWORK',
         path: relativePath(config.root, fileName),
         ...sourceLocation(sourceFile, evidence.node),
