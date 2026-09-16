@@ -82,6 +82,18 @@ export type TupleProps = { readonly rows: readonly [row: { value: string }] }
   assert.ok(result.violations.some(item => /inline nested field/.test(item.message)), JSON.stringify(result, null, 2));
 });
 
+test('readonly props checks index signatures and refuses typeof object shapes', t => {
+  const context = fixture(t, {
+    'src/components/Card.tsx': `const mutable = { value: "x" }
+export type IndexProps = { [key: string]: string }
+export type QueryProps = { readonly row: typeof mutable }
+`,
+  });
+  const result = checkNextPatterns({ ...context, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.ok(result.violations.some(item => /index signature/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.errors.some(item => /computed props shape/.test(item.message)), JSON.stringify(result, null, 2));
+});
+
 test('source names enforce hook basename, module kebab-case and syntactically frozen constants', t => {
   const context = fixture(t, {
     'src/hooks/wrong.ts': 'export const useSession = () => null\n',

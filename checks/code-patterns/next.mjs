@@ -96,6 +96,9 @@ function checkReadonlyType(ts, checker, source, relative, node, violations, erro
       if (ts.isPropertySignature(member)) {
         if (!membersAlreadyReadonly && !readonlyMember(ts, member)) add(member, 'Every props field, including an inline nested field, is readonly.');
         if (member.type) checkReadonlyType(ts, checker, source, relative, member.type, violations, errors);
+      } else if (ts.isIndexSignatureDeclaration(member)) {
+        if (!membersAlreadyReadonly && !readonlyMember(ts, member)) add(member, 'Every props index signature is readonly.');
+        if (member.type) checkReadonlyType(ts, checker, source, relative, member.type, violations, errors);
       }
     }
     return;
@@ -104,7 +107,8 @@ function checkReadonlyType(ts, checker, source, relative, node, violations, erro
     for (const part of node.types) checkReadonlyType(ts, checker, source, relative, part, violations, errors, membersAlreadyReadonly, rootContract);
     return;
   }
-  if (ts.isMappedTypeNode(node) || ts.isConditionalTypeNode(node) || ts.isIndexedAccessTypeNode(node) || ts.isImportTypeNode(node)) {
+  if (ts.isMappedTypeNode(node) || ts.isConditionalTypeNode(node) || ts.isIndexedAccessTypeNode(node)
+    || ts.isImportTypeNode(node) || ts.isTypeQueryNode(node)) {
     errors.push({ ruleId: 'FE_READONLY_PROPS_CONTRACT', path: relative, ...location(source, node),
       message: 'This computed props shape needs an explicit resolved contract before readonly coverage is available.' });
     return;
@@ -126,9 +130,10 @@ function checkReadonlyProps(ts, checker, source, relative, violations, errors) {
     if (statement.heritageClauses?.length) errors.push({ ruleId: 'FE_READONLY_PROPS_CONTRACT', path: relative,
       ...location(source, statement.heritageClauses[0]), message: 'Inherited Props need an explicit resolved contract before readonly coverage is available.' });
     for (const member of statement.members) {
-      if (!ts.isPropertySignature(member)) continue;
+      if (!ts.isPropertySignature(member) && !ts.isIndexSignatureDeclaration(member)) continue;
       if (!readonlyMember(ts, member)) violations.push({ ruleId: 'FE_READONLY_PROPS_CONTRACT', path: relative,
-        ...location(source, member), message: 'Every exported Props field is readonly.' });
+        ...location(source, member), message: ts.isIndexSignatureDeclaration(member)
+          ? 'Every exported Props index signature is readonly.' : 'Every exported Props field is readonly.' });
       if (member.type) checkReadonlyType(ts, checker, source, relative, member.type, violations, errors);
     }
   }
