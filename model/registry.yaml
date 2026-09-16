@@ -163,15 +163,15 @@ targets:
       nestedAgents: forbidden
   devin-agent:
     runtime: devin
-    requestedModel: null
+    requestedModel: swe-2-max
     executionHosts: [orca]
     profiles:
       working: devin-worker
       reasoning: devin-reviewer
     orcaLaunch:
       kind: command-terminal
-      command: devin --permission-mode accept-edits --respect-workspace-trust false
-      reasoningCommand: devin --permission-mode accept-edits --respect-workspace-trust false
+      command: devin --model swe-2-max --permission-mode accept-edits --respect-workspace-trust false
+      reasoningCommand: devin --model swe-2-max --permission-mode accept-edits --respect-workspace-trust false
       dispatch: return-preamble-and-send
       adapter: devin
       nestedAgents: forbidden

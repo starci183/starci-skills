@@ -166,9 +166,9 @@ test('an explicitly allocated Devin operation runs through its own auth-gated co
   const result=startOperation(input,{orca:fake.orca,wait:noWait,candidates:[candidate]});
   assert.equal(result.ok,true);
   assert.equal(result.selection.target,'devin-agent');
-  assert.deepEqual([result.attestation.adapter,result.attestation.agent,result.attestation.model,result.attestation.modelAuthority],['devin','devin','devin-agent','configured-logical-runtime']);
+  assert.deepEqual([result.attestation.adapter,result.attestation.agent,result.attestation.model,result.attestation.modelAuthority],['devin','devin','swe-2-max','configured-logical-runtime']);
   const create=fake.spawned.find(args=>args[0]==='terminal'&&args[1]==='create');
-  assert.match(value(create,'--command'),/models list --format json.*devin --permission-mode accept-edits --respect-workspace-trust false/);
+  assert.match(value(create,'--command'),/models list --format json.*devin --model swe-2-max --permission-mode accept-edits --respect-workspace-trust false/);
   assert.doesNotMatch(value(create,'--command'),/cog_|DEVIN_API_KEY=/);
 });
 

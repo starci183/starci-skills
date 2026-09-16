@@ -2,17 +2,17 @@ schema: starci/execution-profiles@1
 runtime: devin
 provider: cognition-devin
 source: owner-authenticated-local-devin-cli
-modelPolicy: use-account-model-and-attest-the-devin-cli-runtime-before-dispatch
+modelPolicy: pin-swe-2-max-and-attest-the-devin-cli-runtime-before-dispatch
 profiles:
   devin-worker:
     role: working
-    model: devin-agent
+    model: swe-2-max
     imageGeneration: false
     roleDescription: Execute one bounded implementation, content, repair or operational task in the workflow worktree through Devin CLI.
     toolPolicy: intersection-of-operation-contract-worktree-and-owner-authority
   devin-reviewer:
     role: reasoning
-    model: devin-agent
+    model: swe-2-max
     imageGeneration: false
     roleDescription: Verify one bounded change and report evidence without expanding the approved operation scope.
     toolPolicy: intersection-of-operation-contract-worktree-and-owner-authority

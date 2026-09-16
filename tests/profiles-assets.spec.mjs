@@ -19,7 +19,7 @@ test('active roles select Codex, Claude, Qwen or explicitly admitted Devin witho
   const qwen=selectProfile({runtime:'qwencloud',op:'interface.implement'});
   assert.equal(qwen.profile,'qwen3.8-flash-worker');assert.equal(qwen.model,'qwen3.8-flash');assert.equal(qwen.provider,'qwencloud-token-plan');
   const devin=selectProfile({runtime:'cognition',op:'interface.implement'});
-  assert.equal(devin.profile,'devin-worker');assert.equal(devin.model,'devin-agent');assert.equal(devin.provider,'cognition-devin');
+  assert.equal(devin.profile,'devin-worker');assert.equal(devin.model,'swe-2-max');assert.equal(devin.provider,'cognition-devin');
   const qwenReviewer=selectProfile({runtime:'qwen',op:'architecture.decide'});
   assert.equal(qwenReviewer.profile,'qwen3.8-flash-reviewer');assert.equal(qwenReviewer.model,'qwen3.8-flash');
   const deepSeekReviewer=selectProfile({runtime:'qwen',op:'review.verify',profile:'deepseek-v4-pro-reviewer'});
