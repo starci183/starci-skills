@@ -57,6 +57,7 @@ import {DECISION_PREPARE,PROVISION_ASK,STOP_KINDS,authoredDecisionOf,recordNamed
   openOwnerAsk,provisionalLines,redactSecrets,settleOwnerAsk,stopReasonFor,
   mechanicalOwnerLine,noteOwnerList,ownerItems,ownerLines,waitsForOwner} from './owner.mjs';
 import {askFillLine,credentialAsked,fillCommand,fillWaitingAsks,inputReadyAsks,ownerFillLines,settleFilledAsks} from './fill.mjs';
+import {answerEnvelopeArg,renderQuestion} from './ask.mjs';
 import {reconcileWorkflowInputs,recoverWorkflowInputReferences} from './inputs.mjs';
 import {reconcileCanonicalDecisionInputs} from './decision-inputs.mjs';
 import {INTEGRATION_RESEARCH_ORDER,integrationReadiness,prepareCredentialAsk,preparationFingerprint,relatedIntegrations} from './inputs-readiness.mjs';
@@ -109,6 +110,9 @@ export {ASK_KINDS,DECISION_PREPARE,PROVISION_ASK,isAsk,PROVISION_KINDS,QUESTION_
   IDENTITY_SET_COMMAND,OWNER_LINE_KINDS,mechanicalOwnerLine,noteOwnerList,ownerDigest,ownerItems,ownerLines,ownerSection,waitsForOwner} from './owner.mjs';
 export {askFillLine,credentialAsked,custodyIn,fillCommand,fillWaitingAsks,ownerFillLines,settleCredentialPresence,
   settleFilledAsks,variablesIn} from './fill.mjs';
+export {ANSWER_ENVELOPE,FIELD_TYPES,QUESTION_RECORD,answerEnvelopeArg,buildAnswer,buildQuestion,envelopeForCommand,
+  goalRevOf,issueQuestion,markStaleQuestions,noteKernelAnswer,questionFields,questionStale,recordForQuestion,
+  reaskQuestion,renderQuestion,validateAnswer,validateQuestion} from './ask.mjs';
 export {BRAND_PAYLOAD,attributedFiles,brandFields,brandPayload,brandSummary,changedFiles,machineVerify,opDiff,readValidatorMemory,
   renderValidatorMemory,sharedCheckCommand,treeForVerdict,treeVerdictFor,validatorRejectLimit} from './verify.mjs';
 export {LANE_LAYOUTS,KERNEL_PLANNED_KINDS,nodeLayout,laneOf,lanePredicates,designRecord,deriveWorkOp,syncLedgerOps,
@@ -345,6 +349,13 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
   const items=(op.ledgerIds??[]).map(id=>{const item=ledgerItem(state,id);return `- \`${id}\` ${item?.title??'(unknown goal item)'}${item?.inputRef?` - ${item.inputRef}`:''}`;});
   const locks=guards.resourceLocks(op);
   const owned=protectedPaths??op.kernelOwned??[];
+  // A question carrying its typed record renders through the one renderer the kernel owns - numbered options
+  // and typed fields, never markup a model wrote - and the rendering is journaled once per record digest.
+  const typedQuestion=plain(op.question?.typed)?op.question.typed:null;
+  if(typedQuestion&&op.renderedDigest!==typedQuestion.digest){
+    op.renderedDigest=typedQuestion.digest;
+    store.appendEvent({event:'rendered',op:op.id,question:typedQuestion.questionId,digest:typedQuestion.digest,goalRev:typedQuestion.goalRev});
+  }
   const sections=[
     `# Operation contract - \`${op.kind}\`${isAuditOperation(op)?` - read-only \`${op.operation}\` measurement`:''} - op \`${op.id}\` - attempt ${op.attempt}`,``,
     `Runtime StarCi ${isEnrolled(state)?state.engine.version:'5.0'}. One worktree \`${slash(state.worktree)}\` on branch \`${state.branch}\`. ${isEnrolled(state)?'The kernel serializes native writers and independently verifies a frozen copy of your observed changes. This host detects write drift but does not enforce an OS sandbox.':'Other operations are running beside you in this same worktree:'} Never touch a path outside your allowlist, never commit, never switch branches. Your Task id, Dispatch id and terminal handle are in the dispatch preamble.`,``,
@@ -384,7 +395,8 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     // The answer to an `ask` is typed into the op's terminal on Orca; a headless process has already exited by
     // then, so the answer reaches the op through the contract of its next attempt, on every host alike.
     ...(typeof op.answer==='string'&&op.answer.trim()?[`## Answer to the question you asked earlier`,op.answer.trim(),`Act on it; do not ask the same question again.`,``]:[]),
-    ...(plain(op.question)?[`## Question for the owner`,`Asked by \`${op.question.from??'the kernel'}\` (${op.question.kind??'decision'}): ${op.question.text}`,...(op.question.options?.length?op.question.options.map((item,index)=>`${index+1}. ${item}`):[]),``]:[]),
+    ...(typedQuestion?[`## Question for the owner`,...renderQuestion(typedQuestion),``]
+      :plain(op.question)?[`## Question for the owner`,`Asked by \`${op.question.from??'the kernel'}\` (${op.question.kind??'decision'}): ${op.question.text}`,...(op.question.options?.length?op.question.options.map((item,index)=>`${index+1}. ${item}`):[]),``]:[]),
     `## Acceptance`,...(op.acceptance.length?op.acceptance.map((item,index)=>`${index+1}. ${item}`):['1. the goal above holds']),``,
     stepsFor(op,{node:op.nodeId?state.ledger.find(item=>item.nodeId===op.nodeId)??null:null}),``,
     ...jobRulings(store),
@@ -3112,7 +3124,7 @@ function tabReport(state,op,read,text){
   const base={run:state.run??state.id,task:op.task??op.id,dispatch:op.dispatch,from:op.terminal??op.id};
   try{
     const report=read.verdict==='asked'
-      ?buildReport({...base,outcome:'ask',summary:`${op.id} is waiting on a question it never reported`,
+      ?buildReport({...base,outcome:'ask',summary:`${op.id} is waiting on a question it never reported`,goalRev:state.goalRev??null,
         question:{text:text||`${op.id} asked a question in its tab`,options:[],...(read.kind?{kind:read.kind}:{})}})
       :buildReport({...base,outcome:'failed',files:[],checks:[],
         summary:text||`${op.id} ended its turn without writing a report`});
@@ -4288,7 +4300,7 @@ export function applyInbox(store,state,ctx){
       // which the supervisor gives within a minute once this loop returns.
       if(quotaChanged)state.restartRequested='allocation changed';
     }else if(command.kind==='answer'){
-      try{const answered=answerOwnerQuestion(store,state,{op:command.op,choice:command.choice??null,note:command.note??null},ctx);store.appendEvent({event:'inbox-applied',kind:'answer',ask:answered.ask});}
+      try{const answered=answerOwnerQuestion(store,state,{op:command.op,choice:command.choice??null,note:command.note??null,envelope:command.envelope??null},ctx);store.appendEvent({event:'inbox-applied',kind:'answer',ask:answered.ask});}
       catch(error){store.appendEvent({event:'inbox-rejected',kind:'answer',reason:String(error?.message??error)});}
     }else store.appendEvent({event:'inbox-ignored',kind:command.kind??null});
   }
@@ -4653,11 +4665,12 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
   if(command==='workflow-answer'){
     const {store,state}=open(options.id);
     need(options.op,'workflow-answer needs --op <decision.prepare or provision.ask op id>');
+    const envelope=answerEnvelopeArg(options);
     if(state.approved&&kernelAlive(store)){
-      const file=queueInbox(store,{kind:'answer',op:options.op,choice:options.choice??null,note:options.note??null});
+      const file=queueInbox(store,{kind:'answer',op:options.op,choice:options.choice??null,note:options.note??null,...(envelope?{envelope}:{})});
       return {schema:WORKFLOW_KERNEL,command,dir:store.dir,id:state.id,queued:true,inbox:file,next:'the running kernel delivers the answer at its next tick (event owner-answered)'};
     }
-    const answered=answerOwnerQuestion(store,state,{op:options.op,choice:options.choice??null,note:options.note??null});
+    const answered=answerOwnerQuestion(store,state,{op:options.op,choice:options.choice??null,note:options.note??null,envelope});
     store.saveState(state);
     return {schema:WORKFLOW_KERNEL,command,dir:store.dir,id:state.id,...answered,next:'approve or start the workflow again: the paused operation carries the answer in its next contract'};
   }

@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
-import {AUTHOR_KIND,addOp,firstLine,isEnrolled,liveStatus,locateSharedTreePaths,need,slash,unique,validateCommandAt} from './common.mjs';
+import {AUTHOR_KIND,addOp,firstLine,isEnrolled,liveStatus,locateSharedTreePaths,need,plain,slash,unique,validateCommandAt} from './common.mjs';
 import {closeOpTerminal,keepsAskTab} from './terminals.mjs';
 import {settleCredentialPresence,askFillLine} from './fill.mjs';
+import {envelopeForCommand,goalRevOf,issueQuestion,noteKernelAnswer,questionFields,questionStale,reaskQuestion,validateAnswer} from './ask.mjs';
 
 /**
  * The owner loop, in one file, because it is one rule: the runtime prepares a decision and the owner takes it.
@@ -346,13 +347,22 @@ export function settleOwnerAsk(store,state,ask,report){
     ask.question={...(ask.question??{}),...(recommended?{recommended}:{}),...(presentation?{presentation}:{})};
     ask.ownerRequestStatus='waiting-owner';
     state.needUser.push({op:ask.id,kind:'decision',detail:`${ask.question?.text??ask.goal} - answer in the workflow owner page`,record,options,requesters:requesters.map(item=>item.id)});
+    issueQuestion(store,state,ask,{fields:questionFields({text:ask.question?.text??ask.goal,options}),context:{decision:record,...(recommended?{recommended}:{})}});
     store.appendEvent({event:'owner-question',ask:ask.id,record,options:options.length,ownerRequired:true,requesters:requesters.map(item=>item.id)});
     return;
   }
   // The owner answered in the tab while the op was still open: the same ruling as the command, by another door.
   const inTerminal=(String(marker(summary,'answered-by-owner')??'').match(/^\d+/)??[])[0]??null;
   if(inTerminal){
-    settleChoice(store,state,ask,{choice:inTerminal,note:null,options:optionsOf(ask,summary),via:'terminal'});
+    const options=optionsOf(ask,summary);
+    // A number typed in the tab is the same typed answer as `--choice n`: it is checked against the offered
+    // options, and one outside them is rejected and re-asked instead of settling on a guess.
+    const settled=typedAnswer(store,state,ask,{choice:inTerminal,note:null,via:'terminal',options,record:null,strict:false});
+    if(!settled){
+      if(!state.needUser.some(item=>item.op===ask.id&&item.kind==='decision'))
+        state.needUser.push({op:ask.id,kind:'decision',detail:`${ask.question?.text??ask.goal} - answer with workflow-answer --id ${state.id} --op ${ask.id} --choice <n> [--note "..."]`,record:null,options,requesters:requesters.map(item=>item.id)});
+      store.appendEvent({event:'owner-question',ask:ask.id,record:null,options:options.length,requesters:requesters.map(item=>item.id),reason:'the answer typed in the tab was outside the offered options'});
+    }
     return;
   }
   // A provision the owner made: only its presence is reported, never its value. The credential form names the
@@ -377,6 +387,7 @@ export function settleOwnerAsk(store,state,ask,report){
   if(stop&&record)reclassify(store,state,ask,'provision','decision');
   else if(stop){
     state.needUser.push({op:ask.id,kind:'decision',detail:`${ask.question?.text??ask.goal} - answer with workflow-answer --id ${state.id} --op ${ask.id} --choice <n> [--note "..."]${record?` (decision record ${record})`:''}`,record,options,requesters:requesters.map(item=>item.id)});
+    issueQuestion(store,state,ask,{fields:questionFields({text:ask.question?.text??ask.goal,options}),context:{stop,...(record?{decision:record}:{})}});
     store.appendEvent({event:'owner-question',ask:ask.id,record,options:options.length,stop,requesters:requesters.map(item=>item.id)});
     return;
   }
@@ -421,6 +432,7 @@ export function continueOwnerRequest(store,state,{receipt,currentRequest}={}){
  */
 export function openProvisional(store,state,ask,{record,options,recommended,requesters}){
   const decision=record??ask.id;
+  issueQuestion(store,state,ask,{fields:questionFields({text:ask.question?.text??ask.goal,options}),context:{decision,recommended,provisional:true}});
   const chosen=options[recommended-1]??options[0]??'the recommendation in the decision record';
   const answer=`provisional: option ${recommended} - ${chosen} (decision ${decision}). The runtime took its own recommendation so the work could continue; the owner may answer differently, and what rests on it is reopened then.`;
   state.provisional=[...(state.provisional??[]),
@@ -526,6 +538,80 @@ function reopenForDecision(store,state,ctx,decision,answer){
   return unique(reopened);
 }
 
+/** The typed record of a question actually put to the owner, issued lazily for asks older than the record. */
+function ensureQuestionRecord(store,state,ask,{options=[]}={}){
+  const existing=plain(ask?.question?.typed)?ask.question.typed:null;
+  if(existing)return existing;
+  const text=ask?.question?.text??null;
+  if(!text&&!options.length)return null;
+  return issueQuestion(store,state,ask,{fields:questionFields({text:text??ask.goal,options}),context:{kind:ask.question?.kind??'decision'}});
+}
+
+/** The normalized field values as the `choice`/`note` pair `settleChoice` already knows how to deliver. */
+function legacySettle(record,values,envelope){
+  const [first,...rest]=record.fields;
+  const options=(first?.options??[]).map(option=>option.label);
+  let choice=null;const notes=[];
+  const value=first?values[first.id]:null;
+  if(first?.type==='select'&&value)choice=first.options.findIndex(option=>option.id===value.option)+1||null;
+  else if(first?.type==='confirm'&&value)notes.push(value.confirmed?'confirmed':'declined');
+  else if(first?.type==='multi'&&value)notes.push(`options ${value.options.join(', ')} - ${value.labels.join('; ')}`);
+  else if(first?.type==='text'&&value)notes.push(value.text);
+  for(const field of rest){
+    const extra=values[field.id];
+    if(extra?.text)notes.push(`${field.id}: ${extra.text}`);
+    else if(extra?.option!==undefined)notes.push(`${field.id}: ${extra.label}`);
+    else if(extra?.options)notes.push(`${field.id}: ${extra.labels.join('; ')}`);
+    else if(extra?.confirmed!==undefined)notes.push(`${field.id}: ${extra.confirmed?'yes':'no'}`);
+  }
+  if(typeof envelope?.note==='string'&&envelope.note.trim())notes.push(envelope.note.trim());
+  return {choice,note:notes.join('; ')||null,options};
+}
+
+/**
+ * The typed answer path: the record is checked against the current goal revision (a stale question is
+ * re-asked, never settled), the envelope is checked field by field (an answer outside the offered options is
+ * rejected, never guessed), and only then does the ruling resume exactly this ask's requesters. `strict`
+ * turns a rejection into a thrown refusal for the command; the terminal path just re-lists the question.
+ */
+function typedAnswer(store,state,ask,{choice,note,envelope=null,options=[],record=null,via='command',strict=false,ctx=null}){
+  const typed=record??ensureQuestionRecord(store,state,ask,{options});
+  if(!typed)return null;
+  // A question that did not settle is asked again where the owner reads it: a needUser item, unless the
+  // provisional list already carries it. `re-asked` is only honest when the owner can still see the question.
+  const relist=()=>{
+    const listed=state.needUser.some(item=>item.op===ask.id&&item.kind==='decision')
+      ||(state.provisional??[]).some(item=>item.op===ask.id&&!item.answered);
+    if(!listed)state.needUser.push({op:ask.id,kind:'decision',
+      detail:`${ask.question?.text??ask.goal} - answer with workflow-answer --id ${state.id} --op ${ask.id} --choice <n> [--note "..."]`,
+      record:ask.question?.record??null,options:(typed.fields.find(field=>field.options)?.options??[]).map(option=>option.label),requesters:[...(ask.requesters??[])]});
+  };
+  const current=goalRevOf(state,store);
+  if(questionStale(typed,current)){
+    const fresh=reaskQuestion(typed,current);
+    ask.question={...ask.question,typed:fresh};delete ask.question.presentation;
+    ask.ownerRequestRevision=Number(ask.ownerRequestRevision??0)+1;
+    relist();
+    store.appendEvent({event:'question-stale',op:ask.id,question:typed.questionId,digest:typed.digest,from:typed.goalRev,to:current,reasked:fresh.digest});
+    store.appendEvent({event:'asked',op:ask.id,question:fresh.questionId,digest:fresh.digest,goalRev:fresh.goalRev,fields:fresh.fields.length,reason:'re-asked under the current goal revision'});
+    if(strict)need(false,`${typed.questionId} was asked under goal rev ${typed.goalRev} and went stale at rev ${current}; it was re-asked under the current revision and this answer does not settle it`);
+    return null;
+  }
+  const env=plain(envelope)?envelope:envelopeForCommand(typed,{choice,note});
+  const verdict=validateAnswer(typed,env);
+  if(!verdict.ok){
+    relist();
+    store.appendEvent({event:'answer-rejected',op:ask.id,question:typed.questionId,digest:typed.digest,goalRev:typed.goalRev,
+      ...(typeof envelope?.digest==='string'&&envelope.digest.trim()&&envelope.digest.trim()!==typed.digest?{answerDigest:envelope.digest.trim(),answerGoalRev:Number(envelope.goalRev)||null}:{}),
+      errors:verdict.errors.slice(0,8)});
+    if(strict)need(false,`the answer to ${typed.questionId} does not fit the question (${verdict.errors.join('; ')}) - the question stays open`);
+    return null;
+  }
+  store.appendEvent({event:'answered',op:ask.id,question:typed.questionId,digest:typed.digest,goalRev:typed.goalRev,via,answers:verdict.values});
+  const settle=legacySettle(typed,verdict.values,env);
+  return settleChoice(store,state,ask,{choice:settle.choice,note:settle.note,options:settle.options,via,ctx});
+}
+
 /**
  * The owner's answer (`workflow-answer`): recorded on the ask op, delivered to every requester, the question gone.
  *
@@ -534,15 +620,12 @@ function reopenForDecision(store,state,ctx,decision,answer){
  * re-running it would undo the reconciliation the owner just settled, so only a live requester is resumed. And
  * a decision the runtime already took provisionally is confirmed or overturned here.
  */
-export function answerOwnerQuestion(store,state,{op:askId,choice=null,note=null},ctx=null){
+export function answerOwnerQuestion(store,state,{op:askId,choice=null,note=null,envelope=null},ctx=null){
   const ask=state.ops.find(item=>item.id===askId&&isAsk(item.kind))??null;
   const item=state.needUser.find(entry=>entry.op===askId&&entry.kind==='decision')??null;
   const pending=(state.provisional??[]).find(entry=>entry.op===askId&&!entry.answered)??null;
   const raiser=ask??(item?state.ops.find(entry=>entry.id===askId)??null:null);
   need(raiser||pending,`No owner question ${askId} in workflow ${state.id}`);
-  const options=item?.options??raiser?.question?.options??pending?.options??[];
-  const picked=choice!==null&&choice!==undefined&&String(choice).trim()?options[Number(choice)-1]??String(choice):null;
-  need(picked||String(note??'').trim(),'workflow-answer needs --choice <n> or --note "<answer>"');
   // The owner says they have filled the credential in. The word is not the answer: the presence of every
   // variable is checked exactly as the kernel's own tick checks it, and only that settles the ask - `set` over
   // a credential nobody put anywhere is a refusal that names what is missing, never a `done`.
@@ -554,6 +637,16 @@ export function answerOwnerQuestion(store,state,{op:askId,choice=null,note=null}
     need(settled.ok,`${ask.id} is not settled: ${settled.reason}. Run \`${ask.fillCommand??'starci identity fill <slug> --name <VAR>'}\` and answer it.`);
     return {ask:ask.id,answer:settled.summary};
   }
+  const options=[item?.options,raiser?.question?.options,pending?.options].find(list=>Array.isArray(list)&&list.length)??[];
+  // An ask op answers through its typed record: the envelope binds the exact question (id, revision, digest)
+  // and every field is validated; the positional `--choice <n>` is the same answer by another door.
+  if(ask){
+    const settled=typedAnswer(store,state,ask,{choice,note,envelope,options,via:plain(envelope)?'envelope':'command',strict:true,ctx});
+    if(settled)return settled;
+  }
+  need(!plain(envelope),`${askId} carries no typed question record; answer it with --choice <n> or --note "<answer>"`);
+  const picked=choice!==null&&choice!==undefined&&String(choice).trim()?options[Number(choice)-1]??String(choice):null;
+  need(picked||String(note??'').trim(),'workflow-answer needs --choice <n> or --note "<answer>"');
   if(ask)return settleChoice(store,state,ask,{choice,note,options,via:'command',ctx});
   const question=item?.detail??raiser?.goal??pending?.decision??askId;
   const answer=`The owner decided on "${firstLine(question)}": ${picked?`option ${choice} - ${picked}`:''}${picked&&note?'; ':''}${note??''}`.trim();
@@ -748,15 +841,27 @@ export function dedupeNeedUser(state){
 export const MECHANICAL_QUESTION=/^(mechanical|runtime|retry|format|tooling)$/i;
 export function answerOrEscalate(orca,store,state,op,report,ctx){
   if(!MECHANICAL_QUESTION.test(String(report.question?.kind??'')))return openOwnerAsk(store,state,op,{kind:report.question?.kind??'decision',text:report.question?.text??report.summary,options:report.question?.options??[]},ctx,report);
-  const chosen=ctx.decide({situation:`${op.id} asked: ${report.question?.text}`,options:['answer','escalate-to-user'],
-    context:{options:report.question?.options??[],goal:firstLine(op.goal),allowlist:op.allowlist,acceptance:op.acceptance},cwd:ctx.cwd});
+  const offered=(report.question?.options??[]).map(item=>plain(item)?String(item.label??item.text??''):String(item??'')).map(label=>label.trim()).filter(Boolean);
+  // A question that offered a closed set is answered by naming one of its options - the kernel may not invent
+  // a value outside it. `answer` stays for a question that named no set at all, where the answer is free text.
+  const choices=offered.length?[...offered,'answer','escalate-to-user']:['answer','escalate-to-user'];
+  const chosen=ctx.decide({situation:`${op.id} asked: ${report.question?.text}`,options:choices,
+    context:{options:offered,goal:firstLine(op.goal),allowlist:op.allowlist,acceptance:op.acceptance},cwd:ctx.cwd});
   const option=chosen?.ok?chosen.value.option:'escalate-to-user';
+  const typed=plain(report.question?.typed)?report.question.typed:null;
   store.appendEvent({event:'decide',op:op.id,option,rationale:chosen?.ok?chosen.value.rationale:'decide produced no valid option'});
-  if(option==='answer'&&chosen.value.instructions){
+  const picked=offered.indexOf(option);
+  if(picked>=0||(option==='answer'&&chosen.value.instructions)){
     // The answered report file is retained out of the way so the operation can report once more on the same Dispatch.
     const file=store.reportPath(op.dispatch);
     if(fs.existsSync(file))fs.renameSync(file,`${file}.answered-${op.reports.length}`);
-    op.answer=chosen.value.instructions;op.status='answering';
+    noteKernelAnswer(store,op,typed,picked>=0
+      ?{option:picked+1,label:option,reason:chosen.value.rationale??null}
+      :{instructions:chosen.value.instructions,reason:chosen.value.rationale??null});
+    op.answer=picked>=0
+      ?`The kernel answered the question "${firstLine(report.question?.text)}" from its offered options: option ${picked+1} - ${option}${chosen.value.rationale?` (${chosen.value.rationale})`:''}`
+      :chosen.value.instructions;
+    op.status='answering';
     return 'answer';
   }
   // The model could not answer a question it was told is mechanical: that is a question after all, and the

@@ -16,7 +16,7 @@ Usage:
   starci workflow-goal --job <text> [--scope f1,f2] [--lane [<name>]] [--host <skill root>]
   starci workflow-amend --id <id> --amendment <starci/workflow-amendment@1.yaml>
   starci workflow-approve --id <id> [--allocation <runtime>=<slots>[:<tiers>][@<roles>],...] [--allow-dynamic N] [--accept-critique "<reason>"]
-  starci workflow-answer --id <id> --op <ask op> [--choice <n>] [--note "<answer>"]
+  starci workflow-answer --id <id> --op <ask op> [--choice <n>] [--note "<answer>"] [--envelope '<json>' | --envelope-file <file>]
   starci workflow-run --id <id> [--host-adapter orca|headless] [--max-iterations N]
   starci workflow-retry --id <id> --runtime-pin <file>
   starci workflow-status --id <id> [--json true]
