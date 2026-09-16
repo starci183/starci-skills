@@ -5,6 +5,7 @@ import { buildTypeScriptContext, relativePath } from './typescript.mjs';
 import { checkBackend } from './backend.mjs';
 import { checkFrontend } from './frontend.mjs';
 import { checkOwners } from './owners.mjs';
+import { checkModuleRegistration, REGISTRATION_RULE_IDS } from './registration.mjs';
 
 const LIMITATIONS = [
   'This is a static TypeScript dependency and source-shape check; it does not prove runtime dependency-injection bindings, global/provider scope, state lifetime, server/client behavior, feature-versus-capability ownership, route behavior, or business correctness.',
@@ -78,8 +79,14 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
       compiler: null, violations: [], errors: [{ ruleId: match?.[1] ?? 'ARCH_COMPILER_FAILURE', message: message.replace(/^(ARCH_[A-Z_]+):\s*/, '') }], limitations: LIMITATIONS };
   }
   const violations = [];
+  let moduleRegistration = { status: 'not-applicable' };
   if (context.program) violations.push(...checkOwners(config, context));
-  if (context.program && config.kinds.includes('backend')) violations.push(...checkBackend(config, context));
+  if (context.program && config.kinds.includes('backend')) {
+    violations.push(...checkBackend(config, context));
+    const registration = checkModuleRegistration(config, context);
+    violations.push(...registration.violations);
+    moduleRegistration = registration.coverage;
+  }
   if (context.program && config.kinds.includes('frontend')) violations.push(...checkFrontend(config, context));
   const errors = stable(context.errors);
   stable(violations);
@@ -87,6 +94,7 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
   const missingOwnerEntries = config.owners?.filter(owner => !sourceFiles.has(canonical(path.resolve(config.root, ...owner.entry.split('/'))))) ?? [];
   const coverage = {
     sourceFiles: context.files.map(file => relativePath(config.root, canonical(file.fileName))).sort(),
+    moduleRegistration,
     ownerPublicApi: config.owners === null
       ? { status: 'unavailable', reason: 'architecture.json does not declare owners and public entries' }
       : missingOwnerEntries.length
@@ -105,6 +113,7 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
     ...(config.kinds.includes('frontend') ? FRONTEND_RULE_IDS : []),
     ...(coverage.ownerPublicApi.status === 'checked' ? OWNER_RULE_IDS : []),
     ...(coverage.grammarContract.status === 'checked' ? GRAMMAR_RULE_IDS : []),
+    ...(coverage.moduleRegistration.status === 'checked' ? REGISTRATION_RULE_IDS : []),
   ])].sort();
   return {
     schema: 'starci/architecture-check@1',

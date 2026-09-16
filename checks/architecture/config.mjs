@@ -4,12 +4,14 @@ import path from 'node:path';
 const CONFIG_SCHEMA = 'starci/architecture-config@1';
 const KINDS = new Set(['backend', 'frontend']);
 const TOP_LEVEL_KEYS = new Set(['schema', 'kinds', 'tsconfig', 'projects', 'backend', 'frontend', 'owners']);
-const BACKEND_KEYS = new Set(['modules', 'features', 'apps']);
+const BACKEND_KEYS = new Set(['modules', 'features', 'apps', 'moduleRegistration']);
 const FRONTEND_KEYS = new Set(['routes', 'components', 'hooks', 'transport', 'grammar']);
 const OWNER_KEYS = new Set(['id', 'root', 'entry']);
 const GRAMMAR_KEYS = new Set(['package', 'entry', 'styleEntry', 'styleSources', 'consumerManifests', 'peers']);
 const PRODUCTION_SOURCE = /\.(?:[cm]?[jt]sx?)$/i;
 const DECLARATION_SOURCE = /\.d\.[cm]?[jt]s$/i;
+const MODULE_REGISTRATION_KEYS = new Set(['providerIdentity', 'handlerDecorators']);
+const HANDLER_DECORATORS = new Set(['CommandHandler', 'QueryHandler']);
 
 function slash(value) {
   return value.replaceAll('\\', '/');
@@ -246,6 +248,19 @@ function grammarConfig(root, value) {
   return { package: packageName, entry, styleEntry, styleSources, consumerManifests, peers };
 }
 
+function moduleRegistrationConfig(value) {
+  if (value === undefined) return null;
+  exactKeys(value, MODULE_REGISTRATION_KEYS, 'Architecture backend.moduleRegistration');
+  if (value.providerIdentity !== 'exported-class-token') {
+    throw Error('Architecture backend.moduleRegistration.providerIdentity must be exported-class-token.');
+  }
+  if (!Array.isArray(value.handlerDecorators) || new Set(value.handlerDecorators).size !== value.handlerDecorators.length
+    || value.handlerDecorators.some(item => !HANDLER_DECORATORS.has(item))) {
+    throw Error('Architecture backend.moduleRegistration.handlerDecorators must contain unique CommandHandler and/or QueryHandler names.');
+  }
+  return { providerIdentity: value.providerIdentity, handlerDecorators: [...value.handlerDecorators].sort() };
+}
+
 /** Resolve a strict layout contract. It deliberately has no ignore, waiver, or baseline field. */
 export function loadArchitectureConfig(repositoryRoot, configFile) {
   const root = fs.realpathSync(path.resolve(repositoryRoot));
@@ -263,7 +278,7 @@ export function loadArchitectureConfig(repositoryRoot, configFile) {
   const frontend = authored.frontend ?? {};
   exactKeys(backend, BACKEND_KEYS, 'Architecture config backend');
   exactKeys(frontend, FRONTEND_KEYS, 'Architecture config frontend');
-  for (const [key, value] of Object.entries(backend)) requireAuthoredDirectories(root, value, `Architecture backend.${key}`);
+  for (const key of ['modules', 'features', 'apps']) requireAuthoredDirectories(root, backend[key], `Architecture backend.${key}`);
   for (const key of ['routes', 'components', 'hooks', 'transport']) requireAuthoredDirectories(root, frontend[key], `Architecture frontend.${key}`);
   const discovered = discoveredProjects(root, workspaces);
   const projects = pathList(authored.projects ?? authored.tsconfig, discovered, 'Architecture TypeScript project');
@@ -271,6 +286,7 @@ export function loadArchitectureConfig(repositoryRoot, configFile) {
     modules: pathList(backend.modules, ['src/modules'], 'Architecture backend.modules'),
     features: pathList(backend.features, ['src/features'], 'Architecture backend.features'),
     apps: pathList(backend.apps, ['apps'], 'Architecture backend.apps'),
+    moduleRegistration: moduleRegistrationConfig(backend.moduleRegistration),
   };
   const owners = configuredOwners(root, authored.owners);
   return {

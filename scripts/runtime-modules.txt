@@ -3,6 +3,7 @@
 # Build-only modules (ops/generate.mjs, ops/contracts.mjs, scripts/**) are intentionally omitted.
 
 checks/code-patterns/nest.mjs
+checks/code-patterns/nest-metadata.mjs
 
 core/identity.mjs
 core/index.mjs
@@ -28,6 +29,7 @@ checks/architecture/typescript.mjs
 checks/architecture/backend.mjs
 checks/architecture/frontend.mjs
 checks/architecture/owners.mjs
+checks/architecture/registration.mjs
 checks/stacks.mjs
 checks/render.mjs
 execution/contracts.mjs
