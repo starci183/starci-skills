@@ -4,7 +4,7 @@ import path from 'node:path';
 const CONFIG_SCHEMA = 'starci/architecture-config@1';
 const KINDS = new Set(['backend', 'frontend']);
 const TOP_LEVEL_KEYS = new Set(['schema', 'kinds', 'tsconfig', 'projects', 'backend', 'frontend', 'owners']);
-const BACKEND_KEYS = new Set(['modules', 'features', 'apps', 'moduleRegistration']);
+const BACKEND_KEYS = new Set(['modules', 'features', 'apps', 'legacyRoots', 'moduleRegistration']);
 const FRONTEND_KEYS = new Set(['routes', 'components', 'hooks', 'transport', 'grammar']);
 const OWNER_KEYS = new Set(['id', 'root', 'entry']);
 const GRAMMAR_KEYS = new Set(['package', 'entry', 'styleEntry', 'styleSources', 'consumerManifests', 'peers']);
@@ -187,6 +187,14 @@ function pathList(value, defaults, label) {
   return normalized;
 }
 
+function optionalPathList(value, label) {
+  if (value === undefined) return [];
+  const list = Array.isArray(value) ? value : [value];
+  const normalized = list.map(item => safeRelative(item, label));
+  if (new Set(normalized).size !== normalized.length) throw Error(`${label} paths must be unique.`);
+  return normalized;
+}
+
 function requireAuthoredDirectories(root, value, label) {
   if (value === undefined) return;
   for (const relative of (Array.isArray(value) ? value : [value]).map(item => safeRelative(item, label))) {
@@ -278,7 +286,7 @@ export function loadArchitectureConfig(repositoryRoot, configFile) {
   const frontend = authored.frontend ?? {};
   exactKeys(backend, BACKEND_KEYS, 'Architecture config backend');
   exactKeys(frontend, FRONTEND_KEYS, 'Architecture config frontend');
-  for (const key of ['modules', 'features', 'apps']) requireAuthoredDirectories(root, backend[key], `Architecture backend.${key}`);
+  for (const key of ['modules', 'features', 'apps', 'legacyRoots']) requireAuthoredDirectories(root, backend[key], `Architecture backend.${key}`);
   for (const key of ['routes', 'components', 'hooks', 'transport']) requireAuthoredDirectories(root, frontend[key], `Architecture frontend.${key}`);
   const discovered = discoveredProjects(root, workspaces);
   const projects = pathList(authored.projects ?? authored.tsconfig, discovered, 'Architecture TypeScript project');
@@ -286,8 +294,19 @@ export function loadArchitectureConfig(repositoryRoot, configFile) {
     modules: pathList(backend.modules, ['src/modules'], 'Architecture backend.modules'),
     features: pathList(backend.features, ['src/features'], 'Architecture backend.features'),
     apps: pathList(backend.apps, ['apps'], 'Architecture backend.apps'),
+    legacyRoots: optionalPathList(backend.legacyRoots, 'Architecture backend.legacyRoots'),
     moduleRegistration: moduleRegistrationConfig(backend.moduleRegistration),
   };
+  const backendSourceRoots = [...resolvedBackend.modules, ...resolvedBackend.features].map(relative => path.join(root, ...relative.split('/')));
+  const legacySourceRoots = resolvedBackend.legacyRoots.map(relative => path.join(root, ...relative.split('/')));
+  if (legacySourceRoots.some(legacy => !backendSourceRoots.some(source => isInside(source, legacy)))) {
+    throw Error('Architecture backend.legacyRoots must stay inside a configured module or feature source root.');
+  }
+  for (let index = 0; index < legacySourceRoots.length; index += 1) for (let other = index + 1; other < legacySourceRoots.length; other += 1) {
+    if (isInside(legacySourceRoots[index], legacySourceRoots[other]) || isInside(legacySourceRoots[other], legacySourceRoots[index])) {
+      throw Error('Architecture backend.legacyRoots cannot overlap.');
+    }
+  }
   const owners = configuredOwners(root, authored.owners);
   return {
     root,

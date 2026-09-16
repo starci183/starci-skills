@@ -68,6 +68,15 @@ function installNestTypes(root) {
   });
 }
 
+function installSourceShapeTypes(root) {
+  writeFiles(root, {
+    'node_modules/@nestjs/graphql/package.json': '{"name":"@nestjs/graphql","types":"index.d.ts"}',
+    'node_modules/@nestjs/graphql/index.d.ts': 'export declare const Args:(...args:any[])=>any; export declare const ArgsType:(...args:any[])=>any; export declare const InputType:(...args:any[])=>any; export declare const Mutation:(...args:any[])=>any; export declare const ObjectType:(...args:any[])=>any; export declare const Query:(...args:any[])=>any; export declare const Resolver:(...args:any[])=>any; export declare const registerEnumType:(...args:any[])=>any;\n',
+    'node_modules/typeorm/package.json': '{"name":"typeorm","types":"index.d.ts"}',
+    'node_modules/typeorm/index.d.ts': 'export declare const Entity:(...args:any[])=>any; export declare const ViewEntity:(...args:any[])=>any; export declare class EntitySchema<T=unknown>{constructor(options:unknown)} export interface MigrationInterface { up():unknown; down():unknown }\n',
+  });
+}
+
 function monorepoFixture(t, files = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-architecture-monorepo-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -465,9 +474,9 @@ test('Nest registration derives exported class-token ownership and selected CQRS
     'src/framework.ts': 'export { Module as NestModule } from "@nestjs/common"; export { CommandHandler as HandlesCommand } from "@nestjs/cqrs";\n',
     'src/modules/catalog/catalog.service.ts': 'export class CatalogService {}\n',
     'src/modules/catalog/catalog.module.ts': 'import { NestModule } from "../../framework"; import { CatalogService } from "./catalog.service"; const StaticModule=NestModule; @StaticModule({providers:[CatalogService],exports:[CatalogService]}) export class CatalogModule {}\n',
-    'src/features/orders/create.command.ts': 'export class CreateOrderCommand {}\n',
-    'src/features/orders/create.handler.ts': 'import { HandlesCommand } from "../../framework"; import { CreateOrderCommand } from "./create.command"; const SelectedHandler=HandlesCommand; @SelectedHandler(CreateOrderCommand) export class CreateOrderHandler {}\n',
-    'src/features/orders/orders.module.ts': 'import { NestModule } from "../../framework"; import { CatalogModule } from "@modules/catalog/catalog.module"; import { CatalogService } from "@modules/catalog/catalog.service"; import { CreateOrderHandler } from "./create.handler"; @NestModule({imports:[CatalogModule],providers:[CreateOrderHandler,{provide:"LOCAL_CATALOG",useClass:CatalogService}]}) export class OrdersModule {}\n',
+    'src/features/orders/application/create.command.ts': 'export class CreateOrderCommand {}\n',
+    'src/features/orders/application/create.handler.ts': 'import { HandlesCommand } from "../../../framework"; import { CreateOrderCommand } from "./create.command"; const SelectedHandler=HandlesCommand; @SelectedHandler(CreateOrderCommand) export class CreateOrderHandler {}\n',
+    'src/features/orders/orders.module.ts': 'import { NestModule } from "../../framework"; import { CatalogModule } from "@modules/catalog/catalog.module"; import { CatalogService } from "@modules/catalog/catalog.service"; import { CreateOrderHandler } from "./application/create.handler"; @NestModule({imports:[CatalogModule],providers:[CreateOrderHandler,{provide:"LOCAL_CATALOG",useClass:CatalogService}]}) export class OrdersModule {}\n',
   });
   installNestTypes(root);
   const configFile = path.join(root, 'architecture.json');
@@ -540,6 +549,124 @@ test('Nest registration becomes unavailable for hidden metadata or unselected di
   assert.ok(result.coverage.moduleRegistration.details.some(item => /CommonJS Nest framework binding/.test(item)));
   assert.ok(result.coverage.moduleRegistration.details.some(item => /mutable Module decorator identity/.test(item)));
   assert.equal(result.coverage.checkedRuleIds.includes('BE_MODULE_HANDLER_REGISTRATION'), false);
+});
+
+test('backend source shape accepts adopted application, transport, persistence, enum, and GraphQL naming forms', t => {
+  const root = fixture(t, 'backend', {
+    'src/framework.ts': 'export { Args as GqlArgs, InputType as GqlInput, Mutation as GqlMutation, Query as GqlQuery, registerEnumType as registerGraphQlEnum } from "@nestjs/graphql"; export { Entity as DatabaseEntity } from "typeorm";\n',
+    'src/features/orders/index.ts': 'export { CreateOrderUseCase } from "./application/create-order.use-case";\n',
+    'src/features/orders/orders.module.ts': 'export class OrdersModule {}\n',
+    'src/features/orders/application/create-order.contracts.ts': 'export interface CreateOrderParams { readonly itemId:string } export interface CreateOrderResult { readonly id:string }\n',
+    'src/features/orders/application/create-order.use-case.ts': 'import type { CreateOrderParams,CreateOrderResult } from "./create-order.contracts"; export class CreateOrderUseCase { execute(input:CreateOrderParams):CreateOrderResult{return {id:input.itemId}} }\n',
+    'src/features/orders/transport/graphql/dto/create-order.request.ts': 'import { GqlInput } from "../../../../../framework"; @GqlInput() export class CreateOrderRequest { itemId!:string }\n',
+    'src/features/orders/transport/graphql/create-order.resolver.ts': 'import { GqlArgs,GqlMutation } from "../../../../framework"; import { CreateOrderRequest } from "./dto/create-order.request"; export class CreateOrderResolver { @GqlMutation(()=>String,{name:"createOrder"}) create(@GqlArgs("request") request:CreateOrderRequest){return request.itemId} }\n',
+    'src/modules/platform/database/entities/order.entity.ts': 'import { DatabaseEntity } from "../../../../framework"; @DatabaseEntity() export class OrderEntity {}\n',
+    'src/modules/catalog/enums/order-status.ts': 'import { registerGraphQlEnum } from "../../../framework"; export enum OrderStatus { Pending="pending", Complete="complete" } registerGraphQlEnum(OrderStatus,{name:"OrderStatus"});\n',
+    'src/modules/catalog/errors/challenge-not-found.ts': 'export class ChallengeNotFoundException extends Error {}\n',
+  });
+  installSourceShapeTypes(root);
+  const result = check(root);
+  assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+  assert.deepEqual(result.coverage.backendSourceShape, {
+    files: 9, legacyFiles: [], layout: { status: 'checked' }, naming: { status: 'checked' },
+  });
+  assert.ok(result.coverage.checkedRuleIds.includes('BE_FEATURE_LAYOUT_INVALID'));
+  assert.ok(result.coverage.checkedRuleIds.includes('BE_SOURCE_NAME_INVALID'));
+});
+
+test('backend source shape locates layer, class, enum, contract, and GraphQL naming violations', t => {
+  const root = fixture(t, 'backend', {
+    'src/features/orders/application/create-order.request.ts': 'export class CreateOrderRequest {}\n',
+    'src/features/orders/application/create-order.contracts.ts': 'interface CreateOrderData { readonly itemId:string } type WrappedWrong=Readonly<{readonly value:string}>; type Shape={readonly x:string}; type AliasWrong=Shape; type Pick<T,K extends keyof T>=string; type Scalar=Pick<{readonly ignored:string},"ignored">; export {CreateOrderData,WrappedWrong,AliasWrong,Scalar};\n',
+    'src/modules/catalog/bad_Name.service.ts': 'export class WrongName {}\n',
+    'src/modules/catalog/export-list.service.ts': 'class ExportListWrong {} export {ExportListWrong};\n',
+    'src/modules/catalog/class-expression.service.ts': 'export const Wrong=class {};\n',
+    'src/modules/catalog/named-expression.service.ts': 'const Value=class InnerWrong {}; export {Value};\n',
+    'src/features/orders/transport/http/run.use-case.ts': 'export class RunUseCase {}\n',
+    'src/features/orders/transport/graphql/dto/order.entity.ts': 'import { Entity } from "typeorm"; @Entity() export class OrderEntity {}\n',
+    'src/features/orders/migrations/1790000000000-CreateOrders.ts': 'export class CreateOrders { up(){} down(){} }\n',
+    'src/features/orders/transport/graphql/order-view.mapper.ts': 'import { ViewEntity } from "typeorm"; @ViewEntity() export class OrderViewMapper {}\n',
+    'src/features/orders/application/order-schema.use-case.ts': 'import { EntitySchema } from "typeorm"; const make=()=>new EntitySchema({name:"order"}); export const schema=make();\n',
+    'src/features/orders/transport/graphql/create-order.input.ts': 'import { InputType } from "@nestjs/graphql"; @InputType() export class CreateOrderInput {}\n',
+    'src/features/orders/transport/graphql/create-order.resolver.ts': 'import { Args,Mutation } from "@nestjs/graphql"; export class CreateOrderResolver { @Mutation(()=>String,{name:"Create_Order"}) create(@Args("itemId") itemId:string){return itemId} }\n',
+    'src/modules/catalog/enums/order-status.ts': 'export const enum orderStatus { pending=1 }\n',
+  });
+  installSourceShapeTypes(root);
+  const result = check(root);
+  assert.equal(result.coverage.backendSourceShape.layout.status, 'checked', JSON.stringify(result, null, 2));
+  assert.equal(result.coverage.backendSourceShape.naming.status, 'checked', JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_FEATURE_LAYOUT_INVALID' && /request source/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_FEATURE_LAYOUT_INVALID' && /TypeORM entities/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_FEATURE_LAYOUT_INVALID' && item.path.endsWith('/order-view.mapper.ts')), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_FEATURE_LAYOUT_INVALID' && /Migration source/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_FEATURE_LAYOUT_INVALID' && /EntitySchema/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /Source basename/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /Exported class WrongName/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && item.path.endsWith('/export-list.service.ts')), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && item.path.endsWith('/class-expression.service.ts')), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && item.path.endsWith('/named-expression.service.ts')), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /CreateOrderData/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /WrappedWrong/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /AliasWrong/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.equal(result.violations.some(item => /Scalar/.test(item.message)), false, JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /Enums must/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /GraphQL field name/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /literal name request/.test(item.message)), JSON.stringify(result, null, 2));
+});
+
+test('backend source shape exposes legacy and dynamic naming as unavailable coverage', t => {
+  const root = fixture(t, 'backend', {
+    'src/features/legacy/old.service.ts': 'export class OldService {}\n',
+    'src/features/orders/application/run.workflow.ts': 'export const run=()=>"ok";\n',
+    'src/features/orders/transport/graphql/order.resolver.ts': 'import { Query } from "@nestjs/graphql"; const FIELD="order"; export class OrderResolver { @Query(()=>String,{name:FIELD}) order(){return "order"} }\n',
+    'src/features/orders/transport/graphql/wrapped.resolver.ts': 'import { Query } from "@nestjs/graphql"; const make=()=>Query; const Wrapped=make(); export class WrappedResolver { @Wrapped(()=>String,{name:"wrapped"}) wrapped(){return "wrapped"} }\n',
+    'src/features/orders/transport/graphql/deep.resolver.ts': 'import { Query } from "@nestjs/graphql"; const q0=()=>Query; const q1=()=>q0(); const q2=()=>q1(); const q3=()=>q2(); const q4=()=>q3(); const q5=()=>q4(); const q6=()=>q5(); const q7=()=>q6(); const q8=()=>q7(); const q9=()=>q8(); const q10=()=>q9(); const q11=()=>q10(); const q12=()=>q11(); const Deep=q12(); export class DeepResolver { @Deep(()=>String,{name:"deep"}) deep(){return "deep"} }\n',
+    'src/modules/catalog/engine.workflow.ts': 'export class EngineWorkflow {}\n',
+    'src/modules/catalog/graphql-enum.adapter.ts': 'export const createEnumType=(value:unknown)=>value; createEnumType({ Pending:"pending" });\n',
+    'src/modules/catalog/index.ts': 'export const catalog=true;\n',
+    'src/modules/catalog/public.types.ts': 'interface Workspace { readonly id:string } export {Workspace};\n',
+  });
+  installSourceShapeTypes(root);
+  const configFile = path.join(root, 'architecture.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.backend = { legacyRoots: ['src/features/legacy'] };
+  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const result = check(root);
+  assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+  assert.equal(result.coverage.backendSourceShape.layout.status, 'unavailable');
+  assert.equal(result.coverage.backendSourceShape.naming.status, 'unavailable');
+  assert.deepEqual(result.coverage.backendSourceShape.legacyFiles, ['src/features/legacy/old.service.ts']);
+  assert.equal(result.coverage.checkedRuleIds.includes('BE_FEATURE_LAYOUT_INVALID'), false);
+  assert.equal(result.coverage.checkedRuleIds.includes('BE_SOURCE_NAME_INVALID'), false);
+  assert.ok(result.coverage.backendSourceShape.naming.details.some(item => /dynamic @Query field name/.test(item)));
+  assert.ok(result.coverage.backendSourceShape.naming.details.some(item => /constructed Query decorator identity/.test(item)));
+  assert.ok(result.coverage.backendSourceShape.naming.details.some(item => /unproven framework decorator identity/.test(item)));
+  assert.ok(result.coverage.backendSourceShape.naming.details.some(item => /unclassified file role workflow/.test(item)));
+  assert.ok(result.coverage.backendSourceShape.naming.details.some(item => /GraphQL enum adapter/.test(item)));
+  assert.ok(result.coverage.backendSourceShape.naming.details.some(item => /object contract Workspace/.test(item)));
+  assert.ok(result.coverage.backendSourceShape.layout.details.some(item => /role workflow is not a selected application-layer role/.test(item)));
+  assert.equal(result.violations.some(item => item.path.endsWith('/engine.workflow.ts')), false);
+});
+
+test('backend legacy roots must be bounded, existing, and non-overlapping', t => {
+  const root = fixture(t, 'backend', {
+    'src/features/legacy/nested/old.service.ts': 'export class OldService {}\n',
+    'src/modules/catalog/index.ts': 'export const catalog=true;\n',
+  });
+  const configFile = path.join(root, 'architecture.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.backend = { legacyRoots: ['src/features/legacy', 'src/features/legacy/nested'] };
+  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const overlap = check(root);
+  assert.equal(overlap.ok, false);
+  assert.equal(overlap.errors[0].ruleId, 'ARCH_CONFIG_INVALID');
+  assert.match(overlap.errors[0].message, /cannot overlap/);
+  config.backend = { legacyRoots: ['src'] };
+  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const outside = check(root);
+  assert.equal(outside.ok, false);
+  assert.equal(outside.errors[0].ruleId, 'ARCH_CONFIG_INVALID');
+  assert.match(outside.errors[0].message, /must stay inside/);
 });
 
 test('declared Grammar contract binds public code, style entry, peers, and product imports', t => {

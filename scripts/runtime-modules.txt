@@ -4,6 +4,7 @@
 
 checks/code-patterns/nest.mjs
 checks/code-patterns/nest-metadata.mjs
+checks/code-patterns/nest-boundaries.mjs
 
 core/identity.mjs
 core/index.mjs
@@ -30,6 +31,7 @@ checks/architecture/backend.mjs
 checks/architecture/frontend.mjs
 checks/architecture/owners.mjs
 checks/architecture/registration.mjs
+checks/architecture/source-names.mjs
 checks/stacks.mjs
 checks/render.mjs
 execution/contracts.mjs

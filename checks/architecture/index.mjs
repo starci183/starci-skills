@@ -6,11 +6,13 @@ import { checkBackend } from './backend.mjs';
 import { checkFrontend } from './frontend.mjs';
 import { checkOwners } from './owners.mjs';
 import { checkModuleRegistration, REGISTRATION_RULE_IDS } from './registration.mjs';
+import { checkBackendSourceShape, SOURCE_LAYOUT_RULE_ID, SOURCE_NAME_RULE_ID } from './source-names.mjs';
 
 const LIMITATIONS = [
   'This is a static TypeScript dependency and source-shape check; it does not prove runtime dependency-injection bindings, global/provider scope, state lifetime, server/client behavior, feature-versus-capability ownership, route behavior, or business correctness.',
   'Dependencies hidden behind constructed aliases, reflection, or calls other than direct import()/require() syntax require separate review.',
   'Protocol surfaces selected through reflection, nonliteral computed properties, or aliases constructed beyond static import/re-export bindings require separate review.',
+  'Backend source-shape rules classify only resolved roots, declarations, framework symbols, and static decorator arguments; cohesive capability, error, persistence, and migration ownership still require design and runtime evidence.',
 ];
 
 const COMMON_RULE_IDS = [
@@ -80,12 +82,16 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
   }
   const violations = [];
   let moduleRegistration = { status: 'not-applicable' };
+  let backendSourceShape = { status: 'not-applicable' };
   if (context.program) violations.push(...checkOwners(config, context));
   if (context.program && config.kinds.includes('backend')) {
     violations.push(...checkBackend(config, context));
     const registration = checkModuleRegistration(config, context);
     violations.push(...registration.violations);
     moduleRegistration = registration.coverage;
+    const sourceShape = checkBackendSourceShape(config, context);
+    violations.push(...sourceShape.violations);
+    backendSourceShape = sourceShape.coverage;
   }
   if (context.program && config.kinds.includes('frontend')) violations.push(...checkFrontend(config, context));
   const errors = stable(context.errors);
@@ -94,6 +100,7 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
   const missingOwnerEntries = config.owners?.filter(owner => !sourceFiles.has(canonical(path.resolve(config.root, ...owner.entry.split('/'))))) ?? [];
   const coverage = {
     sourceFiles: context.files.map(file => relativePath(config.root, canonical(file.fileName))).sort(),
+    backendSourceShape,
     moduleRegistration,
     ownerPublicApi: config.owners === null
       ? { status: 'unavailable', reason: 'architecture.json does not declare owners and public entries' }
@@ -114,6 +121,8 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
     ...(coverage.ownerPublicApi.status === 'checked' ? OWNER_RULE_IDS : []),
     ...(coverage.grammarContract.status === 'checked' ? GRAMMAR_RULE_IDS : []),
     ...(coverage.moduleRegistration.status === 'checked' ? REGISTRATION_RULE_IDS : []),
+    ...(coverage.backendSourceShape.layout?.status === 'checked' ? [SOURCE_LAYOUT_RULE_ID] : []),
+    ...(coverage.backendSourceShape.naming?.status === 'checked' ? [SOURCE_NAME_RULE_ID] : []),
   ])].sort();
   return {
     schema: 'starci/architecture-check@1',
