@@ -27,12 +27,21 @@ without requiring a self dependency.
 
 The adapter binds the target package manifest and lock, exact public entry, the
 existing files under the package's explicit published roots, and repository
-`src` and `scripts` inputs where present. It follows static relative imports
-from the public entry and rejects a helper outside that bound inventory, dynamic
-module loading, interior links and package escapes. This is a bounded identity,
-not a claim that every file in the repository belongs to the published package.
-The same byte identity and public selection must remain before and after the
-probe.
+`src` and `scripts` inputs where present. It follows static relative, package
+imports and bare-package imports from the public entry, including literal
+`import()` and CommonJS `require()` edges. A bare dependency must resolve to a
+canonical package manifest whose exact name and version have a unique npm
+`package-lock.json` record. The checker hashes that dependency's installed
+package inventory as well as the manifest and lock. The lock record therefore
+does not stand in for the installed bytes. Node built-ins are recorded
+separately. Absolute/file/data imports, non-literal module names, ambiguous lock
+bindings, interior links and package escapes make coverage unavailable.
+
+This is a bounded identity, not a claim that every file in the repository
+belongs to the published package. The same byte inventory and public selection
+must remain before and after the probe. External static dependencies currently
+require npm lock package records; another lock format with external runtime
+dependencies is unavailable rather than treated as equivalent evidence.
 
 ## Finite behavior proof
 
@@ -50,7 +59,10 @@ Node's ESM import conditions and checks these finite vectors:
 
 The subprocess has a fixed timeout, no shell, a minimal non-secret environment,
 bounded output and bounded package inventory. Node's permission model allows
-filesystem reads and denies filesystem writes, child processes and workers.
+filesystem reads only within the fully hashed Grammar inventory roots and the
+fully hashed canonical roots of resolved external packages. An imported module
+cannot obtain behavior data from an unbound file through `node:fs`. Filesystem
+writes, child processes and workers are denied.
 Network access is denied only on Node versions whose permission model exposes
 that capability; Node 22 does not. The report states the actual capability.
 This executes the selected trusted package and is a seat belt against accidental
@@ -67,5 +79,7 @@ presentation copy, error redaction, React rendering, npm behavior, package
 publication, browser behavior or product UAT. The `compiler` field records the
 target TypeScript tool identity required by the common script-result protocol;
 the behavior evidence is separately recorded as a Node ESM execution probe.
-Bare external dependencies are selected by Node under the bound target manifest
-and lock but are not counted as files in the Grammar package inventory.
+The exact static import closure is reported separately from the broader bound
+package inventories that Node is permitted to read. The check does not claim
+that a package lock alone identifies installed bytes or that the permission
+model is a security sandbox for adversarial package code.

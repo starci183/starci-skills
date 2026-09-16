@@ -1,17 +1,19 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { builtinModules } from 'node:module';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
 
 export const GRAMMAR_GUARD_RULES = Object.freeze(['FE_GRAMMAR_GUARD_BEHAVIOR']);
 const CONTRACT_SCHEMA = 'starci/grammar-guard-contract@1';
 const VECTOR_PROFILE = 'starci/grammar-guards-v1';
 const RESULT_SCHEMA = 'starci/grammar-guard-probe@1';
-const MAX_FILES = 2048;
-const MAX_BYTES = 32 * 1024 * 1024;
+const MAX_FILES = 20_000;
+const MAX_BYTES = 256 * 1024 * 1024;
 const TIMEOUT_MS = 15_000;
+const BUILTINS = new Set(builtinModules.flatMap(name => [name, name.startsWith('node:') ? name : `node:${name}`]));
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const slash = value => value.replaceAll('\\', '/');
 
@@ -56,10 +58,11 @@ function readContract(root) {
   return { pkg, value };
 }
 
-function runNode(spawn, args, cwd, timeout = TIMEOUT_MS) {
+function runNode(spawn, args, cwd, timeout = TIMEOUT_MS, allowReads = ['*'], input = undefined) {
   const env = { FORCE_COLOR: '0', NO_COLOR: '1', NODE_ENV: 'production' };
   for (const name of ['SYSTEMROOT', 'WINDIR', 'ComSpec', 'TEMP', 'TMP']) if (typeof process.env[name] === 'string') env[name] = process.env[name];
-  return spawn(process.execPath, ['--permission', '--allow-fs-read=*', ...args], {
+  const permissions = allowReads.map(value => `--allow-fs-read=${value}`);
+  return spawn(process.execPath, ['--permission', ...permissions, ...args], {
     cwd,
     encoding: 'utf8',
     windowsHide: true,
@@ -67,6 +70,7 @@ function runNode(spawn, args, cwd, timeout = TIMEOUT_MS) {
     timeout,
     maxBuffer: 4 * 1024 * 1024,
     env,
+    input,
   });
 }
 
@@ -109,48 +113,7 @@ function resolvePackage(root, contract, spawn) {
   return { root: packageRoot, entry: selected, selection: standalone ? 'standalone-import' : 'consumer-import' };
 }
 
-function staticRelativeDependencies(ts, packageRoot, entry, inventoryFiles, packageType) {
-  const inventory = new Set(inventoryFiles.map(([, file]) => path.resolve(file)));
-  const visited = new Set();
-  const pending = [entry];
-  const resolve = (source, specifier) => {
-    const base = path.resolve(path.dirname(source), specifier);
-    const candidates = [base, ...['.js', '.mjs', '.cjs', '.json'].map(extension => `${base}${extension}`),
-      ...['index.js', 'index.mjs', 'index.cjs', 'index.json'].map(name => path.join(base, name))];
-    const found = candidates.find(candidate => fs.existsSync(candidate) && fs.lstatSync(candidate).isFile());
-    if (!found) throw Error(`Grammar public entry has an unresolved relative dependency: ${specifier}`);
-    const canonical = fs.realpathSync(found);
-    if (!inside(packageRoot, canonical)) throw Error('Grammar public entry dependency escapes its canonical package root.');
-    if (!inventory.has(path.resolve(canonical))) throw Error(`Grammar public entry dependency is outside the bound package inventory: ${slash(path.relative(packageRoot, canonical))}`);
-    return canonical;
-  };
-  while (pending.length) {
-    const file = pending.pop();
-    if (visited.has(file) || !/\.[cm]?[jt]sx?$/i.test(file)) continue;
-    visited.add(file);
-    const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
-    const visit = node => {
-      let literal = null;
-      if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteralLike(node.moduleSpecifier)) literal = node.moduleSpecifier;
-      else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)
-        && node.moduleReference.expression && ts.isStringLiteralLike(node.moduleReference.expression)) literal = node.moduleReference.expression;
-      else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-        if (![1, 2].includes(node.arguments.length) || !ts.isStringLiteralLike(node.arguments[0])) throw Error('Grammar public entry has an unresolved dynamic import.');
-        literal = node.arguments[0];
-      } else if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'require'
-        && (file.toLowerCase().endsWith('.cjs') || (file.toLowerCase().endsWith('.js') && packageType !== 'module'))) {
-        if (node.arguments.length !== 1 || !ts.isStringLiteralLike(node.arguments[0])) throw Error('Grammar public entry has an unresolved dynamic require.');
-        literal = node.arguments[0];
-      }
-      if (literal?.text.startsWith('.')) pending.push(resolve(file, literal.text));
-      ts.forEachChild(node, visit);
-    };
-    visit(source);
-  }
-  return [...visited].map(file => slash(path.relative(packageRoot, file))).sort();
-}
-
-function packageInputs(ts, packageRoot, sourceKind, entry) {
+function packageInputs(packageRoot, sourceKind, entry) {
   const manifest = path.join(packageRoot, 'package.json');
   const pkg = JSON.parse(fs.readFileSync(manifest, 'utf8'));
   if (!Array.isArray(pkg.files) || !pkg.files.length || pkg.files.some(value => typeof value !== 'string' || !value || /[*?{}]/.test(value)
@@ -182,7 +145,7 @@ function packageInputs(ts, packageRoot, sourceKind, entry) {
   };
   for (const absolute of roots) visit(absolute);
   const sorted = [...files].sort(([a], [b]) => a.localeCompare(b));
-  return { pkg, files: sorted, bytes, dependencyFiles: staticRelativeDependencies(ts, packageRoot, entry, sorted, pkg.type) };
+  return { pkg, files: sorted, bytes, readRoots: [...roots].map(value => fs.realpathSync(value)).sort() };
 }
 
 function targetInputs(root) {
@@ -192,21 +155,227 @@ function targetInputs(root) {
   return files;
 }
 
-function identity(ts, root, resolved) {
-  const inventory = packageInputs(ts, resolved.root, resolved.sourceKind, resolved.entry);
+function npmLock(root) {
+  const file = path.join(root, 'package-lock.json');
+  if (!fs.existsSync(file)) return null;
+  const value = JSON.parse(fs.readFileSync(file, 'utf8'));
+  return plain(value.packages) ? value.packages : null;
+}
+
+function packageNameFromSpecifier(specifier) {
+  if (specifier.startsWith('@')) return specifier.split('/').slice(0, 2).join('/');
+  return specifier.split('/')[0];
+}
+
+function packageAt(file, expectedName = null) {
+  for (let cursor = path.dirname(file); path.dirname(cursor) !== cursor; cursor = path.dirname(cursor)) {
+    const manifest = path.join(cursor, 'package.json');
+    if (!fs.existsSync(manifest) || !fs.lstatSync(manifest).isFile()) continue;
+    let pkg;
+    try { pkg = JSON.parse(fs.readFileSync(manifest, 'utf8')); } catch { throw Error('Resolved dependency package manifest is invalid.'); }
+    if (typeof pkg.name !== 'string' || !pkg.name || typeof pkg.version !== 'string' || !pkg.version) continue;
+    if (expectedName && pkg.name !== expectedName) throw Error(`Resolved dependency package identity does not match ${expectedName}.`);
+    return { root: fs.realpathSync(cursor), manifest: fs.realpathSync(manifest), pkg };
+  }
+  throw Error('Resolved external dependency has no canonical package identity.');
+}
+
+function lockBinding(root, packages, packageRecord) {
+  if (!packages) throw Error(`External dependency ${packageRecord.pkg.name} cannot be bound without an npm package-lock package record.`);
+  const suffix = `node_modules/${packageRecord.pkg.name}`;
+  const candidates = Object.entries(packages).filter(([key, value]) => slash(key).endsWith(suffix)
+    && plain(value) && value.version === packageRecord.pkg.version).map(([key]) => key).sort();
+  if (!candidates.length) throw Error(`External dependency ${packageRecord.pkg.name}@${packageRecord.pkg.version} is absent from the target dependency lock.`);
+  const exact = candidates.filter(key => {
+    const declared = path.resolve(root, key);
+    try { return fs.existsSync(declared) && fs.realpathSync(declared) === packageRecord.root; } catch { return false; }
+  });
+  if (exact.length === 1) return slash(exact[0]);
+  if (!inside(root, packageRecord.root) && candidates.length === 1) return slash(candidates[0]);
+  throw Error(`External dependency ${packageRecord.pkg.name}@${packageRecord.pkg.version} has no unique canonical lock binding.`);
+}
+
+function externalPackageInventory(record) {
+  const files = new Map(); let bytes = 0;
+  const names = fs.readdirSync(record.root);
+  if (names.some(name => ['node_modules', '.git'].includes(name))) {
+    throw Error(`External dependency ${record.pkg.name} has an unbounded nested dependency or repository directory.`);
+  }
+  const roots = names.map(name => path.join(record.root, name)).sort();
+  const visit = absolute => {
+    const stat = fs.lstatSync(absolute);
+    if (stat.isSymbolicLink()) throw Error(`External dependency ${record.pkg.name} contains an interior link.`);
+    if (stat.isDirectory()) { for (const name of fs.readdirSync(absolute).sort()) visit(path.join(absolute, name)); return; }
+    if (!stat.isFile()) throw Error(`External dependency ${record.pkg.name} contains a non-file input.`);
+    const canonical = fs.realpathSync(absolute);
+    if (!inside(record.root, canonical)) throw Error(`External dependency ${record.pkg.name} escapes its canonical package root.`);
+    const relative = slash(path.relative(record.root, canonical));
+    if (!files.has(relative)) { files.set(relative, canonical); bytes += stat.size; }
+  };
+  for (const absolute of roots) visit(absolute);
+  return { files: [...files].sort(([a], [b]) => a.localeCompare(b)), bytes, readRoots: [record.root] };
+}
+
+function staticReferences(ts, file, packageType) {
+  const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+  let declaredRequire = false;
+  const findRequireDeclaration = node => {
+    if ((ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node))
+      && node.name && ts.isIdentifier(node.name) && node.name.text === 'require') declaredRequire = true;
+    ts.forEachChild(node, findRequireDeclaration);
+  };
+  findRequireDeclaration(source);
+  const references = [];
+  const visit = node => {
+    let literal = null; let mode = 'import';
+    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteralLike(node.moduleSpecifier)) literal = node.moduleSpecifier;
+    else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
+      if (!node.moduleReference.expression || !ts.isStringLiteralLike(node.moduleReference.expression)) throw Error('Grammar closure has an unresolved import-equals dependency.');
+      literal = node.moduleReference.expression; mode = 'require';
+    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      if (![1, 2].includes(node.arguments.length) || !ts.isStringLiteralLike(node.arguments[0])) throw Error('Grammar closure has an unresolved dynamic import.');
+      literal = node.arguments[0];
+    } else if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'require'
+      && (file.toLowerCase().endsWith('.cjs') || (file.toLowerCase().endsWith('.js') && packageType !== 'module'))) {
+      if (declaredRequire) throw Error('Grammar closure has a shadowed CommonJS require that cannot be resolved statically.');
+      if (node.arguments.length !== 1 || !ts.isStringLiteralLike(node.arguments[0])) throw Error('Grammar closure has an unresolved dynamic require.');
+      literal = node.arguments[0]; mode = 'require';
+    }
+    if (literal) references.push({ specifier: literal.text, mode });
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return references;
+}
+
+function resolveReferences(root, requests, spawn) {
+  if (!requests.length) return [];
+  const pairs = requests.map(({ importer, reference }) => [reference.specifier, pathToFileURL(importer).href, reference.mode]);
+  const code = "import fs from 'node:fs';import {createRequire} from 'node:module';import {fileURLToPath} from 'node:url';const p=JSON.parse(fs.readFileSync(0,'utf8'));process.stdout.write(JSON.stringify(p.map(([s,u,m])=>m==='require'?createRequire(fileURLToPath(u)).resolve(s):import.meta.resolve(s,u))))";
+  const result = runNode(spawn, ['--experimental-import-meta-resolve', '--input-type=module', '-e', code], root, 15_000, ['*'], JSON.stringify(pairs));
+  if (result.error || result.status !== 0 || result.signal || result.stderr || typeof result.stdout !== 'string') throw Error('Grammar static dependency resolution is unavailable.');
+  let urls;
+  try { urls = JSON.parse(result.stdout); } catch { throw Error('Grammar static dependency resolution returned malformed output.'); }
+  if (!Array.isArray(urls) || urls.length !== requests.length || urls.some(value => typeof value !== 'string')) throw Error('Grammar static dependency resolution returned an invalid result.');
+  return urls;
+}
+
+function closureInputs(ts, root, resolved, inventory, spawn) {
+  const grammarInventory = new Set(inventory.files.map(([, file]) => fs.realpathSync(file)));
+  const locks = npmLock(root);
+  const packages = new Map();
+  const grammar = { root: resolved.root, manifest: fs.realpathSync(path.join(resolved.root, 'package.json')), pkg: inventory.pkg,
+    lockKey: null, kind: 'grammar' };
+  packages.set(resolved.root, grammar);
+  const files = new Map();
+  const pending = [resolved.entry];
+  const builtins = new Set();
+  const add = (file, owner) => {
+    const canonical = fs.realpathSync(file);
+    if (!inside(owner.root, canonical)) throw Error('Grammar static dependency escapes its canonical package root.');
+    for (let cursor = canonical; cursor !== owner.root; cursor = path.dirname(cursor)) {
+      if (fs.lstatSync(cursor).isSymbolicLink()) throw Error('Grammar static dependency redirects through an interior link.');
+    }
+    if (!fs.lstatSync(canonical).isFile()) throw Error('Grammar static dependency is not a regular file.');
+    if (owner.kind === 'grammar' && !grammarInventory.has(canonical)) {
+      throw Error(`Grammar public entry dependency is outside the bound package inventory: ${slash(path.relative(owner.root, canonical))}`);
+    }
+    if (!files.has(canonical)) { files.set(canonical, owner); pending.push(canonical); }
+  };
+  add(resolved.entry, grammar);
+  while (pending.length) {
+    const batch = pending.splice(0, pending.length).filter(file => /\.[cm]?[jt]sx?$/i.test(file));
+    const requests = [];
+    for (const importer of batch) {
+      const owner = files.get(importer);
+      for (const reference of staticReferences(ts, importer, owner.pkg.type)) {
+        const specifier = reference.specifier;
+        if (BUILTINS.has(specifier)) { builtins.add(specifier.startsWith('node:') ? specifier : `node:${specifier}`); continue; }
+        if (specifier.startsWith('file:') || specifier.startsWith('data:') || specifier.startsWith('/') || /^[A-Za-z]:[\\/]/.test(specifier)
+          || (/^[a-z][a-z0-9+.-]*:/i.test(specifier) && !specifier.startsWith('node:'))) {
+          throw Error(`Grammar closure uses an unsupported absolute or data dependency: ${specifier}`);
+        }
+        requests.push({ importer, owner, reference });
+      }
+    }
+    const urls = resolveReferences(root, requests, spawn);
+    for (let index = 0; index < requests.length; index += 1) {
+      const { owner, reference } = requests[index], value = urls[index];
+      if (BUILTINS.has(value)) { builtins.add(value.startsWith('node:') ? value : `node:${value}`); continue; }
+      let dependency;
+      if (path.isAbsolute(value)) dependency = fs.realpathSync(value);
+      else {
+        let url;
+        try { url = new URL(value); } catch { throw Error('Grammar dependency resolution returned an invalid URL.'); }
+        if (url.protocol !== 'file:') throw Error(`Grammar dependency resolution is not file-bound: ${reference.specifier}`);
+        dependency = fs.realpathSync(fileURLToPath(url));
+      }
+      let targetOwner;
+      if (reference.specifier.startsWith('.')) {
+        targetOwner = owner;
+        if (!inside(owner.root, dependency)) throw Error('Grammar relative dependency escapes its canonical package root.');
+      } else {
+        const expected = reference.specifier.startsWith('#') ? null : packageNameFromSpecifier(reference.specifier);
+        const found = packageAt(dependency, expected);
+        targetOwner = packages.get(found.root);
+        if (!targetOwner) {
+          found.lockKey = lockBinding(root, locks, found); found.kind = 'external';
+          targetOwner = found; packages.set(found.root, found);
+        }
+      }
+      add(dependency, targetOwner);
+    }
+    if (files.size > MAX_FILES) throw Error('Grammar static dependency closure exceeds the bounded file ceiling.');
+  }
+  const packageList = [...packages.values()].sort((a, b) => `${a.pkg.name}@${a.pkg.version}:${a.lockKey ?? ''}`.localeCompare(`${b.pkg.name}@${b.pkg.version}:${b.lockKey ?? ''}`));
+  const packageLabels = new Map(packageList.map((item, index) => [item.root, item.kind === 'grammar' ? 'grammar' : `dependency:${item.pkg.name}@${item.pkg.version}:${item.lockKey}:${index}`]));
+  for (const item of packageList) item.label = packageLabels.get(item.root);
+  const closureFiles = [...files].map(([file, owner]) => [`${packageLabels.get(owner.root)}:${slash(path.relative(owner.root, file))}`, file])
+    .sort(([a], [b]) => a.localeCompare(b));
+  const manifests = packageList.map(item => [`${packageLabels.get(item.root)}:package.json`, item.manifest]);
+  return { files: [...new Map([...closureFiles, ...manifests].map(item => [item[0], item])).values()].sort(([a], [b]) => a.localeCompare(b)),
+    dependencyFiles: closureFiles.map(([name]) => name), builtins: [...builtins].sort(), packages: packageList.filter(item => item.kind === 'external') };
+}
+
+function identity(ts, root, resolved, spawn) {
+  const inventory = packageInputs(resolved.root, resolved.sourceKind, resolved.entry);
+  const closure = closureInputs(ts, root, resolved, inventory, spawn);
+  const externalInventories = closure.packages.map(item => ({ item, inventory: externalPackageInventory(item) }));
+  return assembleIdentity(root, inventory, closure, externalInventories);
+}
+
+function assembleIdentity(root, inventory, closure, externalInventories) {
   const hash = crypto.createHash('sha256');
   const files = [...targetInputs(root).map(([name, file]) => [`target:${name}`, file]),
-    ...inventory.files.map(([name, file]) => [`grammar:${name}`, file])].sort(([a], [b]) => a.localeCompare(b));
+    ...inventory.files.map(([name, file]) => [`grammar-inventory:${name}`, file]),
+    ...externalInventories.flatMap(({ item, inventory: external }) => external.files.map(([name, file]) => [`${item.label}:inventory:${name}`, file]))]
+    .sort(([a], [b]) => a.localeCompare(b));
+  let bytes = 0;
   for (const [name, file] of files) {
-    hash.update(name); hash.update(Buffer.from([0])); hash.update(fs.readFileSync(file)); hash.update(Buffer.from([0]));
+    const content = fs.readFileSync(file); bytes += content.length;
+    hash.update(name); hash.update(Buffer.from([0])); hash.update(content); hash.update(Buffer.from([0]));
+    if (files.length > MAX_FILES || bytes > MAX_BYTES) throw Error(`Grammar package and dependency identity exceeds the bounded input ceiling (${files.length} files, ${bytes} bytes).`);
   }
-  return { digest: hash.digest('hex'), files: files.map(([name]) => name), package: inventory.pkg, bytes: inventory.bytes,
-    dependencyFiles: inventory.dependencyFiles };
+  const readFiles = [...new Set([...inventory.readRoots, ...externalInventories.flatMap(({ inventory: external }) => external.readRoots)])].sort();
+  return { digest: hash.digest('hex'), files: files.map(([name]) => name), readFiles,
+    package: inventory.pkg, bytes, dependencyFiles: closure.dependencyFiles, builtins: closure.builtins,
+    externalPackages: closure.packages.map(item => ({ name: item.pkg.name, version: item.pkg.version, lockKey: item.lockKey })),
+    externalRecords: closure.packages };
+}
+
+function recheckIdentity(root, resolved, before) {
+  const inventory = packageInputs(resolved.root, resolved.sourceKind, resolved.entry);
+  const externalInventories = before.externalRecords.map(item => {
+    if (lockBinding(root, npmLock(root), item) !== item.lockKey) throw Error(`External dependency ${item.pkg.name} selection changed during the behavior probe.`);
+    return { item, inventory: externalPackageInventory(item) };
+  });
+  return assembleIdentity(root, inventory, { dependencyFiles: before.dependencyFiles, builtins: before.builtins,
+    packages: before.externalRecords }, externalInventories);
 }
 
 function permissionCapabilities() {
   const networkDenied = process.allowedNodeEnvironmentFlags?.has?.('--allow-net') === true;
-  return { model: 'node-permission', trust: 'selected-package-is-trusted', filesystemRead: 'all', filesystemWrite: 'denied',
+  return { model: 'node-permission', trust: 'selected-package-is-trusted', filesystemRead: 'bound-package-inventories', filesystemWrite: 'denied',
     childProcess: 'denied', workerThreads: 'denied', network: networkDenied ? 'denied' : 'not-controlled-by-this-node-version' };
 }
 
@@ -244,8 +413,8 @@ try {
   process.stdout.write(JSON.stringify({schema,ok:false,unavailable:'public-entry-or-contract'}));
 }`;
 
-function executeProbe(resolved, spawn) {
-  const result = runNode(spawn, ['--input-type=module', '-e', PROBE, resolved.entry], resolved.root);
+function executeProbe(resolved, identityValue, spawn) {
+  const result = runNode(spawn, ['--input-type=module', '-e', PROBE, resolved.entry], resolved.root, TIMEOUT_MS, identityValue.readFiles);
   if (result.error || result.status !== 0 || result.signal || result.stderr || typeof result.stdout !== 'string') throw Error('Grammar guard behavior probe did not complete cleanly within its bound.');
   let parsed;
   try { parsed = JSON.parse(result.stdout); } catch { throw Error('Grammar guard behavior probe returned malformed output.'); }
@@ -272,14 +441,15 @@ export function checkGrammarGuards({ root, files, contextFiles = [], ruleIds } =
       const providerManifest = slash(path.relative(root, path.join(resolved.root, 'package.json')));
       if (inside(root, resolved.root) && !contextFiles.includes(providerManifest) && !files.includes(providerManifest)) throw Error('Repository Grammar package is outside the bound input context.');
     }
-    const before = identity(loaded.ts, root, resolved), probe = executeProbe(resolved, spawn), reselected = resolvePackage(root, contract, spawn);
+    const before = identity(loaded.ts, root, resolved, spawn), probe = executeProbe(resolved, before, spawn), reselected = resolvePackage(root, contract, spawn);
     reselected.sourceKind = contract.source.kind;
     if (reselected.root !== resolved.root || reselected.entry !== resolved.entry || reselected.selection !== resolved.selection) throw Error('The consumer Grammar package selection changed during the behavior probe.');
-    const after = identity(loaded.ts, root, reselected);
+    const after = recheckIdentity(root, reselected, before);
     if (before.digest !== after.digest || before.files.join('\0') !== after.files.join('\0')) throw Error('Grammar package or target selection inputs changed during the behavior probe.');
     result.execution = { engine: 'node-esm-import', node: process.version, permissions: permissionCapabilities(), vectorProfile: VECTOR_PROFILE,
       package: { name: before.package.name, version: before.package.version ?? null, root: slash(resolved.root), entry: slash(resolved.entry), selection: resolved.selection,
-        inputDigest: before.digest, boundFiles: before.files.length, packageBytes: before.bytes, dependencyFiles: before.dependencyFiles }, vectors: { requiredRules: probe.ruleCount, presentationStates: probe.stateCount,
+        inputDigest: before.digest, boundFiles: before.files.length, packageBytes: before.bytes, dependencyFiles: before.dependencyFiles,
+        builtins: before.builtins, externalPackages: before.externalPackages }, vectors: { requiredRules: probe.ruleCount, presentationStates: probe.stateCount,
         invalidPresentationValues: 6 } };
     for (const item of probe.violations) result.violations.push({ ruleId: GRAMMAR_GUARD_RULES[0], path: result.files[0], message: `Grammar guard vector failed: ${item.vector} (${item.reason}).` });
     result.checkedRuleIds = [...GRAMMAR_GUARD_RULES];

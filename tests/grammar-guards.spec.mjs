@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { checkGrammarGuards, GRAMMAR_GUARD_RULES } from '../checks/code-patterns/grammar-guards.mjs';
 
 const require = createRequire(import.meta.url);
@@ -69,7 +70,7 @@ test('installed public Grammar exports pass every bounded rule and presentation 
   assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
   assert.deepEqual(result.checkedRuleIds, [...GRAMMAR_GUARD_RULES]);
   assert.equal(result.execution.package.selection, 'installed-import');
-  assert.equal(result.execution.permissions.filesystemRead, 'all');
+  assert.equal(result.execution.permissions.filesystemRead, 'bound-package-inventories');
   assert.equal(result.execution.permissions.filesystemWrite, 'denied');
   assert.equal(result.execution.permissions.network, process.allowedNodeEnvironmentFlags.has('--allow-net') ? 'denied' : 'not-controlled-by-this-node-version');
   assert.deepEqual(result.execution.vectors, { requiredRules: 3, presentationStates: 3, invalidPresentationValues: 6 });
@@ -146,6 +147,68 @@ test('a static public-entry helper outside the declared package inventory is una
   const result = checkGrammarGuards(f.input);
   assert.ok(result.errors.some(item => item.message.includes('outside the bound package inventory')));
   assert.deepEqual(result.checkedRuleIds, []);
+});
+
+test('external imports and behavior reads are covered by canonical dependency custody', async t => {
+  await t.test('a locked external package is byte-bound before and after the probe', inner => {
+    const moduleSource = `export {COMMON_UI_RULE_IDS,PRESENTATION_STATES,defineGrammarRuleConformance,assertPresentationState} from '@external/helper';`;
+    const f = fixture(inner, { moduleSource });
+    f.write('package-lock.json', { lockfileVersion: 3, packages: { 'node_modules/@external/helper': { version: '1.0.0' } } });
+    f.write('node_modules/@external/helper/package.json', { name: '@external/helper', version: '1.0.0', type: 'module', exports: './index.js' });
+    const helper = f.write('node_modules/@external/helper/index.js', goodModule);
+    const clean = checkGrammarGuards(f.input);
+    assert.deepEqual(clean.errors, []); assert.deepEqual(clean.violations, []);
+    assert.deepEqual(clean.execution.package.externalPackages, [{ name: '@external/helper', version: '1.0.0', lockKey: 'node_modules/@external/helper' }]);
+    let mutated = false;
+    const spawn = (command, args, options) => {
+      const result = spawnSync(command, args, options);
+      if (!mutated && args.some(value => value.includes('starci/grammar-guard-probe@1'))) { fs.appendFileSync(helper, '\n// changed'); mutated = true; }
+      return result;
+    };
+    const changed = checkGrammarGuards(f.input, { spawn });
+    assert.ok(changed.errors.some(item => item.message.includes('changed during the behavior probe')));
+    assert.deepEqual(changed.checkedRuleIds, []);
+  });
+  await t.test('a bare package absent from the target lock cannot provide the guard API', inner => {
+    const moduleSource = `export {COMMON_UI_RULE_IDS,PRESENTATION_STATES,defineGrammarRuleConformance,assertPresentationState} from '@external/helper';`;
+    const f = fixture(inner, { moduleSource });
+    f.write('node_modules/@external/helper/package.json', { name: '@external/helper', version: '1.0.0', type: 'module', exports: './index.js' });
+    f.write('node_modules/@external/helper/index.js', goodModule);
+    const result = checkGrammarGuards(f.input);
+    assert.ok(result.errors.some(item => item.message.includes('@external/helper') && item.message.includes('package-lock')), JSON.stringify(result));
+    assert.deepEqual(result.checkedRuleIds, []);
+  });
+  await t.test('an absolute file import is never treated as a package dependency', inner => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-grammar-absolute-'));
+    inner.after(() => fs.rmSync(outside, { recursive: true, force: true }));
+    const helper = path.join(outside, 'helper.mjs'); fs.writeFileSync(helper, goodModule);
+    const moduleSource = `export {COMMON_UI_RULE_IDS,PRESENTATION_STATES,defineGrammarRuleConformance,assertPresentationState} from ${JSON.stringify(pathToFileURL(helper).href)};`;
+    const result = checkGrammarGuards(fixture(inner, { moduleSource }).input);
+    assert.ok(result.errors.some(item => item.message.includes('unsupported absolute or data dependency')));
+    assert.deepEqual(result.checkedRuleIds, []);
+  });
+  await t.test('node:fs cannot supply guard behavior from an unbound file', inner => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-grammar-read-'));
+    inner.after(() => fs.rmSync(outside, { recursive: true, force: true }));
+    const vocabulary = path.join(outside, 'vocabulary.json');
+    fs.writeFileSync(vocabulary, JSON.stringify({ rules: ['RULE-A', 'RULE-B', 'RULE-C'], states: ['neutral', 'pending', 'unavailable'] }));
+    const moduleSource = `
+import fs from 'node:fs';
+const value=JSON.parse(fs.readFileSync(${JSON.stringify(vocabulary)},'utf8'));
+export const COMMON_UI_RULE_IDS=value.rules;
+export const PRESENTATION_STATES=value.states;
+export function defineGrammarRuleConformance(definition){
+  const inherited=new Set(definition.inheritedCommonRules),evidence=new Set(Object.keys(definition.familyEvidence));
+  const missing=COMMON_UI_RULE_IDS.filter(rule=>!inherited.has(rule)&&!evidence.has(rule));
+  const unknown=[...inherited,...evidence].filter(rule=>!COMMON_UI_RULE_IDS.includes(rule));
+  if(missing.length||unknown.length)throw new TypeError('invalid conformance'); return Object.freeze({...definition});
+}
+export function assertPresentationState(value){if(!PRESENTATION_STATES.includes(value))throw new TypeError('invalid state')}
+`;
+    const result = checkGrammarGuards(fixture(inner, { moduleSource }).input);
+    assert.ok(result.errors.some(item => item.message.includes('exports or vocabulary are unavailable')));
+    assert.deepEqual(result.checkedRuleIds, []);
+  });
 });
 
 test('timeout, input mutation, selection changes and an interior package link fail closed', async t => {
