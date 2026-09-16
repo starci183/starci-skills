@@ -310,11 +310,11 @@ test('backend direction includes static dynamic imports that use import attribut
 test('feature application use cases may use Nest injection but cannot reach transport DTOs or protocol framework surfaces', t => {
   const root = fixture(t, 'backend', {
     'src/modules/orders/service.ts': 'export class OrdersService { create(input: {name:string}) { return input } }\n',
-    'src/features/orders/application/valid.use-case.ts': 'import { Injectable } from "@nestjs/common"; import { OrdersService } from "@modules/orders/service"; @Injectable() export class ValidUseCase { constructor(private readonly orders: OrdersService) {} execute(input:{name:string}) { return this.orders.create(input) } }\n',
+    'src/features/orders/application/valid.use-case.ts': 'import * as Nest from "@nestjs/common"; import { OrdersService } from "@modules/orders/service"; @Nest.Injectable() export class ValidUseCase { constructor(private readonly orders: OrdersService) {} execute(input:{name:string}) { return this.orders.create(input) } }\n',
     'src/features/orders/transport/graphql/create.input.ts': 'export class CreateInput { name!: string }\n',
     'src/features/orders/transport/index.ts': 'export type { CreateInput } from "./graphql/create.input"\n',
     'src/features/orders/shared/transport-types.ts': 'export type { CreateInput } from "../transport"\n',
-    'src/features/orders/application/invalid.use-case.ts': 'import { Body } from "@nestjs/common"; import { ArgsType } from "@nestjs/graphql"; import type { CreateInput } from "../shared/transport-types"; @ArgsType() export class InvalidUseCase { execute(@Body() input:CreateInput){ return input } }\n',
+    'src/features/orders/application/invalid.use-case.ts': 'import * as Nest from "@nestjs/common"; import { ArgsType } from "@nestjs/graphql"; import type { CreateInput } from "../shared/transport-types"; @ArgsType() export class InvalidUseCase { execute(@Nest.Body() input:CreateInput){ return input } }\n',
   });
   const result = check(root), rules = result.violations.map(item => item.ruleId);
   assert.ok(rules.includes('BE_APPLICATION_IMPORTS_TRANSPORT'), JSON.stringify(result, null, 2));

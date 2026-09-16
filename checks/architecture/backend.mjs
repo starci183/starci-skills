@@ -5,7 +5,7 @@ import { reachableViolation, relativePath, sourceLocation } from './typescript.m
 const FORBIDDEN_APP_ROLE = /(?:^|\.)(?:service|provider|providers|resolver|controller|handler|repository|entity|use-case|command|query|listener|consumer|processor)\.[cm]?[jt]sx?$/i;
 const FORBIDDEN_DECLARATION = /(?:Service|Provider|Resolver|Controller|Handler|Repository|Entity|UseCase|Command|Query|Listener|Consumer|Processor)$/;
 const FORBIDDEN_DECORATORS = new Set(['Controller', 'Resolver', 'Injectable', 'Processor', 'WebSocketGateway']);
-const TRANSPORT_PACKAGES = /^(?:@nestjs\/(?:graphql|microservices|platform-[^/]+|websockets)|@apollo\/|apollo-server|express(?:\/|$)|fastify(?:\/|$)|graphql(?:\/|$)|class-validator(?:\/|$)|class-transformer(?:\/|$))/;
+const TRANSPORT_PACKAGES = /^(?:@nestjs\/(?:graphql|microservices|platform-[^/]+|websockets)(?:\/|$)|@apollo\/|apollo-server(?:\/|$)|express(?:\/|$)|fastify(?:\/|$)|graphql(?:\/|$)|class-validator(?:\/|$)|class-transformer(?:\/|$))/;
 const NEST_COMMON_TRANSPORT = new Set(['Controller', 'Get', 'Post', 'Put', 'Patch', 'Delete', 'Options', 'Head', 'Body', 'Param', 'Query', 'Req', 'Request', 'Res', 'Response', 'Headers', 'Header', 'HttpCode', 'Redirect', 'Render', 'Sse', 'UploadedFile', 'UploadedFiles', 'UseGuards', 'UseInterceptors', 'UsePipes']);
 
 function absolute(root, relative) {
@@ -76,6 +76,20 @@ function roleEvidence(ts, sourceFile) {
 
 function transportFrameworkEvidence(ts, sourceFile) {
   const found = [];
+  const namespaceUsages = alias => {
+    const usages = [];
+    const visit = node => {
+      if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === alias
+        && NEST_COMMON_TRANSPORT.has(node.name.text)) usages.push({ node: node.name, detail: node.name.text });
+      if (ts.isElementAccessExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === alias) {
+        const selected = ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
+        if (selected === null || NEST_COMMON_TRANSPORT.has(selected)) usages.push({ node: node.argumentExpression, detail: selected ?? 'computed @nestjs/common namespace access' });
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+    return usages;
+  };
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier)) continue;
     const specifier = statement.moduleSpecifier.text;
@@ -86,7 +100,7 @@ function transportFrameworkEvidence(ts, sourceFile) {
     if (specifier !== '@nestjs/common' || !statement.importClause) continue;
     const bindings = statement.importClause.namedBindings;
     if (bindings && ts.isNamespaceImport(bindings)) {
-      found.push({ node: bindings, specifier, detail: 'namespace import from @nestjs/common' });
+      found.push(...namespaceUsages(bindings.name.text).map(item => ({ ...item, specifier })));
       continue;
     }
     if (!bindings || !ts.isNamedImports(bindings)) continue;
