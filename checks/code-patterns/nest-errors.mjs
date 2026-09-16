@@ -89,12 +89,23 @@ function propertyName(ts, node) {
     : ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
 }
 
-function member(object, name) {
-  return object?.properties?.find(item => (item.name?.text ?? item.name?.escapedText) === name);
+function member(ts, object, name) {
+  if (!ts.isObjectLiteralExpression(object)) return null;
+  for (let index = object.properties.length - 1; index >= 0; index -= 1) {
+    const item = object.properties[index];
+    if (ts.isSpreadAssignment(item)) return null;
+    if (item.name && ts.isComputedPropertyName(item.name)) {
+      if (!ts.isStringLiteralLike(item.name.expression)) return null;
+      if (item.name.expression.text === name) return item;
+      continue;
+    }
+    if ((item.name?.text ?? item.name?.escapedText) === name) return item;
+  }
+  return null;
 }
 
 function memberValue(ts, object, name) {
-  const item = member(object, name);
+  const item = member(ts, object, name);
   if (!item) return null;
   if (ts.isPropertyAssignment(item)) return item.initializer;
   if (ts.isShorthandPropertyAssignment(item)) return item.name;
@@ -135,6 +146,7 @@ function readContract(root) {
     const status = item.status.kind === 'code-map' ? { ...item.status, absolute: safeFile(root, item.status.path) } : item.status;
     if (item.status.kind === 'code-map' && (typeof item.status.export !== 'string' || !IDENTIFIER.test(item.status.export))) throw Error('Code-map status needs an exact exported map.');
     if (item.kind === 'nest-http-filter') {
+      if (item.method !== 'catch') throw Error('Nest HTTP filter mapper method must be the framework catch entry.');
       if (!Array.isArray(item.passthroughHostTypes) || new Set(item.passthroughHostTypes).size !== item.passthroughHostTypes.length
         || item.passthroughHostTypes.some(host => typeof host !== 'string' || !host)) throw Error('HTTP passthrough host types must be unique strings.');
     } else if (![item.formatProperty, item.statusPlugin, item.originalErrorProperty].every(name => typeof name === 'string' && IDENTIFIER.test(name))) throw Error('Apollo mapper needs exact formatError, wrapped-error and status-plugin identities.');
@@ -316,7 +328,9 @@ function checkHttpMapper({ ts, checker, source, mapper, errorType, errorIdentity
     inspect(input); return values;
   };
   const visit = node => {
+    if (node !== handler.body && ts.isFunctionLike(node)) return;
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer
+      && (ts.getCombinedNodeFlags(node.parent) & ts.NodeFlags.Const)
       && statusExpression(ts, checker, node.initializer, errorParameter, errorType, mapper, statusMaps)) statusSymbols.add(symbolAt(ts, checker, node.name));
     if (ts.isIfStatement(node)) {
       const throws = [];
@@ -682,6 +696,7 @@ export function checkNestErrors({ root, files, ruleIds, contextFiles = [], archi
             } else ts.forEachChild(item, inspectThrow);
           };
           inspectThrow(node.block);
+          ts.forEachChild(node.block, inspectCatch);
         };
         inspectCatch(source);
       }

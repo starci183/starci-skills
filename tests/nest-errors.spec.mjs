@@ -9,6 +9,7 @@ import { defaultScriptChecker } from '../scripts/check-scoped-lint.mjs';
 
 const require = createRequire(import.meta.url);
 const typescriptRoot = path.dirname(require.resolve('typescript/package.json'));
+const installedNestRoot = path.dirname(require.resolve('@nestjs/common/package.json'));
 const errorSource = `export class AppError extends Error {
   readonly code = 'APP_ERROR';
   readonly httpStatus?: number;
@@ -63,7 +64,7 @@ function contract(overrides = {}) {
   };
 }
 
-function fixture(t, { contractValue = contract(), error = errorSource, filter = filterSource, cause = causeSource, extra = {} } = {}) {
+function fixture(t, { contractValue = contract(), error = errorSource, filter = filterSource, cause = causeSource, extra = {}, realNest = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-nest-errors-'));
   const write = (relative, value) => {
     const target = path.join(root, relative); fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -73,10 +74,16 @@ function fixture(t, { contractValue = contract(), error = errorSource, filter = 
   write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['backend'], tsconfig: 'tsconfig.json' });
   write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', experimentalDecorators: true }, include: ['src/**/*.ts'] });
   write('src/app-error.ts', error); write('src/app-error.filter.ts', filter); write('src/load.ts', cause);
-  write('node_modules/@nestjs/common/package.json', { name: '@nestjs/common', types: 'index.d.ts' });
-  write('node_modules/@nestjs/common/index.d.ts', `export declare function Catch(...types: Function[]): ClassDecorator;
+  if (!realNest) {
+    write('node_modules/@nestjs/common/package.json', { name: '@nestjs/common', types: 'index.d.ts' });
+    write('node_modules/@nestjs/common/index.d.ts', `export declare function Catch(...types: Function[]): ClassDecorator;
 export interface ExceptionFilter { catch(exception: unknown, host: ArgumentsHost): void }
 export interface ArgumentsHost { getType<T extends string>(): T; switchToHttp(): { getResponse<T>(): T } }`);
+  } else {
+    fs.mkdirSync(path.join(root, 'node_modules/@nestjs'), { recursive: true });
+    fs.symlinkSync(installedNestRoot, path.join(root, 'node_modules/@nestjs/common'), 'junction');
+    for (const dependency of ['rxjs']) fs.symlinkSync(path.dirname(require.resolve(`${dependency}/package.json`)), path.join(root, `node_modules/${dependency}`), 'junction');
+  }
   write('node_modules/express/package.json', { name: 'express', types: 'index.d.ts' });
   write('node_modules/express/index.d.ts', 'export interface Response { status(value: number): Response; json(value: unknown): void }');
   for (const [relative, value] of Object.entries(extra)) write(relative, value);
@@ -91,6 +98,11 @@ test('renamed Nest imports, foreign cause normalization and HTTP field flow are 
   const f = fixture(t), result = checkNestErrors(f.input);
   assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
   assert.deepEqual(result.checkedRuleIds, [...NEST_ERROR_RULES].sort());
+});
+
+test('real installed Nest declarations preserve the framework identity checks', t => {
+  const f = fixture(t, { realNest: true }), result = checkNestErrors(f.input);
+  assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
 });
 
 test('public aggregate script routing invokes the isolated Nest error adapter', async t => {
@@ -150,6 +162,37 @@ test('wrong status/body flow is a finding rather than a presence-only pass', t =
     'response.status(status).json({ statusCode: status, code: exception.code, message: exception.message });\n    response.status(200).json({ statusCode: 200, code: "DECOY", message: exception.message });'));
   const mixed = checkNestErrors(f.input);
   assert.ok(mixed.violations.some(item => item.message.includes('derived status')));
+});
+
+test('uncalled nested writers and mutable status aliases cannot supply HTTP proof', t => {
+  const nested = fixture(t, { filter: filterSource.replace(
+    'response.status(status).json({ statusCode: status, code: exception.code, message: exception.message });',
+    'const never = () => { response.status(status).json({ statusCode: status, code: exception.code, message: exception.message }); }; void never;') });
+  assert.ok(checkNestErrors(nested.input).violations.some(item => item.message.includes('derived status')));
+  const mutable = fixture(t, { filter: filterSource.replace('const status = exception.httpStatus ?? 500;', 'let status = exception.httpStatus ?? 500; status = 200;') });
+  assert.ok(checkNestErrors(mutable.input).violations.some(item => item.message.includes('derived status')));
+});
+
+test('later object writes cannot overwrite a mapped HTTP field or preserved cause', t => {
+  const responseSpread = fixture(t, { filter: filterSource.replace('message: exception.message });', 'message: exception.message, ...{ code: "WRONG" } });') });
+  const responseResult = checkNestErrors(responseSpread.input);
+  assert.ok(responseResult.errors.length || responseResult.violations.some(item => item.message.includes('derived status')));
+  const causeSpread = fixture(t, { cause: causeSource.replace('new Error(String(error)) });', 'new Error(String(error)), ...{ originalError: undefined } });') });
+  const result = checkNestErrors(causeSpread.input);
+  assert.ok(result.errors.some(item => item.message.includes('dynamic')) || result.violations.some(item => item.message.includes('cause')));
+});
+
+test('every nested catch is checked for cause preservation', t => {
+  const source = causeSource.replace("try { JSON.parse('x'); } catch (error) {", "try { JSON.parse('x'); } catch (error) { try { JSON.parse('x'); } catch (inner) { throw new AppError({}); }");
+  const f = fixture(t, { cause: source }), result = checkNestErrors(f.input);
+  assert.ok(result.violations.some(item => item.ruleId === 'NEST_FOREIGN_ERROR_CAUSE'));
+});
+
+test('a helper method cannot replace the real ExceptionFilter catch entry', t => {
+  const filter = filterSource.replace('catch(exception:', 'map(exception:')
+    .replace('export class AppErrorFilter implements Filter {', 'export class AppErrorFilter implements Filter { catch(exception: AppError, host: ArgumentsHost): void { void exception; void host; }');
+  const f = fixture(t, { filter, contractValue: contract({ mappers: [{ ...contract().mappers[0], method: 'map' }] }) });
+  assert.ok(checkNestErrors(f.input).errors.some(item => item.message.includes('framework catch entry')));
 });
 
 test('a typed fake HTTP response cannot satisfy the mapper data flow', t => {
