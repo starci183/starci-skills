@@ -113,12 +113,25 @@ export function bindContinuationPath(store,state=null){
     if(relative.startsWith('..')||path.isAbsolute(relative)||path.extname(target).toLowerCase()!=='.md')throw Error('Public continuation binding must be a Markdown file under workflows/');
     store.paths.continuation=target;return target;
   }
-  // Reviewed human briefs often predate the runtime projection and use a friendly filename. Bind the one brief
-  // that already names this exact workflow identity; ambiguity fails back to the stable ID filename.
+  const canonical=path.join(workflows,`${id}.md`);
+  if(fs.existsSync(canonical)){store.paths.continuation=canonical;return canonical;}
+  // Friendly briefs need an explicit identity declaration. A goal index can mention many workflow IDs and
+  // must never become a workflow's checkpoint just because its prose (or an old generated section) names one.
   let matched=[];try{matched=fs.readdirSync(workflows,{withFileTypes:true}).filter(entry=>entry.isFile()&&entry.name.toLowerCase().endsWith('.md')).map(entry=>path.join(workflows,entry.name)).filter(file=>{
-    try{const stat=fs.lstatSync(file);return !stat.isSymbolicLink()&&stat.size<=1024*1024&&fs.readFileSync(file,'utf8').includes(id);}catch{return false;}
+    try{
+      const stat=fs.lstatSync(file);if(stat.isSymbolicLink()||stat.size>1024*1024)return false;
+      const body=fs.readFileSync(file,'utf8');
+      const start=body.indexOf(CONTINUATION_SECTION_START),end=body.indexOf(CONTINUATION_SECTION_END);
+      if((start<0)!==(end<0)||end<start||body.indexOf(CONTINUATION_SECTION_START,start+1)>=0||body.indexOf(CONTINUATION_SECTION_END,end+1)>=0)return false;
+      const authored=start<0?body:body.slice(0,start)+body.slice(end+CONTINUATION_SECTION_END.length);
+      const declarations=authored.split(/\r?\n/).map(line=>{
+        const match=line.match(/^Workflow ID:\s*(?:`([^`\s]+)`|([^`\s]+))\s*$/);return match?.[1]??match?.[2];
+      }).filter(Boolean);
+      if(declarations.length)return declarations.length===1&&declarations[0]===id;
+      return body.startsWith(`<!-- ${CONTINUATION_BRIEF} -->\n# Workflow continuation: ${id}\n`)||body.startsWith(`<!-- ${CONTINUATION_BRIEF} -->\r\n# Workflow continuation: ${id}\r\n`);
+    }catch{return false;}
   });}catch{matched=[];}
-  store.paths.continuation=matched.length===1?matched[0]:path.join(workflows,`${id}.md`);return store.paths.continuation;
+  store.paths.continuation=matched.length===1?matched[0]:canonical;return store.paths.continuation;
 }
 export function continuationPath(store,state=null){return bindContinuationPath(store,state);}
 

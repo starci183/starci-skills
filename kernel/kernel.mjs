@@ -4295,7 +4295,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const relocation=previousJournal&&path.resolve(previousJournal)!==targetJournal?relocateJournal({from:previousJournal,to:targetJournal,workflowId:state.id}):null;
     need(!relocation||relocation.ok,`The journal ${previousJournal} still binds ${state.id}: ${relocation?.reason??''}`);
     // The retired generation's log closes here: everything the retry settled above is its story; the enrollment opens the next.
-    const rotated=store.rotateEvents?.(priorGeneration)??null;
+    // First enrollment has no retired generation. Its approval/amendment events remain in the live log.
+    const rotated=priorGeneration>0?(store.rotateEvents?.(priorGeneration)??null):null;
     if(rotated?.rotated)store.appendEvent({event:'events-rotated',generation:priorGeneration,segment:path.basename(rotated.rotated)});
     const journalChosen=Boolean(options['journal-file'])||state.engine?.journalChosen===true;
     const engine=enrollEngine(store,state,{runtimePin:pin,journalFile:targetJournal});state.launcher=checked.launcher;
