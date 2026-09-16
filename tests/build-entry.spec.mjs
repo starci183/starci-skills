@@ -44,6 +44,18 @@ test('compiled dist is JSON contracts plus mirrored runtime modules; entry requi
   assert.equal(fs.existsSync(path.join(root,'legacy')),false);
 });
 
+test('fresh compiled architecture CLI contains its complete internal module closure',t=>{
+  const target=mktemp();t.after(()=>{assertOwnTemp(target);fs.rmSync(target,{recursive:true,force:true});});
+  fs.mkdirSync(path.join(target,'src/modules'),{recursive:true});fs.mkdirSync(path.join(target,'node_modules'),{recursive:true});
+  fs.symlinkSync(path.join(root,'node_modules/typescript'),path.join(target,'node_modules/typescript'),'junction');
+  fs.writeFileSync(path.join(target,'package.json'),'\u007b"private":true\u007d\n');
+  fs.writeFileSync(path.join(target,'architecture.json'),'\u007b"schema":"starci/architecture-config@1","kinds":["backend"],"tsconfig":"tsconfig.json"\u007d\n');
+  fs.writeFileSync(path.join(target,'tsconfig.json'),'\u007b"compilerOptions":\u007b"target":"ES2022","module":"ESNext","moduleResolution":"Bundler","noEmit":true\u007d,"include":["src/**/*.ts"]\u007d\n');
+  fs.writeFileSync(path.join(target,'src/modules/value.ts'),'export const value=1;\n');
+  const result=spawnSync(process.execPath,[path.join(golden,'.dist/cli/main.mjs'),'architecture','check',target,'--config','architecture.json'],{encoding:'utf8',windowsHide:true});
+  assert.equal(result.status,0,result.stderr||result.stdout);const report=JSON.parse(result.stdout);assert.equal(report.ok,true);assert.deepEqual(report.coverage.sourceFiles,['src/modules/value.ts']);
+});
+
 test('invalid typed operator policy cannot pass build',t=>{const dir=fixtureFromGolden(t);const file=path.join(dir,'ops/uat.verify/operator.yaml');const op=parseYaml(fs.readFileSync(file,'utf8'));op.uatPolicy.appearanceScoring=true;fs.writeFileSync(file,stringifyYaml(op));assert.notEqual(run(dir).status,0);});
 test('ensure-build CLI never reports deferred knowledge success',()=>{
   // Reuses the golden fixture's own cold-build invocation above instead of spawning a second
