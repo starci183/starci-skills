@@ -1,21 +1,30 @@
 import path from 'node:path';
 import { isInside } from './config.mjs';
-import { reachableViolation, relativePath } from './typescript.mjs';
+import { reachableViolation, relativePath, sourceLocation } from './typescript.mjs';
 
 const FORBIDDEN_APP_ROLE = /(?:^|\.)(?:service|provider|providers|resolver|controller|handler|repository|entity|use-case|command|query|listener|consumer|processor)\.[cm]?[jt]sx?$/i;
+const FORBIDDEN_DECLARATION = /(?:Service|Provider|Resolver|Controller|Handler|Repository|Entity|UseCase|Command|Query|Listener|Consumer|Processor)$/;
+const FORBIDDEN_DECORATORS = new Set(['Controller', 'Resolver', 'Injectable', 'Processor', 'WebSocketGateway']);
 
 function absolute(root, relative) {
   return path.resolve(root, ...relative.split('/'));
 }
 
+function roots(root, relatives) {
+  return relatives.map(relative => absolute(root, relative));
+}
+
+function insideAny(candidates, fileName) {
+  return candidates.some(root => isInside(root, fileName));
+}
+
 function appSource(config, fileName) {
-  for (const appRoot of config.backend.apps) {
-    const root = absolute(config.root, appRoot);
-    if (!isInside(root, fileName)) continue;
-    const parts = relativePath(root, fileName).split('/');
+  for (const appRoot of roots(config.root, config.backend.apps)) {
+    if (!isInside(appRoot, fileName)) continue;
+    const parts = relativePath(appRoot, fileName).split('/');
     const sourceIndex = parts.indexOf('src');
     if (sourceIndex < 1) return null;
-    return { appRoot: root, relative: parts.slice(sourceIndex + 1).join('/') };
+    return { appRoot, relative: parts.slice(sourceIndex + 1).join('/') };
   }
   return null;
 }
@@ -27,7 +36,34 @@ function isBootstrapConfig(relative) {
   if (/^(?:config|configuration|environment)\.[cm]?[jt]s$/i.test(basename)) return true;
   const first = relative.split('/')[0];
   return ['bootstrap', 'config', 'env'].includes(first)
-    && /(?:\.config|config|configuration|environment|constants|types)\.[cm]?[jt]s$/i.test(basename);
+    && /(?:\.adapter|\.config|config|configuration|environment|constants|types)\.[cm]?[jt]s$/i.test(basename);
+}
+
+function decoratorName(ts, decorator) {
+  const expression = decorator.expression;
+  const called = ts.isCallExpression(expression) ? expression.expression : expression;
+  if (ts.isIdentifier(called)) return called.text;
+  return ts.isPropertyAccessExpression(called) ? called.name.text : null;
+}
+
+function roleEvidence(ts, sourceFile) {
+  let found = null;
+  const visit = node => {
+    if (found) return;
+    const decorators = ts.canHaveDecorators?.(node) ? ts.getDecorators(node) ?? [] : node.decorators ?? [];
+    const forbidden = decorators.find(item => FORBIDDEN_DECORATORS.has(decoratorName(ts, item)));
+    if (forbidden) {
+      found = { node: forbidden, detail: `@${decoratorName(ts, forbidden)}` };
+      return;
+    }
+    if ((ts.isClassDeclaration(node) || ts.isFunctionDeclaration(node)) && node.name && FORBIDDEN_DECLARATION.test(node.name.text)) {
+      found = { node: node.name, detail: node.name.text };
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return found;
 }
 
 function finding(config, edge, ruleId, message, chain) {
@@ -43,32 +79,41 @@ function finding(config, edge, ruleId, message, chain) {
   };
 }
 
-/** Enforce backend direction and keep executable apps as composition roots. */
+/** Enforce backend direction and keep executable apps as measurable composition roots. */
 export function checkBackend(config, context) {
   const violations = [];
-  const moduleRoot = absolute(config.root, config.backend.modules);
-  const featureRoot = absolute(config.root, config.backend.features);
+  const moduleRoots = roots(config.root, config.backend.modules);
+  const featureRoots = roots(config.root, config.backend.features);
   const isApp = file => Boolean(appSource(config, file));
   for (const sourceFile of context.files) {
     const fileName = path.resolve(sourceFile.fileName);
     const app = appSource(config, fileName);
-    if (app && !isBootstrapConfig(app.relative)) {
-      violations.push({
-        ruleId: FORBIDDEN_APP_ROLE.test(path.posix.basename(app.relative)) ? 'BE_APP_BUSINESS_ROLE' : 'BE_APP_COMPOSITION_ONLY',
-        path: relativePath(config.root, fileName),
-        line: 1,
-        column: 1,
-        message: `Application source ${app.relative} is not a composition entry or narrowly scoped bootstrap configuration. Move business, provider, resolver, and controller code under src/features or src/modules.`,
-      });
+    if (app) {
+      const evidence = roleEvidence(context.ts, sourceFile);
+      if (evidence) {
+        violations.push({
+          ruleId: 'BE_APP_BUSINESS_ROLE',
+          path: relativePath(config.root, fileName),
+          ...sourceLocation(sourceFile, evidence.node),
+          message: `Application composition source contains measurable business/provider role ${evidence.detail}. Move that role under src/features or src/modules.`,
+        });
+      } else if (!isBootstrapConfig(app.relative)) {
+        violations.push({
+          ruleId: FORBIDDEN_APP_ROLE.test(path.posix.basename(app.relative)) ? 'BE_APP_BUSINESS_ROLE' : 'BE_APP_COMPOSITION_ONLY',
+          path: relativePath(config.root, fileName),
+          line: 1,
+          column: 1,
+          message: `Application source ${app.relative} is not an entry, root module, or narrowly named bootstrap/config/framework adapter.`,
+        });
+      }
     }
-    const fromModules = isInside(moduleRoot, fileName);
-    const fromFeatures = isInside(featureRoot, fileName);
+    const fromModules = insideAny(moduleRoots, fileName);
+    const fromFeatures = insideAny(featureRoots, fileName);
     if (!fromModules && !fromFeatures) continue;
     for (const edge of context.edges.get(fileName) ?? []) {
-      if (!edge.runtime) continue;
       if (fromModules) {
-        const featureChain = reachableViolation(context.edges, edge, target => isInside(featureRoot, target));
-        if (featureChain) violations.push(finding(config, edge, 'BE_MODULE_IMPORTS_FEATURE', 'A backend module cannot depend on a feature entry surface.', featureChain));
+        const featureChain = reachableViolation(context.edges, edge, target => insideAny(featureRoots, target));
+        if (featureChain) violations.push(finding(config, edge, 'BE_MODULE_IMPORTS_FEATURE', 'A backend module cannot depend on a feature entry surface, including through a type or barrel.', featureChain));
         const appChain = reachableViolation(context.edges, edge, isApp);
         if (appChain) violations.push(finding(config, edge, 'BE_MODULE_IMPORTS_APP', 'A backend module cannot depend on an application composition root.', appChain));
       }

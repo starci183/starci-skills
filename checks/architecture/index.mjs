@@ -4,7 +4,7 @@ import { checkBackend } from './backend.mjs';
 import { checkFrontend } from './frontend.mjs';
 
 const LIMITATIONS = [
-  'This is a static TypeScript dependency and source-shape check; it does not prove runtime dependency-injection bindings, provider scope, route behavior, or business correctness.',
+  'This is a static TypeScript dependency and source-shape check; it does not prove runtime dependency-injection bindings, global/provider scope, state lifetime, server/client behavior, feature-versus-capability ownership, route behavior, or business correctness.',
   'Dynamic module names and dependencies constructed outside analyzable string-literal imports require separate review.',
 ];
 
@@ -41,7 +41,7 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
     repository: config.root,
     kinds: config.kinds,
     files: context.files.length,
-    compiler: { version: context.loaded.version, resolved: context.loaded.resolved },
+    compiler: { version: context.loaded.version, resolved: context.loaded.resolved, projects: context.projects.map(item => item.relative) },
     violations,
     errors,
     limitations: LIMITATIONS,
