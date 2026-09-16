@@ -109,6 +109,7 @@ kernel/schedule.mjs
 kernel/budget.mjs
 kernel/loads.mjs
 kernel/graph.mjs
+kernel/graph-invalidation.mjs
 kernel/io.mjs
 kernel/ledger.mjs
 kernel/manager.mjs
