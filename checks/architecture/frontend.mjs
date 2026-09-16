@@ -14,6 +14,9 @@ const FORBIDDEN_UPWARD = {
   'product-shells': new Set(['pages']),
   pages: new Set(),
 };
+const WORLD_NAVIGATION_CALLS = new Set(['useParams', 'usePathname', 'useRouter', 'useSearchParams', 'useSelectedLayoutSegment', 'useSelectedLayoutSegments']);
+const WORLD_INTL_CALLS = new Set(['useLocale', 'useMessages', 'useNow', 'useTimeZone', 'useTranslations']);
+const WORLD_SWR_CALLS = new Set(['default', 'useSWR', 'useSWRConfig', 'useSWRImmutable', 'useSWRMutation']);
 
 function absolute(root, relative) {
   return path.resolve(root, ...relative.split('/'));
@@ -370,6 +373,417 @@ function checkPureAndData(config, context, sourceFile, roots) {
   return violations;
 }
 
+function unwrapExpression(ts, expression) {
+  while (expression && (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
+    || ts.isTypeAssertionExpression(expression) || ts.isNonNullExpression(expression)
+    || (ts.isSatisfiesExpression?.(expression) ?? false))) expression = expression.expression;
+  return expression;
+}
+
+function unaliasSymbol(ts, checker, value) {
+  let symbol = value ?? null;
+  const seen = new Set();
+  while (symbol && (symbol.flags & ts.SymbolFlags.Alias) && !seen.has(symbol)) {
+    seen.add(symbol);
+    const target = checker.getAliasedSymbol(symbol);
+    if (!target || target === symbol) break;
+    symbol = target;
+  }
+  return symbol;
+}
+
+function selectedSymbol(ts, checker, expression) {
+  const selected = unwrapExpression(ts, expression);
+  if (!selected) return null;
+  if (ts.isIdentifier(selected)) return checker.getSymbolAtLocation(selected) ?? null;
+  if (ts.isPropertyAccessExpression(selected)) return checker.getSymbolAtLocation(selected.name) ?? null;
+  if (ts.isElementAccessExpression(selected) && ts.isStringLiteralLike(selected.argumentExpression)) {
+    return checker.getSymbolAtLocation(selected.argumentExpression)
+      ?? checker.getTypeAtLocation(selected.expression).getProperty(selected.argumentExpression.text)
+      ?? null;
+  }
+  return null;
+}
+
+function returnedExpressions(ts, declaration) {
+  if ((ts.isArrowFunction(declaration) || ts.isFunctionExpression(declaration)) && !ts.isBlock(declaration.body)) return [declaration.body];
+  const body = ts.isFunctionLike(declaration) ? declaration.body : null;
+  if (!body || !ts.isBlock(body)) return [];
+  const returned = [];
+  const visit = node => {
+    if (node !== body && ts.isFunctionLike(node)) return;
+    if (ts.isReturnStatement(node) && node.expression) returned.push(node.expression);
+    else ts.forEachChild(node, visit);
+  };
+  visit(body);
+  return returned;
+}
+
+function knownWorldImport(specifier, imported) {
+  if (specifier === 'next-intl') return WORLD_INTL_CALLS.has(imported);
+  if (specifier === 'next/navigation' || /(?:^|\/)i18n\/navigation$/.test(specifier)) return WORLD_NAVIGATION_CALLS.has(imported);
+  if (specifier === 'swr' || specifier === 'swr/immutable' || specifier === 'swr/mutation') return WORLD_SWR_CALLS.has(imported);
+  if (specifier === 'next-auth/react') return imported === 'useSession';
+  return false;
+}
+
+function importDeclarationFor(ts, node) {
+  for (let current = node; current; current = current.parent) if (ts.isImportDeclaration(current)) return current;
+  return null;
+}
+
+function isReactCreateElement(ts, checker, call) {
+  const expression = unwrapExpression(ts, call.expression);
+  if (ts.isIdentifier(expression)) {
+    const symbol = checker.getSymbolAtLocation(expression);
+    return (symbol?.declarations ?? []).some(declaration => {
+      const imported = ts.isImportSpecifier(declaration) ? declaration.propertyName?.text ?? declaration.name.text : null;
+      const parent = importDeclarationFor(ts, declaration);
+      return imported === 'createElement' && parent && ts.isStringLiteralLike(parent.moduleSpecifier) && parent.moduleSpecifier.text === 'react';
+    });
+  }
+  if (!ts.isPropertyAccessExpression(expression) || expression.name.text !== 'createElement') return false;
+  const symbol = checker.getSymbolAtLocation(expression.expression);
+  return (symbol?.declarations ?? []).some(declaration => {
+    const parent = importDeclarationFor(ts, declaration);
+    return (ts.isNamespaceImport(declaration) || ts.isImportClause(declaration))
+      && parent && ts.isStringLiteralLike(parent.moduleSpecifier) && parent.moduleSpecifier.text === 'react';
+  });
+}
+
+function jsxTagName(ts, tagName) {
+  if (ts.isIdentifier(tagName)) return tagName.text;
+  if (ts.isPropertyAccessExpression(tagName)) return tagName.name.text;
+  return null;
+}
+
+function wrapperTag(ts, tagName) {
+  const name = jsxTagName(ts, tagName);
+  return name === 'Suspense' || name === 'SWRConfig' || name === 'Provider'
+    || Boolean(name && (name.endsWith('Provider') || name.endsWith('ErrorBoundary')));
+}
+
+function checkWorldRenderBoundaries(config, context, roots) {
+  const { ts } = context;
+  const violations = [];
+  const sourceSet = new Set(context.files.map(source => path.resolve(source.fileName)));
+  const worldInfoCache = new Map();
+  const functionWorldCache = new Map();
+  const renderOutputCache = new Map();
+
+  const importInfo = sourceFile => {
+    const key = path.resolve(sourceFile.fileName);
+    if (worldInfoCache.has(key)) return worldInfoCache.get(key);
+    const checker = context.checkerFor(sourceFile.fileName);
+    const edges = importsForSource(context, sourceFile.fileName);
+    const byStart = new Map(edges.map(edge => [edge.node.getStart(sourceFile), edge]));
+    const symbols = new Set();
+    const namespaces = new Map();
+    for (const statement of sourceFile.statements) {
+      if (!ts.isImportDeclaration(statement) || !statement.importClause || statement.importClause.isTypeOnly
+        || !ts.isStringLiteralLike(statement.moduleSpecifier)) continue;
+      const specifier = statement.moduleSpecifier.text;
+      const edge = byStart.get(statement.moduleSpecifier.getStart(sourceFile));
+      const worldEdge = edge && Boolean(reachableViolation(context.edges, edge,
+        target => insideAny(roots.hooks, target) || insideAny(roots.transport, target),
+        { follow: candidate => candidate.reexport && candidate.runtime }));
+      const clause = statement.importClause;
+      if (clause.name) {
+        const symbol = checker.getSymbolAtLocation(clause.name);
+        if (symbol && (worldEdge || knownWorldImport(specifier, 'default'))) symbols.add(symbol);
+      }
+      const named = clause.namedBindings;
+      if (named && ts.isNamedImports(named)) for (const element of named.elements) {
+        if (element.isTypeOnly) continue;
+        const imported = element.propertyName?.text ?? element.name.text;
+        const symbol = checker.getSymbolAtLocation(element.name);
+        if (symbol && (worldEdge || knownWorldImport(specifier, imported))) symbols.add(symbol);
+      }
+      if (named && ts.isNamespaceImport(named)) {
+        const symbol = checker.getSymbolAtLocation(named.name);
+        if (symbol) namespaces.set(symbol, { specifier, worldEdge });
+      }
+    }
+    const value = { checker, symbols, namespaces };
+    worldInfoCache.set(key, value);
+    return value;
+  };
+
+  const expressionFunctions = (expression, checker, seen = new Set()) => {
+    expression = unwrapExpression(ts, expression);
+    if (!expression) return [];
+    if (ts.isArrowFunction(expression) || ts.isFunctionExpression(expression) || ts.isMethodDeclaration(expression)
+      || ts.isFunctionDeclaration(expression)) return [expression];
+    if (ts.isConditionalExpression(expression)) {
+      return [...expressionFunctions(expression.whenTrue, checker, seen), ...expressionFunctions(expression.whenFalse, checker, seen)];
+    }
+    if (ts.isCallExpression(expression)) {
+      const selected = unwrapExpression(ts, expression.expression);
+      const name = ts.isIdentifier(selected) ? selected.text
+        : ts.isPropertyAccessExpression(selected) ? selected.name.text : null;
+      if (['forwardRef', 'memo'].includes(name) && expression.arguments[0]) return expressionFunctions(expression.arguments[0], checker, seen);
+    }
+    const symbol = unaliasSymbol(ts, checker, selectedSymbol(ts, checker, expression));
+    if (!symbol || seen.has(symbol)) return [];
+    const nextSeen = new Set(seen).add(symbol);
+    const functions = [];
+    for (const declaration of symbol.getDeclarations?.() ?? []) {
+      if (ts.isFunctionDeclaration(declaration) || ts.isMethodDeclaration(declaration)) functions.push(declaration);
+      else if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
+        functions.push(...expressionFunctions(declaration.initializer, checker, nextSeen));
+      } else if (ts.isClassDeclaration(declaration)) {
+        functions.push(...declaration.members.filter(member => ts.isMethodDeclaration(member)
+          && member.name && (ts.isIdentifier(member.name) || ts.isStringLiteralLike(member.name)) && member.name.text === 'render'));
+      }
+    }
+    return [...new Set(functions.filter(fn => fn.body))];
+  };
+
+  const symbolIsWorld = (raw, sourceFile, propertyName = null) => {
+    if (!raw) return false;
+    const info = importInfo(sourceFile);
+    if (info.symbols.has(raw)) return true;
+    for (const [namespace, declaration] of info.namespaces) if (namespace === raw) {
+      return declaration.worldEdge || knownWorldImport(declaration.specifier, propertyName ?? '');
+    }
+    const identity = unaliasSymbol(ts, info.checker, raw);
+    return (identity?.getDeclarations?.() ?? []).some(declaration => {
+      const fileName = declaration.getSourceFile().fileName;
+      return insideAny(roots.hooks, fileName) || insideAny(roots.transport, fileName);
+    });
+  };
+
+  const namespaceIsWorld = (raw, sourceFile, propertyName) => {
+    const info = importInfo(sourceFile);
+    const declaration = info.namespaces.get(raw);
+    return Boolean(declaration && (declaration.worldEdge || knownWorldImport(declaration.specifier, propertyName ?? '')));
+  };
+
+  const calleeIsWorld = (input, checker, sourceFile, seen = new Set()) => {
+    const expression = unwrapExpression(ts, input);
+    if (ts.isIdentifier(expression) && symbolIsWorld(checker.getSymbolAtLocation(expression), sourceFile)) return true;
+    if ((ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression))) {
+      const property = ts.isPropertyAccessExpression(expression) ? expression.name.text
+        : ts.isStringLiteralLike(expression.argumentExpression) ? expression.argumentExpression.text : null;
+      const namespace = checker.getSymbolAtLocation(expression.expression);
+      if (namespaceIsWorld(namespace, sourceFile, property)) return true;
+      if (symbolIsWorld(selectedSymbol(ts, checker, expression), sourceFile)) return true;
+    }
+    const symbol = unaliasSymbol(ts, checker, selectedSymbol(ts, checker, expression));
+    if (!symbol || seen.has(symbol)) return false;
+    const nextSeen = new Set(seen).add(symbol);
+    const declarations = symbol.getDeclarations?.() ?? [];
+    for (const declaration of declarations) {
+      if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
+        if (calleeIsWorld(declaration.initializer, checker, declaration.getSourceFile(), nextSeen)) return true;
+      }
+    }
+    return expressionFunctions(expression, checker).some(fn => functionUsesWorld(fn, checker, nextSeen));
+  };
+
+  const callIsWorld = (call, checker, sourceFile, seen) => calleeIsWorld(call.expression, checker, sourceFile, seen);
+
+  const functionUsesWorld = (fn, checker, seen = new Set()) => {
+    if (functionWorldCache.has(fn)) return functionWorldCache.get(fn);
+    functionWorldCache.set(fn, false);
+    let found = false;
+    const sourceFile = fn.getSourceFile();
+    const visit = node => {
+      if (found) return;
+      if (ts.isCallExpression(node) && callIsWorld(node, checker, sourceFile, seen)) { found = true; return; }
+      ts.forEachChild(node, visit);
+    };
+    visit(fn.body ?? fn);
+    functionWorldCache.set(fn, found);
+    return found;
+  };
+
+  const expressionHasRender = (expression, checker, seen = new Set()) => {
+    expression = unwrapExpression(ts, expression);
+    if (!expression) return false;
+    if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression) || ts.isJsxFragment(expression)) return true;
+    if (ts.isCallExpression(expression) && isReactCreateElement(ts, checker, expression)) return true;
+    if (ts.isConditionalExpression(expression)) return expressionHasRender(expression.whenTrue, checker, seen)
+      || expressionHasRender(expression.whenFalse, checker, seen);
+    if (ts.isBinaryExpression(expression) && [ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken,
+      ts.SyntaxKind.QuestionQuestionToken].includes(expression.operatorToken.kind)) {
+      return expressionHasRender(expression.left, checker, seen) || expressionHasRender(expression.right, checker, seen);
+    }
+    if (ts.isCallExpression(expression) && (ts.isPropertyAccessExpression(expression.expression)
+      || ts.isElementAccessExpression(expression.expression))) {
+      const name = ts.isPropertyAccessExpression(expression.expression) ? expression.expression.name.text
+        : ts.isStringLiteralLike(expression.expression.argumentExpression) ? expression.expression.argumentExpression.text : null;
+      if (name === 'map' && expression.arguments[0]) return expressionFunctions(expression.arguments[0], checker)
+        .some(fn => functionHasRender(fn, checker, seen));
+    }
+    const symbol = unaliasSymbol(ts, checker, selectedSymbol(ts, checker, ts.isCallExpression(expression) ? expression.expression : expression));
+    if (!symbol || seen.has(symbol)) return false;
+    const nextSeen = new Set(seen).add(symbol);
+    if (ts.isIdentifier(expression)) for (const declaration of symbol.getDeclarations?.() ?? []) {
+      if (ts.isVariableDeclaration(declaration) && declaration.initializer && expressionHasRender(declaration.initializer, checker, nextSeen)) return true;
+    }
+    if (ts.isCallExpression(expression)) return expressionFunctions(expression.expression, checker, seen)
+      .some(fn => functionHasRender(fn, checker, nextSeen));
+    return false;
+  };
+
+  const functionHasRender = (fn, checker, seen = new Set()) => {
+    if (renderOutputCache.has(fn)) return renderOutputCache.get(fn);
+    renderOutputCache.set(fn, false);
+    const found = returnedExpressions(ts, fn).some(expression => expressionHasRender(expression, checker, seen));
+    renderOutputCache.set(fn, found);
+    return found;
+  };
+
+  const capturesOuterFunction = (fn, checker) => {
+    const outers = [];
+    for (let parent = fn.parent; parent; parent = parent.parent) if (ts.isFunctionLike(parent)) outers.push(parent);
+    if (!outers.length) return false;
+    let captured = false;
+    const visit = node => {
+      if (captured) return;
+      if (ts.isIdentifier(node)) {
+        const symbol = checker.getSymbolAtLocation(node);
+        for (const declaration of symbol?.getDeclarations?.() ?? []) {
+          if (declaration.pos >= fn.pos && declaration.end <= fn.end) continue;
+          if (outers.some(outer => declaration.pos >= outer.pos && declaration.end <= outer.end)) { captured = true; return; }
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(fn.body ?? fn);
+    return captured;
+  };
+
+  const pureRenderTarget = (expression, checker) => {
+    const functions = expressionFunctions(expression, checker);
+    return functions.length > 0 && functions.every(fn => sourceSet.has(path.resolve(fn.getSourceFile().fileName))
+      && insideAny(roots.components, fn.getSourceFile().fileName)
+      && functionHasRender(fn, checker) && !functionUsesWorld(fn, checker) && !capturesOuterFunction(fn, checker));
+  };
+
+  const expressionSuppliesRender = (expression, checker) => expressionHasRender(expression, checker)
+    || expressionFunctions(expression, checker).some(fn => functionHasRender(fn, checker));
+
+  const renderBoundary = (expression, checker, seen = new Set(), allowEmpty = false) => {
+    expression = unwrapExpression(ts, expression);
+    if (!expression) return allowEmpty;
+    if (expression.kind === ts.SyntaxKind.NullKeyword || expression.kind === ts.SyntaxKind.FalseKeyword) return allowEmpty;
+    if (ts.isConditionalExpression(expression)) return renderBoundary(expression.whenTrue, checker, seen, allowEmpty)
+      && renderBoundary(expression.whenFalse, checker, seen, allowEmpty);
+    if (ts.isBinaryExpression(expression) && expression.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+      return renderBoundary(expression.right, checker, seen, true);
+    }
+    if (ts.isArrayLiteralExpression(expression)) return expression.elements.length > 0
+      && expression.elements.every(item => renderBoundary(item, checker, seen, allowEmpty));
+    if (ts.isIdentifier(expression)) {
+      const symbol = unaliasSymbol(ts, checker, checker.getSymbolAtLocation(expression));
+      if (!symbol || seen.has(symbol)) return false;
+      const nextSeen = new Set(seen).add(symbol);
+      const values = (symbol.getDeclarations?.() ?? []).flatMap(declaration => ts.isVariableDeclaration(declaration) && declaration.initializer
+        ? [declaration.initializer] : []);
+      if (values.length) return values.every(value => renderBoundary(value, checker, nextSeen, allowEmpty));
+    }
+    if (ts.isCallExpression(expression)) {
+      if (isReactCreateElement(ts, checker, expression)) {
+        const target = expression.arguments[0] ? unwrapExpression(ts, expression.arguments[0]) : null;
+        if (!target || ts.isStringLiteralLike(target)) return false;
+        const pureTarget = pureRenderTarget(target, checker) && !wrapperTag(ts, target);
+        const wrapper = wrapperTag(ts, target);
+        if (!pureTarget && !wrapper) return false;
+        const props = expression.arguments[1] ? unwrapExpression(ts, expression.arguments[1]) : null;
+        let hasBoundary = pureTarget;
+        if (props && props.kind !== ts.SyntaxKind.NullKeyword) {
+          if (!ts.isObjectLiteralExpression(props) || props.properties.some(property => ts.isSpreadAssignment(property))) return false;
+          for (const property of props.properties) {
+            if (!ts.isPropertyAssignment(property)) continue;
+            const value = unwrapExpression(ts, property.initializer);
+            if (!expressionSuppliesRender(value, checker)) continue;
+            if (!pureRenderTarget(value, checker) && !renderBoundary(value, checker, seen, true)) return false;
+            const name = property.name && (ts.isIdentifier(property.name) || ts.isStringLiteralLike(property.name)) ? property.name.text : null;
+            if (['children', 'component', 'content', 'render', 'view'].includes(name)) hasBoundary = true;
+          }
+        }
+        const children = expression.arguments.slice(2);
+        if (children.length) {
+          if (!children.every(child => renderBoundary(child, checker, seen, false))) return false;
+          hasBoundary = true;
+        }
+        return hasBoundary;
+      }
+      if ((ts.isPropertyAccessExpression(expression.expression) || ts.isElementAccessExpression(expression.expression))) {
+        const name = ts.isPropertyAccessExpression(expression.expression) ? expression.expression.name.text
+          : ts.isStringLiteralLike(expression.expression.argumentExpression) ? expression.expression.argumentExpression.text : null;
+        if (name === 'map' && expression.arguments[0]) {
+          const renderers = expressionFunctions(expression.arguments[0], checker);
+          return renderers.length > 0 && renderers.every(fn => !functionUsesWorld(fn, checker)
+            && returnedExpressions(ts, fn).length > 0
+            && returnedExpressions(ts, fn).every(value => renderBoundary(value, checker, seen, true)));
+        }
+      }
+      return pureRenderTarget(expression.expression, checker);
+    }
+    if (ts.isJsxFragment(expression)) {
+      const children = expression.children.filter(child => !ts.isJsxText(child) || child.text.trim());
+      return children.length > 0 && children.every(child => ts.isJsxExpression(child)
+        ? renderBoundary(child.expression, checker, seen, false)
+        : ts.isJsxText(child) ? false : renderBoundary(child, checker, seen, false));
+    }
+    if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression)) {
+      const opening = ts.isJsxElement(expression) ? expression.openingElement : expression;
+      const pureTarget = pureRenderTarget(opening.tagName, checker) && !wrapperTag(ts, opening.tagName);
+      const wrapper = wrapperTag(ts, opening.tagName);
+      if (!pureTarget && !wrapper) return false;
+      const children = ts.isJsxElement(expression)
+        ? expression.children.filter(child => !ts.isJsxText(child) || child.text.trim()) : [];
+      let hasBoundary = pureTarget;
+      if (children.length) {
+        if (!children.every(child => ts.isJsxExpression(child)
+          ? renderBoundary(child.expression, checker, seen, false)
+          : ts.isJsxText(child) ? false : renderBoundary(child, checker, seen, false))) return false;
+        hasBoundary = true;
+      }
+      for (const attribute of opening.attributes.properties) {
+        if (!ts.isJsxAttribute(attribute) || !attribute.initializer) continue;
+        const name = attribute.name.text;
+        if (['fallback', 'errorElement'].includes(name)) {
+          if (ts.isStringLiteral(attribute.initializer)) return false;
+          if (ts.isJsxExpression(attribute.initializer)
+            && !renderBoundary(attribute.initializer.expression, checker, seen, true)) return false;
+        }
+        if (ts.isJsxExpression(attribute.initializer) && attribute.initializer.expression
+          && expressionSuppliesRender(attribute.initializer.expression, checker)) {
+          if (!pureRenderTarget(attribute.initializer.expression, checker)
+            && !renderBoundary(attribute.initializer.expression, checker, seen, true)) return false;
+          if (['component', 'content', 'render', 'view'].includes(name)) hasBoundary = true;
+        }
+      }
+      return hasBoundary;
+    }
+    return false;
+  };
+
+  for (const sourceFile of context.files) {
+    if (!insideAny(roots.components, sourceFile.fileName) || !/\.[cm]?tsx$/i.test(sourceFile.fileName)) continue;
+    const checker = context.checkerFor(sourceFile.fileName);
+    const functions = [];
+    const collect = node => {
+      if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)) functions.push(node);
+      ts.forEachChild(node, collect);
+    };
+    collect(sourceFile);
+    for (const fn of functions) {
+      if (!functionHasRender(fn, checker) || !functionUsesWorld(fn, checker)) continue;
+      const returned = returnedExpressions(ts, fn);
+      if (!returned.length || returned.some(expression => !renderBoundary(expression, checker, new Set(), true))) {
+        violations.push(violation(config, sourceFile, fn, 'FE_WORLD_OWNER_RENDER_BOUNDARY',
+          'A visual owner that reads product/world state must hand every render path to a statically resolved pure render function or component; intrinsic-only interaction does not select this rule.', { ts }));
+      }
+    }
+  }
+  return violations;
+}
+
 function checkTierDirection(config, context, sourceFile, roots) {
   const violations = [];
   const source = tierOf(roots.components, sourceFile.fileName);
@@ -422,5 +836,6 @@ export function checkFrontend(config, context) {
     violations.push(...checkTierDirection(config, context, sourceFile, roots));
     violations.push(...checkRawFetch(config, context, sourceFile, roots));
   }
+  violations.push(...checkWorldRenderBoundaries(config, context, roots));
   return violations;
 }

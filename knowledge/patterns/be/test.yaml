@@ -32,8 +32,9 @@ provenance:
     patterns do not approve them.
 
 
-    Open observation at extraction: 31 of 149 handlers and 125 of 396 services have no colocated spec. The
-    twin is the pattern (lint rule exists); the gap is recorded, not excused.
+    Historical filename counts do not decide whether a behavior needs a test. The adopted profile disables
+    handler-has-twin-spec and selects proof from the affected behavior and failure risk. Colocation applies
+    to a selected unit spec; it does not manufacture a spec for every class.
 rules:
   - id: BE-TEST-1
     title: Placement and lanes
@@ -48,9 +49,9 @@ rules:
         when: Unit
         write: <name>.spec.ts beside <name>.ts (875 at extraction; lint unit-test-colocated)
       - id: case-2
-        when: Handler twin
-        write: add-to-cart.handler.spec.ts beside the handler (118 of 149 handlers at extraction; lint
-          handler-has-twin-spec)
+        when: Selected handler behavior
+        write: add-to-cart.handler.spec.ts beside the handler; the historical handler-has-twin-spec count rule
+          is disabled in the adopted profile
       - id: case-3
         when: Service twin
         write: 271 of 396 services under src/modules at extraction
@@ -72,7 +73,6 @@ rules:
     verification:
       automated:
         - unit-test-colocated
-        - handler-has-twin-spec
       manual:
         - Record which transport, service, database and external boundary actually ran; mock-only routing
           tests do not prove integration.
@@ -80,11 +80,15 @@ rules:
       - graphql-command
       - transactional-service
   - id: BE-TEST-2
-    title: "Handler spec: construct directly, cast the mocks"
+    title: Test the real public execution contract
     kind: mandatory
-    requirement: Handler specs construct the subject directly with mock managers cast as never, build message
-      factories, and call execute — never process.
-    rationale: as never appears in 496 of 875 specs at extraction; as unknown as in 323.
+    requirement: An isolated handler/use-case spec constructs the real subject with focused dependency doubles
+      and exercises its public execution entry. A selected Nest integration spec may obtain that same subject
+      from a testing module. For an existing ICQRSHandler, test execute rather than bypassing its protected
+      process hook. Prefer typed doubles; narrow documented harness conversions are permitted where the
+      actual dependency contract needs them, but no cast is mandatory and a cast does not validate behavior.
+    rationale: The Academy example calls the inherited public execute method. Historical cast counts describe
+      its test fixtures and do not justify requiring as never or double casts in a new project.
     cases:
       - id: case-1
         when: Subject
@@ -107,11 +111,15 @@ rules:
     relatedExamples:
       - graphql-command
   - id: BE-TEST-3
-    title: "Service spec: a testing module with shared mocks"
+    title: Construct according to the boundary under test
     kind: mandatory
-    requirement: Capability service specs use Test.createTestingModule with shared EntityManager mocks and
-      alias-based config mocks.
-    rationale: Test.createTestingModule appears in 274 specs at extraction.
+    requirement: Use direct construction for isolated capability behavior. Use the real Test.createTestingModule
+      API when proving Nest registration, injection, named tokens or lifecycle, and retrieve the subject with
+      the appropriate get/resolve API. Reuse focused typed fixtures for shared dependencies. Database mocks
+      establish local behavior only; real transaction, lock and crash claims require the actual store. Keep
+      configuration substitution at the owned config boundary and use the project's resolved aliases.
+    rationale: Nest documents both isolated construction and its testing module. A Service suffix does not
+      make a DI container necessary for every unit test.
     cases:
       - id: case-1
         when: Module
@@ -141,8 +149,11 @@ rules:
   - id: BE-TEST-4
     title: What is asserted
     kind: mandatory
-    requirement: Assert exception types, ordering of side effects, returned rows and persisted arguments. it
-      titles use a verb first.
+    requirement: Assert exception types, ordering of side effects, returned rows and persisted arguments as
+      relevant to the behavior. Test titles start with a word from NEST_TEST_TITLE_ACTIONS in the shared
+      script (for example accepts, rejects, returns, preserves or should). This lexical action-prefix rule
+      is machine-checked; whether the title and assertions faithfully describe the required behavior is
+      agent review. Adding vocabulary is a reviewed profile change, not a per-file suppression.
     rationale: "262 specs use rejects.toBeInstanceOf / toThrow( at extraction; 49 match a message string.
       Verb-first it titles: throws 83, rejects 65, returns 50, refuses 25."
     cases:
@@ -205,8 +216,10 @@ rules:
   - id: BE-TEST-6
     title: Names and layout
     kind: mandatory
-    requirement: "describe uses the class name; callbacks sit on a new line per function-call-argument-newline:
-      always; imports keep multi-line brace style with subject first."
+    requirement: "The outer subject suite names the actual exported class/function under test; nested suites
+      may name scenarios or public methods. Callbacks sit on a new line per the selected function-call-argument-newline
+      profile. Imports retain the adopted multiline brace form. Subject-first import order is an Academy
+      observation rather than an additional import-order rule."
     rationale: 367 …Service, 121 …Handler, 58 …Resolver describe titles at extraction.
     cases:
       - id: case-1

@@ -55,32 +55,37 @@ rules:
         when: "Connected spec"
         write: "asserts the mapping: mocks.cart.isLoading = true … expect(mocks.input?.blockState).toBe(\"pending\")"
     verification:
-      automated: []
+      automated:
+        - FE_ERROR_WORLD_STATE_MAPPING
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
       manual:
-        - Confirm presentation draws resolved failure state rather than catching transport errors.
+        - Confirm failure copy and recovery eligibility match business policy.
     relatedExamples:
       - connected-block
 
   - id: FE-ERROR-2
-    title: The GraphQL envelope
+    title: The selected transport envelope
     kind: mandatory
     requirement: |
-      Every GraphQL response selects { success, message, error, data } and is typed
-      GraphQLResponse<T>. Read hooks unwrap to data or null without throwing. Writes with feedback use
-      runGraphQLWithToast.
+      When an application selects an envelope transport, it declares the envelope discriminator,
+      data and failure fields and the readers that unwrap it. A reader handles transport failure
+      before returning data. Valid empty data may remain null; required missing data is rejected.
+      Normal business dispositions such as pending or refused remain typed data. A transport may
+      instead use a throwing client; GraphQL is not required.
     rationale: |
-      A shared envelope keeps transport and typed-envelope failures visible at one helper.
+      The selected transport policy keeps failure distinct from valid empty data without imposing
+      one protocol or turning every negative business outcome into an exception.
     cases:
       - id: case-1
-        when: "Every response"
+        when: "The selected reference GraphQL transport"
         write: >
           { success, message, error, data } selected in each document (query Course … { success message
           error data { … } }) and typed GraphQLResponse<T> in modules/api/graphql/types.ts
       - id: case-2
-        when: "A read hook unwraps"
-        write: "return result.data?.course?.data ?? null — a missing payload becomes null data, not a throw"
+        when: "A read allows empty data"
+        write: "handle the envelope failure first; returning result.data ?? null is then valid"
       - id: case-3
-        when: "A write with feedback"
+        when: "A selected write with feedback"
         write: >
           runGraphQLWithToast(action, options): Promise<boolean> — "Execute one GraphQL write and
           surface both transport and typed-envelope failures"
@@ -90,8 +95,11 @@ rules:
           const DEFAULT_MESSAGES: ToastMessages = { successTitle: "Success", errorTitle: "Error",
           unauthorizedTitle: "Unauthorized", … } overridable per call through messages
     verification:
-      automated: []
-      manual: []
+      automated:
+        - FE_ERROR_ENVELOPE_POLICY
+        - FE_WRITE_FEEDBACK_OWNER
+      manual:
+        - Verify business dispositions, retry eligibility, failure copy and redaction.
     relatedExamples:
       - connected-block
 
@@ -99,8 +107,9 @@ rules:
     title: throw new Error where silence would be wrong
     kind: mandatory
     requirement: |
-      throw new Error(…) marks results the code cannot continue without (52 sites in src/ non-spec).
-      A custom Error subclass is residual, not a pattern.
+      throw new Error(…) marks transport failures and results the code cannot continue without.
+      It does not replace typed normal business dispositions. A custom Error subclass is residual,
+      not a mandatory pattern.
     rationale: |
       Hard stops prevent silent null continuation when a required payload or owner context is missing.
     cases:
@@ -125,17 +134,21 @@ rules:
           one exists: class PersonalProjectEnrollmentDeniedError extends Error in
           useQueryPersonalProjectTaskWorkspaceSwr.ts; not a pattern
     verification:
-      automated: []
-      manual: []
+      automated:
+        - FE_REQUIRED_VALUE_FAILURE
+      manual:
+        - Select domain-required bindings and confirm which absence modes must stop continuation.
     relatedExamples: []
 
   - id: FE-ERROR-4
-    title: Propagation
+    title: Propagation and ownership
     kind: mandatory
     requirement: |
-      Hook throws are not caught locally; SWR stores them and the connected half reads query.error.
-      Write actions use runGraphQLWithToast and local failure flags. Render crashes go to
-      global-error.tsx. Telemetry lives under config/instrumentation files.
+      A selected data owner maps fetch failure to explicit UI state or propagates it through the
+      installed data client contract. Writes that require feedback name one feedback owner and every
+      bound use site; other writes may own local state without a toast. Uncaught render failures go
+      to explicitly selected Next segment/global boundaries whose props follow the installed Next
+      contract. Telemetry lives under config/instrumentation files.
     rationale: |
       Propagation stays at the layer that already owns user-visible state or process boundaries.
     cases:
@@ -145,7 +158,7 @@ rules:
           not caught; SWR stores it and the connected half reads query.error (catch ( appears in 3
           files across src/)
       - id: case-2
-        when: "Inside a write action"
+        when: "Inside the reference application's selected feedback write"
         write: "runGraphQLWithToast returns false and toasts; the caller flips a local state (payment.hasFailed)"
       - id: case-3
         when: "Render crash"
@@ -154,8 +167,10 @@ rules:
         when: "Telemetry"
         write: "src/config/sentry.ts, src/instrumentation.ts, instrumentation-client.ts"
     verification:
-      automated: []
-      manual: []
+      automated:
+        - FE_NEXT_ERROR_BOUNDARY_LOCATION
+      manual:
+        - Verify feedback applicability, recovery safety, copy, redaction and telemetry behavior.
     relatedExamples:
       - connected-block
 
