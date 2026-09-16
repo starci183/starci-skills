@@ -155,7 +155,7 @@ function checkRoute(config, context, sourceFile, roots) {
   if (!navigationOnly && (mountedPages.length !== 1 || jsx.length !== 1)) {
     violations.push(violation(config, sourceFile, route.fn, 'FE_ROUTE_ONE_PAGE', 'A page.tsx route must mount exactly one pages-tier component, or be a zero-JSX redirect/notFound adapter.', { ts }));
   }
-  if (decision) violations.push(violation(config, sourceFile, decision, 'FE_ROUTE_DRAWING_DECISION', 'Route files cannot make drawing decisions.', { ts }));
+  if (decision && !navigationOnly) violations.push(violation(config, sourceFile, decision, 'FE_ROUTE_DRAWING_DECISION', 'Visual route files cannot make drawing decisions.', { ts }));
   const clientDirective = hasClientDirective(ts, sourceFile);
   if (clientDirective) violations.push(violation(config, sourceFile, clientDirective, 'FE_ROUTE_CLIENT_BOUNDARY', 'A page.tsx route adapter cannot own the client boundary.', { ts }));
   const forbiddenRouteHooks = new Set(['useRouter', 'usePathname', 'useSearchParams', 'useParams', 'useSelectedLayoutSegment', 'useSelectedLayoutSegments']);
