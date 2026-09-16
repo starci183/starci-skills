@@ -451,7 +451,10 @@ const housekeepingIdentity=(bridge,value)=>{
 };
 const housekeepingFiles=identity=>{if(!identity)return [];const root=`.starciwork/_local/workflows/${identity.workflowId}`,files=[`${root}/state.json`,`${root}/events.jsonl`,`${root}/kernel.lock`,`${root}/stop.flag`,
     `${root}/checks/${identity.opId}.json`,`${root}/checks/${identity.opId}.credential-request.json`,`${root}/reports/wait-state.json`,'.starciwork/_local/workflows/supervisor.lock',
-    '.starciwork/_local/workflows/runtime-loads.json','.starciwork/_local/workflows/runtime-budget.json'];
+    '.starciwork/_local/workflows/runtime-loads.json','.starciwork/_local/workflows/runtime-budget.json',
+    // The supervisor appends repository-wide launch diagnostics while operations run. It is neither product output
+    // nor workflow authority; only this exact file is excluded (other logs, state and evidence remain observed).
+    '.starciwork/_local/workflows/supervisor.log'];
   if(identity.dispatch)files.push(`${root}/reports/${identity.dispatch}.json`);return files;};
 const aggregatePacketFile=packet=>({...packet,roots:(packet.roots??[]).map(({packet:ignored,...root})=>root)});
 

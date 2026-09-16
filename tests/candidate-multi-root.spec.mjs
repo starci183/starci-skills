@@ -80,6 +80,7 @@ test('exact current-workflow housekeeping is exempt without entering the candida
   write(accepted.owner,'.starciwork/_local/workflows/wf/events.jsonl','kernel events after launch\n');
   write(accepted.owner,`.starciwork/_local/workflows/wf/reports/${dispatch}.json`,'{"schema":"starci/op-report@1"}\n');
   write(accepted.owner,'.starciwork/_local/workflows/wf/checks/frontend.json','[]\n');
+  write(accepted.owner,'.starciwork/_local/workflows/supervisor.log','{"event":"kernel-started"}\n');
   const sealed=freezeDetectionCandidate(accepted.bridge,{git,requireReported:true,reportedFiles:['src/app.js','.starciwork/evidence/capture.txt'],
     housekeeping:{workflowId:'wf',opId:'frontend',dispatch}});
   assert.equal(sealed.status,'sealed',JSON.stringify(sealed.reasons));
@@ -87,8 +88,23 @@ test('exact current-workflow housekeeping is exempt without entering the candida
     `${owner}/.starciwork/_local/workflows/wf/checks/frontend.json`,
     `${owner}/.starciwork/_local/workflows/wf/events.jsonl`,
     `${owner}/.starciwork/_local/workflows/wf/reports/${dispatch}.json`,
-    `${owner}/.starciwork/_local/workflows/wf/state.json`
+    `${owner}/.starciwork/_local/workflows/wf/state.json`,
+    `${owner}/.starciwork/_local/workflows/supervisor.log`
   ].sort());
+});
+
+test('the same quarantined candidate can seal after exact supervisor diagnostics are recognized, while arbitrary logs remain fenced',t=>{
+  const recovered=fixture(t),report=path.join(recovered.source,'src/app.js');
+  fs.writeFileSync(report,'new source\n');write(recovered.owner,'.starciwork/_local/workflows/supervisor.log','{"event":"round"}\n');
+  const first=freezeDetectionCandidate(recovered.bridge,{git,requireReported:true,reportedFiles:['src/app.js']});
+  assert.equal(first.status,'quarantine');assert.ok(first.reasons.includes('work:outside-allowlist:.starciwork/_local/workflows/supervisor.log'));
+  assert.equal(fs.existsSync(path.join(recovered.bridge.snapshot.controlRoot,'candidate.json')),false,'quarantine precedes aggregate sealing');
+  const sealed=freezeDetectionCandidate(recovered.bridge,{git,requireReported:true,reportedFiles:['src/app.js'],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
+  assert.equal(sealed.status,'sealed',JSON.stringify(sealed.reasons));assert.ok(sealed.housekeepingObserved.some(file=>file.endsWith('/.starciwork/_local/workflows/supervisor.log')));
+
+  const refused=fixture(t);fs.writeFileSync(path.join(refused.source,'src/app.js'),'new source\n');write(refused.owner,'.starciwork/_local/workflows/audit.log','arbitrary\n');
+  const arbitrary=freezeDetectionCandidate(refused.bridge,{git,requireReported:true,reportedFiles:['src/app.js'],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
+  assert.equal(arbitrary.status,'quarantine');assert.ok(arbitrary.reasons.includes('work:outside-allowlist:.starciwork/_local/workflows/audit.log'));
 });
 
 test('a journal-backed live kernel may update another workflow in the shared Work store, but an unacknowledged projection cannot',t=>{
