@@ -135,7 +135,12 @@ rules:
   - id: BE-ERROR-4
     title: Wrapping a foreign error
     kind: mandatory
-    requirement: Catch foreign errors and rethrow a named AbstractException carrying originalError in metadata.
+    requirement: >-
+      When an ownership boundary replaces a caught failure, pass the caught input through the selected
+      error family's declared cause field. Rethrowing the same caught failure is valid; recovery does not
+      require manufacturing a wrapper. The Academy exception profile uses originalError in metadata on
+      AbstractException. Other selected families may use cause. Do not discard non-Error thrown values
+      during normalization. Tests verify that the constructed error actually retains the cause.
     rationale: 25 non-exception files wrap this way at extraction.
     cases:
       - id: case-1
@@ -153,16 +158,22 @@ rules:
         when: Upstream GraphQL
         write: GraphQLDataNotFoundException({ query, variables, url, originalError })
     verification:
-      automated: []
-      manual: []
+      automated:
+        - NEST_FOREIGN_ERROR_CAUSE
+      manual:
+        - Verify whether the boundary should recover, rethrow or translate the failure and test retained cause.
     relatedExamples:
       - graphql-command
       - transactional-service
   - id: BE-ERROR-5
     title: HTTP mapping
     kind: mandatory
-    requirement: AbstractExceptionHttpFilter catches AbstractException for HTTP hosts, logs, and responds with
-      status/code/message. GraphQL hosts rethrow untouched.
+    requirement: >-
+      An exposed HTTP boundary maps the selected error family through its actual Nest ExceptionFilter.catch
+      entry. The response status and statusCode agree; code and message come from the selected public mapping.
+      The transport may own a code-to-status map with an explicit unknown-code fallback. A domain error need
+      not own an HTTP status. Hosts delegated to another transport rethrow the same error. Verify filter
+      registration, safe public messages and structured logging in the running transport tests.
     rationale: ""
     cases:
       - id: case-1
@@ -183,15 +194,22 @@ rules:
         when: GraphQL host
         write: rethrown untouched so Apollo's pipeline owns it
     verification:
-      automated: []
-      manual: []
+      automated:
+        - NEST_TRANSPORT_ERROR_MAPPER
+      manual:
+        - Exercise the registered filter over HTTP, including unknown errors, redaction and delegated hosts.
     relatedExamples:
       - graphql-command
   - id: BE-ERROR-6
     title: GraphQL mapping
     kind: mandatory
-    requirement: "Two layers: GraphQLTransformInterceptor shapes the resolver body envelope; formatError shapes
-      the GraphQL errors entry and transport status. Clients match on error code, not status alone."
+    requirement: >-
+      When GraphQL is selected, its formatter maps the selected error family to stable extensions.code and
+      the declared transport-owned status, with an explicit unknown-error fallback. If the selected API
+      carries extension status into HTTP status, the installed response plugin must consume that same value.
+      A resolver result envelope is a separately selected API contract; GraphQL and the Academy
+      GraphQLTransformInterceptor envelope are not mandatory for every Nest project. Typed business
+      dispositions remain normal results. Clients use the declared error code rather than parsing messages.
     rationale: ""
     cases:
       - id: case-1
@@ -220,8 +238,10 @@ rules:
         write: "interface GraphQLResponse<T = unknown> { data?: T; message: string; success: boolean; error?: string
           }; the FE matches on error code, not on status"
     verification:
-      automated: []
-      manual: []
+      automated:
+        - NEST_TRANSPORT_ERROR_MAPPER
+      manual:
+        - Test the selected GraphQL envelope and wire status, public redaction and expected business dispositions.
     relatedExamples:
       - graphql-command
   - id: BE-ERROR-7
