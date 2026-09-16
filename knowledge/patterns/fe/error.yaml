@@ -134,8 +134,10 @@ rules:
           one exists: class PersonalProjectEnrollmentDeniedError extends Error in
           useQueryPersonalProjectTaskWorkspaceSwr.ts; not a pattern
     verification:
-      automated: []
-      manual: []
+      automated:
+        - FE_REQUIRED_VALUE_FAILURE
+      manual:
+        - Select domain-required bindings and confirm which absence modes must stop continuation.
     relatedExamples: []
 
   - id: FE-ERROR-4
