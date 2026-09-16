@@ -427,6 +427,30 @@ function knownWorldImport(specifier, imported) {
   return false;
 }
 
+function importDeclarationFor(ts, node) {
+  for (let current = node; current; current = current.parent) if (ts.isImportDeclaration(current)) return current;
+  return null;
+}
+
+function isReactCreateElement(ts, checker, call) {
+  const expression = unwrapExpression(ts, call.expression);
+  if (ts.isIdentifier(expression)) {
+    const symbol = checker.getSymbolAtLocation(expression);
+    return (symbol?.declarations ?? []).some(declaration => {
+      const imported = ts.isImportSpecifier(declaration) ? declaration.propertyName?.text ?? declaration.name.text : null;
+      const parent = importDeclarationFor(ts, declaration);
+      return imported === 'createElement' && parent && ts.isStringLiteralLike(parent.moduleSpecifier) && parent.moduleSpecifier.text === 'react';
+    });
+  }
+  if (!ts.isPropertyAccessExpression(expression) || expression.name.text !== 'createElement') return false;
+  const symbol = checker.getSymbolAtLocation(expression.expression);
+  return (symbol?.declarations ?? []).some(declaration => {
+    const parent = importDeclarationFor(ts, declaration);
+    return (ts.isNamespaceImport(declaration) || ts.isImportClause(declaration))
+      && parent && ts.isStringLiteralLike(parent.moduleSpecifier) && parent.moduleSpecifier.text === 'react';
+  });
+}
+
 function jsxTagName(ts, tagName) {
   if (ts.isIdentifier(tagName)) return tagName.text;
   if (ts.isPropertyAccessExpression(tagName)) return tagName.name.text;
@@ -535,8 +559,8 @@ function checkWorldRenderBoundaries(config, context, roots) {
     return Boolean(declaration && (declaration.worldEdge || knownWorldImport(declaration.specifier, propertyName ?? '')));
   };
 
-  const callIsWorld = (call, checker, sourceFile, seen) => {
-    const expression = unwrapExpression(ts, call.expression);
+  const calleeIsWorld = (input, checker, sourceFile, seen = new Set()) => {
+    const expression = unwrapExpression(ts, input);
     if (ts.isIdentifier(expression) && symbolIsWorld(checker.getSymbolAtLocation(expression), sourceFile)) return true;
     if ((ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression))) {
       const property = ts.isPropertyAccessExpression(expression) ? expression.name.text
@@ -547,16 +571,17 @@ function checkWorldRenderBoundaries(config, context, roots) {
     }
     const symbol = unaliasSymbol(ts, checker, selectedSymbol(ts, checker, expression));
     if (!symbol || seen.has(symbol)) return false;
+    const nextSeen = new Set(seen).add(symbol);
     const declarations = symbol.getDeclarations?.() ?? [];
     for (const declaration of declarations) {
       if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
-        const initializer = unwrapExpression(ts, declaration.initializer);
-        const raw = selectedSymbol(ts, checker, initializer);
-        if (symbolIsWorld(raw, declaration.getSourceFile())) return true;
+        if (calleeIsWorld(declaration.initializer, checker, declaration.getSourceFile(), nextSeen)) return true;
       }
     }
-    return expressionFunctions(expression, checker).some(fn => functionUsesWorld(fn, checker, new Set(seen).add(symbol)));
+    return expressionFunctions(expression, checker).some(fn => functionUsesWorld(fn, checker, nextSeen));
   };
+
+  const callIsWorld = (call, checker, sourceFile, seen) => calleeIsWorld(call.expression, checker, sourceFile, seen);
 
   const functionUsesWorld = (fn, checker, seen = new Set()) => {
     if (functionWorldCache.has(fn)) return functionWorldCache.get(fn);
@@ -577,6 +602,7 @@ function checkWorldRenderBoundaries(config, context, roots) {
     expression = unwrapExpression(ts, expression);
     if (!expression) return false;
     if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression) || ts.isJsxFragment(expression)) return true;
+    if (ts.isCallExpression(expression) && isReactCreateElement(ts, checker, expression)) return true;
     if (ts.isConditionalExpression(expression)) return expressionHasRender(expression.whenTrue, checker, seen)
       || expressionHasRender(expression.whenFalse, checker, seen);
     if (ts.isBinaryExpression(expression) && [ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken,
@@ -636,6 +662,9 @@ function checkWorldRenderBoundaries(config, context, roots) {
       && functionHasRender(fn, checker) && !functionUsesWorld(fn, checker) && !capturesOuterFunction(fn, checker));
   };
 
+  const expressionSuppliesRender = (expression, checker) => expressionHasRender(expression, checker)
+    || expressionFunctions(expression, checker).some(fn => functionHasRender(fn, checker));
+
   const renderBoundary = (expression, checker, seen = new Set(), allowEmpty = false) => {
     expression = unwrapExpression(ts, expression);
     if (!expression) return allowEmpty;
@@ -656,6 +685,32 @@ function checkWorldRenderBoundaries(config, context, roots) {
       if (values.length) return values.every(value => renderBoundary(value, checker, nextSeen, allowEmpty));
     }
     if (ts.isCallExpression(expression)) {
+      if (isReactCreateElement(ts, checker, expression)) {
+        const target = expression.arguments[0] ? unwrapExpression(ts, expression.arguments[0]) : null;
+        if (!target || ts.isStringLiteralLike(target)) return false;
+        const pureTarget = pureRenderTarget(target, checker) && !wrapperTag(ts, target);
+        const wrapper = wrapperTag(ts, target);
+        if (!pureTarget && !wrapper) return false;
+        const props = expression.arguments[1] ? unwrapExpression(ts, expression.arguments[1]) : null;
+        let hasBoundary = pureTarget;
+        if (props && props.kind !== ts.SyntaxKind.NullKeyword) {
+          if (!ts.isObjectLiteralExpression(props) || props.properties.some(property => ts.isSpreadAssignment(property))) return false;
+          for (const property of props.properties) {
+            if (!ts.isPropertyAssignment(property)) continue;
+            const value = unwrapExpression(ts, property.initializer);
+            if (!expressionSuppliesRender(value, checker)) continue;
+            if (!pureRenderTarget(value, checker) && !renderBoundary(value, checker, seen, true)) return false;
+            const name = property.name && (ts.isIdentifier(property.name) || ts.isStringLiteralLike(property.name)) ? property.name.text : null;
+            if (['children', 'component', 'content', 'render', 'view'].includes(name)) hasBoundary = true;
+          }
+        }
+        const children = expression.arguments.slice(2);
+        if (children.length) {
+          if (!children.every(child => renderBoundary(child, checker, seen, false))) return false;
+          hasBoundary = true;
+        }
+        return hasBoundary;
+      }
       if ((ts.isPropertyAccessExpression(expression.expression) || ts.isElementAccessExpression(expression.expression))) {
         const name = ts.isPropertyAccessExpression(expression.expression) ? expression.expression.name.text
           : ts.isStringLiteralLike(expression.expression.argumentExpression) ? expression.expression.argumentExpression.text : null;
@@ -676,13 +731,18 @@ function checkWorldRenderBoundaries(config, context, roots) {
     }
     if (ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression)) {
       const opening = ts.isJsxElement(expression) ? expression.openingElement : expression;
-      if (pureRenderTarget(opening.tagName, checker) && !wrapperTag(ts, opening.tagName)) return true;
-      if (!wrapperTag(ts, opening.tagName)) return false;
+      const pureTarget = pureRenderTarget(opening.tagName, checker) && !wrapperTag(ts, opening.tagName);
+      const wrapper = wrapperTag(ts, opening.tagName);
+      if (!pureTarget && !wrapper) return false;
       const children = ts.isJsxElement(expression)
         ? expression.children.filter(child => !ts.isJsxText(child) || child.text.trim()) : [];
-      let hasBoundary = children.length > 0 && children.every(child => ts.isJsxExpression(child)
-        ? renderBoundary(child.expression, checker, seen, false)
-        : ts.isJsxText(child) ? false : renderBoundary(child, checker, seen, false));
+      let hasBoundary = pureTarget;
+      if (children.length) {
+        if (!children.every(child => ts.isJsxExpression(child)
+          ? renderBoundary(child.expression, checker, seen, false)
+          : ts.isJsxText(child) ? false : renderBoundary(child, checker, seen, false))) return false;
+        hasBoundary = true;
+      }
       for (const attribute of opening.attributes.properties) {
         if (!ts.isJsxAttribute(attribute) || !attribute.initializer) continue;
         const name = attribute.name.text;
@@ -691,9 +751,11 @@ function checkWorldRenderBoundaries(config, context, roots) {
           if (ts.isJsxExpression(attribute.initializer)
             && !renderBoundary(attribute.initializer.expression, checker, seen, true)) return false;
         }
-        if (['component', 'content', 'render', 'view'].includes(name)) {
-          if (ts.isJsxExpression(attribute.initializer) && attribute.initializer.expression
-            && pureRenderTarget(attribute.initializer.expression, checker)) hasBoundary = true;
+        if (ts.isJsxExpression(attribute.initializer) && attribute.initializer.expression
+          && expressionSuppliesRender(attribute.initializer.expression, checker)) {
+          if (!pureRenderTarget(attribute.initializer.expression, checker)
+            && !renderBoundary(attribute.initializer.expression, checker, seen, true)) return false;
+          if (['component', 'content', 'render', 'view'].includes(name)) hasBoundary = true;
         }
       }
       return hasBoundary;

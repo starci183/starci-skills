@@ -175,7 +175,7 @@ test('frontend catches route drawing, upward tiers, direct/deep data access, bar
 test('frontend world owners may use resolved same-file, re-exported, and wrapped pure render boundaries', t => {
   const root = fixture(t, 'frontend', {
     'src/components/blocks/demo/World/index.tsx': `"use client";
-import { Suspense } from "react";
+import { Suspense, createElement } from "react";
 import { useThing } from "@/hooks";
 import { DataProvider, ProjectionProvider } from "@/modules/providers";
 import { ResolvedView } from "./views";
@@ -186,6 +186,8 @@ export const OptionalWorld=()=>{const state=useThing();return state&&<ResolvedVi
 export const MappedWorld=()=>{const state=useThing();return [state].map((value)=><ResolvedView key={value} value={value}/>)};
 export const ProjectedWorld=()=>{const state=useThing();return <ProjectionProvider content={state}><ResolvedView value={state}/></ProjectionProvider>};
 export const InjectedWorld=()=>{const state=useThing();return <DataProvider content={ResolvedView} contentProps={{value:state}}/>};
+export const CreatedWorld=()=>{const state=useThing();return createElement(ResolvedView,{value:state})};
+export const RenderedWorld=()=>{useThing();return <ResolvedView render={()=><LoadingView/>} value="ready"/>};
 `,
     'src/components/blocks/demo/World/views.tsx': 'export { ReadyView as ResolvedView } from "./ready";\n',
     'src/components/blocks/demo/World/ready.tsx': 'export const ReadyView=({value}:{value:string})=> <div>{value}</div>;\n',
@@ -209,13 +211,18 @@ test('frontend world owners cannot draw inline, capture owner state, choose a co
     'src/components/blocks/demo/Parent/index.tsx': 'import { useThing } from "@/hooks"; import { Child } from "../Child"; import { ChildView } from "../Child/view"; export const Parent=()=>{const value=useThing();return value==="child"?<Child/>:<ChildView value={value}/>};\n',
     'src/components/blocks/demo/Dynamic/index.tsx': 'import * as Hooks from "@/hooks"; import { ChildView } from "../Child/view"; const views={ready:ChildView}; export const Dynamic=({kind}:{kind:string})=>{Hooks.useThing();const Target=views[kind as keyof typeof views];return <Target value="ready"/>};\n',
     'src/components/blocks/demo/DynamicProvider/index.tsx': 'import { useThing } from "@/hooks"; import { DataProvider } from "@/modules/providers"; import { ChildView } from "../Child/view"; const views={ready:ChildView}; export const DynamicProvider=({kind}:{kind:string})=>{const value=useThing();return <DataProvider content={views[kind as keyof typeof views]} contentProps={{value}}/>};\n',
+    'src/components/blocks/demo/Frame/index.tsx': 'export const Frame=({children,render}:{children?:any,render?:()=>any})=> <section>{render?.()}{children}</section>;\n',
+    'src/components/blocks/demo/Aliased/index.tsx': 'import { useThing } from "@/hooks"; const first=useThing; const second=first; export const Aliased=()=>{const value=second();return <div>{value}</div>};\n',
+    'src/components/blocks/demo/RenderProp/index.tsx': 'import { useThing } from "@/hooks"; import { Frame } from "../Frame"; export const RenderProp=()=>{const value=useThing();return <Frame render={()=><div>{value}</div>}/>};\n',
+    'src/components/blocks/demo/ChildDraw/index.tsx': 'import { useThing } from "@/hooks"; import { Frame } from "../Frame"; export const ChildDraw=()=>{const value=useThing();return <Frame><div>{value}</div></Frame>};\n',
+    'src/components/blocks/demo/Created/index.tsx': 'import * as React from "react"; import { useThing } from "@/hooks"; export const Created=()=>{const value=useThing();return React.createElement("div",null,value)};\n',
     'src/hooks/index.ts': 'export { useThing } from "./use-thing";\n',
     'src/hooks/use-thing.ts': 'export const useThing=()=>"ready";\n',
     'src/modules/providers.tsx': 'export const DataProvider=({content:Content,contentProps}:{content:any,contentProps:any})=> <Content {...contentProps}/>;\n',
   });
   const result = check(root);
   const findings = result.violations.filter(item => item.ruleId === 'FE_WORLD_OWNER_RENDER_BOUNDARY');
-  for (const owner of ['Inline', 'Captured', 'Parent', 'Dynamic', 'DynamicProvider']) {
+  for (const owner of ['Inline', 'Captured', 'Parent', 'Dynamic', 'DynamicProvider', 'Aliased', 'RenderProp', 'ChildDraw', 'Created']) {
     assert.ok(findings.some(item => item.path.includes(`/${owner}/`)), `${owner}: ${JSON.stringify(result, null, 2)}`);
   }
   assert.equal(findings.some(item => item.path.includes('/Child/')), false, JSON.stringify(result, null, 2));
@@ -422,12 +429,12 @@ test('TypeScript import types join the dependency graph and direct dynamic modul
 test('feature application use cases may use Nest injection but cannot reach transport DTOs or protocol framework surfaces', t => {
   const root = fixture(t, 'backend', {
     'src/modules/orders/service.ts': 'export class OrdersService { create(input: {name:string}) { return input } }\n',
-    'src/features/orders/application/valid.use-case.ts': 'import * as Nest from "@nestjs/common"; import { OrdersService } from "@modules/orders/service"; @Nest.Injectable() export class ValidUseCase { constructor(private readonly orders: OrdersService) {} execute(input:{name:string}) { return this.orders.create(input) } }\n',
+    'src/features/orders/application/valid.use-case.ts': 'import * as Nest from "@nestjs/common"; import { OrdersService } from "@modules/orders/service"; interface ValidParams {name:string} interface ValidResult {name:string} @Nest.Injectable() export class ValidUseCase { constructor(private readonly orders: OrdersService) {} execute(input:ValidParams):ValidResult { return this.orders.create(input) } }\n',
     'src/features/orders/application/valid-cjs.use-case.ts': 'import Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidCjsUseCase {}\n',
     'src/features/orders/application/valid-require.use-case.ts': 'const Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidRequireUseCase {}\n',
-    'src/features/orders/application/valid-shadow-es.use-case.ts': 'import * as Nest from "@nestjs/common"; @Nest.Injectable() export class ValidShadowEsUseCase { execute(value:unknown){ function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
-    'src/features/orders/application/valid-shadow-cjs.use-case.ts': 'import Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidShadowCjsUseCase { execute(value:unknown){ function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
-    'src/features/orders/application/valid-shadow-require.use-case.ts': 'const Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidShadowRequireUseCase { execute(value:unknown){ function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
+    'src/features/orders/application/valid-shadow-es.use-case.ts': 'import * as Nest from "@nestjs/common"; @Nest.Injectable() export class ValidShadowEsUseCase { execute(value:unknown):unknown { function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
+    'src/features/orders/application/valid-shadow-cjs.use-case.ts': 'import Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidShadowCjsUseCase { execute(value:unknown):unknown { function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
+    'src/features/orders/application/valid-shadow-require.use-case.ts': 'const Nest = require("@nestjs/common"); @Nest.Injectable() export class ValidShadowRequireUseCase { execute(value:unknown):unknown { function normalize(Nest:{Body:unknown}) { return Nest.Body }; return normalize({Body:value}) } }\n',
     'src/features/orders/transport/graphql/create.input.ts': 'export class CreateInput { name!: string }\n',
     'src/features/orders/transport/index.ts': 'export type { CreateInput } from "./graphql/create.input"\n',
     'src/features/orders/shared/transport-types.ts': 'export type { CreateInput } from "../transport"\n',
