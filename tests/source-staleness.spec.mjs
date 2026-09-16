@@ -83,6 +83,17 @@ test('dirty unrelated paths stay out of scoped coverage while dirty covered file
   const f=fixture(t);fs.writeFileSync(path.join(f.repo,'notes.txt'),'untracked unrelated\n');assert.equal(f.scan().clean,true);fs.appendFileSync(path.join(f.repo,'src/target.ts'),'// changed\n');assert.ok(f.scan().findings.some(item=>item.code==='SOURCE_INPUTS_CHANGED'&&item.nodeId==='target'));
 });
 
+test('scoped trailing glob probes its directory and measures nested tracked files',t=>{
+  const f=fixture(t),targetFile=path.join(f.work,...f.locations.target.split('/')),node=parseYaml(fs.readFileSync(targetFile,'utf8')),
+    evidenceFile=path.join(path.dirname(targetFile),'evidence/target-proof/manifest.yaml'),evidence=parseYaml(fs.readFileSync(evidenceFile,'utf8'));
+  fs.mkdirSync(path.join(f.repo,'src/target'),{recursive:true});fs.writeFileSync(path.join(f.repo,'src/target/nested.ts'),'export const nested = true;\n');
+  run(f.repo,['git','add','src/target/nested.ts']);run(f.repo,['git','commit','-qm','nested coverage']);const revision=run(f.repo,['git','rev-parse','HEAD']);
+  node.completion.sourceIdentity.repositories[0].commit=revision;node.completion.sourceIdentity.repositories[0].coverage.paths=['src/target/**'];
+  evidence.sourceIdentity=structuredClone(node.completion.sourceIdentity);fs.writeFileSync(targetFile,stringifyYaml(node));fs.writeFileSync(evidenceFile,stringifyYaml(evidence));
+  let report=f.scan();assert.ok(!report.findings.some(item=>item.nodeId==='target'&&item.code==='SOURCE_PATH_MISSING'));
+  fs.appendFileSync(path.join(f.repo,'src/target/nested.ts'),'// changed\n');report=f.scan();assert.ok(report.findings.some(item=>item.nodeId==='target'&&item.code==='SOURCE_INPUTS_CHANGED'));
+});
+
 test('sourceRefs use exact path revisions and stack paths route to runtime operations',t=>{
   const f=fixture(t);fs.mkdirSync(path.join(f.repo,'.stacks'),{recursive:true});fs.writeFileSync(path.join(f.repo,'.stacks/application-stacks.yaml'),'schema: synthetic\n');run(f.repo,['git','add','.stacks/application-stacks.yaml']);run(f.repo,['git','commit','-qm','stack']);const revision=run(f.repo,['git','rev-parse','HEAD']);
   const file=path.join(f.work,...f.locations.target.split('/')),node=parseYaml(fs.readFileSync(file,'utf8'));node.sourceRefs=[{repository:'repo',revision,path:'.stacks/application-stacks.yaml',observation:'Synthetic stack source.'}];fs.writeFileSync(file,stringifyYaml(node));

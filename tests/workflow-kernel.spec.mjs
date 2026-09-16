@@ -3626,6 +3626,18 @@ test('a scope composed from other operations allowlists carries no Work tree pat
   assert.deepEqual(['interface.draw','architecture.decide','work.author'].map(kind=>writesWorkRecords(kind)),[true,true,true]);
 });
 
+test('an exact amended path permits its owner-authorized cross-kind form repair without weakening wildcard IO checks',()=>{
+  const decision='.starciwork/features/login/business/srs/business-rules/policy-decisions/d-login-platform-billing-ledger/index.yaml';
+  const business='.starciwork/features/login/business/index.yaml';
+  const broad='.starciwork/features/login/business/**';
+  const op={kind:'decision.prepare',allowlist:[decision,business,broad],amendmentEffects:[
+    {amendment:'owner-grant',paths:[business,broad],resources:[],external:[]}
+  ]};
+  const verdict=producedKindVerdict(op,[decision,business,'.starciwork/features/login/business/overview/index.yaml'],{engine:{}});
+  assert.deepEqual(verdict.undeclared,[{file:'.starciwork/features/login/business/overview/index.yaml',record:'srs'}],
+    'the exact amended parent is authorized, while a broad amendment path does not silently grant new record kinds');
+});
+
 /* ------------------------------------------------------------------ shared-change discipline */
 
 const sharedPlan={definitionOfDone:['the slice works'],

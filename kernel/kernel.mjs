@@ -947,7 +947,16 @@ export function prepareWorkGate(op,ctx){
 /** Every sealed candidate byte is attributed to its operation; legacy runs retain report-confirmed attribution. */
 export function producedKindVerdict(op,observed,ctx){
   const produced=ctx?.engine?[...observed]:attributedFiles(op,observed,ctx);
-  try{return {ok:true,produced,undeclared:undeclaredWrites(op.kind,produced,{profile:ctx?.kindsProfile??null,nodeKind:ctx?.work?.node?.(op.nodeId)?.kind??null})};}
+  try{
+    const undeclared=undeclaredWrites(op.kind,produced,{profile:ctx?.kindsProfile??null,nodeKind:ctx?.work?.node?.(op.nodeId)?.kind??null});
+    // An owner may add an exact path to an existing operation so it can perform a bounded form repair whose
+    // record kind differs from the operation's original output kind. The amendment effect fence has already
+    // proved these paths against the owner-granted ceiling. Keep wildcard grants under the normal kind rule:
+    // only an exact amended file is explicit enough to authorize this cross-kind repair.
+    const exactAmended=new Set((op.amendmentEffects??[]).flatMap(effect=>effect.paths??[])
+      .map(slash).filter(file=>!/[?*\[\]{}]/.test(file)));
+    return {ok:true,produced,undeclared:undeclared.filter(item=>!exactAmended.has(slash(item.file)))};
+  }
   catch(error){return ctx?.engine?{ok:false,produced,undeclared:[],error:String(error?.message??error)}:{ok:true,produced,undeclared:[]};}
 }
 

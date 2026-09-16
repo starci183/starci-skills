@@ -169,7 +169,10 @@ function safeSourceTarget(root,target){
 function coveredChange(repo,revision,coverage){
   const specs=pathspecs(coverage);
   if(coverage.kind==='scoped')for(const relative of specs){
-    const target=path.resolve(repo.root,...relative.split('/')),inside=path.relative(repo.root,target);
+    // A scoped coverage entry may name every descendant of a directory. Git understands the
+    // trailing `/**` pathspec, while the filesystem probe must inspect its concrete directory.
+    const probe=relative.endsWith('/**')?relative.slice(0,-3):relative;
+    const target=path.resolve(repo.root,...probe.split('/')),inside=path.relative(repo.root,target);
     if(inside.startsWith('..')||path.isAbsolute(inside))throw new SourceStalenessInputError('Source coverage escapes its repository','UNSAFE_PATH');
     const checked=safeSourceTarget(repo.root,target);if(checked.kind==='unsafe')return {kind:'unsafe',relative};if(checked.kind==='missing')return {kind:'missing',relative};
   }
