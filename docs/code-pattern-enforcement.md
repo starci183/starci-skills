@@ -98,6 +98,22 @@ scripts. Grammar guard results retain their Node execution and exact package
 input identity in `machineResults[].execution`; a static import-boundary check
 does not substitute for these finite behavior vectors.
 
+The Nest error-family adapter is selected by `NEST-EXCEPTION-IDENTITY`. Its
+`capability` and `academy-abstract-exception` profiles resolve actual TypeScript
+error identity and the declared profile's constructor rules. Universal legacy
+folder/name/return heuristics are explicitly off under a separate guard; the
+replacement script remains required. A missing error-family declaration is
+unavailable, not permission to accept arbitrary thrown values. See
+[Nest error identity](nest-error-identity-check.md).
+
+`NEXT-REQUIRED-VALUE-FAILURE` runs the selected Next required-value guard check.
+Declaring which inputs are required remains a reviewed domain decision; for
+each selected binding, the machine checks that absence reaches a real Error
+before unsafe continuation. An empty declaration does not certify completeness
+of the domain decision. Source adapters and the legacy off guard use the
+[source/input distinction](architecture-input-scope.md), retaining configuration
+bytes in evidence without treating them as application contracts.
+
 ## Evidence limits
 
 A complete code-pattern result proves only the declared mechanical obligations over the recorded files and tool identities. Agents still review responsibility, cohesion, state/effect ownership and edge cases using `docs/architecture-rules.md`, `docs/portable-source-architecture.md` and `docs/backend-source-pattern.md`. Applicable typecheck, boot, contract, concurrency, recovery and rendered behavior evidence remains separate.

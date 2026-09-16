@@ -79,8 +79,8 @@ profiles:
       - BE-TYPING-7
     sourceGlobs:
       - src/**/*.{ts,mts,cts,tsx}
-      - apps/**/*.{ts,mts,cts,tsx}
-      - libs/**/*.{ts,mts,cts,tsx}
+      - apps/*/src/**/*.{ts,mts,cts,tsx}
+      - libs/*/src/**/*.{ts,mts,cts,tsx}
       - test/**/*.{ts,mts,cts,tsx}
       - tests/**/*.{ts,mts,cts,tsx}
     inputGlobs:
@@ -141,6 +141,7 @@ profiles:
           requirement: Require export and enum-member docs, reject restated-name docs and inline suppression/non-ASCII violations under the canon profile.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-be/require-export-jsdoc, starci-be/require-enum-member-jsdoc, starci-be/no-restated-name-jsdoc, starci-be/no-non-ascii-source, starci-be/require-vn-ok-reason, starci-be/no-line-suppression]
             expected: { severity: error }
         semantic:
@@ -149,17 +150,28 @@ profiles:
         status: implemented
       - id: NEST-EXCEPTION-IDENTITY
         sourceRuleIds: [BE-ERROR-1, BE-ERROR-2, BE-ERROR-3, BE-NAMING-3]
-        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.spec.ts', 'src/tests/**', 'libs/*/src/tests/**'] }
+        applicability: { include: ['**/*.{ts,mts,cts,tsx}'], exclude: ['**/*.d.ts', '**/*.d.mts', '**/*.d.cts', '**/*.{spec,test}.{ts,mts,cts,tsx}', '**/*-{spec,test}.{ts,mts,cts,tsx}', '**/__tests__/**', '**/tests/**', '**/test/**'] }
         mechanical:
-          requirement: Academy-profile thrown failures use named AbstractException identities, typed metadata and one object argument.
+          requirement: Resolve selected capability-owned or Academy error-family declarations and escaping throw identities across every selected production source.
+          check: { kind: script, sourceOnly: true, ruleIds: [NEST_ERROR_DECLARATION_IDENTITY, NEST_THROWN_ERROR_IDENTITY] }
+        semantic:
+          guidance: docs/nest-error-identity-check.md
+          review: Select the error family and genuine protocol health exceptions explicitly; preserve typed normal business dispositions and test transport redaction separately.
+        status: implemented
+      - id: NEST-LEGACY-EXCEPTION-POLICY-GUARD
+        sourceRuleIds: [BE-ERROR-1, BE-ERROR-2, BE-ERROR-3, BE-NAMING-3]
+        applicability: { include: ['**/*.{ts,mts,cts,tsx}'], exclude: ['**/*.d.ts', '**/*.d.mts', '**/*.d.cts', '**/*.{spec,test}.{ts,mts,cts,tsx}', '**/*-{spec,test}.{ts,mts,cts,tsx}', '**/__tests__/**', '**/tests/**', '**/test/**'] }
+        mechanical:
+          requirement: Keep universal central-folder, constructor-name and return-value heuristics explicitly disabled while the selected error-family identity script enforces the adopted contract.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-be/exception-name-ends-in-exception, starci-be/exception-code-matches-class-name, starci-be/exception-metadata-type-named-for-class, starci-be/exception-extends-abstract, starci-be/exception-in-errors-folder, starci-be/require-exception-object-arg, starci-be/throw-abstract-exception, starci-be/no-handler-encoded-failure]
-            expected: { severity: error }
+            expected: { severity: off }
         semantic:
-          guidance: knowledge/patterns/be/error.yaml
-          review: Keep typed business dispositions as outcomes and map private causes without leaking them.
-        status: conflict
+          guidance: docs/nest-error-identity-check.md
+          review: The legacy off guard never substitutes for the active NEST-EXCEPTION-IDENTITY obligation.
+        status: implemented
       - id: NEST-OBSERVABILITY
         sourceRuleIds: [BE-ERROR-7, BE-IMPORTS-6]
         applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.spec.ts', 'src/tests/**', 'libs/*/src/tests/**'] }
@@ -167,6 +179,7 @@ profiles:
           requirement: Production source does not use console or framework logger and uses stable structured log identity.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [no-console, starci-be/no-framework-logger, starci-be/no-interpolated-log-message, starci-be/no-error-wording-as-log-identity]
             expected: { severity: error }
         semantic:
@@ -180,6 +193,7 @@ profiles:
           requirement: Preserve named EntityManager injection, transaction callback identity, entity table names and non-eager relations.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-be/must-inject-entity-manager, starci-be/no-injected-repository, starci-be/no-outer-manager-in-transaction, starci-be/require-entity-table-name, starci-be/no-eager-relation]
             expected: { severity: error }
         semantic:
@@ -193,6 +207,7 @@ profiles:
           requirement: When the Academy ICQRS compatibility profile is present, handlers and messages retain its executable contract.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-be/handler-overrides-process, starci-be/message-carries-params-only]
             expected: { severity: error }
         semantic:
@@ -206,6 +221,7 @@ profiles:
           requirement: Protected entry operations carry a recognized guard and transport doors remain in features.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-be/identity-needs-guard, starci-be/door-lives-in-features, starci-be/rest-door-needs-a-reason]
             expected: { severity: error }
         semantic:
@@ -219,6 +235,7 @@ profiles:
           requirement: Selected projection and bridge implementations use the Academy delivery lifecycle shapes.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-be/projection-listener-contract, starci-be/no-dynamic-projection-group-id, starci-be/projection-recompute-must-upsert, starci-be/nats-bridge-delivery-contract, starci-be/no-call-site-transport-override]
             expected: { severity: error }
         semantic:
@@ -232,6 +249,7 @@ profiles:
           requirement: Tests are colocated/discovered as applicable and avoid call-only, sleep, provider-model, branch and mock-transport false proof.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-be/unit-test-colocated, starci-be/no-call-only-spec, starci-be/e2e-uses-production-transport, starci-be/e2e-asserts-persisted-state, starci-be/no-sleep-in-flow, starci-be/no-model-call-in-e2e, starci-be/harness-calls-provider-directly, starci-be/no-branch-in-flow-step, starci-be/no-wiring-in-flow-spec, starci-be/no-api-shaped-e2e-filename, starci-be/no-marker-model-stub]
             expected: { severity: error }
         semantic:
@@ -245,6 +263,7 @@ profiles:
           requirement: Reject any, double/unguarded casts, inline object contracts and const enums; use the adopted generic array form.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: ['@typescript-eslint/no-explicit-any', '@typescript-eslint/array-type', starci-be/no-double-cast, starci-be/no-inline-param-type, starci-be/no-inline-object-type, starci-be/no-const-enum, starci-be/no-unguarded-unknown-cast]
             expected:
               severity: error
@@ -261,6 +280,7 @@ profiles:
           requirement: Reject versioned identifiers, bare exported verbs and vendor-shaped factories on owned modules.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-be/no-version-in-name, starci-be/no-bare-verb-export, starci-be/no-vendor-module-factory-name]
             expected: { severity: error }
         semantic:
@@ -347,6 +367,7 @@ profiles:
           requirement: Use type-only imports when the resolved binding is used only as a type.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: ['@typescript-eslint/consistent-type-imports']
             expected: { severity: error }
         semantic:
@@ -393,6 +414,7 @@ profiles:
           requirement: Keep legacy private-file and no-public-entry heuristics explicitly disabled while the owner public-entry architecture check enforces the adopted boundary.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-be/must-deep-module-import, starci-be/no-folder-reexport]
             expected: { severity: off }
         semantic:
@@ -406,6 +428,7 @@ profiles:
           requirement: Keep the filename-count twin heuristic explicitly disabled; test selection follows actual behavior and risk.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-be/handler-has-twin-spec]
             expected: { severity: off }
         semantic:
@@ -559,6 +582,7 @@ profiles:
           requirement: Require export docs and reject second-language, emoji and inline lint configuration in source/path.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-fe/require-export-jsdoc, starci-fe/no-second-language-in-source, starci-fe/no-second-language-in-path, starci-fe/no-emoji-in-source, starci-fe/no-inline-lint-config]
             expected: { severity: error }
         semantic:
@@ -572,6 +596,7 @@ profiles:
           requirement: Enforce sanctioned unit exports, component signatures, colocated class names and no component helper buckets/runtime namespaces.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-fe/prefer-arrow-export, starci-fe/public-component-signature, starci-fe/no-inline-parameter-type, starci-fe/export-matches-folder, starci-fe/no-runtime-namespace, starci-fe/class-names-in-colocated-file, starci-fe/no-inline-class-name, starci-fe/no-helper-folder-in-components, starci-fe/source-tier-marker-matches-folder, starci-fe/route-tree-holds-routes-only, starci-fe/monorepo-tier-belongs-to-its-side]
             expected: { severity: error }
         semantic:
@@ -585,6 +610,7 @@ profiles:
           requirement: Keep public props explicit, actions conventionally named and CSS/frame ownership out of public component contracts.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-fe/handler-on-prefix, starci-fe/no-placeholder-prop, starci-fe/no-per-part-classname-prop, starci-fe/no-public-classname-prop, starci-fe/no-public-frame-css-props, starci-fe/no-css-door-type-laundering]
             expected: { severity: error }
         semantic:
@@ -598,6 +624,7 @@ profiles:
           requirement: Use the owned Icon/Heading/vendor primitive doors and reject internal StarCi links or direct vendor bypasses.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-fe/no-vendor-icon-outside-icon-leaf, starci-fe/heroicons-is-the-glyph-vendor, starci-fe/no-direct-heroicon-import, starci-fe/no-heading-tag-outside-heading-component, starci-fe/no-hand-rolled-heading, starci-fe/vendor-primitive-has-named-owner, starci-fe/no-internal-starci-href]
             expected: { severity: error }
         semantic:
@@ -611,6 +638,7 @@ profiles:
           requirement: Enforce the Academy token, typography and vocabulary ownership syntax.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-fe/cn-arguments-are-single-tokens, starci-fe/no-arbitrary-value, starci-fe/no-fractional-step, starci-fe/no-unresolved-token-class, starci-fe/no-off-scale-glyph-size, starci-fe/no-decorative-icon-in-metric-cell, starci-fe/no-copy-resolution-below-block, starci-fe/no-hardcoded-copy-in-vocabulary]
             expected: { severity: error }
         semantic:
@@ -624,6 +652,7 @@ profiles:
           requirement: API clients attach served locale and locale headers remain at the link owner.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-fe/api-client-attaches-the-locale, starci-fe/locale-header-belongs-to-the-link]
             expected: { severity: error }
         semantic:
@@ -637,6 +666,7 @@ profiles:
           requirement: Reject double casts and inline public parameter types; use the adopted generic array form.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-fe/no-double-cast, starci-fe/no-inline-parameter-type, '@typescript-eslint/array-type']
             expected:
               severity: error
@@ -653,6 +683,7 @@ profiles:
           requirement: Behavior specs are colocated with their subject under the selected source layout.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-fe/unit-test-colocated]
             expected: { severity: error }
         semantic:
@@ -698,12 +729,25 @@ profiles:
           guidance: docs/portable-source-architecture.md
           review: Decide whether the state is product-world lifecycle or intrinsic browser interaction before applying the check.
         status: implemented
+      - id: NEXT-SOURCE-LAYOUT-AND-HOOK-OWNERSHIP
+        sourceRuleIds: [FE-FOLDER-1, FE-FOLDER-2, FE-ARCHITECTURE-1, FE-ARCHITECTURE-2, FE-ARCHITECTURE-3, FE-IMPORTS-3, FE-IMPORTS-4, FE-FUNCTION-4, FE-FUNCTION-6]
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.{spec,test}.tsx', '**/*.{spec,test}.ts', '**/*-{spec,test}.{ts,tsx}', '**/__tests__/**', 'test/**', 'tests/**'] }
+        mechanical:
+          requirement: Enforce features/pages-layouts-overlays, shared component tiers, centralized custom hooks, app-to-feature-only internal imports and a sibling render file for connected blocks.
+          check:
+            kind: architecture
+            sourceOnly: true
+            ruleIds: [FE_SOURCE_LAYOUT_INVALID, FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES, FE_FEATURE_DEPENDENCY_DIRECTION, FE_CONNECTED_BLOCK_RENDER_PAIR, FE_COMPONENT_WORLD_OWNERSHIP, FE_BLOCK_PRODUCT_HOOK_DEFINITION, FE_CUSTOM_HOOK_LOCATION]
+        semantic:
+          guidance: docs/portable-source-architecture.md
+          review: Review cohesion, public API shape and behavior separately; each source root follows the same roles in a single application or monorepo.
+        status: missing
       - id: NEXT-ERROR-STATE-MAPPING
         sourceRuleIds: [FE-ERROR-1, FE-ERROR-2, FE-ERROR-4]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx', '**/*.test.ts', '**/*.test.tsx', '**/__tests__/**', 'test/**', 'tests/**'] }
         mechanical:
           requirement: Bind declared world failure to closed render state, selected envelope unwrapping, action feedback ownership and installed Next recovery boundaries across the selected production programs.
-          check: { kind: script, ruleIds: [FE_ERROR_WORLD_STATE_MAPPING, FE_ERROR_ENVELOPE_POLICY, FE_WRITE_FEEDBACK_OWNER, FE_NEXT_ERROR_BOUNDARY_LOCATION] }
+          check: { kind: script, sourceOnly: true, ruleIds: [FE_ERROR_WORLD_STATE_MAPPING, FE_ERROR_ENVELOPE_POLICY, FE_WRITE_FEEDBACK_OWNER, FE_NEXT_ERROR_BOUNDARY_LOCATION] }
         semantic:
           guidance: knowledge/patterns/fe/error.yaml
           review: Verify retry eligibility, copy, redaction and valid recovery behavior.
@@ -713,11 +757,11 @@ profiles:
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx', '**/*.test.ts', '**/*.test.tsx', '**/__tests__/**', 'test/**', 'tests/**'] }
         mechanical:
           requirement: Once an owner declares a required payload or context value, its absent-value path terminates with an actual Error before unsafe continuation.
-          check: { kind: script, ruleIds: [FE_REQUIRED_VALUE_FAILURE] }
+          check: { kind: script, sourceOnly: true, ruleIds: [FE_REQUIRED_VALUE_FAILURE] }
         semantic:
           guidance: knowledge/patterns/fe/error.yaml
           review: Decide which values are required and preserve typed normal business dispositions; verify recovery and user-facing behavior separately.
-        status: missing
+        status: implemented
       - id: NEXT-GRAMMAR-GUARD-BEHAVIOR
         sourceRuleIds: [FE-ERROR-5]
         applicability: { include: ['package.json'] }
@@ -818,6 +862,7 @@ profiles:
           requirement: Keep the unconditional filename twin heuristic explicitly disabled; the conditional world-owner architecture check is the replacement.
           check:
             kind: eslint
+            sourceOnly: true
             ruleIds: [starci-fe/connected-block-has-presentational-twin]
             expected: { severity: off }
         semantic:

@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {createRequire} from 'node:module';
 import {checkScopedLint} from '../scripts/check-scoped-lint.mjs';
+import {checkArchitecture} from '../checks/architecture/index.mjs';
 
 function fixture(t){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-architecture-input-scope-'));
@@ -80,4 +82,57 @@ test('configuration changed during checking still invalidates the source result'
   assert.equal(report.status,'unavailable');
   assert.equal(report.inputs.stable,false);
   assert.ok(report.issues.some(item=>item.code==='INPUTS_CHANGED_DURING_CHECK'));
+});
+
+test('source-only script includes custom production roots while retaining metadata as context',async t=>{
+  const f=fixture(t),profile=f.options.profileCatalog.profiles.nest;
+  profile.obligations.push({id:'SOURCE-SCRIPT',sourceRuleIds:['BE-TYPING-1'],applicability:{include:['**/*.ts']},
+    mechanical:{requirement:'Check selected source contracts.',check:{kind:'script',sourceOnly:true,ruleIds:['SOURCE_TEST_RULE']}},
+    semantic:{guidance:'docs/architecture-input-scope.md',review:'Review behavior separately.'},status:'implemented'});
+  const report=await checkScopedLint(f.root,[],f.options);
+  assert.equal(report.status,'clean',JSON.stringify(report.issues));
+  const input=f.seen.find(item=>item.ruleIds.includes('SOURCE_TEST_RULE'));
+  assert.deepEqual(input.files,f.sourceFiles);
+  assert.ok(input.contextFiles.includes('jest.config.ts'));
+  assert.ok(report.inputs.before.files.includes('jest.config.ts'));
+});
+
+test('source-only subject selection rejects non-boolean values instead of silently narrowing scope',async t=>{
+  const f=fixture(t);
+  f.options.profileCatalog.profiles.nest.obligations[1].mechanical.check.sourceOnly='true';
+  const report=await checkScopedLint(f.root,[],f.options);
+  assert.notEqual(report.status,'clean');
+  assert.ok(report.issues.some(item=>item.code==='PROFILE_SUBJECT_SELECTION_INVALID'));
+});
+
+test('real broad TypeScript programs retain explicit configuration roles without hiding custom source roots',async t=>{
+  const f=fixture(t),profile=f.options.profileCatalog.profiles.nest;
+  f.write('package.json',JSON.stringify({private:true}));
+  f.write('architecture.json',JSON.stringify({schema:'starci/architecture-config@1',kinds:['backend'],tsconfig:'tsconfig.json'}));
+  f.write('tsconfig.json',JSON.stringify({compilerOptions:{target:'ES2022',module:'ESNext',moduleResolution:'Bundler',strict:true},include:['**/*.ts']}));
+  f.write('apps/api/src/main.ts','export {}');
+  f.write('apps/api/jest.config.ts','export default {testEnvironment:"node"};');
+  fs.mkdirSync(path.join(f.root,'node_modules'),{recursive:true});
+  const require=createRequire(import.meta.url);
+  fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')),path.join(f.root,'node_modules/typescript'),'junction');
+  profile.sourceGlobs.push('apps/*/src/**/*.ts');profile.inputGlobs.push('apps/*/jest*.ts');
+  profile.obligations[0].mechanical.check.ruleIds=['ARCH_SYNTAX_INVALID'];
+  profile.obligations.push({id:'SOURCE-SCRIPT',sourceRuleIds:['BE-TYPING-1'],applicability:{include:['**/*.ts']},
+    mechanical:{requirement:'Check selected source contracts.',check:{kind:'script',sourceOnly:true,ruleIds:['SOURCE_TEST_RULE']}},
+    semantic:{guidance:'docs/architecture-input-scope.md',review:'Review behavior separately.'},status:'implemented'});
+  const options={...f.options,architecture:checkArchitecture,architectureConfig:'architecture.json'};
+  let report=await checkScopedLint(f.root,[],options);
+  assert.equal(report.status,'clean',JSON.stringify(report.issues));
+  const expected=['apps/api/src/main.ts','server/modules/store/store.ts','src/service.ts'];
+  assert.deepEqual(report.obligations.find(item=>item.id==='SOURCE-SCRIPT').files,expected);
+  const input=f.seen.find(item=>item.ruleIds.includes('SOURCE_TEST_RULE'));
+  assert.deepEqual(input.sourceContextFiles,expected);
+  for(const file of ['jest.config.ts','apps/api/jest.config.ts']){
+    assert.ok(input.contextFiles.includes(file));assert.ok(report.inputs.before.files.includes(file));
+    assert.ok(!report.coverage.lintedFiles.includes(file));
+  }
+  profile.sourceGlobs.push('jest.config.ts');
+  report=await checkScopedLint(f.root,[],options);
+  assert.equal(report.status,'clean',JSON.stringify(report.issues));
+  assert.ok(report.obligations.find(item=>item.id==='SOURCE-SCRIPT').files.includes('jest.config.ts'));
 });
