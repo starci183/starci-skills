@@ -188,7 +188,8 @@ test('identity adapter mixtures and non-disabled legacy guards fail closed', asy
   mixed.profileCatalog.profiles.nest.obligations[0].mechanical.check.ruleIds.push('NEST_ENV_ACCESS');
   let report = await mixed.check();
   assert.equal(report.status, 'unavailable');
-  assert.ok(report.issues.some(issue => issue.code === 'SCRIPT_RESULT_INVALID' && issue.obligation === 'NEST-EXCEPTION-IDENTITY'), JSON.stringify(report.issues));
+  assert.ok(report.issues.some(issue => issue.code === 'SCRIPT_INPUT_UNAVAILABLE' && issue.obligation === 'NEST-EXCEPTION-IDENTITY'), JSON.stringify(report.issues));
+  assert.deepEqual(report.machineResults.find(item => item.obligation === 'NEST-EXCEPTION-IDENTITY').checkedRuleIds, []);
 
   const enabled = fixture(t, { legacy: 'on' });
   report = await enabled.check();
