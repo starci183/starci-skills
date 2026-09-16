@@ -21,6 +21,13 @@ import {budgetVerdict,readRuntimeBudget} from './budget.mjs';
  * Workflow profiles use `adaptive-capacity`: group eligible models by provider, score exact fresh headroom
  * against recent observed and reserved service, then apply a bounded owner preference. The authored
  * `prefer-then-overflow` and `least-loaded-with-budget` modes remain for direct compatibility profiles.
+ *
+ * An owner quota is also a weight: the slots `applyQuota` grants become `quota.targets`, a target share per
+ * runtime. At review time each ready runtime's effective share is that target times a live capacity factor -
+ * zero while cooling or refused, the probed window's remaining share where a provider reports one, observed
+ * launch success for a launch-status pool - and the share a downweighted runtime cannot serve is dealt back to
+ * the fully-capable targets in proportion. The pick is the largest effectiveShare - inFlight deficit, ties
+ * decided by the policy's own order.
  */
 export const ALLOCATION='starci/runtime-allocation@1';
 export const PREFER_THEN_OVERFLOW='prefer-then-overflow';
@@ -29,12 +36,15 @@ export const ADAPTIVE_CAPACITY='adaptive-capacity';
 export const OWNER_PREFERENCE_MULTIPLIER=1.25;
 export const BASE_SERVICE_MS=30*60*1000;
 export const COLD_ESTIMATE_MS={easy:15*60*1000,medium:45*60*1000,hard:90*60*1000,default:45*60*1000};
-export const FAILURE_KINDS=['rate-limited','quota','auth','other'];
+export const FAILURE_KINDS=['rate-limited','quota','auth','stalled','other'];
 /** Reason -> failure kind. Order matters: a 429 that also mentions a quota is still a rate limit. */
 export const FAILURE_PATTERNS={
   'rate-limited':/429|rate.?limit|too many requests|overloaded|capacity/i,
   quota:/quota|insufficient_quota|budget|billing/i,
-  auth:/401|403|unauthorized|forbidden|login/i
+  auth:/401|403|unauthorized|forbidden|login/i,
+  // A launch accepted but producing no progress inside the adapter's readiness timeout is a soft-fail of the
+  // launch-status telemetry kind: it parks the pool like `other`, never like a provider limit.
+  stalled:/\bstall(?:ed|s|ing)?\b|\bstuck\b|no (?:observable |visible )?progress|readiness (?:timeout|timed out)|never (?:became|showed) ready/i
 };
 export const DEFAULT_COOLDOWN_MS={'rate-limited':600000,quota:3600000,auth:86400000,other:300000};
 export const DEFAULT_BACKOFF_FACTOR=2;
@@ -72,7 +82,7 @@ const graphRole=kind=>{try{return roleOf(kind);}catch{return null;}};
 /** Classify why a launch or an operation failed; the kind selects the cooldown. */
 export function classifyFailure(reason){
   const text=typeof reason==='string'?reason:reason==null?'':plain(reason)?String(reason.message??reason.reason??''):String(reason);
-  for(const kind of ['rate-limited','quota','auth'])if(FAILURE_PATTERNS[kind].test(text))return kind;
+  for(const kind of ['rate-limited','quota','auth','stalled'])if(FAILURE_PATTERNS[kind].test(text))return kind;
   return 'other';
 }
 
@@ -89,6 +99,7 @@ function adoptState(state,day){
     streaks:counters(state?.streaks),cooling,
     reservations:plain(state?.reservations)?Object.fromEntries(Object.entries(state.reservations).map(([id,items])=>[id,(Array.isArray(items)?items:[]).filter(plain).map(item=>({...item}))])):{},
     history:plain(state?.history)?Object.fromEntries(Object.entries(state.history).map(([id,items])=>[id,(Array.isArray(items)?items:[]).filter(item=>plain(item)&&Number.isFinite(item.at)&&Number.isFinite(item.durationMs)).map(item=>({...item}))])):{},
+    launchBook:plain(state?.launchBook)?Object.fromEntries(Object.entries(state.launchBook).map(([id,items])=>[id,(Array.isArray(items)?items:[]).filter(item=>plain(item)&&Number.isFinite(item.at)).map(item=>({at:item.at,ok:item.ok===true}))])):{},
     lastAllocated:typeof state?.lastAllocated==='string'?state.lastAllocated:null,
     lastProvider:typeof state?.lastProvider==='string'?state.lastProvider:null
   };
@@ -96,14 +107,25 @@ function adoptState(state,day){
 
 /** Apply workflow capacity and optional role eligibility without replacing the profile's allocation policy. */
 export function applyQuota(runtimes,quota){
-  if(!plain(quota)||(!Array.isArray(quota.order)&&!plain(quota.slots)))return runtimes;
+  if(!plain(quota)||(!Array.isArray(quota.order)&&!plain(quota.slots)&&!plain(quota.targets)))return runtimes;
   const copy=structuredClone(runtimes);
   const order=Array.isArray(quota.order)?quota.order.filter(id=>copy.runtimes?.[id]):[];
+  const granted={};
   for(const [id,n] of Object.entries(plain(quota.slots)?quota.slots:{}))if(copy.runtimes?.[id]&&Number.isFinite(Number(n))){
     copy.runtimes[id].maxParallel=Math.max(0,Number(n));
+    granted[id]=Math.max(0,Number(n));
     // Some external CLIs expose launch/auth status but no account headroom API. Naming a positive slot is the
     // owner's explicit capacity decision for this workflow; absence or zero keeps that runtime closed.
     if(copy.runtimes[id].capacityAuthority==='explicit-workflow-quota')copy.runtimes[id].explicitCapacity=Number(n)>0;
+  }
+  // A granted slot count is also the owner's target share for that runtime (goal §4): record it on the quota
+  // itself and mirror it into the profile so the weights survive the hand to createAllocator either way.
+  const targets=Object.fromEntries(Object.entries({...(plain(quota.targets)?quota.targets:{}),...granted})
+    .map(([id,n])=>[id,Number(n)]).filter(([id,n])=>copy.runtimes?.[id]&&Number.isFinite(n)&&n>=0));
+  if(Object.keys(targets).length){
+    try{quota.targets=targets;}catch{}
+    copy.allocation=plain(copy.allocation)?copy.allocation:{};
+    copy.allocation.targets={...(plain(copy.allocation.targets)?copy.allocation.targets:{}),...targets};
   }
   const roleConstraints=plain(quota.roles)?quota.roles:{};
   const constrainedRoles=new Set(Object.values(roleConstraints).flatMap(value=>Array.isArray(value)?value:[]));
@@ -177,6 +199,10 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
   const backoffFactor=finite(allocation.backoffFactor,DEFAULT_BACKOFF_FACTOR);
   const maxCooldownMs=finite(allocation.maxCooldownMs,DEFAULT_MAX_COOLDOWN_MS);
   const maxParallelOps=finite(runtimes.maxParallelOps,DEFAULT_MAX_PARALLEL_OPS);
+  // The owner weights: `applyQuota` already turned the granted slots into `quota.targets` and mirrored them
+  // into `allocation.targets`. A runtime absent from both has no owner share and stays on the plain policy order.
+  const targetShares=Object.fromEntries(Object.entries({...(plain(allocation.targets)?allocation.targets:{}),...(plain(quota)&&plain(quota.targets)?quota.targets:{})})
+    .map(([id,n])=>[id,Number(n)]).filter(([id,n])=>ids.includes(id)&&Number.isFinite(n)&&n>=0));
   const policy=typeof allocation.policy==='string'?allocation.policy:LEAST_LOADED;
   const adaptive=policy===ADAPTIVE_CAPACITY;
   const ownerPolicy=plain(allocation.ownerPolicy)?allocation.ownerPolicy:null;
@@ -223,6 +249,22 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
   const coldEstimate=difficulty=>COLD_ESTIMATE_MS[difficulty]??COLD_ESTIMATE_MS.default;
   const serviceCost=durationMs=>Math.max(0.25,Math.min(8,finite(durationMs,COLD_ESTIMATE_MS.default)/BASE_SERVICE_MS));
   const trimHistory=()=>{const since=now()-SERVICE_OBSERVATION_MS;for(const id of ids)live.history[id]=(live.history[id]??[]).filter(item=>item.at>=since).slice(-256);};
+  /** The model a pool pins for one role: `models` maps role -> model, then default, then the pool's own name. */
+  const modelFor=(id,role)=>{const pool=pools[id]??{},models=plain(pool.models)?pool.models:{};
+    const named=models[role]??models.default??models['*'];
+    return typeof named==='string'&&named?named:pool.model??pool.target??id;};
+  /** A launch-status pool's capacity factor is its observed launch success, Laplace-smoothed over the service window. */
+  const launchFactor=id=>{
+    const since=now()-SERVICE_OBSERVATION_MS,book=(live.launchBook[id]??[]).filter(item=>item.at>=since);
+    const ok=book.reduce((count,item)=>count+(item.ok?1:0),0);
+    return (ok+1)/(book.length+1);
+  };
+  /** A launch-status pool keeps the launch outcomes its capacity factor reads; a deferral records nothing. */
+  const noteLaunch=(id,ok)=>{
+    if(pools[id]?.quotaTelemetry!=='launch-status')return;
+    const since=now()-SERVICE_OBSERVATION_MS;
+    live.launchBook[id]=[...(live.launchBook[id]??[]),{at:now(),ok:Boolean(ok)}].filter(item=>item.at>=since).slice(-256);
+  };
   // An explicit operation id is an idempotency key. Once that exact reservation is gone, a repeated settlement
   // must never consume the next operation on the same runtime. The oldest-item fallback is compatibility only
   // for callers that do not name an operation.
@@ -315,7 +357,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
         providerFree=providerUse?providerUse.capacity-providerUse.used:Infinity,free=Math.min(slots(id)-load(id)-held,providerFree),window=verdictOf(id);
       const launchStatusCapacity=pool?.quotaTelemetry==='launch-status'&&pool?.capacityAuthority==='explicit-workflow-quota'&&pool?.explicitCapacity===true;
       let qualification=null;
-      if(typeof eligibility==='function')try{qualification=eligibility(job??{kind,role,difficulty},{id,...pool,model:pool.model??pool.target??id});}catch(error){qualification={eligible:false,reasons:[error?.message??'model eligibility unavailable']};}
+      if(typeof eligibility==='function')try{qualification=eligibility(job??{kind,role,difficulty},{id,...pool,model:modelFor(id,role)});}catch(error){qualification={eligible:false,reasons:[error?.message??'model eligibility unavailable']};}
       const reason=!Array.isArray(pool?.roles)||!pool.roles.includes(role)?`no ${role} role`
         :tier&&tier.length&&!tier.includes(id)?`outside the ${difficulty} tier`
         :avoid.includes(id)?'avoided'
@@ -333,7 +375,12 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
         :null;
       // The shared detail travels beside the reason, never inside it: the kernel reads these reasons by shape.
       if(reason){blocked.push({runtime:id,reason,...(providerUse?{admission:{used:providerUse.used,capacity:providerUse.capacity}}:{}),...(held?{sharedLoad:held}:{}),...(parked&&!cool?{shared:true,from:parked.workflow??null}:{}),...(window.exhausted?{budget:{remaining:window.remaining,until:window.until}}:{})});continue;}
-      ready.push({runtime:id,provider,providerRank:providerRankOf(id),target:pool.target??id,load:load(id),free,slots:slots(id),ratio:load(id)/slots(id),opsLeft:opsLeft(id),tokensLeft:tokensLeft(id),rotation:rotation(id),preference:order?rank(order,id):null,sharedLoad:held,remainingShare:window.remaining,quotaTelemetry:launchStatusCapacity?'launch-status':'provider-window',windows:window.windows,band:budgetBand(window.remaining),eligibility:qualification,
+      // The capacity factor is the live health of the runtime's own telemetry: a cooling, refused or offline
+      // pool never reaches `ready` (factor 0); a probed provider window contributes its remaining share; a
+      // launch-status pool contributes its observed launch success; an unread one is trusted at full factor.
+      const capacityFactor=pool?.quotaTelemetry==='launch-status'?launchFactor(id):Number.isFinite(window.remaining)?window.remaining/100:1;
+      ready.push({runtime:id,provider,providerRank:providerRankOf(id),target:pool.target??id,model:modelFor(id,role),load:load(id),free,slots:slots(id),ratio:load(id)/slots(id),opsLeft:opsLeft(id),tokensLeft:tokensLeft(id),rotation:rotation(id),preference:order?rank(order,id):null,sharedLoad:held,inFlight:load(id)+held,remainingShare:window.remaining,quotaTelemetry:launchStatusCapacity?'launch-status':'provider-window',windows:window.windows,band:budgetBand(window.remaining),eligibility:qualification,
+        targetShare:Number.isFinite(targetShares[id])?targetShares[id]:null,capacityFactor,
         admission:providerUse?{used:providerUse.used,capacity:providerUse.capacity}:null});
     }
     // prefer-then-overflow: the first eligible runtime of the role's order wins, so a saturated or cooling
@@ -380,7 +427,24 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
         chosenRuntime:families[0].runtime,reason:'highest usable headroom per observed and reserved service after bounded owner preference'};
     }else ready.sort(ledger?(a,b)=>chosenFirst(a,b)||cmp(a.sharedLoad,b.sharedLoad)||cmp(b.band,a.band)||locally(a,b)
       :(a,b)=>chosenFirst(a,b)||cmp(b.band,a.band)||locally(a,b));
+    // Owner weights are the pick (goal §4). A ready runtime's effective share is its target times its capacity
+    // factor; the share a downweighted runtime cannot serve is dealt to the remaining fully-capable targets in
+    // proportion to their weights - never wholly to the largest deficit. The winner is the largest
+    // effectiveShare - inFlight; the sort is stable, so a tie keeps the order the policy produced above
+    // (adaptive score, then the preference/ratio/round-robin rules of the other policies). A runtime with no
+    // owner target has share zero and competes exactly on the established order.
+    const weighted=ready.filter(item=>Number.isFinite(item.targetShare));
+    if(weighted.length){
+      const freed=weighted.reduce((sum,item)=>sum+item.targetShare*(1-item.capacityFactor),0);
+      const receiverTarget=weighted.filter(item=>item.capacityFactor>=1).reduce((sum,item)=>sum+item.targetShare,0);
+      for(const item of ready){
+        item.effectiveShare=(item.targetShare??0)*item.capacityFactor+(item.capacityFactor>=1&&receiverTarget>0?freed*(item.targetShare??0)/receiverTarget:0);
+        item.deficit=item.effectiveShare-item.inFlight;
+      }
+      ready.sort((a,b)=>cmp(b.deficit,a.deficit));
+    }
     return {kind,role,ready,blocked,preference:order,localRanked,withoutBudget,
+      targets:Object.keys(targetShares).length?{...targetShares}:null,
       budget:probed?Object.fromEntries(ready.map(item=>[item.runtime,item.remainingShare])):null,
       adaptive:adaptiveDecision,admission:admission.source?{source:admission.source,providers:Object.fromEntries(Object.entries(admission.providers).map(([provider,entry])=>[provider,{used:entry.used,capacity:entry.capacity}]))}:null,
       shared:ledger?{workflow,revision:view.revision??0,loads:{...view.loads},cooling:{...view.cooling}}:null};
@@ -413,11 +477,11 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
           difficulty:difficulty??'medium',expectedRevision:evaluated.shared?.revision??0});
         if(!sharedReservation?.conflict)break;
       }
-      const {role,ready,blocked,preference:order,localRanked,withoutBudget,budget:budgetView,adaptive:adaptiveView,shared:sharedView}=evaluated;
+      const {role,ready,blocked,preference:order,localRanked,withoutBudget,budget:budgetView,adaptive:adaptiveView,shared:sharedView,targets:targetView}=evaluated;
       if(inFlight()>=maxParallelOps)return {ok:false,kind,role,avoid,blocked,reason:`maxParallelOps ${maxParallelOps} is already in flight; release a slot before allocating ${kind}`};
       if(!ready.length)return {ok:false,kind,role,avoid,blocked,reason:`no runtime with the ${role} role, a free slot and budget for ${kind}: ${blocked.map(item=>`${item.runtime} (${item.reason})`).join(', ')||'no pool declares that role'}`};
       if(adaptive&&ledger&&job?.opId&&!sharedReservation?.reserved)return {ok:false,kind,role,avoid,blocked,reason:'shared adaptive reservation changed during selection; retry the allocation'};
-      const chosen=ready[0];
+      const chosen=ready[0],weightedPick=Number.isFinite(chosen.deficit);
       live.loads[chosen.runtime]=chosen.load+1;
       live.usedToday[chosen.runtime]=(live.usedToday[chosen.runtime]??0)+1;
       live.lastAllocated=chosen.runtime;
@@ -426,15 +490,17 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
       const reservation={op:job?.opId??job?.id??null,at:now(),launchedAt:null,estimateMs:family?.estimateMs??coldEstimate(difficulty),role,difficulty:difficulty??'medium'};
       live.reservations[chosen.runtime]=[...(live.reservations[chosen.runtime]??[]),reservation];
       // Everything the local order ranked ahead of the chosen runtime was passed over for one reason only: it
-      // carries another kernel's operations. An empty list means the shared view changed nothing.
-      const preferredOver=!adaptive&&localRanked?localRanked.slice(0,Math.max(0,localRanked.indexOf(chosen.runtime))):[];
+      // carries another kernel's operations. An empty list means the shared view changed nothing. When owner
+      // weights picked, the rank difference is the deficit's, and these receipts would misattribute it.
+      const preferredOver=!adaptive&&!weightedPick&&localRanked?localRanked.slice(0,Math.max(0,localRanked.indexOf(chosen.runtime))):[];
       const sharedLoad=Object.fromEntries(ready.filter(item=>item.sharedLoad>0).map(item=>[item.runtime,item.sharedLoad]));
       // What the budget alone moved: the runtimes the shared-and-local order ranked ahead of the chosen one, passed
       // over only because they have clearly less of their provider window left. Empty when the budget changed nothing.
-      const sparedOver=!adaptive&&withoutBudget?withoutBudget.slice(0,Math.max(0,withoutBudget.indexOf(chosen.runtime))):[];
-      return {ok:true,kind,role,runtime:chosen.runtime,target:chosen.target,load:chosen.load+1,slots:chosen.slots,
+      const sparedOver=!adaptive&&!weightedPick&&withoutBudget?withoutBudget.slice(0,Math.max(0,withoutBudget.indexOf(chosen.runtime))):[];
+      return {ok:true,kind,role,runtime:chosen.runtime,target:chosen.target,model:chosen.model,load:chosen.load+1,slots:chosen.slots,
         remaining:remainingOf(chosen.runtime),alternatives:ready.slice(1).map(item=>item.runtime),blocked,at:now(),
         policy,preference:order,overflowed:Boolean(order)&&chosen.preference>0,eligibility:chosen.eligibility??null,
+        ...(weightedPick?{targets:targetView,targetShare:chosen.targetShare,capacityFactor:chosen.capacityFactor,effectiveShare:chosen.effectiveShare,deficit:chosen.deficit}:{}),
         ...(adaptiveView?{adaptive:adaptiveView,reservation:{estimateMs:reservation.estimateMs,role:reservation.role,difficulty:reservation.difficulty}}:{}),
         ...(budgetView?{budget:budgetView,sparedOver}:{}),
         ...(ledger?{shared:{workflow,loads:sharedView?.loads??{}},sharedLoad,preferredOver}:{})};
@@ -478,6 +544,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
       live.loads[runtime]=Math.max(0,load(runtime)-1);
       spend(runtime,tokens);
       delete live.streaks[runtime];
+      noteLaunch(runtime,true);
       dropReservation(runtime,op);const started=reservation?.launchedAt??reservation?.at??now();
       live.history[runtime]=[...(live.history[runtime]??[]),{workflow,op:op??reservation?.op??null,at:now(),durationMs:Math.max(0,now()-started),role:reservation?.role??null,difficulty:reservation?.difficulty??null}]
         .filter(item=>item.at>=now()-SERVICE_OBSERVATION_MS).slice(-256);
@@ -495,6 +562,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
       if(op!==null&&!reservation)return {ok:false,runtime,duplicate:true,observedService:false,load:load(runtime),remaining:remainingOf(runtime)};
       live.loads[runtime]=Math.max(0,load(runtime)-1);
       spend(runtime,tokens);
+      noteLaunch(runtime,false);
       dropReservation(runtime,op);const worked=Number.isFinite(reservation?.launchedAt);
       if(!worked)live.usedToday[runtime]=Math.max(0,(live.usedToday[runtime]??0)-1);
       else live.history[runtime]=[...(live.history[runtime]??[]),{workflow,op:op??reservation?.op??null,at:now(),durationMs:Math.max(0,now()-reservation.launchedAt),role:reservation?.role??null,difficulty:reservation?.difficulty??null}]
@@ -541,6 +609,7 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
         streaks:{...live.streaks},cooling:Object.fromEntries(Object.entries(live.cooling).map(([id,entry])=>[id,{...entry}])),
         reservations:Object.fromEntries(Object.entries(live.reservations).map(([id,items])=>[id,items.map(item=>({...item}))])),
         history:Object.fromEntries(Object.entries(live.history).map(([id,items])=>[id,items.map(item=>({...item}))])),
+        launchBook:Object.fromEntries(Object.entries(live.launchBook).map(([id,items])=>[id,items.map(item=>({...item}))])),
         lastAllocated:live.lastAllocated,lastProvider:live.lastProvider
       };
     },
