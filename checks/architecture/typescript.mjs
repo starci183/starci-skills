@@ -77,7 +77,15 @@ function runtimeImport(ts, node) {
   return true;
 }
 
-function moduleReferences(ts, sourceFile) {
+function isUnshadowedCommonJsRequire(ts, checker, expression) {
+  if (!ts.isIdentifier(expression) || expression.text !== 'require') return false;
+  const symbol = checker?.getSymbolAtLocation(expression);
+  if (!symbol) return true;
+  const declarations = symbol.getDeclarations?.() ?? [];
+  return declarations.length > 0 && declarations.every(declaration => declaration.getSourceFile().isDeclarationFile);
+}
+
+function moduleReferences(ts, sourceFile, checker) {
   const found = [];
   const visit = node => {
     if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteralLike(node.moduleSpecifier)) {
@@ -87,7 +95,7 @@ function moduleReferences(ts, sourceFile) {
       found.push({ node: node.moduleReference.expression, specifier: node.moduleReference.expression.text, runtime: !node.isTypeOnly, declaration: node });
     } else if (ts.isCallExpression(node) && node.arguments.length > 0 && ts.isStringLiteralLike(node.arguments[0])
       && ((node.expression.kind === ts.SyntaxKind.ImportKeyword && [1, 2].includes(node.arguments.length))
-        || (ts.isIdentifier(node.expression) && node.expression.text === 'require' && node.arguments.length === 1))) {
+        || (isUnshadowedCommonJsRequire(ts, checker, node.expression) && node.arguments.length === 1))) {
       found.push({ node: node.arguments[0], specifier: node.arguments[0].text, runtime: true, declaration: node });
     }
     ts.forEachChild(node, visit);
@@ -261,7 +269,7 @@ export function buildTypeScriptContext(config, injectedTypeScript) {
     const candidates = occurrences.get(from) ?? [];
     const project = candidates.find(item => isInside(path.dirname(path.join(config.root, ...item.relative.split('/'))), from)) ?? candidates[0];
     if (!project) continue;
-    for (const reference of moduleReferences(ts, sourceFile)) {
+    for (const reference of moduleReferences(ts, sourceFile, project.program.getTypeChecker())) {
       const resolvedName = ts.resolveModuleName(reference.specifier, sourceFile.fileName, project.options, host).resolvedModule?.resolvedFileName;
       if (!resolvedName) {
         const codeLike = !ASSET_EXTENSION.test(reference.specifier);
@@ -342,4 +350,4 @@ export function reachableViolation(edges, firstEdge, forbidden, { follow = () =>
   return null;
 }
 
-export { sourceLocation };
+export { isUnshadowedCommonJsRequire, sourceLocation };

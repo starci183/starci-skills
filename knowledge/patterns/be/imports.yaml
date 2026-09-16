@@ -67,8 +67,10 @@ rules:
   - id: BE-IMPORTS-2
     title: Brace style
     kind: mandatory
-    requirement: Every import is multi-line, one binding per line, with a trailing comma. Prefer import type for
-      type-only bindings.
+    requirement: Named braced imports are multi-line, one complete binding per line, with a trailing comma
+      for nonempty bindings. Side-effect, default-only and namespace imports use their valid TypeScript
+      forms without invented braces or invalid trailing commas. Prefer import type for type-only bindings;
+      the selected type-import lint rule checks usage separately from layout.
     rationale: 'Lint object-curly-newline with ImportDeclaration: "always" enforces it. 1388 of 4463 files use
       import type at extraction.'
     cases:
@@ -95,7 +97,8 @@ rules:
           } from "../abstract"
     verification:
       automated:
-        - object-curly-newline
+        - NEST_IMPORT_FORMAT
+        - '@typescript-eslint/consistent-type-imports'
       manual: []
     relatedExamples: []
   - id: BE-IMPORTS-3

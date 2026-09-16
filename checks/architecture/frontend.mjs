@@ -1,6 +1,7 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { isInside } from './config.mjs';
-import { reachableViolation, relativePath, sourceLocation } from './typescript.mjs';
+import { isUnshadowedCommonJsRequire, reachableViolation, relativePath, sourceLocation } from './typescript.mjs';
 
 const TIERS = new Set(['leaves', 'branches', 'overlays', 'composites', 'blocks', 'layouts', 'product-shells', 'pages']);
 const FORBIDDEN_UPWARD = {
@@ -45,6 +46,131 @@ function violation(config, sourceFile, node, ruleId, message, extra = {}) {
     message,
     ...Object.fromEntries(Object.entries(extra).filter(([key]) => key !== 'ts')),
   };
+}
+
+function readJson(file) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
+}
+
+function exportTargets(value) {
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) return value.flatMap(exportTargets);
+  if (value && typeof value === 'object' && !Array.isArray(value)) return Object.values(value).flatMap(exportTargets);
+  return [];
+}
+
+function grammarExport(manifest, packageName, specifier) {
+  const key = specifier === packageName ? '.' : `.${specifier.slice(packageName.length)}`;
+  const value = manifest?.exports?.[key];
+  const targets = exportTargets(value);
+  return targets.length > 0 && targets.every(target => target.startsWith('./') && !target.includes('\\') && !target.split('/').includes('..'));
+}
+
+function canonical(file) {
+  const absolute = path.resolve(file);
+  try { return path.resolve(fs.realpathSync(absolute)); } catch { return absolute; }
+}
+
+function grammarExportTargets(manifest, packageRoot, packageName, specifier) {
+  const key = specifier === packageName ? '.' : `.${specifier.slice(packageName.length)}`;
+  return exportTargets(manifest?.exports?.[key]).filter(target => target.startsWith('./') && !target.includes('\\') && !target.split('/').includes('..'))
+    .map(target => canonical(path.resolve(packageRoot, target)));
+}
+
+function literalModules(ts, sourceFile, checker) {
+  const modules = [];
+  const visit = node => {
+    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && ts.isStringLiteralLike(node.moduleSpecifier)) {
+      modules.push({ node: node.moduleSpecifier, specifier: node.moduleSpecifier.text });
+    } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)
+      && node.moduleReference.expression && ts.isStringLiteralLike(node.moduleReference.expression)) {
+      modules.push({ node: node.moduleReference.expression, specifier: node.moduleReference.expression.text });
+    } else if (ts.isCallExpression(node) && node.arguments.length > 0 && ts.isStringLiteralLike(node.arguments[0])
+      && (node.expression.kind === ts.SyntaxKind.ImportKeyword || isUnshadowedCommonJsRequire(ts, checker, node.expression))) {
+      modules.push({ node: node.arguments[0], specifier: node.arguments[0].text });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return modules;
+}
+
+function cssImports(content) {
+  const imports = [];
+  const withoutComments = content.replace(/\/\*[\s\S]*?\*\//g, match => match.replace(/[^\r\n]/g, ' '));
+  const pattern = /@import\s+(?:url\(\s*(?:(["'])(.*?)\1|([^\s)]+))\s*\)|(["'])(.*?)\4)/gi;
+  for (const match of withoutComments.matchAll(pattern)) {
+    imports.push({ specifier: match[2] ?? match[3] ?? match[5], index: match.index });
+  }
+  return imports;
+}
+
+function checkGrammar(config, context) {
+  const grammar = config.frontend.grammar;
+  if (!grammar) return [];
+  const violations = [];
+  const local = context.workspaces.find(workspace => workspace.name === grammar.package);
+  const packageRoot = local?.root ?? path.join(config.root, 'node_modules', ...grammar.package.split('/'));
+  const manifestFile = path.join(packageRoot, 'package.json');
+  const manifest = readJson(manifestFile);
+  const consumers = grammar.consumerManifests.map(relative => ({ relative, root: path.dirname(path.join(config.root, ...relative.split('/'))),
+    manifest: readJson(path.join(config.root, ...relative.split('/'))) ?? {} }));
+  const contractProblems = [];
+  const styleBypasses = [];
+  if (manifest?.name !== grammar.package) contractProblems.push(`installed package ${grammar.package} is unavailable or has a different name`);
+  for (const consumer of consumers) if (!Object.hasOwn(consumer.manifest.dependencies ?? {}, grammar.package)) {
+    contractProblems.push(`${consumer.relative} does not declare ${grammar.package} as a runtime dependency`);
+  }
+  if (!grammarExport(manifest, grammar.package, grammar.entry)) contractProblems.push(`${grammar.entry} is not a safe declared package export`);
+  if (!grammarExport(manifest, grammar.package, grammar.styleEntry)) contractProblems.push(`${grammar.styleEntry} is not a safe declared style export`);
+  const actualPeers = Object.keys(manifest?.peerDependencies ?? {}).sort();
+  const selectedPeers = [...grammar.peers].sort();
+  if (JSON.stringify(actualPeers) !== JSON.stringify(selectedPeers)) {
+    contractProblems.push(`${grammar.package} peerDependencies must exactly match the selected peers ${selectedPeers.join(', ')}`);
+  }
+  for (const peer of grammar.peers) {
+    for (const consumer of consumers) if (!Object.hasOwn(consumer.manifest.dependencies ?? {}, peer) && !Object.hasOwn(consumer.manifest.peerDependencies ?? {}, peer)) {
+      contractProblems.push(`${consumer.relative} does not declare Grammar peer ${peer}`);
+    }
+  }
+  for (const source of grammar.styleSources) {
+    const content = fs.readFileSync(path.join(config.root, ...source.split('/')), 'utf8');
+    const grammarStyles = cssImports(content).filter(item => item.specifier === grammar.package || item.specifier.startsWith(`${grammar.package}/`));
+    if (!grammarStyles.some(item => item.specifier === grammar.styleEntry)) contractProblems.push(`${source} does not import ${grammar.styleEntry}`);
+    for (const imported of grammarStyles) if (imported.specifier !== grammar.styleEntry) {
+      contractProblems.push(`${source} imports Grammar style ${imported.specifier} outside the selected style entry`);
+      styleBypasses.push({ ruleId: 'ARCH_GRAMMAR_EXPORT_BYPASS', path: source,
+        line: content.slice(0, imported.index).split(/\r?\n/).length, column: 1, package: grammar.package, specifier: imported.specifier,
+        message: `Style source must use the selected Grammar style entry ${grammar.styleEntry}; ${imported.specifier} is outside that contract.` });
+    }
+  }
+  if (contractProblems.length) violations.push({
+    ruleId: 'ARCH_GRAMMAR_CONTRACT_INVALID',
+    path: fs.existsSync(manifestFile) && isInside(config.root, manifestFile) ? relativePath(config.root, manifestFile) : 'package.json',
+    line: 1,
+    column: 1,
+    package: grammar.package,
+    message: `Grammar contract is invalid: ${contractProblems.join('; ')}.`,
+  });
+  const allowed = new Set([grammar.entry, grammar.styleEntry]);
+  violations.push(...styleBypasses);
+  for (const sourceFile of context.files) {
+    if (isInside(packageRoot, sourceFile.fileName)) continue;
+    if (!consumers.some(consumer => isInside(consumer.root, sourceFile.fileName))) continue;
+    const edgesByStart = new Map((context.edges.get(path.resolve(sourceFile.fileName)) ?? []).map(edge => [edge.node.getStart(sourceFile), edge]));
+    for (const reference of literalModules(context.ts, sourceFile, context.checkerFor(sourceFile.fileName))) {
+      if (reference.specifier !== grammar.package && !reference.specifier.startsWith(`${grammar.package}/`)) continue;
+      if (allowed.has(reference.specifier)) {
+        const edge = edgesByStart.get(reference.node.getStart(sourceFile));
+        const expected = grammarExportTargets(manifest, packageRoot, grammar.package, reference.specifier);
+        if (!edge || expected.includes(canonical(edge.to))) continue;
+      }
+      violations.push(violation(config, sourceFile, reference.node, 'ARCH_GRAMMAR_EXPORT_BYPASS',
+        `Product source must import the selected Grammar code entry ${grammar.entry} or style entry ${grammar.styleEntry}; ${reference.specifier} is outside that contract.`,
+        { specifier: reference.specifier, package: grammar.package }));
+    }
+  }
+  return violations;
 }
 
 function hasClientDirective(ts, sourceFile) {
@@ -287,7 +413,7 @@ export function checkFrontend(config, context) {
     hooks: absoluteRoots(config.root, config.frontend.hooks),
     transport: absoluteRoots(config.root, config.frontend.transport),
   };
-  const violations = [];
+  const violations = checkGrammar(config, context);
   for (const sourceFile of context.files) {
     if (insideAny(roots.routes, sourceFile.fileName) && path.basename(sourceFile.fileName).toLowerCase() === 'page.tsx') {
       violations.push(...checkRoute(config, context, sourceFile, roots));
