@@ -142,12 +142,13 @@ writes:
     path: .starciwork/_resources/identities/<identity>/resource.yaml +
       .starciwork/_resources/fixtures/<fixture>/resource.yaml
     fields:
+      - schema
       - selected identity metadata
       - selected fixture metadata
       - revision
       - "details: actual IDs and sealed refs only"
     content:
-      en: Fill or refresh only already selected identity/fixture resource slots after observing real
+      en: Fill or refresh only already selected identity/fixture resource slots (work/resource@1) after observing real
         setup. Finalize semantic IDs, revisions and custody refs before computing the verification
         input digest. Preserve reusable identity records; per-run effects and cleanup results belong
         to evidence rather than post-proof resource edits.
@@ -366,7 +367,7 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: Run workspace validation; every cited ID/path exists or is explicitly proposed, required
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
         assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
         done.
   - id: sequence
@@ -452,3 +453,9 @@ uatPolicy:
   recording: screenshots-and-real-video
   cleanup: finally-owned-and-verified
   paidAI: reuse-explicit-flow-authorization
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

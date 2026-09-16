@@ -197,6 +197,42 @@ sections:
         auto-rerun consumers. Report impact and run only the next separately selected eligible op.
         Changes in unbound external source/runtime state still require actual inspection and
         resource revision updates; this is not a background watcher.
+  - title: Canonical layout ownership
+    blocks:
+      - ".claude owns the layout of .starciwork and .stacks: directory structure, file names and
+        the `schema:` const of every record class are defined in the catalog, never chosen by the
+        agent. An operation writes each artifact only at its declared path and name. A wrong path,
+        wrong file name, missing `schema:` const or wrong const fails the run; the layout is never
+        adapted to fit an observed file."
+      - "Every structured artifact an op writes carries its declared `schema:` const as a record
+        key: node records `work/node@2`, the workspace `work/workspace@1`, resources
+        `work/resource@1`, evidence manifests `work/evidence@1` (emitted by the kernel from the
+        op's manifest fields), the workflow goal `starci/workflow-goal@1`, intake records
+        `starci/workflow-intake@1`, .stacks compose `starci/application-stacks@1`. Staged handoffs
+        carry the request-frozen contract the kernel stores as `starci/staged-job-result@1` /
+        `starci/staged-op-response@1`. Repository-side artifacts (source, tests, documents)
+        carry no YAML const of their own but land exactly at the declared ceiling path."
+      - "Every operation's checks include the record-class validator `starci validate` for the
+        .starciwork artifacts it writes; operations that materialize or verify .stacks deployments
+        also run `starci stacks check`. An op that authors `extensions.work3.checks` on a node
+        includes the validator there. Layout, name and schema violations are operator failures,
+        not content to repair silently."
+      - "The layout covers the whole .starciwork tree. `_local/workflows/<id>/` run state -
+        `goal.json` (starci/workflow-goal@1), `goal.md`, `checks/`, `contracts/`, `inbox/`,
+        `reports/` - is kernel-owned: an operation writes only its declared files there
+        (intake.json, a goal revision) and never emits checks, contracts, inbox commands or
+        reports; those are kernel outputs, not op output."
+      - "`features/<feature>/` record trees follow the declared shape: `features/index.yaml` the
+        catalog, one `index.yaml` per node folder (`work/node@2`), business overview and split SRS
+        leaves whose `extensions.work3.srs` payloads carry their `starci/srs-*@1` section const
+        with `starci/srs-aggregate@1` intermediate indexes, architecture overview and SDS leaves
+        whose `extensions.work3.sds` payloads carry their `starci/sds-*@1` section const with
+        `starci/sds-aggregate@1` intermediates, `ui/**` nodes with their `assets/`, implementation
+        frontend/backend nodes, `uat/<flow>/` folders `{index.yaml,accounts.yaml,fixtures.yaml,
+        seed.sql,cleanup.sql,assets/}`, `integration/<id>/` nodes, the root `brand/index.yaml`
+        with `brand/assets/**`, and `_resources/<category>/<slug>/resource.yaml`. Every feature
+        record class carries its schema const and is covered by `starci validate`; writing outside
+        the declared layout fails checks."
   - title: Evidence, completion and commits
     blocks:
       - "Before executing, establish the selected node's current `inputDigest` using the read-only

@@ -62,15 +62,17 @@ writes:
   - id: node
     path: N/index.yaml
     fields:
+      - schema
       - assertions
       - implementation.changes
       - extensions.work3.allowlist
       - extensions.work3.checks
       - extensions.work3.resources
     content:
-      en: "Author only the fields that make the node launchable: its testable assertions, the write scope as
+      en: "Author only the fields that make the work/node@2 node launchable: its testable assertions, the write scope as
         real inspected files, one check per assertion with a verbatim runnable command, and the exclusive
-        runtime resources those checks need. Preserve every other authored line, including the node's
+        runtime resources those checks need. The authored extensions.work3.checks include the record-class
+        validator `starci validate` so wrong path, name or schema fails the node's own checks. Preserve every other authored line, including the node's
         description, refs, dependsOn, required flag and state. Never write completion, never write the kernel's
         own extension block, never write anything under the node's evidence folder, and never edit another node."
   - id: integration
@@ -84,7 +86,7 @@ writes:
       - description
       - assertions
     content:
-      en: One todo integration node per integration the feature declares (kind integration, state todo, required
+      en: One todo integration node per integration the feature declares (schema work/node@2, kind integration, state todo, required
         true), naming the outside system and the credential by variable name only; the node the tree owes for the
         declaration, whose live proof is another operation's. Never a credential value.
   - id: parts
@@ -105,7 +107,8 @@ writes:
       en: "Cut mode only. One child node per observable behaviour, written as work/node@2 with kind
         implementation, state todo and required true: its description, its assertions, its write scope of at most
         twelve inspected files disjoint from every sibling and from the seam, and one runnable check per
-        assertion. Exactly one child is the seam - the one that owns the module wiring, dependency registration,
+        assertion plus the record-class validator `starci validate` so wrong path, name or schema fails
+        the child's own checks. Exactly one child is the seam - the one that owns the module wiring, dependency registration,
         migrations, shared contracts and shared types every other child would otherwise touch - and every other
         child names the seam in dependsOn, so it is built first and alone and the rest fan out behind it. Never
         author a child outside the parent's own folder and never write product code."
@@ -170,7 +173,7 @@ steps:
       - node
       - evidence
     action:
-      en: Run the workspace validator over the edited tree and confirm the record still validates and now
+      en: Run the record-class validator `starci validate` over the edited tree and confirm the record still validates and now
         declares both a write scope and checks. Record the assertion-to-check mapping and any open question.
         Build nothing and change no product source; the kernel launches the node's own work afterwards.
   - reads:
@@ -208,7 +211,7 @@ steps:
     action:
       en: "Cut mode. Turn the cut node into a derived parent: remove its state, its completion and its write
         scope and keep its assertions as the group's acceptance under extensions.work3.groupAssertions, because
-        a parent with children authors no state and derives one from them. Then run the workspace validator over
+        a parent with children authors no state and derives one from them. Then run the record-class validator `starci validate` over
         the edited tree and confirm the parent is derived and every child is launchable on its own. Record the
         seam, the children and the write scope of each. Build nothing and change no product source; the kernel
         launches the seam first, fans the rest out behind it and proves the whole group once."
@@ -264,3 +267,9 @@ placeholders:
   integration-id: Stable id of one declared integration, the folder its node is named after
   node-dir: Tree-relative directory of the cut Work node, inside the operation allowlist
   part: Stable slug of one child node under that directory
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

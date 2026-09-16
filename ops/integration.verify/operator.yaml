@@ -18,6 +18,15 @@ graphPolicy:
   prerequisiteState: done
   dispatch: never
 reads:
+  - id: application-stacks
+    path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + schemas/application-stacks.schema.json
+    purpose:
+      en: When the selected scope touches application deployment, .stacks, bootstrap or recovery,
+        load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
+        credential custody, lifecycle commands and existing consumers. Run `starci stacks check`
+        when validating a materialized stack; bind its exact inputs and limitations.
+        Acceptance additionally requires the selected real startup, persistence, recovery and
+        application checks. This conditional read grants no extra deployment or source scope.
   - id: official-docs
     path: current provider official documentation + owning integration declaration preparation
     purpose:
@@ -190,15 +199,17 @@ steps:
       - repo
       - architecture
       - integration
+      - application-stacks
     writes:
       - evidence
     action:
       en: Write the scenario beside its evidence and drive it through the delivered client - the same entry
         point the product uses, reading the same variable - so what is proven is the product's own path to
-        the provider. No mock, stub, fake, spy, recorded cassette or in-process shortcut may stand in for the
-        declared provider anywhere in this scenario; a stand-in is the defect this operation exists to catch,
-        not a fallback when the provider is awkward. Create only the preconditions the exchange needs, inside
-        the sandbox account.
+        the provider; where the product runs from a materialized .stacks deployment, reach it through the
+        declared components, never an improvised address. No mock, stub, fake, spy, recorded cassette or
+        in-process shortcut may stand in for the declared provider anywhere in this scenario; a stand-in is
+        the defect this operation exists to catch, not a fallback when the provider is awkward. Create only
+        the preconditions the exchange needs, inside the sandbox account.
   - reads:
       - effects
       - repo
@@ -249,8 +260,8 @@ steps:
 proofs:
   - id: binding
     requirement:
-      en: Workspace validation ran; every cited ID and path exists or is explicitly proposed, the input
-        bindings are current, and an honest not-run or fail cannot earn done.
+      en: "`starci validate` ran; every cited ID and path exists or is explicitly proposed, the input
+        bindings are current, and an honest not-run or fail cannot earn done."
   - id: declaration
     requirement:
       en: The integration under proof is the one a business or architecture record declared, with its
@@ -328,3 +339,10 @@ integrationPolicy:
   missingCredential: blocked-environment-with-custody-slug-and-variable-name
   secretValues: never-written
   evidenceProof: live
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+    - starci-stacks-check
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

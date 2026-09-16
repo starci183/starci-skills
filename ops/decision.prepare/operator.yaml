@@ -37,11 +37,12 @@ writes:
   - id: decision
     path: .starciwork/features/<feature>/business/srs/business-rules/policy-decisions/<slug>/index.yaml
     fields:
+      - schema
       - description
       - extensions.work3.srs
       - refs
     content:
-      en: One policy-decision record draft (kind business, an srs-policy-decision section with decisionStatus
+      en: One policy-decision record draft (work/node@2, kind business, an srs-policy-decision section with decisionStatus
         open, the shape of the existing policy decisions of the tree), state todo, carrying in order the question in one sentence; why it
         matters and what changes until it is answered; the options, numbered, each with what it means
         for the architecture, the user stories, the security and authority, the business rules and the
@@ -84,7 +85,7 @@ steps:
     writes: []
     action:
       en: >-
-        Run the workspace validation and report done exactly once: first line "decision: <record id>", then
+        Run `starci validate` and report done exactly once: first line "decision: <record id>", then
         "recommended: <n>", then the options numbered as the owner will answer them. If the owner happened to
         answer here already, the first line is "answered-by-owner: <n>" instead.
 
@@ -119,3 +120,9 @@ placeholders:
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   slug: Stable decision slug
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

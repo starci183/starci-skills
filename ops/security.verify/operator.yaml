@@ -1,0 +1,254 @@
+id: security.verify
+goal:
+  en: Inspect one selected slice of code and configuration for vulnerabilities read-only and leave
+    typed findings with evidence - repairing nothing it finds.
+nodeKinds:
+  - implementation
+completionProfile: implementation
+sideEffects:
+  - execution of exactly the declared read-only scan/analysis commands in the declared sandbox
+graphPolicy:
+  mode: read-only
+  location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+  prerequisiteState: done
+  dispatch: never
+reads:
+  - id: target
+    path: N/index.yaml
+    purpose:
+      en: "Read the existing selected N/index.yaml, ancestor scope, declared refs/dependencies/assertions
+        and validator freshness. This consumer op requires its target node to exist. An absent
+        target is a scope/graph gap: report it and propose a separately selected scope op; do not
+        create a target or invent its acceptance/graph here."
+  - id: business
+    path: .starciwork/<business>/business/**/index.yaml
+    purpose:
+      en: Read accepted requirements, denials, data classifications and authority boundaries declared
+        as relevant inputs in the selected .starciwork graph. The records say what a vulnerability is
+        for this slice - a denied action the code permits is a finding; a needed missing input is a
+        reported graph/scope gap.
+  - id: architecture
+    path: .starciwork/<business>/architecture/**/index.yaml
+    purpose:
+      en: Read the declared security boundaries - authentication, authorization, tenancy, secrets
+        custody, external calls and data ownership - the inspection is held to. Where the design is
+        silent about a boundary the slice must hold, report the gap instead of guessing one.
+  - id: repo
+    path: repository:<repo-id>/<bound-paths>
+    purpose:
+      en: Resolve repository resource, actual checkout/root/HEAD and dirty state; read the delivered
+        slice - entry points, authz checks, queries, serialization, configuration and dependency
+        manifests. The inspection binds the exact inspected tree; configuration includes declared
+        deployment files inside the read set.
+  - id: rules
+    path: knowledge/architecture-rules.json + knowledge/code-pattern-enforcement.json +
+      docs/code-pattern-enforcement.md
+    purpose:
+      en: Read the declared responsibility boundaries and enforcement rules the inspection measures
+        against - secret/public value separation, denial handling, ownership boundaries. Findings
+        are measured against declared rules and the graph's security requirements, never against
+        invented policy; a rule absent here is a gap to report, not a finding to fabricate.
+  - id: machines
+    path: scripts/check-scoped-lint.mjs + checks/code-patterns/*.mjs + checks/architecture/*.mjs
+    purpose:
+      en: When the selected inspection includes boundary or enforcement checks, read the sealed
+        machines' supported arguments, report schema, exit codes and coverage limits and run them
+        read-only verbatim. Machine output is retained as evidence; the inspected code remains the
+        finding's proof, and this read grants no fix-flag or repair authority.
+  - id: checks
+    path: selected request checks[] + repository:<repo-id>/<manifest-paths>
+    purpose:
+      en: Read the exact scan/analysis commands the request lists and the manifest scripts that
+        define them. These commands are run verbatim - read-only by declaration - and nothing else
+        is added, narrowed or substituted. A listed command that does not exist is a reported
+        blocker, never a locally invented equivalent.
+  - id: effects
+    path: current request authorization + declared sandbox effects
+    purpose:
+      en: Bind the read-only scan commands to the selected assertions. No scan may write to the
+        product tree, touch a shared or production target, or exfiltrate code or secrets; an
+        inspection that cannot stay read-only is outside this op.
+  - id: matrix
+    path: selected complete-job matrix request + workflows/jobs.json
+    purpose:
+      en: Only when explicitly selected in a job matrix, read the exact cell ID, operation, immutable
+        input bindings, requested output JSON shapes and required criteria. Standalone execution
+        needs no fabricated matrix request. A template is not authority for extra effects.
+  - id: profile
+    path: model/registry.json + selected runtime execution profile + actual host tools/model
+    purpose:
+      en: Resolve this operator's request-bound external-agent chain from the selected StarCi skill and active
+        profiles. Use current host model configuration; historical model names are not availability
+        proof. Capabilities are the intersection of actual tools, selected profile policy, op
+        permissions and existing task authority. Do not revive V2 dispatch chains, retired profiles
+        or extra-agent permissions.
+writes:
+  - id: node
+    path: N/index.yaml
+    fields:
+      - state
+      - blocker
+      - completion.inputDigest
+      - completion.evidence
+      - completion.codeRefs
+    content:
+      en: Read the existing selected scope, expected assertions and .starciwork graph unchanged. Write
+        only state/blocker/completion here; findings and scan output belong to the evidence result,
+        not semantic node prose. Missing refs/dependencies/acceptance require a reported gap or
+        separately selected scope update; never add/remove them to obtain pass.
+  - id: evidence
+    path: E/manifest.yaml + E/findings.json + E/scan-output.txt + E/result.md
+    fields:
+      - id
+      - nodeId
+      - inputDigest
+      - outcome
+      - assertions
+      - assets
+      - provenance
+      - codeRefs
+      - extensions
+    content:
+      en: "Keep every finding typed - id, severity, rule, the exact file and line or configuration
+        key, the evidence excerpt and the reachable-from analysis - bound to the inspected tree and
+        commit. Record each declared check with command, cwd, exit code and sanitized output, and
+        each surface not inspected with its reason. Redact secrets and personal data before assets
+        are hashed; a finding never contains a usable credential. Operator-specific observed result
+        in E/result.md: findings first, then inspected surface and not-run items - no verdict the
+        evidence does not carry."
+  - id: matrixHandoff
+    path: E/job-result.json
+    fields:
+      - requestId
+      - requestDigest
+      - op
+      - operation when selected
+      - status
+      - criteria
+      - outputs
+      - artifacts
+    content:
+      en: Only for a selected job matrix, return the exact request-bound result. Populate every declared
+        cell output with actual canonical Work/source/runtime references or produced JSON artifacts
+        from this job; retain real artifact bytes and hashes. Do not rename/regenerate upstream
+        expectations. Missing required output/evidence remains blocked or failed and cannot advance.
+        The selected request freezes output field schemas before execution.
+steps:
+  - reads:
+      - target
+      - business
+      - architecture
+      - repo
+      - rules
+      - profile
+    writes:
+      - evidence
+    action:
+      en: "Bind the inspection scope - the exact files, entry points, configuration and dependency
+        manifests inside the read set - and restate each required assertion as the vulnerability
+        question it asks. Map the declared security boundaries and enforcement rules onto the actual
+        code surface. Resolve the execution profile and actual tool availability before selecting
+        instruments; this does not switch the model/runtime or spawn workers."
+  - reads:
+      - repo
+      - checks
+      - machines
+      - effects
+    writes:
+      - evidence
+    action:
+      en: Run exactly the declared read-only scan commands verbatim - including the declared
+        architecture/code-pattern machines where the inspection covers boundaries - and read the
+        flagged code itself, since a scanner's line is a lead, the inspected code and its callers are the
+        evidence. Trace injection, authz, deserialization, secret-handling and configuration
+        exposure paths the declared boundaries require; a finding without a reachable path is
+        recorded as a finding with its reachability stated, not inflated.
+  - reads:
+      - repo
+      - architecture
+      - business
+      - rules
+    writes:
+      - evidence
+    action:
+      en: Classify each finding by severity against the declared boundaries and rules, and record
+        what was NOT inspected and why. Preserve failing evidence honestly; repair nothing, pin no
+        dependency, weaken no check, and change no configuration - every finding is for a separate
+        repair operation.
+  - reads:
+      - target
+      - repo
+      - checks
+      - matrix
+    writes:
+      - node
+      - evidence
+      - matrixHandoff
+    action:
+      en: Report done once with the findings bound to the inspected tree and commit; report failed
+        when a required surface could not be inspected and the evidence says so. A scanner crash, an
+        unrun required check or a skipped surface stays not-run - never a clean report. When
+        selected in a job matrix, produce E/job-result.json bound to the exact request, its output
+        schema and every required criterion. Never self-advance.
+proofs:
+  - id: binding
+    requirement:
+      en: Run the record-class validator `starci validate`; every cited ID/path exists or is explicitly proposed, required
+        assertions are covered, input bindings are current, and an honest not-run/fail cannot earn
+        done.
+  - id: coverage
+    requirement:
+      en: Every declared inspection surface - entry points, authz checks, queries, serialization,
+        secrets handling, configuration and dependency manifests - was actually read or scanned, and
+        each required assertion has an evidence-bound answer. An uninspected surface is named with
+        its reason, not absorbed into a pass.
+  - id: typed-findings
+    requirement:
+      en: Every finding carries severity, rule, exact file/line or configuration key, evidence
+        excerpt and reachability, bound to the inspected commit. A finding with no evidence is a
+        not-run observation, and no finding contains a usable secret.
+  - id: read-only
+    requirement:
+      en: The inspection changed nothing - repository status shows the inspected tree untouched, the
+        scan commands stayed read-only, and no finding was repaired, hidden or re-classified to look
+        cleaner.
+blockers:
+  - code: INSPECTION_SURFACE_MISSING
+    condition:
+      en: The selected slice, its entry points or its declared security boundaries cannot be resolved
+        from records and source; report the exact missing surface.
+  - code: SCANNER_UNAVAILABLE
+    condition:
+      en: "A declared read-only check or its runner cannot execute in this environment and the cause
+        is provably unfixable from the allowlist - report blocked with blocker kind environment
+        naming the exact missing tool or command."
+  - code: OUTSIDE_ALLOWLIST
+    condition:
+      en: "Completing a required inspection needs a path, target or effect outside the selected read
+        set - report the exact need as blocker kind shared-change rather than widening it."
+  - code: AUTHORITY_REQUIRED
+    condition:
+      en: "An inspection step needs an authority the goal does not grant, such as touching a shared
+        target - report blocked with blocker kind authority, an owner decision."
+  - code: DECLARED_DEPENDENCY_UNMET
+    condition:
+      en: A declared prerequisite is not effectively done, or a required declared input/scope is missing.
+        Report node/resource IDs and propose a separately selected graph update when needed; never
+        run predecessors or weaken dependsOn/refs/required to proceed.
+placeholders:
+  business: Selected business slug
+  repo-id: Resolved direct repository name or path
+  bound-paths: Inspected source read set
+  manifest-paths: Manifest and script files defining the listed scan commands
+securityPolicy:
+  surface: code-and-config
+  effects: read-only-inspection
+  findings: typed-with-evidence
+  repair: never
+  secretsInFindings: never
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run

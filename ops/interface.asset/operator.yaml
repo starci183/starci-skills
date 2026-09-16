@@ -63,13 +63,14 @@ writes:
   - id: node
     path: N/index.yaml
     fields:
+      - schema
       - ui.artworkSlots[].file
       - ui.artworkSlots[].sha256
       - ui.artworkSlots[].status
       - ui.artworkSlots[].provenance
       - assets:[{path}]
     content:
-      en: "Record the produced artwork against the slots the record already declares: per slot the repository path
+      en: "Record the produced artwork on the work/node@2 record against the slots it already declares: per slot the repository path
         of the file, its sha256, its status and the tool provenance of the generation, and bind each path in the
         record's asset list so the bytes are covered. Add no slot, remove no slot and rewrite no brief, region,
         size or crop: those are the drawing's, and a slot that turned out wrong is a reported gap, not an edit of
@@ -194,3 +195,9 @@ placeholders:
   repo-id: Resolved direct repository name or path
   bound-paths: Inspected source read set
   asset-path: Owned asset destination declared by the allowlist
+layoutPolicy:
+  layout: defined-by-.claude-catalog-never-agent-chosen
+  artifacts: every-structured-write-carries-its-declared-schema-const
+  checks:
+    - starci-validate
+  wrongLayout: wrong-path-name-or-schema-const-fails-the-run
