@@ -140,3 +140,4 @@ workflows/source-layout.mjs
 workflows/typed.mjs
 workflows/work-binding.mjs
 checks/code-patterns/next.mjs
+checks/code-patterns/next-errors.mjs
