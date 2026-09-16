@@ -1,0 +1,723 @@
+schema: starci/code-pattern-profile@1
+profiles:
+  nest:
+    title: StarCi NestJS code pattern
+    canon:
+      package: '@starci/eslint-canon-be'
+      version: 1.2.1
+      contentDigest:
+        algorithm: sha256
+        include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts']
+        exclude: ['**/*.test.mjs']
+        framing: sorted-posix-relative-path-null-raw-bytes-null
+        value: c11c9a98f3441cf37503613e7d78747e651646f9d54c103a4db4114124afa6c4
+        files: 18
+    sourceRuleRoots:
+      - knowledge/patterns/be
+    expectedSourceRuleIds:
+      - BE-ARCHITECTURE-1
+      - BE-ARCHITECTURE-2
+      - BE-ARCHITECTURE-3
+      - BE-ARCHITECTURE-4
+      - BE-COMMENT-1
+      - BE-COMMENT-2
+      - BE-COMMENT-3
+      - BE-COMMENT-4
+      - BE-COMMENT-5
+      - BE-COMMENT-6
+      - BE-COMMENT-7
+      - BE-ERROR-1
+      - BE-ERROR-2
+      - BE-ERROR-3
+      - BE-ERROR-4
+      - BE-ERROR-5
+      - BE-ERROR-6
+      - BE-ERROR-7
+      - BE-FOLDER-1
+      - BE-FOLDER-2
+      - BE-FOLDER-3
+      - BE-FOLDER-4
+      - BE-FOLDER-5
+      - BE-FOLDER-6
+      - BE-FOLDER-7
+      - BE-FUNCTION-1
+      - BE-FUNCTION-2
+      - BE-FUNCTION-3
+      - BE-FUNCTION-4
+      - BE-FUNCTION-5
+      - BE-FUNCTION-6
+      - BE-FUNCTION-7
+      - BE-FUNCTION-8
+      - BE-IMPORTS-1
+      - BE-IMPORTS-2
+      - BE-IMPORTS-3
+      - BE-IMPORTS-4
+      - BE-IMPORTS-5
+      - BE-IMPORTS-6
+      - BE-IMPORTS-7
+      - BE-NAMING-1
+      - BE-NAMING-2
+      - BE-NAMING-3
+      - BE-NAMING-4
+      - BE-NAMING-5
+      - BE-NAMING-6
+      - BE-NAMING-7
+      - BE-NAMING-8
+      - BE-TEST-1
+      - BE-TEST-2
+      - BE-TEST-3
+      - BE-TEST-4
+      - BE-TEST-5
+      - BE-TEST-6
+      - BE-TEST-7
+      - BE-TYPING-1
+      - BE-TYPING-2
+      - BE-TYPING-3
+      - BE-TYPING-4
+      - BE-TYPING-5
+      - BE-TYPING-6
+      - BE-TYPING-7
+    sourceGlobs:
+      - src/**/*.ts
+      - apps/**/*.ts
+      - libs/**/*.ts
+      - test/**/*.ts
+      - tests/**/*.ts
+    obligations:
+      - id: NEST-DEPENDENCY-DIRECTION
+        sourceRuleIds: [BE-ARCHITECTURE-1, BE-FOLDER-1, BE-IMPORTS-4]
+        applicability: { include: ['**/*.ts'], exclude: ['**/*.d.ts'] }
+        mechanical:
+          requirement: Resolve aliases, relative imports, literals, re-exports and packages before enforcing app to feature to module direction.
+          check:
+            kind: architecture
+            ruleIds: [BE_MODULE_IMPORTS_FEATURE, BE_MODULE_IMPORTS_APP, BE_FEATURE_IMPORTS_APP, ARCH_PACKAGE_IMPORTS_APP, ARCH_PACKAGE_EXPORT_BYPASS, ARCH_INTERNAL_IMPORT_UNRESOLVED]
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci architecture check' }
+        semantic:
+          guidance: docs/backend-source-pattern.md
+          review: Confirm that a declared module owns a cohesive capability instead of hiding feature orchestration.
+        status: implemented
+      - id: NEST-APP-COMPOSITION
+        sourceRuleIds: [BE-ARCHITECTURE-2, BE-FOLDER-1]
+        applicability: { include: ['apps/**/src/**/*.ts', 'src/main.ts', 'src/app.module.ts'] }
+        mechanical:
+          requirement: Keep app roots to entry, root-module and narrowly named bootstrap/config roles.
+          check:
+            kind: architecture
+            ruleIds: [BE_APP_COMPOSITION_ONLY, BE_APP_BUSINESS_ROLE]
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci architecture check' }
+        semantic:
+          guidance: docs/backend-source-pattern.md
+          review: Inspect callbacks with neutral names for hidden product behavior.
+        status: implemented
+      - id: NEST-APPLICATION-TRANSPORT-BOUNDARY
+        sourceRuleIds: [BE-ARCHITECTURE-4, BE-FOLDER-2, BE-FUNCTION-2, BE-FUNCTION-4, BE-TYPING-7]
+        applicability: { include: ['src/features/**/application/**/*.ts'] }
+        mechanical:
+          requirement: Application use cases and contracts cannot import transport DTOs or protocol-framework surfaces.
+          check:
+            kind: architecture
+            ruleIds: [BE_APPLICATION_IMPORTS_TRANSPORT, BE_APPLICATION_TRANSPORT_FRAMEWORK]
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci architecture check' }
+        semantic:
+          guidance: docs/backend-source-pattern.md
+          review: Verify semantic validation and DTO/result projection at the actual transport boundary.
+        status: implemented
+      - id: NEST-DOCUMENTED-EXPORTS
+        sourceRuleIds: [BE-COMMENT-1, BE-COMMENT-2, BE-COMMENT-4, BE-COMMENT-7]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.spec.ts'] }
+        mechanical:
+          requirement: Require export and enum-member docs, reject restated-name docs and inline suppression/non-ASCII violations under the canon profile.
+          check:
+            kind: eslint
+            ruleIds: [starci-be/require-export-jsdoc, starci-be/require-enum-member-jsdoc, starci-be/no-restated-name-jsdoc, starci-be/no-non-ascii-source, starci-be/require-vn-ok-reason, starci-be/no-line-suppression]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/comment.yaml
+          review: Confirm prose explains responsibility or consequence rather than satisfying presence by paraphrase.
+        status: implemented
+      - id: NEST-EXCEPTION-IDENTITY
+        sourceRuleIds: [BE-ERROR-1, BE-ERROR-2, BE-ERROR-3, BE-NAMING-3]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts'], exclude: ['**/*.spec.ts', 'src/tests/**'] }
+        mechanical:
+          requirement: Academy-profile thrown failures use named AbstractException identities, typed metadata and one object argument.
+          check:
+            kind: eslint
+            ruleIds: [starci-be/exception-name-ends-in-exception, starci-be/exception-code-matches-class-name, starci-be/exception-metadata-type-named-for-class, starci-be/exception-extends-abstract, starci-be/exception-in-errors-folder, starci-be/require-exception-object-arg, starci-be/throw-abstract-exception, starci-be/no-handler-encoded-failure]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/error.yaml
+          review: Keep typed business dispositions as outcomes and map private causes without leaking them.
+        status: implemented
+      - id: NEST-OBSERVABILITY
+        sourceRuleIds: [BE-ERROR-7, BE-IMPORTS-6]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts'], exclude: ['**/*.spec.ts', 'src/tests/**'] }
+        mechanical:
+          requirement: Production source does not use console or framework logger and uses stable structured log identity.
+          check:
+            kind: eslint
+            ruleIds: [no-console, starci-be/no-framework-logger, starci-be/no-interpolated-log-message, starci-be/no-error-wording-as-log-identity]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/error.yaml
+          review: Verify redaction and correlation fields against the real logging adapter.
+        status: implemented
+      - id: NEST-PERSISTENCE-SHAPE
+        sourceRuleIds: [BE-FOLDER-6, BE-FUNCTION-3, BE-FUNCTION-5, BE-TYPING-7]
+        applicability: { include: ['src/**/*.ts'], exclude: ['**/*.spec.ts'] }
+        mechanical:
+          requirement: Preserve named EntityManager injection, transaction callback identity, entity table names and non-eager relations.
+          check:
+            kind: eslint
+            ruleIds: [starci-be/must-inject-entity-manager, starci-be/no-injected-repository, starci-be/no-outer-manager-in-transaction, starci-be/require-entity-table-name, starci-be/no-eager-relation]
+            expected: { severity: error }
+        semantic:
+          guidance: docs/backend-source-pattern.md
+          review: Boot the named connection and test atomicity; AST shape cannot prove the token or database effect.
+        status: implemented
+      - id: NEST-CONDITIONAL-CQRS-SHAPE
+        sourceRuleIds: [BE-FUNCTION-1, BE-FUNCTION-2, BE-NAMING-6]
+        applicability: { include: ['src/**/*.handler.ts', 'src/**/*.command.ts', 'src/**/*.query.ts'] }
+        mechanical:
+          requirement: When the Academy ICQRS compatibility profile is present, handlers and messages retain its executable contract.
+          check:
+            kind: eslint
+            ruleIds: [starci-be/handler-overrides-process, starci-be/message-carries-params-only]
+            expected: { severity: error }
+        semantic:
+          guidance: docs/backend-source-pattern.md
+          review: A bus must own real dispatch/pipeline semantics; this check does not require CQRS for direct use cases.
+        status: implemented
+      - id: NEST-AUTHORIZATION-DOOR
+        sourceRuleIds: [BE-FUNCTION-4, BE-FUNCTION-6]
+        applicability: { include: ['src/features/**/*.ts'] }
+        mechanical:
+          requirement: Protected entry operations carry a recognized guard and transport doors remain in features.
+          check:
+            kind: eslint
+            ruleIds: [starci-be/identity-needs-guard, starci-be/door-lives-in-features, starci-be/rest-door-needs-a-reason]
+            expected: { severity: error }
+        semantic:
+          guidance: docs/architecture-rules.md
+          review: Exercise denied and cross-scope actions; decorator presence does not prove resource authorization.
+        status: implemented
+      - id: NEST-DELIVERY-CONTRACT-SHAPE
+        sourceRuleIds: [BE-FUNCTION-6, BE-TEST-5]
+        applicability: { include: ['src/**/*.ts'] }
+        mechanical:
+          requirement: Selected projection and bridge implementations use the Academy delivery lifecycle shapes.
+          check:
+            kind: eslint
+            ruleIds: [starci-be/projection-listener-contract, starci-be/no-dynamic-projection-group-id, starci-be/projection-recompute-must-upsert, starci-be/nats-bridge-delivery-contract, starci-be/no-call-site-transport-override]
+            expected: { severity: error }
+        semantic:
+          guidance: docs/architecture-rules.md
+          review: Verify durable acknowledgement, deduplication, fencing and unknown-effect recovery separately.
+        status: implemented
+      - id: NEST-TEST-STATIC-CONTRACT
+        sourceRuleIds: [BE-FOLDER-7, BE-TEST-1, BE-TEST-5, BE-TEST-7]
+        applicability: { include: ['**/*.spec.ts', 'src/tests/**/*.ts', 'apps/*/test/**/*.ts'] }
+        mechanical:
+          requirement: Tests are colocated/discovered as applicable and avoid call-only, sleep, provider-model, branch and mock-transport false proof.
+          check:
+            kind: eslint
+            ruleIds: [starci-be/unit-test-colocated, starci-be/no-call-only-spec, starci-be/e2e-uses-production-transport, starci-be/e2e-asserts-persisted-state, starci-be/no-sleep-in-flow, starci-be/no-model-call-in-e2e, starci-be/harness-calls-provider-directly, starci-be/no-branch-in-flow-step, starci-be/no-wiring-in-flow-spec, starci-be/no-api-shaped-e2e-filename, starci-be/no-marker-model-stub]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/test.yaml
+          review: Confirm assertions establish the named behavior and actual effect boundary.
+        status: implemented
+      - id: NEST-TYPE-SAFETY
+        sourceRuleIds: [BE-TYPING-2, BE-TYPING-3, BE-TYPING-4, BE-TYPING-5]
+        applicability: { include: ['**/*.ts'], exclude: ['**/*.d.ts'] }
+        mechanical:
+          requirement: Reject any, double/unguarded casts, inline object contracts and const enums; use the adopted generic array form.
+          check:
+            kind: eslint
+            ruleIds: ['@typescript-eslint/no-explicit-any', '@typescript-eslint/array-type', starci-be/no-double-cast, starci-be/no-inline-param-type, starci-be/no-inline-object-type, starci-be/no-const-enum, starci-be/no-unguarded-unknown-cast]
+            expected:
+              severity: error
+              optionsByRule:
+                '@typescript-eslint/array-type': [{ default: generic, readonly: generic }]
+        semantic:
+          guidance: knowledge/patterns/be/typing.yaml
+          review: Verify runtime parsing and contract ownership; TypeScript shape is not validation.
+        status: implemented
+      - id: NEST-NAMED-CODE-SHAPE
+        sourceRuleIds: [BE-NAMING-5, BE-NAMING-6]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts'], exclude: ['**/*.spec.ts'] }
+        mechanical:
+          requirement: Reject versioned identifiers, bare exported verbs and vendor-shaped factories on owned modules.
+          check:
+            kind: eslint
+            ruleIds: [starci-be/no-version-in-name, starci-be/no-bare-verb-export, starci-be/no-vendor-module-factory-name]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/be/naming.yaml
+          review: Confirm names describe the actual responsibility rather than merely satisfying suffix syntax.
+        status: implemented
+      - id: NEST-OWNER-PUBLIC-ENTRY
+        sourceRuleIds: [BE-ARCHITECTURE-3, BE-FOLDER-4, BE-IMPORTS-1, BE-IMPORTS-4]
+        applicability: { include: ['src/features/**/*.ts', 'src/modules/**/*.ts'] }
+        mechanical:
+          requirement: Cross-owner imports resolve through an explicit named public entry and public entries do not export-star.
+          check:
+            kind: architecture
+            ruleIds: [ARCH_OWNER_EXPORT_BYPASS, ARCH_OWNER_EXPORT_STAR]
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci architecture check' }
+        semantic:
+          guidance: docs/backend-source-pattern.md
+          review: Confirm the exported surface is a stable capability API.
+        status: missing
+      - id: NEST-MODULE-REGISTRATION
+        sourceRuleIds: [BE-ARCHITECTURE-3, BE-FOLDER-3, BE-FUNCTION-8]
+        applicability: { include: ['src/**/*.module.ts', 'apps/**/src/app.module.ts'] }
+        mechanical:
+          requirement: Detect direct re-registration of another module's exported provider and validate selected handler/module registration shape.
+          check: { kind: architecture, ruleIds: [BE_MODULE_PROVIDER_REREGISTRATION, BE_MODULE_HANDLER_REGISTRATION] }
+        semantic:
+          guidance: docs/backend-source-pattern.md
+          review: Boot-test token, scope, configuration and lifetime; named instances cannot be inferred from syntax alone.
+        status: missing
+      - id: NEST-COMMENT-MEMBER-SHAPE
+        sourceRuleIds: [BE-COMMENT-3, BE-COMMENT-5, BE-COMMENT-6]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts'], exclude: ['**/*.spec.ts'] }
+        mechanical:
+          requirement: Enforce required member-doc presence and the adopted line/block comment placement and sentence form.
+          check: { kind: eslint, ruleIds: [starci-be/require-member-jsdoc, starci-be/comment-form] }
+        semantic:
+          guidance: knowledge/patterns/be/comment.yaml
+          review: Confirm comments explain consequence and corrected reasoning.
+        status: missing
+      - id: NEST-FEATURE-FILE-SHAPE
+        sourceRuleIds: [BE-FOLDER-2, BE-FOLDER-5, BE-FOLDER-6, BE-NAMING-1, BE-NAMING-2, BE-NAMING-4, BE-NAMING-7, BE-NAMING-8]
+        applicability: { include: ['src/features/**/*.ts', 'src/modules/**/*.ts'] }
+        mechanical:
+          requirement: Enforce adopted feature/application/transport placement and filename, class, enum, type and GraphQL surface syntax.
+          check: { kind: architecture, ruleIds: [BE_FEATURE_LAYOUT_INVALID, BE_SOURCE_NAME_INVALID] }
+        semantic:
+          guidance: docs/backend-source-pattern.md
+          review: Select direct use case versus bus and domain versus persistence ownership before judging placement.
+        status: missing
+      - id: NEST-TRANSPORT-ERROR-MAPPING
+        sourceRuleIds: [BE-ERROR-4, BE-ERROR-5, BE-ERROR-6]
+        applicability: { include: ['src/features/**/transport/**/*.ts', 'src/modules/platform/**/*.ts'] }
+        mechanical:
+          requirement: Check the adopted HTTP/GraphQL exception mapping and preservation of a foreign originalError where wrapped.
+          check: { kind: eslint, ruleIds: [starci-be/foreign-error-keeps-cause, starci-be/transport-error-mapping] }
+        semantic:
+          guidance: knowledge/patterns/be/error.yaml
+          review: Verify public redaction and expected versus unknown outcome behavior.
+        status: missing
+      - id: NEST-ENV-CACHE-BOUNDARY
+        sourceRuleIds: [BE-IMPORTS-6]
+        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts'], exclude: ['**/*.spec.ts', 'src/tests/**'] }
+        mechanical:
+          requirement: Restrict process.env to the declared parser, raw cache tokens to their owner and default exports to sanctioned Jest entries.
+          check: { kind: eslint, ruleIds: [starci-be/must-use-cache-service, starci-be/no-default-export, no-restricted-syntax] }
+        semantic:
+          guidance: knowledge/patterns/be/imports.yaml
+          review: None; these are code-shape obligations.
+        status: conflict
+        conflict: The first two IDs exist only in the Academy repository's private plugin, not the pinned canon package; no-restricted-syntax options are repository-local.
+      - id: NEST-IMPORT-FORMAT
+        sourceRuleIds: [BE-IMPORTS-2]
+        applicability: { include: ['**/*.ts'] }
+        mechanical:
+          requirement: Enforce multiline imports, one binding per line, trailing comma and type-only imports.
+          check: { kind: eslint, ruleIds: [object-curly-newline, '@typescript-eslint/consistent-type-imports', import-one-binding-per-line] }
+        semantic:
+          guidance: knowledge/patterns/be/imports.yaml
+          review: None; import order is intentionally not part of this obligation.
+        status: missing
+      - id: NEST-JEST-ALIAS-PARITY
+        sourceRuleIds: [BE-IMPORTS-7, BE-TEST-1]
+        applicability: { include: ['jest*.ts', 'tsconfig*.json', 'package.json'] }
+        mechanical:
+          requirement: Compare Jest discovery and moduleNameMapper with the declared TypeScript projects and aliases.
+          check: { kind: script, ruleIds: [NEST_JEST_ALIAS_PARITY, NEST_TEST_DISCOVERY] }
+        semantic:
+          guidance: knowledge/patterns/be/test.yaml
+          review: Record which real service, database and external boundaries ran.
+        status: missing
+      - id: NEST-TEST-CODE-FORM
+        sourceRuleIds: [BE-TEST-2, BE-TEST-3, BE-TEST-4, BE-TEST-6]
+        applicability: { include: ['**/*.spec.ts'] }
+        mechanical:
+          requirement: Enforce selected subject construction, execute entry, describe/it naming and formatting forms.
+          check: { kind: eslint, ruleIds: [starci-be/spec-subject-shape, starci-be/spec-name-shape] }
+        semantic:
+          guidance: knowledge/patterns/be/test.yaml
+          review: Verify assertions prove effects and ordering rather than calls alone.
+        status: missing
+      - id: NEST-CONTRACT-TYPE-FORM
+        sourceRuleIds: [BE-TYPING-1, BE-TYPING-2, BE-TYPING-3, BE-TYPING-4, BE-NAMING-7]
+        applicability: { include: ['src/**/*.ts'], exclude: ['**/*.spec.ts'] }
+        mechanical:
+          requirement: Enforce explicit named public inputs/results, readonly dependency/message fields and adopted serialized enum/type-name forms.
+          check: { kind: eslint, ruleIds: [starci-be/public-contract-shape, starci-be/readonly-boundary, starci-be/public-enum-shape] }
+        semantic:
+          guidance: knowledge/patterns/be/typing.yaml
+          review: Decide whether a value is public, extensible or transport-owned before selecting its type form.
+        status: missing
+      - id: NEST-LEGACY-BARREL-RULES
+        sourceRuleIds: [BE-FOLDER-4, BE-IMPORTS-1, BE-IMPORTS-4]
+        applicability: { include: ['src/**/*.ts'] }
+        mechanical:
+          requirement: Use explicit owner public entries under the adopted architecture.
+          check: { kind: eslint, ruleIds: [starci-be/must-deep-module-import, starci-be/no-folder-reexport] }
+        semantic:
+          guidance: docs/backend-source-pattern.md
+          review: None; the machine conflicts with the adopted public-entry rule.
+        status: conflict
+        conflict: These legacy rules require private declaring-file imports and reject index public entries; they cannot certify the adopted owner API.
+      - id: NEST-HANDLER-TWIN-COUNT
+        sourceRuleIds: [BE-FOLDER-7, BE-TEST-1]
+        applicability: { include: ['src/**/*.handler.ts'] }
+        mechanical:
+          requirement: Tests follow actual behavior/risk, not a filename count.
+          check: { kind: eslint, ruleIds: [starci-be/handler-has-twin-spec] }
+        semantic:
+          guidance: knowledge/patterns/be/test.yaml
+          review: Select meaningful handler/use-case proof from effects.
+        status: conflict
+        conflict: The available rule is off and requires a twin by filename; current standard rejects count-only test requirements.
+    semanticOnly:
+      - id: NEST-COHESIVE-ORCHESTRATION
+        sourceRuleIds: [BE-FUNCTION-3, BE-FUNCTION-7, BE-TYPING-6]
+        rationale: Whether a wrapper, helper, port or generic owns a meaningful responsibility depends on scenario and lifecycle meaning.
+        guidance: docs/backend-source-pattern.md
+      - id: NEST-CONCURRENCY-DESIGN
+        sourceRuleIds: [BE-FUNCTION-6]
+        rationale: Atomicity, idempotency and unknown-effect recovery require store/provider design and executable competing/crash tests.
+        guidance: docs/architecture-rules.md
+      - id: NEST-IMPORT-ORDER-OBSERVATION
+        sourceRuleIds: [BE-IMPORTS-3, BE-IMPORTS-5]
+        rationale: Import order is explicitly observational; selected execution form and ownership decide imports.
+        guidance: knowledge/patterns/be/imports.yaml
+
+  next:
+    title: StarCi Next.js code pattern
+    canon:
+      package: '@starci/eslint-canon-fe'
+      version: 3.0.2
+      contentDigest:
+        algorithm: sha256
+        include: ['**/*.mjs', '**/*.json', '**/*.md', '**/*.ts']
+        exclude: ['**/*.test.mjs']
+        framing: sorted-posix-relative-path-null-raw-bytes-null
+        value: 68d89c3738964910367c7fe3c958a1b944cc2c22ba0c023755ce090e1c614bbd
+        files: 21
+    sourceRuleRoots:
+      - knowledge/patterns/fe
+    expectedSourceRuleIds:
+      - FE-ARCHITECTURE-1
+      - FE-ARCHITECTURE-2
+      - FE-ARCHITECTURE-3
+      - FE-ARCHITECTURE-4
+      - FE-ARCHITECTURE-5
+      - FE-COMMENT-1
+      - FE-COMMENT-2
+      - FE-COMMENT-3
+      - FE-COMMENT-4
+      - FE-COMMENT-5
+      - FE-ERROR-1
+      - FE-ERROR-2
+      - FE-ERROR-3
+      - FE-ERROR-4
+      - FE-ERROR-5
+      - FE-FOLDER-1
+      - FE-FOLDER-2
+      - FE-FOLDER-3
+      - FE-FOLDER-4
+      - FE-FOLDER-5
+      - FE-FOLDER-6
+      - FE-FUNCTION-1
+      - FE-FUNCTION-2
+      - FE-FUNCTION-3
+      - FE-FUNCTION-4
+      - FE-FUNCTION-5
+      - FE-FUNCTION-6
+      - FE-FUNCTION-7
+      - FE-IMPORTS-1
+      - FE-IMPORTS-2
+      - FE-IMPORTS-3
+      - FE-IMPORTS-4
+      - FE-IMPORTS-5
+      - FE-IMPORTS-6
+      - FE-IMPORTS-7
+      - FE-NAMING-1
+      - FE-NAMING-2
+      - FE-NAMING-3
+      - FE-NAMING-4
+      - FE-NAMING-5
+      - FE-NAMING-6
+      - FE-NAMING-7
+      - FE-TEST-1
+      - FE-TEST-2
+      - FE-TEST-3
+      - FE-TEST-4
+      - FE-TEST-5
+      - FE-TEST-6
+      - FE-TYPING-1
+      - FE-TYPING-2
+      - FE-TYPING-3
+      - FE-TYPING-4
+      - FE-TYPING-5
+      - FE-TYPING-6
+      - FE-TYPING-7
+      - FE-TYPING-8
+    sourceGlobs:
+      - src/**/*.{ts,tsx}
+      - apps/*/src/**/*.{ts,tsx}
+      - packages/*/src/**/*.{ts,tsx}
+    obligations:
+      - id: NEXT-ROUTE-COMPOSITION
+        sourceRuleIds: [FE-ARCHITECTURE-1, FE-FOLDER-3, FE-FUNCTION-7]
+        applicability: { include: ['**/app/**/page.tsx'] }
+        mechanical:
+          requirement: A route is a server adapter with one page owner or a zero-JSX redirect/notFound result.
+          check:
+            kind: architecture
+            ruleIds: [FE_ROUTE_DEFAULT_EXPORT, FE_ROUTE_ONE_PAGE, FE_ROUTE_DRAWING_DECISION, FE_ROUTE_CLIENT_BOUNDARY, FE_ROUTE_CLIENT_HOOK]
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci architecture check' }
+        semantic:
+          guidance: docs/portable-source-architecture.md
+          review: Confirm a server loader adapts framework input rather than owning product orchestration.
+        status: implemented
+      - id: NEXT-DEPENDENCY-DIRECTION
+        sourceRuleIds: [FE-ARCHITECTURE-2, FE-ARCHITECTURE-4, FE-FOLDER-1, FE-FOLDER-4, FE-IMPORTS-1, FE-IMPORTS-3, FE-IMPORTS-4]
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
+        mechanical:
+          requirement: Resolve real routes, tiers, transports, aliases and package exports before enforcing inward/downward dependencies.
+          check:
+            kind: architecture
+            ruleIds: [FE_TIER_IMPORTS_UPWARD, FE_COMPONENT_IMPORTS_TRANSPORT, FE_COMPONENT_DEEP_HOOK_IMPORT, FE_FETCH_OUTSIDE_TRANSPORT, ARCH_PACKAGE_IMPORTS_APP, ARCH_PACKAGE_EXPORT_BYPASS, ARCH_INTERNAL_IMPORT_UNRESOLVED]
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci architecture check' }
+        semantic:
+          guidance: docs/portable-source-architecture.md
+          review: Classify scenario, reusable capability and intrinsic visual responsibilities before applying a directory edge.
+        status: implemented
+      - id: NEXT-PURE-BOUNDARY
+        sourceRuleIds: [FE-ARCHITECTURE-3, FE-FUNCTION-2, FE-FUNCTION-4, FE-TYPING-8]
+        applicability: { include: ['**/component.tsx'] }
+        mechanical:
+          requirement: An existing resolved presentation half cannot reach product world, transport, router or locale owners.
+          check:
+            kind: architecture
+            ruleIds: [FE_PURE_WORLD_HOOK, FE_PURE_WORLD_IMPORT, FE_PURE_REACHES_DATA]
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci architecture check' }
+        semantic:
+          guidance: docs/portable-source-architecture.md
+          review: Intrinsic focus, measurement, disclosure, drag and reduced-motion state remain valid visual ownership.
+        status: implemented
+      - id: NEXT-COMMENT-SOURCE-HYGIENE
+        sourceRuleIds: [FE-COMMENT-1, FE-COMMENT-5]
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.spec.ts', '**/*.spec.tsx'] }
+        mechanical:
+          requirement: Require export docs and reject second-language, emoji and inline lint configuration in source/path.
+          check:
+            kind: eslint
+            ruleIds: [starci-fe/require-export-jsdoc, starci-fe/no-second-language-in-source, starci-fe/no-second-language-in-path, starci-fe/no-emoji-in-source, starci-fe/no-inline-lint-config]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/fe/comment.yaml
+          review: Confirm docs/comments explain ownership and consequence.
+        status: implemented
+      - id: NEXT-FILE-AND-EXPORT-SHAPE
+        sourceRuleIds: [FE-FOLDER-2, FE-FOLDER-6, FE-FUNCTION-1, FE-FUNCTION-5, FE-NAMING-1, FE-NAMING-3, FE-NAMING-7]
+        applicability: { include: ['**/*.{ts,tsx}'] }
+        mechanical:
+          requirement: Enforce sanctioned unit exports, component signatures, colocated class names and no component helper buckets/runtime namespaces.
+          check:
+            kind: eslint
+            ruleIds: [starci-fe/prefer-arrow-export, starci-fe/public-component-signature, starci-fe/no-inline-parameter-type, starci-fe/export-matches-folder, starci-fe/no-runtime-namespace, starci-fe/class-names-in-colocated-file, starci-fe/no-inline-class-name, starci-fe/no-helper-folder-in-components, starci-fe/source-tier-marker-matches-folder, starci-fe/route-tree-holds-routes-only, starci-fe/monorepo-tier-belongs-to-its-side]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/fe/folder.yaml
+          review: Split a file only for a stable responsibility; file count never creates a boundary.
+        status: implemented
+      - id: NEXT-PRESENTATION-API
+        sourceRuleIds: [FE-FUNCTION-2, FE-FUNCTION-3, FE-NAMING-2, FE-NAMING-6]
+        applicability: { include: ['**/*.tsx'], exclude: ['**/*.spec.tsx'] }
+        mechanical:
+          requirement: Keep public props explicit, actions conventionally named and CSS/frame ownership out of public component contracts.
+          check:
+            kind: eslint
+            ruleIds: [starci-fe/handler-on-prefix, starci-fe/no-placeholder-prop, starci-fe/no-per-part-classname-prop, starci-fe/no-public-classname-prop, starci-fe/no-public-frame-css-props, starci-fe/no-css-door-type-laundering]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/fe/function.yaml
+          review: Name/group props for the real render contract; no fixed state/props/on triple is required.
+        status: implemented
+      - id: NEXT-VENDOR-AND-GRAMMAR-USAGE
+        sourceRuleIds: [FE-FOLDER-5, FE-IMPORTS-5, FE-IMPORTS-7]
+        applicability: { include: ['**/*.{ts,tsx}'] }
+        mechanical:
+          requirement: Use the owned Icon/Heading/vendor primitive doors and reject internal StarCi links or direct vendor bypasses.
+          check:
+            kind: eslint
+            ruleIds: [starci-fe/no-vendor-icon-outside-icon-leaf, starci-fe/heroicons-is-the-glyph-vendor, starci-fe/no-direct-heroicon-import, starci-fe/no-heading-tag-outside-heading-component, starci-fe/no-hand-rolled-heading, starci-fe/vendor-primitive-has-named-owner, starci-fe/no-internal-starci-href]
+            expected: { severity: error }
+        semantic:
+          guidance: docs/portable-source-architecture.md
+          review: Inspect installed Grammar exports/props; a lint name cannot prove an API exists.
+        status: implemented
+      - id: NEXT-TOKENS-TYPOGRAPHY-COPY
+        sourceRuleIds: [FE-IMPORTS-5, FE-IMPORTS-7, FE-NAMING-5]
+        applicability: { include: ['**/*.{ts,tsx}'] }
+        mechanical:
+          requirement: Enforce the Academy token, typography and vocabulary ownership syntax.
+          check:
+            kind: eslint
+            ruleIds: [starci-fe/cn-arguments-are-single-tokens, starci-fe/no-arbitrary-value, starci-fe/no-fractional-step, starci-fe/no-unresolved-token-class, starci-fe/no-off-scale-glyph-size, starci-fe/no-decorative-icon-in-metric-cell, starci-fe/no-copy-resolution-below-block, starci-fe/no-hardcoded-copy-in-vocabulary]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/ui
+          review: Rendered hierarchy, tone, contrast and accessibility remain visual/behavior proof.
+        status: implemented
+      - id: NEXT-LOCALE-BOUNDARY
+        sourceRuleIds: [FE-FUNCTION-6, FE-IMPORTS-3, FE-NAMING-4]
+        applicability: { include: ['**/*.{ts,tsx}'] }
+        mechanical:
+          requirement: API clients attach served locale and locale headers remain at the link owner.
+          check:
+            kind: eslint
+            ruleIds: [starci-fe/api-client-attaches-the-locale, starci-fe/locale-header-belongs-to-the-link]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/fe/function.yaml
+          review: Verify identity-sensitive cache keys and localized error mapping through behavior tests.
+        status: implemented
+      - id: NEXT-TYPE-SAFETY
+        sourceRuleIds: [FE-TYPING-1, FE-TYPING-4, FE-TYPING-6]
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }
+        mechanical:
+          requirement: Reject double casts and inline public parameter types; use the adopted generic array form.
+          check:
+            kind: eslint
+            ruleIds: [starci-fe/no-double-cast, starci-fe/no-inline-parameter-type, '@typescript-eslint/array-type']
+            expected:
+              severity: error
+              optionsByRule:
+                '@typescript-eslint/array-type': [{ default: generic, readonly: generic }]
+        semantic:
+          guidance: knowledge/patterns/fe/typing.yaml
+          review: Type ownership and runtime wire mapping remain distinct from syntax.
+        status: implemented
+      - id: NEXT-TEST-COLLOCATION
+        sourceRuleIds: [FE-TEST-1]
+        applicability: { include: ['**/*.{ts,tsx}'] }
+        mechanical:
+          requirement: Behavior specs are colocated with their subject under the selected source layout.
+          check:
+            kind: eslint
+            ruleIds: [starci-fe/unit-test-colocated]
+            expected: { severity: error }
+        semantic:
+          guidance: knowledge/patterns/fe/test.yaml
+          review: Test selection follows behavior/risk, never missing-file count alone.
+        status: implemented
+      - id: NEXT-OWNER-PUBLIC-ENTRY
+        sourceRuleIds: [FE-ARCHITECTURE-4, FE-ARCHITECTURE-5, FE-FOLDER-4, FE-IMPORTS-1, FE-IMPORTS-4, FE-IMPORTS-6, FE-IMPORTS-7]
+        applicability: { include: ['**/*.{ts,tsx}'] }
+        mechanical:
+          requirement: Cross-owner same-source imports use explicit named public entries and those entries do not export-star.
+          check:
+            kind: architecture
+            ruleIds: [ARCH_OWNER_EXPORT_BYPASS, ARCH_OWNER_EXPORT_STAR]
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci architecture check' }
+        semantic:
+          guidance: docs/portable-source-architecture.md
+          review: Confirm the public surface belongs to one cohesive feature/module/package owner.
+        status: missing
+      - id: NEXT-GRAMMAR-CONTRACT
+        sourceRuleIds: [FE-FOLDER-5, FE-IMPORTS-1, FE-IMPORTS-5, FE-IMPORTS-7]
+        applicability: { include: ['**/*.{ts,tsx}', 'package.json', 'packages/grammar/package.json'] }
+        mechanical:
+          requirement: Product imports resolve through selected installed Grammar exports and the declared peer/style family matches that package.
+          check:
+            kind: architecture
+            ruleIds: [ARCH_GRAMMAR_EXPORT_BYPASS, ARCH_GRAMMAR_CONTRACT_INVALID]
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci architecture check' }
+        semantic:
+          guidance: docs/portable-source-architecture.md
+          review: Typecheck actual component props and render states; static package identity cannot prove behavior.
+        status: missing
+      - id: NEXT-CONDITIONAL-RENDER-BOUNDARY
+        sourceRuleIds: [FE-ARCHITECTURE-3, FE-FOLDER-2, FE-FUNCTION-4, FE-NAMING-1, FE-TEST-1]
+        applicability: { include: ['**/*.tsx'], exclude: ['**/*.spec.tsx'] }
+        mechanical:
+          requirement: A product-world owner uses an explicit resolved render boundary; intrinsic-only client state does not require a Base twin.
+          check:
+            kind: architecture
+            ruleIds: [FE_WORLD_OWNER_RENDER_BOUNDARY]
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci architecture check' }
+        semantic:
+          guidance: docs/portable-source-architecture.md
+          review: Decide whether the state is product-world lifecycle or intrinsic browser interaction before applying the check.
+        status: missing
+      - id: NEXT-ERROR-STATE-MAPPING
+        sourceRuleIds: [FE-ERROR-1, FE-ERROR-2, FE-ERROR-3, FE-ERROR-4, FE-ERROR-5]
+        applicability: { include: ['src/**/*.{ts,tsx}', 'apps/*/src/**/*.{ts,tsx}', 'packages/grammar/src/**/*.{ts,tsx}'] }
+        mechanical:
+          requirement: Check adopted GraphQL envelope selection/unwrapping, write wrapper use and owned error-boundary locations.
+          check: { kind: eslint, ruleIds: [starci-fe/graphql-envelope-shape, starci-fe/write-feedback-boundary, starci-fe/error-owner-location] }
+        semantic:
+          guidance: knowledge/patterns/fe/error.yaml
+          review: Verify retry eligibility, copy, redaction and valid recovery behavior.
+        status: missing
+      - id: NEXT-DATA-LIFECYCLE-KEYS
+        sourceRuleIds: [FE-FUNCTION-6, FE-NAMING-4, FE-TYPING-8]
+        applicability: { include: ['src/features/**/*.{ts,tsx}', 'src/hooks/**/*.{ts,tsx}', 'apps/*/src/features/**/*.{ts,tsx}'] }
+        mechanical:
+          requirement: Selected SWR hooks use null for unavailable inputs, include all result identities in keys and keep mutation identity tied to the resource.
+          check: { kind: eslint, ruleIds: [starci-fe/swr-key-identity, starci-fe/transport-through-owner] }
+        semantic:
+          guidance: knowledge/patterns/fe/function.yaml
+          review: Exercise identity changes and stale-result boundaries; syntax cannot prove key completeness without domain meaning.
+        status: missing
+      - id: NEXT-READONLY-STATE-TYPES
+        sourceRuleIds: [FE-TYPING-2, FE-TYPING-3, FE-TYPING-5, FE-TYPING-7]
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.spec.ts', '**/*.spec.tsx'] }
+        mechanical:
+          requirement: Enforce readonly props/nested collections, declared return forms and selected closed vocabulary syntax.
+          check: { kind: eslint, ruleIds: [starci-fe/readonly-props, starci-fe/return-type-profile, starci-fe/closed-vocabulary-shape] }
+        semantic:
+          guidance: knowledge/patterns/fe/typing.yaml
+          review: Distinguish truly binary flags from mutually exclusive states and map transport enums at the owner.
+        status: missing
+      - id: NEXT-NAMING-AND-TEST-FORM
+        sourceRuleIds: [FE-NAMING-2, FE-NAMING-4, FE-NAMING-5, FE-NAMING-7, FE-TEST-2, FE-TEST-3, FE-TEST-4, FE-TEST-5, FE-TEST-6]
+        applicability: { include: ['**/*.{ts,tsx}'] }
+        mechanical:
+          requirement: Enforce hook/module/spec basenames, constant names, describe/it forms and prohibited snapshot/network/copy/class assertions.
+          check: { kind: eslint, ruleIds: [starci-fe/source-name-shape, starci-fe/spec-form, starci-fe/no-snapshot-or-network-spec] }
+        semantic:
+          guidance: knowledge/patterns/fe/test.yaml
+          review: Connected/pure test responsibilities apply only when production owns that meaningful split.
+        status: missing
+      - id: NEXT-LEGACY-BLOCK-TWIN
+        sourceRuleIds: [FE-ARCHITECTURE-3, FE-FUNCTION-4, FE-TEST-1]
+        applicability: { include: ['src/components/blocks/**/index.tsx'] }
+        mechanical:
+          requirement: Apply the adopted conditional world-owner boundary across configured owners without manufacturing twins for intrinsic state.
+          check: { kind: eslint, ruleIds: [starci-fe/connected-block-has-presentational-twin, starci-fe/no-resting-twin-component, starci-fe/no-resting-branch-at-call-site, starci-fe/presentational-purity] }
+        semantic:
+          guidance: docs/portable-source-architecture.md
+          review: None; this machine is narrower/different from the adopted obligation.
+        status: conflict
+        conflict: The available checker is block/path/name heuristic and cannot certify the adopted conditional any-tier boundary; use NEXT-CONDITIONAL-RENDER-BOUNDARY when implemented.
+    semanticOnly:
+      - id: NEXT-COMMENT-QUALITY
+        sourceRuleIds: [FE-COMMENT-2, FE-COMMENT-3, FE-COMMENT-4]
+        rationale: Whether prose adds a source-sensitive constraint or consequence is semantic after presence/source hygiene checks.
+        guidance: knowledge/patterns/fe/comment.yaml
+      - id: NEXT-COHESIVE-UI-OWNERSHIP
+        sourceRuleIds: [FE-FOLDER-1, FE-FOLDER-6, FE-FUNCTION-2, FE-FUNCTION-3, FE-FUNCTION-5]
+        rationale: Cohesion and usefulness of a separate render/helper contract depend on the product responsibility.
+        guidance: docs/portable-source-architecture.md
+      - id: NEXT-IMPORT-ORDER-OBSERVATION
+        sourceRuleIds: [FE-IMPORTS-2]
+        rationale: The source explicitly records import order as observed rather than mandatory.
+        guidance: knowledge/patterns/fe/imports.yaml
