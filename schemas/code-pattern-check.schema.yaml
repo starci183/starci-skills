@@ -1,0 +1,109 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: starci://schemas/code-pattern-check.schema.json
+type: object
+additionalProperties: false
+required: [schema, profile, repository, ok, status, inventoryDigest, canon, machineResults, coverage, obligations, files, issues, limitations, reportDigest]
+properties:
+  schema: {const: starci/code-pattern-check@1}
+  profile: {type: [string, 'null']}
+  repository: {type: string}
+  ok: {type: boolean}
+  status: {enum: [clean, findings, unavailable, invalid]}
+  inventoryDigest: {type: [string, 'null'], pattern: '^[a-f0-9]{64}$'}
+  canon:
+    anyOf:
+      - {type: 'null'}
+      - type: object
+        additionalProperties: false
+        required: [name, version, digest, files]
+        properties:
+          name: {type: string, minLength: 1}
+          version: {type: [string, 'null']}
+          digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+          files: {type: integer, minimum: 0}
+  machineResults:
+    type: array
+    items:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [kind, schema, digest, ok, files, kinds, coverage]
+          properties:
+            kind: {const: architecture}
+            schema: {type: [string, 'null']}
+            digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+            ok: {type: boolean}
+            files: {type: integer, minimum: 0}
+            kinds: {$ref: '#/$defs/strings'}
+            coverage: {type: [object, 'null']}
+        - type: object
+          additionalProperties: false
+          required: [kind, obligation, schema, digest, ok, files, checkedRuleIds, compiler]
+          properties:
+            kind: {const: script}
+            obligation: {type: string, minLength: 1}
+            schema: {type: [string, 'null']}
+            digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+            ok: {type: boolean}
+            files: {$ref: '#/$defs/strings'}
+            checkedRuleIds: {$ref: '#/$defs/strings'}
+            compiler: {type: [object, 'null']}
+  coverage:
+    type: object
+    additionalProperties: false
+    required: [expectedFiles, requestedFiles, configuredFiles, lintedFiles, ignoredFiles, missingFiles, required, covered, uncovered, conflicting]
+    properties:
+      expectedFiles: {$ref: '#/$defs/strings'}
+      requestedFiles: {$ref: '#/$defs/strings'}
+      configuredFiles: {$ref: '#/$defs/strings'}
+      lintedFiles: {$ref: '#/$defs/strings'}
+      ignoredFiles: {$ref: '#/$defs/strings'}
+      missingFiles: {$ref: '#/$defs/strings'}
+      required: {type: array, items: {type: object}}
+      covered: {$ref: '#/$defs/strings'}
+      uncovered: {$ref: '#/$defs/strings'}
+      conflicting: {$ref: '#/$defs/strings'}
+  obligations:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, sourceRuleIds, applicability, status, machine, coverage, files, rules]
+      properties:
+        id: {type: [string, 'null']}
+        sourceRuleIds: {$ref: '#/$defs/strings'}
+        applicability: {type: object}
+        status: {type: [string, 'null']}
+        machine: {type: [object, 'null']}
+        coverage: {enum: [required, covered, uncovered, conflicting, not-applicable, pending]}
+        files: {$ref: '#/$defs/strings'}
+        rules: {type: array, items: {type: object}}
+  files:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [path, errorCount, warningCount, fatalErrorCount, suppressedCount]
+      properties:
+        path: {type: string}
+        errorCount: {type: integer, minimum: 0}
+        warningCount: {type: integer, minimum: 0}
+        fatalErrorCount: {type: integer, minimum: 0}
+        suppressedCount: {type: integer, minimum: 0}
+  issues:
+    type: array
+    items:
+      type: object
+      required: [code]
+      properties:
+        code: {type: string, minLength: 1}
+  limitations:
+    type: array
+    minItems: 1
+    items: {type: string, minLength: 1}
+  reportDigest: {type: string, pattern: '^[a-f0-9]{64}$'}
+$defs:
+  strings:
+    type: array
+    uniqueItems: true
+    items: {type: string}

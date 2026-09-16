@@ -108,6 +108,7 @@ hosts/orca/adapter.mjs
 hosts/headless/host.mjs
 providers/validate.mjs
 scripts/config.mjs
+scripts/check-scoped-lint.mjs
 scripts/check-stales.mjs
 scripts/plan.mjs
 scripts/present-goal.mjs

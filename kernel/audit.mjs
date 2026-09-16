@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import {canonicalJSON,sha256} from '../core/index.mjs';
+import {CODE_PATTERN_REPORT,verifyCodePatternReportDigest} from '../scripts/check-scoped-lint.mjs';
 
 /** Read-only measurement modes carried by review.verify. They are never delivery or repair verdicts. */
 export const AUDIT_OPERATIONS=Object.freeze(['stales','lint']);
@@ -25,6 +26,7 @@ function commandProtocol(command){
   if(new RegExp(`^${starci}\\s+architecture\\s+check(?:\\s|$)`,'i').test(value))return 'architecture';
   if(new RegExp(`^${starci}\\s+stacks\\s+check(?:\\s|$)`,'i').test(value))return 'stacks';
   if(new RegExp(`^${starci}\\s+validate(?:\\s|$)`,'i').test(value))return 'work';
+  if(/^node(?:\.exe)?\s+(?:"[^"]*scripts\/check-scoped-lint\.mjs"|'[^']*scripts\/check-scoped-lint\.mjs'|\S*scripts\/check-scoped-lint\.mjs)(?:\s|$)/i.test(value))return 'code-pattern';
   return 'shell';
 }
 
@@ -106,6 +108,16 @@ function structured(protocol,result,exitCode){
     const consistent=exitCode===0?value.ok&&count===0:exitCode===1?!value.ok&&count>0:false;
     return consistent?{ok:true,outcome:exitCode===0?'clean':'findings',count,schema:'work/validation-result@1',resultDigest:digest(result.stdout)}:
       {ok:false,reason:`Work validation exit ${exitCode} contradicts its report`};
+  }
+  if(protocol==='code-pattern'){
+    const shape=value.schema===CODE_PATTERN_REPORT&&typeof value.ok==='boolean'&&['clean','findings','unavailable','invalid'].includes(value.status)&&
+      plain(value.coverage)&&Array.isArray(value.obligations)&&Array.isArray(value.files)&&Array.isArray(value.issues)&&verifyCodePatternReportDigest(value);
+    if(!shape)return {ok:false,reason:'code-pattern check returned a malformed report'};
+    if(exitCode===2||['unavailable','invalid'].includes(value.status))return {ok:false,reason:`code-pattern check could not inspect its inputs (${value.issues.map(issue=>issue?.code??'unknown').slice(0,8).join(', ')})`};
+    const count=value.issues.length,consistent=exitCode===0?value.ok&&value.status==='clean'&&count===0:
+      exitCode===1?!value.ok&&value.status==='findings'&&count>0:false;
+    return consistent?{ok:true,outcome:exitCode===0?'clean':'findings',count,schema:value.schema,resultDigest:value.reportDigest}:
+      {ok:false,reason:`code-pattern check exit ${exitCode} contradicts its report`};
   }
   return null;
 }

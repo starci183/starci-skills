@@ -1,55 +1,164 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createRequire} from 'node:module';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+import {canonicalJSON,sha256} from '../core/index.mjs';
+import {readDistJson} from '../core/runtime-root.mjs';
+import {checkArchitecture} from '../checks/architecture/index.mjs';
 
-// A result-integrity guard, not a replacement for canonical config/structural audits.
-export function inspectLintResults(expectedFiles, results) {
-  const expected=new Set(expectedFiles.map(p=>path.resolve(p)));
-  const seen=new Set();
-  const issues=[];
-  for(const result of results) {
-    const file=path.resolve(result.filePath);
-    if(!expected.has(file)) issues.push({file,code:'UNEXPECTED_FILE'});
-    if(seen.has(file)) issues.push({file,code:'DUPLICATE_RESULT'});
-    seen.add(file);
-    for(const message of result.messages??[]) if(message.fatal || message.severity>0) issues.push({file,code:'LINT_MESSAGE',ruleId:message.ruleId,line:message.line,message:message.message});
-    for(const message of result.suppressedMessages??[]) issues.push({file,code:'SUPPRESSED_MESSAGE',ruleId:message.ruleId,line:message.line});
+export const CODE_PATTERN_REPORT='starci/code-pattern-check@1';
+const PROFILE_SCHEMA='starci/code-pattern-profile@1',STATUSES=new Set(['implemented','missing','conflict']);
+const MACHINE_KINDS=new Set(['eslint','architecture','repository-audit','script']);
+const SKIP_DIRECTORIES=new Set(['.git','.next','.scannerwork','.starciwork','coverage','dist','node_modules','out']);
+const MAX_CANON_FILES=512,MAX_CANON_BYTES=8*1024*1024;
+const clean=value=>String(value??'').replaceAll('\\','/').replace(/^\.\//,'');
+const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
+const severity=value=>{const level=Array.isArray(value)?value[0]:value;if(level==='off')return 0;if(level==='warn'||level==='warning')return 1;if(level==='error')return 2;return Number.isInteger(level)&&level>=0&&level<=2?level:null;};
+const setting=value=>{const values=Array.isArray(value)?value:[value],level=severity(values[0]);return level===null?null:[level,...values.slice(1)];};
+const same=(left,right)=>canonicalJSON(left)===canonicalJSON(right);
+
+function braceVariants(value){const match=/\{([^{}]+)\}/.exec(value);return match?match[1].split(',').flatMap(part=>braceVariants(`${value.slice(0,match.index)}${part}${value.slice(match.index+match[0].length)}`)):[value];}
+function globExpression(value){let source='';const input=clean(value);for(let index=0;index<input.length;index++){
+  const char=input[index];if(char==='*'&&input[index+1]==='*'){index+=1;if(input[index+1]==='/'){index+=1;source+='(?:.*/)?';}else source+='.*';}
+  else if(char==='*')source+='[^/]*';else if(char==='?')source+='[^/]';else source+=/[.+^${}()|[\]\\]/.test(char)?`\\${char}`:char;
+}return new RegExp(`^${source}$`);}
+const matchAny=(file,globs=[])=>globs.flatMap(braceVariants).some(pattern=>globExpression(pattern).test(clean(file)));
+const applies=(file,value={})=>{const include=Array.isArray(value.include)?value.include:[],exclude=Array.isArray(value.exclude)?value.exclude:[];return (!include.length||matchAny(file,include))&&!matchAny(file,exclude);};
+
+function sourceFiles(repository,globs){
+  const roots=new Set();for(const pattern of globs){const first=clean(pattern).split('/')[0];roots.add(/[?*{]/.test(first)?repository:path.join(repository,first));}
+  const files=[],unsafe=[];const visit=directory=>{let entries;try{entries=fs.readdirSync(directory,{withFileTypes:true});}catch(error){if(error?.code!=='ENOENT')unsafe.push(clean(path.relative(repository,directory))||'.');return;}
+    for(const entry of entries.sort((a,b)=>a.name.localeCompare(b.name))){if(SKIP_DIRECTORIES.has(entry.name))continue;const absolute=path.join(directory,entry.name),relative=clean(path.relative(repository,absolute));
+      let stat;try{stat=fs.lstatSync(absolute);}catch{unsafe.push(relative);continue;}if(stat.isSymbolicLink()){if(matchAny(relative,globs))unsafe.push(relative);continue;}
+      if(stat.isDirectory())visit(absolute);else if(stat.isFile()&&matchAny(relative,globs))files.push(relative);}};
+  for(const root of [...roots].sort())visit(root);return {files:[...new Set(files)].sort(),unsafe:[...new Set(unsafe)].sort()};
+}
+
+function exactFiles(repository,inputs){
+  if(!Array.isArray(inputs)||!inputs.length)throw Object.assign(Error('Explicit source file paths are required.'),{code:'FILES_REQUIRED'});const files=[];
+  for(const input of inputs){if(typeof input!=='string'||!input.trim()||/[?*{}]/.test(input))throw Object.assign(Error(`Globs are not supported as file inputs: ${input}`),{code:'FILE_INPUT_INVALID'});
+    const requested=path.resolve(repository,input),relative=path.relative(repository,requested);if(relative==='..'||relative.startsWith(`..${path.sep}`)||path.isAbsolute(relative))throw Object.assign(Error(`File escapes repository: ${input}`),{code:'FILE_OUTSIDE_REPOSITORY'});
+    let file;try{file=fs.realpathSync(requested);}catch{throw Object.assign(Error(`File is missing or unreadable: ${input}`),{code:'FILE_UNAVAILABLE'});}const realRelative=path.relative(repository,file),stat=fs.lstatSync(requested);
+    if(realRelative==='..'||realRelative.startsWith(`..${path.sep}`)||path.isAbsolute(realRelative)||stat.isSymbolicLink()||!fs.statSync(file).isFile())throw Object.assign(Error(`File must be a regular file inside repository: ${input}`),{code:'FILE_UNSAFE'});
+    files.push({absolute:file,relative:clean(realRelative)});}
+  if(new Set(files.map(file=>file.absolute)).size!==files.length)throw Object.assign(Error('Duplicate file inputs.'),{code:'DUPLICATE_FILE_INPUT'});return files.sort((a,b)=>a.relative.localeCompare(b.relative));
+}
+
+function packageMetadata(entry,expectedName){let directory=path.dirname(entry);while(path.dirname(directory)!==directory){const file=path.join(directory,'package.json');if(fs.existsSync(file)){const value=JSON.parse(fs.readFileSync(file,'utf8'));if(value.name===expectedName)return {root:directory,value};}directory=path.dirname(directory);}throw Object.assign(Error(`Cannot locate package metadata for ${expectedName}.`),{code:'CANON_PACKAGE_METADATA_UNAVAILABLE'});}
+export function packageIdentity(root,policy){
+  if(!plain(policy)||policy.algorithm!=='sha256'||policy.framing!=='sorted-posix-relative-path-null-raw-bytes-null'||!Array.isArray(policy.include)||!Array.isArray(policy.exclude))throw Object.assign(Error('Canon content digest policy is unsupported.'),{code:'CANON_DIGEST_POLICY_INVALID'});
+  const files=[];let total=0;const visit=directory=>{for(const entry of fs.readdirSync(directory,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){if(entry.name==='node_modules')continue;const absolute=path.join(directory,entry.name),relative=clean(path.relative(root,absolute)),stat=fs.lstatSync(absolute);
+    if(stat.isSymbolicLink())throw Object.assign(Error(`Canon package contains unsupported symlink ${relative}.`),{code:'CANON_PACKAGE_UNSAFE'});if(stat.isDirectory())visit(absolute);else if(stat.isFile()&&matchAny(relative,policy.include)&&!matchAny(relative,policy.exclude)){total+=stat.size;files.push({absolute,relative,size:stat.size});if(files.length>MAX_CANON_FILES||total>MAX_CANON_BYTES)throw Object.assign(Error('Canon package exceeds bounded identity limits.'),{code:'CANON_PACKAGE_TOO_LARGE'});}}};
+  visit(root);const hash=crypto.createHash('sha256');for(const file of files.sort((a,b)=>a.relative.localeCompare(b.relative))){hash.update(Buffer.from(file.relative,'utf8'));hash.update(Buffer.from([0]));hash.update(fs.readFileSync(file.absolute));hash.update(Buffer.from([0]));}
+  return {digest:hash.digest('hex'),files:files.length};
+}
+
+async function targetRuntime(repository,profile){
+  const require=createRequire(path.join(repository,'package.json')),name=profile.canon.package;let eslintEntry,canonEntry;
+  try{eslintEntry=require.resolve('eslint');}catch{throw Object.assign(Error('Target-local ESLint is unavailable.'),{code:'ESLINT_UNAVAILABLE'});}
+  try{canonEntry=require.resolve(name);}catch{throw Object.assign(Error(`Target-local ${name} is unavailable.`),{code:'CANON_PACKAGE_UNAVAILABLE'});}
+  let ESLint;try{({ESLint}=require(eslintEntry));}catch{throw Object.assign(Error('Target-local ESLint cannot be loaded.'),{code:'ESLINT_UNAVAILABLE'});}if(typeof ESLint!=='function')throw Object.assign(Error('Target-local ESLint does not export ESLint.'),{code:'ESLINT_UNAVAILABLE'});
+  let canon;try{canon=await import(`${pathToFileURL(canonEntry).href}?identity=${fs.statSync(canonEntry).mtimeMs}`);}catch{throw Object.assign(Error(`Target-local ${name} cannot be loaded.`),{code:'CANON_PACKAGE_UNAVAILABLE'});}
+  const metadata=packageMetadata(canonEntry,name),identity=packageIdentity(metadata.root,profile.canon.contentDigest);
+  return {eslint:new ESLint({cwd:repository,fix:false,warnIgnored:true}),canon,package:{name:metadata.value.name,version:metadata.value.version??null,digest:identity.digest,files:identity.files}};
+}
+
+function checkedProfile(catalog,name){
+  if(!plain(catalog)||catalog.schema!==PROFILE_SCHEMA||!plain(catalog.profiles))throw Object.assign(Error('Code-pattern profile catalog is missing or malformed.'),{code:'PROFILE_CATALOG_INVALID'});const profile=catalog.profiles[name];
+  if(!plain(profile)||!plain(profile.canon)||typeof profile.canon.package!=='string'||typeof profile.canon.version!=='string'||!plain(profile.canon.contentDigest)||
+    !Array.isArray(profile.sourceGlobs)||!profile.sourceGlobs.length||!profile.sourceGlobs.every(value=>typeof value==='string'&&value.trim())||!Array.isArray(profile.obligations)||!Array.isArray(profile.semanticOnly)||
+    !Array.isArray(profile.expectedSourceRuleIds)||!profile.expectedSourceRuleIds.length)throw Object.assign(Error(`Code-pattern profile ${name} is missing or malformed.`),{code:'PROFILE_INVALID'});
+  const expected=profile.expectedSourceRuleIds,declared=[...profile.obligations,...profile.semanticOnly],ids=declared.map(item=>item?.id),covered=declared.flatMap(item=>Array.isArray(item?.sourceRuleIds)?item.sourceRuleIds:[]);
+  if(new Set(expected).size!==expected.length||new Set(ids).size!==ids.length||expected.some(id=>typeof id!=='string'||!id.trim())||ids.some(id=>typeof id!=='string'||!id.trim())||
+    covered.some(id=>typeof id!=='string'||!expected.includes(id))||expected.some(id=>!covered.includes(id)))throw Object.assign(Error(`Code-pattern profile ${name} does not map every authored source rule exactly into a declared obligation or semantic review.`),{code:'PROFILE_INVENTORY_INVALID'});
+  return profile;
+}
+function expectedSetting(check,ruleId){const expected=check.expectedByRule?.[ruleId]??check.expected?.rules?.[ruleId]??check.expected;if(!plain(expected)||severity(expected.severity)===null)throw Object.assign(Error(`ESLint rule ${ruleId} has no exact expected severity.`),{code:'PROFILE_EXPECTATION_INVALID'});const options=expected.optionsByRule?.[ruleId]??expected.options??[];return setting([expected.severity,...(Array.isArray(options)?options:[options])]);}
+function lintObligations(profile,expectedFiles){
+  const items=[],issues=[];for(const obligation of profile.obligations){const check=obligation?.mechanical?.check,base={id:obligation?.id??null,sourceRuleIds:Array.isArray(obligation?.sourceRuleIds)?[...obligation.sourceRuleIds]:[],applicability:plain(obligation?.applicability)?structuredClone(obligation.applicability):{},status:obligation?.status??null,machine:plain(check)?{kind:check.kind,id:check.externalResult?.command??check.script?.id??null}:null};
+    if(typeof base.id!=='string'||!base.id||!STATUSES.has(base.status)||!base.machine||!MACHINE_KINDS.has(base.machine.kind)){issues.push({code:'PROFILE_OBLIGATION_INVALID',obligation:base.id});items.push({...base,coverage:'conflicting',files:[],rules:[]});continue;}
+    if(base.status!=='implemented'){issues.push({code:base.status==='missing'?'MECHANICAL_CHECK_MISSING':'MECHANICAL_CHECK_CONFLICT',obligation:base.id});items.push({...base,coverage:base.status==='missing'?'uncovered':'conflicting',files:[],rules:[]});continue;}
+    if(base.machine.kind==='architecture'||base.machine.kind==='script'){const ruleIds=Array.isArray(check.ruleIds)?check.ruleIds:[],files=expectedFiles.filter(file=>applies(file,base.applicability));if(!ruleIds.length||!ruleIds.every(rule=>typeof rule==='string'&&rule.trim())){issues.push({code:'PROFILE_MACHINE_RULES_MISSING',obligation:base.id});items.push({...base,coverage:'conflicting',files,rules:[]});continue;}items.push({...base,coverage:files.length?'pending':'not-applicable',files,rules:ruleIds.map(id=>({id}))});continue;}
+    if(base.machine.kind!=='eslint'){issues.push({code:'EXTERNAL_MACHINE_RESULT_UNBOUND',obligation:base.id,machineKind:base.machine.kind});items.push({...base,coverage:'uncovered',files:[],rules:[]});continue;}
+    const ruleIds=Array.isArray(check.ruleIds)?check.ruleIds:[],files=expectedFiles.filter(file=>applies(file,base.applicability));if(!ruleIds.length||!ruleIds.every(rule=>typeof rule==='string'&&rule.trim())){issues.push({code:'PROFILE_ESLINT_RULES_MISSING',obligation:base.id});items.push({...base,coverage:'conflicting',files,rules:[]});continue;}
+    let rules=[];try{rules=ruleIds.map(ruleId=>({id:ruleId,expected:expectedSetting(check,ruleId)}));}catch(error){issues.push({code:error.code??'PROFILE_EXPECTATION_INVALID',obligation:base.id});items.push({...base,coverage:'conflicting',files,rules:[]});continue;}items.push({...base,coverage:files.length?'required':'not-applicable',files,rules});}
+  return {items,issues};
+}
+
+export function inspectLintResults(expectedFiles,results){const expected=new Set(expectedFiles.map(file=>path.resolve(file))),seen=new Set(),issues=[];for(const result of results){const file=path.resolve(result.filePath);if(!expected.has(file))issues.push({file,code:'UNEXPECTED_FILE'});if(seen.has(file))issues.push({file,code:'DUPLICATE_RESULT'});seen.add(file);
+  for(const message of result.messages??[])if(message.fatal||message.severity>0)issues.push({file,code:'LINT_MESSAGE',ruleId:message.ruleId??null,line:message.line??null,message:String(message.message??'')});for(const message of result.suppressedMessages??[])issues.push({file,code:'SUPPRESSED_MESSAGE',ruleId:message.ruleId??null,line:message.line??null});}
+  for(const file of expected)if(!seen.has(file))issues.push({file,code:'MISSING_RESULT'});return issues;}
+const seal=report=>({...report,reportDigest:sha256(canonicalJSON(report))});
+const baseReport=(profile,repository)=>({schema:CODE_PATTERN_REPORT,profile,repository:clean(repository),ok:false,status:'unavailable',inventoryDigest:null,canon:null,machineResults:[],
+  coverage:{expectedFiles:[],requestedFiles:[],configuredFiles:[],lintedFiles:[],ignoredFiles:[],missingFiles:[],required:[],covered:[],uncovered:[],conflicting:[]},obligations:[],files:[],issues:[],
+  limitations:['This gate proves only authored machine obligations and actual static ESLint execution; it does not prove business meaning, design quality, runtime behavior or UAT.','Semantic-only obligations remain agent-guided Markdown review and cannot satisfy a mechanical code rule.']});
+
+async function defaultScriptChecker(profileName,input){
+  const moduleName=profileName==='nest'?'nest':profileName==='next'?'next':null;if(!moduleName)throw Object.assign(Error(`No static code-pattern checker is registered for ${profileName}.`),{code:'SCRIPT_CHECKER_UNAVAILABLE'});
+  let loaded;try{loaded=await import(new URL(`../checks/code-patterns/${moduleName}.mjs`,import.meta.url));}catch(error){throw Object.assign(Error(`Static code-pattern checker ${moduleName} is unavailable: ${error.message??error}`),{code:'SCRIPT_CHECKER_UNAVAILABLE'});}
+  const checker=moduleName==='nest'?loaded.checkNestPatterns:loaded.checkNextPatterns;if(typeof checker!=='function')throw Object.assign(Error(`Static code-pattern checker ${moduleName} does not expose the canonical adapter.`),{code:'SCRIPT_CHECKER_UNAVAILABLE'});
+  return checker(input);
+}
+
+function inspectScriptResult(result,{repository,files,ruleIds}){
+  const expectedFiles=[...files].sort(),expectedRules=[...ruleIds].sort();let resultRepository=null;try{resultRepository=fs.realpathSync(result?.repository??'');}catch{}
+  const valid=plain(result)&&result.schema==='starci/code-pattern-script@1'&&resultRepository===repository&&Array.isArray(result.files)&&Array.isArray(result.checkedRuleIds)&&Array.isArray(result.violations)&&Array.isArray(result.errors)&&plain(result.compiler)&&
+    same([...result.files].sort(),expectedFiles)&&same([...result.checkedRuleIds].sort(),expectedRules)&&new Set(result.files).size===result.files.length&&new Set(result.checkedRuleIds).size===result.checkedRuleIds.length;
+  if(!valid)return {valid:false,unavailable:true,violations:[],errors:[]};
+  const shaped=[...result.violations,...result.errors].every(item=>plain(item)&&typeof item.message==='string'&&(!Object.hasOwn(item,'ruleId')||item.ruleId===undefined||item.ruleId===null||expectedRules.includes(item.ruleId))&&(!Object.hasOwn(item,'path')||item.path===undefined||item.path===null||expectedFiles.includes(clean(item.path))));
+  return {valid:shaped,unavailable:!shaped||result.errors.length>0,violations:shaped?result.violations:[],errors:shaped?result.errors:[]};
+}
+
+export async function checkScopedLint(root,inputs,{profile:profileName,profileCatalog=null,runtime=null,architecture=checkArchitecture,architectureConfig=null,scriptChecker=defaultScriptChecker,all=false}={}){
+  let repository;try{repository=fs.realpathSync(root);}catch{return seal({...baseReport(profileName??null,String(root??'')),status:'invalid',issues:[{code:'REPOSITORY_UNAVAILABLE'}]});}let profile;
+  try{profile=checkedProfile(profileCatalog??readDistJson('model','code-patterns.json'),profileName);}catch(error){return seal({...baseReport(profileName??null,repository),status:'invalid',issues:[{code:error.code??'INPUT_INVALID',message:String(error.message??error)}]});}
+  const enumerated=sourceFiles(repository,profile.sourceGlobs),expected=enumerated.files;if(all&&!expected.length)return seal({...baseReport(profileName,repository),inventoryDigest:sha256(canonicalJSON(profile)),status:'unavailable',issues:[{code:'SOURCE_INVENTORY_EMPTY'}]});let files;
+  try{files=exactFiles(repository,all?expected:inputs);}catch(error){return seal({...baseReport(profileName??null,repository),status:'invalid',issues:[{code:error.code??'INPUT_INVALID',message:String(error.message??error)}]});}
+  const report=baseReport(profileName,repository),requested=files.map(file=>file.relative),expectedSet=new Set(expected),requestedSet=new Set(requested);
+  report.inventoryDigest=sha256(canonicalJSON(profile));report.coverage.expectedFiles=expected;report.coverage.requestedFiles=requested;for(const file of enumerated.unsafe)report.issues.push({code:'SOURCE_PATH_UNSAFE',file});
+  for(const file of expected)if(!requestedSet.has(file)){report.coverage.missingFiles.push(file);report.issues.push({code:'SOURCE_FILE_UNCHECKED',file});}for(const file of requested)if(!expectedSet.has(file))report.issues.push({code:'FILE_OUTSIDE_PROFILE_SOURCE',file});
+  const obligations=lintObligations(profile,expected);report.obligations=obligations.items;report.issues.push(...obligations.issues);let unavailable=enumerated.unsafe.length>0;
+  const architectureObligations=report.obligations.filter(item=>item.coverage==='pending'&&item.machine.kind==='architecture');
+  if(architectureObligations.length){let result;try{result=architecture({repositoryRoot:repository,configFile:architectureConfig??undefined});}catch(error){result={schema:'starci/architecture-check@1',ok:false,kinds:[],files:0,violations:[],errors:[{ruleId:'ARCH_EXECUTION_UNAVAILABLE',message:String(error.message??error)}]};}
+    const valid=plain(result)&&result.schema==='starci/architecture-check@1'&&typeof result.ok==='boolean'&&Array.isArray(result.kinds)&&Number.isInteger(result.files)&&Array.isArray(result.violations)&&Array.isArray(result.errors);
+    report.machineResults.push({kind:'architecture',schema:result?.schema??null,digest:sha256(canonicalJSON(result??null)),ok:valid&&result.ok,files:valid?result.files:0,kinds:valid?[...result.kinds]:[],coverage:valid&&plain(result.coverage)?structuredClone(result.coverage):null});
+    if(!valid){unavailable=true;report.issues.push({code:'ARCHITECTURE_RESULT_INVALID'});for(const item of architectureObligations)item.coverage='uncovered';}
+    else if(result.errors.length){unavailable=true;for(const error of result.errors)report.issues.push({code:'ARCHITECTURE_INPUT_UNAVAILABLE',ruleId:error?.ruleId??null});for(const item of architectureObligations)item.coverage='uncovered';}
+    else {const expectedKind=profileName==='nest'?'backend':'frontend';if(!result.kinds.includes(expectedKind)){unavailable=true;report.issues.push({code:'ARCHITECTURE_PROFILE_UNAVAILABLE',expectedKind});}
+      for(const violation of result.violations)report.issues.push({code:'ARCHITECTURE_VIOLATION',ruleId:violation?.ruleId??null,path:violation?.path??null,line:violation?.line??null});
+      for(const item of architectureObligations){const ids=new Set(item.rules.map(rule=>rule.id)),needsOwner=[...ids].some(id=>['ARCH_OWNER_EXPORT_BYPASS','ARCH_OWNER_EXPORT_STAR'].includes(id)),needsGrammar=[...ids].some(id=>['ARCH_GRAMMAR_EXPORT_BYPASS','ARCH_GRAMMAR_CONTRACT_INVALID'].includes(id));let complete=result.kinds.includes(expectedKind)&&![...result.violations].some(violation=>ids.has(violation?.ruleId));
+        if(needsOwner&&result.coverage?.ownerPublicApi?.status!=='checked'){complete=false;unavailable=true;report.issues.push({code:'ARCHITECTURE_OWNER_PUBLIC_API_UNAVAILABLE',obligation:item.id});}
+        if(needsGrammar&&result.coverage?.grammarContract?.status!=='checked'){complete=false;unavailable=true;report.issues.push({code:'ARCHITECTURE_GRAMMAR_CONTRACT_UNAVAILABLE',obligation:item.id});}
+        item.coverage=complete?'covered':'uncovered';}}
   }
-  for(const file of expected) if(!seen.has(file)) issues.push({file,code:'MISSING_RESULT'});
-  return issues;
-}
-
-export async function checkScopedLint(root, inputs) {
-  const repository=fs.realpathSync(root);
-  if(!inputs.length) throw Error('Explicit owned file paths are required; no globs or implicit whole-repo run.');
-  const files=inputs.map(input=>{
-    if(/[?*]/.test(input)) throw Error('Globs are not supported: '+input);
-    const file=fs.realpathSync(path.resolve(repository,input));
-    const relative=path.relative(repository,file);
-    if(relative==='..'||relative.startsWith('..'+path.sep)||path.isAbsolute(relative)||!fs.statSync(file).isFile()) throw Error('File must be inside repository: '+input);
-    return file;
-  });
-  if(new Set(files).size!==files.length) throw Error('Duplicate file inputs.');
-  const require=createRequire(path.join(repository,'package.json'));
-  const {ESLint}=require('eslint');
-  const eslint=new ESLint({cwd:repository,fix:false,warnIgnored:true});
-  const configuration=[];
-  for(const file of files) {
-    if(await eslint.isPathIgnored(file)) throw Error('Owned file is ignored: '+file);
-    const config=await eslint.calculateConfigForFile(file);
-    if(!config) throw Error('No effective lint configuration: '+file);
-    configuration.push({file,noInlineConfig:config.linterOptions?.noInlineConfig===true,rules:config.rules});
+  const scriptObligations=report.obligations.filter(item=>item.coverage==='pending'&&item.machine.kind==='script');
+  for(const item of scriptObligations){const ruleIds=item.rules.map(rule=>rule.id),input={root:repository,files:[...item.files],ruleIds};let result;
+    try{result=await scriptChecker(profileName,input);}catch(error){result={schema:null,repository,files:item.files,checkedRuleIds:ruleIds,violations:[],errors:[{message:String(error.message??error)}],compiler:{version:null,resolved:false}};}
+    const inspected=inspectScriptResult(result,{repository,files:item.files,ruleIds});report.machineResults.push({kind:'script',obligation:item.id,schema:result?.schema??null,digest:sha256(canonicalJSON(result??null)),ok:inspected.valid&&!inspected.unavailable&&!inspected.violations.length,files:inspected.valid?[...result.files]:[],checkedRuleIds:inspected.valid?[...result.checkedRuleIds]:[],compiler:inspected.valid?structuredClone(result.compiler):null});
+    if(!inspected.valid){unavailable=true;item.coverage='uncovered';report.issues.push({code:'SCRIPT_RESULT_INVALID',obligation:item.id});continue;}
+    if(inspected.errors.length){unavailable=true;item.coverage='uncovered';for(const error of inspected.errors)report.issues.push({code:'SCRIPT_INPUT_UNAVAILABLE',obligation:item.id,ruleId:error.ruleId??null,path:error.path??null,message:error.message});continue;}
+    for(const violation of inspected.violations)report.issues.push({code:'SCRIPT_PATTERN_VIOLATION',obligation:item.id,ruleId:violation.ruleId??null,path:violation.path??null,line:violation.line??null,column:violation.column??null,message:violation.message});item.coverage=inspected.violations.length?'uncovered':'covered';
   }
-  const results=await eslint.lintFiles(files);
-  const issues=inspectLintResults(files,results);
-  return {ok:issues.length===0,scope:'lint-result-integrity-only',structuralConformance:'not-proven',configuration,issues};
+  let loaded;
+  try{loaded=runtime??await targetRuntime(repository,profile);}catch(error){return seal({...report,status:'unavailable',issues:[...report.issues,{code:error.code??'LINT_RUNTIME_UNAVAILABLE',message:String(error.message??error)}]});}
+  report.canon={name:loaded.package.name,version:loaded.package.version,digest:loaded.package.digest,files:loaded.package.files};const declared=profile.canon.contentDigest;
+  if(loaded.package.name!==profile.canon.package)report.issues.push({code:'CANON_PACKAGE_WRONG',expected:profile.canon.package,observed:loaded.package.name});if(loaded.package.version!==profile.canon.version)report.issues.push({code:'CANON_VERSION_MISMATCH',expected:profile.canon.version,observed:loaded.package.version});
+  if(loaded.package.digest!==declared.value||loaded.package.files!==declared.files)report.issues.push({code:'CANON_CONTENT_MISMATCH',expected:{digest:declared.value,files:declared.files},observed:{digest:loaded.package.digest,files:loaded.package.files}});
+  const exported=plain(loaded.canon?.rules)?loaded.canon.rules:{},recommended=plain(loaded.canon?.recommended)?loaded.canon.recommended:{},required=[];
+  for(const obligation of report.obligations.filter(item=>item.coverage==='required'))for(const rule of obligation.rules){required.push({obligation:obligation.id,applicability:obligation.applicability,ruleId:rule.id,expected:rule.expected});const prefix=profileName==='nest'?'starci-be/':'starci-fe/';if(rule.id.startsWith(prefix)&&!Object.hasOwn(exported,rule.id.slice(prefix.length)))report.issues.push({code:'CANON_RULE_UNAVAILABLE',obligation:obligation.id,ruleId:rule.id});if(Object.hasOwn(recommended,rule.id))rule.canonRecommended=setting(recommended[rule.id]);}
+  report.coverage.required=required;const configurations=new Map();try{for(const file of files){if(await loaded.eslint.isPathIgnored(file.absolute)){report.coverage.ignoredFiles.push(file.relative);report.issues.push({code:'FILE_IGNORED',file:file.relative});continue;}const config=await loaded.eslint.calculateConfigForFile(file.absolute);if(!plain(config)){report.issues.push({code:'NO_EFFECTIVE_CONFIG',file:file.relative});continue;}configurations.set(file.relative,config);report.coverage.configuredFiles.push(file.relative);if(config.linterOptions?.noInlineConfig!==true)report.issues.push({code:'INLINE_CONFIG_NOT_REFUSED',file:file.relative});}}
+  catch(error){return seal({...report,status:'unavailable',issues:[...report.issues,{code:'EFFECTIVE_CONFIG_UNAVAILABLE',message:String(error.message??error)}]});}
+  const covered=[];for(const obligation of report.obligations.filter(item=>item.coverage==='required')){let cleanObligation=true;for(const file of obligation.files){const config=configurations.get(file);if(!config){cleanObligation=false;continue;}for(const rule of obligation.rules){const actual=setting(config.rules?.[rule.id]);if(actual===null){report.issues.push({code:'REQUIRED_RULE_MISSING',obligation:obligation.id,file,ruleId:rule.id,expected:rule.expected});cleanObligation=false;}else if(!same(actual,rule.expected)){report.issues.push({code:'REQUIRED_RULE_MISMATCH',obligation:obligation.id,file,ruleId:rule.id,expected:rule.expected,observed:actual});cleanObligation=false;}}}if(cleanObligation)covered.push(obligation.id);}
+  report.coverage.covered=[...new Set([...covered,...report.obligations.filter(item=>item.coverage==='covered').map(item=>item.id)])].sort();report.coverage.uncovered=report.obligations.filter(item=>['uncovered','required','pending'].includes(item.coverage)&&!report.coverage.covered.includes(item.id)).map(item=>item.id).sort();report.coverage.conflicting=report.obligations.filter(item=>item.coverage==='conflicting').map(item=>item.id).sort();let results;
+  try{results=await loaded.eslint.lintFiles(files.map(file=>file.absolute));}catch(error){return seal({...report,status:'unavailable',issues:[...report.issues,{code:'LINT_EXECUTION_UNAVAILABLE',message:String(error.message??error)}]});}
+  const integrity=inspectLintResults(files.map(file=>file.absolute),results);report.coverage.lintedFiles=[...new Set(results.map(result=>clean(path.relative(repository,path.resolve(result.filePath)))).filter(file=>expectedSet.has(file)))].sort();for(const issue of integrity)report.issues.push({...issue,file:clean(path.relative(repository,issue.file))});
+  report.files=results.map(result=>({path:clean(path.relative(repository,path.resolve(result.filePath))),errorCount:Number(result.errorCount??0),warningCount:Number(result.warningCount??0),fatalErrorCount:Number(result.fatalErrorCount??0),suppressedCount:Array.isArray(result.suppressedMessages)?result.suppressedMessages.length:0})).sort((a,b)=>a.path.localeCompare(b.path));
+  report.issues=report.issues.sort((a,b)=>canonicalJSON(a).localeCompare(canonicalJSON(b)));report.ok=report.issues.length===0;report.status=report.ok?'clean':unavailable?'unavailable':'findings';return seal(report);
 }
 
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
-  try {
-    const result=await checkScopedLint(process.argv[2]??'.',process.argv.slice(3));
-    process.stdout.write(JSON.stringify(result)+'\n');
-    if(!result.ok) process.exitCode=1;
-  } catch(error) {process.stderr.write(error.message+'\n');process.exitCode=1;}
-}
+export const codePatternExitCode=report=>report?.status==='clean'&&report?.ok===true?0:report?.status==='findings'?1:2;
+export function parseScopedLintArgs(argv){let profile=null,root='.',architectureConfig=null,all=false;const files=[];for(let index=0;index<argv.length;index++){const value=argv[index];if(value==='--'){files.push(...argv.slice(index+1));break;}if(value==='--all'){all=true;continue;}if(value==='--profile'){profile=argv[++index]??null;continue;}if(value==='--root'){root=argv[++index]??null;continue;}if(value==='--architecture-config'){architectureConfig=argv[++index]??null;continue;}throw Object.assign(Error(`Unknown argument ${value}; expected --profile <nest|next> --root <repository> [--architecture-config <file>] (--all | -- <files...>).`),{code:'ARGUMENT_INVALID'});}if(!profile||!root||(all===Boolean(files.length)))throw Object.assign(Error('Usage: check-scoped-lint --profile <nest|next> --root <repository> [--architecture-config <file>] (--all | -- <explicit files...>)'),{code:'ARGUMENT_INVALID'});return {profile,root,architectureConfig,all,files};}
+export async function scopedLintMain(argv,{checker=checkScopedLint,write=value=>process.stdout.write(value)}={}){let parsed;try{parsed=parseScopedLintArgs(argv);}catch(error){const report=seal({...baseReport(null,''),status:'invalid',issues:[{code:error.code??'ARGUMENT_INVALID',message:String(error.message??error)}]});write(`${JSON.stringify(report)}\n`);return {report,exitCode:2};}const report=await checker(parsed.root,parsed.files,{profile:parsed.profile,architectureConfig:parsed.architectureConfig,all:parsed.all});write(`${JSON.stringify(report)}\n`);return {report,exitCode:codePatternExitCode(report)};}
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){const result=await scopedLintMain(process.argv.slice(2));process.exitCode=result.exitCode;}
+export const verifyCodePatternReportDigest=report=>plain(report)&&typeof report.reportDigest==='string'&&report.reportDigest===sha256(canonicalJSON(Object.fromEntries(Object.entries(report).filter(([key])=>key!=='reportDigest'))));
