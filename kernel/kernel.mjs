@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import {ENGINE_SCHEMA,ENGINE_VERSION,createEngineRuntime,enrollEngine,isEnrolled,isJobPending,journalFileFor,predatesEngineSchema,relocateJournal,settleGenerationLeases,prepareGenerationRetry,staleLeaseProof} from './engine.mjs';
+import {ENGINE_SCHEMA,ENGINE_VERSION,createEngineRuntime,enrollEngine,isEnrolled,isJobPending,journalFileFor,predatesEngineSchema,relocateJournal,settleGenerationLeases,prepareGenerationRetry,staleLeaseProof,validateCandidateRoot} from './engine.mjs';
 import {applyOwnerInbox} from './owner-inbox.mjs';
 import {verifyAcceptedIntegrationOwnerRequests} from './owner-requests.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
@@ -24,7 +24,7 @@ import {resolveExecutionChain} from './chains.mjs';
 import {loadsFileFor} from './loads.mjs';
 import {planProtectedProof,proofApplies,proofFinding,proofPlan,protectedProofFinding,runAtBase,runProtectedProof} from '../checks/proof.mjs';
 import {evaluateAcceptance,kernelVerificationReceipt,resolveEvidencePacket} from '../checks/acceptance.mjs';
-import {persistInlineCandidate,protectedOracleManifest} from './candidate-bridge.mjs';
+import {candidateChecksNeedDependencies,persistInlineCandidate,protectedOracleManifest} from './candidate-bridge.mjs';
 import {prepareCandidateIntegration} from './candidates.mjs';
 import {candidateRootBindings as buildCandidateRootBindings,resolveCandidateReferences} from './candidate-roots.mjs';
 import {buildManagerSnapshot,validateManagerDecision,managerProgressDigest} from './manager.mjs';
@@ -555,6 +555,51 @@ function stoppedRetryDispatchId(op){
   const persisted=attempts[0]?.dispatchId;
   return typeof persisted==='string'&&persisted?persisted:null;
 }
+const decisionQuestionDigest=question=>crypto.createHash('sha256').update(JSON.stringify(question??null)).digest('hex');
+const fileDigest=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+/**
+ * A completed redundant decision worker may have reported after the owner's answer was durably accepted.  Its
+ * bytes are not the owner's answer, so they still pass through ordinary candidate acceptance.  This marker
+ * carries only enough immutable identity to let the stopped kernel replay that exact report on its next run.
+ */
+export function stageAnsweredDecisionLateReport(state,op,{store,runtime,dispatchId,taskId}={}){
+  const reportFile=store?.reportPath?.(dispatchId),report=reportFile&&fs.existsSync(reportFile)?readJson(reportFile,null):null,
+    receipt=op?.ownerAnswer?.receiptId,identity=op?.candidate?.identity;
+  if(!report||report.schema!=='starci/op-report@1'||report.outcome!=='done'||report.run!==state.run||report.task!==taskId||report.dispatch!==dispatchId||
+    report.from!==op.terminal||report.signal?.type!=='worker_done'||report.signal?.orcaOutcome!=='succeeded'||report.sent?.type!=='worker_done')
+    return {ok:false,reason:'late report is not bound to the exact current Run/Task/Dispatch and successful worker signal'};
+  if(report.question!==null&&report.question!==undefined)return {ok:false,reason:'late answered-decision report attempts to replace the prepared owner question'};
+  if(typeof receipt!=='string'||!receipt||op.ownerContinuationReceipt!==receipt||op.ownerRequestStatus!=='answered')
+    return {ok:false,reason:'answered decision has no exact immutable owner continuation receipt'};
+  let packet;try{packet=runtime.candidatePacket(op);}catch(error){return {ok:false,reason:`sealed candidate packet is unavailable: ${String(error?.message??error)}`};}
+  if(!identity||!['workflowId','opId','attempt','generation','jobId'].every(field=>packet?.[field]===identity[field]))
+    return {ok:false,reason:'late report does not bind the exact sealed candidate identity'};
+  if(packet.candidateDigest!==op.candidateDigest||packet.candidateDigest!==op.candidate?.candidateDigest)
+    return {ok:false,reason:'late report candidate digest differs from the durable operation candidate'};
+  const roots=Array.isArray(packet.roots)?packet.roots:[{id:'source',repoRoot:state.worktree,changes:packet.changes??[],
+      observedFiles:(packet.changes??[]).map(change=>({rootId:'source',path:change.path,displayPath:change.path}))}],
+    observed=roots.flatMap(root=>(root.observedFiles??[]).map(file=>({root,path:file.path,displayPath:file.displayPath}))),
+    reported=new Set((report.files??[]).map(normalize));
+  if(!observed.length||observed.some(item=>item.path!==item.displayPath||!reported.has(normalize(item.displayPath))))
+    return {ok:false,reason:'late report does not attribute every sealed candidate output'};
+  for(const item of observed){
+    const change=(item.root.changes??[]).find(row=>row.path===item.path),canonical=path.join(item.root.repoRoot,...item.path.split('/'));
+    if(!change?.afterSha256||!fs.existsSync(canonical)||fileDigest(canonical)!==change.afterSha256)
+      return {ok:false,reason:`canonical bytes no longer match the sealed candidate: ${item.displayPath}`};
+  }
+  op.lateReportRecovery={schema:'starci/answered-decision-late-report@1',dispatch:dispatchId,task:taskId,run:state.run,
+    reportSha256:fileDigest(reportFile),candidateDigest:packet.candidateDigest,questionDigest:decisionQuestionDigest(op.question),ownerReceipt:receipt};
+  op.retainedOwnerTerminal={schema:'starci/retained-owner-terminal@1',handle:op.terminal,dispatch:dispatchId,ownership:'user_owned'};
+  op.status='running';delete op.pending;
+  return {ok:true,lateReportPending:true,report:reportFile,observedFiles:observed.map(item=>item.displayPath),candidateDigest:packet.candidateDigest};
+}
+export function lateReportReplayMatches(state,op,report,{store}={}){
+  const late=op?.lateReportRecovery,reportFile=store?.reportPath?.(op?.dispatch),receipt=op?.ownerAnswer?.receiptId;
+  return Boolean(late?.schema==='starci/answered-decision-late-report@1'&&late.dispatch===op.dispatch&&late.task===report?.task&&late.run===report?.run&&
+    report.run===state.run&&report.task===op.launch?.task&&report.from===op.terminal&&reportFile&&fs.existsSync(reportFile)&&fileDigest(reportFile)===late.reportSha256&&
+    op.candidateDigest===late.candidateDigest&&decisionQuestionDigest(op.question)===late.questionDigest&&receipt===late.ownerReceipt&&
+    op.ownerContinuationReceipt===receipt&&op.ownerRequestStatus==='answered'&&(report.question===null||report.question===undefined));
+}
 export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost=settleDispatch,createRuntime=createEngineRuntime,git=spawnSync,waitFn=sleepSync,acceptedPreparedDecision=false}={}){
   const lease=op?.lease,dispatchId=stoppedRetryDispatchId(op),taskId=op?.launch?.task,candidate=op?.candidate?.identity;
   const preparedDecision=acceptedPreparedDecision&&op?.status==='done'&&preparedOwnerDecision(op);
@@ -587,7 +632,16 @@ export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost
   const runtime=createRuntime({store,state,eligibility:()=>({eligible:false,reasons:['retry reconciliation only']}),git});
   try{
     const reconciled=runtime.settleStoppedOperation(op,{dispatch:dispatchId,settlement,reason:'public workflow retry proved the exact native worker exited',acceptedPreparedDecision:preparedDecision});
-    if(!reconciled.ok)return reconciled;
+    if(!reconciled.ok){
+      if(preparedDecision&&reconciled.effectState==='partial'){
+        const staged=stageAnsweredDecisionLateReport(state,op,{store,runtime,dispatchId,taskId});
+        if(staged.ok){store.appendEvent({event:'prepared-decision-late-report-staged',op:op.id,jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,
+          run:state.run,task:taskId,dispatch:dispatchId,candidateDigest:staged.candidateDigest,observedFiles:staged.observedFiles,
+          proof:'exact succeeded settled worker report will replay through ordinary candidate verification while its writer remains held'});store.saveState(state);return staged;}
+        return {...reconciled,reason:`${reconciled.reason}; ${staged.reason}`};
+      }
+      return reconciled;
+    }
     store.appendEvent({event:preparedDecision?'prepared-decision-lease-reconciled':'retry-native-attempt-reconciled',op:op.id,jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,
       run:state.run,task:taskId,dispatch:dispatchId,candidateDigest:reconciled.candidateDigest??null,observedFiles:reconciled.observedFiles??[],
       proof:preparedDecision?(userTakeover?'the owner request was already prepared; Orca completed the exact worker, revoked its capability and transferred the retained terminal to the user; sealed candidate had no changes':'the owner request was already prepared; exact Orca worker exited; typed process settlement succeeded; sealed candidate had no changes'):'exact Orca worker exited; typed process settlement succeeded; candidate bytes were sealed while its writer fence remained held'});
@@ -669,7 +723,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
       dependencyDigests:op.dependencyDigests??{},environmentDigest:typeof op.environmentDigest==='string'&&op.environmentDigest.trim()?op.environmentDigest:
         (typeof state.engine?.runtimePin?.digest==='string'&&state.engine.runtimePin.digest.trim()?state.engine.runtimePin.digest:
           (typeof state.engine?.runtimePinDigest==='string'&&state.engine.runtimePinDigest.trim()?state.engine.runtimePinDigest:'runtime-unpinned')),
-      dependencyInstall:op.dependencyInstall??null});
+      dependencyInstall:op.dependencyInstall??null,dependencyRequired:candidateChecksNeedDependencies(op.checks)});
       const dropped=begun.schema==='starci/candidate-root-bridge@1'?begun.roots.flatMap(root=>(root.bridge.droppedOwnedPaths??[]).map(file=>root.id==='source'?file:path.join(root.repoRoot,file))):begun.droppedOwnedPaths??[];
       if(dropped.length){op.ownedBaselinePaths=(op.ownedBaselinePaths??[]).filter(file=>!dropped.includes(file));store.appendEvent({event:'owned-baseline-dropped',op:op.id,attempt:op.attempt,paths:dropped,reason:'clean since the prior attempt (committed or reverted): no longer owned'});}}
     if(ctx.engine)ctx.engine.beginLaunchIntent(op);
@@ -2087,7 +2141,17 @@ export function handleBlocked(store,state,op,report,ctx){
  */
 function settleAuthoredRecord(store,state,op,ctx){
   if(op.integrationPreparation){store.appendEvent({event:'integration-preparation-authored',op:op.id,owner:op.integrationPreparation.owner});return 'integration-preparation-authored';}
-  if(isAsk(op.kind)){settleOwnerAsk(store,state,op,op.reports.at(-1)??{});return 'owner-ask-settled';}
+  if(isAsk(op.kind)){
+    // A late report authenticates worker bytes; it has no authority to reopen or rewrite the owner decision that
+    // was accepted while that worker was still finishing. Exact question/receipt identity was checked before
+    // verification and integration, so successful acceptance preserves it verbatim here.
+    if(op.lateReportRecovery?.schema==='starci/answered-decision-late-report@1'&&op.ownerRequestStatus==='answered'&&
+      op.ownerAnswer?.receiptId===op.lateReportRecovery.ownerReceipt&&op.ownerContinuationReceipt===op.lateReportRecovery.ownerReceipt){
+      store.appendEvent({event:'prepared-decision-owner-answer-preserved',op:op.id,receiptId:op.ownerAnswer.receiptId});
+      return 'owner-ask-settled';
+    }
+    settleOwnerAsk(store,state,op,op.reports.at(-1)??{});return 'owner-ask-settled';
+  }
   // A node authored for a shared change closes nothing and completes no existing record: the tree is re-read so
   // the next sync sees the new node, and the requester is released by `resumePaused` like any other shared op.
   if(Array.isArray(op.sharedAuthored)){
@@ -2169,6 +2233,11 @@ function settleAuditMeasurement(orca,store,state,op,report,ctx){
 }
 
 export function applyOpReport(orca,store,state,op,report,ctx){
+  const deferLateFailure=reasons=>{
+    if(op.lateReportRecovery?.schema!=='starci/answered-decision-late-report@1')return null;
+    op.pending={kind:'answered-decision-late-report',reasons:(reasons??[]).map(String)};
+    return 'acceptance-pending';
+  };
   if(!isAuditOperation(op)&&validatorOnlyBlock(report)){
     const outcome=(report.open??[]).length?'partial':'done';
     store.appendEvent({event:'validator-only-block',op:op.id,from:report.outcome,to:outcome,note:'the kernel owns the whole-tree validator and judges it by what this operation could have caused'});
@@ -2236,9 +2305,11 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       let fingerprint=null;try{fingerprint=preparationFingerprint(ctx.work.api.readNode(ctx.work.at,ctx.work.node(op.nodeId)));}catch{}
       const prepared=work.declaredIntegrations(ctx.work.loaded).list.filter(entry=>entry.declaredBy===op.integrationPreparation.owner);
       const errors=prepared.flatMap(entry=>integrationReadiness(entry,{now:clockOf(ctx)}).errors);
-      if(!prepared.length||errors.length||!fingerprint||fingerprint!==op.preparationBefore)
-        return retryOp(store,state,op,[...errors,...(!prepared.length?['The owning integration declaration is missing.']:[]),
-          ...(!fingerprint||fingerprint!==op.preparationBefore?['The research repair changed content outside preparation or has no valid launch baseline.']:[])],ctx,'integration-preparation-invalid');
+      if(!prepared.length||errors.length||!fingerprint||fingerprint!==op.preparationBefore){
+        const findings=[...errors,...(!prepared.length?['The owning integration declaration is missing.']:[]),
+          ...(!fingerprint||fingerprint!==op.preparationBefore?['The research repair changed content outside preparation or has no valid launch baseline.']:[])],late=deferLateFailure(findings);
+        if(late)return late;return retryOp(store,state,op,findings,ctx,'integration-preparation-invalid');
+      }
     }
     if(ctx.engine&&op.candidate?.status!=='sealed'){
       const frozen=ctx.engine.freezeCandidate(op,{reportedFiles:report.files??[],requireReported:true});
@@ -2248,7 +2319,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
         return 'acceptance-pending';
       }
     }
-    if(ctx.engine&&op.candidate?.dependency?.command&&!op.candidate?.dependency?.ready){const dependency=ctx.engine.prepareCandidateDependencies(op);if(!dependency.ready){op.pending={kind:'candidate-dependencies',reason:dependency.evidence};return 'acceptance-pending';}}
+    if(ctx.engine&&!op.candidate?.dependency?.ready){const dependency=ctx.engine.prepareCandidateDependencies(op);if(!dependency.ready){op.pending={kind:'candidate-dependencies',reason:dependency.evidence??dependency.reason};return 'acceptance-pending';}}
     const candidateView=ctx.engine?ctx.engine.candidateView(op):null,candidateRoot=candidateView?.source.workerRoot??null;
     const workView=candidateView?.work,workRelative=workView?path.relative(workView.repoRoot,workView.workRoot??path.join(workView.repoRoot,'.starciwork')):null;
     const candidateWorkRoot=workView?path.join(workView.workerRoot,workRelative):null,candidateWork=ctx.engine&&ctx.work?{...ctx.work,repoRoot:workView.workerRoot,
@@ -2278,12 +2349,14 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     if(!verified.ok){
       op.reports.at(-1).downgradedTo='failed';
       store.appendEvent({event:'machine-verify-failed',op:op.id,failed:verified.failed.map(check=>`${check.name}=${check.exitCode}`)});
+      const late=deferLateFailure(verified.failed.map(check=>`kernel recheck failed: ${check.name}=${check.exitCode}`));if(late)return late;
       return retryOp(store,state,op,verified.failed.map(check=>`the kernel re-ran ${check.name} (\`${check.command}\`) and it exited ${check.exitCode}: ${check.evidence}`),ctx,'machine-verify-failed');
     }
     const files=ctx.engine?[...(op.candidate?.observedFiles??[])]:changedFiles(state,op,ctx,op.allowlist,{exclude:op.kernelOwned??[]});
     const amendmentValidation=operationAmendmentVerdict(state,op,{files,resources:ctx.guards.resourceLocks(op),external:op.externalEffects??[]});
     if(!amendmentValidation.ok){
       op.reports.at(-1).downgradedTo='failed';store.appendEvent({event:'amendment-effect-validation-failed',op:op.id,findings:amendmentValidation.reasons});
+      const late=deferLateFailure(amendmentValidation.reasons);if(late)return late;
       return retryOp(store,state,op,amendmentValidation.reasons,ctx,'amendment-effect-validation-failed');
     }
     // Every changed file this op is answerable for is mapped to a record kind, and a file whose kind this op does
@@ -2298,12 +2371,14 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     if(!kindVerdict.ok){
       const finding=`record-kind validation was unavailable: ${kindVerdict.error}`;
       op.reports.at(-1).downgradedTo='failed';store.appendEvent({event:'io-kind-validation-unavailable',op:op.id,reason:finding});
+      const late=deferLateFailure([finding]);if(late)return late;
       return retryOp(store,state,op,[finding],ctx,'io-kind-validation-unavailable');
     }
     if(undeclared.length){
       op.reports.at(-1).downgradedTo='failed';
       store.appendEvent({event:'io-undeclared-write',op:op.id,files:undeclared.map(item=>item.file)});
-      return retryOp(store,state,op,undeclared.map(item=>`produced a ${item.record} record it does not declare: ${item.file}`),ctx,'io-undeclared-write');
+      const findings=undeclared.map(item=>`produced a ${item.record} record it does not declare: ${item.file}`),late=deferLateFailure(findings);
+      if(late)return late;return retryOp(store,state,op,findings,ctx,'io-undeclared-write');
     }
     // Legacy drawings and frontend implementations are checked against exact captured bytes before any model
     // judges them. ImageGen directions remain design input; an implementation must provide separate capture,
@@ -2316,7 +2391,8 @@ export function applyOpReport(orca,store,state,op,report,ctx){
         const failed=(Array.isArray(rendered.checks)?rendered.checks:[]).filter(check=>plain(check)&&check.outcome!=='pass');
         op.reports.at(-1).downgradedTo='failed';
         store.appendEvent({event:'render-check-failed',op:op.id,checks:failed.map(check=>`${check.id}=${check.outcome}`)});
-        return retryOp(store,state,op,failed.map(check=>`render check ${check.id} ${check.outcome}: ${check.detail??''}`.trim()),ctx,'render-check-failed');
+        const findings=failed.map(check=>`render check ${check.id} ${check.outcome}: ${check.detail??''}`.trim()),late=deferLateFailure(findings);
+        if(late)return late;return retryOp(store,state,op,findings,ctx,'render-check-failed');
       }
       if(plain(rendered)&&rendered.ok)store.appendEvent({event:'render-checked',op:op.id,checks:(rendered.checks??[]).map(check=>`${check.id}=${check.outcome}`)});
     }
@@ -2350,7 +2426,8 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       store.appendEvent({event:'proof',op:op.id,verdict:proof.verdict,specs:plan.specs,reason:proof.reason??null});
       if(proof.verdict==='contradiction'){
         op.reports.at(-1).downgradedTo='failed';
-        return retryOp(store,state,op,[proofFinding(proof)],ctx,'proof-contradiction');
+        const findings=[proofFinding(proof)],late=deferLateFailure(findings);if(late)return late;
+        return retryOp(store,state,op,findings,ctx,'proof-contradiction');
       }
       if(proof.verdict==='weak'){const finding=proofFinding(proof);op.proofFindings=[...(op.proofFindings??[]),finding];state.needUser.push({op:op.id,kind:'proof',detail:finding});}
       }
@@ -2367,6 +2444,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
     }
     if(validation.verdict==='reject'){
       op.reports.at(-1).downgradedTo='failed';
+      const late=deferLateFailure(validation.findings);if(late)return late;
       op.validatorRejects=(op.validatorRejects??0)+1;
       if(op.validatorRejects>=VALIDATOR_REJECT_LIMIT){
         op.status='blocked';
@@ -2672,7 +2750,14 @@ export function quarantineCandidate(store,state,op,pending){
   store.saveState(state);
 }
 
-function acceptReports(orca,store,state,ctx){
+export function restoreDeferredReportOperation(op,before,error){
+  for(const key of Object.keys(op))delete op[key];Object.assign(op,before);
+  op.pending=error?.code==='STARCI_MODEL_QUOTA_WAIT'?{kind:'model-quota-wait',status:'waiting',reason:String(error.message).slice(0,240)}:
+    {kind:'durable-job',jobId:error?.job?.identity?.jobId,status:error?.job?.status};
+  return op;
+}
+
+export function acceptReports(orca,store,state,ctx){
   // The report file is the source of truth: a report whose Orca signal failed to send is still a report.
   const reports=store.readReports().filter(report=>report?.dispatch&&report?.outcome);
   const actions=[];
@@ -2680,6 +2765,10 @@ function acceptReports(orca,store,state,ctx){
     const report=reports.find(item=>item.dispatch===op.dispatch);
     if(!report)continue;
     const dispatch=op.dispatch,runtime=op.runtime,terminal=op.terminal;
+    const late=op.lateReportRecovery;
+    if(late){
+      if(!lateReportReplayMatches(state,op,report,{store})){quarantineCandidate(store,state,op,{kind:'answered-decision-late-report',reasons:['late report, question, owner receipt, or candidate identity changed before replay']});continue;}
+    }
     ctx.currentOp=op;
     if(ctx.engine&&report.outcome==='done'&&!op.workerSettled){
       const settled=settleDispatch(orca,dispatch,{cwd:state.worktree,reason:'freeze candidate before independent acceptance',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
@@ -2706,18 +2795,30 @@ function acceptReports(orca,store,state,ctx){
     }
     const before=ctx.engine?structuredClone(op):null;
     let action;
-    try{action=applyOpReport(orca,store,state,op,report,ctx);}
+    try{action=applyOpReport(orca,store,state,op,report,late?{...ctx,orca:null}:ctx);}
     catch(error){
       if(!ctx.engine||(!isJobPending(error)&&error?.code!=='STARCI_MODEL_QUOTA_WAIT'))throw error;
-      for(const key of Object.keys(op))delete op[key];Object.assign(op,before);
-      op.pending=error?.code==='STARCI_MODEL_QUOTA_WAIT'?{kind:'model-quota-wait',status:'waiting',reason:String(error.message).slice(0,240)}:{kind:'durable-job',jobId:error.job?.identity?.jobId,status:error.job?.status};
+      restoreDeferredReportOperation(op,before,error);
       store.saveState(state);continue;
+    }
+    if(late&&(action!=='owner-ask-settled'||op.status!=='done')){
+      for(const key of Object.keys(op))delete op[key];Object.assign(op,before);
+      quarantineCandidate(store,state,op,{kind:'answered-decision-late-report',reasons:[`ordinary acceptance did not accept the exact late decision report (${action})`]});
+      continue;
     }
     if(ctx.engine&&action==='acceptance-pending'){
       if(/quarantine|protected-proof|candidate-dependencies|required-acceptance/.test(op.pending?.kind??''))quarantineCandidate(store,state,op,op.pending);
       continue;
     }
     delete op.pending;
+    if(late){
+      const preserved=decisionQuestionDigest(op.question)===late.questionDigest&&op.ownerAnswer?.receiptId===late.ownerReceipt&&
+        op.ownerContinuationReceipt===late.ownerReceipt&&op.ownerRequestStatus==='answered';
+      if(!preserved){for(const key of Object.keys(op))delete op[key];Object.assign(op,before);quarantineCandidate(store,state,op,{kind:'answered-decision-late-report',reasons:['ordinary acceptance changed the prepared question or immutable owner receipt']});continue;}
+      delete op.lateReportRecovery;
+      store.appendEvent({event:'prepared-decision-late-report-accepted',op:op.id,dispatch,candidateDigest:late.candidateDigest,
+        reportSha256:late.reportSha256,ownerReceipt:late.ownerReceipt,proof:'ordinary report, machine, candidate, integration and acceptance gates passed; owner terminal retained'});
+    }
     actions.push({op:op.id,action});
     state.stalls=0;
     if(op.status!=='answering'){
@@ -4384,6 +4485,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const migration=migrateEngineState(store,state);
     const pin=options['runtime-pin']?readJson(path.resolve(options['runtime-pin']),null):state.engine?.runtimePin;
     const checked=verifyRuntimePin(pin);need(checked.ok,`A verified runtime pin is required: ${checked.reason??''}`);
+    const candidateRoot=options['candidate-root']?validateCandidateRoot(options['candidate-root']):state.engine?.candidateRoot??null;
     if(isEnrolled(state)&&store.readEvents().some(event=>event.event==='legacy-coordinator-no-effect-proved')){
       const runtimeRoot=path.dirname(state.engine.journalFile),runtimeProfile=workflowRuntimeProfile(state),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
         policyFile:path.join(skillRoot,'.dist','model','capabilities.json'),qualificationsFile:path.join(runtimeRoot,'model-qualifications.json'),probationsFile:path.join(runtimeRoot,'model-probations.json'),root:runtimeRoot});
@@ -4403,9 +4505,30 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       for(const key of ['lease','pending','workerSettled','retryReconciled'])delete op[key];
       if(op.status==='blocked'&&op.refusal==='runtime-reconciliation'){op.status='ready';delete op.refusal;}
     }
+    let lateReportRecovery=null;
+    for(const op of state.ops.filter(item=>item.lease&&item.status==='blocked'&&item.lateReportRecovery?.schema==='starci/answered-decision-late-report@1')){
+      const report=store.readReports().find(item=>item.dispatch===op.dispatch);
+      need(report&&lateReportReplayMatches(state,op,report,{store}),`Late decision report ${op.id} no longer matches its retained question, receipt, candidate, or report bytes`);
+      op.status='running';delete op.pending;delete op.refusal;
+      lateReportRecovery={op:op.id,dispatch:op.dispatch,report:store.reportPath(op.dispatch),observedFiles:[...(op.candidate?.observedFiles??[])]};
+      store.appendEvent({event:'prepared-decision-late-report-readmitted',op:op.id,dispatch:op.dispatch,jobId:op.lease.jobId,
+        proof:'public retry re-admitted the same immutable report and retained writer after a prior acceptance gate did not pass'});
+    }
     for(const op of state.ops.filter(item=>item.lease&&preparedOwnerDecision(item)&&item.status==='done'&&item.launch?.task&&stoppedRetryDispatchId(item)&&item.candidate?.identity)){
       const reconciled=reconcileStoppedNativeRetryLease(state,op,{orca,store,acceptedPreparedDecision:true});
       need(reconciled.ok,`Answered decision lease ${op.lease?.jobId??op.id} cannot be reconciled for retry: ${reconciled.reason}`);
+      if(reconciled.lateReportPending)lateReportRecovery={op:op.id,dispatch:op.dispatch,report:reconciled.report,observedFiles:reconciled.observedFiles};
+    }
+    if(lateReportRecovery){
+      const priorPin=state.engine.runtimePin;
+      state.engine.runtimePin=pin;state.launcher=checked.launcher;
+      store.appendEvent({event:'recovery-runtime-adopted',generation:state.engine.generation,op:lateReportRecovery.op,
+        fromDigest:priorPin?.digest??null,toDigest:pin.digest,jobId:state.ops.find(item=>item.id===lateReportRecovery.op)?.lease?.jobId??null,
+        proof:'the owner-selected verified retry pin is adopted without changing the retained job generation; only its exact late report is eligible'});
+      store.saveState(state);
+      const stopFile=path.join(store.dir,'stop.flag');fs.rmSync(stopFile,{force:true});store.acknowledgeRuntimeFile?.(stopFile,'stop.flag','delete');
+      return {schema:WORKFLOW_KERNEL,command,ok:true,id:state.id,recoveryPending:true,runtimePin:pin.digest,...lateReportRecovery,
+      next:'The supervisor resumes this same generation on the adopted sealed runtime. The exact late report replays through ordinary verification while its writer remains held; repeat workflow-retry only after that acceptance settles.'};
     }
     for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&!settledOperation(item)&&item.launch?.task&&stoppedRetryDispatchId(item)&&!item.dispatch&&!item.terminal&&item.candidate?.identity)){
       const reconciled=reconcileStoppedNativeRetryLease(state,op,{orca,store});
@@ -4464,7 +4587,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const rotated=priorGeneration>0?(store.rotateEvents?.(priorGeneration)??null):null;
     if(rotated?.rotated)store.appendEvent({event:'events-rotated',generation:priorGeneration,segment:path.basename(rotated.rotated)});
     const journalChosen=Boolean(options['journal-file'])||state.engine?.journalChosen===true;
-    const engine=enrollEngine(store,state,{runtimePin:pin,journalFile:targetJournal});state.launcher=checked.launcher;
+    const previousCandidateRoot=state.engine?.candidateRoot??null;
+    const engine=enrollEngine(store,state,{runtimePin:pin,journalFile:targetJournal,candidateRoot});state.launcher=checked.launcher;
     const retryJournal=openJournal({file:targetJournal});
     try{
       store.bindJournal(retryJournal,engine.generation,{state,goalIdentity:state.goalDigest??undefined});
@@ -4475,6 +4599,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       if(rotated?.rotated)store.acknowledgeRuntimeFile?.(rotated.rotated,path.basename(rotated.rotated),'rename');
       if(journalChosen)state.engine.journalChosen=true;
       if(relocation)store.appendEvent({event:'journal-relocated',from:relocation.from,to:relocation.to,retired:relocation.retired,copied:relocation.copied});
+      if(options['candidate-root'])store.appendEvent({event:'candidate-root-selected',from:previousCandidateRoot,to:state.engine.candidateRoot,
+        scope:'new candidate attempts only; existing candidate records retain their exact stored paths'});
       // The generations this retry retires give back the probation their unfinished attempts consumed.
       if(state.modelEligibility?.probationScopes){
         const runtimeRoot=path.dirname(state.engine.journalFile),runtimeProfile=workflowRuntimeProfile(state),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
@@ -4486,6 +4612,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       store.saveState(state);
       const stopFile=path.join(store.dir,'stop.flag');fs.rmSync(stopFile,{force:true});store.acknowledgeRuntimeFile?.(stopFile,'stop.flag','delete');
       return {schema:WORKFLOW_KERNEL,command,ok:true,id:state.id,engine:ENGINE_VERSION,generation:engine.generation,retried:retry,
+        candidateRoot:state.engine.candidateRoot??null,
         next:'The supervisor starts the approved workflow on its sealed runtime. This is a resumed workflow trial, not a clean end-to-end trial.'};
     }finally{store.unbindJournal?.(retryJournal);retryJournal.close();}
   }

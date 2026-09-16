@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateWriterResource,freezeDetectionCandidate,prepareCandidateDependencies,resolveCandidateReference,runtimeWriterHint} from '../kernel/candidate-bridge.mjs';
+import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateChecksNeedDependencies,candidateDependencyPlan,candidateWriterResource,freezeDetectionCandidate,prepareCandidateDependencies,resolveCandidateReference,runtimeWriterHint} from '../kernel/candidate-bridge.mjs';
 
 const git=(command,args,options)=>spawnSync(command,args,options);
 const run=(cwd,...args)=>{const result=git('git',args,{cwd,encoding:'utf8',windowsHide:true});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
@@ -152,10 +152,52 @@ test('candidate evidence environment identity rejects object-shaped runtime pins
   assert.throws(()=>beginDetectionCandidate({identity:f.bridge.identity,repoRoot:f.root,workerRoot:'unused',controlRoot:'unused',references:[],git,environmentDigest:{digest:'env'}}),/nonempty string/);
 });
 
-test('dependency artifact is installed outside candidate without symlinks or an external cache',t=>{const f=fixture(t);f.bridge.dependency.command='synthetic install';
-  const result=prepareCandidateDependencies(f.bridge,{exec:(command,options)=>{assert.equal(options.cwd.startsWith(f.bridge.snapshot.controlRoot),true);assert.deepEqual(Object.keys(options.env),['npm_config_cache']);assert.equal(options.env.npm_config_cache.startsWith(options.cwd),true);
+test('dependency artifact installs inside the private candidate with a private cache',t=>{const f=fixture(t);f.bridge.dependency.command='synthetic install';
+  const result=prepareCandidateDependencies(f.bridge,{exec:(command,options)=>{assert.equal(options.cwd,f.bridge.snapshot.workerRoot);assert.equal(options.env.npm_config_cache.startsWith(f.bridge.snapshot.controlRoot),true);
     fs.mkdirSync(path.join(options.cwd,'node_modules','tool'),{recursive:true});fs.writeFileSync(path.join(options.cwd,'node_modules','tool','index.js'),'ok');return {status:0,stdout:'installed'};}});
-  assert.equal(result.ready,true);assert.equal(result.root.startsWith(f.bridge.snapshot.workerRoot),false);assert.equal(result.checkEnv.NODE_PATH,path.join(result.root,'node_modules'));
+  assert.equal(result.ready,true);assert.equal(result.root.startsWith(f.bridge.snapshot.workerRoot),false);assert.equal(result.checkEnv.NODE_PATH,path.join(f.bridge.snapshot.workerRoot,'node_modules'));
+});
+
+test('dependency planning is gated by check consumers and honors declared package-manager provenance',t=>{
+  const root=cloneTemplate(t,initOnlyBase,'starci-bridge-plan-');fs.writeFileSync(path.join(root,'package.json'),'{"packageManager":"pnpm@10.0.0"}');fs.writeFileSync(path.join(root,'package-lock.json'),'{}');fs.writeFileSync(path.join(root,'pnpm-lock.yaml'),'lockfileVersion: 9\n');
+  assert.equal(candidateChecksNeedDependencies([{command:'node host/validate-yaml.mjs'}]),false);
+  for(const command of ['node node_modules/eslint/bin/eslint.js src/a.ts','node "node_modules/eslint/bin/eslint.js" src/a.ts',"node 'node_modules/eslint/bin/eslint.js' src/a.ts",'npm run typecheck --workspace app','tsc --noEmit','eslint src','jest --runInBand','vitest run','next build','nest build'])
+    assert.equal(candidateChecksNeedDependencies([{command}]),true,command);
+  assert.equal(candidateDependencyPlan(root,{required:false}).ready,true);
+  assert.deepEqual(candidateDependencyPlan(root,{required:true}),{manager:'pnpm',command:null,ready:false,reason:'unsupported declared package manager: pnpm'});
+  const absent=cloneTemplate(t,initOnlyBase,'starci-bridge-no-package-');assert.deepEqual(candidateDependencyPlan(absent,{required:true}),{manager:null,command:null,ready:false,reason:'package tools are required but package.json is missing'});
+});
+
+test('dependency preparation rejects a link that escapes the private candidate',t=>{const f=fixture(t);f.bridge.dependency.command='synthetic install';
+  const outside=fs.mkdtempSync(path.join(os.tmpdir(),'starci-external-dependency-'));t.after(()=>fs.rmSync(outside,{recursive:true,force:true}));
+  const result=prepareCandidateDependencies(f.bridge,{exec:(command,options)=>{fs.mkdirSync(path.join(options.cwd,'node_modules'),{recursive:true});fs.symlinkSync(outside,path.join(options.cwd,'node_modules','escape'),'junction');return {status:0,stdout:'installed'};}});
+  assert.equal(result.ready,false);assert.match(result.evidence,/external links: node_modules\/escape/);
+});
+
+test('dependency preparation rejects external root and workspace-local node_modules before following them',t=>{
+  for(const placement of ['node_modules','apps/app/node_modules']){const f=fixture(t);f.bridge.dependency.command='synthetic install';const outside=fs.mkdtempSync(path.join(os.tmpdir(),'starci-external-modules-'));t.after(()=>fs.rmSync(outside,{recursive:true,force:true}));
+    const result=prepareCandidateDependencies(f.bridge,{exec:(command,options)=>{const target=path.join(options.cwd,...placement.split('/'));fs.mkdirSync(path.dirname(target),{recursive:true});fs.symlinkSync(outside,target,'junction');return {status:0,stdout:'installed'};}});
+    assert.equal(result.ready,false,placement);assert.match(result.evidence,new RegExp(`external links: ${placement.replace('/','\\/')}`));
+  }
+});
+
+test('npm workspace dependencies materialize in the candidate for literal node_modules and workspace scripts',t=>{
+  const root=cloneTemplate(t,initOnlyBase,'starci-bridge-workspace-');fs.mkdirSync(path.join(root,'apps','app'),{recursive:true});fs.mkdirSync(path.join(root,'packages','tool'),{recursive:true});
+  fs.writeFileSync(path.join(root,'package.json'),JSON.stringify({private:true,workspaces:['apps/*','packages/*']}));
+  fs.writeFileSync(path.join(root,'apps','app','package.json'),JSON.stringify({name:'@demo/app',version:'1.0.0',scripts:{typecheck:'node ../../node_modules/tool/bin.js'},dependencies:{tool:'1.0.0'}}));
+  fs.writeFileSync(path.join(root,'packages','tool','package.json'),JSON.stringify({name:'tool',version:'1.0.0'}));fs.writeFileSync(path.join(root,'packages','tool','bin.js'),'console.log("workspace-ok")\n');
+  assert.equal(spawnSync('npm install --package-lock-only --ignore-scripts --no-audit --no-fund',{cwd:root,encoding:'utf8',windowsHide:true,shell:true}).status,0);
+  run(root,'add','-A');run(root,'commit','--quiet','-m','workspace');
+  const parent=path.dirname(root),bridge=beginDetectionCandidate({identity:{workflowId:'wf',opId:'workspace',attempt:1,generation:1,jobId:'workspace-job'},repoRoot:root,
+    workerRoot:path.join(parent,`${path.basename(root)}-candidate`),controlRoot:path.join(parent,`${path.basename(root)}-control`),allowlist:['apps/app/**'],git,environmentDigest:'env'});
+  t.after(()=>{fs.rmSync(bridge.snapshot.workerRoot,{recursive:true,force:true});fs.rmSync(bridge.snapshot.controlRoot,{recursive:true,force:true});});
+  assert.deepEqual(candidateDependencyPlan(bridge.snapshot.workerRoot),{manager:'npm',lockfile:'package-lock.json',command:'npm ci --ignore-scripts --no-audit --no-fund',lifecycleScripts:'disabled'});
+  const installed=prepareCandidateDependencies(bridge,{exec:(command,options)=>spawnSync(command,{...options})});assert.equal(installed.ready,true,installed.evidence);
+  const links=[];for(const entry of fs.readdirSync(path.join(bridge.snapshot.workerRoot,'node_modules'),{withFileTypes:true})){const target=path.join(bridge.snapshot.workerRoot,'node_modules',entry.name);if(fs.lstatSync(target).isSymbolicLink())links.push(fs.realpathSync(target));}
+  assert.ok(links.length>0,'npm workspaces should create candidate-local links');assert.ok(links.every(target=>path.relative(bridge.snapshot.workerRoot,target)&&!path.relative(bridge.snapshot.workerRoot,target).startsWith('..')),'workspace links stay inside the candidate');
+  const literal=spawnSync(process.execPath,['node_modules/tool/bin.js'],{cwd:bridge.snapshot.workerRoot,encoding:'utf8',env:{...process.env,...installed.checkEnv}});
+  const workspace=spawnSync('npm run typecheck --workspace @demo/app',{cwd:bridge.snapshot.workerRoot,encoding:'utf8',windowsHide:true,shell:true,env:{...process.env,...installed.checkEnv}});
+  assert.equal(literal.status,0,literal.stderr);assert.match(literal.stdout,/workspace-ok/);assert.equal(workspace.status,0,workspace.stderr);assert.match(workspace.stdout,/workspace-ok/);
 });
 
 test('kernel runtime bytes are copied into frozen worker and base views without changing protected oracles',t=>{const f=fixture(t),oracle=f.bridge.snapshot.oracle.digest;

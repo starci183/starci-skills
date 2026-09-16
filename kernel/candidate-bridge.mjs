@@ -125,6 +125,35 @@ const trackedFor=(git,root,scopes)=>{
 const DEFAULT_EXCLUDED=[/(^|\/)\.git(\/|$)/,/(^|\/)node_modules(\/|$)/,/(^|\/)(dist|build|coverage|\.cache)(\/|$)/,
   /(^|\/)\.env([^/]*)$/,/(^|\/)(secrets?|credentials?)(\.|\/|$)/,/\.(pem|p12|pfx|key|enc)$/i,/(^|\/)\.starciwork\/_(local|resources)(\/|$)/];
 const safeTracked=file=>!DEFAULT_EXCLUDED.some(pattern=>pattern.test(clean(file)));
+export function candidateDependencyPlan(root,{declared=null,required=true}={}){
+  if(typeof declared==='string'&&declared.trim())return {manager:'declared',command:declared.trim(),lifecycleScripts:'caller-declared'};
+  if(!required)return {manager:null,command:null,ready:true,reason:'declared checks require no package tools'};
+  const packageFile=path.join(root,'package.json'),npmLock=['npm-shrinkwrap.json','package-lock.json'].find(file=>fs.existsSync(path.join(root,file)));
+  if(!fs.existsSync(packageFile))return {manager:null,command:null,ready:false,reason:'package tools are required but package.json is missing'};
+  const manifest=readJson(packageFile)??{},declaredManager=String(manifest.packageManager??'').split('@')[0]||null;
+  if(declaredManager&&declaredManager!=='npm')return {manager:declaredManager,command:null,ready:false,reason:`unsupported declared package manager: ${declaredManager}`};
+  if(npmLock)return {manager:'npm',lockfile:npmLock,command:'npm ci --ignore-scripts --no-audit --no-fund',lifecycleScripts:'disabled'};
+  const unsupported=[['pnpm','pnpm-lock.yaml'],['yarn','yarn.lock'],['bun','bun.lock'],['bun','bun.lockb']].find(([,file])=>fs.existsSync(path.join(root,file)));
+  return {manager:unsupported?.[0]??declaredManager??'unknown',command:null,ready:false,
+    reason:unsupported?`unsupported candidate dependency lockfile: ${unsupported[1]}`:'package manifest has no deterministic lockfile'};
+}
+export const candidateChecksNeedDependencies=checks=>(checks??[]).some(check=>{
+  const command=String(check?.command??check??'').trim();
+  return /(?:^|[\s"'=])(?:\.?[\\/])?node_modules[\\/]|\b(?:npm|pnpm|yarn|bun)\s+(?:run|exec|test|build|lint|typecheck)\b|\bnpx\b|(?:^|[;&|]\s*)(?:[^\s"']*[\\/])?(?:tsc|eslint|jest|vitest|next|nest)(?:\.cmd)?(?:\s|$)/i.test(command);
+});
+function externalDependencyLinks(candidateRoot){
+  const base=path.resolve(candidateRoot),outside=[];
+  const within=(target,link)=>{let resolved;try{resolved=fs.realpathSync(target);}catch{outside.push(clean(path.relative(base,link)));return false;}
+    const relative=path.relative(base,resolved);if(relative.startsWith('..')||path.isAbsolute(relative)){outside.push(clean(path.relative(base,link)));return false;}return true;};
+  const inspectModules=modules=>{const stat=fs.lstatSync(modules);if(stat.isSymbolicLink()&&!within(modules,modules))return;
+    let entries=[];try{entries=fs.readdirSync(modules,{withFileTypes:true});}catch{return;}
+    for(const entry of entries){const target=path.join(modules,entry.name),item=fs.lstatSync(target);
+      if(item.isSymbolicLink())within(target,target);else if(item.isDirectory())inspectTree(target);}};
+  const inspectTree=at=>{let entries=[];try{entries=fs.readdirSync(at,{withFileTypes:true});}catch{return;}
+    for(const entry of entries){const target=path.join(at,entry.name);if(entry.name==='node_modules'){inspectModules(target);continue;}
+      const item=fs.lstatSync(target);if(item.isDirectory()&&!item.isSymbolicLink())inspectTree(target);}};
+  inspectTree(base);return [...new Set(outside)].sort();
+}
 const runtimeInternal=file=>/(^|\/)\.starciwork\/_local(\/|$)/.test(clean(file));
 // Local workflow state is intentionally absent from candidate/model payloads, but it is still inventoried here.
 // This walk includes Git-ignored files and hashes only their state; it never copies their bytes into a snapshot.
@@ -255,7 +284,7 @@ export function runtimeWriterHint({host='orca-native',repoRoot}={}){
 
 /** Capture accepted head, relevant input bytes and every pre-existing dirty path before a native worker starts. */
 function beginSingleDetectionCandidate({identity,repoRoot,workerRoot,controlRoot,allowlist=[],references=[],inputPaths=[],oraclePaths=[],git,
-  dependencyDigests={},environmentDigest='runtime-unpinned',ownedDirtyPaths=[],runtimeManagedFiles=[],dependencyInstall=null,nonGit=false,runtimePin=null,now=Date.now}={}){
+  dependencyDigests={},environmentDigest='runtime-unpinned',ownedDirtyPaths=[],runtimeManagedFiles=[],dependencyInstall=null,dependencyRequired=false,nonGit=false,runtimePin=null,now=Date.now}={}){
   if(runtimePin){const checked=verifyRuntimePin({...runtimePin,root:repoRoot});if(!checked.ok)throw new Error(`candidate runtime pin is invalid before snapshot: ${checked.reason}`);}
   const dirty=nonGit?[]:statusPaths(git,repoRoot).filter(file=>!runtimeInternal(file)),local=nonGit?[]:runtimeLocalPaths(repoRoot),allTracked=nonGit?[]:trackedFor(git,repoRoot,['.']);
   if(typeof environmentDigest!=='string'||!environmentDigest.trim())throw new TypeError('candidate environmentDigest must be a nonempty string');
@@ -284,6 +313,7 @@ function beginSingleDetectionCandidate({identity,repoRoot,workerRoot,controlRoot
   if(invalidOwned.length)throw new Error(`owned dirty baseline paths must be inside the bounded allowlist: ${invalidOwned.join(', ')}`);
   const managed=runtimeManagedFiles.filter(item=>item&&typeof item.path==='string'&&typeof item.start==='string'&&typeof item.end==='string')
     .map(item=>({path:clean(item.path),start:item.start,end:item.end}));
+  const dependencyPlan=nonGit?{manager:null,command:null,ready:true,reason:'non-Git runtime root'}:candidateDependencyPlan(workerRoot,{declared:dependencyInstall,required:dependencyRequired});
   const bridge={schema:DETECTION_BRIDGE,identity,snapshot,repoRoot:path.resolve(repoRoot),nonGit:Boolean(nonGit),runtimePin:runtimePin?{...runtimePin}:null,allowlist:[...allowlist],references:[...references],resolvedReferences,inputPaths:[...inputPaths],
     acceptedHead,sourceBaseline:states(repoRoot,sourcePaths),dirtyBaseline:states(repoRoot,dirty),dirtyBaselinePaths:dirty,
     localBaseline:states(repoRoot,local),runtimeWriters:nonGit?[]:runtimeWriters(repoRoot,identity.workflowId,git),
@@ -291,8 +321,8 @@ function beginSingleDetectionCandidate({identity,repoRoot,workerRoot,controlRoot
     // A scoped non-Git binding (the canonical workflow store) does not inventory its surrounding repository.
     // Retain the exact file states so its own continuation still enters managed-section collision checks.
     runtimeManagedFullBaseline:nonGit?states(repoRoot,managed.map(item=>item.path)):[],
-    ownedDirtyPaths:[...owned].sort(),droppedOwnedPaths,dependency:{mode:'isolated-artifact',command:dependencyInstall,
-      root:path.join(controlRoot,'dependencies'),externalCache:'forbidden',symlinkedDependencies:'forbidden',assurance:'detection-only',ready:dependencyInstall===null},
+    ownedDirtyPaths:[...owned].sort(),droppedOwnedPaths,dependency:{mode:'candidate-local-install',...dependencyPlan,
+      root:path.join(controlRoot,'dependencies'),candidateRoot:workerRoot,externalCache:'forbidden',externalSymlinks:'forbidden',assurance:'detection-only',ready:Boolean(dependencyPlan.ready)},
     writer:runtimeWriterHint({repoRoot}),beganAt:new Date(now()).toISOString()};
   fs.writeFileSync(path.join(controlRoot,'bridge.json'),`${JSON.stringify(bridge,null,2)}\n`,{flag:'wx'});
   return bridge;
@@ -319,7 +349,8 @@ export function beginDetectionCandidate(options={}){
       const bridge=beginSingleDetectionCandidate({...options,...binding,repoRoot:binding.repoRoot,
         workerRoot:path.join(options.workerRoot,'roots',binding.id),controlRoot:path.join(options.controlRoot,'roots',binding.id),
         allowlist:binding.allowlist??[],references:binding.references??[],inputPaths:binding.inputPaths??[],oraclePaths:binding.oraclePaths??[],
-        ownedDirtyPaths:binding.ownedDirtyPaths??[],runtimeManagedFiles:binding.runtimeManagedFiles??[],dependencyInstall:binding.id==='source'?options.dependencyInstall:null});
+        ownedDirtyPaths:binding.ownedDirtyPaths??[],runtimeManagedFiles:binding.runtimeManagedFiles??[],dependencyInstall:binding.id==='source'?options.dependencyInstall:null,
+        dependencyRequired:binding.id==='source'?Boolean(options.dependencyRequired):false});
       begun.push({binding,bridge});
     }
     const rootSnapshots=begun.map(({binding,bridge})=>rootSnapshotRecord(binding,bridge)),primary=begun.find(item=>item.binding.id==='source')??begun[0];
@@ -515,16 +546,14 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],requireRep
 /** Build an isolated dependency artifact. Checks keep candidate cwd and receive PATH/NODE_PATH explicitly. */
 export function prepareCandidateDependencies(bridge,{exec,command=bridge?.dependency?.command,timeoutMs=20*60*1000}={}){
   if(bridge?.schema===ROOT_DETECTION_BRIDGE){const source=bridge.roots.find(root=>root.id==='source')??bridge.roots[0];return prepareCandidateDependencies(source.bridge,{exec,command:source.bridge?.dependency?.command,timeoutMs});}
-  if(!command)return {...bridge.dependency,ready:true,reason:'no dependency installation declared'};
+  const candidateRoot=bridge.snapshot.workerRoot,plan=command?{...bridge.dependency,command}:candidateDependencyPlan(candidateRoot);
+  if(!plan.command)return {...bridge.dependency,...plan,ready:Boolean(plan.ready)};
   const dependencyRoot=bridge.dependency.root;fs.mkdirSync(dependencyRoot,{recursive:true});
-  for(const name of ['package.json','package-lock.json','npm-shrinkwrap.json']){
-    const source=path.join(bridge.snapshot.workerRoot,name),target=path.join(dependencyRoot,name);
-    if(fs.existsSync(source)){const stat=fs.lstatSync(source);if(stat.isSymbolicLink()||!stat.isFile())throw new Error(`dependency manifest is not a regular candidate file: ${name}`);fs.copyFileSync(source,target);}
-  }
-  const result=exec(command,{cwd:dependencyRoot,shell:true,encoding:'utf8',windowsHide:true,timeout:timeoutMs,timeoutMs,maxBuffer:64*1024*1024,
-    env:{npm_config_cache:path.join(dependencyRoot,'.cache')}});
-  const ready=Number.isInteger(result?.status)&&result.status===0;
-  return {...bridge.dependency,ready,exitCode:Number.isInteger(result?.status)?result.status:1,
-    evidence:String(`${result?.stdout??''}${result?.stderr??''}`).slice(-2000),candidateRoot:bridge.snapshot.workerRoot,
-    checkEnv:{NODE_PATH:path.join(dependencyRoot,'node_modules'),PATH:`${path.join(dependencyRoot,'node_modules','.bin')}${path.delimiter}${process.env.PATH??''}`}};
+  const result=exec(plan.command,{cwd:candidateRoot,shell:true,encoding:'utf8',windowsHide:true,timeout:timeoutMs,timeoutMs,maxBuffer:64*1024*1024,
+    env:{...process.env,npm_config_cache:path.join(dependencyRoot,'.cache')}});
+  const externalLinks=Number.isInteger(result?.status)&&result.status===0?externalDependencyLinks(candidateRoot):[];
+  const ready=Number.isInteger(result?.status)&&result.status===0&&!externalLinks.length;
+  return {...bridge.dependency,...plan,ready,exitCode:Number.isInteger(result?.status)?result.status:1,
+    evidence:externalLinks.length?`dependency install created external links: ${externalLinks.join(', ')}`:String(`${result?.stdout??''}${result?.stderr??''}`).slice(-2000),candidateRoot,
+    checkEnv:{NODE_PATH:path.join(candidateRoot,'node_modules'),PATH:`${path.join(candidateRoot,'node_modules','.bin')}${path.delimiter}${process.env.PATH??''}`}};
 }

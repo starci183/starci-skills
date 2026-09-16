@@ -29,6 +29,7 @@ workflow kernel (forwarded to the launcher; add --host <skill root> to reach a W
                        --startup-token <token> is supplied by the supervisor's exclusive startup reservation
   workflow-retry       --id <id> --runtime-pin <file>: retry a paused workflow with fresh agents on that sealed build
                        --journal-file <path>: use a local journal visible to the execution host
+                       --candidate-root <absolute-local-dir>: store only new attempt candidates below this directory
   workflow-status      print what one workflow is doing now, from its own files
   workflow-list        one line per workflow of this repository
   workflow-stop        checkpoint/pause at the next tick and export backend-owned workflows/<id>.md

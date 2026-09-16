@@ -9,7 +9,7 @@ import {EventEmitter} from 'node:events';
 import {preparedEntry,inputAsk} from './helpers/input-fixture.mjs';
 import {encodePng,screen} from './helpers/png.mjs';
 import {brandColours} from '../checks/render.mjs';
-import {refreshCredentialPreparation,deferForIntegrationPreparation,normalizePreparationAuthority,reconcileStoppedNativeRetryLease,persistLaunchAttempts} from '../kernel/kernel.mjs';
+import {refreshCredentialPreparation,deferForIntegrationPreparation,normalizePreparationAuthority,reconcileStoppedNativeRetryLease,stageAnsweredDecisionLateReport,lateReportReplayMatches,restoreDeferredReportOperation,persistLaunchAttempts} from '../kernel/kernel.mjs';
 import {reserveStartup} from '../kernel/startup-lock.mjs';
 import {reconcileWorkflowInputs} from '../kernel/inputs.mjs';
 import {credentialFields} from '../kernel/inputs-model.mjs';
@@ -18,6 +18,7 @@ import {resolveExecutionChain} from '../kernel/chains.mjs';
 import {ORCA_HOST,createOrcaCalls} from '../hosts/orca/calls.mjs';
 import {HEADLESS_HOST,createHeadlessHost} from '../hosts/headless/host.mjs';
 import {reportOutcome} from '../hosts/orca/protocol.mjs';
+import {keepsAskTab} from '../kernel/terminals.mjs';
 import {buildReport} from '../kernel/reports.mjs';
 import {spawn,spawnSync} from 'node:child_process';
 import {validateGoalPlan,validateOp} from '../models/functions.mjs';
@@ -5343,6 +5344,39 @@ test('public retry settles an answered decision rerun only from exact stopped cu
     'an accepted prepared question waits for its owner without relaunching or retaining a new writer');
   const missingReceipt={...op,lease:{...lease},ownerContinuationReceipt:'different'};
   assert.match(reconcileStoppedNativeRetryLease(state,missingReceipt,{acceptedPreparedDecision:true,store:{},orca:{},createRuntime(){throw Error('must not');}}).reason,/still active/);
+});
+
+test('late answered-decision recovery binds exact report, question, candidate digest and current bytes',()=>{
+  const dir=tmp(),repo=path.join(dir,'repo'),reports=path.join(dir,'reports');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(reports);
+  try{
+    const relative='decision.yaml',current=path.join(repo,relative);fs.writeFileSync(current,'choice: open\n');
+    const digest=sha256(fs.readFileSync(current)),dispatch='ctx-late',task='task-late',receipt='receipt-owner',reportFile=path.join(reports,`${dispatch}.json`);
+    const report={schema:'starci/op-report@1',kind:'op',outcome:'done',run:'run-late',task,dispatch,from:'term-owner',summary:'decision: demo recommended: 2',files:[relative],checks:[],open:[],question:null,
+      signal:{type:'worker_done',orcaOutcome:'succeeded'},sent:{messageId:'msg-late',sentAt:2,type:'worker_done'}};
+    fs.writeFileSync(reportFile,`${JSON.stringify(report,null,2)}\n`);
+    const identity={workflowId:'wf',opId:'ask',attempt:3,generation:7,jobId:'job-late'},packet={...identity,candidateDigest:'candidate-late',roots:[{id:'source',repoRoot:repo,
+      observedFiles:[{rootId:'source',path:relative,displayPath:relative}],changes:[{path:relative,afterSha256:digest}]}]},
+      base={id:'ask',kind:'decision.prepare',attempt:3,status:'done',terminal:'term-owner',candidateDigest:'candidate-late',candidate:{status:'sealed',candidateDigest:'candidate-late',identity},
+        question:{kind:'decision',text:'Choose?',options:[{id:'1',label:'One'},{id:'2',label:'Two'}],prepared:true},ownerRequestStatus:'answered',ownerAnswer:{receiptId:receipt},ownerContinuationReceipt:receipt};
+    const store={reportPath:id=>path.join(reports,`${id}.json`)},runtime={candidatePacket:()=>packet},state={id:'wf',run:'run-late'};
+    const op=structuredClone(base),staged=stageAnsweredDecisionLateReport(state,op,{store,runtime,dispatchId:dispatch,taskId:task});
+    op.dispatch=dispatch;op.launch={task};
+    assert.equal(staged.ok,true);assert.equal(op.status,'running');assert.equal(op.lateReportRecovery.ownerReceipt,receipt);assert.equal(op.retainedOwnerTerminal.handle,'term-owner');
+    assert.equal(lateReportReplayMatches(state,op,report,{store}),true);
+    op.lease={jobId:'job-late',leaseToken:'held-writer'};const before=structuredClone(op),pending=Object.assign(Error('validator pending'),{code:'STARCI_JOB_PENDING',job:{identity:{jobId:'check-late'},status:'running'}});
+    op.status='done';delete op.lease;delete op.lateReportRecovery;
+    restoreDeferredReportOperation(op,before,pending);
+    assert.equal(op.lease.leaseToken,'held-writer');assert.equal(op.lateReportRecovery.reportSha256,before.lateReportRecovery.reportSha256);
+    assert.deepEqual(op.pending,{kind:'durable-job',jobId:'check-late',status:'running'});assert.equal(lateReportReplayMatches(state,op,report,{store}),true,'persisted completion can replay after the durable check settles');
+    op.status='done';assert.equal(keepsAskTab(state,op),true,'the exact USER_OWNED retained terminal survives answered-decision sweeps');op.status='running';
+    op.question.options[1].label='Changed';assert.equal(lateReportReplayMatches(state,op,report,{store}),false,'changed question refuses replay before acceptance effects');
+    const badCandidate=structuredClone(base);
+    assert.equal(stageAnsweredDecisionLateReport(state,badCandidate,{store,runtime:{candidatePacket:()=>({...packet,candidateDigest:'different'})},dispatchId:dispatch,taskId:task}).ok,false,'candidate digest mismatch refuses recovery');
+    fs.writeFileSync(reportFile,`${JSON.stringify({...report,task:'other-task'},null,2)}\n`);
+    assert.equal(stageAnsweredDecisionLateReport(state,structuredClone(base),{store,runtime,dispatchId:dispatch,taskId:task}).ok,false,'report identity mismatch refuses recovery');
+    fs.writeFileSync(reportFile,`${JSON.stringify(report,null,2)}\n`);fs.writeFileSync(current,'choice: externally changed\n');
+    assert.equal(stageAnsweredDecisionLateReport(state,structuredClone(base),{store,runtime,dispatchId:dispatch,taskId:task}).ok,false,'canonical digest mismatch refuses recovery');
+  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
 test('a stray is quarantined when git names the file and the validator names the reserved directory above it',()=>{

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createJobBridge,inputDigest} from '../kernel/job-bridge.mjs';
 import {createJobs} from '../kernel/jobs.mjs';
-import {createEngineRuntime,settleGenerationLeases,settleNeverStartedModelJobs,unsettledGenerationJobs,prepareGenerationRetry} from '../kernel/engine.mjs';
+import {candidateBaseFor,createEngineRuntime,settleGenerationLeases,settleNeverStartedModelJobs,unsettledGenerationJobs,prepareGenerationRetry,validateCandidateRoot} from '../kernel/engine.mjs';
 import {attestModelResult} from '../kernel/job-attestation.mjs';
 import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
 import {validateOp} from '../models/functions.mjs';
@@ -14,6 +14,18 @@ import {createAllocator,loadRuntimes,withProviderPreference} from '../kernel/sch
 import {persistPrelaunchReservation,retryOwnedBaseline,retryableOperation} from '../kernel/kernel.mjs';
 
 const fixture=t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-engine-adapter-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const state={id:'wf',worktree:dir,head:'a'.repeat(40),createdAt:1,engine:{schema:'starci/engine@1',generation:2,journalFile:path.join(dir,'journal.sqlite')},ops:[]};const store={dir:path.join(dir,'workflow'),appendEvent(){},saveState(){}},modelBudget={schema:'starci/runtime-budget@1',at:Date.now(),providers:{codex:{status:'ok',windows:{weekly:{usedPercent:10,resetsAt:null}}},claude:{status:'ok',windows:{weekly:{usedPercent:20,resetsAt:null}}},qwen:{status:'ok',windows:{weekly:{usedPercent:30,resetsAt:null}}}}};return {dir,state,store,modelBudget};};
+
+test('candidate storage defaults beside the journal and a validated configured root scopes each workflow',t=>{
+  const f=fixture(t),configured=path.join(f.dir,'candidate-volume');
+  assert.equal(candidateBaseFor(f.state),path.join(f.dir,'candidates',f.state.id));
+  assert.equal(validateCandidateRoot(configured),fs.realpathSync(configured));
+  f.state.engine.candidateRoot=configured;
+  assert.equal(candidateBaseFor(f.state),path.join(configured,f.state.id));
+  const explicit=path.join(f.dir,'explicit-operation-base');
+  assert.equal(candidateBaseFor(f.state,explicit),explicit,'an existing explicit candidate base remains exact');
+  assert.throws(()=>validateCandidateRoot('relative/candidates'),/absolute local directory/);
+  assert.throws(()=>validateCandidateRoot('\\\\server\\share\\candidates'),/absolute local directory/);
+});
 
 test('durable validator excludes cooling choices before selecting its single provider and replays across skip changes',t=>{
   const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});

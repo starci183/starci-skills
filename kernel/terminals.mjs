@@ -85,6 +85,8 @@ export function closeOpTerminal(orca,store,state,op){
  * every other op's tab is closed, is how the owner looked at six tabs and found no question in any of them.
  */
 export function keepsAskTab(state,op){
+  if(op?.retainedOwnerTerminal?.schema==='starci/retained-owner-terminal@1'&&op.retainedOwnerTerminal.ownership==='user_owned'&&
+    op.retainedOwnerTerminal.handle===op.terminal&&op.retainedOwnerTerminal.dispatch===op.dispatch)return true;
   if(op?.kind!=='decision.prepare'||op.status!=='done'||op.answer||state?.finished)return false;
   const last=[...(op.reports??[])].reverse().find(report=>report?.outcome==='done')??null;
   return /^\s*decision:/.test(String(last?.summary??''));

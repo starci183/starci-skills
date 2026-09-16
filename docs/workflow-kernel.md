@@ -1285,6 +1285,12 @@ journal remains the capacity authority: a model, judge or operation job reserves
 atomically, and a crashed or `effect_unknown` job keeps that lease until its effects are settled. A cooldown
 outlives the kernel that found it: the limit belongs to the provider.
 
+Candidate working copies use the engine journal's sibling `candidates/<workflow-id>` directory by default.
+At a stopped retry boundary, `workflow-retry --candidate-root <absolute-local-directory>` validates and persists
+another local writable root; only new candidate attempts use `<candidate-root>/<workflow-id>`. Existing candidate
+records keep their exact stored paths. This option never relocates the shared journal, capacity records, prior
+candidates or product source, and it does not change `LOCALAPPDATA`.
+
 What it changes in allocation, with `createAllocator({shared:{path, workflow}})`:
 
 - another kernel's live operations on a runtime count as **load**, so `maxParallel` is the runtime's cap across

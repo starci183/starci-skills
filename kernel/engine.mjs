@@ -181,11 +181,25 @@ function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadR
 }
 
 /** Opt in only at a settled workflow boundary. Canonical Work and approved goal references stay intact. */
-export function enrollEngine(store,state,{journalFile=journalFileFor(),runtimePin=null,now=Date.now}={}){
+export function validateCandidateRoot(value){
+  const supplied=String(value??'').trim();
+  if(!supplied)return null;
+  if(!path.isAbsolute(supplied)||/^[/\\]{2}/.test(supplied))throw Error('Candidate root must be an absolute local directory');
+  const resolved=path.resolve(supplied);
+  fs.mkdirSync(resolved,{recursive:true});
+  const stat=fs.statSync(resolved);if(!stat.isDirectory())throw Error(`Candidate root is not a directory: ${resolved}`);
+  fs.accessSync(resolved,fs.constants.W_OK);
+  return fs.realpathSync(resolved);
+}
+
+export const candidateBaseFor=(state,explicit=null)=>explicit??path.join(state?.engine?.candidateRoot??path.join(path.dirname(state.engine.journalFile),'candidates'),state.id);
+
+export function enrollEngine(store,state,{journalFile=journalFileFor(),runtimePin=null,candidateRoot=null,now=Date.now}={}){
   if(state.ops.some(op=>op.dispatch&&['running','answering'].includes(op.status)))throw Error('Settle live operation dispatches before enrolling a workflow in the durable engine');
   const previous=state.engine;
   state.engine={schema:ENGINE_SCHEMA,version:ENGINE_VERSION,generation:(previous?.generation??0)+1,journalFile:path.resolve(journalFile),
-    assurance:'detection-only',coordination:'agent-v1',runtimePin:runtimePin??previous?.runtimePin??null,enrolledAt:now()};
+    assurance:'detection-only',coordination:'agent-v1',runtimePin:runtimePin??previous?.runtimePin??null,
+    ...(candidateRoot??previous?.candidateRoot?{candidateRoot:path.resolve(candidateRoot??previous.candidateRoot)}:{}),enrolledAt:now()};
   state.finished=null;state.phase='run';
   store.appendEvent({event:'engine-enrolled',schema:ENGINE_SCHEMA,generation:state.engine.generation,version:ENGINE_VERSION,
     assurance:state.engine.assurance,coordination:state.engine.coordination,note:'Existing accepted Work remains accepted; only unfinished operations receive the new execution policy.'});
@@ -233,7 +247,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
   };
   const writer=candidateWriterResource(state.worktree);admission.setCapacity(writer.key,1);
   const declareMachineResources=value=>resourceLocks(value).map(machineResource).map(resource=>{admission.setCapacity(resource.key,1);return resource;});
-  candidateBase??=path.join(path.dirname(state.engine.journalFile),'candidates',state.id);
+  candidateBase=candidateBaseFor(state,candidateBase);
   const identity=op=>opIdentity(state,op);
   const unwrap=result=>{if(result?.pending)deferJob(result);if(result?.status!=='succeeded')throw Error(result?.result?.reason??`Durable job ${result?.status}`);return result.result;};
   const requestModel=(name,args,op=null)=>{args=Array.isArray(args?.providers)?args:{...args,providers:nonOperationModels(configuredModelRole(name))};const bound=identity(op),base=modelInput(args),selectionKey=inputDigest({name,args:base,...bound});state.engine.modelSelections??={};let saved=state.engine.modelSelections[selectionKey],selected;
@@ -411,7 +425,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       return completed.ok?{ok:true,effectState:'none',observedFiles:observed,candidateDigest:op.candidateDigest??null}:{ok:false,effectState:'unknown',reason:completed.reason??'durable native job could not be completed'};
     },
     beginCandidate(op,{repoRoot=state.worktree,allowlist=op.allowlist??[],references=op.references??[],inputPaths=[],oraclePaths=[],ownedDirtyPaths=[],
-      dependencyDigests={},environmentDigest=null,runtimeManagedFiles=[],dependencyInstall=null,roots=null,bindingDigest=null}={}){
+      dependencyDigests={},environmentDigest=null,runtimeManagedFiles=[],dependencyInstall=null,dependencyRequired=false,roots=null,bindingDigest=null}={}){
       if(!git)throw Error('the candidate lifecycle requires the kernel Git adapter');
       const lease=op.lease;if(!lease)throw Error(`reserve ${op.id} before beginning its candidate`);
       if(op.candidate?.identity?.jobId===lease.jobId){const existing=this.candidateBridge(op),expected=bindingDigest??(roots?candidateRootBindingDigest(roots):null);
@@ -420,7 +434,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       delete op.candidate;delete op.candidateDigest;delete op.oracleDigest;
       const root=path.join(candidateBase,lease.jobId),bridgeRecord=beginDetectionCandidate({identity:{workflowId:lease.workflowId,opId:lease.opId,
         attempt:lease.attempt,generation:lease.generation,jobId:lease.jobId},repoRoot,workerRoot:path.join(root,'worker'),controlRoot:path.join(root,'control'),
-        allowlist,references,inputPaths,oraclePaths,ownedDirtyPaths,dependencyDigests,environmentDigest,runtimeManagedFiles,dependencyInstall,
+        allowlist,references,inputPaths,oraclePaths,ownedDirtyPaths,dependencyDigests,environmentDigest,runtimeManagedFiles,dependencyInstall,dependencyRequired,
         ...(roots?{roots,bindingDigest:bindingDigest??candidateRootBindingDigest(roots)}:{}),git,now});
       op.candidate=candidateRecord(bridgeRecord);return bridgeRecord;
     },
