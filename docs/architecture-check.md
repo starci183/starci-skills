@@ -45,6 +45,8 @@ Resolved backend feature/module roots use the adopted domain-first source shape 
 
 The [Nest contract check](nest-contract-check.md) separately resolves callable owner/use-case signatures and readonly injected dependency or CQRS message fields. It follows inherited generic `execute` contracts and constructor assignments to declared fields without treating transport DTOs as immutable messages. Owner gaps, dynamic framework identity, unsupported field storage or unresolved signatures make only the affected contract coverage unavailable; declaration shape never claims runtime validation, DI lifetime or serialized compatibility.
 
+The [Next data lifecycle check](next-data-lifecycle-check.md) binds declared SWR query and mutation calls to the canonical TypeScript program and installed SWR major version. It checks explicit null gates, result identities and mutation resource identities for static keys while leaving domain identity completeness and cache behavior to target tests and review.
+
 ## Research basis and counterexamples
 
 Reviewed 2026-09-16:
