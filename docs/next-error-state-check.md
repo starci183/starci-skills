@@ -4,8 +4,9 @@
 
 ## Rules
 
-- `FE_ERROR_ENVELOPE_POLICY` binds an explicitly selected transport envelope type and its readers. The envelope exposes a boolean success discriminator, data and failure fields. Each reader handles transport failure before returning data. `emptyData: valid` may return `data ?? null`; `emptyData: required` proves an explicit missing-data throw. A normal business disposition such as `pending` or `refused` remains data.
-- `FE_WRITE_FEEDBACK_OWNER` binds a resolved write action, feedback owner and every selected site. Every call of that action in the covered source roots belongs to a declared site and flows through the resolved feedback owner. A local same-named function does not satisfy the rule. Passing or storing an action through an unsupported dynamic shape makes coverage unavailable.
+- `FE_ERROR_WORLD_STATE_MAPPING` binds a resolved world/data source call to one connected owner, a closed failure-state contract and the actual render symbol/state prop that consumes it. Every reachable render of that symbol must carry the proven failure mapping; mutable state provenance and statically unreachable source/render paths fail unavailable. The render function may be local in the same file; no Base twin or extra file is required. Calls outside the declared owner and dynamic source aliases fail closed. `FE_WORLD_OWNER_RENDER_BOUNDARY` remains the separate architecture proof that selected world ownership does not leak into presentation.
+- `FE_ERROR_ENVELOPE_POLICY` binds an explicitly selected transport envelope type and its readers. The envelope exposes a boolean success discriminator, data and failure fields. Each reader handles transport failure before returning data, and mutable aliases cannot supply data provenance. `emptyData: valid` may return `data ?? null`; `emptyData: required` proves an explicit missing-data throw. A normal business disposition such as `pending` or `refused` remains data.
+- `FE_WRITE_FEEDBACK_OWNER` binds a resolved write action, feedback owner and every selected site. Every reachable call of that action in the covered source roots belongs to a declared site and flows through the resolved feedback owner using the selected `promise` or `callback` binding. A promise is passed before it is awaited, so rejection remains visible to the owner. A callback owner must reachably invoke its operation parameter. A local same-named function does not satisfy the rule. Passing or storing an action through an unsupported dynamic shape makes coverage unavailable.
 - `FE_NEXT_ERROR_BOUNDARY_LOCATION` checks only explicitly declared global or segment boundaries. It verifies the reserved Next filename, `use client`, typed `error` and recovery props, a reachable recovery action and the global HTML shell. The permitted recovery prop is read from the installed Next error-boundary declarations, so the checker does not assume `reset` when the installed contract uses `unstable_retry`.
 
 These rules do not require GraphQL, Apollo, SWR, a toast, or a boundary in every route folder. The application contract selects the mechanisms that actually apply. Retry eligibility, user copy, redaction, telemetry and whether a write warrants feedback remain design review obligations.
@@ -16,7 +17,19 @@ The target `package.json` owns `starci.codePatterns.next.errorState`:
 
 ```json
 {
+  "schema": "starci/next-error-state@1",
   "sourceRoots": ["src"],
+  "worldMappings": [
+    {
+      "id": "course",
+      "owner": { "path": "src/features/course-owner.tsx", "export": "CourseOwner" },
+      "source": { "path": "src/api/use-course.ts", "export": "useCourseWorld" },
+      "failurePath": "query.error",
+      "state": { "path": "src/ui/course-view.tsx", "export": "CourseState" },
+      "failureState": "failed",
+      "render": { "path": "src/ui/course-view.tsx", "symbol": "CourseView", "stateProp": "state" }
+    }
+  ],
   "transports": [
     { "root": "src/api", "mode": "envelope", "envelopeIds": ["read"] }
   ],
@@ -36,6 +49,7 @@ The target `package.json` owns `starci.codePatterns.next.errorState`:
     {
       "action": { "path": "src/api/write.ts", "export": "saveCourse" },
       "feedback": { "path": "src/ui/feedback.ts", "export": "withFeedback" },
+      "binding": "promise",
       "sites": [{ "path": "src/features/save.ts", "export": "saveFromForm" }]
     }
   ],
@@ -73,4 +87,4 @@ Primary references reviewed 2026-09-16:
 
 ## Static limits
 
-The check proves declared symbols, direct/awaited calls, simple result bindings, envelope branches and boundary structure. Higher-order action registries, reflective invocation, computed envelope fields or unsupported control-flow indirection produce typed unavailable errors. It cannot judge retry safety, message quality, security redaction, telemetry usefulness or business-state meaning.
+The check proves declared symbols, reachable direct call paths, immutable promise/callback and state/data provenance, source-to-state mapping on every selected render, envelope branches and boundary structure. Statically dead proof sites, higher-order registries, reflective invocation, computed envelope fields or unsupported control-flow indirection produce typed unavailable errors. It cannot judge retry safety, message quality, security redaction, telemetry usefulness or business-state meaning.
