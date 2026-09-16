@@ -113,6 +113,7 @@ targets:
   claude-fable-5.1:
     runtime: claude
     requestedModel: null
+    headlessModel: claude-fable-5-1
     profiles:
       reasoning: fable-5.1
     orcaLaunch:
