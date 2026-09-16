@@ -358,10 +358,25 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       const lease=op?.lease;if(!lease)return {ok:false,reason:'operation has no durable native lease'};
       const effectState=settlement?.effectState??'unknown';
       if(settlement?.schema!=='starci/orca-supervised-settlement@1'||settlement.dispatchId!==dispatch||effectState!=='none')return {ok:false,effectState,reason:'typed host settlement did not prove this exact native process stopped'};
-      const job=journal.getJob(lease.jobId),events=journal.events({workflowId:lease.workflowId});
+      let job=journal.getJob(lease.jobId),events=journal.events({workflowId:lease.workflowId});
+      const attempts=Array.isArray(op?.launch?.attempts)?op.launch.attempts:[],candidate=op?.candidate?.identity,
+        intent=events.find(event=>event.entity_id===lease.jobId&&event.generation===lease.generation&&event.kind==='operation-launch-intent'
+          &&event.payload?.opId===lease.opId&&event.payload?.attempt===lease.attempt),
+        recoverable=job?.kind==='operation'&&job.workflow_id===lease.workflowId&&job.op_id===lease.opId&&job.attempt===lease.attempt&&job.generation===lease.generation
+          &&job.status==='leased'&&job.lease_token===lease.leaseToken&&!job.worker_id&&op?.launch?.ok===false&&typeof op.launch.task==='string'&&op.launch.task
+          &&attempts.length===1&&attempts[0]?.dispatchId===dispatch&&attempts[0]?.effectState==='unknown'&&intent
+          &&candidate?.workflowId===lease.workflowId&&candidate?.opId===lease.opId&&candidate?.attempt===lease.attempt
+          &&candidate?.generation===lease.generation&&candidate?.jobId===lease.jobId;
+      if(recoverable){
+        const eventId=`${lease.jobId}:launch-reconciled:${dispatch}`;
+        journal.transaction(db=>{const changed=db.prepare("UPDATE jobs SET worker_id=?,updated_at=? WHERE job_id=? AND lease_token=? AND status='leased' AND worker_id IS NULL").run(dispatch,now(),lease.jobId,lease.leaseToken).changes;
+          if(changed===1)db.prepare('INSERT OR IGNORE INTO events(event_id,workflow_id,entity_type,entity_id,generation,kind,payload_json,created_at) VALUES(?,?,?,?,?,?,?,?)')
+            .run(eventId,lease.workflowId,'job',lease.jobId,lease.generation,'operation-launch-reconciled',JSON.stringify({opId:lease.opId,attempt:lease.attempt,task:op.launch.task,dispatch,proof:'single persisted unknown-effect launch attempt plus exact typed host settlement'}),now());});
+        job=journal.getJob(lease.jobId);events=journal.events({workflowId:lease.workflowId});
+      }
       const exact=job&&job.kind==='operation'&&job.workflow_id===lease.workflowId&&job.op_id===lease.opId&&job.attempt===lease.attempt
         &&job.generation===lease.generation&&job.lease_token===lease.leaseToken&&job.worker_id===dispatch;
-      const launched=events.some(event=>event.entity_id===lease.jobId&&event.generation===lease.generation&&event.kind==='operation-launched'
+      const launched=events.some(event=>event.entity_id===lease.jobId&&event.generation===lease.generation&&['operation-launched','operation-launch-reconciled'].includes(event.kind)
         &&event.payload?.dispatch===dispatch);
       if(!exact||!launched||typeof dispatch!=='string'||!dispatch)return {ok:false,effectState:'unknown',reason:'host settlement is not bound to this exact durable Dispatch attempt'};
       op.workerSettled=true;

@@ -208,6 +208,32 @@ test('a stopped exact native Dispatch freezes and preserves unreported effects b
   const job=runtime.journal.listJobs().find(item=>item.op_id==='native');assert.equal(job.status,'failed');assert.equal(runtime.journal.db.prepare('SELECT count(*) AS n FROM leases WHERE job_id=?').get(job.job_id).n,0);assert.equal(runtime.journal.events({workflowId:'wf'}).some(event=>event.kind==='operation-stopped-effects-preserved'&&event.payload.dispatch==='ctx-native'),true);bridge.close();
 });
 
+test('a single unknown-effect failed launch binds its exact settled Dispatch before preserving candidate effects',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),
+    op={id:'failed-native',kind:'frontend.implement',attempt:2,status:'blocked',allowlist:['a.js']};f.state.ops=[op];
+  const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})}),reserved=runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});
+  assert.equal(reserved.ok,true);runtime.beginLaunchIntent(op);
+  op.launch={ok:false,task:'task-failed',dispatch:null,effectState:'unknown',attempts:[{dispatchId:'ctx-failed',effectState:'unknown',stage:'dispatch_input'}]};
+  op.candidate={identity:{workflowId:f.state.id,opId:op.id,attempt:op.attempt,generation:f.state.engine.generation,jobId:op.lease.jobId}};
+  runtime.freezeCandidate=()=>{op.candidateDigest='recovered-candidate';return {status:'sealed',observedFiles:['a.js']};};
+  const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-failed',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-failed',effectState:'none'},reason:'retry proved exit'});
+  assert.equal(result.ok,true);assert.deepEqual(result.observedFiles,['a.js']);assert.equal(runtime.journal.getJob(reserved.jobId).worker_id,'ctx-failed');
+  const event=runtime.journal.events({workflowId:f.state.id}).find(item=>item.kind==='operation-launch-reconciled');
+  assert.deepEqual([event?.payload?.task,event?.payload?.dispatch],['task-failed','ctx-failed']);bridge.close();
+});
+
+test('failed-launch reconciliation rejects ambiguous attempts and mismatched candidate identity',t=>{
+  for(const variant of ['ambiguous','candidate-mismatch']){
+    const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),
+      op={id:`failed-${variant}`,kind:'frontend.implement',attempt:2,status:'blocked',allowlist:['a.js']};f.state.ops=[op];
+    const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})}),reserved=runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);
+    op.launch={ok:false,task:'task-failed',dispatch:null,effectState:'unknown',attempts:[{dispatchId:'ctx-failed',effectState:'unknown'},...(variant==='ambiguous'?[{dispatchId:'ctx-other',effectState:'unknown'}]:[])]};
+    op.candidate={identity:{workflowId:f.state.id,opId:op.id,attempt:variant==='candidate-mismatch'?1:op.attempt,generation:f.state.engine.generation,jobId:op.lease.jobId}};
+    const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-failed',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-failed',effectState:'none'}});
+    assert.equal(result.ok,false);assert.match(result.reason,/not bound/);assert.equal(runtime.journal.getJob(reserved.jobId).worker_id,null);bridge.close();
+  }
+});
+
 test('a stopped native attempt with unsealable scope drift retains its writer and cannot launder paths into retry baseline',t=>{
   const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'drift',kind:'backend.implement',attempt:1,status:'running',allowlist:['src/**'],dispatch:'ctx-drift'};f.state.ops=[op];
   const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-drift',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
