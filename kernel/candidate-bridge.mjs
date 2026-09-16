@@ -122,8 +122,10 @@ const trackedFor=(git,root,scopes)=>{
   if(!scopes.length)return [];
   return execGit(git,root,['ls-files','-z','--',...scopes]).split('\0').map(clean).filter(Boolean);
 };
+// `.starciwork/_local/inputs/` is the one permitted `_local` subtree: goal staging copies owner-named external
+// files there, digest-bound, precisely so the candidate provenance rule can read them (see stageExternalInputs).
 const DEFAULT_EXCLUDED=[/(^|\/)\.git(\/|$)/,/(^|\/)node_modules(\/|$)/,/(^|\/)(dist|build|coverage|\.cache)(\/|$)/,
-  /(^|\/)\.env([^/]*)$/,/(^|\/)(secrets?|credentials?)(\.|\/|$)/,/\.(pem|p12|pfx|key|enc)$/i,/(^|\/)\.starciwork\/_(local|resources)(\/|$)/];
+  /(^|\/)\.env([^/]*)$/,/(^|\/)(secrets?|credentials?)(\.|\/|$)/,/\.(pem|p12|pfx|key|enc)$/i,/(^|\/)\.starciwork\/_local\/(?!inputs(?:\/|$))/,/(^|\/)\.starciwork\/_resources(\/|$)/];
 const safeTracked=file=>!DEFAULT_EXCLUDED.some(pattern=>pattern.test(clean(file)));
 export function candidateDependencyPlan(root,{declared=null,required=true}={}){
   if(typeof declared==='string'&&declared.trim())return {manager:'declared',command:declared.trim(),lifecycleScripts:'caller-declared'};

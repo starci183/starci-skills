@@ -219,3 +219,18 @@ test('runtime acknowledgement rebaselines an allowlisted path but protects an ac
   const refused=freezeDetectionCandidate(protectedFixture.bridge,{git,reportedFiles:[protectedPath],requireReported:true});
   assert.equal(refused.status,'quarantine');assert.ok(refused.reasons.includes(`kernel-owned-write-drift:${protectedPath}`),JSON.stringify(refused.reasons));
 });
+
+test('goal-staged _local inputs are readable references while live workflow state stays excluded',t=>{
+  const root=cloneTemplate(t,appBase,'starci-inputs-'),parent=path.dirname(root);
+  const input=path.join(root,'.starciwork','_local','inputs','wf','1-handoff.md');fs.mkdirSync(path.dirname(input),{recursive:true});fs.writeFileSync(input,'owner staged bytes\n');
+  const live=path.join(root,'.starciwork','_local','workflows','wf','state.json');fs.mkdirSync(path.dirname(live),{recursive:true});fs.writeFileSync(live,'{}\n');
+  const identity={workflowId:'wf',opId:'op',attempt:1,generation:1,jobId:'job-in'};
+  const bridge=beginDetectionCandidate({identity,repoRoot:root,workerRoot:path.join(parent,'in-candidate'),controlRoot:path.join(parent,'in-control'),
+    allowlist:['src/**'],references:['.starciwork/_local/inputs/wf/1-handoff.md'],git,environmentDigest:'env'});
+  t.after(()=>{fs.rmSync(bridge.snapshot.workerRoot,{recursive:true,force:true});fs.rmSync(bridge.snapshot.controlRoot,{recursive:true,force:true});});
+  assert.ok(bridge.snapshot.source.entries.some(item=>item.path==='.starciwork/_local/inputs/wf/1-handoff.md'),'the frozen owner input is attested in the snapshot');
+  assert.throws(()=>beginDetectionCandidate({identity:{...identity,jobId:'job-live'},repoRoot:root,
+    workerRoot:path.join(parent,'live-candidate'),controlRoot:path.join(parent,'live-control'),
+    allowlist:['src/**'],references:['.starciwork/_local/workflows/wf/state.json'],git,environmentDigest:'env'}),
+    /not a readable, permitted source file/,'live kernel state is never a candidate input');
+});
