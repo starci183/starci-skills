@@ -10,10 +10,11 @@ import { defaultScriptChecker } from '../scripts/check-scoped-lint.mjs';
 const require = createRequire(import.meta.url);
 const typescriptRoot = path.dirname(require.resolve('typescript/package.json'));
 const installedNestRoot = path.dirname(require.resolve('@nestjs/common/package.json'));
+const installedNestCoreRoot = path.dirname(require.resolve('@nestjs/core/package.json'));
 const errorSource = `export class AppError extends Error {
   readonly code = 'APP_ERROR';
   readonly httpStatus?: number;
-  constructor(readonly metadata: { originalError?: Error } = {}) { super('failed'); }
+  constructor(readonly metadata: { originalError?: unknown; normalizedError?: Error } = {}) { super('failed'); }
 }`;
 const filterSource = `import { ArgumentsHost, Catch as Handles, ExceptionFilter as Filter } from '@nestjs/common';
 import type { Response } from 'express';
@@ -30,9 +31,14 @@ export class AppErrorFilter implements Filter {
 const causeSource = `import { AppError } from './app-error';
 export function load(): void {
   try { JSON.parse('x'); } catch (error) {
-    throw new AppError({ originalError: error instanceof Error ? error : new Error(String(error)) });
+    throw new AppError({ originalError: error });
   }
 }`;
+const moduleSource = `import { Module as NestModule } from '@nestjs/common';
+import { APP_FILTER as GLOBAL_FILTER } from '@nestjs/core';
+import { AppErrorFilter } from './app-error.filter';
+@NestModule({ providers: [{ provide: GLOBAL_FILTER, useClass: AppErrorFilter }] })
+export class AppModule {}`;
 const graphqlSource = `import { GraphQLModule as Gql } from '@nestjs/graphql';
 import { AppError } from './app-error';
 const httpStatusPlugin = {
@@ -73,15 +79,21 @@ function fixture(t, { contractValue = contract(), error = errorSource, filter = 
   write('package.json', { private: true, starci: { codePatterns: { nest: { transportErrors: contractValue } } } });
   write('architecture.json', { schema: 'starci/architecture-config@1', kinds: ['backend'], tsconfig: 'tsconfig.json' });
   write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', experimentalDecorators: true }, include: ['src/**/*.ts'] });
-  write('src/app-error.ts', error); write('src/app-error.filter.ts', filter); write('src/load.ts', cause);
+  write('src/app-error.ts', error); write('src/app-error.filter.ts', filter); write('src/app.module.ts', moduleSource); write('src/load.ts', cause);
   if (!realNest) {
     write('node_modules/@nestjs/common/package.json', { name: '@nestjs/common', types: 'index.d.ts' });
     write('node_modules/@nestjs/common/index.d.ts', `export declare function Catch(...types: Function[]): ClassDecorator;
+export declare function Controller(path?: string): ClassDecorator;
+export declare function Module(metadata: { providers?: readonly unknown[] }): ClassDecorator;
+export declare function UseFilters(...filters: readonly unknown[]): ClassDecorator & MethodDecorator;
 export interface ExceptionFilter { catch(exception: unknown, host: ArgumentsHost): void }
 export interface ArgumentsHost { getType<T extends string>(): T; switchToHttp(): { getResponse<T>(): T } }`);
+    write('node_modules/@nestjs/core/package.json', { name: '@nestjs/core', types: 'index.d.ts' });
+    write('node_modules/@nestjs/core/index.d.ts', 'export declare const APP_FILTER: unique symbol;');
   } else {
     fs.mkdirSync(path.join(root, 'node_modules/@nestjs'), { recursive: true });
     fs.symlinkSync(installedNestRoot, path.join(root, 'node_modules/@nestjs/common'), 'junction');
+    fs.symlinkSync(installedNestCoreRoot, path.join(root, 'node_modules/@nestjs/core'), 'junction');
     for (const dependency of ['rxjs']) fs.symlinkSync(path.dirname(require.resolve(`${dependency}/package.json`)), path.join(root, `node_modules/${dependency}`), 'junction');
   }
   write('node_modules/express/package.json', { name: 'express', types: 'index.d.ts' });
@@ -94,7 +106,7 @@ export interface ArgumentsHost { getType<T extends string>(): T; switchToHttp():
   return { root, write, files, input: { root, files, contextFiles: files, ruleIds: NEST_ERROR_RULES, architectureConfig: 'architecture.json' } };
 }
 
-test('renamed Nest imports, foreign cause normalization and HTTP field flow are checked', t => {
+test('renamed Nest imports, raw foreign cause identity, registration and HTTP field flow are checked', t => {
   const f = fixture(t), result = checkNestErrors(f.input);
   assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
   assert.deepEqual(result.checkedRuleIds, [...NEST_ERROR_RULES].sort());
@@ -108,6 +120,7 @@ test('real installed Nest declarations preserve the framework identity checks', 
 test('a TypeScript path alias cannot impersonate the installed Nest framework', t => {
   const f = fixture(t, { extra: { 'src/fake-nest.ts': `
 export function Catch(..._types: Function[]): ClassDecorator { return () => {}; }
+export function Module(_metadata: unknown): ClassDecorator { return () => {}; }
 export interface ExceptionFilter { catch(exception: unknown, host: ArgumentsHost): void }
 export interface ArgumentsHost { getType<T extends string>(): T; switchToHttp(): { getResponse<T>(): T } }
 ` } });
@@ -118,6 +131,62 @@ export interface ArgumentsHost { getType<T extends string>(): T; switchToHttp():
   assert.deepEqual(result.checkedRuleIds, []);
 });
 
+test('static APP_FILTER useExisting and resolved UseFilters registrations select the declared mapper', t => {
+  const useExisting = fixture(t, { extra: { 'src/app.module.ts': moduleSource.replace(
+    '{ provide: GLOBAL_FILTER, useClass: AppErrorFilter }', 'AppErrorFilter, { provide: GLOBAL_FILTER, useExisting: AppErrorFilter }') } });
+  let result = checkNestErrors(useExisting.input);
+  assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
+
+  const useFilters = fixture(t, { extra: {
+    'src/app.module.ts': 'export const noGlobalModule = true;',
+    'src/controller.ts': `import { Controller, UseFilters as SelectFilters } from '@nestjs/common';
+import { AppErrorFilter } from './app-error.filter';
+@Controller('items') export class ItemsController { @SelectFilters(AppErrorFilter) route(): void {} }`,
+  } });
+  result = checkNestErrors(useFilters.input);
+  assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
+});
+
+test('unregistered, spoofed and incomplete APP_FILTER declarations cannot prove installation', t => {
+  const missing = fixture(t, { extra: { 'src/app.module.ts': 'export const noRegistration = true;' } });
+  let result = checkNestErrors(missing.input);
+  assert.ok(result.violations.some(item => item.message.includes('resolved static APP_FILTER')));
+
+  const spoofed = fixture(t, { extra: { 'src/app.module.ts': `import { Module } from '@nestjs/common';
+import { AppErrorFilter } from './app-error.filter';
+const APP_FILTER = 'APP_FILTER';
+@Module({ providers: [{ provide: APP_FILTER, useClass: AppErrorFilter }] }) export class AppModule {}` } });
+  result = checkNestErrors(spoofed.input);
+  assert.ok(result.violations.some(item => item.message.includes('resolved static APP_FILTER')));
+
+  const orphanExisting = fixture(t, { extra: { 'src/app.module.ts': moduleSource.replace(
+    '{ provide: GLOBAL_FILTER, useClass: AppErrorFilter }', '{ provide: GLOBAL_FILTER, useExisting: AppErrorFilter }') } });
+  result = checkNestErrors(orphanExisting.input);
+  assert.ok(result.violations.some(item => item.message.includes('resolved static APP_FILTER')));
+
+  const unusedUseFilters = fixture(t, { extra: { 'src/app.module.ts': `import { UseFilters } from '@nestjs/common';
+import { AppErrorFilter } from './app-error.filter';
+@UseFilters(AppErrorFilter) export class NotAController {}` } });
+  result = checkNestErrors(unusedUseFilters.input);
+  assert.ok(result.violations.some(item => item.message.includes('resolved static APP_FILTER')));
+});
+
+test('bootstrap and dynamic provider registration remain unavailable', t => {
+  const dynamic = fixture(t, { extra: { 'src/app.module.ts': `import { Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
+import { AppErrorFilter } from './app-error.filter';
+const providers = [{ provide: APP_FILTER, useClass: AppErrorFilter }];
+@Module({ providers }) export class AppModule {}` } });
+  let result = checkNestErrors(dynamic.input);
+  assert.ok(result.errors.some(item => item.message.includes('bootstrap or dynamic')));
+
+  const bootstrap = fixture(t, { extra: { 'src/app.module.ts': `import { AppErrorFilter } from './app-error.filter';
+declare const app: { useGlobalFilters(...filters: unknown[]): void };
+app.useGlobalFilters(new AppErrorFilter());` } });
+  result = checkNestErrors(bootstrap.input);
+  assert.ok(result.errors.some(item => item.message.includes('bootstrap or dynamic')));
+});
+
 test('public aggregate script routing invokes the isolated Nest error adapter', async t => {
   const f = fixture(t), result = await defaultScriptChecker('nest', f.input);
   assert.equal(result.schema, 'starci/code-pattern-script@1');
@@ -126,17 +195,20 @@ test('public aggregate script routing invokes the isolated Nest error adapter', 
 });
 
 test('replacement throws preserve the caught input through the declared cause property', t => {
-  const f = fixture(t, { cause: causeSource.replace('error instanceof Error ? error : new Error(String(error))', 'undefined') });
+  const f = fixture(t, { cause: causeSource.replace('originalError: error', 'originalError: undefined') });
   let result = checkNestErrors(f.input);
   assert.ok(result.violations.some(item => item.ruleId === 'NEST_FOREIGN_ERROR_CAUSE' && item.message.includes('cause property')));
-  f.write('src/load.ts', causeSource.replace('error instanceof Error ? error : new Error(String(error))', 'normalize(error)').replace("export function load", "const normalize = (value: unknown): Error => new Error(String(value));\nexport function load"));
+  f.write('src/load.ts', causeSource.replace('originalError: error', 'originalError: normalize(error)').replace("export function load", "const normalize = (value: unknown): Error => new Error(String(value));\nexport function load"));
   result = checkNestErrors(f.input);
-  assert.ok(result.errors.some(item => item.ruleId === 'NEST_FOREIGN_ERROR_CAUSE' && item.message.includes('dynamic')));
-  f.write('src/load.ts', causeSource.replace('throw new AppError({ originalError: error instanceof Error ? error : new Error(String(error)) });',
-    'const metadata = { originalError: error instanceof Error ? error : new Error(String(error)) }; throw new AppError(metadata);'));
+  assert.ok(result.violations.some(item => item.ruleId === 'NEST_FOREIGN_ERROR_CAUSE' && item.message.includes('cause property')));
+  f.write('src/load.ts', causeSource.replace('throw new AppError({ originalError: error });',
+    'const metadata = { originalError: error, normalizedError: new Error(String(error)) }; throw new AppError(metadata);'));
   result = checkNestErrors(f.input);
   assert.ok(!result.errors.some(item => item.ruleId === 'NEST_FOREIGN_ERROR_CAUSE'));
   assert.ok(!result.violations.some(item => item.ruleId === 'NEST_FOREIGN_ERROR_CAUSE'));
+  f.write('src/load.ts', causeSource.replace('originalError: error', 'originalError: error instanceof Error ? error : new Error(String(error))'));
+  result = checkNestErrors(f.input);
+  assert.ok(result.violations.some(item => item.ruleId === 'NEST_FOREIGN_ERROR_CAUSE' && item.message.includes('cause property')));
 });
 
 test('same-error rethrows and recovery catches do not manufacture wrapper obligations', t => {
@@ -190,7 +262,7 @@ test('later object writes cannot overwrite a mapped HTTP field or preserved caus
   const responseSpread = fixture(t, { filter: filterSource.replace('message: exception.message });', 'message: exception.message, ...{ code: "WRONG" } });') });
   const responseResult = checkNestErrors(responseSpread.input);
   assert.ok(responseResult.errors.length || responseResult.violations.some(item => item.message.includes('derived status')));
-  const causeSpread = fixture(t, { cause: causeSource.replace('new Error(String(error)) });', 'new Error(String(error)), ...{ originalError: undefined } });') });
+  const causeSpread = fixture(t, { cause: causeSource.replace('originalError: error });', 'originalError: error, ...{ originalError: undefined } });') });
   const result = checkNestErrors(causeSpread.input);
   assert.ok(result.errors.some(item => item.message.includes('dynamic')) || result.violations.some(item => item.message.includes('cause')));
 });

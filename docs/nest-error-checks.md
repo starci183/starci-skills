@@ -60,27 +60,53 @@ existing transport mapper.
 - `NEST_FOREIGN_ERROR_CAUSE` examines catch-owned escaping `throw` statements.
   Rethrowing the same caught identity is valid. Replacing it with a declared
   error family must carry the caught input through a declared cause property.
-  Direct values, immutable aliases and the common
-  `error instanceof Error ? error : new Error(String(error))` normalization are
-  supported. Calls, mutable/ambiguous flow and nested-function replacement
-  throws are unavailable rather than assumed safe. Recovery catches with no
-  escaping throw are outside this syntax rule.
+  Direct values and immutable aliases are supported. A diagnostic
+  `new Error(String(error))` may be stored separately, but it cannot replace
+  the raw caught value in the declared cause property. Calls,
+  mutable/ambiguous flow and nested-function replacement throws are unavailable
+  rather than assumed safe. Recovery catches with no escaping throw are outside
+  this syntax rule.
 - `NEST_TRANSPORT_ERROR_MAPPER` checks real TypeScript/framework identities and
   value flow. A Nest HTTP filter resolves `@Catch`, `ExceptionFilter` and
   `ArgumentsHost`, derives one status with an explicit fallback, writes that
   status to the real HTTP response, maps the configured code/message, and
-  rethrows the same error for declared passthrough hosts. An Apollo mapper binds
-  its selected-error and unknown-error branches and connects extension status
-  to transport status.
+  rethrows the same error for declared passthrough hosts. The selected filter
+  must also have a resolved static registration: Nest `APP_FILTER` with the
+  exact `useClass`, `APP_FILTER` with an exact `useExisting` provider in the
+  same module, or `@UseFilters` with the exact mapper class or instance on a
+  resolved Nest controller/class method. Module spreads, computed provider
+  records and bootstrap `useGlobalFilters` remain unavailable because static
+  inspection cannot prove their effective value.
+  An Apollo mapper binds its selected-error and unknown-error branches and
+  connects extension status to transport status.
 
 ## Limits
 
-Static structure does not prove that a mapper is registered in a running app,
-that public messages and metadata are safely redacted, that retry semantics are
-correct, or that a request receives the expected wire status. It does not
-decide whether a caught failure should be recovered instead of thrown. Run the
-selected unit/integration transport tests and review those semantic decisions.
+Static structure proves only the declared registration form and selected source
+identity. It does not prove module reachability at boot, provider lifetime,
+public-message redaction, retry semantics or the wire result of a request. It
+does not decide whether a caught failure should be recovered instead of thrown.
+Run the selected boot/unit/integration transport tests and review those semantic
+decisions.
 
 The Academy `AbstractException`, HTTP filter, GraphQL response envelope and
 Apollo status plugin are reference forms from one application. Their names,
 GraphQL envelope and domain-owned `httpStatus` are not universal Nest rules.
+
+## Error-family identity follow-up
+
+The transport declaration does not select a universal exception hierarchy. A
+separate target declaration must choose either capability-owned error families
+or the legacy Academy hierarchy before source identity can receive machine
+credit. The intended closed declaration is
+`package.json#starci.codePatterns.nest.errorIdentity` with schema
+`starci/nest-error-identity@1`, a profile of `capability` or
+`academy-abstract-exception`, explicit source roots, and exact exported family
+identities. Each family declares its source path/export, code property,
+constructor metadata argument and cause properties; the Academy profile also
+declares one exact exported base identity. A future identity adapter must use
+resolved TypeScript symbols to verify declared family inheritance, stable code,
+the metadata object constructor/super flow and every escaping thrown identity in
+the selected roots. Dynamic factories are unavailable. Same-identity rethrows
+remain valid, and typed business dispositions are return values outside this
+throw-identity rule. This transport adapter does not claim that follow-up proof.

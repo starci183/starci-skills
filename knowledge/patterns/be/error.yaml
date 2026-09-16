@@ -61,8 +61,8 @@ rules:
         write: "toJSON(): string → { message, code, metadata }; static fromJSON<T extends AbstractException>(…)"
       - id: case-3
         when: Cause
-        write: "getOriginalError(): Error { return this.metadata?.originalError as Error }; export interface
-          AbstractExceptionMetadata { originalError?: Error }"
+        write: "getOriginalError(): unknown { return this.metadata?.originalError }; export interface
+          AbstractExceptionMetadata { originalError?: unknown; normalizedError?: Error }"
       - id: case-4
         when: Status
         write: httpStatus is optional; undefined means 500 at both transports
@@ -107,7 +107,9 @@ rules:
     kind: mandatory
     requirement: Throw the named AbstractException for a failed operation. Do not hide failures in an ad hoc
       success:false envelope. Explicitly specified typed business dispositions remain normal domain results.
-      Never new Error in src/** outside test lanes.
+      Anonymous Error must not escape as the selected application failure. Constructing an Error internally for
+      a retained diagnostic or normalization is allowed when the selected named failure still carries the raw
+      cause identity.
     rationale: ""
     cases:
       - id: case-1
@@ -123,8 +125,10 @@ rules:
           refused by policy) remains a normal domain result. The installed no-handler-encoded-failure rule is
           a warning and is not authority to change SRS outcomes.
       - id: case-4
-        when: Never new Error
-        write: NewExpression[callee.name="Error"] is banned in src/** outside the test lanes
+        when: Named escaping failure
+        write: >-
+          Do not throw a bare new Error as the selected application failure. A wrapper may keep
+          normalizedError: new Error(String(error)) only in addition to originalError: error.
     verification:
       automated: []
       manual:
@@ -139,21 +143,22 @@ rules:
       When an ownership boundary replaces a caught failure, pass the caught input through the selected
       error family's declared cause field. Rethrowing the same caught failure is valid; recovery does not
       require manufacturing a wrapper. The Academy exception profile uses originalError in metadata on
-      AbstractException. Other selected families may use cause. Do not discard non-Error thrown values
-      during normalization. Tests verify that the constructed error actually retains the cause.
+      AbstractException. Other selected families may use cause. Preserve the exact caught value, including
+      non-Error values. A normalized diagnostic may be additional metadata; it never replaces the raw cause.
+      Tests verify that the constructed error actually retains the cause.
     rationale: 25 non-exception files wrap this way at extraction.
     cases:
       - id: case-1
         when: Crypto
-        write: "catch (error) { throw new DecryptionFailedException({ originalError: error instanceof Error ? error :
-          new Error(String(error)) }) }"
+        write: "catch (error) { throw new DecryptionFailedException({ originalError: error, normalizedError:
+          error instanceof Error ? error : new Error(String(error)) }) }"
       - id: case-2
         when: Cursor parsing
-        write: "catch (error) { throw new CourseCommunityCursorException({ originalError: error as Error }) }"
+        write: "catch (error) { throw new CourseCommunityCursorException({ originalError: error }) }"
       - id: case-3
         when: At-least-once consumer
-        write: "catch (error) { const exception = new KafkaCdcMessageException({ topic, originalError: error
-          instanceof Error ? error : undefined }); … log and continue }"
+        write: "catch (error) { const exception = new KafkaCdcMessageException({ topic, originalError: error }); …
+          log and continue }"
       - id: case-4
         when: Upstream GraphQL
         write: GraphQLDataNotFoundException({ query, variables, url, originalError })
@@ -172,8 +177,11 @@ rules:
       An exposed HTTP boundary maps the selected error family through its actual Nest ExceptionFilter.catch
       entry. The response status and statusCode agree; code and message come from the selected public mapping.
       The transport may own a code-to-status map with an explicit unknown-code fallback. A domain error need
-      not own an HTTP status. Hosts delegated to another transport rethrow the same error. Verify filter
-      registration, safe public messages and structured logging in the running transport tests.
+      not own an HTTP status. Hosts delegated to another transport rethrow the same error. The exact mapper
+      is registered through a resolved
+      static APP_FILTER useClass/useExisting provider or @UseFilters boundary; dynamic bootstrap registration
+      requires separate boot evidence and is unavailable to the static rule. Verify running registration,
+      safe public messages and structured logging in transport tests.
     rationale: ""
     cases:
       - id: case-1
