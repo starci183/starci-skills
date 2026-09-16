@@ -28,6 +28,7 @@ checks/architecture/typescript.mjs
 checks/architecture/backend.mjs
 checks/architecture/frontend.mjs
 checks/architecture/owners.mjs
+checks/architecture/registration.mjs
 checks/stacks.mjs
 checks/render.mjs
 execution/contracts.mjs

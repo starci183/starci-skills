@@ -37,6 +37,8 @@ Review and meaningful boot/render tests still decide:
 
 Nest modules export their public provider API. A consumer should import the owning module rather than directly re-registering its providers. Truly app-wide stateless/shared infrastructure can be registered once at the composition root. Named database clients, differently configured providers, tenant/workspace instances, and request-scoped providers are not blanket global candidates.
 
+When a backend explicitly selects `exported-class-token` registration checking, the checker discovers every resolved Nest `@Module`, `@CommandHandler`, and `@QueryHandler` in the checked production TypeScript program. A class-token provider that a module both provides and exports has one static owner; another module listing that same class token must import the owner instead. A provider object with a different named token remains a distinct registration. Selected CQRS decorators must have exactly one direct module registration. Dynamic/spread provider metadata, an unresolved framework binding, or a discovered handler decorator omitted from the selected set makes registration coverage unavailable rather than passing an incomplete inventory. This static relation does not prove runtime scope, dynamic-module options, or a bootable DI container.
+
 ## Research basis and counterexamples
 
 Reviewed 2026-09-16:
@@ -65,7 +67,11 @@ Repositories with equivalent responsibilities at different paths may add a small
   "backend": {
     "modules": "server/modules",
     "features": "server/features",
-    "apps": ["server/apps"]
+    "apps": ["server/apps"],
+    "moduleRegistration": {
+      "providerIdentity": "exported-class-token",
+      "handlerDecorators": ["CommandHandler", "QueryHandler"]
+    }
   },
   "frontend": {
     "routes": "web/app",
