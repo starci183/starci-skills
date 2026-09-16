@@ -923,10 +923,12 @@ function resolveProjectAuthority(repository, contractProjects, architectureProje
         if (observed !== architectureProjects.configDigest) throw Error('architecture config digest does not match its exact bytes');
         if (context && !context.has(architectureProjects.configPath)) throw Error('architecture config is absent from exact contextFiles');
         const parsed = JSON.parse(bytes.toString('utf8'));
-        if (parsed?.schema !== 'starci/architecture-config@1' || !Array.isArray(parsed.projects)) {
-          throw Error('architecture config does not expose starci/architecture-config@1 projects');
+        if (parsed?.schema !== 'starci/architecture-config@1'
+          || (parsed.projects !== undefined && parsed.tsconfig !== undefined)) {
+          throw Error('architecture config does not expose one starci/architecture-config@1 project selection');
         }
-        declaredProjects = [...parsed.projects].sort();
+        const authoredProjects = parsed.projects ?? parsed.tsconfig;
+        declaredProjects = (Array.isArray(authoredProjects) ? authoredProjects : [authoredProjects]).sort();
       } catch (error) { errors.push({ path: architectureProjects.configPath, message: `Invalid architecture project authority: ${error.message}` }); }
       bound = normalizedProjectList(repository, architectureProjects.projects, 'architectureProjects', errors);
       if (declaredProjects && !sameStrings(bound, declaredProjects)) {

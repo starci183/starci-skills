@@ -730,7 +730,7 @@ profiles:
         semantic:
           guidance: knowledge/patterns/fe/typing.yaml
           review: Declare the symbol role before this checker can distinguish required public return types from useful inference.
-        status: missing
+        status: implemented
       - id: NEXT-CLOSED-VOCABULARY-SHAPE
         sourceRuleIds: [FE-TYPING-3, FE-TYPING-7]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx'] }
@@ -740,7 +740,7 @@ profiles:
         semantic:
           guidance: knowledge/patterns/fe/typing.yaml
           review: Distinguish binary flags from mutually exclusive states and map transport enums at the owner.
-        status: missing
+        status: implemented
       - id: NEXT-SOURCE-NAME-SHAPE
         sourceRuleIds: [FE-NAMING-4, FE-NAMING-5, FE-NAMING-7]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx'] }
@@ -760,7 +760,7 @@ profiles:
         semantic:
           guidance: knowledge/patterns/fe/naming.yaml
           review: Confirm the named value actually owns a public contract role.
-        status: missing
+        status: implemented
       - id: NEXT-SPEC-SUBJECT-AND-DESCRIBE
         sourceRuleIds: [FE-TEST-4]
         applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts'] }

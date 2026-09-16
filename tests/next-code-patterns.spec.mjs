@@ -166,6 +166,19 @@ test('project authority assigns every selected source to its canonical TypeScrip
   assert.ok(rebound.errors.some(item => /list disagrees with the bound architecture config/.test(item.message)), JSON.stringify(rebound, null, 2));
 });
 
+test('project authority mirrors the canonical singular tsconfig architecture form', t => {
+  const context = fixture(t, {
+    'src/Card.tsx': 'export type CardProps = { readonly label: string }\n',
+  });
+  const bytes = Buffer.from(JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['frontend'], tsconfig: 'tsconfig.json' }));
+  fs.writeFileSync(path.join(context.root, 'architecture.json'), bytes);
+  const result = checkNextPatterns({ ...context, architectureProjects: { ...context.architectureProjects,
+    configDigest: crypto.createHash('sha256').update(bytes).digest('hex'), projects: ['tsconfig.json'] },
+  ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.deepEqual(result.errors, [], JSON.stringify(result, null, 2));
+  assert.equal(result.compiler.projectAuthority.source, 'architecture');
+});
+
 test('package project fallback is explicit and cannot disagree with canonical architecture authority', t => {
   const packageContract = { schema: 'starci/next-code-pattern-contract@1', owners: [], closedVocabularies: [], projects: ['tsconfig.json'] };
   const context = fixture(t, {
