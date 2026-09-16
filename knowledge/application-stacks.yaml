@@ -29,6 +29,10 @@ guidance:
       external dependencies from accepted architecture. Include only applicable components.
       Give every component an environment-specific managed service, explicit external binding
       or justified exclusion. Bind multi-repo build contexts/revisions without adjacent-clone assumptions.
+      When development supports both application containers and native host application processes,
+      declare each as a complete, mutually exclusive profile over the same component inventory.
+      A profile choice never changes which frontend, API, worker, bootstrap or dependency components
+      belong to the selected application.
   - id: STACK-OWNERSHIP
     requirement: |
       Ownership, network location and failure domain are distinct. Outside Kubernetes does
@@ -44,6 +48,13 @@ guidance:
       init/migration jobs, application readiness and a dependency-backed smoke journey.
       Generate declared local service secrets once, encrypt and reuse them. Provider-issued
       credentials are researched owner inputs only for enabled features requiring them.
+      A separately declared native-app profile may run application packages through exact package
+      scripts while the same Compose-owned dependencies remain managed. Bind each package to a
+      repository role, immutable revision, package root, private generated env file, host ports and
+      readiness. Bind container applications to the same source revision plus exact context,
+      Dockerfile and package inputs. Native connections use loopback and published dependency ports;
+      container connections use service DNS and container ports. Profiles must be mutually exclusive,
+      may reuse the same intended host ports only across profiles, and must not print env contents.
   - id: STACK-SECRETS
     requirement: |
       Keep encrypted artifacts and public recipient metadata versioned. Store the decryption
@@ -86,6 +97,9 @@ guidance:
       migrations, await app readiness, run the selected journey, then record the active release.
       Distinguish restart, image rollback and data rollback; preserve old release/config and
       volume ownership. Never reverse irreversible migrations or erase unrelated data to recover.
+      Bind the chosen dev profile and source/config/image identities before effects. Refuse source
+      drift, missing build inputs, same-profile port collisions or an already-running conflicting
+      profile. App mode switches retain the exact named dependency volumes and encrypted custody.
   - id: STACK-RECOVERY
     requirement: |
       Cover all stateful owners, consistent capture, independent artifact/key custody, restore

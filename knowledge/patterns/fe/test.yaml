@@ -29,12 +29,13 @@ rules:
     title: Placement
     kind: mandatory
     requirement: |
-      Specs sit beside their subject. Pure halves use component.spec.tsx; connected halves use
-      index.spec.tsx; hooks and classNames use matching .spec siblings. No __tests__/ folders. Runner
-      is vitest with @testing-library/react. A new unit with both halves (FE-FUNCTION-4) needs both
-      specs; a leaf has one.
+      Specs sit beside their subject. When a unit has two meaningful halves, component.spec.tsx covers
+      the Base contract and index.spec.tsx covers connected mapping. A one-part unit has the one
+      behavior-focused spec its risk requires. Hooks and classNames use matching .spec siblings; no
+      __tests__/ folders. The runner is vitest with @testing-library/react.
     rationale: |
-      Colocation and one-spec-per-half prevent one half from standing in for the other.
+      Colocation makes ownership clear. Tests follow behavior boundaries; file counts never create a
+      second component or a redundant spec.
     cases:
       - id: case-1
         when: "Pure half"
@@ -60,11 +61,15 @@ rules:
           Both files above, one per half. Neither stands in for the other: the connected spec replaces
           the pure half wholesale (FE-TEST-2 Case 4) and the pure spec stubs its child owners
           (FE-TEST-3 Case 3), so a unit carrying one spec has one uncovered half rather than partial
-          coverage of two. A leaf has no pure half and therefore one spec (FE-FOLDER-2 Case 4)
+          coverage of two. This applies only after FE-FUNCTION-4 establishes two real responsibilities.
+      - id: case-8
+        kind: exception
+        when: "A one-part visual unit"
+        write: "Keep one focused spec when behavior/risk warrants it; do not create a twin only to justify another spec."
     verification:
       automated: []
       manual:
-        - Confirm new split units ship both component.spec.tsx and index.spec.tsx.
+        - Confirm each real half is covered; do not infer a violation from a missing twin or test count alone.
     relatedExamples:
       - connected-block
 

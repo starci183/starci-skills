@@ -34,6 +34,27 @@ contains the object or that a snapshot actually covers the claimed tree: inspect
 the real source and checks. Legacy codeRefs stay strict. This does not change UAT
 served-build provenance or turn implementation proof into UAT completion.
 
+### Keep source drift, evidence invalidation, and unavailable inputs distinct
+
+These conditions have different owners and must remain separate in read-only reports and repair
+preflight:
+
+- **Source drift** means current source no longer matches the repository/revision/snapshot and scoped
+  coverage named by an implementation completion. It is an implementation observation. It does not
+  rewrite SRS/SDS, and current code never becomes the expected behavior merely because it is newer.
+- **Evidence invalidation** means a stored review/completion/evidence binding no longer matches the
+  current semantic `contextDigest` or `inputDigest`, or required proof no longer covers the current
+  contract. The canonical validator determines this from Work. Old receipts and artifacts remain
+  history; they no longer certify the changed input.
+- **Unavailable input** means a required repository, revision, snapshot, declared asset, parser, or
+  external proof cannot be resolved. Report it as blocked/unknown with the missing owner and input.
+  Do not label it drift, infer that evidence is stale, or rewrite Work to make the check pass.
+
+`review.verify` may report these facts in `stales` or `lint` mode. It does not repair source or write
+canonical completion. A later repair operation re-reads canonical Work first, compares source against
+the target specification, records pre/post identities and checks only inside its approved source
+scope, and leaves source-independent SDS free of paths and symbols.
+
 Use each layer's supported schema and verification profile. The common question
 is whether the actual result satisfies its current inputs and acceptance, with
 enough specific support for another reviewer to judge it.
@@ -101,6 +122,12 @@ publication neither accepts a workflow nor marks its nodes done.
    `refs` propagate semantic change but do not impose execution order;
    `dependsOn` expresses prerequisites that must currently be done. Include
    genuine shared imports, not every nearby folder.
+   Use the validator's actual digest graph: a changed ancestor specification can affect its subtree;
+   a changed child affects the aggregate parent and consumers reached from that parent; explicit
+   refs/dependsOn, typed SRS/SDS links, resources and the frontend brand binding add other edges.
+   A nearby or sibling SRS change is not a global invalidation by location alone. If an aggregate
+   deliberately owns shared constraints or is explicitly imported, that semantic edge is a valid
+   cause and must be reported rather than bypassed.
 4. Review or rerun appropriate checks and bind completion to current inputs.
    Inspect `effectiveState`; a retained stored done on stale inputs is not done.
    Preserve unrelated completed branches and useful prior results without

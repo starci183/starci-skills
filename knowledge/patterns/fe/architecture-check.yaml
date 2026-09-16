@@ -2,77 +2,87 @@ schema: starci/knowledge-source@1
 id: fe.architecture-check
 title: Enforceable frontend architecture boundaries
 purpose: |-
-  State the route, tier, pure-component, hook, and transport boundaries enforced by the portable architecture check.
+  Define portable route-adapter, responsibility, package, and data-boundary rules without treating one repository topology as the architecture.
 appliesTo:
   - frontend
 family: fe
 provenance:
+  reviewedAt: 2026-09-16
   sources:
-    - tsconfig.json
-    - src/app/**/page.tsx
-    - src/components/**
-    - src/hooks/**
-    - src/modules/api/**
+    - https://nextjs.org/docs/app/getting-started/server-and-client-components
+    - https://www.typescriptlang.org/docs/handbook/modules/reference.html
+    - starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8/src/app/**/page.tsx
+    - starci-academy-fe@44bba218685b7eed2a5d9e479689707ab6381bc8/src/components/**
+    - nivo-fe@a01a7bd7474fc6b43b831853d9ef870c202f3844/{apps,packages}/**
     - knowledge/patterns/fe/folder.yaml
     - knowledge/patterns/fe/function.yaml
     - knowledge/patterns/fe/imports.yaml
   limitations: |-
-    Static TypeScript and JSX analysis does not prove rendered behavior, data correctness, or dependencies whose names are constructed dynamically. The selected repository's tsconfig and installed TypeScript remain the resolution authority.
+    Static TypeScript analysis does not prove rendered behavior, accessibility, request ownership, or whether a client boundary is usefully split. The selected repository's manifests, tsconfig, installed TypeScript, framework conventions, and package exports are resolution authority. Reference code supplies evidence and counterexamples, not automatic permission.
 rules:
   - id: FE-ARCHITECTURE-1
-    title: A route mounts one page
+    title: Routes adapt framework inputs to one visual owner
     kind: mandatory
     requirement: |-
-      Each page.tsx default-exports a local route function that mounts exactly one component from the pages tier and creates no additional drawing tree or conditional drawing decision.
+      A visual route may resolve framework-owned server inputs such as params, searchParams, headers, cookies, session, redirects, notFound, or a server loader, then mounts one page-level visual owner. A route that only redirects or terminates with notFound mounts no visual owner. Shell composition belongs in a layout or the page owner, not beside the page in the route adapter.
     rationale: |-
-      Route files select a screen while drawing ownership stays in components/pages.
+      The invariant is one visual responsibility, not a fixed empty-props syntax. Framework adapters can remain server components without leaking routing concerns into reusable UI.
     cases:
       - id: case-1
-        when: A product route
-        write: Import one page, define a local Route const that mounts it, and default-export Route.
+        when: A product route renders a screen
+        write: Resolve framework inputs and mount one page-level owner.
       - id: case-2
-        when: Shared navigation or shell is required
-        write: Compose it in the page or route layout rather than adding a second drawing root to page.tsx.
+        kind: exception
+        when: A compatibility or index route redirects or calls notFound
+        write: Return no visual owner; the redirect/notFound is the complete route responsibility.
+      - id: case-3
+        when: Navigation or a shell is required
+        write: Compose it in the route layout or page owner.
     verification:
       automated:
         - FE_ROUTE_DEFAULT_EXPORT
         - FE_ROUTE_ONE_PAGE
         - FE_ROUTE_DRAWING_DECISION
-      manual: []
+      manual:
+        - Confirm a route-level loader or server adapter does not become product orchestration or duplicate client fetching.
     relatedExamples: []
   - id: FE-ARCHITECTURE-2
-    title: UI tiers point downward
+    title: Responsibilities point inward and downward
     kind: mandatory
     requirement: |-
-      Pages compose lower tiers; blocks compose composites, branches, overlays, and leaves; leaves do not reach higher component tiers. Relative paths, aliases, and re-export barrels have the same direction.
+      Runtime dependencies follow responsibility: framework route adapter to page or shell, page or shell to feature/product composition, composition to reusable visual composition, and reusable composition to leaf or Grammar primitives. Lower responsibilities do not import route, page, shell, session, transport, or product-world owners. Relative paths, aliases, workspace packages, dynamic string literals, and re-export barrels obey the same direction.
     rationale: |-
-      A resolved dependency direction prevents path spelling or a barrel from hiding upward coupling.
+      A partial responsibility graph remains valid across a single-source repository and a monorepo. Directory names and an absolute tier rank do not decide architecture by themselves.
     cases:
       - id: case-1
-        when: A page needs product behavior
-        write: Compose a block.
+        when: A reusable unit needs product state
+        write: Receive a resolved contract or move the orchestration to the owning feature/page.
       - id: case-2
-        when: A leaf needs higher-tier state
-        write: Accept resolved props; do not import the higher tier.
+        when: A domain overlay coordinates a product scenario
+        write: Treat it as feature composition even if its folder is named overlays; do not demote it by folder name.
+      - id: case-3
+        when: A visual primitive needs browser-only interaction
+        write: Keep intrinsic focus, disclosure, drag, measurement, or reduced-motion behavior local when it has no product-world or transport ownership.
     verification:
       automated:
         - FE_TIER_IMPORTS_UPWARD
-      manual: []
+      manual:
+        - Classify the responsibility before treating a folder-to-folder edge as upward.
     relatedExamples: []
   - id: FE-ARCHITECTURE-3
-    title: Connected code owns data and world context
+    title: Split world ownership only when there is a boundary to own
     kind: mandatory
     requirement: |-
-      Connected component entries use the hooks barrel. Pure component.tsx files have no client directive, world hook, router/locale import, or runtime path to hooks/API transport. Hooks own transport access, and raw fetch stays under the API transport root.
+      Product data, session, locale/router decisions, and transport lifecycle have one connected owner and reach rendering through resolved values and actions. A presentational Base twin is required only when that separation exists and provides an independently useful render contract. Intrinsic visual state, refs, focus, measurement, motion, and disclosure may stay in one client visual component. Missing component.tsx, Base, or a paired spec is never a violation by count alone.
     rationale: |-
-      Pure render units remain deterministic while request lifecycle and world state have one explicit owner.
+      The split isolates real world dependencies without manufacturing forwarding components around ordinary browser interaction.
     cases:
       - id: case-1
-        when: A connected component needs data
-        write: Import a named hook from the configured hooks/index barrel.
+        when: A component reads product data, session, router/locale, or transport state
+        write: Put that ownership in the connected entry/hook and pass resolved props/actions to presentation.
       - id: case-2
-        when: A pure component needs data or an action
-        write: Receive the resolved value or callback through props.
+        when: A component only owns its DOM ref, focus, disclosure, measurement, or motion
+        write: Keep one client visual component unless reuse or testing reveals a meaningful separate contract.
       - id: case-3
         when: A hook sends a request
         write: Call a function under the configured API transport root.
@@ -80,10 +90,35 @@ rules:
       automated:
         - FE_COMPONENT_DEEP_HOOK_IMPORT
         - FE_COMPONENT_IMPORTS_TRANSPORT
-        - FE_PURE_CLIENT_BOUNDARY
         - FE_PURE_WORLD_HOOK
         - FE_PURE_WORLD_IMPORT
         - FE_PURE_REACHES_DATA
         - FE_FETCH_OUTSIDE_TRANSPORT
-      manual: []
+      manual:
+        - Distinguish intrinsic browser interaction from product-world ownership before requiring a split.
+    relatedExamples: []
+  - id: FE-ARCHITECTURE-4
+    title: Packages expose owned public APIs
+    kind: mandatory
+    requirement: |-
+      Discover application and package roots from manifests and tsconfig, including workspace globs and file dependencies. Applications may consume declared package exports. Packages do not import application internals, and cross-package consumers use the owning package's declared public exports. A packages/ path or a second consumer does not by itself make code shared. An explicitly bound same-root backend/frontend repository keeps both responsibility roles and one workspace/Work owner.
+    rationale: |-
+      Package boundaries are ownership and distribution contracts; repository topology and consumer counts are only observations.
+    cases:
+      - id: case-1
+        when: A repository uses npm workspaces
+        write: Resolve each matched package manifest and its exports before checking cross-package imports.
+      - id: case-2
+        when: A single application uses file:packages/grammar
+        write: Treat the file dependency as a package boundary even without a root workspaces field.
+      - id: case-3
+        when: Logic has one cohesive owner and one consumer
+        write: Keep it with that owner; sharing never requires two consumers.
+    verification:
+      automated:
+        - ARCH_PACKAGE_IMPORTS_APP
+        - ARCH_PACKAGE_EXPORT_BYPASS
+        - ARCH_INTERNAL_IMPORT_UNRESOLVED
+      manual:
+        - Confirm the public export is semantically stable rather than merely reachable.
     relatedExamples: []

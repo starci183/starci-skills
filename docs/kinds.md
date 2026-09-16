@@ -34,7 +34,7 @@ wrote it - and every kind below declares its `reads` and its `writes` over exact
 | `record` | `**/index.yaml` - the authored fields of one Work node | - |
 | `srs` | `features/*/business/**` | `decision` |
 | `sds` | `features/*/architecture/**` | `srs`, `decision` |
-<!-- decision.prepare prepares a decision the runtime takes provisionally and never waits; provision.ask asks for what only the owner can give and waits in its tab. The old single kind owner.ask is renamed on kernel start (kind-renamed). -->
+<!-- decision.prepare prepares a canonical question, distinct outcomes and one recommendation. Decisive product policy waits for an exact owner answer/receipt; only ordinary reversible technical ambiguity may proceed on a recorded recommendation. provision.ask asks for what only the owner can give. The old single kind owner.ask is renamed on kernel start (kind-renamed). -->
 | `decision` | `features/*/business/srs/business-rules/policy-decisions/**` (a business record with the `srs-policy-decision` section) | - (the owner's) |
 | `brand` | `brand/index.yaml` | `code` (the real token files) |
 | `design` | `features/*/ui/**` | `srs`, `sds`, `brand`, `grammar` |
@@ -231,8 +231,9 @@ admits, takes the most reasonable one by the accepted records, the other feature
 product's own conventions, writes it into the requirement with its acceptance, says why in
 `extensions.work3.decisionLog` and bumps the `rev`; the requester reads the settled record behind it. The one
 thing it does not take silently is a reading that changes an observable outcome about money, authority or
-customer data: that is reported `ask` with `question.kind: decision`, numbered options and one recommendation,
-which the kernel takes provisionally while the owner is asked. `architecture.revise` is the same move one
+customer data: that is reported `ask` with `question.kind: decision`, distinct numbered outcomes and one
+recommendation. The requester remains non-actionable until an exact owner answer/receipt selects one.
+`architecture.revise` is the same move one
 layer later, and both are held to it by the same contract sequence and the same two validator rules. Only a
 kind that **reads** the requirement may raise `srs-gap`, which is why `frontend.implement` reads `srs`.
 

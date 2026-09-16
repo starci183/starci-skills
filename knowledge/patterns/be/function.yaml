@@ -197,12 +197,12 @@ rules:
     title: Helpers
     kind: mandatory
     requirement: |-
-      Shared pure helpers are exported arrow consts with named parameter interfaces; decorator factories use SetMetadata; helpers live beside consumers as .util.ts or under utils/.
+      Cohesive pure helpers are exported arrow consts with named parameter interfaces; decorator factories use SetMetadata; helpers live with their owning capability as .util.ts or under utils/. Reuse count does not decide ownership.
     rationale: |-
       245 exported arrow consts against 20 export function under src/modules at extraction.
     cases:
       - id: case-1
-        when: Pure mapping shared by two callers
+        when: Pure mapping owned by a cohesive capability
         write: |-
           export const getKpiCurrentValues = (stats: UserStatsResult): Record<KpiKey, number> => ({ [KpiKey.Lessons]: stats.weeklyLessons, … }) in kpi-current.util.ts
       - id: case-2

@@ -19,6 +19,9 @@ rules:
     or place feature business at .starciwork/business/ or .starciwork/features/business/.
   - The project's backend repository owns .starciwork. FE and other sources share that Work via the
     registry; do not create duplicate Work in the central registry or frontend.
+  - A combined repository may explicitly bind both be and fe to the same real repository root. Its
+    backend owner role still owns exactly one .starciwork; source packages do not become separate
+    StarCi workspaces. A split-repository binding remains separate and cannot duplicate Work.
   - The same backend owns internal .starciwork/_local/plans for both BE and FE workflow state. The
     host registry is not project state; a host may also be a backend only when the selected binding
     explicitly names it as that role.

@@ -35,12 +35,6 @@ roles:
         type: file
       - path: package.json
         type: json-file
-      - path: pnpm-workspace.yaml
-        type: file
-      - path: tsconfig.json
-        type: file
-      - path: src
-        type: directory
     requiredAny:
       - id: backend-source-roots
         paths:
@@ -74,14 +68,14 @@ roles:
         type: git-marker
       - path: package.json
         type: json-file
-      - path: pnpm-workspace.yaml
-        type: file
     requiredAny:
       - id: frontend-source-roots
         paths:
           - apps
           - packages
           - src
+          - app
+          - pages
         minimum: 1
     forbidden:
       - .claude-v3
@@ -104,7 +98,9 @@ roles:
         minimum: 1
     content: []
 pairRules:
-  - Host, backend and frontend are explicit real directories; backend and frontend are distinct. Host may equal backend only when both roles explicitly resolve to the same real directory.
+  - Host, backend and frontend are explicit real repository roots. Backend and frontend may explicitly bind the same combined repository; source projects inside it keep their own responsibility and dependency boundaries.
+  - Host may equal backend, including a combined backend/frontend repository, only when the binding explicitly resolves those roles to the same real directory. No frontend-only host role is inferred.
+  - Package manager and source topology are project choices. A single application does not need a workspace manifest; npm, pnpm and other workspace tools use their actual manifests. TypeScript project configuration is checked by architecture check, not by demanding a root tsconfig or src directory in every layout.
   - Host owns the only .claude/SKILL.md runtime identity and .workspaces project/route registry. Backend owns the project's only .starciwork.
   - Routed backend and frontend sources contain no duplicate StarCi runtime or route-registry identity and no product workspace outside the backend-owned .starciwork.
   - A project-owned .claude or .workspaces directory without those identity markers is not rejected by name alone; .stacks may hold legitimate repository deployment knowledge.

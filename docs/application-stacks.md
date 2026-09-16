@@ -16,6 +16,10 @@ Ownership is explicit. It is never inferred from local versus hosted, Compose ve
 
 Each environment accounts for browser apps, APIs, workers, bootstrap and migration jobs, stateful services, ingress, persistent data, configuration, secret consumers, and external dependencies. Its runbook supplies `prepare`, `doctor`, `up`, `status`, `logs`, and `down`; VPS also supplies `update`, `rollback`, `backup`, and `restore`. Verification entries cover cold start, restart, and persistence.
 
+An optional development `profiles` map expresses mutually exclusive ways to run that same closed inventory. A profile classifies every component as `docker-service`, `host-process`, `external`, or `excluded`; required components cannot disappear when the mode changes. The rendered Compose model selects one profile through `x-starci-profile`. Profiles without this declaration retain the original single-mode contract and are not described as dual-mode capable.
+
+Top-level `sources` give each application source a repository role, symbolic host binding (`rootRef`), and immutable revision. The rendered model supplies the resolved roots and revisions in `x-starci-sources`. A resolved root may be outside the deployment repository for a routed split-repository application. This explicit binding avoids an adjacent-clone assumption; the static checker never searches neighboring directories.
+
 ## Finite layout
 
 ```text
@@ -36,9 +40,13 @@ Each environment accounts for browser apps, APIs, workers, bootstrap and migrati
 
 Generated output stays in a finite declared location. Development plaintext may use a regular file below a private, ignored `.stacks/dev/runtime/` directory and must never be committed. Decryption identities, Swarm unlock keys, join tokens, and recovery custody stay outside the repository.
 
-## Development with Docker Compose
+## Development with Docker Compose and native application processes
 
-A supported development machine needs Docker Engine running Linux containers and Docker Compose v2. It does not need host Node.js, a host database, or a manually installed application runtime. `prepare` verifies Docker, Compose, architecture, capacity, ports, encryption recipients, and declared inputs. `up` materializes exact credentials, renders and validates Compose, runs infrastructure and migrations in dependency order, starts the application, and waits for declared readiness.
+A supported development machine needs Docker Engine running Linux containers and Docker Compose v2. The default full-Docker profile does not need host Node.js. An explicitly selected native-app profile additionally requires the application repository's declared host runtime and runs exact `package.json` scripts; PostgreSQL, identity, queues and other declared dependencies remain in Compose. `prepare` verifies the selected profile, sources, revisions, build inputs, runtime, capacity, ports, encryption recipients, and declared inputs. `up` materializes exact credentials, renders and validates Compose, runs infrastructure and migrations in dependency order, starts the selected application processes, and waits for declared readiness.
+
+For a Docker application component, a profile binds `source`, `sourceRoot`, Compose `service`, exact build `context`, `dockerfile`, and relevant package inputs. For a host process it binds `source`, `sourceRoot`, a real package script name, a private file below `.stacks` for generated environment material, loopback readiness, and host ports. Dependency connections record only variable names, hosts, and ports: host applications use loopback plus published ports, while application containers use Compose service DNS plus container ports. Credentials remain in the existing encrypted/materialized secret path and are never placed in these endpoint declarations.
+
+Every stateful Docker component in a profile declares named volumes, custody, and backup references. Dependency images use immutable digest identities. The same host port may appear in two mutually exclusive profiles; it cannot collide within the selected profile. The lifecycle receipt binds the selected profile so a Docker and native copy of the same app cannot be treated as one healthy deployment.
 
 Restart and container recreation reuse the same credential bytes. A generator must not replace a datastore credential while its persistent volume remains. Development `down` retains named data and credential custody by default.
 
@@ -103,9 +111,9 @@ Its `starci/application-stacks-check@1` result checks static conformance. For de
 
 ## Checker coverage and acceptance evidence
 
-The static checker validates the closed manifest shape, environment runtime, complete component-to-service classification, ownership fields, regular in-repository source files, bounded rendered model input, selected unresolved interpolation, sensitive environment naming, required runbook entries, declared VPS platform fields, safe custody references, structural SOPS envelopes, exact environment-specific secret declarations and grants, and the presence of Swarm deploy policy, healthcheck, and overlay networking for managed non-bootstrap services.
+The static checker validates the closed manifest shape, environment runtime, complete component classification, ownership fields, bounded rendered model input, selected unresolved interpolation, sensitive environment naming, required runbook entries, declared VPS platform fields, safe custody references, structural SOPS envelopes, exact environment-specific secret declarations and grants, and the presence of Swarm deploy policy, healthcheck, and overlay networking for managed non-bootstrap services. For declared dev profiles it also validates exact selected-profile closure, mutually exclusive group identity, split-repository source and revision bindings, real package scripts and build inputs, rendered build contexts, immutable dependency images, host/container endpoint separation, per-profile port uniqueness, and named state-volume custody.
 
-It does not invoke Docker, execute a runbook, authenticate the rendered model, decrypt SOPS, discover inventory, or independently prove ownership. It also does not prove dependency order, port exposure, immutable image availability, healthcheck quality, migration behavior, update convergence, rollback safety, backups, resource capacity, Swarm quorum, or actual Ubuntu/image architecture compatibility.
+It does not invoke Docker or host processes, execute a runbook, authenticate the rendered model, inspect native env contents, independently read Git history, decrypt SOPS, discover inventory, or independently prove ownership. A declared profile, readiness URL, source revision, or image digest is checked for consistency rather than proven live. The checker also does not prove dependency order, conflicting processes already running, port exposure, image availability, healthcheck quality, migration behavior, update convergence, rollback safety, backups, resource capacity, Swarm quorum, or actual Ubuntu/image architecture compatibility.
 
 Those properties require disposable and cold-host evidence: deterministic rendering, runtime-native validation, secret allowlisting and redaction, supported image platforms, cold start, restart with stable credentials, migrations before readiness, failed-task rejection, encrypted off-host backup, isolated restore, and non-destructive application rollback. A manifest or successful static check alone does not satisfy them.
 

@@ -20,15 +20,16 @@ provenance:
     edf72554425f918e80c9205e9c6db10596e722f0; not a fresh audit. Old counts cannot claim a fresh scan.
 rules:
   - id: FE-ERROR-1
-    title: Failure is a state of the pure half
+    title: Failure is resolved before presentation
     kind: mandatory
     requirement: |
-      Failure is a member of the pure-half state union. The connected half maps SWR error into that
-      state, resolves failure copy into labels, and exposes retry on on. Connected specs assert the
-      mapping.
+      A data/world owner maps transport failure into an explicit renderable state, resolves failure
+      copy, and exposes only valid recovery actions. When the unit has a Base split, those values cross
+      its resolved contract; otherwise the same owner/presentation boundary remains explicit in the
+      one unit. Tests assert the mapping and retry eligibility.
     rationale: |
-      Treating failure as renderable state keeps transport out of the pure half and makes retry an
-      explicit action.
+      Treating failure as renderable state keeps transport details out of presentation and makes
+      recovery conditions explicit without requiring a Base twin.
     cases:
       - id: case-1
         when: "The generic case"
@@ -56,7 +57,7 @@ rules:
     verification:
       automated: []
       manual:
-        - Confirm pure halves draw failure from state/labels rather than catching transport errors.
+        - Confirm presentation draws resolved failure state rather than catching transport errors.
     relatedExamples:
       - connected-block
 

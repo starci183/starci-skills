@@ -133,14 +133,16 @@ rules:
       - connected-block
 
   - id: FE-IMPORTS-4
-    title: Tier direction
+    title: Responsibility direction
     kind: mandatory
     requirement: |
-      Pages import blocks (and sometimes leaves/hooks). Blocks import leaves, branches, Grammar, hooks
-      and modules. Leaves import Grammar and vendor only. Pure halves never import the data layer at
-      runtime. Upward imports are not a pattern.
+      Framework adapters import page/shell owners; pages and feature compositions import reusable
+      visual units and Grammar; reusable units import lower visual/Grammar responsibilities. A resolved
+      presentation contract never imports the data layer at runtime. Directory names are evidence,
+      not an absolute total rank: classify domain overlays and other compositions by responsibility.
     rationale: |
-      One-way tier direction keeps connected ownership above pure presentation.
+      One-way responsibility direction keeps route/product/data ownership above reusable presentation
+      across single-source repositories and workspaces.
     cases:
       - id: case-1
         when: "Page → block"

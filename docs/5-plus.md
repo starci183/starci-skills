@@ -51,9 +51,9 @@ Six statements hold the release together. Every section below is one of them mad
    mechanical questions; a credential is never invented, stubbed, defaulted or silently skipped, and no
    secret value is written anywhere. What is NOT a question for the owner is an unclear record: an SRS or an
    SDS that is confusing, contradictory or silent is revised by the runtime towards its most reasonable
-   reading, with the reason in the record's decision log and the `rev` bumped, and only a reading that moves
-   money, authority or customer data is put to the owner - provisionally, on the runtime's recommendation,
-   so the work is prepared rather than stopped (§4b). What the owner must PROVIDE is read from the whole
+   reading, with the reason in the record's decision log and the `rev` bumped. A reading that moves money,
+   authority or customer data is put to the owner as distinct typed outcomes and one recommendation; dependent
+   work stays non-actionable until an exact owner answer/receipt selects one (§4b). What the owner must PROVIDE is read from the whole
    product up front instead of one stuck operation at a time.
 6. **Design delivery is image-first.** For a large FE scope, `interface.draw` selects a small representative
    critical-screen set and invokes built-in ImageGen with accepted business/SDS, brand, UI knowledge and actual
@@ -353,12 +353,12 @@ owner's - a provision, an irreversible effect, a decision - stays (`parked-rejud
 ## 4b. The record is revised, not asked about
 
 An SRS or an SDS that is confusing, contradictory or silent is not a reason to stop. The owner ruled it on
-2026-09-14 and the runtime is built to it: **the runtime revises the record itself towards the most
-reasonable reading, states why, bumps the `rev` and moves on.** The owner reads the log and overturns it if
-they disagree, and the proof digests reopen whatever was built on the old reading. Only a reading that
-changes an observable outcome about **money, authority or customer data** is not the runtime's to take
-silently - and even then the work does not stop: the decision is taken **provisionally** on the runtime's
-own recommendation while the owner is asked.
+2026-09-14 and the runtime uses that path for **ordinary reversible technical ambiguity**: it records the most
+reasonable reading, states why, bumps the `rev` and moves on. A reading that changes an observable product
+policy about **money, authority or customer data** is not the runtime's to infer. It prepares a canonical
+question, distinct typed outcomes and one recommendation, then preserves an unresolved owner dependency until
+an exact answer/receipt selects one. Settled legacy receipts remain history; malformed legacy topic receipts
+are withdrawn rather than replayed as policy.
 
 There are two repair kinds, one per record, and they are mirrors of each other:
 
@@ -417,9 +417,9 @@ exact name, and every other operation carries on.
 
 ## 5. The owner loop
 
-The owner's ruling of 2026-09-14, in one sentence: **the owner is asked only for what the runtime cannot
-obtain and for what it must not do; every other open question is taken provisionally on the runtime's own
-recommendation and the work continues.** Before it, a workflow could sit blocked all day on a line the owner
+The owner is asked for what the runtime cannot obtain, for irreversible effects, and for decisive product
+policy about money, authority or customer data. Ordinary reversible technical ambiguity may use a recorded
+recommendation; it cannot replace an exact owner receipt for those reserved decisions. Before this split, a workflow could sit blocked all day on a line the owner
 could not act on - "decide whether the last findings stand", "no runtime could launch op-3" - while the one
 question that really was theirs waited in the same list.
 
@@ -446,36 +446,24 @@ stops; only the owner performs them, because *undo* is not one of the runtime's 
 `stopReasonFor(question)` reads the sentence first and an unambiguously declared kind second. `authority`
 alone is never a stop, because it is also the kernel's own generic blocker kind - the words decide.
 
-### Provisional decisions
+### Prepared decisions
 
-Every other question the records do not settle - a real conflict between decided records, money, authority,
-customer data, a `hidden-decision` a review found - opens the **same** `decision.prepare` (or `provision.ask` for a provision) op, and the requester is
-**not** paused. It only `dependsOn` the ask op, so nothing schedules it before a recommendation exists
-(`owner-ask-opened {provisional: true}`).
+An unsettled decisive product-policy question opens `decision.prepare`; a provision opens `provision.ask`.
+The decision op writes one canonical question, at least two distinct typed outcomes and one recommendation.
+The requester remains non-actionable while the draft is unprepared/running or while no exact accepted owner
+answer/receipt selects an outcome. A recommendation is preparation, not authority.
 
-The ask op's job is then to write the decision record with numbered options and ONE recommendation and report
-`decision: <record id>` plus a line `recommended: <n>`. The kernel resumes every requester with
+`workflow-answer --id <wf> --op <ask> --choice <n> [--note "..."]` accepts only an exact prepared choice and
+records the correlated owner receipt. Invalid or stale preparation hides legacy fallback/options and rejects
+answer actions. A settled valid legacy receipt remains settled; similarly worded topic IDs or authority text
+do not match by substring.
 
-```
-provisional: option <n> - <text> (decision <id>)
-```
-
-in its contract (`owner-answer-provisional`), records `op.provisional = [<decision id>]` on the requester and
-on every op that later depends on it or works the same node (`inheritProvisional`), and lists the decision
-under **`state.provisional`** - `{decision, op, recommended, options, at, answered}` - and never under
-`needUser`. `markDone` stores those ids in the node's kernel block, so the tree itself remembers which proofs
-rest on an answer the owner has not given yet.
-
-**The workflow may finish `done` with provisional decisions.** The final report carries `provisional` and a
-rendered `## Provisional decisions (n)` block, and `workflow-status` prints the same section - separately from
-`## Needs you`, because nothing is waiting on them.
-
-`workflow-answer --id <wf> --op <ask> --choice <n> [--note "..."]` then settles one, whenever the owner likes:
+An exact answer settles the prepared decision:
 
 | the owner's choice | what happens |
 | --- | --- |
-| the same as `recommended` | `decision-confirmed`; nothing that was built on it moves |
-| a different option | `decision-overturned {decision, choice, reopened}`: every done node whose kernel block lists that decision is `markReopened`, its work is planned again with the owner's answer as a finding, and a requester still alive gets the new answer |
+| any exact prepared choice, including the recommendation | record the correlated owner receipt; only then may dependent decisive-policy work become actionable |
+| a later different authorized choice | preserve the earlier receipt as history and reopen only affected work through the current dependency bindings |
 
 An irreversible ask keeps its authority boundary and paused requester until the owner answers. A credential
 uses the researched workflow input surface described below and resumes through canonical custody checks.
@@ -567,8 +555,8 @@ And `needUser` itself is deduplicated by `(kind, op|node, first 120 characters o
    `owner-ask-answered-from-record`) or writes the one decision record draft.
 3. **Answer.** Through the op's own terminal, or through `workflow-answer` and the kernel's inbox. The
    supervisor model's `decide` still answers only `question.kind: mechanical`, and only from the closed option
-   set the kernel offered it; a mechanical question it cannot answer becomes a provisional decision rather
-   than a stop.
+   set the kernel offered it. If it cannot answer safely, it remains unresolved; decisive product policy is
+   never converted into an inferred provisional answer.
 
 What the owner will have to provide is not discovered one stuck operation at a time. The critic reads the
 whole product for it up front and answers `provisions` - credentials, sandbox or test accounts on external
@@ -886,19 +874,19 @@ last row group.
 | the critic answers the overlaps as the cases, and the formula is gone | `tests/llm-functions.spec.mjs` - "the critic answers the overlaps with the decided records as the three cases, and the formula is gone" |
 | the Work schema documents the reconciliation row | `tests/reconciliation.spec.mjs` - "the Work schema documents the reconciliation row and leaves extensions free-form" |
 | a non-mechanical question opens an `decision.prepare` (or `provision.ask` for a provision); a mechanical one stays with the kernel | `tests/workflow-kernel.spec.mjs` - "a question only the owner can answer pauses the op and opens an decision.prepare op; the drafted decision is listed, the answer is delivered, and a mechanical question stays with the kernel" |
-| a credential the environment lacks is the owner's question, and so is an effect nobody can undo; an `authority` block that names neither is a provisional decision | `tests/workflow-kernel.spec.mjs` - "an environment blocker that names a credential is the question of the owner, prepared by an decision.prepare op, and credentialNeed reads the detail" |
+| a credential the environment lacks is the owner's question, and so is an effect nobody can undo; an `authority` block that names neither still needs classification as ordinary technical ambiguity or decisive policy | workflow-kernel and owner-request regressions |
 | the owner is asked only for what the runtime cannot obtain and cannot undo, over product-agnostic sentences | `tests/kernel-seams.spec.mjs` - "the runtime asks the owner only for what it cannot obtain and for what it cannot undo" |
-| every other decision is taken provisionally, the requester continues, and the owner is told | `tests/kernel-seams.spec.mjs` - "a decision the records do not settle is taken provisionally: the requester continues and the owner is told" |
-| the same option confirms; a different one reopens what rested on it | `tests/kernel-seams.spec.mjs` - "the same option confirms a provisional decision; a different one overturns it and reopens what rested on it" |
-| a proof records the decisions it rests on that the owner has not taken | `tests/kernel-seams.spec.mjs` - "markDone stores the digest of the declaration the proof was accepted under" |
+| decisive product policy stays non-actionable until an exact owner choice/receipt | owner-request decision option and actionability regressions |
+| invalid or stale preparation rejects answers without replaying a legacy fallback | owner-request decision option and legacy receipt regressions |
+| a settled valid legacy receipt remains historical proof | owner-request legacy receipt regressions |
 | the owner answers in the op's own terminal, and a credential reports only presence | `tests/kernel-seams.spec.mjs` - "the owner answers in the op's own terminal, and a credential reports only that it is present"; `tests/contract-steps.spec.mjs` - "the decision.prepare sequence asks in its own terminal, and a credential is put into custody by the owner, never handed over"; `tests/ops.spec.mjs` - "the decision.prepare operator asks in its own terminal and never asks for a credential value" |
 | a credential lives in the tree's encrypted custody, filled from stdin alone and echoed nowhere | `tests/cli.spec.mjs` - "identity set puts a value into the tree's encrypted custody from stdin alone, and echoes it nowhere", "identity set refuses with the exact reason when sops or its key is not there, and writes nothing" |
-| a spent review bound escalates inside the runtime instead of asking | `tests/workflow-kernel.spec.mjs` - "a spent review bound escalates inside the runtime: one more repair on an unused runtime, and findings that cite no decided record become a provisional decision" |
+| a spent review bound escalates inside the runtime; a resulting decisive policy gap still waits for its owner | workflow-kernel and owner-request regressions |
 | a shared change too deep becomes one Work node, never a question | `tests/workflow-kernel.spec.mjs` - "a shared change too deep to delegate again becomes one Work node the kernel authors, not a question for the owner" |
 | a record path an op asked for is refused in its terminal; a mixed request is split | `tests/workflow-kernel.spec.mjs` - "a shared change must name its paths...", "a shared change that asks for record paths and code paths is split: the record paths are refused, the code paths continue" |
 | a spent launch bound cools and is re-admitted, capped per day | `tests/workflow-kernel.spec.mjs` - "a spent launch bound cools the op and re-admits it, and only the daily cap reaches the owner" |
 | the owner's list carries one item per question | `tests/kernel-seams.spec.mjs` - "the owner's list carries one item per question, not one per iteration" |
-| `workflow-status` prints the provisional decisions beside, not inside, `## Needs you` | `tests/workflow-view.spec.mjs` - "the render is a plain terminal page with tables and no control codes" |
+| `workflow-status` keeps unresolved owner decisions actionable and correlated | workflow-view and owner-request regressions |
 | the decision record lands in the feature folder the tree has, never the id segment | `tests/workflow-kernel.spec.mjs` - "the decision folder of an owner question comes from the feature folder in the tree, never from the id segment" |
 | the host profile validates against the kinds capability vocabulary | `tests/hosts.spec.mjs` - "the shipped host profile validates against the real kinds capability vocabulary" |
 | each adapter describes itself exactly as the profile declares it | `tests/hosts.spec.mjs` - "each adapter describes itself exactly as the profile declares it" |

@@ -4,14 +4,14 @@ import { createRequire } from 'node:module';
 import { isInside, slash } from './config.mjs';
 
 const CODE_EXTENSIONS = /\.(?:[cm]?[jt]sx?)$/i;
-const TEST_FILE = /\.(?:spec|test)\.[cm]?[jt]sx?$/i;
+const TEST_FILE = /(?:^|[.-])(?:spec|test)\.[cm]?[jt]sx?$/i;
 const ASSET_EXTENSION = /\.(?:css|scss|sass|less|svg|png|jpe?g|gif|webp|avif|ico|woff2?|ttf|eot|ya?ml|json)$/i;
 
 function diagnosticMessage(ts, diagnostic) {
   return ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
 }
 
-function compilerError(ts, root, diagnostic, ruleId = 'ARCH_TSCONFIG_INVALID') {
+function compilerError(ts, root, diagnostic, project, ruleId = 'ARCH_TSCONFIG_INVALID') {
   const fileName = diagnostic.file?.fileName;
   let line;
   let column;
@@ -22,6 +22,7 @@ function compilerError(ts, root, diagnostic, ruleId = 'ARCH_TSCONFIG_INVALID') {
   }
   return {
     ruleId,
+    project,
     ...(fileName && isInside(root, fileName) ? { path: slash(path.relative(root, fileName)) } : {}),
     ...(line ? { line, column } : {}),
     message: diagnosticMessage(ts, diagnostic),
@@ -45,6 +46,10 @@ export function loadTargetTypeScript(repositoryRoot) {
     throw Error('ARCH_TYPESCRIPT_INVALID: the target TypeScript package does not expose the compiler API.');
   }
   return { ts, resolved, version: String(ts.version ?? 'unknown') };
+}
+
+function readJson(file) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return {}; }
 }
 
 function pathAliasMatches(specifier, paths = {}) {
@@ -103,50 +108,147 @@ function isProductionSource(root, sourceFile) {
     && !slash(sourceFile.fileName).includes('/node_modules/');
 }
 
-/** Parse the real target tsconfig and build an internal runtime dependency graph. */
+function canonical(file) {
+  const absolute = path.resolve(file);
+  try { return path.resolve(fs.realpathSync(absolute)); } catch { return absolute; }
+}
+
+function workspaceMetadata(config) {
+  const backendAppRoots = config.backend.apps.map(item => path.join(config.root, ...item.split('/')));
+  const roots = config.workspaces.map(relative => {
+    const root = path.join(config.root, ...relative.split('/'));
+    const pkg = readJson(path.join(root, 'package.json'));
+    const routeRoots = config.frontend.routes.map(item => path.join(config.root, ...item.split('/')));
+    return { root: canonical(root), relative, name: typeof pkg.name === 'string' ? pkg.name : null, exports: pkg.exports,
+      app: routeRoots.some(route => isInside(root, route)) || backendAppRoots.some(appRoot => isInside(appRoot, root) && path.resolve(appRoot) !== path.resolve(root)) };
+  });
+  return roots.sort((a, b) => b.root.length - a.root.length);
+}
+
+function workspaceOf(workspaces, file) {
+  return workspaces.find(workspace => isInside(workspace.root, file)) ?? null;
+}
+
+function exportPatternMatches(pattern, request) {
+  if (!pattern.includes('*')) return pattern === request;
+  const [before, after = ''] = pattern.split('*');
+  return request.startsWith(before) && request.endsWith(after);
+}
+
+function packageExported(workspace, specifier) {
+  if (!workspace.name || (specifier !== workspace.name && !specifier.startsWith(`${workspace.name}/`))) return false;
+  const request = specifier === workspace.name ? '.' : `.${specifier.slice(workspace.name.length)}`;
+  const declaration = workspace.exports;
+  if (typeof declaration === 'string' || Array.isArray(declaration)) return request === '.';
+  if (!declaration || typeof declaration !== 'object') return false;
+  const keys = Object.keys(declaration);
+  if (!keys.some(key => key.startsWith('.'))) return request === '.';
+  return keys.some(key => exportPatternMatches(key, request));
+}
+
+function boundaryViolation(root, edge, fromWorkspace, toWorkspace, ruleId, message) {
+  return {
+    ruleId,
+    path: relativePath(root, edge.from),
+    line: edge.line,
+    column: edge.column,
+    specifier: edge.specifier,
+    resolvedPath: relativePath(root, edge.to),
+    message,
+    fromPackage: fromWorkspace?.name ?? fromWorkspace?.relative,
+    toPackage: toWorkspace?.name ?? toWorkspace?.relative,
+  };
+}
+
+/** Parse every declared target tsconfig and build one source and package dependency graph. */
 export function buildTypeScriptContext(config, injectedTypeScript) {
   const loaded = injectedTypeScript ? { ts: injectedTypeScript, resolved: '(injected test compiler)', version: String(injectedTypeScript.version) }
     : loadTargetTypeScript(config.root);
   const { ts } = loaded;
-  const configFile = path.join(config.root, config.tsconfig);
-  if (!fs.existsSync(configFile)) throw Error(`ARCH_TSCONFIG_MISSING: ${config.tsconfig} does not exist.`);
-  const read = ts.readConfigFile(configFile, ts.sys.readFile);
-  if (read.error) return { loaded, errors: [compilerError(ts, config.root, read.error)], files: [], edges: new Map(), program: null };
-  const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, path.dirname(configFile), undefined, configFile);
-  if (parsed.errors.length) {
-    return { loaded, errors: parsed.errors.map(item => compilerError(ts, config.root, item)), files: [], edges: new Map(), program: null };
+  const errors = [];
+  const projects = [];
+  const queue = [...config.projects];
+  const seenProjects = new Set();
+  while (queue.length) {
+    const relative = queue.shift();
+    if (seenProjects.has(relative)) continue;
+    seenProjects.add(relative);
+    const configFile = path.join(config.root, ...relative.split('/'));
+    if (!fs.existsSync(configFile)) {
+      errors.push({ ruleId: 'ARCH_TSCONFIG_MISSING', project: relative, message: `${relative} does not exist.` });
+      continue;
+    }
+    const read = ts.readConfigFile(configFile, ts.sys.readFile);
+    if (read.error) {
+      errors.push(compilerError(ts, config.root, read.error, relative));
+      continue;
+    }
+    const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, path.dirname(configFile), undefined, configFile);
+    if (parsed.errors.length) {
+      errors.push(...parsed.errors.map(item => compilerError(ts, config.root, item, relative)));
+      continue;
+    }
+    for (const reference of parsed.projectReferences ?? []) {
+      const referencedFile = ts.resolveProjectReferencePath ? ts.resolveProjectReferencePath(reference)
+        : (path.extname(reference.path) ? reference.path : path.join(reference.path, 'tsconfig.json'));
+      const absoluteReference = path.resolve(referencedFile);
+      if (!isInside(config.root, absoluteReference)) {
+        errors.push({ ruleId: 'ARCH_TSCONFIG_REFERENCE_OUTSIDE', project: relative, message: `Project reference leaves the repository: ${slash(path.relative(config.root, absoluteReference))}.` });
+      } else {
+        queue.push(slash(path.relative(config.root, absoluteReference)));
+      }
+    }
+    const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options, projectReferences: parsed.projectReferences });
+    errors.push(...program.getSyntacticDiagnostics().filter(item => !item.file || isInside(config.root, item.file.fileName))
+      .map(item => compilerError(ts, config.root, item, relative, 'ARCH_SYNTAX_INVALID')));
+    projects.push({ relative, program, options: parsed.options });
   }
-  const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options, projectReferences: parsed.projectReferences });
-  const files = program.getSourceFiles().filter(file => isProductionSource(config.root, file)).sort((a, b) => a.fileName.localeCompare(b.fileName));
-  if (files.length === 0) {
-    return { loaded, errors: [{ ruleId: 'ARCH_NO_SOURCE', message: 'The target tsconfig contains no production TypeScript or JavaScript source.' }], files, edges: new Map(), program };
+  const fileMap = new Map();
+  const occurrences = new Map();
+  for (const project of projects) {
+    for (const sourceFile of project.program.getSourceFiles().filter(file => isProductionSource(config.root, file))) {
+      const name = canonical(sourceFile.fileName);
+      if (!fileMap.has(name)) fileMap.set(name, sourceFile);
+      if (!occurrences.has(name)) occurrences.set(name, []);
+      occurrences.get(name).push(project);
+    }
   }
-  const errors = program.getSyntacticDiagnostics().filter(item => !item.file || isInside(config.root, item.file.fileName))
-    .map(item => compilerError(ts, config.root, item, 'ARCH_SYNTAX_INVALID'));
-  const sourceNames = new Set(files.map(file => path.resolve(file.fileName)));
-  const edges = new Map(files.map(file => [path.resolve(file.fileName), []]));
+  const files = [...fileMap.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, file]) => file);
+  const edges = new Map([...fileMap.keys()].map(file => [file, []]));
+  for (const [file, sourceFile] of fileMap) {
+    const sourceName = path.resolve(sourceFile.fileName);
+    if (sourceName !== file) edges.set(sourceName, edges.get(file));
+  }
+  const edgeKeys = new Set();
   const host = { ...ts.sys, fileExists: ts.sys.fileExists, readFile: ts.sys.readFile, realpath: ts.sys.realpath };
-  for (const sourceFile of files) {
-    const from = path.resolve(sourceFile.fileName);
+  const workspaces = workspaceMetadata(config);
+  const workspaceNames = new Set(workspaces.map(item => item.name).filter(Boolean));
+  for (const [from, sourceFile] of fileMap) {
+    const owningWorkspace = workspaceOf(workspaces, from);
+    const candidates = occurrences.get(from) ?? [];
+    const project = candidates.find(item => isInside(path.dirname(path.join(config.root, ...item.relative.split('/'))), from)) ?? candidates[0];
+    if (!project) continue;
     for (const reference of moduleReferences(ts, sourceFile)) {
-      const resolved = ts.resolveModuleName(reference.specifier, sourceFile.fileName, parsed.options, host).resolvedModule?.resolvedFileName;
-      if (!resolved) {
+      const resolvedName = ts.resolveModuleName(reference.specifier, sourceFile.fileName, project.options, host).resolvedModule?.resolvedFileName;
+      if (!resolvedName) {
         const codeLike = !ASSET_EXTENSION.test(reference.specifier);
-        const internal = reference.specifier.startsWith('.') || pathAliasMatches(reference.specifier, parsed.options.paths);
+        const workspaceImport = [...workspaceNames].some(name => reference.specifier === name || reference.specifier.startsWith(`${name}/`));
+        const internal = reference.specifier.startsWith('.') || pathAliasMatches(reference.specifier, project.options.paths) || workspaceImport;
         if (codeLike && internal) {
           errors.push({
             ruleId: 'ARCH_INTERNAL_IMPORT_UNRESOLVED',
-            path: slash(path.relative(config.root, sourceFile.fileName)),
+            project: project.relative,
+            path: relativePath(config.root, sourceFile.fileName),
             ...sourceLocation(sourceFile, reference.node),
             specifier: reference.specifier,
-            message: `Internal import ${reference.specifier} is not resolvable with ${config.tsconfig}.`,
+            message: `Internal import ${reference.specifier} is not resolvable with ${project.relative}.`,
           });
         }
         continue;
       }
-      const actualTarget = path.resolve(resolved);
-      if (!sourceNames.has(actualTarget)) continue;
-      edges.get(from).push({
+      const actualTarget = canonical(resolvedName);
+      if (!fileMap.has(actualTarget)) continue;
+      const edge = {
         from,
         to: actualTarget,
         runtime: reference.runtime,
@@ -155,11 +257,24 @@ export function buildTypeScriptContext(config, injectedTypeScript) {
         declaration: reference.declaration,
         reexport: ts.isExportDeclaration(reference.declaration),
         sourceFile,
+        project: project.relative,
         ...sourceLocation(sourceFile, reference.node),
-      });
+      };
+      const key = `${from}\0${actualTarget}\0${reference.node.getStart(sourceFile)}\0${reference.specifier}`;
+      if (!edgeKeys.has(key)) { edges.get(from).push(edge); edgeKeys.add(key); }
+      const targetWorkspace = workspaceOf(workspaces, actualTarget);
+      if (owningWorkspace && targetWorkspace && owningWorkspace !== targetWorkspace) {
+        if (!owningWorkspace.app && targetWorkspace.app) {
+          errors.push(boundaryViolation(config.root, edge, owningWorkspace, targetWorkspace, 'ARCH_PACKAGE_IMPORTS_APP', 'A reusable workspace package cannot depend on an application workspace.'));
+        }
+        if (!packageExported(targetWorkspace, reference.specifier)) {
+          errors.push(boundaryViolation(config.root, edge, owningWorkspace, targetWorkspace, 'ARCH_PACKAGE_EXPORT_BYPASS', 'Cross-package imports must use the target package name and a declared package export.'));
+        }
+      }
     }
   }
-  return { loaded, errors, files, edges, program, ts, options: parsed.options };
+  if (projects.length && files.length === 0) errors.push({ ruleId: 'ARCH_NO_SOURCE', message: 'The configured TypeScript projects contain no production TypeScript or JavaScript source.' });
+  return { loaded, errors, files, edges, programs: projects.map(item => item.program), program: projects[0]?.program ?? null, projects, ts, workspaces, workspaceOf: file => workspaceOf(workspaces, canonical(file)) };
 }
 
 export function relativePath(root, fileName) {

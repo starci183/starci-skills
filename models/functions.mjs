@@ -1,6 +1,7 @@
 import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import {readDistJson} from '../core/runtime-root.mjs';
 import {normalizeResolvedReferences} from './validator-transport.mjs';
 import {nonOperationModels} from '../scripts/config.mjs';
 import {KINDS as OPERATION_KINDS,writesOf} from '../kernel/graph.mjs';
@@ -29,14 +30,26 @@ const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const unique=list=>[...new Set(list)];
 
-/** Headless provider commands. The prompt goes on stdin; the JSON answer is extracted from the provider's own envelope. */
-export const HEADLESS_PROVIDERS={
-  'claude-opus':{command:['claude','-p','--output-format','json','--model','claude-opus-5'],extract:extractClaude,usage:usageClaude},
-  'claude-fable-5.1':{command:['claude','-p','--output-format','json','--model','claude-fable-5-1'],extract:extractClaude,usage:usageClaude},
-  'qwen3.8-flash':{command:['qwen','--model','qwen3.8-flash','--approval-mode','yolo','--output-format','json','--exclude-tools','agent'],extract:extractQwen,usage:usageQwen},
-  'gpt-5.6-sol':{command:['codex','exec','--json','--model','gpt-5.6-sol'],extract:extractCodex,usage:usageCodex},
-  'gpt-6-astra':{command:['codex','exec','--json','--model','gpt-6-astra'],extract:extractCodex,usage:usageCodex}
-};
+/** Provider syntax is family-specific; model identities come from the same registry as native workers. */
+export function headlessProvidersFromRegistry(registry,profiles){
+  const families={
+    codex:model=>({command:['codex','exec','--json','--model',model],extract:extractCodex,usage:usageCodex}),
+    claude:model=>({command:['claude','-p','--output-format','json','--model',model],extract:extractClaude,usage:usageClaude}),
+    qwen:model=>({command:['qwen','--model',model,'--approval-mode','yolo','--output-format','json','--exclude-tools','agent'],extract:extractQwen,usage:usageQwen})
+  };
+  const providers={};
+  for(const [id,target] of Object.entries(registry.targets??{})){
+    const make=families[target.runtime];if(!make)continue;
+    const profile=target.profiles?.working??target.profiles?.reasoning;
+    const model=target.headlessModel??target.requestedModel??profiles[target.runtime]?.profiles?.[profile]?.model;
+    if(typeof model!=='string'||!model.trim())continue;
+    providers[id]=make(model);
+  }
+  return providers;
+}
+/** The prompt goes on stdin; each family extracts its own response envelope. Eligibility remains a separate gate. */
+export const HEADLESS_PROVIDERS=headlessProvidersFromRegistry(readDistJson('model','registry.json'),
+  Object.fromEntries(['codex','claude','qwen'].map(family=>[family,readDistJson('model',`${family}.json`)])));
 /** A provider that refuses with a quota signal is not broken: the chain moves on without retrying it. */
 export const RATE_LIMITED=/429|rate.?limit|too many requests|overloaded/i;
 function extractClaude(stdout){

@@ -140,15 +140,17 @@ rules:
       - connected-block
 
   - id: FE-FUNCTION-4
-    title: What each half does
+    title: What each applicable half does
     kind: mandatory
     requirement: |
-      The connected half owns "use client", translations, locale, router, SWR hooks and state
-      resolution, then returns <XBase … />. The pure half has no "use client", no runtime @/hooks or
-      @/modules/api imports, and never chooses between a connected child and its Base per render.
+      When a product/world boundary exists, the connected owner holds translations, locale, router,
+      session, data hooks and state resolution, then passes resolved values/actions to XBase. That
+      Base has no runtime world/transport dependency and never chooses between a connected child and
+      its Base per render. Intrinsic browser interaction such as refs, focus, disclosure, measurement,
+      drag, and reduced motion may remain in one client visual unit without a Base twin.
     rationale: |
-      Keeping world access in index.tsx makes the pure half fixture-testable and prevents hidden
-      fetch decisions inside render trees.
+      Separating real world access makes presentation fixture-testable and prevents hidden requests,
+      while avoiding boilerplate where there is no independent render contract.
     cases:
       - id: case-1
         when: "Connected half"
@@ -178,10 +180,14 @@ rules:
           one every time; the page-level provider lives in index.tsx, which resolves the data and hands
           XBase its props. The occurrences are in
           https://github.com/starci183/starci-skills/blob/edf72554425f918e80c9205e9c6db10596e722f0/tests/evidence/20260903-presentation-sweep.json
+      - id: case-6
+        kind: exception
+        when: "Intrinsic visual interaction without product-world or transport ownership"
+        write: "Keep one client component; a missing component.tsx/Base twin is not a violation."
     verification:
       automated: []
       manual:
-        - Confirm pure halves never import runtime hooks or choose connected vs Base per render.
+        - Confirm an actual Base never imports world hooks, and require a split only for a real boundary.
     relatedExamples:
       - connected-block
 
@@ -260,16 +266,21 @@ rules:
     title: Route file
     kind: mandatory
     requirement: |
-      Every page.tsx defines a local Route const that mounts one page with empty props and default-
-      exports that route. The route makes no drawing decision.
+      A page.tsx default-exports a local route adapter. It may resolve framework-owned server inputs,
+      then mounts one page-level visual owner. A redirect/notFound-only route mounts none. It does not
+      compose a second shell/root or make a product drawing decision.
     rationale: |
       Route files stay thin so drawing ownership remains in pages/blocks.
     cases:
       - id: case-1
-        when: "Every page.tsx"
+        when: "Visual page.tsx"
         write: >
           const AuthenticationRoute = () => <AuthenticationPage {...{}} /> then export default
           AuthenticationRoute — the route makes no drawing decision
+      - id: case-2
+        kind: exception
+        when: "Redirect/notFound-only page.tsx"
+        write: "Resolve params/searchParams as needed and redirect or terminate without a visual tree."
     verification:
       automated: []
       manual: []

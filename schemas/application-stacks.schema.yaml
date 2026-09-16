@@ -9,6 +9,18 @@ additionalProperties: false
 required: [schema, components, environments, k8s]
 properties:
   schema: {const: starci/application-stacks@1}
+  sources:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, repositoryRole, rootRef, revision]
+      properties:
+        id: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+        repositoryRole: {enum: [backend, frontend, shared]}
+        rootRef: {type: string, pattern: '^[A-Z][A-Z0-9_]*$'}
+        revision: {type: string, pattern: '^[a-f0-9]{7,64}$'}
   components:
     type: array
     minItems: 1
@@ -58,6 +70,11 @@ $defs:
             failureDomain: {type: string, minLength: 1}
             endpointRef: {type: string}
             reason: {type: string}
+      profiles:
+        type: object
+        minProperties: 1
+        additionalProperties:
+          $ref: '#/$defs/profile'
       runbook:
         type: object
         additionalProperties: false
@@ -105,3 +122,78 @@ $defs:
             version: {type: string}
             recipientPolicy: {type: string, minLength: 1}
             keyCustody: {type: string, minLength: 1}
+  profile:
+    type: object
+    additionalProperties: false
+    required: [exclusiveGroup, components]
+    properties:
+      exclusiveGroup: {type: string, minLength: 1}
+      components:
+        type: object
+        minProperties: 1
+        additionalProperties:
+          $ref: '#/$defs/profileComponent'
+  profileComponent:
+    type: object
+    additionalProperties: false
+    required: [mode]
+    properties:
+      mode: {enum: [docker-service, host-process, external, excluded]}
+      service: {type: string}
+      source: {type: string}
+      sourceRoot: {type: string}
+      command: {type: string}
+      envFile: {type: string}
+      readiness:
+        type: object
+        additionalProperties: false
+        required: [scheme, host, port, path]
+        properties:
+          scheme: {enum: [http, https, tcp]}
+          host: {type: string, minLength: 1}
+          port: {type: number}
+          path: {type: string}
+      build:
+        type: object
+        additionalProperties: false
+        required: [context, dockerfile, inputs]
+        properties:
+          context: {type: string, minLength: 1}
+          dockerfile: {type: string, minLength: 1}
+          inputs: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+      image: {type: string}
+      ports:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [name, host]
+          properties:
+            name: {type: string, pattern: '^[a-z][a-z0-9-]*$'}
+            host: {type: number}
+            container: {type: number}
+      connections:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [component, variable, host, port]
+          properties:
+            component: {type: string}
+            variable: {type: string, pattern: '^[A-Z][A-Z0-9_]*$'}
+            host: {type: string, minLength: 1}
+            port: {type: number}
+      storage:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [volume, custody, backupRef]
+          properties:
+            volume: {type: string, minLength: 1}
+            custody: {type: string, minLength: 1}
+            backupRef: {type: string, minLength: 1}
+      owner: {type: string}
+      failureDomain: {type: string}
+      endpointRef: {type: string}
+      reason: {type: string}

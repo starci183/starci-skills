@@ -34,7 +34,7 @@ provenance:
 topics:
   - path: architecture-check.yaml
     title: Architecture check
-    decides: "Enforceable one-page routes, downward UI tiers, and pure/connected data boundaries"
+    decides: "Enforceable route adapters, responsibility/package direction, and applicable world/presentation boundaries"
     rules: "FE-ARCHITECTURE-1 … FE-ARCHITECTURE-3"
   - path: folder.yaml
     title: Folder
@@ -50,7 +50,7 @@ topics:
     rules: "FE-FUNCTION-1 … FE-FUNCTION-7"
   - path: imports.yaml
     title: Imports
-    decides: "The @/ alias, Grammar entry, import order, tier direction, the hooks barrel"
+    decides: "The @/ alias, Grammar entry, import order, responsibility direction, the hooks barrel"
     rules: "FE-IMPORTS-1 … FE-IMPORTS-7"
   - path: comment.yaml
     title: Comment
