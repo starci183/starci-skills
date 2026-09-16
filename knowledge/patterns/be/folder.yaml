@@ -1,222 +1,118 @@
 schema: starci/knowledge-source@1
 id: be.folder
-title: Folder
-purpose: |-
-  Given a piece of backend code, which directory and which file name does it get?
+title: Backend folder
+purpose: Apply the adopted responsibility pattern. Read docs/backend-source-pattern.md for the coherent
+  layout, code forms, source critique and verification limits.
 appliesTo:
   - backend
 family: be
 provenance:
-  extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
+  reviewedAt: 2026-09-16
   sources:
-    - src/features/api/core/graphql/mutations/courses/add-to-cart/*
-    - src/features/api/core/graphql/queries/courses/course/*
-    - src/features/api/core/graphql/mutations/courses/courses.module.ts
-    - src/modules/platform/{winston,throttler,exceptions}/
-    - src/modules/ai/
-    - src/modules/databases/postgresql/primary/{entities,enums}/
-    - src/tests/
-    - jest.config.ts
-  limitations: |-
-    Historical reference-source observations preserved at the extraction commit; not a fresh audit of current repository conformance. Counts and file totals cited in rationale or cases are provenance from that extraction, not claims about today. Inspect the selected repository's actual types/APIs, aliases and lint/test setup; verify reference conformance within approved .starciwork scope. Target legacy code does not override the reference. Current business requirements and architecture belong to .starciwork; code patterns do not approve them.
-
-    Open observation: one class per exception file holds in 275 of 294 files at extraction; 19 files hold two to eight classes (errors/api/graphql.ts, errors/community/*.ts, errors/users/user.ts). The single-class form dominates and is what new files follow; the multi-class files are not declared wrong here.
+    - docs/backend-source-pattern.md
+    - starci-academy-backend@1731b15ba4ed526477e3c572b9d82c31ab64f1d5/src/features/api/core/graphql/mutations/courses/add-to-cart/
+    - starci-academy-backend@1731b15ba4ed526477e3c572b9d82c31ab64f1d5/src/modules/databases/postgresql/primary/primary.module-definition.ts
+    - https://docs.nestjs.com/fundamentals/dynamic-modules
+    - https://docs.nestjs.com/techniques/validation
+  limitations: Adopted Nest/TypeScript profile, not universal framework law. Historical Academy examples contain
+    debt and do not override these revised rules. Existing profile-specific lint/source needs an authorized
+    coherent migration; runtime installation neither migrates product source nor refreshes proof. Static
+    checks do not establish behavior.
 rules:
   - id: BE-FOLDER-1
-    title: Two roots
+    title: Responsibility roots
     kind: mandatory
-    requirement: |-
-      Backend source uses two primary roots under src/: features for doors the outside world calls, and modules for capabilities those doors compose. Test infrastructure and the composition root have fixed homes.
-    rationale: |-
-      Extracted from the historical reference backend layout; doors and capabilities are separated so feature units compose shared capabilities without mixing entry surfaces into capability trees.
-    cases:
-      - id: case-1
-        when: A door the outside world calls
-        write: |-
-          src/features/<door>/ — api, socketio, cli, backup, mock, video-encoder
-      - id: case-2
-        when: A capability doors compose
-        write: |-
-          src/modules/<capability>/ — ai, api, bussiness, crypto, databases, filesystem, init, integrations, lib, membership, platform, playground-agent-core
-      - id: case-3
-        when: Test infrastructure
-        write: |-
-          src/tests/{e2e,fixtures,harness,helpers,mocks}/ — e.g. src/tests/mocks/entity-manager.mock.ts
-      - id: case-4
-        when: Composition root
-        write: |-
-          apps/core/src/app.module.ts (registers AbstractExceptionHttpFilter as APP_FILTER)
+    requirement: Apps own process composition; src/features/<feature> owns use-case orchestration and transport
+      adapters; src/modules/{domain,platform,integrations}/<capability> owns cohesive reusable capabilities.
+      Single application composition may be src/main.ts and src/app.module.ts. Package monorepos preserve
+      these roles through explicit root mappings. A module may have one consumer.
+    rationale: Ownership decides placement; repository topology and reuse count do not decide semantics.
     verification:
-      automated: []
-      manual: []
-    relatedExamples:
-      - graphql-command
+      automated:
+        - BE_MODULE_IMPORTS_FEATURE
+        - BE_MODULE_IMPORTS_APP
+        - BE_FEATURE_IMPORTS_APP
+      manual:
+        - Verify the actual owner and public API, not only folder names.
+    relatedExamples: []
   - id: BE-FOLDER-2
-    title: One GraphQL unit
+    title: One feature, explicit protocol boundary
     kind: mandatory
-    requirement: |-
-      A mutation or query is one kebab-case folder under its domain. Preserve the resolver/service/message/handler/module/DTO responsibilities, including the handler's colocated test. A reference unit's additional resolver spec is not a replacement for handler or transport coverage. Capability services follow BE-FOLDER-4 rather than duplicating this GraphQL unit structure.
-    rationale: |-
-      Historical counts under features/api/core/graphql (extraction provenance): .module.ts 338, .module-definition.ts 336, .resolver.ts 305, .service.ts 203, .handler.ts 129, .handler.spec.ts 104, .query.ts 64, .command.ts 62, .resolver.spec.ts 59.
-    cases:
-      - id: case-1
-        when: Mutation unit mutations/courses/add-to-cart/
-        write: |-
-          add-to-cart.command.ts · add-to-cart.handler.ts · add-to-cart.handler.spec.ts · add-to-cart.service.ts · add-to-cart.resolver.ts · add-to-cart.module.ts · add-to-cart.module-definition.ts · graphql-types/request.ts · graphql-types/response.ts
-      - id: case-2
-        when: Query unit queries/courses/course/
-        write: |-
-          course.query.ts · course.handler.ts · course.handler.spec.ts · course.service.ts · course.resolver.ts · course.resolver.spec.ts · course.module.ts · course.module-definition.ts · graphql-types/request.ts · graphql-types/response.ts
-      - id: case-3
-        when: Shared GraphQL objects
-        write: |-
-          features/api/core/graphql/shared/… (*.object.ts, 14 at extraction)
-    verification:
-      automated: []
-      manual: []
-    relatedExamples:
-      - graphql-command
-  - id: BE-FOLDER-3
-    title: Domain aggregator
-    kind: mandatory
-    requirement: |-
-      Domain folders aggregate unit modules via register(...). Import alone is not registration. Verify that the consuming app registers the feature aggregator and CQRS infrastructure. Do not copy the Core database token into a separately owned instance connection.
-    rationale: |-
-      Academy registers CqrsModule.forRoot() in apps/core/src/app.module.ts; a source import or directly constructed handler test does not prove the production Nest container can resolve the bus and handler.
-    cases:
-      - id: case-1
-        when: The domain folder
-        write: |-
-          mutations/courses/courses.module.ts + courses.module-definition.ts beside the unit folders add-to-cart/, clear-cart/, course-enroll/, …
-      - id: case-2
-        when: Registration
-        write: |-
-          AddToCartSingleMutationModule.register({ … }) listed inside courses.module.ts; import alone is not registration
-      - id: case-3
-        when: Top aggregators
-        write: |-
-          mutations/mutations.module.ts, queries/queries.module.ts, graphql/graphql.module.ts, core/core.module.ts, api/api.module.ts, each with a .module-definition.ts
+    requirement: New features place protocol-neutral use cases/contracts in application/ and protocol
+      DTOs/controllers/resolvers/consumers in transport/<protocol>/. Use a direct <action>.use-case.ts by
+      default. Add command/query/handler files only for an adopted bus contract. Do not require forwarding
+      services, template bases, or a fixed file count. Existing transport-first layouts are explicitly mapped
+      compatibility profiles, not the default for new source.
+    rationale: Multiple entry protocols must share one scenario without importing transport DTOs into the
+      application layer.
     verification:
       automated: []
       manual:
-        - Confirm consuming app registers feature aggregator and CqrsModule; do
-          not treat direct handler construction as Nest wiring proof.
-    relatedExamples:
-      - graphql-command
-  - id: BE-FOLDER-4
-    title: One capability module
+        - Review application contracts for request-context, ORM entity and protocol DTO leaks.
+    relatedExamples: []
+  - id: BE-FOLDER-3
+    title: Registration is executable composition
     kind: mandatory
-    requirement: |-
-      A capability under src/modules/ lives as one cohesive folder with module, module-definition, service/providers/decorators as applicable, and local constants/enums/types/utils.
-    rationale: |-
-      Historical counts under src/modules (extraction provenance): .service.ts 396, .service.spec.ts 271, .entity.ts 197, .module.ts 116, .module-definition.ts 115, .listener.ts 18, .providers.ts 16, .decorators.ts 16, .guard.ts 11.
-    cases:
-      - id: case-1
-        when: modules/platform/winston/
-        write: |-
-          winston.module.ts · winston.module-definition.ts · winston.service.ts · winston.service.spec.ts · winston.providers.ts · winston.providers.spec.ts · winston.decorators.ts · config.ts · constants/ · enums/ · types/ · utils/
-      - id: case-2
-        when: modules/platform/throttler/
-        write: |-
-          throttler.module.ts · throttler.module-definition.ts · throttler.decorators.ts · config.ts · types.ts · enums/ · guards/ · types/ · utils/
-      - id: case-3
-        when: modules/ai/
-        write: |-
-          ai.module.ts · ai.module-definition.ts · ai-entitlement.service.ts (+ .spec.ts) · ai-invoke.service.ts · constants/ai-entitlement.constants.ts · balancer/ · ping/ · types/ · utils/
-      - id: case-4
-        when: Helper
-        write: |-
-          modules/bussiness/projections/user-stats/kpi-current.util.ts (.util.ts beside its types.ts)
+    requirement: The consuming Nest module imports actual feature/module registrations and exports only required
+      APIs. Fixed registration uses a static module. Add dynamic registration only for real caller
+      configuration or instance identity. A CQRS-selected feature must register its bus and handlers.
+    rationale: Import syntax and direct handler construction do not establish a working DI container.
     verification:
       automated: []
-      manual: []
-    relatedExamples:
-      - transactional-service
-  - id: BE-FOLDER-5
-    title: Exceptions have one home
+      manual:
+        - Boot the applicable app container and resolve real provider tokens.
+    relatedExamples: []
+  - id: BE-FOLDER-4
+    title: Capability shape follows owned behavior
     kind: mandatory
-    requirement: |-
-      Exception classes live under src/modules/platform/exceptions/errors/<domain>/<name>.ts. Transport mapping and exception enums live under the exceptions tree. New files follow the no-suffix form.
-    rationale: |
-
-    cases:
-      - id: case-1
-        when: Any exception class
-        write: |-
-          src/modules/platform/exceptions/errors/<domain>/<name>.ts — 294 files across ai/ api/ backup/ bento4/ cache/ cli/ coding/ community/ courses/ … at extraction (lint exception-in-errors-folder)
-      - id: case-2
-        when: The base
-        write: |-
-          errors/abstract.ts
-      - id: case-3
-        when: Transport mapping
-        write: |-
-          exceptions/filters/abstract-exception-http.filter.ts (+ .spec.ts)
-      - id: case-4
-        when: Enums used by exceptions
-        write: |-
-          exceptions/enums/ensure.ts, exceptions/enums/job.ts
-      - id: case-5
-        when: Legacy suffix (residual; not the pattern for new files)
-        write: |-
-          five files still end in .exception.ts under errors/mixin/; the 289 others carry no suffix
+    requirement: A capability has an explicit index.ts public API and meaningful providers/contracts/policies with
+      colocated tests. Add a Nest module only when DI registration is needed. Add module-definition only for
+      meaningful typed dynamic options. Keep helpers with their owner; do not create empty conventional
+      folders.
+    rationale: A capability boundary is useful independently of boilerplate.
     verification:
       automated:
-        - exception-in-errors-folder
-      manual: []
-    relatedExamples:
-      - graphql-command
-  - id: BE-FOLDER-6
-    title: Data
+        - BE_MODULE_IMPORTS_FEATURE
+        - BE_MODULE_IMPORTS_APP
+      manual:
+        - Check exported contracts, state owner and lifetime.
+    relatedExamples: []
+  - id: BE-FOLDER-5
+    title: Errors stay with their semantic owner
     kind: mandatory
-    requirement: |-
-      Entities, database enums and migrations live under the owning database module with the fixed suffixes and naming forms below.
-    rationale: |
-
-    cases:
-      - id: case-1
-        when: Entity
-        write: |-
-          modules/databases/postgresql/primary/entities/cart-item.entity.ts (197 .entity.ts, 92 with .entity.spec.ts at extraction); base entities/abstract.ts, abstract-projection.ts
-      - id: case-2
-        when: Enum
-        write: |-
-          modules/databases/postgresql/primary/enums/locale.ts, enums/action-type.ts (76 files export an enum here at extraction)
-      - id: case-3
-        when: Migration
-        write: |-
-          <timestamp>-<PascalCaseName>.ts, e.g. 1719200000000-AddIsEnrolledToEnrollments.ts — the only PascalCase file names in src/ (95 at extraction)
+    requirement: Domain error codes/types belong to the owning capability. Platform exceptions own generic error
+      representation and transport mapping infrastructure; transport adapters own protocol response
+      projection. Existing centralized Academy errors are a legacy profile whose lint must be migrated
+      coherently before moving classes. Do not copy feature policy into a generic error module.
+    rationale: Error mapping must not reverse dependencies or couple domain policy to HTTP/GraphQL.
     verification:
       automated: []
-      manual: []
+      manual:
+        - Review safe client projection and private cause/log separation.
+    relatedExamples: []
+  - id: BE-FOLDER-6
+    title: One persistence and migration owner
+    kind: mandatory
+    requirement: Entities, database constraints/enums and migrations belong to the declared named
+      database/persistence owner. In the new layout this may be
+      modules/platform/databases/<connection>/{entities,migrations}; existing modules/databases paths can be
+      mapped. Capability domain values are not automatically database enums. No feature transport owns a
+      second schema definition or migration history.
+    rationale: Explicit connection and schema ownership prevents competing migrations and wrong-tenant access.
+    verification:
+      automated: []
+      manual:
+        - Verify the data owner, actual connection token and transaction boundary.
     relatedExamples: []
   - id: BE-FOLDER-7
-    title: Tests
+    title: Tests belong to behavior
     kind: mandatory
-    requirement: |-
-      Unit and integration specs are colocated with their subjects by suffix; e2e/harness and shared mocks live under src/tests/.
-    rationale: |
-
-    cases:
-      - id: case-1
-        when: Unit
-        write: |-
-          <name>.spec.ts beside <name>.ts (875 at extraction)
-      - id: case-2
-        when: Integration
-        write: |-
-          <name>.int-spec.ts beside its subject (7 at extraction), e.g. graphql/schema-builds.int-spec.ts
-      - id: case-3
-        when: End-to-end and harness
-        write: |-
-          src/tests/e2e/, src/tests/harness/ (*.e2e-spec.ts, *.harness-spec.ts; jest-harness.json)
-      - id: case-4
-        when: Shared mocks
-        write: |-
-          src/tests/mocks/entity-manager.mock.ts imported as @tests/mocks/entity-manager.mock
+    requirement: Colocate unit/integration tests with their owner; keep shared fixtures and app/DB harnesses in
+      src/tests or the equivalent declared test root. Select boot, contract, concurrency and crash tests from
+      actual effects. Do not create empty tests for every conventional filename.
+    rationale: Useful evidence checks invariants at their real boundary.
     verification:
       automated: []
-      manual: []
-    relatedExamples:
-      - graphql-command
-      - transactional-service
+      manual:
+        - A mocked manager test is not database isolation, boot or remote-effect evidence.
+    relatedExamples: []
