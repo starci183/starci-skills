@@ -9,6 +9,13 @@ family: fe
 provenance:
   extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
   sources:
+    - src/app/[lang]/authentication/page.tsx
+    - src/app/[lang]/layout.tsx
+    - src/app/providers.tsx
+    - src/components/pages/AuthenticationPage/**
+    - src/components/blocks/auth/AuthenticationPanel/**
+    - src/hooks/auth/useAuthPanel.ts
+    - src/modules/api/graphql/**
     - src/components/**
     - src/hooks/**
     - src/modules/api/**
@@ -26,35 +33,35 @@ rules:
     title: Responsibility directories
     kind: mandatory
     requirement: |
-      Place a unit in the directory that owns its responsibility. Pages own routed screens; product
-      blocks and domain overlays own feature composition; reusable compositions own visual assembly;
-      leaves own narrow visual primitives. These roles form a partial dependency graph rather than a
-      total rank inferred from folder names.
+      Place code with its responsibility: app/ owns framework route/layout/provider adapters;
+      features/<feature>/ owns one product scenario and its page, UI, model and data lifecycle;
+      modules/<capability>/ owns cohesive reusable technical/domain capabilities; components/ owns
+      reusable product visuals; packages/grammar owns product-agnostic visual contracts. These roles
+      form a partial dependency graph rather than a total rank inferred from folder names.
     rationale: |
-      Stable roles make ownership discoverable while allowing a domain overlay or other composition
-      to keep its real feature responsibility.
+      Stable owners remain portable across a single source root and a monorepo. Existing Academy
+      pages/blocks/hooks are source mappings to assess, not a requirement to repeat their topology.
     cases:
       - id: case-1
-        when: "A reusable fixed visual unit"
-        write: "src/components/leaves/<Name>/ (40 units, flat)"
+        when: "A routed authentication scenario"
+        write: "src/features/authentication/{index.ts,page/,ui/,model/,data/}"
       - id: case-2
-        when: "A feature unit with a connected half"
+        when: "A reusable API client or session store"
         write: >
-          src/components/blocks/<domain>/<Name>/ (109 units under 11 domains:
-          ai auth coding commerce community courses dashboard learn locale profile search)
+          src/modules/api/ or src/modules/session/ with one explicit public index.ts entry
       - id: case-3
-        when: "A routed screen"
-        write: "src/components/pages/<Name>Page/ (50 units, flat)"
+        when: "A reusable product visual without scenario ownership"
+        write: "src/components/<role>/<Name>/ according to the repository's established visual tiers"
       - id: case-4
-        kind: exception
-        when: "Other composition tiers"
+        kind: residual
+        when: "Academy components/pages, components/blocks and hooks currently own a scenario"
         write: >
-          branches/, composites/, layouts/, overlays/. Existing product-shells/ is an unresolved
-          legacy exception, not a template for a new tier.
+          Treat those paths as migration evidence. Changed code follows its accepted SDS and moves only
+          when the bounded refactor owns the dependency closure.
     verification:
       automated: []
       manual:
-        - Confirm new units land in leaves/, blocks/<domain>/, or pages/, not product-shells/.
+        - Confirm the unit's responsibility and public entry, rather than assigning it by consumer count.
     relatedExamples:
       - connected-block
 
@@ -62,9 +69,9 @@ rules:
     title: Discoverable files for one unit
     kind: mandatory
     requirement: |
-      One unit is one PascalCase folder and uses the repository's sanctioned basenames. Add
-      component.tsx and the Base export only when the unit has a meaningful connected/presentational
-      boundary. classNames.ts is present only when the unit owns class strings.
+      A visual unit uses the repository's sanctioned basenames. Add component.tsx and a Base export only
+      when the unit has a meaningful connected/presentational boundary. Feature model/data files are
+      named for the use case they own. classNames.ts is present only when the unit owns class strings.
     rationale: |
       Stable basenames make class, tests, and an applicable connected/presentational split discoverable
       without requiring empty forwarding twins.
@@ -82,6 +89,11 @@ rules:
         when: "Single visual unit (leaves/ButtonStateSample/)"
         write: >
           classNames.ts · index.tsx — no component.tsx/Base twin is required without a separate world owner
+      - id: case-5
+        when: "Feature data/model"
+        write: >
+          data/use-authentication.ts, data/mapper.ts and model/auth-flow.ts; do not create empty
+          index/component pairs for nonvisual responsibilities
     notes: |
       Counts across pages (50): index.tsx 49, component.tsx 49, component.spec.tsx 42,
       index.spec.tsx 24, audit.json 22, classNames.ts 9. Across blocks (109): component.tsx 101,
@@ -137,43 +149,37 @@ rules:
     relatedExamples: []
 
   - id: FE-FOLDER-4
-    title: Data layer placement
+    title: Feature data and module placement
     kind: mandatory
     requirement: |
-      Read/write SWR hooks, auth/socket hooks, GraphQL documents and non-API modules live under their
-      sanctioned roots. Components reach hooks only through the hooks barrel.
+      Scenario-specific request lifecycle, mapping and documents live with their feature. Generic API
+      client/link/error plumbing lives in modules/api; shared session, routing, theme and toast capabilities
+      live in their owning modules. Generated wire contracts stay in the API or feature data adapter.
+      Reusable presentation does not import them. A global hooks barrel is not required.
     rationale: |
-      One door for data keeps transport paths mockable and prevents deep imports from components.
+      This separates product scenario ownership from reusable transport mechanics without creating a
+      global bucket for unrelated hooks.
     cases:
       - id: case-1
-        when: "A read hook"
-        write: "src/hooks/swr/useQuery<Thing>Swr.ts (80) with sibling .spec.ts"
+        when: "Authentication request lifecycle"
+        write: "src/features/authentication/data/use-authentication.ts"
       - id: case-2
-        when: "A write hook"
-        write: "src/hooks/swr/useMutate<Thing>Swr.ts (32) with sibling .spec.ts"
+        when: "Feature wire mapping"
+        write: "src/features/authentication/data/mapper.ts maps generated/wire values to the feature model"
       - id: case-3
-        when: "Auth / socket hooks"
-        write: "src/hooks/auth/useSessionToken.ts, src/hooks/socketio/**"
+        when: "Generic Apollo client/link chain"
+        write: "src/modules/api/client/create-apollo-client.ts"
       - id: case-4
-        when: "The one door for components"
-        write: >
-          src/hooks/index.ts re-exports hooks only ("Hooks ONLY. Types, cache keys and query modules
-          stay behind their own paths")
+        when: "Shared session storage"
+        write: "src/modules/session/session-store.ts, exported through src/modules/session/index.ts"
       - id: case-5
-        when: "A GraphQL document"
-        write: >
-          src/modules/api/graphql/queries/query-<thing>.ts,
-          src/modules/api/graphql/mutations/mutation-<thing>.ts
-      - id: case-6
-        when: "Response/request types"
-        write: "src/modules/api/graphql/queries/types/<thing>.ts"
-      - id: case-7
-        when: "Non-API modules"
-        write: "src/modules/{ai,code,learn,routing,search,theme,toast,types,utils}/"
+        kind: residual
+        when: "Legacy Academy data hooks under src/hooks"
+        write: "Keep compatibility imports bounded; new unrelated lifecycles do not expand the global barrel."
     verification:
       automated: []
       manual:
-        - Confirm components import hooks from @/hooks, not deep swr paths.
+        - Confirm each lifecycle has one feature owner and transport mechanics have one module owner.
     relatedExamples:
       - connected-block
 
@@ -211,29 +217,28 @@ rules:
     relatedExamples: []
 
   - id: FE-FOLDER-6
-    title: What a unit folder does not hold
+    title: Keep units cohesive
     kind: mandatory
     requirement: |
-      A unit folder does not hold a second component, inline class strings, a __tests__/ folder, a
-      helpers/ or utils/ folder, or deployment constants read via process.env.NEXT_PUBLIC_*.
+      A unit folder contains files that change for the same responsibility. Do not create generic helpers/
+      or utils/ buckets inside components, read deployment configuration in presentation, or split files
+      solely to meet a count. Collocated subordinate renders and pure helpers are valid when they remain
+      private to the owner; a separately stable responsibility receives its own named owner.
     rationale: |
-      Keeping one export per unit and relocating env reads to modules prevents duplicated environment
-      homes and helper sprawl inside components.
+      Cohesion prevents helper sprawl and duplicated configuration while avoiding one-component-per-folder
+      ceremony that has no dependency boundary.
     cases:
       - id: case-1
-        when: "A second component in the same folder"
+        when: "A small subordinate render is private to one owner"
         write: >
-          Not observed in 87 of 109 block folders; the unit is one export per index.tsx/component.tsx
+          Keep it local with an unexported contract; extract it when it gains a stable public responsibility.
       - id: case-2
         when: "Class strings in component.tsx"
         write: "Never; they go to classNames.ts (lint class-names-in-colocated-file, no-inline-class-name)"
       - id: case-3
-        when: "A __tests__/ folder"
-        write: "0 across src/; specs sit beside their file"
-      - id: case-4
         when: "A helpers/ or utils/ folder"
-        write: "0 under src/components (lint no-helper-folder-in-components)"
-      - id: case-5
+        write: "Do not use it to hide mixed feature, transport or visual responsibilities."
+      - id: case-4
         when: "A deployment constant"
         write: >
           Never. process.env.NEXT_PUBLIC_* lives under src/modules/ and is reached through the module
@@ -247,6 +252,7 @@ rules:
         - no-helper-folder-in-components
       manual:
         - Confirm no process.env.NEXT_PUBLIC_* reads inside component folders.
+        - Confirm extraction is justified by ownership or lifecycle rather than file length/count.
     relatedExamples: []
 openQuestions:
   - id: currency-and-locale-literals

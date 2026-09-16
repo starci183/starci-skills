@@ -77,11 +77,13 @@ rules:
     title: "Connected spec: mock the doors, assert the props handed down"
     kind: mandatory
     requirement: |
-      Connected specs hoist mock state, mock @/hooks and translation/router doors, replace the pure
-      twin wholesale, import the connected export after mocks, assert mapped props/actions, and reset
-      in beforeEach.
+      When a separate connected owner exists, its focused spec mocks the feature/module public doors and
+      framework translation/router adapters, replaces a separate render unit when useful, and asserts
+      resolved mapping/actions. It does not require a global hooks barrel or a render twin that production
+      does not own.
     rationale: |
-      Mocking the barrel and the pure twin isolates connected mapping without reaching the network.
+      Mocking owned boundaries isolates connected mapping without turning a repository-wide barrel into
+      architecture or manufacturing an extra production file for the test.
     cases:
       - id: case-1
         when: "Hoisted mock state"
@@ -90,20 +92,20 @@ rules:
           as string | undefined, cart: { data: undefined as unknown, error: undefined as unknown,
           isLoading: false, mutate: vi.fn() }, … }))
       - id: case-2
-        when: "The hooks barrel"
+        when: "The feature or module door"
         write: >
-          vi.mock("@/hooks", () => ({ useQueryMyCartSwr: () => mocks.cart,
-          useQueryCoursesCheckoutPreviewSwr: () => mocks.preview, … })) (25 of 61 block index specs)
+          vi.mock("@/features/cart", …) or mock the same-feature data module. Legacy Academy specs may
+          mock @/hooks while that compatibility surface remains.
       - id: case-3
         when: "Translation and routing"
         write: >
           vi.mock("next-intl", () => ({ useLocale: () => "en", useTranslations: () => (key: string) =>
           key })), vi.mock("@/i18n/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }))
       - id: case-4
-        when: "The pure twin"
+        when: "A real render unit"
         write: >
           vi.mock("./component", () => ({ CartBlockBase: (input: TestInput) => { mocks.input = input;
-          return <output data-testid="cart" /> } }))
+          return <output data-testid="cart" /> } })). Skip this case when no separate render unit exists.
       - id: case-5
         when: "Import after mocks"
         write: "import { CartBlock } from \"./index\" placed after the vi.mock calls"
@@ -198,7 +200,7 @@ rules:
         write: "0 toMatchSnapshot / toMatchInlineSnapshot in src/"
       - id: case-2
         when: "Network"
-        write: "never reached; @/hooks is mocked wholesale, which is why the barrel exists"
+        write: "never reached; mock the owning feature data or API-module boundary"
       - id: case-3
         when: "Translation content"
         write: "useTranslations: () => (key: string) => key — a spec asserts keys, not copy"

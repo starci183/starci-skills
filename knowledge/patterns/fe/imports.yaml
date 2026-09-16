@@ -30,14 +30,16 @@ rules:
     title: Paths
     kind: mandatory
     requirement: |
-      Cross-folder app imports use @/. Grammar objects come from @starci/grammar/common after verifying
-      installed exports. Same-unit imports use relative ./ paths. Type-only imports mark types.
+      Same-unit imports use relative paths. Cross-folder imports inside one configured source root may
+      use that root's declared alias. Cross-package imports use the dependency package name and a declared
+      package export. Grammar objects come from a verified installed family entry. Type-only imports mark types.
     rationale: |
-      A single alias and verified public Grammar entry prevent deep-path and retired-alias drift.
+      Aliases are source-root conveniences, while package exports are ownership contracts. TypeScript
+      paths do not create or replace a package API.
     cases:
       - id: case-1
-        when: "Anything under src/ from another folder"
-        write: "\"@/…\" — the only alias (\"@/*\": [\"./src/*\"]); 459 files use it"
+        when: "Another owner under the same configured src root"
+        write: "Use the repository's resolved alias, such as @/features/authentication."
       - id: case-2
         when: "A Grammar object"
         write: >
@@ -54,8 +56,13 @@ rules:
       - id: case-5
         when: "Type only"
         write: >
-          import type { AuthMode } from "@/hooks/auth/useAuthPanel", import { type CourseDetail } from
-          "…" (274 files)
+          import type { AuthenticationMode } from "@/features/authentication"; type-only syntax does
+          not permit bypassing an owner or package public entry.
+      - id: case-6
+        when: "A local file dependency or workspace package"
+        write: >
+          Import @starci/grammar/common through package.json exports; never reach packages/grammar/src
+          through @/ or a tsconfig path.
     verification:
       automated: []
       manual:
@@ -97,38 +104,40 @@ rules:
     relatedExamples: []
 
   - id: FE-IMPORTS-3
-    title: Data enters a block through the hooks barrel
+    title: Data enters through the owning feature or module
     kind: mandatory
     requirement: |
-      Blocks import hooks from @/hooks, never deep @/hooks/swr/… paths. Hooks reach transport modules
-      themselves. Types are not re-exported by the barrel.
+      A connected feature unit imports its data lifecycle from that feature's public or same-unit entry.
+      The data owner reaches transport through the API module's public entry. Reusable presentation does
+      not import data hooks. A repository-wide hooks barrel is optional and never substitutes for ownership.
     rationale: |
-      The barrel is the mock door for connected specs and keeps transport behind hooks.
+      Feature/module entries keep scenario and transport boundaries visible. A global hook barrel groups
+      unrelated lifecycles and becomes a mock convention rather than an architecture contract.
     cases:
       - id: case-1
-        when: "A block reads or writes"
+        when: "Authentication owns a browser request lifecycle"
         write: >
-          import { useQueryCourseSwr } from "@/hooks" (82 block files import @/hooks); the barrel
-          docblock: "A block imports @/hooks, never @/hooks/swr/useQuerySomethingSwr"
+          import { useAuthentication } from "@/features/authentication" or use a same-feature relative
+          import while building that public entry.
       - id: case-2
-        when: "A hook reaches the transport"
+        when: "A feature data owner reaches GraphQL"
         write: >
-          import { queryCourse } from "../../modules/api/graphql/queries/query-course" (57 hook files)
-          or from "@/modules/api/…" (56 hook files) — evenly split, see open question
+          Import the typed operation/client through @/modules/api or a feature-owned data adapter;
+          do not import it from presentation.
       - id: case-3
-        when: "A type from the data layer"
+        when: "A presentation needs a feature model"
         write: >
-          import type { CourseAdvisorRecommendation } from "@/modules/ai/course-advisor-response" —
-          types are not re-exported by the barrel
+          Import the feature/view type through the feature entry, not a GraphQL response or Apollo type.
       - id: case-4
-        when: "Auth identity"
+        kind: residual
+        when: "Legacy code uses src/hooks/index.ts"
         write: >
-          import { useViewerKey } from "@/hooks/auth/useViewerKey" inside hooks; components mock
-          "@/hooks/auth/useSessionToken" in specs
+          Treat the barrel as a compatibility surface while moving changed scenario ownership to its
+          feature. Do not add unrelated exports merely to preserve the global barrel pattern.
     verification:
       automated: []
       manual:
-        - Confirm components do not deep-import @/hooks/swr/*.
+        - Confirm a data lifecycle has a feature owner and reusable presentation does not import it.
     relatedExamples:
       - connected-block
 
@@ -136,33 +145,32 @@ rules:
     title: Responsibility direction
     kind: mandatory
     requirement: |
-      Framework adapters import page/shell owners; pages and feature compositions import reusable
-      visual units and Grammar; reusable units import lower visual/Grammar responsibilities. A resolved
-      presentation contract never imports the data layer at runtime. Directory names are evidence,
-      not an absolute total rank: classify domain overlays and other compositions by responsibility.
+      Framework adapters import feature/page or shell owners; features import reusable modules and visual
+      contracts; modules import lower capabilities or vendors; product visuals import Grammar. Dependencies
+      never point from a module/Grammar back to a feature or app. A resolved presentation contract never
+      imports the data layer at runtime. Directory names are evidence, not an absolute total rank.
     rationale: |
       One-way responsibility direction keeps route/product/data ownership above reusable presentation
       across single-source repositories and workspaces.
     cases:
       - id: case-1
-        when: "Page → block"
+        when: "Route → feature page"
         write: >
-          import { AuthenticationPanel } from "@/components/blocks/auth/AuthenticationPanel" (48 of 50
-          pages import blocks; 11 import leaves; 8 import hooks; 1 imports modules)
+          import { AuthenticationPage } from "@/features/authentication"
       - id: case-2
-        when: "Block → leaf, branch, Grammar, hooks, modules"
+        when: "Feature → module and visual contract"
         write: >
-          import { CodeBlock } from "@/components/leaves/CodeBlock", import { Article } from
-          "@/components/branches/Article" (82 blocks import hooks, 67 import modules)
+          The feature data adapter imports @/modules/api; the feature view imports reusable visuals and
+          @starci/grammar/common.
       - id: case-3
-        when: "Leaf → Grammar and vendor only"
+        when: "Reusable visual → Grammar and approved vendor"
         write: >
           import type { ButtonVariant } from "@starci/grammar/common"; world-reading hooks or imports
           from higher tiers are not valid leaf precedents
       - id: case-4
         kind: residual
-        when: "Upward import"
-        write: "block → page observed once; leaf → block observed once; neither is a pattern"
+        when: "Academy components/blocks/pages encode current feature composition"
+        write: "Map their actual responsibility before moving them; the folder label alone is not authority."
       - id: case-5
         when: "Pure half → data layer"
         write: "never at runtime; 18 component.tsx files use import type from @/modules/api/graphql/queries/… only"
@@ -208,15 +216,15 @@ rules:
     title: Re-exports
     kind: mandatory
     requirement: |
-      The hooks barrel re-exports one named hook per line, never export *. Grammar family entries use
-      named re-exports with .js suffixes. Block/page index re-exporting ./component is residual, not
-      required.
+      Feature, module and package public entries use explicit named exports for their supported contract,
+      never `export *` across ownership boundaries. Grammar family entries use named re-exports with the
+      package's emitted suffix convention. Local block/page re-exporting remains optional.
     rationale: |
       Explicit named re-exports keep the public surface auditable.
     cases:
       - id: case-1
-        when: "The hooks barrel"
-        write: "export { useMutateAddToCartSwr } from \"./swr/useMutateAddToCartSwr\" — one line per hook, no export *"
+        when: "A feature public entry"
+        write: "Export its route-facing entry, application contract and intended hooks explicitly."
       - id: case-2
         when: "Grammar family entry"
         write: >
@@ -237,7 +245,8 @@ rules:
     title: Forbidden
     kind: mandatory
     requirement: |
-      Do not deep-import hooks from components, default-export from src/components, inline
+      Do not bypass another owner or package public entry, let resolved presentation runtime-import
+      transport, default-export from reusable src/components, inline
       eslint-disable, use namespace outside the configured exception, import Grammar from the package
       root or mixed families, load a second family stylesheet under one root, clone Common shell
       geometry, or put product names/business logic into Grammar public exports.
@@ -245,8 +254,8 @@ rules:
       These bans protect mockability, lint integrity and Grammar family boundaries.
     cases:
       - id: case-1
-        when: "Deep hook path from a component"
-        write: "\"@/hooks/swr/useQueryCourseSwr\" — escapes vi.mock(\"@/hooks\")"
+        when: "A reusable visual imports a data hook or a consumer deep-imports another feature"
+        write: "Move lifecycle to the feature owner or consume the owner's explicit public entry."
       - id: case-2
         when: "Default export from src/components"
         write: "0 exist"
@@ -298,7 +307,8 @@ openQuestions:
   - id: hooks-to-modules-api-path-style
     summary: |
       Hooks reach modules/api through ../../modules/api/… in 57 files and @/modules/api/… in 56.
-      No variant dominates; this file does not choose.
+      This is historical Academy debt. New or changed feature owners use a same-feature relative path
+      and consume the API module through its public entry; no global path style is inferred from counts.
   - id: connected-index-reexport-component
     summary: |
       export * from "./component" at the end of a connected index.tsx is present in 19/95 blocks
