@@ -19,6 +19,12 @@ specifications/v2.mjs
 kernel/chains.mjs
 approvals/policy.mjs
 checks/brand.mjs
+checks/architecture.mjs
+checks/architecture/index.mjs
+checks/architecture/config.mjs
+checks/architecture/typescript.mjs
+checks/architecture/backend.mjs
+checks/architecture/frontend.mjs
 checks/stacks.mjs
 checks/render.mjs
 execution/contracts.mjs

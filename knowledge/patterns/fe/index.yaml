@@ -32,6 +32,10 @@ provenance:
     Verify installed Grammar exports at the public entry @starci/grammar/common; do not revive stale
     @grammar/* aliases as canonical.
 topics:
+  - path: architecture-check.yaml
+    title: Architecture check
+    decides: "Enforceable one-page routes, downward UI tiers, and pure/connected data boundaries"
+    rules: "FE-ARCHITECTURE-1 … FE-ARCHITECTURE-3"
   - path: folder.yaml
     title: Folder
     decides: "Tier directories, the file set of one unit, what a unit folder may not hold"

@@ -37,6 +37,7 @@ Usage:
   starci workspace init <work-root> --id <workspace-id>
   starci storage <backend-root>
   starci source-layout <backend-root> <frontend-root>
+  starci architecture check <repo-root> [--config <repository-relative.json>]
   starci stacks check <repo-root> --environment dev|vps --deployment-model <rendered.yaml-or-json>
   starci validate <work-root>
   starci identity set <slug> --name <VAR> [--work-root <path>] [--expected-write-revision <revision|none>]   (the value is read from stdin, never printed)
@@ -176,6 +177,18 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
   try {
     const [command, ...args] = argv;
     if (!command || ['--help', '-h', 'help'].includes(command)) { emit(help); return 0; }
+    if(command==='architecture'){
+      const [action,repoRoot,...rest]=args;
+      if(action!=='check'||!repoRoot||repoRoot.startsWith('--'))throw Error('Use starci architecture check <repo-root> [--config <repository-relative.json>].');
+      let configFile;
+      if(rest.length){
+        if(rest.length!==2||rest[0]!=='--config'||!rest[1]||rest[1].startsWith('--'))throw Error('Invalid architecture check options.');
+        configFile=rest[1];
+      }
+      const {checkArchitecture}=await import('../checks/architecture.mjs');
+      const result=checkArchitecture({repositoryRoot:repoRoot,configFile});
+      emit(result);return result.ok?0:1;
+    }
     if(command==='stacks'){
       const [action,repoRoot,...rest]=args;
       if(action!=='check'||!repoRoot||repoRoot.startsWith('--'))throw Error('Use starci stacks check <repo-root> --environment dev|vps --deployment-model <rendered.yaml-or-json>.');

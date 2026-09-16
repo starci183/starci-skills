@@ -1,0 +1,89 @@
+schema: starci/knowledge-source@1
+id: fe.architecture-check
+title: Enforceable frontend architecture boundaries
+purpose: |-
+  State the route, tier, pure-component, hook, and transport boundaries enforced by the portable architecture check.
+appliesTo:
+  - frontend
+family: fe
+provenance:
+  sources:
+    - tsconfig.json
+    - src/app/**/page.tsx
+    - src/components/**
+    - src/hooks/**
+    - src/modules/api/**
+    - knowledge/patterns/fe/folder.yaml
+    - knowledge/patterns/fe/function.yaml
+    - knowledge/patterns/fe/imports.yaml
+  limitations: |-
+    Static TypeScript and JSX analysis does not prove rendered behavior, data correctness, or dependencies whose names are constructed dynamically. The selected repository's tsconfig and installed TypeScript remain the resolution authority.
+rules:
+  - id: FE-ARCHITECTURE-1
+    title: A route mounts one page
+    kind: mandatory
+    requirement: |-
+      Each page.tsx default-exports a local route function that mounts exactly one component from the pages tier and creates no additional drawing tree or conditional drawing decision.
+    rationale: |-
+      Route files select a screen while drawing ownership stays in components/pages.
+    cases:
+      - id: case-1
+        when: A product route
+        write: Import one page, define a local Route const that mounts it, and default-export Route.
+      - id: case-2
+        when: Shared navigation or shell is required
+        write: Compose it in the page or route layout rather than adding a second drawing root to page.tsx.
+    verification:
+      automated:
+        - FE_ROUTE_DEFAULT_EXPORT
+        - FE_ROUTE_ONE_PAGE
+        - FE_ROUTE_DRAWING_DECISION
+      manual: []
+    relatedExamples: []
+  - id: FE-ARCHITECTURE-2
+    title: UI tiers point downward
+    kind: mandatory
+    requirement: |-
+      Pages compose lower tiers; blocks compose composites, branches, overlays, and leaves; leaves do not reach higher component tiers. Relative paths, aliases, and re-export barrels have the same direction.
+    rationale: |-
+      A resolved dependency direction prevents path spelling or a barrel from hiding upward coupling.
+    cases:
+      - id: case-1
+        when: A page needs product behavior
+        write: Compose a block.
+      - id: case-2
+        when: A leaf needs higher-tier state
+        write: Accept resolved props; do not import the higher tier.
+    verification:
+      automated:
+        - FE_TIER_IMPORTS_UPWARD
+      manual: []
+    relatedExamples: []
+  - id: FE-ARCHITECTURE-3
+    title: Connected code owns data and world context
+    kind: mandatory
+    requirement: |-
+      Connected component entries use the hooks barrel. Pure component.tsx files have no client directive, world hook, router/locale import, or runtime path to hooks/API transport. Hooks own transport access, and raw fetch stays under the API transport root.
+    rationale: |-
+      Pure render units remain deterministic while request lifecycle and world state have one explicit owner.
+    cases:
+      - id: case-1
+        when: A connected component needs data
+        write: Import a named hook from the configured hooks/index barrel.
+      - id: case-2
+        when: A pure component needs data or an action
+        write: Receive the resolved value or callback through props.
+      - id: case-3
+        when: A hook sends a request
+        write: Call a function under the configured API transport root.
+    verification:
+      automated:
+        - FE_COMPONENT_DEEP_HOOK_IMPORT
+        - FE_COMPONENT_IMPORTS_TRANSPORT
+        - FE_PURE_CLIENT_BOUNDARY
+        - FE_PURE_WORLD_HOOK
+        - FE_PURE_WORLD_IMPORT
+        - FE_PURE_REACHES_DATA
+        - FE_FETCH_OUTSIDE_TRANSPORT
+      manual: []
+    relatedExamples: []

@@ -1,0 +1,66 @@
+schema: starci/knowledge-source@1
+id: be.architecture-check
+title: Enforceable backend architecture boundaries
+purpose: |-
+  State the backend dependency and application-composition boundaries enforced by the portable architecture check.
+appliesTo:
+  - backend
+family: be
+provenance:
+  sources:
+    - tsconfig.json
+    - src/modules/**
+    - src/features/**
+    - apps/*/src/{main.ts,app.module.ts}
+  limitations: |-
+    Static TypeScript dependency analysis does not prove Nest dependency-injection bindings, provider scope, runtime registration, or business behavior. The selected repository's tsconfig and installed TypeScript remain the resolution authority.
+rules:
+  - id: BE-ARCHITECTURE-1
+    title: Dependency direction
+    kind: mandatory
+    requirement: |-
+      Runtime dependencies point from apps to features to modules. A module cannot reach a feature or app, and a feature cannot reach an app, whether the import is relative, aliased, or hidden behind a re-export barrel.
+    rationale: |-
+      Capabilities stay reusable when entry surfaces and composition roots cannot flow back into them.
+    cases:
+      - id: case-1
+        when: A module needs another capability
+        write: Import another module through the target repository's configured path or relative path.
+      - id: case-2
+        when: A feature exposes a door
+        write: Compose modules; do not import an executable app.
+      - id: case-3
+        when: An internal alias or relative import cannot resolve
+        write: Treat it as a configuration/source error, not a passing architecture check.
+    verification:
+      automated:
+        - BE_MODULE_IMPORTS_FEATURE
+        - BE_MODULE_IMPORTS_APP
+        - BE_FEATURE_IMPORTS_APP
+        - ARCH_INTERNAL_IMPORT_UNRESOLVED
+      manual: []
+    relatedExamples: []
+  - id: BE-ARCHITECTURE-2
+    title: Apps are composition roots
+    kind: mandatory
+    requirement: |-
+      apps/<name>/src contains executable entry, root module, and narrowly named bootstrap configuration. Business services, providers, resolvers, controllers, handlers, repositories, and entities live under src/features or src/modules.
+    rationale: |-
+      A thin app owns assembly and process startup while product behavior remains testable and reusable below it.
+    cases:
+      - id: case-1
+        when: Process entry
+        write: apps/<name>/src/main.ts
+      - id: case-2
+        when: Nest composition
+        write: apps/<name>/src/app.module.ts
+      - id: case-3
+        kind: exception
+        when: Bootstrap-only environment configuration
+        write: A narrowly named config, environment, constants, or types file under bootstrap/, config/, or env/; role-suffixed business/provider files remain forbidden there.
+    verification:
+      automated:
+        - BE_APP_COMPOSITION_ONLY
+        - BE_APP_BUSINESS_ROLE
+      manual: []
+    relatedExamples: []
