@@ -4399,7 +4399,7 @@ test('the kernel holds its launch in the repository runtime ledger and clears th
     assert.equal(ledger().schema,'starci/runtime-loads@1');
     assert.deepEqual(ledger().runtimes[launched.runtime].live.map(item=>[item.workflow,item.op]),
       [[harness.store.id,'op-intake']]);
-    assert.equal(ledger().runtimes[launched.runtime].usedToday,1);
+    assert.equal(ledger().runtimes[launched.runtime].usedToday,0,'reservation and launch are projected work, not completed service');
     // The report lands: the slot is released locally and the entry leaves the shared ledger with it.
     scripts['op-intake'].push(doneReport(intakeFile,'sales'));
     harness.run({allocator,maxIterations:2});

@@ -5,9 +5,9 @@ import path from 'node:path';
  * The shared runtime ledger of one repository: `<workflowsRoot>/runtime-loads.json`. Several workflows run at
  * once, each with its own kernel and its own allocator, so nothing but this file tells one kernel that another
  * is already on `claude-fable-5.1` and that a provider parked it two minutes ago. The ledger carries exactly
- * three facts per runtime - which workflow runs which operation on it, until when a provider limit cools it
- * down, and how many operations the repository spent on it today - and it never carries a quota: a quota is a
- * workflow's own cap and stays in that workflow's state.
+ * facts per runtime - which workflow reserves/runs which operation, recent settled service durations, shared
+ * provider cooldown and compatibility daily counters. It never carries provider quota; the probed budget is a
+ * separate fresh observation.
  *
  * Several kernels write the file, so a write takes a `.lock` beside it (pid plus timestamp, retried with short
  * waits, stale after 30 s), rewrites the whole document into a temp file and renames it into place. Reading is
@@ -21,6 +21,9 @@ export const LOADS_FILE='runtime-loads.json';
 export const LOCK_STALE_MS=30000;
 export const LOCK_WAIT_MS=20;
 export const LOCK_RETRIES=40;
+/** Completed service is relevant only while it can describe current quota/load conditions. */
+export const SERVICE_OBSERVATION_MS=6*60*60*1000;
+export const MAX_SERVICE_OBSERVATIONS=256;
 /** Only a provider limit is everyone's: a rate limit and an exhausted quota are shared, a local failure is not. */
 export const SHARED_COOLING_KINDS=['rate-limited','quota'];
 
@@ -61,14 +64,22 @@ function adopt(raw,{now,own,alive}){
     const live=(Array.isArray(entry.live)?entry.live:[])
       .filter(item=>plain(item)&&typeof item.workflow==='string'&&item.workflow&&typeof item.op==='string'&&item.op)
       .filter(item=>item.workflow===own||alive(item.workflow))
-      .map(item=>({workflow:item.workflow,op:item.op,since:Number.isFinite(item.since)?item.since:at}));
+      .map(item=>({workflow:item.workflow,op:item.op,since:Number.isFinite(item.since)?item.since:at,phase:item.phase==='reserved'?'reserved':'launched',
+        launchedAt:Number.isFinite(item.launchedAt)?item.launchedAt:null,
+        estimateMs:Number.isFinite(item.estimateMs)&&item.estimateMs>0?item.estimateMs:null,
+        role:text(item.role,40),difficulty:text(item.difficulty,20)}));
     const cool=plain(entry.cooling)&&Number.isFinite(entry.cooling.until)&&entry.cooling.until>at
       ?{until:entry.cooling.until,reason:text(entry.cooling.reason),kind:text(entry.cooling.kind,40),workflow:text(entry.cooling.workflow,120)}
       :null;
     const day=typeof entry.day==='string'&&entry.day?entry.day:today;
-    runtimes[id]={live,cooling:cool,usedToday:day===today&&Number.isFinite(entry.usedToday)?Math.max(0,entry.usedToday):0,day:day===today?day:today};
+    const history=(Array.isArray(entry.history)?entry.history:[])
+      .filter(item=>plain(item)&&Number.isFinite(item.at)&&item.at>=at-SERVICE_OBSERVATION_MS&&Number.isFinite(item.durationMs)&&item.durationMs>=0)
+      .map(item=>({workflow:text(item.workflow,120),op:text(item.op,160),at:item.at,durationMs:item.durationMs,
+        role:text(item.role,40),difficulty:text(item.difficulty,20)}))
+      .sort((a,b)=>a.at-b.at).slice(-MAX_SERVICE_OBSERVATIONS);
+    runtimes[id]={live,history,cooling:cool,usedToday:day===today&&Number.isFinite(entry.usedToday)?Math.max(0,entry.usedToday):0,day:day===today?day:today};
   }
-  return {schema:RUNTIME_LOADS,at,runtimes};
+  return {schema:RUNTIME_LOADS,revision:Number.isInteger(raw?.revision)?raw.revision:0,at,runtimes};
 }
 
 /**
@@ -80,16 +91,17 @@ export function readLoads({path:file,workflow=null,now=Date.now,alive=null}={}){
   const root=path.dirname(String(file??''));
   const isAlive=alive??(id=>kernelAliveAt(root,id));
   const raw=file?readRaw(file):null;
-  const empty={ok:false,schema:RUNTIME_LOADS,at:now(),runtimes:{},loads:{},ops:{},cooling:{}};
+  const empty={ok:false,schema:RUNTIME_LOADS,revision:0,at:now(),runtimes:{},loads:{},ops:{},cooling:{},history:{}};
   if(!plain(raw)||!plain(raw.runtimes))return empty;
   const ledger=adopt(raw,{now,own:workflow,alive:isAlive});
-  const loads={},ops={},cooling={};
+  const loads={},ops={},cooling={},history={};
   for(const [id,entry] of Object.entries(ledger.runtimes)){
     const outside=entry.live.filter(item=>item.workflow!==workflow);
     if(outside.length){loads[id]=outside.length;ops[id]=outside;}
+    if(entry.history.length)history[id]=entry.history;
     if(entry.cooling)cooling[id]=entry.cooling;
   }
-  return {ok:true,...ledger,loads,ops,cooling};
+  return {ok:true,...ledger,loads,ops,cooling,history};
 }
 
 /** The lock beside the ledger. A lock whose pid is dead or whose stamp is older than `staleMs` is broken. */
@@ -130,12 +142,14 @@ export function createLoadsLedger({path:file,workflow,now=Date.now,alive=null,re
   need(typeof workflow==='string'&&workflow.trim(),'A shared runtime ledger needs the workflow id that writes it');
   const root=path.dirname(file);
   const isAlive=alive??(id=>kernelAliveAt(root,id));
-  const entryOf=(ledger,runtime)=>(ledger.runtimes[runtime]=ledger.runtimes[runtime]??{live:[],cooling:null,usedToday:0,day:utcDay(now())});
+  const entryOf=(ledger,runtime)=>(ledger.runtimes[runtime]=ledger.runtimes[runtime]??{live:[],history:[],cooling:null,usedToday:0,day:utcDay(now())});
   const mutate=change=>{
     const lock=acquire(file,{now,retries,waitMs,staleMs,sleep});
     try{
       const ledger=adopt(readRaw(file),{now,own:workflow,alive:isAlive});
       const result=change(ledger);
+      if(plain(result)&&result.skipWrite)return {ok:true,locked:lock.locked,ledger,...result};
+      ledger.revision+=1;
       writeAtomic(file,ledger);
       return {ok:true,locked:lock.locked,ledger,...(plain(result)?result:{})};
     }catch(error){return {ok:false,locked:lock.locked,reason:String(error?.message??error).slice(0,200)};}
@@ -145,23 +159,45 @@ export function createLoadsLedger({path:file,workflow,now=Date.now,alive=null,re
     schema:RUNTIME_LOADS,file,workflow,
     /** The other kernels' loads and every shared cooldown; an unreadable file reads as nothing shared. */
     read(){return readLoads({path:file,workflow,now,alive:isAlive});},
-    /** An operation actually launched on a runtime: one live entry, and the day's count for the repository. */
-    launched({runtime,op}){
+    /** Compare-and-reserve: a selector that read an older revision retries instead of overbooking stale headroom. */
+    reserved({runtime,op,estimateMs=null,role=null,difficulty=null,expectedRevision=null}){
+      if(!runtime||!op)return null;
+      return mutate(ledger=>{
+        if(Number.isInteger(expectedRevision)&&ledger.revision!==expectedRevision)return {conflict:true,expectedRevision,actualRevision:ledger.revision,skipWrite:true};
+        const entry=entryOf(ledger,runtime);
+        entry.live=[...entry.live.filter(item=>!(item.workflow===workflow&&item.op===op)),{workflow,op,since:now(),phase:'reserved',
+          estimateMs:Number.isFinite(estimateMs)&&estimateMs>0?estimateMs:null,role:text(role,40),difficulty:text(difficulty,20)}];
+        return {reserved:true,revision:ledger.revision+1};
+      });
+    },
+    /** An operation actually launched on a runtime: one live reservation. Completion is charged on release. */
+    launched({runtime,op,estimateMs=null,role=null,difficulty=null}){
       if(!runtime||!op)return null;
       return mutate(ledger=>{
         const entry=entryOf(ledger,runtime);
-        entry.live=[...entry.live.filter(item=>!(item.workflow===workflow&&item.op===op)),{workflow,op,since:now()}];
-        entry.usedToday+=1;
+        const prior=entry.live.find(item=>item.workflow===workflow&&item.op===op);
+        entry.live=[...entry.live.filter(item=>!(item.workflow===workflow&&item.op===op)),{workflow,op,since:prior?.since??now(),phase:'launched',launchedAt:now(),
+          estimateMs:Number.isFinite(estimateMs)&&estimateMs>0?estimateMs:null,role:text(role,40),difficulty:text(difficulty,20)}];
       });
     },
-    /** An operation ended: its own entry goes, and without an op id the oldest entry of this workflow does. */
-    released({runtime,op=null}){
+    /**
+     * An operation settled: its reservation goes. Only observed work (`completed:true`) enters the rolling
+     * service history; failed/no-effect admission releases capacity without manufacturing completed service.
+     */
+    released({runtime,op=null,completed=false}){
       if(!runtime)return null;
       return mutate(ledger=>{
         const entry=entryOf(ledger,runtime);
         const mine=entry.live.filter(item=>item.workflow===workflow);
         const drop=op?mine.find(item=>item.op===op):mine.sort((a,b)=>a.since-b.since)[0];
-        if(drop)entry.live=entry.live.filter(item=>item!==drop);
+        if(drop){
+          entry.live=entry.live.filter(item=>item!==drop);
+          if(completed){
+            entry.usedToday+=1;
+            entry.history=[...(entry.history??[]),{workflow,op:drop.op,at:now(),durationMs:Math.max(0,now()-(drop.launchedAt??drop.since)),role:drop.role,difficulty:drop.difficulty}]
+              .filter(item=>item.at>=now()-SERVICE_OBSERVATION_MS).slice(-MAX_SERVICE_OBSERVATIONS);
+          }
+        }
         return {dropped:drop?drop.op:null};
       });
     },

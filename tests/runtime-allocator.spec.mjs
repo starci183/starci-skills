@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
-import {ALLOCATION,withProviderPreference,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,budgetBand,classifyFailure,createAllocator,sequentialRuntimes} from '../kernel/schedule.mjs';
+import {ADAPTIVE_CAPACITY,ALLOCATION,withProviderPreference,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,budgetBand,classifyFailure,createAllocator,sequentialRuntimes} from '../kernel/schedule.mjs';
 import {RUNTIME_LOADS,loadsFile,loadsFileFor,readLoads} from '../kernel/loads.mjs';
 
 const profile=parseYaml(fs.readFileSync(new URL('../model/runtimes.yaml',import.meta.url),'utf8'));
@@ -467,7 +467,7 @@ test('two kernels write the one ledger under a lock and both their launches surv
   two.allocate('architecture.decide');two.launched('claude-fable-5.1',{op:'op-second'});
   const entry=shared.read().runtimes['claude-fable-5.1'];
   assert.deepEqual(entry.live.map(item=>[item.workflow,item.op]),[[first,'op-first'],[second,'op-second']]);
-  assert.equal(entry.usedToday,2);
+  assert.equal(entry.usedToday,0,'admitted/live reservations are not reported as completed service');
   assert.equal(shared.read().schema,RUNTIME_LOADS);
   // Each writer released the lock, and each kernel counts only the other one's operation as shared load.
   assert.equal(fs.existsSync(`${shared.file}.lock`),false);
@@ -524,48 +524,79 @@ test('model eligibility is filtered before provider budget ranking and returns i
   assert.equal(picked.ok,true);assert.notEqual(picked.runtime,'gpt-5.6-sol');assert.equal(picked.eligibility.mode,'qualified');assert.ok(decisions.length>=profile.maxParallelOps);
 });
 
-test('the owner provider order moves every preference and tier onto the named providers first and still overflows to the rest',()=>{
-  const preferred=withProviderPreference(profile,['codex','qwen','claude']);
-  const providersOf=list=>list.map(id=>profile.runtimes[id].provider);
-  assert.deepEqual(providersOf(preferred.allocation.preference.plan),['codex','codex','claude','claude']);
-  assert.deepEqual(preferred.allocation.preference.plan,['gpt-6-astra','gpt-5.6-sol','claude-fable-5.1','claude-opus'],'within one provider the authored order is kept');
-  assert.deepEqual(providersOf(preferred.allocation.tiers.easy),['codex','qwen','claude']);
-  assert.deepEqual(providersOf(preferred.allocation.tiers.hard.decide),['codex','codex','claude','claude']);
-  assert.deepEqual([...preferred.allocation.preference.implement].sort(),[...profile.allocation.preference.implement].sort(),'no runtime is dropped, so overflow still reaches every one of them');
-  assert.deepEqual(preferred.allocation.providerOrder,['codex','qwen','claude']);
-  assert.deepEqual(profile.allocation.preference.plan,['claude-fable-5.1','gpt-6-astra','claude-opus','gpt-5.6-sol'],'the authored profile is not mutated');
-  assert.equal(withProviderPreference(profile,[]),profile,'no order named, nothing reordered');
-  const partial=withProviderPreference(profile,['qwen']);
-  assert.deepEqual(partial.allocation.preference.verify,['qwen3.8-flash','gpt-5.6-sol','claude-fable-5.1','gpt-6-astra','claude-opus'],'providers the owner did not name keep their authored order behind the named one');
+test('adaptive policy keeps tiers as suitability sets and records one bounded owner preference instead of a chain',()=>{
+  const adaptive=withProviderPreference(profile,{mode:'adaptive',preferredProvider:'codex',source:'allocation'});
+  assert.equal(adaptive.allocation.policy,ADAPTIVE_CAPACITY);
+  assert.deepEqual(adaptive.allocation.ownerPolicy,{mode:'adaptive',preferredProvider:'codex',preferenceMultiplier:1.25,source:'allocation'});
+  assert.deepEqual(adaptive.allocation.preference,profile.allocation.preference,'runtime/model order remains the within-family suitability order');
+  assert.deepEqual(adaptive.allocation.tiers,profile.allocation.tiers,'difficulty eligibility is unchanged');
+  assert.equal(profile.allocation.policy,PREFER_THEN_OVERFLOW,'the authored compatibility profile is not mutated');
 });
 
-test('a named provider order outranks the probed window, and an exhausted window still overflows past the owner choice',()=>{
-  const at=Date.UTC(2026,8,15,9);
-  const budgetAt=(claude,codex)=>({schema:'starci/runtime-budget@1',at,providers:{
-    claude:{status:'ok',windows:{session:{usedPercent:5,resetsAt:at+3_600_000,minutes:300},weekly:{usedPercent:claude,resetsAt:at+86_400_000,minutes:10080},fableWeekly:{usedPercent:claude,resetsAt:at+86_400_000,minutes:10080}}},
-    codex:{status:'ok',windows:{weekly:{usedPercent:codex,resetsAt:at+86_400_000,minutes:10080}}}}});
-  // The owner's provider has clearly less of its week left than the one they did not pick.
-  const rich=budgetAt(20,60),preferred=withProviderPreference(profile,['codex','qwen','claude']);
-  assert.equal(createAllocator({runtimes:profile,now:()=>at,budget:rich}).allocate('work.author').runtime,'claude-fable-5.1','without an order the fuller window leads');
-  const owned=createAllocator({runtimes:preferred,now:()=>at,budget:rich}).allocate('work.author');
-  assert.equal(owned.runtime,'gpt-6-astra','the owner order leads, even against a window with more left');
-  assert.deepEqual(owned.sparedOver,[],'the budget moved nothing, so it spared nothing');
-  assert.equal(createAllocator({runtimes:preferred,now:()=>at,budget:rich}).allocate('backend.implement').runtime,'gpt-5.6-sol');
-  // Codex out of window: its runtimes are not eligible at all, so the choice overflows rather than stalling.
-  const drained=createAllocator({runtimes:preferred,now:()=>at,budget:budgetAt(20,99)}).allocate('work.author');
-  assert.equal(drained.runtime,'claude-fable-5.1','an exhausted preferred provider overflows to the next runtime of the role');
-  assert.ok(drained.blocked.some(item=>item.runtime==='gpt-6-astra'&&/window|budget|exhaust/i.test(item.reason)),'the preferred runtime is blocked by its window, not by the order');
+test('adaptive allocation follows asymmetric fresh headroom, reverses with quota, and preference is a bounded bias',()=>{
+  const at=Date.UTC(2026,8,15,9),time=clock(at),adaptive=withProviderPreference(profile,{mode:'adaptive',preferredProvider:'codex'});
+  const reset=at+7*86_400_000,budget=(codex,claude)=>()=>({schema:'starci/runtime-budget@1',at:time.now(),providers:{
+    codex:{status:'ok',windows:{weekly:{usedPercent:codex,resetsAt:reset,minutes:10080}}},
+    claude:{status:'ok',windows:{weekly:{usedPercent:claude,resetsAt:reset,minutes:10080}}}}});
+  const simulate=(codex,claude)=>{const allocator=createAllocator({runtimes:adaptive,now:time.now,budget:budget(codex,claude)}),chosen=[];
+    for(let index=0;index<30;index+=1){const pick=allocator.allocate('backend.implement',{restrictTo:['gpt-5.6-sol','claude-opus'],job:{opId:`op-${index}`}});assert.equal(pick.ok,true,pick.reason);chosen.push(profile.runtimes[pick.runtime].provider);allocator.launched(pick.runtime,{op:`op-${index}`});time.advance(10*60_000);allocator.release(pick.runtime,{op:`op-${index}`});}
+    return tally(chosen);};
+  const codexRich=simulate(20,80);assert.ok(codexRich.codex>codexRich.claude,JSON.stringify(codexRich));
+  const claudeRich=simulate(85,20);assert.ok(claudeRich.claude>claudeRich.codex,JSON.stringify(claudeRich));
+  const equal=simulate(40,40);assert.ok(equal.codex>equal.claude&&equal.claude>0,'preference wins close choices without starving healthy Claude');
 });
 
-test('a named provider order also leads the shared key, so another kernel on the chosen provider does not move the work off it',t=>{
-  const shared=sharedRoot(t),other='20260915-100000-other',mine='20260915-104251-mine';
-  shared.kernel(other);
-  shared.write({'gpt-6-astra':liveOn(other,'op-plan')});
-  const preferred=withProviderPreference(profile,['codex','qwen','claude']);
-  const authored=createAllocator({runtimes:profile,now:()=>Date.UTC(2026,8,15,9),shared:{path:shared.file,workflow:mine}});
-  assert.equal(authored.allocate('work.author').runtime,'claude-fable-5.1','left to itself the kernel takes the authored first choice');
-  const owned=createAllocator({runtimes:preferred,now:()=>Date.UTC(2026,8,15,9),shared:{path:shared.file,workflow:mine}});
-  const picked=owned.allocate('work.author');
-  assert.equal(profile.runtimes[picked.runtime].provider,'codex','the owner provider keeps the work even though another kernel is on one of its runtimes');
-  assert.equal(picked.runtime,'gpt-5.6-sol','inside the chosen provider the shared key still avoids the runtime the other kernel holds');
+test('adaptive families count shared quota once, reject stale or unknown quota, and preserve reservation settlement semantics',t=>{
+  const at=Date.UTC(2026,8,15,9),time=clock(at),shared=sharedRoot(t),mine='mine',other='other';shared.kernel(mine);shared.kernel(other);
+  const adaptive=withProviderPreference(profile,{mode:'adaptive',preferredProvider:'codex'});
+  const budget=()=>({schema:'starci/runtime-budget@1',at:time.now(),providers:{
+    codex:{status:'ok',windows:{weekly:{usedPercent:30,resetsAt:time.now()+86_400_000,minutes:10080}}},
+    claude:{status:'ok',windows:{weekly:{usedPercent:30,resetsAt:time.now()+86_400_000,minutes:10080},fableWeekly:{usedPercent:30,resetsAt:time.now()+86_400_000,minutes:10080}}},
+    qwen:{status:'ok',windows:{weekly:{usedPercent:30,resetsAt:time.now()+86_400_000,minutes:10080}}}}});
+  const allocator=createAllocator({runtimes:adaptive,now:time.now,budget,shared:{path:shared.file,workflow:mine}});
+  const review=allocator.review('review.verify');
+  const claude=review.adaptive.families.find(item=>item.provider==='claude');
+  assert.ok(claude.candidates.includes('claude-fable-5.1')&&claude.candidates.includes('claude-opus'));
+  assert.equal(review.adaptive.families.filter(item=>item.provider==='claude').length,1,'two Claude models do not duplicate family headroom');
+  const first=allocator.allocate('backend.implement',{job:{opId:'no-effect'}});allocator.deferred(first.runtime,{op:'no-effect'});
+  assert.equal((allocator.serialize().history[first.runtime]??[]).length,0,'pre-admission deferral refunds the reservation without completed service');
+  const worked=allocator.allocate('backend.implement',{job:{opId:'worked'}});allocator.launched(worked.runtime,{op:'worked'});time.advance(20*60_000);const failed=allocator.failed(worked.runtime,{op:'worked',reason:'rate limit after the model produced work'});
+  assert.equal(failed.observedService,true);assert.equal((allocator.serialize().history[worked.runtime]??[]).length,1,'work that ran before failure still consumed virtual service');
+  const unknown=allocator.allocate('backend.implement',{job:{opId:'unknown-effect'}});allocator.launched(unknown.runtime,{op:'unknown-effect'});
+  assert.equal(allocator.serialize().reservations[unknown.runtime].some(item=>item.op==='unknown-effect'),true,'unknown effects retain their reservation until settlement');
+  const stale={...budget(),at:at-10*60_000};const blocked=createAllocator({runtimes:adaptive,now:time.now,budget:stale}).allocate('backend.implement');
+  assert.equal(blocked.ok,false);assert.ok(blocked.blocked.filter(item=>['gpt-5.6-sol','claude-opus','qwen3.8-flash'].includes(item.runtime)).every(item=>/unknown or stale/.test(item.reason)));
+});
+
+test('adaptive selection receipts distinguish quota unknown, exhausted, cooling and authoritative capacity exclusions',()=>{
+  const at=Date.UTC(2026,8,15,9),adaptive=withProviderPreference(profile,{mode:'adaptive',preferredProvider:null}),reset=at+86_400_000;
+  const partial={schema:'starci/runtime-budget@1',at,providers:{
+    claude:{status:'ok',windows:{weekly:{usedPercent:96,resetsAt:reset,minutes:10080}}},
+    qwen:{status:'ok',windows:{weekly:{usedPercent:20,resetsAt:reset,minutes:10080}}}}};
+  const allocator=createAllocator({runtimes:adaptive,now:()=>at,budget:partial,state:{cooling:{'qwen3.8-flash':{kind:'rate-limited',until:at+600_000,reason:'429'}}}});
+  const refused=allocator.allocate('backend.implement',{restrictTo:['gpt-5.6-sol','claude-opus','qwen3.8-flash'],job:{opId:'receipt-refused'}});
+  assert.equal(refused.ok,false);
+  assert.match(refused.blocked.find(item=>item.runtime==='gpt-5.6-sol').reason,/unknown or stale/);
+  assert.deepEqual(refused.blocked.find(item=>item.runtime==='claude-opus').budget,{remaining:4,until:reset});
+  assert.match(refused.blocked.find(item=>item.runtime==='qwen3.8-flash').reason,/cooling after rate-limited/);
+
+  const known={schema:'starci/runtime-budget@1',at,providers:{codex:{status:'ok',windows:{weekly:{usedPercent:20,resetsAt:reset,minutes:10080}}}}};
+  const capacity=createAllocator({runtimes:adaptive,now:()=>at,budget:known,providerAdmission:()=>({source:'sqlite-admission',providers:{codex:{used:5,capacity:5,jobs:[]}}})});
+  const full=capacity.allocate('backend.implement',{restrictTo:['gpt-5.6-sol'],job:{opId:'receipt-capacity'}});
+  assert.equal(full.ok,false);const excluded=full.blocked.find(item=>item.runtime==='gpt-5.6-sol');
+  assert.match(excluded.reason,/authoritative admission/);assert.deepEqual(excluded.admission,{used:5,capacity:5});
+});
+
+test('cross-workflow adaptive selection compare-and-reserves projected service before native launch',t=>{
+  const at=Date.UTC(2026,8,15,9),shared=sharedRoot(t),one='one',two='two';shared.kernel(one);shared.kernel(two);
+  const adaptive=withProviderPreference(profile,{mode:'adaptive',preferredProvider:null}),budget={schema:'starci/runtime-budget@1',at,providers:{
+    codex:{status:'ok',windows:{weekly:{usedPercent:40,resetsAt:at+86_400_000,minutes:10080}}},
+    claude:{status:'ok',windows:{weekly:{usedPercent:40,resetsAt:at+86_400_000,minutes:10080}}}}};
+  const first=createAllocator({runtimes:adaptive,now:()=>at,budget,shared:{path:shared.file,workflow:one}});
+  const second=createAllocator({runtimes:adaptive,now:()=>at,budget,shared:{path:shared.file,workflow:two}});
+  const a=first.allocate('backend.implement',{restrictTo:['gpt-5.6-sol','claude-opus'],job:{opId:'a'}});
+  const b=second.allocate('backend.implement',{restrictTo:['gpt-5.6-sol','claude-opus'],job:{opId:'b'}});
+  assert.equal(a.ok,true);assert.equal(b.ok,true);
+  assert.notEqual(profile.runtimes[a.runtime].provider,profile.runtimes[b.runtime].provider,'the second selector sees the first projected reservation, not identical stale headroom');
+  const live=shared.read().runtimes;assert.equal(Object.values(live).flatMap(entry=>entry.live??[]).filter(item=>item.phase==='reserved').length,2);
 });

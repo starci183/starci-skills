@@ -1254,19 +1254,24 @@ expensive runtimes are split across them, not owned by one. One file says so: th
 the workflow directories every kernel of the repository already shares.
 
 ```json
-{"schema":"starci/runtime-loads@1","runtimes":{"claude-fable-5.1":{
-  "live":[{"workflow":"20260912-101500-nivo-setup","op":"op-decide","since":1789000000000}],
+{"schema":"starci/runtime-loads@1","revision":12,"runtimes":{"claude-fable-5.1":{
+  "live":[{"workflow":"20260912-101500-nivo-setup","op":"op-decide","since":1789000000000,
+    "phase":"reserved","estimateMs":2700000,"role":"decide","difficulty":"medium"}],
+  "history":[{"workflow":"20260912-101500-nivo-setup","op":"op-design","at":1788999000000,
+    "durationMs":1800000,"role":"decide","difficulty":"medium"}],
   "cooling":{"until":1789000600000,"reason":"HTTP 429","kind":"rate-limited","workflow":"20260912-101500-nivo-setup"},
   "usedToday":3,"day":"2026-09-12"}}}
 ```
 
-The kernel records a launch (the allocation was accepted **and** the operation actually launched), a release or
-a failure, and a provider cooldown; at start it drops its own leftovers - entries of this workflow whose
+Adaptive selection compare-and-reserves projected service under the ledger lock before native launch. The
+kernel advances it to `launched`, records a release or failure, and records a provider cooldown; at start it drops its own leftovers - entries of this workflow whose
 operation is no longer running (`runtime-loads-swept`). Writes are atomic (temp file, rename) under a `.lock`
 beside the file carrying pid and timestamp, retried with short waits and broken when it is stale (30 s) or its
 pid is dead. Entries of a workflow whose kernel is dead - no live pid in its `kernel.lock` - are ignored on
-read and dropped on the next write, so a crashed kernel never holds a slot of Fable for the others. A
-cooldown outlives the kernel that found it: the limit belongs to the provider.
+read and dropped on the next write. That pruning applies only to heuristic telemetry. The SQLite admission
+journal remains the capacity authority: a model, judge or operation job reserves `ai/provider:<family>`
+atomically, and a crashed or `effect_unknown` job keeps that lease until its effects are settled. A cooldown
+outlives the kernel that found it: the limit belongs to the provider.
 
 What it changes in allocation, with `createAllocator({shared:{path, workflow}})`:
 
@@ -1275,20 +1280,21 @@ What it changes in allocation, with `createAllocator({shared:{path, workflow}})`
 - a cooldown another kernel ran into is a cooldown here (`runtime-cooling-shared {runtime, until, from}`, once
   per learned cooldown); only provider limits are published - a rate limit and an exhausted quota - while an
   auth or local failure stays the kernel's own;
-- among the candidates that all qualify - role, free slot, an unexhausted provider window, no cooldown - the
-  one **no other kernel is using** wins, and inside one shared load the local order decides (preference, then ratio, then chain order).
-  So a second workflow's hard operation goes to Astra while Fable carries the first one's, and the receipt says
-  so: `allocation-shared {op, runtime, preferredOver:[...], sharedLoad:{runtime:n}}`.
+- adaptive allocation groups eligible runtimes by provider, then scores exact fresh headroom against recent
+  observed service and projected reservations. Multiple models do not duplicate a family's quota or admission
+  capacity. A bounded preference from `config.json` multiplies the feasible preferred family by 1.25; capacity,
+  quota and eligibility remain hard constraints;
+- a model/judge lease in the SQLite journal reduces the capacity and projected service visible to an operation,
+  including after a controller dies or the job becomes `effect_unknown`. The reverse path uses the same atomic
+  resource when a model or judge is admitted;
+- the receipt is `allocation-adaptive {op, runtime, provider, preferredProvider, observationWindowMs, families,
+  excluded, reason}`. Each family reports headroom, observed service, reserved service, authoritative admitted
+  load, estimate and score; `excluded` gives the bounded reason and applicable reset/admission facts for every
+  rejected candidate. Legacy `allocation-shared` and `allocation-budgeted` receipts remain for legacy profiles.
 
-The quota proposal reads the same file: when the first runtime of a kind's launch chain carries live operations
-of another workflow, the next chain runtime that has the role is proposed a slot too, with the reason in the
-row (`... is busy with <workflow>`), so a lane opened while another lane is on Fable proposes Astra without the
-owner saying "prefer Astra, Fable is busy".
-
-What it never changes: **a workflow's own quota.** The slots and order the user approved stay that workflow's
-cap, the per-workflow `maxParallelOps` is unchanged, and nothing shared ever widens them. And the ledger is
-never a gate: an unreadable, missing or foreign file reads as nothing shared, so allocation degrades to the
-local behaviour and a launch is never blocked by it.
+What it never changes: **a workflow's own quota.** The slots the user approved stay that workflow's cap, the
+per-workflow `maxParallelOps` is unchanged, and nothing shared ever widens them. An unreadable JSON ledger loses
+only the scheduling estimate; it never manufactures quota or bypasses the SQLite family ceiling.
 
 ## The operation contract
 
@@ -1565,25 +1571,21 @@ whose every runtime is exhausted (`quota-pool-empty`); stale numbers never bind 
 forced in. A runtime is bound by the generic
 windows of its provider (`provider:` in model/runtimes.yaml) and by a named window only when its profile
 names it (`budgetWindow: fableWeekly`); `budgetVerdict` says whether a window is exhausted (95% and not yet
-reset) and what share is left. Kernels read the file, never Orca. The allocator folds the verdict into every
-pick: a runtime whose window is exhausted is blocked (`provider window exhausted until <reset>`) until the
-reset, and among the ready runtimes the one with clearly more of its window left comes first - in bands of
-25 points, so a few percent never reorder a role's own chain while a half-spent week does; a runtime no window
-binds (a local model, an unread provider) sits in the top band. The shared-load key still comes first. When
-the budget alone moved the choice the launch says so: `allocation-budgeted {op, runtime, sparedOver:[...],
-remaining:{runtime:share}}`.
+reset) and what share is left. Kernels read the file, never Orca. Adaptive allocation requires a fresh known
+window and blocks an exhausted family until its reset. It uses the exact tightest applicable remaining
+percentage in `headroom × ownerPreference / (observedService + reservedService + estimatedNewService)`.
+Service is normalized only for relative scheduling, with a six-hour observation window and conservative
+15/45/90 minute cold estimates. This is an observed greedy heuristic rather than a claim of globally optimal
+scheduling. Unknown and stale quota authorize no adaptive launch.
 
 That probed window is the **only** budget. No pool in `model/runtimes.yaml` declares a cap of its own any
 more: one did, and it stalled a migration late in the evening while the provider still had nearly half of its
 week left. A pool is bound by its provider's window, its own slots and its cooldowns, and by nothing else.
 
-And under every tier there is another one. The reasoning roles - `decide` and `plan` - no longer end at Fable
-and Astra: Fable overflows to Opus, Astra to Sol, and both of those carry the roles and appear at the end of
-the launch chains, so an operation whose top runtimes are full, cooling or out of window moves down instead of
-waiting for a week to reset. Because the policy is prefer-then-overflow the top tier is still preferred
-whenever it has a free slot, and the moment one frees the next operation goes back to it; a difficulty tier
-may order its runtimes per role (`tiers: {hard: {default: [...], decide: [...]}}`) so naming the downgrade for
-decide and plan leaves the order of the coding roles inside that tier untouched.
+Reasoning and coding tiers remain suitability sets: role, difficulty, tool support, qualification/probation and
+independent-review rules filter candidates before scoring. Authored order breaks model ties inside one family;
+it is not a cross-provider try-until-success chain. Appropriate closed planner, validator and manager pools keep
+their declared Claude/Codex members; Qwen is not inferred into those roles.
 
 ## The event log, by concern
 
@@ -1650,8 +1652,10 @@ workflow store exists; `host` which host this run is on and whether it is sequen
 `wait` one wait slice and how it ended (`woken` for an inbox command or a stop flag); `launched` an operation
 started, with the allocation and the runtimes not used; `launch-failed` / `launch-refused` the launch did not
 happen, or was refused before any effect; `allocation-deferred` / `allocation-rejected` no runtime qualified,
-or the allocated one did not belong to the operation's environments; `allocation-shared` another kernel's
-load moved the pick; `allocation-budgeted` the provider window moved it; `schedule-deferred` an op was held
+or the allocated one did not belong to the operation's environments; `allocation-adaptive` records the chosen
+family/runtime and bounded headroom, admitted/reserved service, estimate, preference and score facts;
+`allocation-shared` another kernel's load moved a legacy-policy pick; `allocation-budgeted` the provider window
+moved a legacy-policy pick; `schedule-deferred` an op was held
 (a design op waiting for the brand record, an allowlist or resource clash); `op-host-unsupported` the op's
 kind needs a capability this host does not offer; `op-out-of-repository` the node names another repository;
 `op-blocked` / `op-paused` / `op-resumed` / `op-reopened` / `op-done` the op's transitions; `op-added` a lane

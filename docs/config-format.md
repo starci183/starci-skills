@@ -33,6 +33,10 @@ Required keys only:
 - `language` — BCP-47-like tag (`vi`, `en`, …)
 - `model` — `null` (inherit host) or non-empty host model name
 - `effort` — one of `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra`
+- `allocation.mode` — `adaptive`; fresh quota, current admitted load, recent service and task/model suitability
+  are recomputed before every future assignment
+- `allocation.preferredProvider` — `null` for automatic capacity or one declared provider id for a bounded
+  preference; this never forms a fallback chain
 - `models.selection` — `quota-aware`; selection happens before a call
 - `models.pools` — the two closed cross-provider pools, `fable-astra` and `opus-sol`; every member is a
   known runtime with the role its consumers require
@@ -45,11 +49,21 @@ Required keys only:
 | `validator` | `critiqueGoal`, `validateOp` | `fable-astra` |
 
 The named pools keep provider diversity without making one model a fallback. Before a call, admission chooses
-an eligible, qualified member using actual capacity and known quota; missing quota data is not treated as
-unlimited capacity. Functions retain separate typed inputs and independent contexts even when they share a
-pool. Operation-agent runtime selection continues to come from the operation policy and runtime catalog;
-this map does not override it. The runtime pin seals the accepted `config.json` digest so detached model jobs
-use the same role map.
+an eligible, qualified member using actual capacity and fresh known quota. Planner/validator remain in the
+Fable/Astra pool and manager/technical decisions remain in Opus/Sol; adaptive allocation does not invent Qwen
+support for these functions. Functions retain separate typed inputs and independent contexts even when they
+share a pool.
+
+Operation candidates still come from the operation policy and runtime catalog, but adaptive allocation treats
+catalog order as eligibility/suitability rather than sequential fallback. It groups candidates by provider
+family so several models do not multiply one family's quota, and combines fresh quota with atomic admitted
+family load. The runtime pin seals the accepted `config.json` digest, so config changes apply to future
+assignments only after a new pin and an orderly same-id restart/retry boundary; a running dispatch never changes
+identity.
+
+Existing ignored files without `allocation` resolve to `{mode:"adaptive", preferredProvider:null}` in memory.
+The former `providers` array remains readable for compatibility: its first item becomes
+`preferredProvider`, while later items no longer define a chain. The loader never rewrites either form.
 
 ## Related catalog ownership (not config)
 

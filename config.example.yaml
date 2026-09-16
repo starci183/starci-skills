@@ -1,6 +1,9 @@
 language: vi
 model: null
 effort: medium
+# Adaptive mode combines fresh quota, live reservations and task/model suitability. Set preferredProvider to a
+# provider id such as codex for a bounded owner bias; it is not a fallback chain.
+allocation: {mode: adaptive, preferredProvider: null}
 # Non-operation models are quota-aware peer pools. Eligibility and qualification still admit every actual call.
 models:
   selection: quota-aware

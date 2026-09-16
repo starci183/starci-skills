@@ -1,17 +1,17 @@
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
-import {bridgeJobId,createJobBridge,inputDigest,replayModelFunction} from './job-bridge.mjs';
+import {bridgeJobId,createJobBridge,inputDigest} from './job-bridge.mjs';
 import {hasReplayableStagedResult} from './job-worker.mjs';
 import {createJobs} from './jobs.mjs';
 import {rankJobs,updateProgressBudget,progressExhausted} from './scheduler.mjs';
-import {loadRuntimes} from './schedule.mjs';
+import {ADAPTIVE_CAPACITY,OWNER_PREFERENCE_MULTIPLIER,loadRuntimes} from './schedule.mjs';
 import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateRecord,candidateWriterResource,freezeDetectionCandidate,prepareCandidateDependencies,readCandidateBridge,readCandidatePacket,readCandidateSnapshot} from './candidate-bridge.mjs';
 import {candidateRootBindingDigest} from './candidate-roots.mjs';
 import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
 import {reconcilePureModelJobs} from './job-reconcile.mjs';
 import {openJournal} from './journal.mjs';
-import {createAdmission} from './admission.mjs';
+import {GLOBAL_AI_RESOURCE,createAdmission} from './admission.mjs';
 import {resourceLocks} from './guards.mjs';
 import {ENGINE_SCHEMA,isEnrolled,kindRole,predatesEngineSchema,sealedRuntimeOf} from './common.mjs';
 import {nonOperationModels} from '../scripts/config.mjs';
@@ -133,22 +133,29 @@ export function prepareGenerationRetry({journalFile,workflowId,generation,now=Da
 const modelRole=name=>['critiqueGoal','validateOp','classifyScreen'].includes(name)?'verify':['assessGoal','planOp','presentOwnerQuestion'].includes(name)?'plan':'decide';
 const configuredModelRole=name=>['assessGoal','planOp','presentOwnerQuestion'].includes(name)?'planner':['critiqueGoal','validateOp','classifyScreen'].includes(name)?'validator':'kernelManager';
 const machineResource=key=>({key:`machine:${key}`,units:1});
-function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadRuntimes(),identity={},budget=null,now=Date.now){
+function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadRuntimes(),identity={},budget=null,now=Date.now,providerAdmission={}){
   if(typeof eligibility!=='function')throw Error(`Model eligibility is required for ${name}`);
   const role=modelRole(name),requested=Array.isArray(args?.providers)?args.providers:Object.keys(runtimes.runtimes??{});
   const job={kind:name==='validateOp'?'judge':'model',role,input:{functionName:name,args:modelInput(args)},...identity};
   const policyTargets=typeof modelPolicy?.providerFilter==='function'?new Set(modelPolicy.providerFilter(job)):null;
   const candidates=requested.map(id=>({id,runtime:{id,...runtimes.runtimes?.[id],model:runtimes.runtimes?.[id]?.target}})).filter(({runtime})=>runtime.target&&(runtime.roles??[]).includes(role)&&(!policyTargets||policyTargets.has(runtime.target)));
   const eligible=candidates.map((candidate,index)=>({...candidate,index,decision:eligibility(job,candidate.runtime),budget:budgetVerdict(candidate.runtime,budget,{now:now(),requireFresh:true})})).filter(item=>item.decision?.eligible===true);
-  // The owner's provider order comes first, the probed window second: a preferred provider that is out of window
-  // is not in this list at all, so the choice reorders and never starves.
-  const order=Array.isArray(runtimes.allocation?.providerOrder)?runtimes.allocation.providerOrder:[];
-  const providerRank=item=>{const at=order.indexOf(item.runtime?.provider);return at<0?order.length:at;};
-  const available=eligible.filter(item=>item.budget.known&&!item.budget.exhausted)
-    .sort((a,b)=>providerRank(a)-providerRank(b)||b.budget.remaining-a.budget.remaining||a.index-b.index),providers=available.slice(0,1).map(item=>item.id);
-  if(!providers.length){const error=Error(eligible.length?`No eligible ${name} model has known available provider quota`:`No evaluated model is eligible for ${name}`);if(eligible.length){error.code='STARCI_MODEL_QUOTA_WAIT';error.reasons=eligible.map(item=>({runtime:item.id,known:item.budget.known,exhausted:item.budget.exhausted,until:item.budget.until}));}throw error;}
+  const adaptive=runtimes.allocation?.policy===ADAPTIVE_CAPACITY,owner=runtimes.allocation?.ownerPolicy??{},preferred=owner.preferredProvider??null;
+  const admitted=provider=>providerAdmission?.[provider]??null;
+  const available=eligible.filter(item=>item.budget.known&&!item.budget.exhausted&&(!admitted(item.runtime.provider)||admitted(item.runtime.provider).used<admitted(item.runtime.provider).capacity));
+  if(adaptive)available.sort((a,b)=>{
+    const score=item=>(item.budget.remaining/100)*(item.runtime.provider===preferred?(owner.preferenceMultiplier??OWNER_PREFERENCE_MULTIPLIER):1)/(1+(admitted(item.runtime.provider)?.used??0));
+    return score(b)-score(a)||b.budget.remaining-a.budget.remaining||a.index-b.index;
+  });
+  else available.sort((a,b)=>b.budget.remaining-a.budget.remaining||a.index-b.index);
+  const providers=available.slice(0,1).map(item=>item.id);
+  if(!providers.length){const quotaReady=eligible.filter(item=>item.budget.known&&!item.budget.exhausted),capacityBlocked=quotaReady.length>0&&quotaReady.every(item=>{const view=admitted(item.runtime.provider);return view&&view.used>=view.capacity;});
+    const error=Error(eligible.length?(capacityBlocked?`No eligible ${name} model has provider admission capacity`:`No eligible ${name} model has known available provider quota`):`No evaluated model is eligible for ${name}`);
+    if(eligible.length){error.code='STARCI_MODEL_QUOTA_WAIT';error.waitKind=capacityBlocked?'provider-capacity':'provider-quota';error.reasons=eligible.map(item=>({runtime:item.id,known:item.budget.known,exhausted:item.budget.exhausted,until:item.budget.until,
+      admitted:admitted(item.runtime.provider)?.used??null,capacity:admitted(item.runtime.provider)?.capacity??null}));}throw error;}
   const selected=available[0];return {args:{...modelInput(args),providers},runtime:selected.runtime,decision:selected.decision,job,
-    considered:available.map(item=>({runtime:item.id,remaining:item.budget.remaining})),refused:candidates.filter(candidate=>!eligible.some(item=>item.id===candidate.id)).map(candidate=>candidate.id)};
+    considered:available.map(item=>({runtime:item.id,provider:item.runtime.provider,remaining:item.budget.remaining,active:admitted(item.runtime.provider)?.used??0,
+      preferred:item.runtime.provider===preferred})),refused:candidates.filter(candidate=>!eligible.some(item=>item.id===candidate.id)).map(candidate=>candidate.id)};
 }
 
 /** Opt in only at a settled workflow boundary. Canonical Work and approved goal references stay intact. */
@@ -171,6 +178,26 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
   bridge??=createJobBridge({journalFile:state.engine.journalFile,now,...(spawnChild?{spawnChild}:{}),eligibility:job=>job.kind==='model'||job.kind==='judge'?{eligible:Array.isArray(job.input?.args?.providers)&&job.input.args.providers.length>0,reasons:['no evaluated provider in durable model job']}:{eligible:false,reasons:['operation eligibility must name its selected runtime']},beforeSpawn:({job})=>{const meta=job.payload?.admission;if(meta?.mode!=='probation')return {ok:true,code:'qualified'};const consumed=modelPolicy?.consumeProbation?.({kind:job.kind,role:job.role,input:job.payload,workflowId:job.workflow_id,opId:job.op_id,attempt:job.attempt,generation:job.generation,jobId:job.job_id},meta.runtime);if(!consumed?.ok)return {ok:false,code:consumed?.code??'probation-unavailable'};store.saveState(state);return consumed;}});
   const {journal,admission}=bridge,jobs=createJobs({journal,admission,now});
   runtimeProfile??=loadRuntimes();
+  const providerResource=provider=>`ai/provider:${provider}`;
+  // A provider family owns one concurrency ceiling. Adding another model name for the same account must not
+  // manufacture more provider capacity, so the widest real runtime is the family ceiling instead of their sum.
+  const providerCapacities={};for(const runtime of Object.values(runtimeProfile.runtimes??{})){if(!runtime?.provider)continue;providerCapacities[runtime.provider]=Math.max(providerCapacities[runtime.provider]??0,Math.max(0,Number(runtime.maxParallel??1)));}
+  for(const [provider,capacity] of Object.entries(providerCapacities))admission.setCapacity(providerResource(provider),Math.max(0,capacity));
+  const providerAdmissionView=()=>{
+    // Expiry moves an unproved timed-out worker to effect_unknown and deliberately retains its lease. It also
+    // clears residue only for already settled jobs, so this read never turns uncertainty into free capacity.
+    admission.expire();
+    const capacities=new Map(journal.db.prepare("SELECT resource_key,capacity FROM resources WHERE resource_key LIKE 'ai/provider:%' ORDER BY resource_key").all()
+      .map(row=>[row.resource_key.slice('ai/provider:'.length),row.capacity]));
+    const providers={};for(const [provider,capacity] of capacities)providers[provider]={capacity,used:0,jobs:[]};
+    for(const row of journal.db.prepare("SELECT l.resource_key,l.units,j.job_id,j.workflow_id,j.op_id,j.kind,j.role,j.status,j.payload_json FROM leases l JOIN jobs j ON j.job_id=l.job_id WHERE l.resource_key LIKE 'ai/provider:%' ORDER BY l.resource_key,j.created_at,j.job_id").all()){
+      const provider=row.resource_key.slice('ai/provider:'.length),entry=providers[provider]??={capacity:0,used:0,jobs:[]};
+      let payload={};try{payload=JSON.parse(row.payload_json??'{}')??{};}catch{}
+      entry.used+=row.units;entry.jobs.push({jobId:row.job_id,workflow:row.workflow_id,op:row.op_id,kind:row.kind,role:row.role,
+        status:row.status,runtime:payload?.admission?.runtime??payload?.runtime??null,units:row.units});providers[provider]=entry;
+    }
+    return {source:'sqlite-admission',providers};
+  };
   const writer=candidateWriterResource(state.worktree);admission.setCapacity(writer.key,1);
   const declareMachineResources=value=>resourceLocks(value).map(machineResource).map(resource=>{admission.setCapacity(resource.key,1);return resource;});
   candidateBase??=path.join(path.dirname(state.engine.journalFile),'candidates',state.id);
@@ -178,11 +205,15 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
   const unwrap=result=>{if(result?.pending)deferJob(result);if(result?.status!=='succeeded')throw Error(result?.result?.reason??`Durable job ${result?.status}`);return result.result;};
   const requestModel=(name,args,op=null)=>{args=Array.isArray(args?.providers)?args:{...args,providers:nonOperationModels(configuredModelRole(name))};const bound=identity(op),base=modelInput(args),selectionKey=inputDigest({name,args:base,...bound});state.engine.modelSelections??={};let saved=state.engine.modelSelections[selectionKey],selected;
     if(saved){const replayArgs={...base,providers:[saved.provider]},kind=name==='validateOp'?'judge':'model',role=modelRole(name),input={handler:'model-function',functionName:name,args:replayArgs,admission:{runtime:saved.runtime,mode:saved.mode}},jobId=bridgeJobId({...bound,kind,input}),existing=journal.getJob(jobId);if(existing&&existing.status!=='queued')selected={args:replayArgs,runtime:{id:saved.runtime},decision:{mode:saved.mode},job:{kind,role}};}
-    if(!selected){const budget=typeof modelBudget==='function'?modelBudget():modelBudget??readRuntimeBudget(path.dirname(store.dir));selected=eligibleModelSelection(name,args,eligibility,modelPolicy,runtimeProfile,bound,budget,now);saved={provider:selected.args.providers[0],runtime:selected.runtime.id,mode:selected.decision.mode??'qualified'};state.engine.modelSelections[selectionKey]=saved;
+    if(!selected){const budget=typeof modelBudget==='function'?modelBudget():modelBudget??readRuntimeBudget(path.dirname(store.dir));
+      const providerAdmission=providerAdmissionView().providers;
+      selected=eligibleModelSelection(name,args,eligibility,modelPolicy,runtimeProfile,bound,budget,now,providerAdmission);saved={provider:selected.args.providers[0],runtime:selected.runtime.id,mode:selected.decision.mode??'qualified'};state.engine.modelSelections[selectionKey]=saved;
       store.appendEvent?.({event:'model-selected',function:name,op:bound.opId??null,runtime:saved.runtime,provider:saved.provider,mode:saved.mode,considered:selected.considered??[],refused:selected.refused??[]});store.saveState(state);}
-    return unwrap(replayModelFunction(bridge,name,selected.args,bound,{admission:{runtime:saved.runtime,mode:saved.mode},kind:selected.job?.kind??(name==='validateOp'?'judge':'model'),role:selected.job?.role??modelRole(name)}));};
+    const kind=selected.job?.kind??(name==='validateOp'?'judge':'model'),role=selected.job?.role??modelRole(name),provider=runtimeProfile.runtimes?.[saved.runtime]?.provider;
+    const input={handler:'model-function',functionName:name,args:selected.args,admission:{runtime:saved.runtime,mode:saved.mode}};
+    return unwrap(bridge.request({...bound,kind,role,input,resources:[{key:GLOBAL_AI_RESOURCE,units:1},...(provider?[{key:providerResource(provider),units:1}]:[])]}));};
   return {
-    journal,admission,jobs,bridge,identity,requiredValidation:true,
+    journal,admission,jobs,bridge,identity,requiredValidation:true,providerAdmissionView,
     model:requestModel,
     manageWorkflow(snapshot,{providers=nonOperationModels('kernelManager')}={}){if(state.engine.coordination!=='agent-v1')throw Error('Agent-led coordination is not enrolled');return requestModel('manageWorkflow',{snapshot,providers},{id:snapshot.decisionId,attempt:1});},
     check(command,options={},op=null){const resources=declareMachineResources({kind:op?.kind,checks:[{command}],resources:options.resources});return unwrap(bridge.request({...identity(op),kind:'check',role:'machine-check',...(resources.length?{resources}:{}),input:{handler:'command',shellCommand:command,cwd:options.cwd??state.worktree,timeoutMs:options.timeoutMs??1800000,
@@ -197,13 +228,14 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
         ?bindings.filter(binding=>binding.workerWritable||binding.runtimeWritable).map(binding=>candidateWriterResource(binding.repoRoot))
         :((op.allowlist??[]).length?[writer]:[]);
       for(const resource of rootWriters)admission.setCapacity(resource.key,1);
-      const machineResources=declareMachineResources(op),resources=[{key:'ai/global',units:1},...rootWriters,...machineResources]
+      const provider=pool.provider,machineResources=declareMachineResources(op),resources=[{key:GLOBAL_AI_RESOURCE,units:1},...(provider?[{key:providerResource(provider),units:1}]:[]),...rootWriters,...machineResources]
         .sort((a,b)=>a.key.localeCompare(b.key));
       if(existing&&existing.lease_token&&['leased','running','effect_unknown'].includes(existing.status)){
         const rows=journal.db.prepare('SELECT resource_key,units,expires_at FROM leases WHERE job_id=? AND token=? ORDER BY resource_key').all(existing.job_id,existing.lease_token),expected=existing.payload?.expectedResources??[];
         const exact=existing.payload?.reservationProtocol==='intent-v1'&&rows.length>0&&rows.every(item=>Number.isFinite(item.expires_at)&&item.expires_at>now())&&JSON.stringify(rows.map(({resource_key,units})=>({resource_key,units})))===JSON.stringify([...expected].sort((a,b)=>a.key.localeCompare(b.key)).map(item=>({resource_key:item.key,units:item.units})));
         if(!exact)return {ok:false,reasons:['existing durable reservation resource binding is incomplete']};
-        op.lease={...bound,leaseToken:existing.lease_token,machineResources:expected.map(item=>item.key).filter(key=>key.startsWith('machine:')),probationRuntime:existing.payload.runtime,probationRole:existing.role};
+        op.lease={...bound,leaseToken:existing.lease_token,machineResources:expected.map(item=>item.key).filter(key=>key.startsWith('machine:')),
+          providerResource:expected.map(item=>item.key).find(key=>key.startsWith('ai/provider:'))??null,probationRuntime:existing.payload.runtime,probationRole:existing.role};
         return {ok:true,...bound,leaseToken:existing.lease_token,runtime:existing.payload.runtime,target:existing.payload.target,reattached:true};
       }
       const decision=eligibility?.(job,{id:allocated.runtime,...pool,model:pool.target??allocated.target});
@@ -211,7 +243,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       journal.enqueueJob({...bound,kind:'operation',role:effectiveRole,payload:{runtime:allocated.runtime,target:allocated.target,kind:op.kind,reservationProtocol:'intent-v1',expectedResources:resources.map(item=>({key:item.key,units:item.units})).sort((a,b)=>a.key.localeCompare(b.key))}});
       const result=admission.reserve({...bound,resources,ttlMs:10*60*1000});
       if(result.ok&&decision.mode==='probation'){const consumed=modelPolicy?.consumeProbation?.(probationJob,{id:allocated.runtime,...pool,model:pool.target??allocated.target});if(!consumed?.ok){admission.release({...bound,leaseToken:result.leaseToken});journal.db.prepare("UPDATE jobs SET status='cancelled',result_json=?,updated_at=? WHERE job_id=?").run(JSON.stringify({reason:consumed?.code??'probation-unavailable'}),now(),bound.jobId);return {ok:false,reasons:[consumed?.code??'probation-unavailable'],...bound};}}
-      if(result.ok)op.lease={...bound,leaseToken:result.leaseToken,machineResources:machineResources.map(item=>item.key),probationRuntime:allocated.runtime,probationRole:effectiveRole};
+      if(result.ok)op.lease={...bound,leaseToken:result.leaseToken,machineResources:machineResources.map(item=>item.key),providerResource:provider?providerResource(provider):null,probationRuntime:allocated.runtime,probationRole:effectiveRole};
       return {...result,...bound};
     },
     reservationPhase(op){
@@ -270,7 +302,8 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       }
       if(job.lease_token!==lease.leaseToken)return {ok:false,reason:'stale operation settlement fence'};
       if(workerOnly){
-        const releasable=new Set(['ai/global',...(op.lease.machineResources??[])]);
+        const heldProviders=journal.db.prepare("SELECT resource_key FROM leases WHERE job_id=? AND token=? AND resource_key LIKE 'ai/provider:%'").all(op.lease.jobId,op.lease.leaseToken).map(row=>row.resource_key);
+        const releasable=new Set(['ai/global',...heldProviders,...(op.lease.machineResources??[])]);
         journal.transaction(db=>{const remove=db.prepare('DELETE FROM leases WHERE job_id=? AND token=? AND resource_key=?');for(const key of releasable)remove.run(op.lease.jobId,op.lease.leaseToken,key);});
         journal.appendEvent({eventId:`${op.lease.jobId}:worker-stopped`,workflowId:state.id,entityType:'job',entityId:op.lease.jobId,generation:state.engine.generation,kind:'operation-worker-stopped',payload:{reason,writerRetained:true}});
         return {ok:true,writerRetained:true};

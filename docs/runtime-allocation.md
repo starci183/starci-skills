@@ -1,19 +1,16 @@
-# Runtime allocation: prefer, then overflow
+# Runtime allocation: adaptive observed capacity
 
 For enrolled workflows, measured eligibility or explicitly bounded local probation filters this pool
 before budget ranking. SQLite admission enforces the shared ceiling for operation workers and model jobs;
 native Orca writers also require the exclusive canonical-root reservation. Read [the execution contract](execution-contract.md).
 
-In runtime 5-plus the kernel no longer walks an ordered list of providers. Every
-runtime is a pool declared in `model/runtimes.yaml` with the roles it may
-take and how many operations it can run at once. No pool declares a daily cap:
-the only budget is the provider's own window, probed and read from
-`runtime-budget.json`. For each ready operation the kernel calls
-`allocate(kind, {avoid})` and receives one eligible pool — one that has the
-role, a free slot, an unexhausted provider window and no cooldown — plus the
-role the worker will play. `maxParallelOps: 10` caps the
-whole workflow, so ten ready operations can be in flight across Codex, Claude
-and Qwen at the same time instead of queueing behind one provider.
+The workflow-bound runtime profile uses adaptive allocation by default. It does
+not walk an ordered provider chain. Every runtime is a pool declared in
+`model/runtimes.yaml` with roles, task tiers and real parallel slots. Before
+each assignment the allocator filters role, tier, tool/host launchability,
+model qualification or bounded probation, independent review, cooldown, slot
+capacity and fresh provider quota. Only those candidates enter allocation.
+Unknown or stale quota is unknown and does not authorize an adaptive launch.
 
 `allocation.fanOut` is the one bound the allocator answers but does not apply
 itself: `{seamFirst: true, maxPerGroup: 9}`. When a heavy node has been cut into
@@ -34,46 +31,59 @@ through `kernel/graph.mjs`), which is the one place a kind is defined;
 `roleOfKind` in `model/runtimes.yaml` stays the fallback for a kind the graph
 does not carry, which is every 4.x operator id the graph never adopted.
 
-## The policy: prefer, then overflow
+## The weighted observed-capacity heuristic
 
-The kernel does **not** spread work evenly. Each role has a preference order in
-`allocation.preference`, and every new operation goes to the first runtime in
-that order that is eligible. When the preferred runtime is saturated (all
-`maxParallel` slots busy), out of budget or cooling down, the operation
-overflows to the next runtime; when a preferred slot frees up again, the next
-operation returns to it.
+Allocation groups eligible runtimes by provider family before it scores them.
+Two Claude models therefore contribute different suitability and real slots,
+but do not duplicate Claude's family quota. Within a family, the runtime with
+the best applicable fresh window is chosen first and the authored role/tier
+order breaks remaining model ties.
 
-```yaml
-allocation:
-  policy: prefer-then-overflow
-  preference:
-    implement: [claude-opus, gpt-5.6-sol, qwen3.8-flash]
-    verify: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol, qwen3.8-flash]
-    decide: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
-    plan: [claude-fable-5.1, gpt-6-astra, claude-opus, gpt-5.6-sol]
-    write: [claude-opus, gpt-5.6-sol, qwen3.8-flash]
+For each family the allocator derives:
+
+- usable headroom: the tightest applicable provider/model window's exact
+  remaining percentage, with exhausted windows excluded;
+- projected work: admitted operations already reserved locally or by other
+  workflows, using a median duration observed for the same role and difficulty;
+- recent service: actual settled run duration in the current provider-window
+  segment, bounded to a rolling six hours;
+- a conservative cold estimate of 15, 45 or 90 minutes for easy, medium or hard
+  work when no suitable observation exists.
+
+The explainable score is
+`usableHeadroom × ownerPreference / (observedService + reservedService + estimatedNewService)`.
+Service is normalized to 30-minute units only for relative scheduling; it is
+never reported as provider tokens or quota consumption. The chosen family has
+the highest score. A deterministic family rotation and then provider name break
+an exact tie. This is a greedy heuristic over current observations, not a claim
+of globally optimal scheduling.
+
+`config.json` controls the owner bias:
+
+```json
+{"allocation":{"mode":"adaptive","preferredProvider":"codex"}}
 ```
 
-With the shipped pools — Claude Opus 5 slots, Codex Sol 3, Qwen 3.8 Flash 4 —
-six `backend.implement` operations land five on Opus and the sixth on Codex Sol.
-A 429 from Opus parks it for the rate-limit cooldown, so the next operations go
-to Codex Sol until its three slots are busy and then to Qwen; when the cooldown
-ends and an Opus slot is free, the next operation goes to Opus again. Nothing in
-the policy is a special case: a saturated or cooling runtime simply is not in the
-eligible set, and the next preference takes the operation.
+`preferredProvider` is optional. A preferred feasible family receives a fixed
+1.25 multiplier. This decides close choices and remains subordinate to quota,
+capacity, qualification, role, tier, tool and independent-review constraints.
+The old `providers: ["codex", "qwen", "claude"]` form remains readable: only
+its first member becomes the preferred family; it is never interpreted as a
+try-until-success chain. No preference field means automatic adaptive capacity.
 
-`least-loaded-with-budget` remains the fallback ranking, and a role that
-declares no preference list uses it even under `prefer-then-overflow`: eligible
-pools are ordered by load ratio (`load / maxParallel`), then by free slots, then
-by remaining daily budget, with an exact tie broken by round robin from the last
-allocated runtime.
+Every answer carries alternatives, explicit candidate exclusions and an
+`adaptive` receipt containing quota headroom, observation window, observed and
+reserved service, authoritative admission load/capacity, cost estimate,
+preference, score, chosen family/runtime and an `excluded` list for ineligible,
+quota-unknown, exhausted, cooling or capacity-blocked candidates.
+The kernel records the same bounded facts as `allocation-adaptive`; it never
+records credentials or raw provider output.
 
-Every answer also carries `alternatives`, `overflowed` and a `blocked` list
-saying why each other pool was skipped, which is what the kernel logs when it
-has to wait. `release(runtime, {tokens})` returns the slot when an operation ends
-and charges the tokens it used. `failed(runtime, {reason})` returns the slot too,
-refunds the operation (a launch that produced nothing costs no budget) and parks
-the pool.
+A pre-admission deferral or proven no-effect launch refunds its projected
+reservation idempotently. A launched attempt that did work before failing keeps
+its observed service, distinct from measured provider quota. Unknown effects
+retain both the adaptive reservation and the authoritative SQLite admission
+lease until settlement.
 
 No runtime available is not an error: the kernel keeps the operation queued and
 waits for a slot.
@@ -85,9 +95,11 @@ the provider actually keeps — Claude's session and week, Fable's own week,
 Codex's week — probed by the supervisor and written beside the stores as
 `runtime-budget.json`. A window at or past 95% is exhausted: its runtimes are
 skipped with `provider window exhausted until <reset>` and come back by
-themselves at the reset. Among the ready ones, more window left comes first, in
-bands of 25 points. A cap of our own on top of that is what once stalled a
-migration just before midnight while the provider still had half its week.
+themselves at the reset. Adaptive scoring uses exact remaining percentage and
+requires a budget no older than the shared freshness bound. A stale or unread
+provider stays queued with an explicit reason; it is never promoted to 100%.
+A cap of our own on top of the provider window is what once stalled a migration
+just before midnight while the provider still had half its week.
 
 The daily counters remain in the allocator for a profile that does declare
 `budget: {opsPerDay, tokensPerDay?}` — a host profile with a metered key, say —
@@ -114,27 +126,32 @@ the other pools keep working.
 A workflow is not alone on its runtimes. Every kernel of a repository shares one
 file beside the workflow directories - `.starciwork/_local/workflows/runtime-loads.json`,
 schema `starci/runtime-loads@1`, written by `kernel/loads.mjs` - and
-`createAllocator({shared:{path, workflow}})` reads it before it chooses. Another
-kernel's live operations on a runtime are load here too, so `maxParallel` holds
-across kernels; a rate limit or an exhausted quota one kernel ran into cools the
-runtime down for all of them; and among candidates that all qualify the one no
-other kernel is using wins, ties going to the local order. That is the whole
-difference: `preferredOver` and `sharedLoad` on the receipt name what the shared
-view passed over, `launched(runtime, {op})`, `release(runtime, {op})` and
-`failed(runtime, {op, reason})` keep the file current, `sharedSync(ops)` drops
-this workflow's leftovers at start, and `takeSharedNotices()` hands the kernel
-the cooldowns it learned from somebody else. A workflow's quota is untouched by
-all of it, and an unreadable ledger is not an error: the allocator falls back to
-the local view. See
+`createAllocator({shared:{path, workflow}})` reads it before it chooses. Adaptive
+selection performs a locked compare-and-reserve against the ledger revision, so
+a concurrent selector either sees the projected reservation or retries; it
+cannot commit a decision based on the older revision. `launched(runtime,{op})`
+advances that reservation, and settlement removes it. Successful or
+work-consuming settlement adds a bounded duration observation; no-effect
+failure and deferral do not. Rate-limit and exhausted-quota cooldowns remain
+shared.
+
+This JSON ledger is scheduling telemetry, not custody. Enrolled operation,
+model and judge jobs atomically reserve `ai/global` plus
+`ai/provider:<family>` in the SQLite admission journal. Provider capacity is
+shared across those job kinds and across workflows; an `effect_unknown` job
+keeps both leases. SQLite is the hard admission decision if telemetry and
+admission race or disagree. `sharedSync(ops)` drops abandoned heuristic
+reservations at restart, and unreadable telemetry never manufactures provider
+quota. See
 [workflow-kernel.md](workflow-kernel.md#runtimes-are-shared-across-workflows).
 
 ## Why there is no chain
 
-A chain made every operation start at the same provider, so one runtime was
-always the bottleneck and a rate limit there stalled the whole workflow while
-four idle pools watched. Allocation inverts that: the order is a preference the
-user owns, and eligibility — slots, budget, health — decides how far down it the
-operation actually goes. Two rules survive from the chain era.
+A chain made every operation start at the same provider and treated alternatives
+as sequential retries. Adaptive allocation treats catalog entries as an
+eligible candidate set, filters them before scoring and hands the typed launcher
+exactly one resolved candidate. The launcher therefore cannot reintroduce the
+old Codex→Qwen→Claude order after allocation. Two independent rules remain.
 `verifyAvoidsImplementRuntime: true` keeps review independent —
 `allocateVerify(kind, {implementRuntime})` excludes the runtime that wrote the
 code, and when no other pool qualifies it returns `ok:false` with the reason so

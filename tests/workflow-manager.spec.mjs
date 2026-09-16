@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {buildManagerSnapshot,validateManagerDecision,MANAGER_DECISION} from '../kernel/manager.mjs';
-import {coordinateManagedWorkflow,activatePendingOps,verificationCandidates,workflowModelConfigRoot} from '../kernel/kernel.mjs';
+import {coordinateManagedWorkflow,activatePendingOps,verificationCandidates,workflowModelConfigRoot,workflowRuntimeProfile} from '../kernel/kernel.mjs';
+import {ADAPTIVE_CAPACITY} from '../kernel/schedule.mjs';
 
 const state=()=>({id:'wf',job:'Ship approved work',definitionOfDone:['proof passes'],iterations:4,needUser:[],ledger:[],
   engine:{generation:2,coordination:'agent-v1',manager:{}},ops:[
@@ -11,6 +15,17 @@ const state=()=>({id:'wf',job:'Ship approved work',definitionOfDone:['proof pass
 test('enrolled model configuration is read from the sealed pin instead of mutable host settings',()=>{
   assert.equal(workflowModelConfigRoot({host:'host',engine:{schema:'starci/engine@1',runtimePin:{root:'sealed'}}}),'sealed');
   assert.equal(workflowModelConfigRoot({host:'host'}),'host');
+});
+
+test('the real workflow profile binds adaptive config and treats a legacy provider list as one preference',()=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-workflow-profile-'));
+  try{
+    fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(root,'config.example.yaml'));
+    const automatic=workflowRuntimeProfile({host:root});assert.equal(automatic.allocation.policy,ADAPTIVE_CAPACITY);assert.equal(automatic.allocation.ownerPolicy.preferredProvider,null);
+    const base={language:'vi',model:null,effort:'medium',models:{selection:'quota-aware',pools:{'fable-astra':['claude-fable-5.1','gpt-6-astra'],'opus-sol':['claude-opus','gpt-5.6-sol']},nonOperation:{planner:'fable-astra',kernelManager:'opus-sol',validator:'fable-astra'}},providers:['codex','qwen','claude']};
+    fs.writeFileSync(path.join(root,'config.json'),JSON.stringify(base));const legacy=workflowRuntimeProfile({host:root});
+    assert.equal(legacy.allocation.policy,ADAPTIVE_CAPACITY);assert.equal(legacy.allocation.ownerPolicy.preferredProvider,'codex');assert.equal(legacy.allocation.providerOrder,undefined);
+  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 
 test('a persisted prelaunch reservation continues mechanically without spending another manager decision',()=>{

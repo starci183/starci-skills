@@ -43,7 +43,7 @@ import {AUTHOR_KIND,PLAN_KIND,AUTHORS_RECORD,authorsRecord,BRAND_DECIDE,BRAND_KI
   tail,toOp,unique,validateCommandAt,workModule,workOpId,workValidateCommand,writeJson} from './common.mjs';
 import {ioBlock,kindsReadingBrand,undeclaredWrites,writesWorkRecords} from './io.mjs';
 import {readDistJson} from '../core/runtime-root.mjs';
-import {configuredProviderOrder,loadConfig,nonOperationModels} from '../scripts/config.mjs';
+import {configuredAllocationPolicy,loadConfig,nonOperationModels} from '../scripts/config.mjs';
 import {recordDigests,reconcileIntake} from './reconciliation.mjs';
 import {renderChecksFor} from '../checks/render.mjs';
 import {CONTINUATION_SECTION_END,CONTINUATION_SECTION_START,bindContinuationPath,continuationBoundary,exportContinuationBrief} from './continuation.mjs';
@@ -651,7 +651,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
     op.coordinatorRecovered=true;
     if(recoverCoordinatorTab(orca,store,state,{cwd:state.worktree})){
       // The slot the allocation took is given back without a failure: the runtime did nothing wrong.
-      try{ctx.allocator.release?.(allocated.runtime,{op:op.id});}catch{}
+      try{(ctx.allocator.deferred??ctx.allocator.release)?.call(ctx.allocator,allocated.runtime,{op:op.id});}catch{}
       op.status='ready';op.launch=null;return {ok:false,reason:'the coordinator tab was replaced; the launch is tried again',recovered:true};
     }
   }
@@ -1064,6 +1064,13 @@ function scheduleOps(orca,store,state,ctx,{orderedOpIds=null}={}){
     // The probed provider budget changed the choice: a runtime with clearly more of its window left took the operation.
     if(allocated.sparedOver?.length)store.appendEvent({event:'allocation-budgeted',op:op.id,runtime:allocated.runtime,
       sparedOver:allocated.sparedOver,remaining:allocated.budget??{}});
+    if(allocated.adaptive)store.appendEvent({event:'allocation-adaptive',op:op.id,runtime:allocated.runtime,
+      provider:allocated.adaptive.chosenProvider,preferredProvider:allocated.adaptive.preferredProvider??null,
+      observationWindowMs:allocated.adaptive.observationWindowMs,reason:allocated.adaptive.reason,
+      families:allocated.adaptive.families.map(family=>({provider:family.provider,runtime:family.runtime,headroom:family.headroom,
+        observedCost:family.observedCost,reservedCost:family.reservedCost,admittedLoad:family.admittedLoad,providerCapacity:family.providerCapacity,
+        estimateMs:family.estimateMs,score:family.score,preferred:family.preferred})),
+      excluded:(allocated.blocked??[]).map(item=>({runtime:item.runtime,reason:item.reason,...(item.budget?{budget:item.budget}:{}),...(item.admission?{admission:item.admission}:{})}))});
     let candidate=null;
     try{candidate=allocated.candidate??ctx.allocator.candidateFor(launchOperator(op.kind),allocated.target);}
     catch(error){
@@ -2893,7 +2900,7 @@ function settleFromTab(orca,store,state,op,ctx,observed){
   if(read.verdict==='prompt-missing'){
     const settled=settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:'prompt-missing',terminalHandle:op.terminal,closeTerminal:true,wait:ctx.wait});
     if(!reconcileStoppedNativeAttempt(store,state,op,ctx,settled,'prompt-missing'))return 'native-reconciliation';
-    ctx.allocator.release(op.runtime,{op:op.id});
+    (typeof ctx.allocator.deferred==='function'?ctx.allocator.deferred:ctx.allocator.release).call(ctx.allocator,op.runtime,{op:op.id});
     op.infraRestarts=(op.infraRestarts??0)+1;
     store.appendEvent({event:'op-relaunched',op:op.id,runtime:op.runtime,reason:'prompt-missing',
       infraRestarts:op.infraRestarts,restarts:op.restarts});
@@ -3096,13 +3103,11 @@ export function withSupervisorPreference(profile,runtimes){
   return copy;
 }
 /**
- * The runtime profile this workflow runs under: the authored profile, reordered by the provider order the owner
- * set in the config.json the workflow is pinned to. Every allocation decision and every non-operation model
- * choice of this workflow reads it, so one line in config.json moves the whole run onto the owner's provider
- * without changing which runtimes may be overflowed to.
+ * The runtime profile this workflow runs under: adaptive capacity plus the optional bounded owner preference
+ * sealed in the workflow's config.json. Operation tiers remain suitability filters, never a provider chain.
  */
 export const workflowRuntimeProfile=state=>{
-  try{return withProviderPreference(loadRuntimes(),configuredProviderOrder(loadConfig(workflowModelConfigRoot(state))));}
+  try{return withProviderPreference(loadRuntimes(),configuredAllocationPolicy(loadConfig(workflowModelConfigRoot(state))));}
   catch{return loadRuntimes();}
 };
 /** Closed non-operation model bindings come only from validated config.json. */
@@ -3508,6 +3513,9 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     runtimeProfile:workflowRuntimeProfile(state),
     exec:(command,options)=>ctx.engine.check(command,options,ctx.currentOp??null)}):null);
   if(ctx.engine){
+    // The allocator is constructed before the engine opens SQLite. Bind it now so operation scoring sees the
+    // same model/judge/operation leases that admission will atomically enforce, including effect_unknown jobs.
+    ctx.allocator.bindProviderAdmission?.(()=>ctx.engine.providerAdmissionView());
     store.bindJournal?.(ctx.engine.journal,state.engine.generation,{state});
     store.acknowledgeRuntimeFile?.(path.join(store.dir,'kernel.lock'),'kernel.lock','replace');
     const retired=ctx.engine.journal.retireGenerations?.({workflowId:state.id,generation:state.engine.generation})??null;
