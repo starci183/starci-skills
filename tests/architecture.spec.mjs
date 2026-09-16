@@ -140,9 +140,9 @@ test('backend resolves aliases, relative imports, and re-export barrels before e
 
 test('frontend accepts a one-page route, downward tiers, connected hook barrel, and hook-owned transport', t => {
   const root = fixture(t, 'frontend', {
-    'src/app/home/page.tsx': 'import { HomePage } from "@/components/pages/HomePage"; const Route = () => <HomePage {...{}} />; export default Route\n',
-    'src/components/pages/HomePage/index.tsx': '"use client"; import { useThing } from "@/hooks"; import { HomePageBase } from "./component"; export const HomePage=()=>{useThing();return <HomePageBase />};\n',
-    'src/components/pages/HomePage/component.tsx': 'import { Card } from "@/components/blocks/home/Card"; export const HomePageBase=()=> <Card />\n',
+    'src/app/home/page.tsx': 'import { HomePage } from "@/features/pages/HomePage"; const Route = () => <HomePage {...{}} />; export default Route\n',
+    'src/features/pages/HomePage/index.tsx': '"use client"; import { useThing } from "@/hooks"; import { HomePageBase } from "./component"; export const HomePage=()=>{useThing();return <HomePageBase />};\n',
+    'src/features/pages/HomePage/component.tsx': 'import { Card } from "@/components/blocks/home/Card"; export const HomePageBase=()=> <Card />\n',
     'src/components/blocks/home/Card/index.tsx': 'import { Leaf } from "@/components/leaves/Leaf"; export const Card=()=> <Leaf />\n',
     'src/components/leaves/Leaf/index.tsx': 'export const Leaf=()=> <span />\n',
     'src/hooks/index.ts': 'export { useThing } from "./swr/useThing"\n',
@@ -155,8 +155,8 @@ test('frontend accepts a one-page route, downward tiers, connected hook barrel, 
 
 test('frontend catches route drawing, upward tiers, direct/deep data access, barrel bypass, world hooks, and raw fetch', t => {
   const root = fixture(t, 'frontend', {
-    'src/app/home/page.tsx': 'import { HomePage } from "@/components/pages/HomePage"; import { Leaf } from "@/components/leaves/Leaf"; const Route=()=> <><Leaf/><HomePage /></>; export default Route\n',
-    'src/components/pages/HomePage/index.tsx': 'export const HomePage=()=> <main />\n',
+    'src/app/home/page.tsx': 'import { HomePage } from "@/features/pages/HomePage"; import { Leaf } from "@/components/leaves/Leaf"; const Route=()=> <><Leaf/><HomePage /></>; export default Route\n',
+    'src/features/pages/HomePage/index.tsx': 'export const HomePage=()=> <main />\n',
     'src/components/blocks/home/Card/index.tsx': 'import { useThing } from "@/hooks/swr/useThing"; export const Card=()=>{useThing();return <div/>}\n',
     'src/components/leaves/Leaf/index.tsx': 'import { Card } from "../../blocks/home/Card"; export const Leaf=()=> <Card/>\n',
     'src/components/blocks/home/Pure/component.tsx': '"use client"; import { useContext } from "react"; import { query } from "../../../../bridge"; export const Pure=()=>{useContext(null as never);fetch("/x");return <div>{query()}</div>}\n',
@@ -274,7 +274,7 @@ test('CLI emits one actionable JSON record and uses target-local TypeScript', t 
 test('config has layout fields but rejects waiver and baseline fields', t => {
   const root = fixture(t, 'frontend', {
     'src/app/home/page.tsx': 'const Route=()=>null; export default Route\n',
-    'src/components/pages/HomePage/index.tsx': 'export const HomePage=()=>null\n',
+    'src/features/pages/HomePage/index.tsx': 'export const HomePage=()=>null\n',
   });
   const file = path.join(root, 'architecture.json');
   const config = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -296,8 +296,8 @@ test('omitted owner and Grammar declarations remain explicit unavailable coverag
   assert.deepEqual(backendResult.coverage.sourceFiles, ['src/features/feature.ts', 'src/modules/value.ts']);
   assert.equal(backendResult.coverage.checkedRuleIds.includes('ARCH_OWNER_EXPORT_BYPASS'), false);
   const frontend = fixture(t, 'frontend', {
-    'src/app/page.tsx': 'import { HomePage } from "@/components/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
-    'src/components/pages/HomePage/index.tsx': 'export const HomePage=()=> <main/>\n',
+    'src/app/page.tsx': 'import { HomePage } from "@/features/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
+    'src/features/pages/HomePage/index.tsx': 'export const HomePage=()=> <main/>\n',
   });
   const frontendResult = check(frontend);
   assert.equal(frontendResult.coverage.ownerPublicApi.status, 'unavailable');
@@ -306,8 +306,8 @@ test('omitted owner and Grammar declarations remain explicit unavailable coverag
 
 test('solution tsconfig references merge workspace programs and honor declared package exports', t => {
   const root = monorepoFixture(t, {
-    'apps/web/src/app/page.tsx': 'import { HomePage } from "@/components/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
-    'apps/web/src/components/pages/HomePage/index.tsx': 'import { Card } from "@fixture/ui"; export const HomePage=()=> <Card/>\n',
+    'apps/web/src/app/page.tsx': 'import { HomePage } from "@/features/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
+    'apps/web/src/features/pages/HomePage/index.tsx': 'import { Card } from "@fixture/ui"; export const HomePage=()=> <Card/>\n',
     'packages/ui/src/index.ts': 'export { Card } from "./blocks/Card"\n',
     'packages/ui/src/blocks/Card/index.tsx': 'import { Leaf } from "../../leaves/Leaf"; export const Card=()=> <Leaf/>\n',
     'packages/ui/src/leaves/Leaf/index.tsx': 'export const Leaf=()=> <span/>\n',
@@ -320,8 +320,8 @@ test('solution tsconfig references merge workspace programs and honor declared p
 
 test('monorepo rejects package export aliases, package to app imports, and type-only barrel bypasses', t => {
   const root = monorepoFixture(t, {
-    'apps/web/src/app/page.tsx': 'import { HomePage } from "@/components/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
-    'apps/web/src/components/pages/HomePage/index.tsx': 'import { Leaf } from "@fixture/ui/leaves/Leaf"; export const HomePage=()=> <Leaf/>\n',
+    'apps/web/src/app/page.tsx': 'import { HomePage } from "@/features/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
+    'apps/web/src/features/pages/HomePage/index.tsx': 'import { Leaf } from "@fixture/ui/leaves/Leaf"; export const HomePage=()=> <Leaf/>\n',
     'apps/web/src/contracts/secret.ts': 'export type AppSecret = string\n',
     'packages/ui/src/index.ts': 'export type { AppSecret } from "@fixture/app/contracts/secret"\n',
     'packages/ui/src/leaves/Leaf/index.tsx': 'export const Leaf=()=> <span/>\n',
@@ -334,8 +334,8 @@ test('monorepo rejects package export aliases, package to app imports, and type-
 
 test('single-app file dependencies participate in package export and package-to-app boundaries', t => {
   const root = fixture(t, 'frontend', {
-    'src/app/page.tsx': 'import { HomePage } from "@/components/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
-    'src/components/pages/HomePage/index.tsx': 'import { Public } from "@fixture/ui/public"; export const HomePage=()=> <Public/>\n',
+    'src/app/page.tsx': 'import { HomePage } from "@/features/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
+    'src/features/pages/HomePage/index.tsx': 'import { Public } from "@fixture/ui/public"; export const HomePage=()=> <Public/>\n',
     'src/contracts/app.ts': 'export type AppContract = string\n',
     'packages/ui/package.json': JSON.stringify({ name: '@fixture/ui', private: true, exports: { './public': './src/public/index.tsx' } }),
     'packages/ui/tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', baseUrl: '../..', paths: { '@fixture/app/*': ['src/*'] }, noEmit: true }, include: ['src/**/*'] }),
@@ -348,7 +348,7 @@ test('single-app file dependencies participate in package export and package-to-
   fs.writeFileSync(tsconfigFile, JSON.stringify(config));
   let result = check(root);
   assert.equal(result.errors.some(item => item.ruleId.startsWith('ARCH_PACKAGE_')), false, JSON.stringify(result, null, 2));
-  fs.writeFileSync(path.join(root, 'src/components/pages/HomePage/index.tsx'), 'import { Public } from "@fixture/ui/public"; import { Private } from "@fixture/ui/private"; export const HomePage=()=> <><Public/><Private/></>\n');
+  fs.writeFileSync(path.join(root, 'src/features/pages/HomePage/index.tsx'), 'import { Public } from "@fixture/ui/public"; import { Private } from "@fixture/ui/private"; export const HomePage=()=> <><Public/><Private/></>\n');
   fs.mkdirSync(path.join(root, 'packages/ui/src/private'), { recursive: true });
   fs.writeFileSync(path.join(root, 'packages/ui/src/private/index.tsx'), 'export const Private=()=> <span/>\n');
   fs.writeFileSync(path.join(root, 'packages/ui/src/public/index.tsx'), 'export type { AppContract } from "@fixture/app/contracts/app"; export const Public=()=> <span/>\n');
@@ -361,8 +361,8 @@ test('single-app file dependencies participate in package export and package-to-
 test('declared package export key must resolve to its declared target rather than a private alias target', t => {
   const root = monorepoFixture(t, {
     'apps/web/tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'preserve', baseUrl: '../..', paths: { '@/*': ['apps/web/src/*'], '@fixture/ui/public': ['packages/ui/src/private/index.tsx'] }, noEmit: true }, include: ['src/**/*'] }),
-    'apps/web/src/app/page.tsx': 'import { HomePage } from "@/components/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
-    'apps/web/src/components/pages/HomePage/index.tsx': 'import { Public } from "@fixture/ui/public"; export const HomePage=()=> <Public/>\n',
+    'apps/web/src/app/page.tsx': 'import { HomePage } from "@/features/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
+    'apps/web/src/features/pages/HomePage/index.tsx': 'import { Public } from "@fixture/ui/public"; export const HomePage=()=> <Public/>\n',
     'packages/ui/package.json': JSON.stringify({ name: '@fixture/ui', private: true, exports: { './public': './src/Public/index.tsx' } }),
     'packages/ui/src/Public/index.tsx': 'export const Public=()=> <span/>\n',
     'packages/ui/src/private/index.tsx': 'export const Public=()=> <span/>\n',
@@ -727,10 +727,10 @@ test('backend legacy roots must be bounded, existing, and non-overlapping', t =>
 
 test('declared Grammar contract binds public code, style entry, peers, and product imports', t => {
   const root = fixture(t, 'frontend', {
-    'src/app/page.tsx': 'import { ProductPage } from "@/components/pages/ProductPage"; export default function Route(){ return <ProductPage/> }\n',
+    'src/app/page.tsx': 'import { ProductPage } from "@/features/pages/ProductPage"; export default function Route(){ return <ProductPage/> }\n',
     'src/app/globals.css': '@import "@fixture/grammar/core/styles.css";\n',
-    'src/components/pages/ProductPage/index.tsx': 'import { Button } from "@fixture/grammar/common"; export const ProductPage=()=> <Button/>\n',
-    'src/components/pages/ProductPage/shadow.ts': 'const require=(value:string)=>value; export const local=require("@fixture/grammar/private")\n',
+    'src/features/pages/ProductPage/index.tsx': 'import { Button } from "@fixture/grammar/common"; export const ProductPage=()=> <Button/>\n',
+    'src/features/pages/ProductPage/shadow.ts': 'const require=(value:string)=>value; export const local=require("@fixture/grammar/private")\n',
     'packages/grammar/src/common/index.tsx': 'export const Button=()=> <button/>\n',
     'packages/grammar/src/private.tsx': 'export const Button=()=> <button data-private/>\n',
     'packages/grammar/src/core/styles.css': ':root{}\n',
@@ -746,24 +746,24 @@ test('declared Grammar contract binds public code, style entry, peers, and produ
   fs.writeFileSync(tsconfigFile, `${JSON.stringify(tsconfig, null, 2)}\n`);
   const configFile = path.join(root, 'architecture.json');
   const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-  config.owners = [];
+  config.owners = [{ id: 'product-page', root: 'src/features/pages/ProductPage', entry: 'src/features/pages/ProductPage/index.tsx' }];
   config.frontend = { grammar: { package: '@fixture/grammar', entry: '@fixture/grammar/common',
     styleEntry: '@fixture/grammar/core/styles.css', styleSources: ['src/app/globals.css'], consumerManifests: ['package.json'],
     peers: ['react', '@fixture/theme'] } };
   fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
   const valid = check(root);
   assert.equal(valid.ok, true, JSON.stringify(valid, null, 2));
-  assert.deepEqual(valid.coverage.ownerPublicApi, { status: 'checked', declarations: 0 });
+  assert.deepEqual(valid.coverage.ownerPublicApi, { status: 'checked', declarations: 1 });
   assert.deepEqual(valid.coverage.grammarContract, { status: 'checked', package: '@fixture/grammar' });
   for (const ruleId of ['ARCH_OWNER_EXPORT_BYPASS', 'ARCH_OWNER_EXPORT_STAR', 'ARCH_GRAMMAR_EXPORT_BYPASS', 'ARCH_GRAMMAR_CONTRACT_INVALID']) {
     assert.ok(valid.coverage.checkedRuleIds.includes(ruleId));
   }
 
-  fs.writeFileSync(path.join(root, 'src/components/pages/ProductPage/shadow.ts'), 'export const direct=require("@fixture/grammar/private")\n');
+  fs.writeFileSync(path.join(root, 'src/features/pages/ProductPage/shadow.ts'), 'export const direct=require("@fixture/grammar/private")\n');
   const realRequireBypass = check(root);
   assert.ok(realRequireBypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS'
     && item.path.endsWith('/shadow.ts')), JSON.stringify(realRequireBypass, null, 2));
-  fs.writeFileSync(path.join(root, 'src/components/pages/ProductPage/shadow.ts'), 'const require=(value:string)=>value; export const local=require("@fixture/grammar/private")\n');
+  fs.writeFileSync(path.join(root, 'src/features/pages/ProductPage/shadow.ts'), 'const require=(value:string)=>value; export const local=require("@fixture/grammar/private")\n');
 
   tsconfig.compilerOptions.paths['@fixture/grammar/common'] = ['packages/grammar/src/private.tsx'];
   fs.writeFileSync(tsconfigFile, `${JSON.stringify(tsconfig, null, 2)}\n`);
@@ -781,14 +781,14 @@ test('declared Grammar contract binds public code, style entry, peers, and produ
   assert.ok(unquotedStyleBypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS' && item.specifier === '@fixture/grammar/heritage/styles.css'), JSON.stringify(unquotedStyleBypass, null, 2));
   fs.writeFileSync(path.join(root, 'src/app/globals.css'), '@import "@fixture/grammar/core/styles.css";\n');
 
-  fs.writeFileSync(path.join(root, 'src/components/pages/ProductPage/index.tsx'), 'import { Button } from "@fixture/grammar/core"; export const ProductPage=()=> <Button/>\n');
+  fs.writeFileSync(path.join(root, 'src/features/pages/ProductPage/index.tsx'), 'import { Button } from "@fixture/grammar/core"; export const ProductPage=()=> <Button/>\n');
   const bypass = check(root);
   assert.ok(bypass.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_EXPORT_BYPASS'), JSON.stringify(bypass, null, 2));
 
   fs.writeFileSync(path.join(root, 'packages/grammar/package.json'), JSON.stringify({ name: '@fixture/grammar',
     exports: { './common': './src/common/index.tsx', './core/styles.css': './src/core/styles.css' },
     peerDependencies: { react: '>=18', '@fixture/theme': '>=1', '@fixture/extra': '>=1' } }));
-  fs.writeFileSync(path.join(root, 'src/components/pages/ProductPage/index.tsx'), 'import { Button } from "@fixture/grammar/common"; export const ProductPage=()=> <Button/>\n');
+  fs.writeFileSync(path.join(root, 'src/features/pages/ProductPage/index.tsx'), 'import { Button } from "@fixture/grammar/common"; export const ProductPage=()=> <Button/>\n');
   const extraPeer = check(root);
   assert.ok(extraPeer.violations.some(item => item.ruleId === 'ARCH_GRAMMAR_CONTRACT_INVALID' && /exactly match/.test(item.message)), JSON.stringify(extraPeer, null, 2));
 
@@ -851,8 +851,8 @@ test('workspace discovery supports exact and deep bounded entries and rejects un
 test('frontend accepts redirect-only server routes and intrinsic client visual state', t => {
   const root = fixture(t, 'frontend', {
     'src/app/home/page.tsx': 'import { redirect } from "next/navigation"; export default async function Route({params}){const {lang}=await params;redirect(lang === "vi" ? "/next" : `/${lang}/next`)}\n',
-    'src/components/pages/HomePage/index.tsx': 'export const HomePage=()=>null\n',
-    'src/app/guarded/page.tsx': 'import { redirect } from "next/navigation"; import { HomePage } from "@/components/pages/HomePage"; export default function Route({session,lang}){if(!session) redirect(lang === "vi" ? "/vi/login" : "/en/login");return <HomePage/>}\n',
+    'src/features/pages/HomePage/index.tsx': 'export const HomePage=()=>null\n',
+    'src/app/guarded/page.tsx': 'import { redirect } from "next/navigation"; import { HomePage } from "@/features/pages/HomePage"; export default function Route({session,lang}){if(!session) redirect(lang === "vi" ? "/vi/login" : "/en/login");return <HomePage/>}\n',
     'src/components/leaves/Disclosure/component.tsx': '"use client"; import { useRef,useState,useEffect } from "react"; export const Disclosure=()=>{const r=useRef(null);const [open,setOpen]=useState(false);useEffect(()=>{},[]);return <button ref={r} onClick={()=>setOpen(!open)} /> }\n',
   });
   const result = check(root);
@@ -861,8 +861,8 @@ test('frontend accepts redirect-only server routes and intrinsic client visual s
 
 test('frontend rejects a visual branch that selects a page versus no composition', t => {
   const root = fixture(t, 'frontend', {
-    'src/app/home/page.tsx': 'import { HomePage } from "@/components/pages/HomePage"; export default function Route({show}){return show ? <HomePage/> : null}\n',
-    'src/components/pages/HomePage/index.tsx': 'export const HomePage=()=> <main/>\n',
+    'src/app/home/page.tsx': 'import { HomePage } from "@/features/pages/HomePage"; export default function Route({show}){return show ? <HomePage/> : null}\n',
+    'src/features/pages/HomePage/index.tsx': 'export const HomePage=()=> <main/>\n',
   });
   const result = check(root);
   assert.ok(result.violations.some(item => item.ruleId === 'FE_ROUTE_DRAWING_DECISION'), JSON.stringify(result, null, 2));
@@ -910,7 +910,7 @@ test('backend composition roots support standard src and exact app source layout
 test('explicit missing layout roots and empty project programs fail closed', t => {
   const root = fixture(t, 'frontend', {
     'src/app/home/page.tsx': 'export default function Route(){return null}\n',
-    'src/components/pages/HomePage/index.tsx': 'export const HomePage=()=>null\n',
+    'src/features/pages/HomePage/index.tsx': 'export const HomePage=()=>null\n',
   });
   const configFile = path.join(root, 'architecture.json');
   const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));

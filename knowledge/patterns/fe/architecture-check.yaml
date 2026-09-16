@@ -34,6 +34,8 @@ rules:
     kind: mandatory
     requirement: |-
       A visual route may resolve framework-owned server inputs such as params, searchParams, headers, cookies, session, redirects, notFound, or a server loader, then mounts one page-level visual owner. A route that only redirects or terminates with notFound mounts no visual owner. Shell composition belongs in a layout or the page owner, not beside the page in the route adapter.
+      Every resolved internal app import or re-export, including type-only edges, enters an exact public
+      entry under features/{pages,layouts,overlays}; React, Next and external framework imports remain valid.
     rationale: |-
       The invariant is one visual responsibility, not a fixed empty-props syntax. Framework adapters can remain server components without leaking routing concerns into reusable UI.
     cases:
@@ -52,6 +54,7 @@ rules:
         - FE_ROUTE_DEFAULT_EXPORT
         - FE_ROUTE_ONE_PAGE
         - FE_ROUTE_DRAWING_DECISION
+        - FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES
       manual:
         - Confirm a route-level loader or server adapter does not become product orchestration or duplicate client fetching.
     relatedExamples: []
@@ -59,7 +62,11 @@ rules:
     title: Responsibilities point inward and downward
     kind: mandatory
     requirement: |-
-      Runtime dependencies follow responsibility: framework route adapter to page or shell, page or shell to feature/product composition, composition to reusable visual composition, and reusable composition to leaf or Grammar primitives. Lower responsibilities do not import route, page, shell, session, transport, or product-world owners. Relative paths, aliases, workspace packages, dynamic string literals, and re-export barrels obey the same direction.
+      Dependencies follow the sanctioned roots: app to feature public entry; feature to components/hooks/modules;
+      component away from app/features; hook away from app/features/components; module away from
+      app/features/components/hooks. Components descend blocks to composites/branches/leaves without a
+      mandatory visit through every tier. Relative paths, aliases, type-only edges, workspace packages,
+      dynamic string literals and re-export barrels obey the same direction.
     rationale: |-
       A partial responsibility graph remains valid across a single-source repository and a monorepo. Directory names and an absolute tier rank do not decide architecture by themselves.
     cases:
@@ -75,6 +82,8 @@ rules:
     verification:
       automated:
         - FE_TIER_IMPORTS_UPWARD
+        - FE_FEATURE_DEPENDENCY_DIRECTION
+        - FE_SOURCE_LAYOUT_INVALID
       manual:
         - Classify the responsibility before treating a folder-to-folder edge as upward.
     relatedExamples: []
@@ -82,7 +91,12 @@ rules:
     title: Split world ownership only when there is a boundary to own
     kind: mandatory
     requirement: |-
-      Product data, session, locale/router decisions, and transport lifecycle have one connected owner and reach rendering through resolved values and actions. A presentational Base twin is required only when that separation exists and provides an independently useful render contract. Intrinsic visual state, refs, focus, measurement, motion, and disclosure may stay in one client visual component. Missing component.tsx, Base, or a paired spec is never a violation by count alone.
+      Product data, session, locale/router decisions and transport lifecycle in a block belong to
+      blocks/<Name>/index.tsx and every nonempty render path reaches a resolved pure export from sibling
+      component.tsx. Pure blocks and lower tiers have no mandatory twin. Leaves, branches and composites
+      may own intrinsic React interaction but cannot own product-world lifecycle. All authored custom useX
+      declarations live under hooks/<domain>; a hooks/ui implementation remains intrinsic only while its
+      resolved closure is free of product hooks, modules, transport, session and route lifecycle.
     rationale: |-
       The split isolates real world dependencies without manufacturing forwarding components around ordinary browser interaction.
     cases:
@@ -97,6 +111,10 @@ rules:
         write: Call a function under the configured API transport root.
     verification:
       automated:
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
+        - FE_COMPONENT_WORLD_OWNERSHIP
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_BLOCK_PRODUCT_HOOK_DEFINITION
         - FE_COMPONENT_DEEP_HOOK_IMPORT
         - FE_COMPONENT_IMPORTS_TRANSPORT
         - FE_PURE_WORLD_HOOK
@@ -136,18 +154,18 @@ rules:
     title: Features own scenarios and modules own reusable capabilities
     kind: mandatory
     requirement: |-
-      A feature owns one product scenario, its connected lifecycle, feature-neutral input/result model,
-      and its transport-to-feature mapping. A module owns one cohesive reusable technical or domain
-      capability and exposes a declared public entry. Framework routes and app providers adapt to a
-      feature; Grammar stays product-agnostic. Wire/schema-generated types remain inside the transport
-      boundary and are mapped before presentation or Grammar.
+      Features/{pages,layouts,overlays} own product composition. Hooks/<domain> own authored custom
+      lifecycle functions and map module results to the product-facing contract. A module owns one cohesive
+      reusable technical or domain capability and exposes a declared public entry. Framework routes adapt
+      to a feature; Grammar stays product-agnostic. Wire/schema-generated types remain inside the module
+      transport boundary and are mapped before presentation or Grammar.
     rationale: |-
-      Ownership remains legible without a global hooks/services layer or a mandatory wrapper per file.
+      Ownership remains legible with one declared hooks root and without a mandatory wrapper per file.
       Transport revisions then affect their adapter and mapper instead of every render contract.
     cases:
       - id: case-1
         when: An authentication journey coordinates browser persistence, redirects and API operations
-        write: Keep the lifecycle under the authentication feature; call shared API/session modules through their public entries.
+        write: Keep its hook under hooks/authentication and call shared API/session modules through public entries.
       - id: case-2
         when: A GraphQL document has generated result and variable types
         write: Keep the generated wire contract at the data adapter and map it to the feature model.
