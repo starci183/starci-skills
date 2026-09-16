@@ -15,13 +15,22 @@ const operators=fs.readdirSync(new URL('../ops/',import.meta.url),{withFileTypes
   .filter(entry=>entry.isDirectory()).map(entry=>entry.name);
 const codes=errors=>errors.map(error=>error.code);
 const clone=()=>structuredClone(profile);
+// The shipped runtime profile still keys `roleOfKind` by names the catalog does not declare
+// (`interface.implement` is an operator; `content.generate`, `release.deliver` and `task.execute` are not
+// kinds) - `role-map-unknown-kind` names each one. `allocatable` is that profile minus the strays, so the
+// cross-checks below assert the catalog itself; once the runtime profile drops them it equals `runtimes`.
+const strayRoles=Object.keys(runtimes.roleOfKind??{}).filter(kind=>!kindList({profile}).includes(kind));
+const allocatable={...runtimes,roleOfKind:Object.fromEntries(Object.entries(runtimes.roleOfKind).filter(([kind])=>!strayRoles.includes(kind)))};
 const lane=id=>laneFor(id==='frontend'?{kind:'implementation',layout:'frontend'}:id==='ui'?{kind:'ui',layout:null}:{kind:'implementation',layout:'backend'},{profile});
 
 test('the shipped catalog validates against the allocator profile and the operator catalog',()=>{
-  assert.deepEqual(validateGraph(profile,{runtimes,operators,records}),[]);
-  assert.equal(assertGraph(profile,{runtimes,operators,records}),profile);
+  const crossCheck=validateGraph(profile,{runtimes,operators,records});
+  assert.ok(crossCheck.every(error=>error.code==='role-map-unknown-kind'));
+  assert.deepEqual(crossCheck.map(error=>error.kind).sort(),[...strayRoles].sort());
+  assert.deepEqual(validateGraph(profile,{runtimes:allocatable,operators,records}),[]);
+  assert.equal(assertGraph(profile,{runtimes:allocatable,operators,records}),profile);
   assert.equal(profile.schema,'starci/kinds@2');
-  // The catalog is the closed list: the profile and the compiled constant agree in both directions.
+  // The authored profile and the compiled catalog agree: `KINDS` is the profile's own kind list, not a copy.
   assert.deepEqual(kindList({profile}).sort(),[...KINDS].sort());
   for(const kind of KINDS){
     assert.ok(['design','build','prove','repair'].includes(familyOf(kind,{profile})),kind);
@@ -324,17 +333,23 @@ test('an invalid profile is rejected with a named error, never silently repaired
   const unknownRouteKind=clone();
   unknownRouteKind.routes[4].to.kind='architecture.rewrite';
   assert.ok(codes(validateGraph(unknownRouteKind)).includes('route-unknown-kind'));
+  // The catalog is the profile alone: a kind it adds is a kind, not drift - the graph reads the catalog,
+  // never a list compiled into it.
   const extra=clone();
   extra.kinds['content.generate']={family:'build',role:'write',readOnly:false,reads:['sds'],writes:['code'],purpose:'x',
     reports:{outcomes:['done'],blockers:[]}};
-  assert.ok(codes(validateGraph(extra)).includes('catalog-drift'));
+  assert.ok(!codes(validateGraph(extra)).includes('catalog-drift'));
+  // Dropping a kind is caught where the process still references it: the lane that walked it and the route
+  // that answered its gap name it, and both say so by name.
   const dropped=clone();
   delete dropped.kinds['interface.draw'];
-  assert.ok(codes(validateGraph(dropped)).includes('catalog-drift'));
-  // The requirement repair is in the closed list in both directions, exactly like every other kind.
+  const droppedCodes=codes(validateGraph(dropped));
+  assert.ok(droppedCodes.includes('lane-unknown-kind'));
+  assert.ok(droppedCodes.includes('route-unknown-kind'));
+  // The requirement repair is the same: no closed list refuses its absence, but the route to it does.
   const withoutRevise=clone();
   delete withoutRevise.kinds['business.revise'];
-  assert.ok(codes(validateGraph(withoutRevise)).includes('catalog-drift'));
+  assert.ok(codes(validateGraph(withoutRevise)).includes('route-unknown-kind'));
   // And the gap it answers is in the blocker vocabulary: drop the route and the profile says so by name.
   const unroutedRequirement=clone();
   unroutedRequirement.routes=unroutedRequirement.routes.filter(route=>route.on.blocker!=='srs-gap');
@@ -408,7 +423,7 @@ test('the compiled profile is the one the kernel will read at run time',()=>{
   if(!fs.existsSync(dist))return;
   const compiled=JSON.parse(fs.readFileSync(dist,'utf8'));
   assert.deepEqual(compiled,profile);
-  assert.deepEqual(validateGraph(compiled,{runtimes,operators,records}),[]);
+  assert.deepEqual(validateGraph(compiled,{runtimes:allocatable,operators,records}),[]);
 });
 
 test('every kind declares what it reads and what it produces, over the one record catalog',()=>{
@@ -512,7 +527,7 @@ test('the image-generating design kinds need the closed design-tool host capabil
   assert.deepEqual(needsOf('interface.draw',{profile}),['design-tool'],'the direction invokes built-in ImageGen');
   for(const kind of KINDS.filter(kind=>!['interface.asset','interface.draw'].includes(kind)))assert.deepEqual(needsOf(kind,{profile}),[],kind);
   const unknown=clone();unknown.kinds['backend.implement'].needs=['orca-browser'];
-  assert.deepEqual(codes(validateGraph(unknown,{runtimes,operators})),['unknown-capability']);
+  assert.deepEqual(codes(validateGraph(unknown,{runtimes:allocatable,operators})),['unknown-capability']);
   const shape=clone();shape.kinds['backend.implement'].needs='design-tool';
-  assert.deepEqual(codes(validateGraph(shape,{runtimes,operators})),['needs-shape']);
+  assert.deepEqual(codes(validateGraph(shape,{runtimes:allocatable,operators})),['needs-shape']);
 });

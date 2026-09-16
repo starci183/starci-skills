@@ -24,9 +24,14 @@ import {RECORD_KINDS, loadRecords, recordReads} from './io.mjs';
  * `lane` - and an unresolvable symbol is reported as `unresolved`, never guessed into a default.
  */
 export const KIND_GRAPH='starci/kind-graph@1';
-/** The closed catalog. `validateGraph` refuses a profile that adds to it or drops from it. */
-export const KINDS=Object.freeze(['decision.prepare','provision.ask','business.decide','business.revise','architecture.decide','architecture.revise','brand.decide','interface.draw','interface.asset','e2e.verify',
-  'frontend.implement','backend.implement','runtime.operate','grammar.update','uat.verify','integration.verify','review.verify','work.author','implementation.plan']);
+/**
+ * The catalog before a profile can be loaded. `KINDS` (declared below, after `kindList`) is the loaded
+ * catalog itself - the compiled profile when `.dist` can be read, this baseline when it cannot (a tree whose
+ * `.dist` is not built yet still has to resolve kinds). It survives as the fallback only: the catalog lives
+ * in `model/kinds.yaml`, and nothing here refuses a profile for adding to it or dropping from it.
+ */
+const BASELINE_KINDS=['decision.prepare','provision.ask','business.decide','business.revise','architecture.decide','architecture.revise','brand.decide','interface.draw','interface.asset','e2e.verify',
+  'frontend.implement','backend.implement','runtime.operate','grammar.update','uat.verify','integration.verify','review.verify','work.author','implementation.plan'];
 export const FAMILIES=Object.freeze(['design','build','prove','repair']);
 export const ROLES=Object.freeze(['decide','plan','implement','verify','write']);
 /**
@@ -97,6 +102,12 @@ const stepsOf=lane=>Array.isArray(lane?.steps)?lane.steps.map(step=>typeof step=
 
 /** Every kind the loaded profile catalogues, in catalog order. */
 export function kindList({profile=null}={}){return Object.keys(profileOf(profile).kinds);}
+/**
+ * The operation kinds of the loaded catalog: `kindList()` on the compiled profile when `.dist` can be read,
+ * `BASELINE_KINDS` before it can. Kernel callers that keep this list (`routeKind` answers a route's named
+ * kind through it) follow the catalog as it grows - a kind the profile adds needs no edit here.
+ */
+export const KINDS=Object.freeze((()=>{try{return kindList();}catch{return [...BASELINE_KINDS];}})());
 /** One catalog entry; throws for a kind the profile does not declare, because an unknown kind is a bug. */
 export function kindRecord(kind,{profile=null}={}){
   const record=profileOf(profile).kinds[kind];
@@ -187,33 +198,71 @@ function laneSteps(lane,profile){
   return stepsOf(lane);
 }
 
-const satisfied=(name,predicates)=>{
-  const value=predicates?.[name];
-  return typeof value==='function'?Boolean(value(name)):Boolean(value);
+/** Predicate names with this prefix are answered by the workflow's goal, not by a node record. */
+export const GOAL_PREDICATE='goal.';
+/**
+ * Whether the goal declares one metric as required. The metrics block is `goal.metrics` or the `done:` block
+ * of goal.md §1, either a mapping (`requiresSecurity: true`, or an object that only an explicit
+ * `required: false` disarms) or a list (a named entry is required unless it says `required: false`). A goal
+ * that never declares the metric requires nothing, so a missing block, a missing entry and a falsy one all
+ * answer `false` - and nothing here can throw, because an unreadable goal is not a reason to keep a step the
+ * goal never asked for.
+ */
+export function goalMetricRequired(goal,metric){
+  for(const block of [goal?.metrics,goal?.done]){
+    if(Array.isArray(block)){
+      for(const entry of block){
+        const name=typeof entry==='string'?entry:entry?.name??entry?.id??entry?.metric;
+        if(name===metric)return typeof entry==='string'?true:entry.required!==false;
+      }
+      continue;
+    }
+    if(plain(block)&&Object.hasOwn(block,metric)){
+      const value=block[metric];
+      return plain(value)?value.required!==false:Boolean(value);
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether an `optionalWhen` predicate retires its step. A name the caller evaluated wins first; a `goal.*`
+ * name the caller did not supply is answered against the workflow's goal metrics block - satisfied exactly
+ * when the goal does not require the named metric, so a missing metric skips the step rather than running
+ * or erroring. Any other unknown predicate is false: the default is to run the step.
+ */
+const satisfied=(name,predicates,goal)=>{
+  if(Object.hasOwn(predicates??{},name)){
+    const value=predicates[name];
+    return typeof value==='function'?Boolean(value(name)):Boolean(value);
+  }
+  if(typeof name==='string'&&name.startsWith(GOAL_PREDICATE))return !goalMetricRequired(goal,name.slice(GOAL_PREDICATE.length));
+  return false;
 };
 
 /**
  * The next step of a lane, or `null` when the lane is walked. The order is mandatory: a step that is neither
  * done nor a satisfied optional is returned even when a later step is already done, so a lane cannot be
  * entered in the middle and a skipped step is never silently accepted. `optionalWhen` is satisfied only by a
- * named predicate the kernel evaluated - a missing predicate is false, so the default is to run the step.
+ * named predicate the kernel evaluated or, for `goal.*` names, the goal itself - a missing predicate is
+ * false, so the default is to run the step.
  */
-export function nextKind(lane,doneKinds=[],{predicates={},profile=null}={}){
+export function nextKind(lane,doneKinds=[],{predicates={},goal=null,profile=null}={}){
   const resolved=profileOf(profile);
   const done=new Set(Array.isArray(doneKinds)?doneKinds:[doneKinds]);
   for(const step of laneSteps(lane,resolved)){
     if(done.has(step.kind))continue;
-    if(typeof step.optionalWhen==='string'&&satisfied(step.optionalWhen,predicates))continue;
+    if(typeof step.optionalWhen==='string'&&satisfied(step.optionalWhen,predicates,goal))continue;
     return step.kind;
   }
   return null;
 }
 
 /** The optional steps of a lane a kernel would skip right now: satisfied by a named predicate and not done. */
-export function skippedKinds(lane,doneKinds=[],{predicates={},profile=null}={}){
+export function skippedKinds(lane,doneKinds=[],{predicates={},goal=null,profile=null}={}){
   const resolved=profileOf(profile);
   const done=new Set(Array.isArray(doneKinds)?doneKinds:[doneKinds]);
-  return laneSteps(lane,resolved).filter(step=>!done.has(step.kind)&&typeof step.optionalWhen==='string'&&satisfied(step.optionalWhen,predicates)).map(step=>step.kind);
+  return laneSteps(lane,resolved).filter(step=>!done.has(step.kind)&&typeof step.optionalWhen==='string'&&satisfied(step.optionalWhen,predicates,goal)).map(step=>step.kind);
 }
 
 /** A one-line markdown rendering of a lane, for an operation contract, a status view or docs. */
@@ -298,8 +347,9 @@ const subsetOn=(a,b)=>Object.entries(a).every(([key,value])=>b[key]===value);
  * authored mistake here is a process mistake: an unknown kind in a lane or a route, a lane that builds
  * without proving, a design step after a build step, a prove kind allowed to redesign, a route without a
  * limit, a route no query can reach because an earlier one shadows it, a cycle between two named kinds, a
- * blocker no route answers. `runtimes` cross-checks the allocator profile, `operators` the op catalog, and
- * `records` the record catalog every `reads`/`writes` entry is named in.
+ * blocker no route answers, a revision kind rewriting a record it does not read. `runtimes` cross-checks the
+ * allocator profile - every `roleOfKind` key must name a kind and every kind its role - `operators` the op
+ * catalog, and `records` the record catalog every `reads`/`writes` entry is named in.
  *
  * Four of the errors are about the declaration of 5-plus rather than about the shape of the process, and
  * they are what makes that declaration worth having. A kind that writes a record it shares no derivation
@@ -333,9 +383,8 @@ export function validateGraph(given=null,{runtimes=null,operators=null,records=n
   const declaredReads=kind=>listOf(profile.kinds[kind]?.reads);
   const declaredWrites=kind=>listOf(profile.kinds[kind]?.writes);
 
-  // The catalog is closed in both directions: the compiled KINDS list and the profile must agree.
-  for(const kind of KINDS)if(!catalogue.includes(kind))fail(errors,'catalog-drift',`The catalog is missing the required kind ${kind}`,{kind});
-  for(const kind of catalogue)if(!KINDS.includes(kind))fail(errors,'catalog-drift',`${kind} is not in the closed KINDS list of kernel/graph.mjs`,{kind});
+  // The catalog is the profile alone: a kind the profile adds is a kind, and validation checks what the
+  // profile says about it - never a name compiled into this module.
 
   for(const [kind,record] of Object.entries(profile.kinds)){
     if(!plain(record)){fail(errors,'kind-shape',`Kind ${kind} is not a mapping`,{kind});continue;}
@@ -350,6 +399,12 @@ export function validateGraph(given=null,{runtimes=null,operators=null,records=n
       if(!recordKinds.includes(entry))fail(errors,'unknown-record',`Kind ${kind} names the record kind ${entry}, which the record catalog does not declare`,{kind,record:entry});
     if(record.readOnly===true&&writes.length)fail(errors,'readonly-writes',`Kind ${kind} is readOnly and may not declare writes`,{kind,writes});
     if(record.readOnly===false&&!writes.length)fail(errors,'writes-nothing',`Kind ${kind} is not readOnly but produces nothing; declare what it writes`,{kind});
+    // A repair edits a record that already exists, so the record must be in its reads: a revision cannot
+    // restate a record it never saw. A kind that authors a record fresh - the evidence of a run, artwork,
+    // the brand itself - legitimately writes what was never there to read, and is held by `writer-blind`.
+    if(record.family==='repair'||kind.endsWith('.revise'))
+      for(const written of writes)if(!reads.includes(written))
+        fail(errors,'writes-unread',`Kind ${kind} rewrites ${written}, which it does not read`,{kind,record:written});
     // A writer must have at least one of the record's own derivation sources in view - reading it, or
     // authoring it in the same operation. A kind that shares none of them is writing a record it cannot
     // check against anything it saw, which is exactly the blind restatement the record catalog exists to stop.
@@ -492,6 +547,10 @@ export function validateGraph(given=null,{runtimes=null,operators=null,records=n
 
   if(plain(runtimes)){
     const roleOfKind=plain(runtimes.roleOfKind)?runtimes.roleOfKind:{};
+    // The map is keyed by kind names: a key the catalog does not declare (an operator name, a retired kind)
+    // is a stray the allocator would resolve to nothing.
+    for(const kind of Object.keys(roleOfKind))
+      if(!catalogue.includes(kind))fail(errors,'role-map-unknown-kind',`The runtime profile maps ${kind} to a role, but the catalog declares no such kind`,{kind,role:roleOfKind[kind]});
     for(const [kind,record] of Object.entries(profile.kinds)){
       if(!plain(record))continue;
       const declared=roleOfKind[kind];
@@ -509,3 +568,6 @@ export function assertGraph(profile=null,{runtimes=null,operators=null,records=n
   need(!errors.length,`The kind graph does not validate: ${errors.map(error=>`${error.code}: ${error.message}`).join('; ')}`);
   return resolved;
 }
+
+/* ------------------------------------------------------------------ invalidation */
+export {propagateInvalidation} from './graph-invalidation.mjs';
