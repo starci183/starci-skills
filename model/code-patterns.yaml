@@ -84,9 +84,16 @@ profiles:
       - test/**/*.ts
       - tests/**/*.ts
     inputGlobs:
-      - jest*.ts
+      - jest*.{js,mjs,cjs,ts,json}
+      - apps/*/jest*.{js,mjs,cjs,ts,json}
+      - libs/*/jest*.{js,mjs,cjs,ts,json}
+      - packages/*/jest*.{js,mjs,cjs,ts,json}
       - tsconfig*.json
+      - apps/*/tsconfig*.json
+      - libs/*/tsconfig*.json
+      - packages/*/tsconfig*.json
       - package.json
+      - package-lock.json
     obligations:
       - id: NEST-DEPENDENCY-DIRECTION
         sourceRuleIds: [BE-ARCHITECTURE-1, BE-FOLDER-1, BE-IMPORTS-4]
@@ -349,14 +356,14 @@ profiles:
         status: implemented
       - id: NEST-JEST-ALIAS-PARITY
         sourceRuleIds: [BE-IMPORTS-7, BE-TEST-1]
-        applicability: { include: ['jest*.ts', 'tsconfig*.json', 'package.json'] }
+        applicability: { include: ['jest*.{js,mjs,cjs,ts,json}', 'apps/*/jest*.{js,mjs,cjs,ts,json}', 'libs/*/jest*.{js,mjs,cjs,ts,json}', 'packages/*/jest*.{js,mjs,cjs,ts,json}', 'tsconfig*.json', 'apps/*/tsconfig*.json', 'libs/*/tsconfig*.json', 'packages/*/tsconfig*.json', 'package.json', 'package-lock.json'] }
         mechanical:
           requirement: Compare Jest discovery and moduleNameMapper with the declared TypeScript projects and aliases.
           check: { kind: script, ruleIds: [NEST_JEST_ALIAS_PARITY, NEST_TEST_DISCOVERY] }
         semantic:
           guidance: knowledge/patterns/be/test.yaml
           review: Record which real service, database and external boundaries ran.
-        status: missing
+        status: implemented
       - id: NEST-TEST-CODE-FORM
         sourceRuleIds: [BE-TEST-2, BE-TEST-3, BE-TEST-4, BE-TEST-6]
         applicability: { include: ['**/*.spec.ts'] }
