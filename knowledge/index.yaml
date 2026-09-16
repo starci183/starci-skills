@@ -4,25 +4,38 @@ title: Knowledge
 purpose: |
   This tree contains scoped development reference material, not task orchestration.
   See patterns/scan-coverage.yaml for current source-scan coverage and known automated-check gaps.
-appliesTo: [knowledge]
+appliesTo:
+  - knowledge
 provenance:
   extractionCommit: edf72554425f918e80c9205e9c6db10596e722f0
   limitations: |
     Component names, tokens, ownership tables and source counts describe the reference family
     at observation time. Verify the actual installed package/source before using them; do not
-    invent missing APIs or impose this family on a different stack. A source-derived business
+    invent missing APIs or substitute a different framework family. A source-derived business
     description remains unapproved until its owner accepts it. Historical evidence links are
     pinned Git provenance at the extraction commit, not current instructions or current product
     proof. If the remote link is unavailable, inspect that exact object with
     `git show <commit>:<path>` in this skills repository.
 guidance:
   - id: load-order
-    requirement: |
-      Read coding-reference.yaml and the smallest applicable English topic. Knowledge has no
-      translated mirrors. Stable rule IDs identify implementation and review criteria, not
-      execution authority. Product requirements, design, scope, state and verification belong
-      in .starciwork. These references do not authorize the next op.
+    requirement: Read architecture-rules.yaml, coding-reference.yaml and the smallest applicable English Nest/Next
+      topic. All projects use Next.js/NestJS and the owner Academy patterns. Code patterns are checked by
+      executable scripts; design patterns and edge cases are reviewed by agents using Markdown guidance.
+      Knowledge has no translated mirrors and grants no execution authority. Product requirements, design,
+      scope, state and evidence belong in .starciwork.
 branches:
+  - id: architecture-rules
+    title: Common Nest/Next architecture rules
+    path: architecture-rules.yaml
+    use: Shared ownership/effect invariants, fixed stack and executable-code versus agent-design verification.
+  - id: design-patterns
+    title: Enterprise design pattern decisions
+    path: design-patterns.yaml
+    use: Semantic selection and failure review with primary research; scoped agent review and real behavior evidence.
+  - id: code-pattern-enforcement
+    title: Executable code-pattern coverage
+    path: code-pattern-enforcement.yaml
+    use: Runtime-owned obligation inventory, complete mechanical coverage and explicit missing/conflicting checkers.
   - id: application-stacks
     title: Complete application stacks
     path: application-stacks.yaml
@@ -38,11 +51,13 @@ branches:
   - id: backend-patterns
     title: Backend patterns
     path: patterns/be/index.yaml
-    use: Mandatory BE conventions, established from starci-academy-backend.
+    use: Concrete NestJS code patterns derived from Academy; executable code checks and separately scoped semantic
+      review.
   - id: frontend-patterns
     title: Frontend patterns
     path: patterns/fe/index.yaml
-    use: Mandatory FE conventions, established from starci-academy-fe.
+    use: Concrete Next.js and Grammar code patterns derived from Academy; executable code checks and separately
+      scoped semantic review.
   - id: ui
     title: UI
     path: ui/index.yaml

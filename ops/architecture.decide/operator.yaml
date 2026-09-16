@@ -12,6 +12,13 @@ graphPolicy:
   prerequisiteState: done
   dispatch: never
 reads:
+  - id: design-patterns
+    path: knowledge/architecture-rules.json + knowledge/design-patterns.json + docs/design-pattern-catalog.md
+    purpose:
+      en: Apply the fixed NestJS/Next.js ownership standard and select only patterns triggered by the
+        actual scenario. Review transaction/effect boundaries, state authority, concurrency, failure
+        and recovery using primary sources where needed. Record decisions in the existing design;
+        pattern names and source observations are not behavioral proof or authority for code edits.
   - id: application-stacks
     path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + schemas/application-stacks.schema.json
     purpose:
@@ -104,6 +111,7 @@ writes:
         The selected request freezes output field schemas before execution.
 steps:
   - reads:
+      - design-patterns
       - application-stacks
       - target
       - business
@@ -117,8 +125,9 @@ steps:
       en: "Resolve accepted SRS scope, drivers, actors and platform constraints from canonical Work. Read
         specifications/sds-map.json and docs/architecture-sds.md. Survey relevant source,
         configuration and installed APIs; then independently record retain, extend, correct, replace
-        or add decisions with rationale, impact and migration. Prescribe target repository roles,
-        paths, symbols and signatures without source status, revisions or proof. Never write product
+        or add decisions with rationale, impact and migration. Prescribe logical responsibilities,
+        interfaces, state and failure behavior. Repository/file/symbol/call mappings and actual
+        revisions or proof belong to Implementation. Never write product
         code or present a design constraint as deployed behavior."
   - reads:
       - target
