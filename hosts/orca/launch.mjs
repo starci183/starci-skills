@@ -10,7 +10,8 @@ import {createOrcaCalls,defaultOrcaExecutable,getPath} from './calls.mjs';
 import {HOST_ENV,createHeadlessHost,headlessRoot} from '../headless/host.mjs';
 import {attestOperationWorker,formatOrcaDisplayName,planOperationAgentLaunch} from '../../execution/supervision.mjs';
 import {protocolMain} from './protocol.mjs';
-import {kernelMain} from '../../kernel/kernel.mjs';
+import {kernelMain,OP_DEADLINE_MS} from '../../kernel/kernel.mjs';
+import {roleOf as operationRoleOf} from '../../kernel/graph.mjs';
 import {supervisorMain} from '../../kernel/supervisor.mjs';
 import {serveWorkflowInputs} from '../../kernel/inputs-server.mjs';
 import {WORKFLOW_LIST,buildList,buildView,renderList,renderView} from '../../kernel/view.mjs';
@@ -45,8 +46,12 @@ export function createHostRunner({adapter,cwd=process.cwd(),env=process.env,repo
 export const qwenLaunchMode='command-terminal';
 const OP_LAUNCH='starci/orca-supervised-op-launch@2';
 const SETTLEMENT='starci/orca-supervised-settlement@1';
-// Orca fails the Dispatch when the TUI has not consumed the pasted spec in this time; five minutes covers a slow TUI on a busy machine.
-const WORKER_START_TIMEOUT_MS=300000;
+// Orca's worker-start timeout covers the whole supervised worker lifetime, not just prompt delivery. Keep its
+// finite fallback aligned with the kernel attempt deadline; callers pass the exact op deadline when available.
+const workerExecutionTimeout=(operation,timeoutMs)=>{
+  if(timeoutMs!==undefined&&timeoutMs!==null){need(Number.isFinite(timeoutMs)&&timeoutMs>0,'Operation worker timeout must be a positive finite number');return timeoutMs;}
+  return operationRoleOf(operation)==='verify'?OP_DEADLINE_MS.verify:OP_DEADLINE_MS.default;
+};
 
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};
@@ -147,7 +152,7 @@ export function parseSkip(value,chain,registry=readDistJson('model','registry.js
  * allocator - not the chain - decides which runtime an operation gets, and the launcher must then try
  * exactly that one. A caller passes either `skip` or `candidates`, never both.
  */
-export function buildOperationLaunch({run,workflowTask,from,worktree,operation,scope,spec,skip,candidates:allocated=null,kind=null}){
+export function buildOperationLaunch({run,workflowTask,from,worktree,operation,scope,spec,skip,candidates:allocated=null,kind=null,timeoutMs=null}){
   const runId=required(run,'nested workflow Run ID'),workflow=required(workflowTask,'parent workflow Task ID');
   const monitor=required(from,'own supervising terminal handle');
   need(monitor.startsWith('term_'),'--from must be the exact supervising terminal handle');
@@ -167,13 +172,14 @@ export function buildOperationLaunch({run,workflowTask,from,worktree,operation,s
   need(chain.length,'Every candidate of the operation chain was skipped');
   // The tab is named after the op's KIND: an `e2e.verify` op launched through the `uat.verify` operator contract must read as e2e.
   const displayName=formatOrcaDisplayName('operation-agent',{operation:kind??op,scope:opScope});
+  const executionTimeoutMs=workerExecutionTimeout(kind??op,timeoutMs);
   const candidates=chain.map(selection=>{
     const planned=planOperationAgentLaunch({taskId:'$operationTaskId',worktree:target.selector,selection,operation:op,scope:opScope});
     if(planned.mode==='command-terminal'){
       return {selection,launch:'command-terminal',terminalParams:{worktree:target.selector,title:displayName,command:planned.steps[0].args.command},dispatchParams:{task:'$operationTaskId',to:'$terminalHandle',from:monitor,run:runId,'return-preamble':true}};
     }
     const start=planned.steps[0].args;
-    const workerParams={task:'$operationTaskId',worktree:start.worktree,agent:start.agent,run:runId,from:monitor,'display-name':displayName,'timeout-ms':WORKER_START_TIMEOUT_MS};
+    const workerParams={task:'$operationTaskId',worktree:start.worktree,agent:start.agent,run:runId,from:monitor,'display-name':displayName,'timeout-ms':executionTimeoutMs};
     if(start.model)workerParams.model=start.model;
     if(start.effort)workerParams.effort=start.effort;
     return {selection,launch:'managed-agent',workerParams};

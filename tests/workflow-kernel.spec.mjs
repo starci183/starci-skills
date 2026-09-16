@@ -360,6 +360,30 @@ test('typed stale findings settle a real report and durable journal as measureme
   }finally{journal?.close();harness.cleanup();}
 });
 
+test('a pending durable audit check remains replayable and its persisted findings settle on the next pass',()=>{
+  const harness=setup({plan:auditPlan(),scripts:{}});
+  try{
+    approve(harness.store,harness.state);const op=running(harness.state,'audit-source','ctx_pending_audit');
+    op.candidate={status:'sealed',digest:'candidate-audit',observedFiles:[]};
+    const report=buildReport({outcome:'partial',run:'run_wf',task:'task_pending_audit',dispatch:op.dispatch,from:'term_pending_audit',
+      summary:'The exact scanner measured one current stale binding.',files:[],
+      checks:[{name:op.checks[0].name,command:op.checks[0].command,exitCode:1,evidence:'typed source-staleness report contains one finding'}],
+      open:['SOURCE_IDENTITY_CHANGED audit-record requires revalidation']});
+    report.sent={messageId:'msg_pending_audit',sentAt:1,type:report.signal.type};
+    const pending=Object.assign(Error('durable check is running'),{code:'STARCI_JOB_PENDING',job:{identity:{jobId:'bridge-audit-check'},status:'running'}}),
+      base={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>1234,work:null,engine:{}};
+    assert.throws(()=>applyOpReport(harness.fake.orca,harness.store,harness.state,op,report,{...base,exec:()=>{throw pending;}}),error=>error===pending);
+    assert.equal(op.status,'running');assert.equal(op.dispatch,'ctx_pending_audit');assert.equal(op.refusal,null);
+    assert.deepEqual(op.candidate,{status:'sealed',digest:'candidate-audit',observedFiles:[]});
+    assert.equal(events(harness.store).some(event=>event.event==='audit-measurement-failed'),false);
+    assert.equal(fs.existsSync(harness.store.checksPath(`${op.id}-audit`)),false);
+    const action=applyOpReport(harness.fake.orca,harness.store,harness.state,op,report,{...base,
+      exec:()=>({status:1,stdout:JSON.stringify(stalenessReport()),stderr:''})});
+    assert.equal(action,'audit-measured');assert.equal(op.status,'done');assert.equal(op.verdict,'findings');
+    assert.equal(op.audit.findingCount,1);assert.equal(op.refusal,null);
+  }finally{harness.cleanup();}
+});
+
 test('typed architecture violations are findings while architecture input errors fail the audit',()=>{
   const plan=auditPlan('lint','starci architecture check .'),harness=setup({plan,scripts:{}});
   try{
@@ -453,6 +477,12 @@ test('a named audit contract permits only control transport and requires files e
     assert.match(contract,/omit the `--files` argument/);
     assert.match(contract,/must carry `files: \[\]`/);
     assert.doesNotMatch(contract,/--files <comma-separated changed paths>/);
+    assert.match(contract,/This `partial` completes the measurement/);
+    assert.match(contract,/Unavailable, malformed or failed measurement is not a successful audit/);
+    assert.match(contract,/Preserve actual exit codes and all findings/);
+    assert.doesNotMatch(contract,/## Cook until done|partial` is allowed only|report as if that check passed/);
+    const ping=template.split('## Ping (mandatory)')[1].split('## Never')[0].trim();
+    assert.ok(contract.includes(`## Ping (mandatory)\n${ping}`),'audit preserves the real heartbeat protocol');
   }finally{harness.cleanup();}
 });
 
@@ -478,6 +508,7 @@ test('the goal phase writes goal.md and goal.json and stops: nothing is launched
     const state=harness.store.loadState();
     const contract=renderContract({template,op:state.ops[0],state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
     assert.match(contract,/## Cook until done/);assert.match(contract,/## Ping \(mandatory\)/);
+    assert.match(contract,/partial` is allowed only when your session budget/,'implementation retains its completion loop');
     assert.match(contract,/## Acceptance/);assert.match(contract,/## Never/);
     // A plan-mode backend.implement op without a Work node still gets the implement.ledger working order.
     assert.match(contract,/## Working order \(mandatory, in this order\)\nSequence `implement\.ledger`\./);
@@ -2402,6 +2433,21 @@ test('the decision folder of an owner question comes from the feature folder in 
     ['.starciwork/features/workspace-dashboard/business/srs/business-rules/policy-decisions/**']);
   assert.deepEqual(decisionAllowlistFor({},{nodeId:null,ledgerIds:[],allowlist:['apps/x/**']},ctx),
     ['.starciwork/decisions/**'],'no feature known: the tree-level folder');
+});
+
+test('the kernel operation deadline reaches the host through the allocated launcher',()=>{
+  const plan=structuredClone(salesPlan);plan.ops[0].timeoutMs=47*60*1000;
+  const harness=setup({plan,scripts:{},allocator:fakeAllocator({pools:{implement:['claude-opus']}})});
+  try{
+    approve(harness.store,harness.state);harness.state.run='run_wf';harness.state.from='term_kernel';
+    const received=[];
+    harness.run({maxIterations:1,launch:(orca,args)=>launchWithCandidate(orca,{...args,
+      build:()=>({candidates:[{selection:args.candidate}]}),
+      start:input=>{received.push(input.timeoutMs);return {ok:true,selection:args.candidate,
+        task:{id:'task_deadline'},dispatchId:'ctx_deadline',terminal:{handle:'term_deadline'},attempts:[]};}
+    })});
+    assert.deepEqual(received,[47*60*1000]);
+  }finally{harness.cleanup();}
 });
 
 test('a launch Orca refuses because the coordinator pane is gone replaces the kernel tab, re-binds the Run and tries again without counting a runtime failure',()=>{

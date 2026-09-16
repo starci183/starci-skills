@@ -25,7 +25,7 @@ const noWait=()=>{};
 // Execution op: qwen command terminal first, then Claude Opus, Codex Sol and bounded Luna capacity.
 const opName='[Op] backend.implement - Sales';
 const input={run:'run_sales',workflowTask:'task_workflow_sales',from:'term_monitor_sales',worktree,
-  operation:'backend.implement',scope:'Sales',spec:'Implement the bounded Sales slice and report exactly once.'};
+  operation:'backend.implement',scope:'Sales',spec:'Implement the bounded Sales slice and report exactly once.',timeoutMs:45*60*1000};
 // Reasoning op: managed agents only (Fable, then Astra).
 const reasonName='[Op] architecture.decide - Sales';
 const reasonInput={...input,operation:'architecture.decide',spec:'Decide the bounded Sales SDS gap.'};
@@ -97,13 +97,18 @@ test('operation request carries the whole chain with its launch kinds and owns t
   assert.equal(planned.candidates[1].workerParams.model,'claude-opus-5');
   assert.equal(planned.candidates[2].workerParams.model,'gpt-5.6-sol');
   assert.equal(planned.candidates[3].workerParams.model,'gpt-5.6-luna');
-  assert.equal(planned.candidates[1].workerParams['timeout-ms'],300000,'five minutes for the TUI to consume the pasted spec');
+  assert.equal(planned.candidates[1].workerParams['timeout-ms'],45*60*1000,'the native worker receives the operation execution deadline');
   assert.deepEqual(planned.runAttestationParams,{id:'run_sales'});
   assert.equal(planned.taskParams['display-name'],opName);
   assert.throws(()=>buildOperationLaunch({...input,worktree:'current'}),/filesystem-relative path/);
   assert.throws(()=>buildOperationLaunch({...input,worktree:worktreePath}),/must be relative/);
   // The reasoning chain carries its downgrade now: Opus under Fable, Sol under Astra, all four managed agents.
   assert.deepEqual(buildOperationLaunch(reasonInput).candidates.map(candidate=>[candidate.selection.target,candidate.launch]),[['claude-fable-5.1','managed-agent'],['gpt-6-astra','managed-agent'],['claude-opus','managed-agent'],['gpt-5.6-sol','managed-agent']]);
+  const defaultReview=buildOperationLaunch({...reasonInput,operation:'review.verify',kind:'review.verify',timeoutMs:null});
+  assert.ok(defaultReview.candidates.filter(candidate=>candidate.launch==='managed-agent').every(candidate=>candidate.workerParams['timeout-ms']===3*60*60*1000),'review fallback stays finite at the kernel verify deadline');
+  const defaultBuild=buildOperationLaunch({...input,timeoutMs:null});
+  assert.ok(defaultBuild.candidates.filter(candidate=>candidate.launch==='managed-agent').every(candidate=>candidate.workerParams['timeout-ms']===8*60*60*1000),'build fallback stays finite at the kernel default deadline');
+  assert.throws(()=>buildOperationLaunch({...input,timeoutMs:Infinity}),/positive finite/);
 });
 
 test('a supervisor chain resolves from the registry with its model and effort, never from a hardcoded provider',()=>{

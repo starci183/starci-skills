@@ -1321,9 +1321,11 @@ open items, findings, acceptance, the exact check commands, the checks file, the
 [Brand and artwork](#brand-and-artwork)).
 Between the acceptance and the process prose it splices the kind-specific working order from
 `kernel/contract.mjs` (`stepsFor`): see [op-granularity.md](op-granularity.md), "Working order per kind".
-The process prose (`## Cook until done`, `## Ping (mandatory)`, `## Never`) is reused verbatim from
-`docs/supervision-templates/op.md`, so one template serves every operation kind and no placeholder survives
-into a rendered contract.
+Implementation operations reuse the process prose (`## Cook until done`, `## Ping (mandatory)`,
+`## Never`) from `docs/supervision-templates/op.md`. Named read-only audits replace the repair loop
+with measurement completion: valid findings are reported as `partial` and independently verified
+as a completed audit with findings. They keep the same heartbeat and prohibitions, preserve actual
+exit codes, and emit no source or documentation files. No placeholder survives into a rendered contract.
 
 ## The final report
 

@@ -8,8 +8,9 @@ file, and the report command with its run, reports directory and checks file.
 The working order of one operation is not here: `kernel/contract.mjs` renders a kind-specific
 "Working order (mandatory, in this order)" section from the operation's own values (see
 [op-granularity.md](../op-granularity.md), "Working order per kind"). The sections below are the process
-around that order. They are identical for every operation kind and are reused from this file verbatim, so
-the process is edited in one place and never improvised per operation.
+around that order. Implementation operations reuse them verbatim. Named read-only audits replace
+the repair loop with measurement completion while preserving Ping and Never; valid findings finish
+an audit and do not authorize repairs. The renderer owns that distinction.
 
 ## Cook until done (you own this loop)
 Follow the working order above; when a check fails, read the failure, fix, run it again. Repeat until every acceptance statement holds and every check exits 0; only then report `done`. Do not stop early to ask whether to continue, and do not hand unfinished work back as `partial`: `partial` is allowed only when your session budget (turns or wall time) is about to end, and its `open[]` must say exactly where to resume. Report `failed` only after your own attempts are exhausted and a check still fails (say which and why). Report `ask` only for a decision you cannot take from this contract and its references; report `blocked` only for a change outside your allowlist (`shared-change`, naming the exact paths in the detail), a requirement your SRS does not settle or settles twice in two ways (`srs-gap`, naming the record), a real design gap (`sds-gap`), a screen or state your interface design record does not contain (`interface-gap`, naming both), or an environment you cannot fix (`environment`). A walk of a rendered surface that stopped before its last step is `partial` or `failed`, never `done`.

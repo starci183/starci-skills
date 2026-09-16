@@ -133,7 +133,13 @@ export function measureAuditChecks(op,run){
   const checks=[],failures=[];
   let findings=0;
   for(const check of op.checks??[]){
-    let execution;try{execution=run(check);}catch(error){execution={status:null,stdout:'',stderr:'',error:String(error?.message??error)};}
+    let execution;try{execution=run(check);}catch(error){
+      // A durable check is resumed by the kernel after its worker settles. Treating that
+      // control-flow signal as missing output would reject the audit while the check is
+      // still running, and would discard its subsequently persisted structured result.
+      if(error?.code==='STARCI_JOB_PENDING')throw error;
+      execution={status:null,stdout:'',stderr:'',error:String(error?.message??error)};
+    }
     const exitCode=Number.isInteger(execution?.status)?execution.status:null,protocol=commandProtocol(check.command);
     let observation=null;
     if(protocol&&protocol!=='shell')observation=structured(protocol,execution,exitCode);

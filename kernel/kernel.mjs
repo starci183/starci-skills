@@ -328,12 +328,19 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
   for(const heading of ['## Cook until done','## Ping (mandatory)','## Never'])
     need(text.includes(heading),`The operation template has no "${heading}" section`);
   const afterCook=text.split('## Cook until done')[1];
-  const cook=`## Cook until done${afterCook.split('## Never')[0]}`.replace(/\s+$/,'');
+  const processText=afterCook.split('## Never')[0];
+  const namedAudit=isAuditOperation(op);
+  const cook=namedAudit?[
+    '## Complete the named audit',
+    'Run the declared measurement against unchanged inputs. A valid clean result (exit 0) is `done`; a valid result with findings (exit 1) is `partial`, with the actual findings in `open[]` and checks. This `partial` completes the measurement: the kernel independently verifies it and records the audit as done with findings. It does not require session-budget exhaustion, source repair, or repeated checks until clean.',
+    'Unavailable, malformed or failed measurement is not a successful audit; report the actual failure or blocker. Findings grant no repair authority. Preserve `files: []` and write only the exact check/report control transport.',
+    '',
+    `## Ping (mandatory)${processText.split('## Ping (mandatory)')[1]}`.replace(/\s+$/,'')
+  ].join('\n'):`## Cook until done${processText}`.replace(/\s+$/,'');
   const never=`## Never${text.split('## Never')[1]}`.replace(/\s+$/,'');
   const checksFile=slash(store.checksPath(op.id));
   const credentialRequestFile=checksFile.replace(/\.json$/,'.credential-request.json');
   const reportsDir=slash(store.paths.reports);
-  const namedAudit=isAuditOperation(op);
   const items=(op.ledgerIds??[]).map(id=>{const item=ledgerItem(state,id);return `- \`${id}\` ${item?.title??'(unknown goal item)'}${item?.inputRef?` - ${item.inputRef}`:''}`;});
   const locks=guards.resourceLocks(op);
   const owned=protectedPaths??op.kernelOwned??[];
@@ -383,8 +390,12 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     cook,``,
     `## Checks to run`,...(op.checks.length?op.checks.map(check=>`- ${check.name}: \`${check.command}\``):['- none were declared: run the checks this code already has and record them']),
     `Record every command with its exit code in \`${checksFile}\` as a JSON array \`[{"name","command","exitCode","evidence"}]\`.`,
-    `The kernel re-runs these exact commands itself after your report and computes your changed files from git: a \`done\` the machine cannot reproduce is downgraded to \`failed\` and comes back to you.`,
-    `An error the whole-tree validator reports under a path outside your allowlist is not yours: name it in your summary and report as if that check passed for your files. The kernel judges the tree by what you could have caused, never by a red corner another workflow owns.`,``,
+    ...(namedAudit?[
+      `The kernel independently re-runs the declared measurement and checks that inspected inputs did not change. Preserve actual exit codes and all findings, including those outside your repair authority; never report a failed measurement as passing.`
+    ]:[
+      `The kernel re-runs these exact commands itself after your report and computes your changed files from git: a \`done\` the machine cannot reproduce is downgraded to \`failed\` and comes back to you.`,
+      `An error the whole-tree validator reports under a path outside your allowlist is not yours: name it in your summary and report as if that check passed for your files. The kernel judges the tree by what you could have caused, never by a red corner another workflow owns.`
+    ]),``,
     `## Report (exactly once, at the end)`,
     `\`node ${launcher} report --run ${run} --from <your terminal> --task <op task> --dispatch <your dispatch> --reports-dir ${reportsDir} --outcome done|partial|failed|ask|blocked --summary "<what you did, what the checks showed, what is left>" ${namedAudit?'':'--files <comma-separated changed paths> '}--checks-file ${checksFile} [--open "<item>,<item>"] [--question "<text>" --options "a,b"] [--blocker shared-change|srs-gap|sds-gap|interface-gap|brand-gap|grammar-gap|environment|authority:<detail>] [--credential-request-file <safe JSON>]\``,
     ...(namedAudit?[`- \`--files\` is exactly empty for this named audit. Findings belong in the summary, checks and \`open[]\`; they never become files.`]:[`- \`--files\` must acknowledge every net changed path. Use source-relative paths for source files; for routed Work files use \`.starciwork/...\` or the displayed absolute path. One relative non-Work name belongs only to source. Unknown or escaping entries authorize nothing; an unchanged touched-and-reverted extra is diagnostic.`]),
@@ -410,8 +421,8 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
  * candidate alone so a mismatch is caught before any Orca effect. Why the other targets were not used is
  * recorded in the kernel's own `launched` event (`allocation`), never as a fake launcher attempt.
  */
-export function launchWithCandidate(orca,{cwd,run,workflowTask,from,worktree,operation,scope,spec,candidate,runtime=null,wait,build=buildOperationLaunch,start=startOperation}){
-  const input={run,workflowTask,from,worktree,operation,scope,spec};
+export function launchWithCandidate(orca,{cwd,run,workflowTask,from,worktree,operation,scope,spec,candidate,runtime=null,timeoutMs=null,wait,build=buildOperationLaunch,start=startOperation}){
+  const input={run,workflowTask,from,worktree,operation,scope,spec,timeoutMs};
   const target=required(candidate?.target,'allocated runtime target');
   const chain=build(input).candidates.map(item=>item.selection.target);
   const canonical=resolveExecutionChain({skill:'starci',op:operation}).candidates.find(item=>item.target===target);
@@ -654,7 +665,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
     if(ctx.engine)ctx.engine.beginLaunchIntent(op);
     workerEffectStarted=true;
     launched=ctx.launch(orca,{cwd:state.worktree,run:state.run,workflowTask:state.workflowTask??state.id,from:state.from,
-      worktree:relative,operation:launchOperator(op.kind),kind:op.kind,scope:op.id,spec:operationSpec(op,contract),candidate:allocated.candidate,runtime:allocated.runtime,wait:ctx.wait});
+      worktree:relative,operation:launchOperator(op.kind),kind:op.kind,scope:op.id,spec:operationSpec(op,contract),candidate:allocated.candidate,runtime:allocated.runtime,timeoutMs:opDeadlineFor(op),wait:ctx.wait});
   }catch(error){
     const typedNoEffect=['ORCA_COORDINATOR_MISMATCH','ORCA_TASK_CREATE_FAILED'].includes(error?.code)&&error?.effectState==='none';
     const effectState=error?.effectState==='unknown'?'unknown':typedNoEffect?'none':workerEffectStarted?'unknown':'none';
