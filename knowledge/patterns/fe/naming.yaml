@@ -25,8 +25,9 @@ rules:
       UI feature units live below features/pages, features/layouts or features/overlays. Reusable visual
       units live below components/blocks, components/composites, components/branches or components/leaves.
       The folder name is the public unit export. A connected block uses sibling index.tsx and component.tsx
-      exports; its resolved presentation export appends Base. Lower reusable tiers and feature UI units do
-      not acquire a twin merely for symmetry. Route wrappers use a local …Route const.
+      exports. Its resolved presentation export commonly appends Base when that name is selected by the
+      unit's public contract; the suffix is not required merely because component.tsx exists. Lower reusable
+      tiers and feature UI units do not acquire a twin for symmetry. Route wrappers use a local …Route const.
     rationale: |
       Matching folder and export names makes ownership discoverable; Base marks an actual resolved
       presentation contract rather than a mandatory second file.
@@ -40,7 +41,7 @@ rules:
           export const AuthenticationPageBase = (props: AuthenticationPageProps) => … (47/49; the two
           CoursePlayground*Page units export …PageShell)
       - id: case-3
-        when: "Connected block render half, components/blocks/StarCiAiChat/component.tsx"
+        when: "Connected block render half whose selected public name uses Base, components/blocks/StarCiAiChat/component.tsx"
         write: "export const StarCiAiChatBase = … (98 of 118 component.tsx exports end in Base)"
       - id: case-4
         when: "Leaf, components/leaves/ButtonStateSample/index.tsx"
