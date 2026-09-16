@@ -87,21 +87,30 @@ function isUnshadowedCommonJsRequire(ts, checker, expression) {
 
 function moduleReferences(ts, sourceFile, checker) {
   const found = [];
+  const unproven = [];
   const visit = node => {
     if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteralLike(node.moduleSpecifier)) {
       found.push({ node: node.moduleSpecifier, specifier: node.moduleSpecifier.text, runtime: runtimeImport(ts, node), declaration: node });
     } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)
       && node.moduleReference.expression && ts.isStringLiteralLike(node.moduleReference.expression)) {
       found.push({ node: node.moduleReference.expression, specifier: node.moduleReference.expression.text, runtime: !node.isTypeOnly, declaration: node });
-    } else if (ts.isCallExpression(node) && node.arguments.length > 0 && ts.isStringLiteralLike(node.arguments[0])
-      && ((node.expression.kind === ts.SyntaxKind.ImportKeyword && [1, 2].includes(node.arguments.length))
-        || (isUnshadowedCommonJsRequire(ts, checker, node.expression) && node.arguments.length === 1))) {
-      found.push({ node: node.arguments[0], specifier: node.arguments[0].text, runtime: true, declaration: node });
+    } else if (ts.isImportTypeNode(node)) {
+      const literal = ts.isLiteralTypeNode(node.argument) && ts.isStringLiteralLike(node.argument.literal) ? node.argument.literal : null;
+      if (literal) found.push({ node: literal, specifier: literal.text, runtime: false, declaration: node });
+      else unproven.push({ node, kind: 'TypeScript import type' });
+    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      if ([1, 2].includes(node.arguments.length) && ts.isStringLiteralLike(node.arguments[0])) {
+        found.push({ node: node.arguments[0], specifier: node.arguments[0].text, runtime: true, declaration: node });
+      } else unproven.push({ node, kind: 'dynamic import()' });
+    } else if (ts.isCallExpression(node) && isUnshadowedCommonJsRequire(ts, checker, node.expression)) {
+      if (node.arguments.length === 1 && ts.isStringLiteralLike(node.arguments[0])) {
+        found.push({ node: node.arguments[0], specifier: node.arguments[0].text, runtime: true, declaration: node });
+      } else unproven.push({ node, kind: 'dynamic require()' });
     }
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
-  return found;
+  return { found, unproven };
 }
 
 function sourceLocation(sourceFile, node) {
@@ -269,7 +278,15 @@ export function buildTypeScriptContext(config, injectedTypeScript) {
     const candidates = occurrences.get(from) ?? [];
     const project = candidates.find(item => isInside(path.dirname(path.join(config.root, ...item.relative.split('/'))), from)) ?? candidates[0];
     if (!project) continue;
-    for (const reference of moduleReferences(ts, sourceFile, project.program.getTypeChecker())) {
+    const references = moduleReferences(ts, sourceFile, project.program.getTypeChecker());
+    for (const item of references.unproven) errors.push({
+      ruleId: 'ARCH_DYNAMIC_DEPENDENCY_UNPROVEN',
+      project: project.relative,
+      path: relativePath(config.root, sourceFile.fileName),
+      ...sourceLocation(sourceFile, item.node),
+      message: `${item.kind} must use a string-literal module name so architecture coverage can resolve its dependency.`,
+    });
+    for (const reference of references.found) {
       const resolvedName = ts.resolveModuleName(reference.specifier, sourceFile.fileName, project.options, host).resolvedModule?.resolvedFileName;
       if (!resolvedName) {
         const codeLike = !ASSET_EXTENSION.test(reference.specifier);

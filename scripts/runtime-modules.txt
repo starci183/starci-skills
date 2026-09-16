@@ -27,6 +27,7 @@ checks/architecture/config.mjs
 checks/architecture/typescript.mjs
 checks/architecture/backend.mjs
 checks/architecture/frontend.mjs
+checks/architecture/owners.mjs
 checks/stacks.mjs
 checks/render.mjs
 execution/contracts.mjs
@@ -135,3 +136,4 @@ workflows/storage.mjs
 workflows/source-layout.mjs
 workflows/typed.mjs
 workflows/work-binding.mjs
+checks/code-patterns/next.mjs
