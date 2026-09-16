@@ -63,11 +63,13 @@ writes:
       - dependsOn
       - required
     content:
-      en: Every authored index.yaml is a work/node@2 record at its catalog-declared path. Author
+      en: Every authored index.yaml is a work/node@2 record at its catalog-declared path under
+        features/<feature>/business/. Author
         business/overview/index.yaml with businessOverview for readable purpose, customer
         understanding, outcome, scope and open questions. Author typed extensions.work3.srs leaves
         under functional-requirements, non-functional-requirements, business-rules,
-        policy-decisions, data and customer-journeys. Every item owns a folder/index.yaml; every
+        policy-decisions, data and customer-journeys - each leaf payload carrying its declared
+        starci/srs-*@1 section const. Every item owns a folder/index.yaml; every
         intermediate index carries only starci/srs-aggregate@1 metadata. Keep each FR's main,
         alternative and exception flows, branch review, postconditions and acceptance together.
         Write all canonical SRS content in English, including natural-language prose, YAML/schema

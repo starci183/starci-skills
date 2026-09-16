@@ -85,9 +85,11 @@ writes:
       - required
       - extensions.work3.sds
     content:
-      en: Every authored index.yaml is a work/node@2 record at its catalog-declared path. Author
+      en: Every authored index.yaml is a work/node@2 record at its catalog-declared path under
+        features/<feature>/architecture/. Author
         overview plus typed extensions.work3.sds leaves in flows, components, contracts,
-        data, quality, deployment, decisions and verification. Parent indexes carry only
+        data, quality, deployment, decisions and verification - each leaf payload carrying its
+        declared starci/sds-*@1 section const. Parent indexes carry only
         starci/sds-aggregate@1 metadata. Components prescribe logical responsibilities and
         interfaces without repository roles, paths, symbols, signatures, source status or revision
         evidence. Write all canonical SDS content in English, including natural-language prose,

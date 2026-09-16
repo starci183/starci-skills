@@ -217,6 +217,22 @@ sections:
         also run `starci stacks check`. An op that authors `extensions.work3.checks` on a node
         includes the validator there. Layout, name and schema violations are operator failures,
         not content to repair silently."
+      - "The layout covers the whole .starciwork tree. `_local/workflows/<id>/` run state -
+        `goal.json` (starci/workflow-goal@1), `goal.md`, `checks/`, `contracts/`, `inbox/`,
+        `reports/` - is kernel-owned: an operation writes only its declared files there
+        (intake.json, a goal revision) and never emits checks, contracts, inbox commands or
+        reports; those are kernel outputs, not op output."
+      - "`features/<feature>/` record trees follow the declared shape: `features/index.yaml` the
+        catalog, one `index.yaml` per node folder (`work/node@2`), business overview and split SRS
+        leaves whose `extensions.work3.srs` payloads carry their `starci/srs-*@1` section const
+        with `starci/srs-aggregate@1` intermediate indexes, architecture overview and SDS leaves
+        whose `extensions.work3.sds` payloads carry their `starci/sds-*@1` section const with
+        `starci/sds-aggregate@1` intermediates, `ui/**` nodes with their `assets/`, implementation
+        frontend/backend nodes, `uat/<flow>/` folders `{index.yaml,accounts.yaml,fixtures.yaml,
+        seed.sql,cleanup.sql,assets/}`, `integration/<id>/` nodes, the root `brand/index.yaml`
+        with `brand/assets/**`, and `_resources/<category>/<slug>/resource.yaml`. Every feature
+        record class carries its schema const and is covered by `starci validate`; writing outside
+        the declared layout fails checks."
   - title: Evidence, completion and commits
     blocks:
       - "Before executing, establish the selected node's current `inputDigest` using the read-only

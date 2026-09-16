@@ -52,7 +52,9 @@ writes:
       en: The typed handoff (schema starci/workflow-intake@1) the calling chat hands to the Orca host - the request digest, exactly one
         selected workflow id from the catalog, the scope statement (proposed nodes, dependencies and
         exclusions for scope.define to bound), the acceptance criteria and the unresolved questions.
-        No guessed defaults; an unanswerable question is carried in open, not answered.
+        No guessed defaults; an unanswerable question is carried in open, not answered. The intake
+        file is the only _local/workflows/<workflow>/ file this op writes; the kernel's run state
+        (goal.json, checks/, contracts/, inbox/, reports/) is never op output.
   - id: evidence
     path: E/intake.json + E/result.json + E/artifacts
     fields:

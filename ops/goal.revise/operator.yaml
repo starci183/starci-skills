@@ -62,7 +62,9 @@ writes:
       - derivedFrom
     content:
       en: Write goal v(n+1) whole - goal.json carries schema starci/workflow-goal@1, goal.md its human
-        rendering - rev bumped by exactly one, derivedFrom naming the previous rev
+        rendering - the only _local/workflows/<workflow>/ files this op writes; the kernel's run
+        state (checks/, contracts/, inbox/, reports/) is never op output - rev bumped by exactly
+        one, derivedFrom naming the previous rev
         and its digest, done still a checkable metrics block. Every changed section is carried at
         its new value; sections the revision did not touch are carried byte-identical. A direct edit
         that leaves no diff, a rev jump other than +1, or a done block the kernel cannot evaluate is
