@@ -102,7 +102,9 @@ function source(value,label){
 }
 const sourceKey=value=>`${value.threadId}:${value.messageIdAvailability==='available'?value.messageId:`not-exposed:${digest({quote:value.quote,at:value.at})}`}`;
 const DEPENDENCY_EDITABLE=new Set(['pending','ready','blocked']);
-const liveIdentity=op=>['lease','dispatch','terminal','task','pending'].some(key=>op?.[key]!==undefined&&op[key]!==null)||op?.workerSettled===false;
+// A Task id is durable operation tracking and intentionally survives a reconciled retry. It does not prove a
+// worker is live. Leases, dispatches, terminals, pending durable effects and an explicitly unsettled worker do.
+const liveIdentity=op=>['lease','dispatch','terminal','pending'].some(key=>op?.[key]!==undefined&&op[key]!==null)||op?.workerSettled===false;
 function assertAcyclic(ops){
   const dependencies=new Map(ops.map(op=>[op.id,[...(op.dependsOn??[])]])),visiting=new Set(),visited=new Set();
   const walk=(id,trail=[])=>{if(visiting.has(id))throw Error(`Workflow amendment operation dependency cycle: ${[...trail,id].join(' -> ')}`);if(visited.has(id))return;

@@ -152,6 +152,23 @@ test('an amendment without check supersession keeps its pre-extension digest for
   assert.equal(f.store.loadState().amendments.length,1);
 });
 
+test('retained Task tracking is amendable after reconciliation while live effect identities remain fenced',t=>{
+  const tracked=fixture(t);tracked.state.ledger=[{id:'frontend-slice',title:'Existing frontend refactor slice',status:'planned',evidence:[]}];
+  const op=tracked.state.ops[1];op.status='ready';delete op.lease;op.task='task_retained_after_retry';op.checks=[{name:'old-path',command:'node --test components/old.spec.mjs'}];tracked.store.saveState(tracked.state);
+  const record=operationAmendment(tracked);record.changes.supersedeOperationChecks={'remaining-1':[{from:{name:'old-path',command:'node --test components/old.spec.mjs'},to:{name:'new-path',command:'node --test features/new.spec.mjs'},reason:'The retained Task id tracks history; no worker identity remains live.'}]};
+  fs.writeFileSync(tracked.amendmentFile,stringifyYaml(record));
+  applyWorkflowAmendment(tracked.store,tracked.state,tracked.amendmentFile);
+  assert.equal(op.task,'task_retained_after_retry','amendment preserves canonical Task tracking');
+  assert.deepEqual(op.dependsOn,['pre-source-audit']);assert.deepEqual(op.checks,[{name:'new-path',command:'node --test features/new.spec.mjs'}]);
+
+  for(const [name,identity] of [['lease',{jobId:'job-live'}],['dispatch','ctx_live'],['terminal','term_live'],['pending',{kind:'durable-job'}],['workerSettled',false]]){
+    const f=fixture(t);f.state.ledger=[{id:'frontend-slice',title:'Existing frontend refactor slice',status:'planned',evidence:[]}];
+    const target=f.state.ops[1];target.status='ready';delete target.lease;target.task='task_historical';target[name]=identity;f.store.saveState(f.state);
+    const amendment=operationAmendment(f);fs.writeFileSync(f.amendmentFile,stringifyYaml(amendment));
+    assert.throws(()=>applyWorkflowAmendment(f.store,f.state,f.amendmentFile),/accepted or live operation/,name);
+  }
+});
+
 test('an authorized amendment atomically inserts pre-audit and post-review operations into the existing DAG',t=>{
   const f=fixture(t),accepted=structuredClone(f.state.ops[0]),decisions=structuredClone(f.state.decisions),approval=f.state.goalDigest;
   f.state.ledger=[{id:'frontend-slice',title:'Existing frontend refactor slice',status:'planned',evidence:[]}];
