@@ -55,9 +55,11 @@ rules:
         when: "Connected spec"
         write: "asserts the mapping: mocks.cart.isLoading = true … expect(mocks.input?.blockState).toBe(\"pending\")"
     verification:
-      automated: []
+      automated:
+        - FE_ERROR_WORLD_STATE_MAPPING
+        - FE_WORLD_OWNER_RENDER_BOUNDARY
       manual:
-        - Confirm presentation draws resolved failure state rather than catching transport errors.
+        - Confirm failure copy and recovery eligibility match business policy.
     relatedExamples:
       - connected-block
 

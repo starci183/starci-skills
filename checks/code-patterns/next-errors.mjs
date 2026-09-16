@@ -4,6 +4,7 @@ import { loadArchitectureConfig, isInside, slash } from '../architecture/config.
 import { buildTypeScriptContext } from '../architecture/typescript.mjs';
 
 export const NEXT_ERROR_RULES = Object.freeze([
+  'FE_ERROR_WORLD_STATE_MAPPING',
   'FE_ERROR_ENVELOPE_POLICY',
   'FE_WRITE_FEEDBACK_OWNER',
   'FE_NEXT_ERROR_BOUNDARY_LOCATION',
@@ -35,6 +36,19 @@ function symbolOf(ts, checker, node) {
   let symbol = checker.getSymbolAtLocation(node), guard = 0;
   while (symbol && symbol.flags & ts.SymbolFlags.Alias && guard++ < 20) symbol = checker.getAliasedSymbol(symbol);
   return symbol;
+}
+
+function symbolIdentity(symbol) {
+  const declarations = symbol?.declarations ?? symbol?.getDeclarations?.() ?? [];
+  if (!declarations.length) return null;
+  return declarations.map(declaration => `${key(declaration.getSourceFile().fileName)}:${declaration.pos}:${declaration.end}:${declaration.kind}`).sort().join('|');
+}
+
+function sameSymbol(left, right) {
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const leftIdentity = symbolIdentity(left), rightIdentity = symbolIdentity(right);
+  return Boolean(leftIdentity && rightIdentity && leftIdentity === rightIdentity);
 }
 
 function stableCompiler(options) {
@@ -78,7 +92,8 @@ function parseContract(repository, bound) {
   const manifest = regular(repository, 'package.json', 'Next code-pattern manifest');
   const parsed = JSON.parse(fs.readFileSync(manifest, 'utf8'));
   const contract = parsed?.starci?.codePatterns?.next?.errorState;
-  exactKeys(contract, ['sourceRoots', 'transports', 'envelopes', 'writes', 'boundaries'], 'package.json#starci.codePatterns.next.errorState');
+  exactKeys(contract, ['schema', 'sourceRoots', 'transports', 'worldMappings', 'envelopes', 'writes', 'boundaries'], 'package.json#starci.codePatterns.next.errorState');
+  if (contract.schema !== 'starci/next-error-state@1') throw Error('errorState.schema must be starci/next-error-state@1.');
   const sourceRoots = array(contract.sourceRoots, 'errorState.sourceRoots').map((root, index) => exactRelative(root, `errorState.sourceRoots[${index}]`));
   if (new Set(sourceRoots).size !== sourceRoots.length || sourceRoots.some((root, index) => sourceRoots.some((other, otherIndex) => index !== otherIndex && (root.startsWith(`${other}/`) || other.startsWith(`${root}/`))))) {
     throw Error('errorState.sourceRoots must be unique and nonoverlapping.');
@@ -89,6 +104,21 @@ function parseContract(repository, bound) {
     if (!bound.has(item.path)) throw Error(`${label} is outside the exact selected/context file set: ${item.path}`);
     return item;
   };
+  const worldMappings = array(contract.worldMappings ?? [], 'errorState.worldMappings', { nonempty: false }).map((entry, index) => {
+    const label = `errorState.worldMappings[${index}]`;
+    exactKeys(entry, ['id', 'owner', 'source', 'failurePath', 'state', 'failureState', 'render'], label);
+    if (!/^[a-z][a-z0-9-]*$/.test(entry.id ?? '')) throw Error(`${label}.id must be kebab-case.`);
+    if (typeof entry.failurePath !== 'string' || !/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(entry.failurePath)) throw Error(`${label}.failurePath must be a static binding path.`);
+    if (typeof entry.failureState !== 'string' || !entry.failureState) throw Error(`${label}.failureState must be a nonempty literal member.`);
+    exactKeys(entry.state, ['path', 'export'], `${label}.state`);
+    exactKeys(entry.render, ['path', 'symbol', 'stateProp'], `${label}.render`);
+    if (typeof entry.render.symbol !== 'string' || !/^[A-Za-z_$][\w$]*$/.test(entry.render.symbol)
+      || typeof entry.render.stateProp !== 'string' || !/^[A-Za-z_$][\w$]*$/.test(entry.render.stateProp)) throw Error(`${label}.render needs exact symbol and stateProp names.`);
+    if (!bound.has(entry.render.path)) throw Error(`${label}.render is outside the exact selected/context file set: ${entry.render.path}`);
+    return { id: entry.id, owner: bind(entry.owner, `${label}.owner`), source: bind(entry.source, `${label}.source`), failurePath: entry.failurePath,
+      state: bind(entry.state, `${label}.state`), failureState: entry.failureState,
+      render: { path: exactRelative(entry.render.path, `${label}.render.path`), symbol: entry.render.symbol, stateProp: entry.render.stateProp } };
+  });
   const envelopes = array(contract.envelopes ?? [], 'errorState.envelopes', { nonempty: false }).map((entry, index) => {
     const label = `errorState.envelopes[${index}]`;
     exactKeys(entry, ['id', 'type', 'discriminator', 'dataField', 'errorFields', 'readers'], label);
@@ -116,11 +146,12 @@ function parseContract(repository, bound) {
   const envelopeIds = new Set(envelopes.map(item => item.id));
   const writes = array(contract.writes ?? [], 'errorState.writes', { nonempty: false }).map((entry, index) => {
     const label = `errorState.writes[${index}]`;
-    exactKeys(entry, ['action', 'feedback', 'sites'], label);
+    exactKeys(entry, ['action', 'feedback', 'binding', 'sites'], label);
+    if (!['promise', 'callback'].includes(entry.binding)) throw Error(`${label}.binding must be promise or callback.`);
     const sites = array(entry.sites, `${label}.sites`).map((site, siteIndex) => bind(site, `${label}.sites[${siteIndex}]`));
     const siteKeys = sites.map(site => `${site.path}\0${site.export}`);
     if (new Set(siteKeys).size !== siteKeys.length) throw Error(`${label}.sites contains duplicates.`);
-    return { action: bind(entry.action, `${label}.action`), feedback: bind(entry.feedback, `${label}.feedback`), sites };
+    return { action: bind(entry.action, `${label}.action`), feedback: bind(entry.feedback, `${label}.feedback`), binding: entry.binding, sites };
   });
   const boundaries = array(contract.boundaries ?? [], 'errorState.boundaries', { nonempty: false }).map((entry, index) => {
     const label = `errorState.boundaries[${index}]`;
@@ -161,7 +192,10 @@ function parseContract(repository, bound) {
   uniqueBindings(envelopes.flatMap(item => item.readers), 'errorState envelope readers');
   uniqueBindings(writes.map(item => item.action), 'errorState write actions');
   uniqueBindings(boundaries, 'errorState boundaries');
-  return { sourceRoots, envelopes, writes, boundaries };
+  if (new Set(worldMappings.map(item => item.id)).size !== worldMappings.length) throw Error('errorState.worldMappings IDs must be unique.');
+  const worldKeys = worldMappings.map(item => `${item.owner.path}\0${item.owner.export}\0${item.source.path}\0${item.source.export}\0${item.failurePath}`);
+  if (new Set(worldKeys).size !== worldKeys.length) throw Error('errorState.worldMappings contains a duplicate owner/source/failure path.');
+  return { sourceRoots, worldMappings, envelopes, writes, boundaries };
 }
 
 function projectFor(context, repository, relative) {
@@ -199,6 +233,321 @@ function functionNode(ts, item) {
   return null;
 }
 
+function namedSourceSymbol(relative, name, env) {
+  const item = projectFor(env.context, env.repository, relative), { ts, checker, source } = item;
+  const module = checker.getSymbolAtLocation(source);
+  const exposed = module && checker.getExportsOfModule(module).find(symbol => symbol.name === name);
+  if (exposed) {
+    const symbol = symbolOf(ts, checker, exposed.declarations?.[0]?.name ?? exposed.valueDeclaration?.name) ?? exposed;
+    if ((symbol.declarations ?? []).some(declaration => key(declaration.getSourceFile().fileName) === key(source.fileName))) return { ...item, symbol };
+  }
+  const found = [];
+  for (const statement of source.statements) {
+    if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name?.text === name) found.push(symbolOf(ts, checker, statement.name));
+    if (ts.isVariableStatement(statement)) for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.name.text === name) found.push(symbolOf(ts, checker, declaration.name));
+    }
+  }
+  const symbols = [...new Set(found.filter(Boolean))];
+  if (symbols.length !== 1) throw Error(`Declared source symbol ${name} is not unique in ${relative}.`);
+  return { ...item, symbol: symbols[0] };
+}
+
+function stringMembers(ts, type, seen = new Set()) {
+  if (!type || seen.has(type)) return null;
+  seen.add(type);
+  if (type.flags & ts.TypeFlags.StringLiteral) return new Set([type.value]);
+  if (!(type.flags & ts.TypeFlags.Union) || !type.types?.length) return null;
+  const result = new Set();
+  for (const part of type.types) {
+    const members = stringMembers(ts, part, seen);
+    if (!members) return null;
+    for (const member of members) result.add(member);
+  }
+  return result;
+}
+
+function callResultBindings(ts, checker, call) {
+  for (let node = call; node && !ts.isFunctionLike(node.parent); node = node.parent) {
+    if (!ts.isVariableDeclaration(node) || !node.initializer || !containsNode(ts, node.initializer, call)) continue;
+    if (ts.isIdentifier(node.name)) return new Map([[node.name.text, symbolOf(ts, checker, node.name)]]);
+    if (ts.isObjectBindingPattern(node.name)) {
+      const result = new Map();
+      for (const element of node.name.elements) if (ts.isIdentifier(element.name) && !element.dotDotDotToken) result.set(element.name.text, symbolOf(ts, checker, element.name));
+      return result;
+    }
+    return new Map();
+  }
+  return new Map();
+}
+
+function accessIdentity(ts, checker, node) {
+  const parts = [];
+  let value = unwrap(ts, node);
+  while (ts.isPropertyAccessExpression(value) || (ts.isElementAccessExpression(value) && ts.isStringLiteralLike(value.argumentExpression))) {
+    parts.unshift(ts.isPropertyAccessExpression(value) ? value.name.text : value.argumentExpression.text);
+    value = unwrap(ts, value.expression);
+  }
+  return ts.isIdentifier(value) ? { symbol: symbolOf(ts, checker, value), parts } : null;
+}
+
+function referencesFailure(ts, checker, node, base, fields) {
+  let found = false;
+  const visit = child => {
+    const access = accessIdentity(ts, checker, child);
+    if (access?.symbol === base && access.parts.length >= fields.length && fields.every((field, index) => access.parts[index] === field)) found = true;
+    if (!found) ts.forEachChild(child, visit);
+  };
+  visit(node); return found;
+}
+
+function failurePolarity(ts, checker, node, base, fields) {
+  const value = unwrap(ts, node);
+  if (referencesFailure(ts, checker, value, base, fields)
+    && (ts.isIdentifier(value) || ts.isPropertyAccessExpression(value) || ts.isElementAccessExpression(value))) return true;
+  if (ts.isPrefixUnaryExpression(value) && value.operator === ts.SyntaxKind.ExclamationToken) {
+    const nested = failurePolarity(ts, checker, value.operand, base, fields); return nested === null ? null : !nested;
+  }
+  if (ts.isCallExpression(value) && ts.isIdentifier(value.expression) && value.expression.text === 'Boolean' && value.arguments.length === 1
+    && !checker.getSymbolAtLocation(value.expression)?.declarations?.some(declaration => !declaration.getSourceFile().hasNoDefaultLib)) {
+    return referencesFailure(ts, checker, value.arguments[0], base, fields) ? true : null;
+  }
+  if (ts.isBinaryExpression(value)) {
+    const left = referencesFailure(ts, checker, value.left, base, fields), right = referencesFailure(ts, checker, value.right, base, fields);
+    const other = left ? unwrap(ts, value.right) : right ? unwrap(ts, value.left) : null;
+    const absent = other && (other.kind === ts.SyntaxKind.NullKeyword || (ts.isIdentifier(other) && other.text === 'undefined'
+      && !(checker.getSymbolAtLocation(other)?.declarations?.length)));
+    if (!absent) return null;
+    if ([ts.SyntaxKind.ExclamationEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken].includes(value.operatorToken.kind)) return true;
+    if ([ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.EqualsEqualsEqualsToken].includes(value.operatorToken.kind)) return false;
+  }
+  return null;
+}
+
+function literalState(ts, node, expected) {
+  const value = unwrap(ts, node);
+  return (ts.isStringLiteralLike(value) && value.text === expected)
+    || (ts.isAsExpression(node) && ts.isStringLiteralLike(node.expression) && node.expression.text === expected);
+}
+
+function staticBoolean(ts, node) {
+  const value = unwrap(ts, node);
+  if (value.kind === ts.SyntaxKind.TrueKeyword) return true;
+  if (value.kind === ts.SyntaxKind.FalseKeyword) return false;
+  if (value.kind === ts.SyntaxKind.NullKeyword) return false;
+  if (ts.isNumericLiteral(value)) return Number(value.text) !== 0 && !Number.isNaN(Number(value.text));
+  if (ts.isBigIntLiteral(value)) return value.text !== '0n';
+  if (ts.isStringLiteralLike(value) || ts.isNoSubstitutionTemplateLiteral(value)) return value.text.length > 0;
+  if (ts.isVoidExpression(value)) return false;
+  if (ts.isPrefixUnaryExpression(value) && [ts.SyntaxKind.PlusToken, ts.SyntaxKind.MinusToken].includes(value.operator)
+    && ts.isNumericLiteral(unwrap(ts, value.operand))) {
+    const numeric = Number(unwrap(ts, value.operand).text) * (value.operator === ts.SyntaxKind.MinusToken ? -1 : 1);
+    return numeric !== 0 && !Number.isNaN(numeric);
+  }
+  if (ts.isPrefixUnaryExpression(value) && value.operator === ts.SyntaxKind.ExclamationToken) {
+    const nested = staticBoolean(ts, value.operand);
+    return nested === null ? null : !nested;
+  }
+  return null;
+}
+
+function statementTerminates(ts, statement) {
+  if (ts.isReturnStatement(statement) || ts.isThrowStatement(statement)) return true;
+  if (ts.isBlock(statement)) return Boolean(statement.statements.length && statementTerminates(ts, statement.statements.at(-1)));
+  if (ts.isIfStatement(statement)) {
+    const selected = staticBoolean(ts, statement.expression);
+    if (selected === true) return statementTerminates(ts, statement.thenStatement);
+    if (selected === false) return Boolean(statement.elseStatement && statementTerminates(ts, statement.elseStatement));
+    return Boolean(statement.elseStatement && statementTerminates(ts, statement.thenStatement) && statementTerminates(ts, statement.elseStatement));
+  }
+  return false;
+}
+
+function staticallyUnreachable(ts, node, stop) {
+  for (let current = node; current?.parent && current !== stop; current = current.parent) {
+    const parent = current.parent;
+    if (ts.isBlock(parent)) {
+      const containing = parent.statements.find(statement => statement.pos <= current.pos && current.end <= statement.end);
+      const index = containing ? parent.statements.indexOf(containing) : -1;
+      if (index > 0 && parent.statements.slice(0, index).some(statement => statementTerminates(ts, statement))) return true;
+    }
+    if (ts.isIfStatement(parent)) {
+      const value = staticBoolean(ts, parent.expression);
+      if (value === false && parent.thenStatement.pos <= node.pos && node.end <= parent.thenStatement.end) return true;
+      if (value === true && parent.elseStatement && parent.elseStatement.pos <= node.pos && node.end <= parent.elseStatement.end) return true;
+    }
+    if (ts.isConditionalExpression(parent)) {
+      const value = staticBoolean(ts, parent.condition);
+      if (value === false && parent.whenTrue.pos <= node.pos && node.end <= parent.whenTrue.end) return true;
+      if (value === true && parent.whenFalse.pos <= node.pos && node.end <= parent.whenFalse.end) return true;
+    }
+    if (ts.isWhileStatement(parent) && staticBoolean(ts, parent.expression) === false
+      && parent.statement.pos <= node.pos && node.end <= parent.statement.end) return true;
+    if (ts.isForStatement(parent) && parent.condition && staticBoolean(ts, parent.condition) === false
+      && parent.statement.pos <= node.pos && node.end <= parent.statement.end) return true;
+    if (ts.isBinaryExpression(parent) && parent.right.pos <= node.pos && node.end <= parent.right.end) {
+      const left = staticBoolean(ts, parent.left);
+      if (parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken && left === false) return true;
+      if (parent.operatorToken.kind === ts.SyntaxKind.BarBarToken && left === true) return true;
+    }
+  }
+  return false;
+}
+
+function isConstVariable(ts, declaration) {
+  return ts.isVariableDeclaration(declaration) && Boolean(ts.getCombinedNodeFlags(declaration.parent) & ts.NodeFlags.Const);
+}
+
+function renderConsumesState(ts, checker, render, prop) {
+  const fn = functionNode(ts, render);
+  if (!fn?.body || !fn.parameters.length) return false;
+  const parameter = fn.parameters[0];
+  let owner = null, local = null;
+  if (ts.isIdentifier(parameter.name)) owner = symbolOf(ts, checker, parameter.name);
+  if (ts.isObjectBindingPattern(parameter.name)) {
+    const element = parameter.name.elements.find(item => {
+      const exposed = item.propertyName ?? item.name;
+      return ts.isIdentifier(exposed) && exposed.text === prop && ts.isIdentifier(item.name);
+    });
+    if (element) local = symbolOf(ts, checker, element.name);
+  }
+  let used = false;
+  const visit = node => {
+    if (node !== fn.body && ts.isFunctionLike(node)) return;
+    if (owner && propertyAccess(ts, checker, node, owner, prop)) used = true;
+    if (local && ts.isIdentifier(node) && symbolOf(ts, checker, node) === local
+      && !(ts.isBindingElement(node.parent) && node.parent.name === node)) used = true;
+    if (!used) ts.forEachChild(node, visit);
+  };
+  visit(fn.body); return used;
+}
+
+function renderStateType(ts, checker, render, prop) {
+  const fn = functionNode(ts, render);
+  if (!fn?.parameters.length) return null;
+  const parameterType = checker.getTypeAtLocation(fn.parameters[0]);
+  const property = checker.getPropertiesOfType(parameterType).find(symbol => symbol.name === prop);
+  return property ? checker.getTypeOfSymbolAtLocation(property, property.valueDeclaration ?? fn.parameters[0]) : null;
+}
+
+function checkWorldMapping(entry, env, result) {
+  const owner = exportedSymbol(entry.owner, env.context, env.repository), sourceOwner = exportedSymbol(entry.source, env.context, env.repository);
+  const stateOwner = exportedSymbol(entry.state, env.context, env.repository), render = namedSourceSymbol(entry.render.path, entry.render.symbol, env);
+  const { ts, checker } = owner, fn = functionNode(ts, owner), renderFn = functionNode(render.ts, render);
+  const add = (node, message, unavailable = false, relative = entry.owner.path, source = owner.source) => (unavailable ? result.errors : result.violations)
+    .push({ ruleId: 'FE_ERROR_WORLD_STATE_MAPPING', path: relative, ...location(source, node), message });
+  if (!fn?.body || !renderFn?.body) return add(owner.source, `World owner ${entry.owner.export} and render symbol ${entry.render.symbol} must resolve to source functions.`, true);
+  const members = stringMembers(stateOwner.ts, stateOwner.checker.getDeclaredTypeOfSymbol(stateOwner.symbol));
+  if (!members) add(stateOwner.source, `State ${entry.state.export} must resolve to a closed string-literal union.`, true, entry.state.path, stateOwner.source);
+  else if (!members.has(entry.failureState)) add(stateOwner.source, `Failure state ${entry.failureState} is not a member of ${entry.state.export}.`, false, entry.state.path, stateOwner.source);
+  if (!renderConsumesState(render.ts, render.checker, render, entry.render.stateProp)) add(render.source, `Render symbol ${entry.render.symbol} does not consume state prop ${entry.render.stateProp}.`, false, entry.render.path, render.source);
+  const renderType = renderStateType(render.ts, render.checker, render, entry.render.stateProp);
+  const renderAlias = renderType?.aliasSymbol ?? renderType?.getSymbol?.();
+  if (!renderType || !sameSymbol(renderAlias, stateOwner.symbol)) add(render.source,
+    `Render state prop ${entry.render.stateProp} does not resolve to declared state contract ${entry.state.export}.`, true, entry.render.path, render.source);
+  const calls = [];
+  let unsupportedSource = false;
+  const collect = node => {
+    if (node !== fn.body && ts.isFunctionLike(node)) {
+      if (containsSymbol(ts, checker, node, sourceOwner.symbol)) unsupportedSource = true;
+      return;
+    }
+    if (ts.isCallExpression(node) && sameSymbol(symbolOf(ts, checker, unwrap(ts, node.expression)), sourceOwner.symbol)) calls.push(node);
+    ts.forEachChild(node, collect);
+  };
+  collect(fn.body);
+  if (calls.length !== 1) return add(fn, unsupportedSource ? `World source ${entry.source.export} appears only in unsupported indirect control flow.`
+    : `World mapping ${entry.id} must resolve exactly one call to ${entry.source.export} inside ${entry.owner.export}.`, unsupportedSource || calls.length > 1);
+  if (staticallyUnreachable(ts, calls[0], fn.body)) return add(calls[0], `World source ${entry.source.export} is called only in statically unreachable control flow.`, true);
+  const bindings = callResultBindings(ts, checker, calls[0]), [baseName, ...fields] = entry.failurePath.split('.'), base = bindings.get(baseName);
+  if (!base) return add(calls[0], `failurePath ${entry.failurePath} does not start at the declared source call result.`, true);
+  const mappedStates = new Map();
+  let unstableState = false;
+  const recordState = node => {
+    if (!ts.isVariableDeclaration(node) || !ts.isIdentifier(node.name) || !node.initializer) return;
+    const value = unwrap(ts, node.initializer);
+    if (!ts.isConditionalExpression(value)) return;
+    const polarity = failurePolarity(ts, checker, value.condition, base, fields);
+    if (polarity === true && literalState(ts, value.whenTrue, entry.failureState)
+      || polarity === false && literalState(ts, value.whenFalse, entry.failureState)) {
+      if (isConstVariable(ts, node)) mappedStates.set(symbolOf(ts, checker, node.name), true);
+      else unstableState = true;
+    }
+  };
+  const stateValueProof = node => {
+    const value = unwrap(ts, node);
+    if (literalState(ts, value, entry.failureState)) return 'literal';
+    if (ts.isIdentifier(value) && mappedStates.has(symbolOf(ts, checker, value))) return 'mapped';
+    if (ts.isConditionalExpression(value)) {
+      const polarity = failurePolarity(ts, checker, value.condition, base, fields);
+      return polarity === true && literalState(ts, value.whenTrue, entry.failureState)
+        || polarity === false && literalState(ts, value.whenFalse, entry.failureState) ? 'conditional' : null;
+    }
+    return null;
+  };
+  const renderedState = node => {
+    if (!(ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) || !sameSymbol(symbolOf(ts, checker, node.tagName), render.symbol)) return null;
+    const attribute = node.attributes.properties.find(item => ts.isJsxAttribute(item) && item.name.getText(owner.source) === entry.render.stateProp);
+    if (!attribute?.initializer) return null;
+    if (ts.isStringLiteral(attribute.initializer)) return attribute.initializer.text === entry.failureState ? 'literal' : null;
+    return ts.isJsxExpression(attribute.initializer) && attribute.initializer.expression ? stateValueProof(attribute.initializer.expression) : null;
+  };
+  const insideFailureBranch = node => {
+    for (let current = node; current && current !== fn.body; current = current.parent) if (ts.isIfStatement(current)) {
+      const polarity = failurePolarity(ts, checker, current.expression, base, fields);
+      if (polarity === true && current.thenStatement.pos <= node.pos && node.end <= current.thenStatement.end) return true;
+      if (polarity === false && current.elseStatement && current.elseStatement.pos <= node.pos && node.end <= current.elseStatement.end) return true;
+    }
+    return false;
+  };
+  let proven = false, sawRender = false, unsupportedRender = false, unprovenRender = false;
+  const inspect = node => {
+    if (node !== fn.body && ts.isFunctionLike(node)) {
+      if (containsSymbol(ts, checker, node, render.symbol) || referencesFailure(ts, checker, node, base, fields)) unsupportedRender = true;
+      return;
+    }
+    recordState(node);
+    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && sameSymbol(symbolOf(ts, checker, node.tagName), render.symbol)) {
+      if (staticallyUnreachable(ts, node, fn.body)) { unsupportedRender = true; return; }
+      sawRender = true;
+      const proof = renderedState(node);
+      if (proof === 'mapped' || proof === 'conditional' || proof === 'literal' && insideFailureBranch(node)) proven = true;
+      else unprovenRender = true;
+    }
+    ts.forEachChild(node, inspect);
+  };
+  inspect(fn.body);
+  if (unstableState) add(fn, `World mapping ${entry.id} stores failure-state provenance in a mutable binding.`, true);
+  if (!sawRender) add(fn, unsupportedRender ? `World render mapping appears only in unsupported indirect control flow.`
+    : `World owner ${entry.owner.export} does not render declared symbol ${entry.render.symbol}.`, unsupportedRender);
+  else if (!proven || unprovenRender) add(fn, `Every reachable ${entry.render.symbol} render in ${entry.owner.export} must map ${entry.failurePath} to ${entry.failureState} on prop ${entry.render.stateProp}.`);
+}
+
+function checkWorldCoverage(entries, env, result) {
+  const rows = entries.map(entry => ({ entry, source: exportedSymbol(entry.source, env.context, env.repository), owner: exportedSymbol(entry.owner, env.context, env.repository) }));
+  for (const relative of [...env.bound].filter(file => SOURCE.test(file) && !TEST_SOURCE.test(file))) {
+    const { source, checker, ts } = projectFor(env.context, env.repository, relative);
+    const visit = node => {
+      if (ts.isCallExpression(node)) {
+        const called = symbolOf(ts, checker, unwrap(ts, node.expression)), matches = rows.filter(row => sameSymbol(called, row.source.symbol));
+        if (matches.length) {
+          const owner = enclosingFunction(ts, node);
+          if (!matches.some(row => sameSymbol(functionSymbol(ts, checker, owner), row.owner.symbol))) result.violations.push({ ruleId: 'FE_ERROR_WORLD_STATE_MAPPING', path: relative,
+            ...location(source, node), message: `World source ${matches[0].entry.source.export} is called outside every declared state-mapping owner.` });
+        }
+      }
+      if (ts.isIdentifier(node)) for (const row of rows) if (sameSymbol(symbolOf(ts, checker, node), row.source.symbol)) {
+        const parent = node.parent, directCall = ts.isCallExpression(parent) && unwrap(ts, parent.expression) === node;
+        const declaration = ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent) || row.source.symbol.declarations?.includes(parent);
+        if (!directCall && !declaration) result.errors.push({ ruleId: 'FE_ERROR_WORLD_STATE_MAPPING', path: relative, ...location(source, node),
+          message: `Dynamic reference to world source ${row.entry.source.export} cannot prove an exact owner/state call path.` });
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+}
+
 function propertyAccess(ts, checker, node, owner, field) {
   const value = unwrap(ts, node);
   if (ts.isPropertyAccessExpression(value) && value.name.text === field) return symbolOf(ts, checker, value.expression) === owner;
@@ -208,7 +557,11 @@ function propertyAccess(ts, checker, node, owner, field) {
 
 function containsThrow(ts, node) {
   let found = false;
-  const visit = child => { if (ts.isThrowStatement(child)) found = true; else ts.forEachChild(child, visit); };
+  const visit = child => {
+    if (ts.isThrowStatement(child) && !staticallyUnreachable(ts, child, node)) found = true;
+    else if (child !== node && ts.isFunctionLike(child)) return;
+    else ts.forEachChild(child, visit);
+  };
   visit(node); return found;
 }
 
@@ -251,8 +604,11 @@ function checkEnvelope(entry, env, result) {
     if (!ts.isIdentifier(parameter.name)) { add(parameter, 'Envelope reader input binding must be a statically resolved identifier.', true, reader.source, binding.path); continue; }
     const owner = symbolOf(ts, reader.checker, parameter.name), inputType = reader.checker.getTypeAtLocation(parameter);
     if (inputType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) { add(parameter, `Reader ${binding.export} input type is any/unknown.`, true, reader.source, binding.path); continue; }
-    if (!reader.checker.isTypeAssignableTo(inputType, declared) && !reader.checker.isTypeAssignableTo(declared, inputType)) add(parameter, `Reader ${binding.export} input is not the declared ${entry.id} envelope.`, false, reader.source, binding.path);
-    let handled = false, sawFailureBranch = false, returned = false, missingHandled = binding.emptyData === 'valid', sawMissingBranch = false;
+    const inputContract = inputType.aliasSymbol ?? inputType.getSymbol?.();
+    if (!sameSymbol(inputContract, typeItem.symbol)) add(parameter, `Reader ${binding.export} input is not the declared ${entry.id} envelope.`, false, reader.source, binding.path);
+    let handled = false, handledAt = Number.POSITIVE_INFINITY, sawFailureBranch = false, returned = false,
+      returnedAt = Number.POSITIVE_INFINITY, missingHandled = binding.emptyData === 'valid', sawMissingBranch = false,
+      unstableDataAlias = false;
     const dataExpression = (node, seen = new Set()) => {
       const value = unwrap(ts, node);
       if (!value || seen.has(value)) return false;
@@ -261,30 +617,42 @@ function checkEnvelope(entry, env, result) {
       if (ts.isBinaryExpression(value) && value.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken) return dataExpression(value.left, seen);
       if (ts.isIdentifier(value)) {
         const declaration = symbolOf(ts, reader.checker, value)?.valueDeclaration;
-        return Boolean(declaration && ts.isVariableDeclaration(declaration) && declaration.initializer && dataExpression(declaration.initializer, seen));
+        if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer) return false;
+        if (!isConstVariable(ts, declaration)) { unstableDataAlias = true; return false; }
+        return dataExpression(declaration.initializer, seen);
       }
       return false;
     };
     const visit = node => {
       if (ts.isIfStatement(node)) {
         if (failureCondition(ts, reader.checker, node.expression, owner, entry.discriminator.field)) {
-          sawFailureBranch = true; if (containsThrow(ts, node.thenStatement)) handled = true;
+          sawFailureBranch = true; if (node.parent === fn.body && containsThrow(ts, node.thenStatement)) { handled = true; handledAt = Math.min(handledAt, node.pos); }
         }
         const success = propertyAccess(ts, reader.checker, node.expression, owner, entry.discriminator.field);
-        if (success && node.elseStatement) { sawFailureBranch = true; if (containsThrow(ts, node.elseStatement)) handled = true; }
+        if (success && node.elseStatement) { sawFailureBranch = true; if (node.parent === fn.body && containsThrow(ts, node.elseStatement)) { handled = true; handledAt = Math.min(handledAt, node.pos); } }
       }
-      if (ts.isReturnStatement(node) && node.expression) {
-        if (dataExpression(node.expression)) returned = true;
+      if (ts.isReturnStatement(node) && node.expression && !staticallyUnreachable(ts, node, fn.body)) {
+        if (dataExpression(node.expression)) { returned = true; returnedAt = Math.min(returnedAt, node.pos); }
       }
       if (binding.emptyData === 'required' && ts.isIfStatement(node) && missingDataCondition(ts, reader.checker, node.expression, owner, entry.dataField)) {
-        sawMissingBranch = true; if (containsThrow(ts, node.thenStatement)) missingHandled = true;
+        sawMissingBranch = true;
+        let supported = node.parent === fn.body;
+        for (let current = node.parent; !supported && current && current !== fn.body; current = current.parent) {
+          if (ts.isIfStatement(current) && current.parent === fn.body
+            && propertyAccess(ts, reader.checker, current.expression, owner, entry.discriminator.field)
+            && current.thenStatement.pos <= node.pos && node.end <= current.thenStatement.end) supported = true;
+        }
+        if (supported && containsThrow(ts, node.thenStatement)) missingHandled = true;
       }
+      if (node !== fn.body && ts.isFunctionLike(node)) return;
       ts.forEachChild(node, visit);
     };
     visit(fn.body);
+    if (unstableDataAlias) add(fn, `Reader ${binding.export} uses a mutable data alias whose envelope provenance cannot be proved.`, true, reader.source, binding.path);
     if (!handled) add(fn, sawFailureBranch ? `Reader ${binding.export} failure branch uses an unsupported indirect handler.`
       : `Reader ${binding.export} must handle the transport failure discriminator before returning data.`, sawFailureBranch, reader.source, binding.path);
     if (!returned) add(fn, `Reader ${binding.export} must return the declared data field; valid empty data may use ?? null after failure handling.`, false, reader.source, binding.path);
+    else if (handled && returnedAt < handledAt) add(fn, `Reader ${binding.export} returns data before its transport failure guard.` , false, reader.source, binding.path);
     if (!missingHandled) add(fn, sawMissingBranch ? `Reader ${binding.export} missing-data branch uses an unsupported indirect handler.`
       : `Reader ${binding.export} declares required data and must reject an absent data field.`, sawMissingBranch, reader.source, binding.path);
   }
@@ -295,9 +663,18 @@ function enclosingFunction(ts, node) {
   return null;
 }
 
+function functionSymbol(ts, checker, node) {
+  if (!node) return null;
+  if (node.name && (ts.isIdentifier(node.name) || ts.isStringLiteralLike(node.name))) return symbolOf(ts, checker, node.name);
+  const parent = node.parent;
+  if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) return symbolOf(ts, checker, parent.name);
+  if (ts.isPropertyAssignment(parent) && (ts.isIdentifier(parent.name) || ts.isStringLiteralLike(parent.name))) return symbolOf(ts, checker, parent.name);
+  return null;
+}
+
 function containsSymbol(ts, checker, node, target) {
   let found = false;
-  const visit = child => { if (ts.isIdentifier(child) && symbolOf(ts, checker, child) === target) found = true; else ts.forEachChild(child, visit); };
+  const visit = child => { if (ts.isIdentifier(child) && sameSymbol(symbolOf(ts, checker, child), target)) found = true; else ts.forEachChild(child, visit); };
   visit(node); return found;
 }
 
@@ -310,18 +687,48 @@ function containsNode(ts, node, target) {
 
 function resultBindingForCall(ts, checker, call) {
   for (let node = call; node; node = node.parent) {
-    if (ts.isVariableDeclaration(node) && node.initializer && containsNode(ts, node.initializer, call) && ts.isIdentifier(node.name)) return symbolOf(ts, checker, node.name);
+    if (ts.isVariableDeclaration(node) && node.initializer && containsNode(ts, node.initializer, call) && ts.isIdentifier(node.name)) {
+      const isConst = Boolean(ts.getCombinedNodeFlags(node.parent) & ts.NodeFlags.Const);
+      const awaited = (() => { for (let item = call.parent; item && item !== node; item = item.parent) if (ts.isAwaitExpression(item)) return true; return false; })();
+      let direct = unwrap(ts, node.initializer);
+      if (ts.isAwaitExpression(direct)) direct = unwrap(ts, direct.expression);
+      return { symbol: symbolOf(ts, checker, node.name), isConst, awaited, indirect: direct !== call };
+    }
     if (ts.isFunctionLike(node)) break;
   }
   return null;
 }
 
+
+function visitOwnFunction(ts, fn, callback) {
+  const visit = node => {
+    if (node !== fn && ts.isFunctionLike(node)) return;
+    callback(node);
+    ts.forEachChild(node, visit);
+  };
+  visit(fn.body ?? fn);
+}
+
 function checkWrite(entry, env, result) {
   const action = exportedSymbol(entry.action, env.context, env.repository), feedback = exportedSymbol(entry.feedback, env.context, env.repository);
-  if (!functionNode(action.ts, action) || !functionNode(feedback.ts, feedback)) {
+  const feedbackFunction = functionNode(feedback.ts, feedback);
+  if (!functionNode(action.ts, action) || !feedbackFunction) {
     result.errors.push({ ruleId: 'FE_WRITE_FEEDBACK_OWNER', path: entry.action.path, line: 1, column: 1,
       message: 'Declared write action and feedback owner must both resolve to callable source functions.' });
     return;
+  }
+  if (entry.binding === 'callback') {
+    const parameter = feedbackFunction.parameters[0], binding = parameter && feedback.ts.isIdentifier(parameter.name) && symbolOf(feedback.ts, feedback.checker, parameter.name);
+    let invoked = false, unreachableInvocation = false;
+    if (binding) visitOwnFunction(feedback.ts, feedbackFunction, node => {
+      if (feedback.ts.isCallExpression(node) && sameSymbol(symbolOf(feedback.ts, feedback.checker, unwrap(feedback.ts, node.expression)), binding)) {
+        if (staticallyUnreachable(feedback.ts, node, feedbackFunction.body)) unreachableInvocation = true;
+        else invoked = true;
+      }
+    });
+    if (!invoked) result.errors.push({ ruleId: 'FE_WRITE_FEEDBACK_OWNER', path: entry.feedback.path, line: 1, column: 1,
+      message: unreachableInvocation ? `Callback feedback owner ${entry.feedback.export} invokes its operation only in statically unreachable control flow.`
+        : `Callback feedback owner ${entry.feedback.export} does not invoke its bound operation parameter.` });
   }
   const sites = entry.sites.map(binding => ({ ...exportedSymbol(binding, env.context, env.repository), fn: null }));
   for (const site of sites) {
@@ -336,7 +743,7 @@ function checkWrite(entry, env, result) {
     const visit = node => {
       if (ts.isCallExpression(node)) {
         const called = symbolOf(ts, checker, unwrap(ts, node.expression));
-        if (called === action.symbol) {
+        if (sameSymbol(called, action.symbol)) {
           actionCalls.push({ node, source, checker, ts, relative, owner: enclosingFunction(ts, node) });
         }
       }
@@ -345,20 +752,53 @@ function checkWrite(entry, env, result) {
     visit(source);
   }
   for (const call of actionCalls) {
-    const site = siteByFunction.get(call.owner);
+    if (staticallyUnreachable(call.ts, call.node, call.owner?.body)) {
+      result.errors.push({ ruleId: 'FE_WRITE_FEEDBACK_OWNER', path: call.relative, ...location(call.source, call.node),
+        message: `Write action ${entry.action.export} appears only in statically unreachable control flow and cannot prove feedback ownership.` });
+      continue;
+    }
+    let site = siteByFunction.get(call.owner);
+    if (!site) site = sites.find(candidate => candidate.fn && candidate.fn.pos <= call.node.pos && call.node.end <= candidate.fn.end && (() => {
+      for (let node = call.node.parent; node && node !== candidate.fn; node = node.parent) if (call.ts.isFunctionLike(node)) {
+        const registration = node.parent;
+        if (!call.ts.isCallExpression(registration) || !registration.arguments.includes(node)
+          || !sameSymbol(symbolOf(call.ts, call.checker, unwrap(call.ts, registration.expression)), feedback.symbol)) return false;
+      }
+      return true;
+    })());
     if (!site) {
       result.violations.push({ ruleId: 'FE_WRITE_FEEDBACK_OWNER', path: call.relative, ...location(call.source, call.node), message: `Write action ${entry.action.export} is used outside its exact declared feedback sites.` });
       continue;
     }
     seenSites.add(site);
     const resultBinding = resultBindingForCall(call.ts, call.checker, call.node);
+    if (resultBinding && (!resultBinding.isConst || resultBinding.awaited || resultBinding.indirect)) result.errors.push({ ruleId: 'FE_WRITE_FEEDBACK_OWNER', path: call.relative,
+      ...location(call.source, call.node), message: !resultBinding.isConst
+        ? `Write action ${entry.action.export} result uses a mutable binding; feedback provenance is unavailable.`
+        : resultBinding.awaited ? `Write action ${entry.action.export} is awaited before feedback ownership; rejected transport failure bypasses the feedback owner.`
+          : `Write action ${entry.action.export} result uses an unsupported indirect binding before feedback ownership.` });
     let bound = false;
     const visit = node => {
-      if (call.ts.isCallExpression(node) && symbolOf(call.ts, call.checker, unwrap(call.ts, node.expression)) === feedback.symbol
-        && (containsNode(call.ts, node, call.node) || (resultBinding && containsSymbol(call.ts, call.checker, node, resultBinding)))) bound = true;
-      call.ts.forEachChild(node, visit);
+      if (call.ts.isCallExpression(node) && sameSymbol(symbolOf(call.ts, call.checker, unwrap(call.ts, node.expression)), feedback.symbol)) {
+        const direct = containsNode(call.ts, node, call.node);
+        let awaited = false, callback = false, indirect = false;
+        if (direct) for (let current = call.node.parent; current && current !== node; current = current.parent) {
+          if (call.ts.isAwaitExpression(current)) awaited = true;
+          if (call.ts.isFunctionLike(current)) callback = true;
+          if (call.ts.isCallExpression(current)) indirect = true;
+        }
+        if (awaited) result.errors.push({ ruleId: 'FE_WRITE_FEEDBACK_OWNER', path: call.relative, ...location(call.source, call.node),
+          message: `Write action ${entry.action.export} is awaited while evaluating feedback arguments; rejected transport failure bypasses the feedback owner.` });
+        const mode = callback ? 'callback' : 'promise';
+        if (!awaited && direct && mode !== entry.binding) result.violations.push({ ruleId: 'FE_WRITE_FEEDBACK_OWNER', path: call.relative,
+          ...location(call.source, call.node), message: `Write action ${entry.action.export} uses ${mode} feedback binding but contract selects ${entry.binding}.` });
+        if (indirect) result.errors.push({ ruleId: 'FE_WRITE_FEEDBACK_OWNER', path: call.relative, ...location(call.source, call.node),
+          message: `Write action ${entry.action.export} passes through an unsupported call before feedback ownership.` });
+        if (!awaited && !indirect && mode === entry.binding && (direct || (entry.binding === 'promise' && resultBinding?.isConst && !resultBinding.awaited && !resultBinding.indirect
+          && containsSymbol(call.ts, call.checker, node, resultBinding.symbol)))) bound = true;
+      }
     };
-    visit(site.fn.body);
+    visitOwnFunction(call.ts, site.fn, visit);
     if (!bound) result.violations.push({ ruleId: 'FE_WRITE_FEEDBACK_OWNER', path: site.binding.path, ...location(site.source, site.fn), message: `Write site ${site.binding.export} does not bind ${entry.action.export} to feedback owner ${entry.feedback.export}.` });
   }
   for (const site of sites) if (site.fn && !seenSites.has(site)) result.violations.push({ ruleId: 'FE_WRITE_FEEDBACK_OWNER', path: site.binding.path,
@@ -367,10 +807,10 @@ function checkWrite(entry, env, result) {
   for (const relative of boundFiles) {
     const { source, checker, ts } = projectFor(env.context, env.repository, relative);
     const visit = node => {
-      if (ts.isIdentifier(node) && symbolOf(ts, checker, node) === action.symbol) {
+      if (ts.isIdentifier(node) && sameSymbol(symbolOf(ts, checker, node), action.symbol)) {
         const parent = node.parent, directCall = ts.isCallExpression(parent) && unwrap(ts, parent.expression) === node;
         const declaration = (ts.isImportSpecifier(parent) || ts.isExportSpecifier(parent)) || action.symbol.declarations?.includes(parent);
-        const feedbackArgument = ts.isCallExpression(parent) && symbolOf(ts, checker, unwrap(ts, parent.expression)) === feedback.symbol;
+        const feedbackArgument = ts.isCallExpression(parent) && sameSymbol(symbolOf(ts, checker, unwrap(ts, parent.expression)), feedback.symbol);
         if (!directCall && !declaration && !feedbackArgument) result.errors.push({ ruleId: 'FE_WRITE_FEEDBACK_OWNER', path: relative,
           ...location(source, node), message: `Dynamic reference to write action ${entry.action.export} cannot prove exact feedback-site coverage.` });
       }
@@ -440,7 +880,14 @@ function checkBoundary(entry, env, result, next) {
     return ts.isIdentifier(exposed) && exposed.text === entry.recoveryProp && ts.isIdentifier(element.name);
   });
   const recoverySymbol = recoveryBinding && symbolOf(ts, checker, recoveryBinding.name);
-  let recoveryCall = false, html = false, body = false;
+  let recoveryCall = false, unsupportedRecovery = false, html = false, body = false;
+  const eventCallback = node => {
+    for (let current = node.parent; current && current !== fn.body; current = current.parent) {
+      if (ts.isJsxAttribute(current) && /^on[A-Z]/.test(current.name.getText(source))) return true;
+      if (ts.isStatement(current) && !ts.isExpressionStatement(current)) return false;
+    }
+    return false;
+  };
   const recoveryUse = node => {
     const parent = node.parent;
     if (ts.isCallExpression(parent) && unwrap(ts, parent.expression) === node) return true;
@@ -451,18 +898,36 @@ function checkBoundary(entry, env, result, next) {
     return false;
   };
   const visit = node => {
+    if (node !== fn && ts.isFunctionLike(node) && !eventCallback(node)) {
+      let referenced = false;
+      const probe = child => {
+        if (owner && propertyAccess(ts, checker, child, owner, entry.recoveryProp)) referenced = true;
+        if (recoverySymbol && ts.isIdentifier(child) && sameSymbol(symbolOf(ts, checker, child), recoverySymbol)) referenced = true;
+        if (!referenced) ts.forEachChild(child, probe);
+      };
+      probe(node); if (referenced) unsupportedRecovery = true;
+      return;
+    }
+    const unreachable = staticallyUnreachable(ts, node, fn.body);
     if (ts.isCallExpression(node) && ((owner && propertyAccess(ts, checker, node.expression, owner, entry.recoveryProp))
-      || (recoverySymbol && symbolOf(ts, checker, unwrap(ts, node.expression)) === recoverySymbol))) recoveryCall = true;
-    if (owner && propertyAccess(ts, checker, node, owner, entry.recoveryProp) && recoveryUse(node)) recoveryCall = true;
+      || (recoverySymbol && symbolOf(ts, checker, unwrap(ts, node.expression)) === recoverySymbol))) {
+      if (unreachable) unsupportedRecovery = true; else recoveryCall = true;
+    }
+    if (owner && propertyAccess(ts, checker, node, owner, entry.recoveryProp) && recoveryUse(node)) {
+      if (unreachable) unsupportedRecovery = true; else recoveryCall = true;
+    }
     if (recoverySymbol && ts.isIdentifier(node) && symbolOf(ts, checker, node) === recoverySymbol
-      && node !== recoveryBinding?.name && recoveryUse(node)) recoveryCall = true;
+      && node !== recoveryBinding?.name && recoveryUse(node)) {
+      if (unreachable) unsupportedRecovery = true; else recoveryCall = true;
+    }
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const tag = node.tagName.getText(source); if (tag === 'html') html = true; if (tag === 'body') body = true;
     }
     ts.forEachChild(node, visit);
   };
   visit(fn.body);
-  if (!recoveryCall) add(fn, `Boundary must expose a reachable ${entry.recoveryProp} recovery action.`);
+  if (!recoveryCall) add(fn, unsupportedRecovery ? `Boundary recovery ${entry.recoveryProp} appears only in unsupported indirect control flow.`
+    : `Boundary must expose a reachable ${entry.recoveryProp} recovery action.`, unsupportedRecovery);
   if (entry.role === 'global' && (!html || !body)) add(fn, 'A global Next error boundary renders its required html and body shell.');
 }
 
@@ -488,6 +953,11 @@ export function checkNextErrors({ root, files, ruleIds, contextFiles = [], archi
     const missing = [...covered].filter(relative => !bound.has(relative));
     if (missing.length) throw Error(`errorState.sourceRoots coverage is incomplete; bind every owning-program source (${missing.slice(0, 4).join(', ')}${missing.length > 4 ? ', …' : ''}).`);
     const env = { repository, bound, contract, context };
+    if (ruleIds.includes('FE_ERROR_WORLD_STATE_MAPPING')) {
+      if (!contract.worldMappings.length) throw Error('FE_ERROR_WORLD_STATE_MAPPING needs at least one declared world-state mapping.');
+      for (const entry of contract.worldMappings) checkWorldMapping(entry, env, result);
+      checkWorldCoverage(contract.worldMappings, env, result);
+    }
     if (ruleIds.includes('FE_ERROR_ENVELOPE_POLICY')) {
       if (!contract.envelopes.length) throw Error('FE_ERROR_ENVELOPE_POLICY needs at least one selected envelope contract.');
       for (const entry of contract.envelopes) checkEnvelope(entry, env, result);
