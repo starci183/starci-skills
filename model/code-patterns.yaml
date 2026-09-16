@@ -78,11 +78,11 @@ profiles:
       - BE-TYPING-6
       - BE-TYPING-7
     sourceGlobs:
-      - src/**/*.ts
-      - apps/**/*.ts
-      - libs/**/*.ts
-      - test/**/*.ts
-      - tests/**/*.ts
+      - src/**/*.{ts,mts,cts,tsx}
+      - apps/**/*.{ts,mts,cts,tsx}
+      - libs/**/*.{ts,mts,cts,tsx}
+      - test/**/*.{ts,mts,cts,tsx}
+      - tests/**/*.{ts,mts,cts,tsx}
     inputGlobs:
       - jest*.{js,mjs,cjs,ts,json}
       - apps/*/jest*.{js,mjs,cjs,ts,json}
@@ -289,7 +289,7 @@ profiles:
         semantic:
           guidance: docs/backend-source-pattern.md
           review: Boot-test token, scope, configuration and lifetime; named instances cannot be inferred from syntax alone.
-        status: missing
+        status: implemented
       - id: NEST-COMMENT-MEMBER-SHAPE
         sourceRuleIds: [BE-COMMENT-3, BE-COMMENT-5, BE-COMMENT-6]
         applicability: { include: ['src/**/*.ts', 'apps/**/*.ts', 'libs/**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts'] }
@@ -302,14 +302,14 @@ profiles:
         status: implemented
       - id: NEST-FEATURE-FILE-SHAPE
         sourceRuleIds: [BE-FOLDER-2, BE-FOLDER-5, BE-FOLDER-6, BE-NAMING-1, BE-NAMING-2, BE-NAMING-4, BE-NAMING-7, BE-NAMING-8]
-        applicability: { include: ['src/features/**/*.ts', 'src/modules/**/*.ts'] }
+        applicability: { include: ['src/features/**/*.{ts,mts,cts,tsx}', 'src/modules/**/*.{ts,mts,cts,tsx}'], exclude: ['**/*.d.ts', '**/*.d.mts', '**/*.d.cts'] }
         mechanical:
           requirement: Enforce adopted feature/application/transport placement and filename, class, enum, type and GraphQL surface syntax.
           check: { kind: architecture, ruleIds: [BE_FEATURE_LAYOUT_INVALID, BE_SOURCE_NAME_INVALID] }
         semantic:
           guidance: docs/backend-source-pattern.md
           review: Select direct use case versus bus and domain versus persistence ownership before judging placement.
-        status: missing
+        status: implemented
       - id: NEST-TRANSPORT-ERROR-MAPPING
         sourceRuleIds: [BE-ERROR-4, BE-ERROR-5, BE-ERROR-6]
         applicability: { include: ['src/features/**/transport/**/*.ts', 'src/modules/platform/**/*.ts'] }
@@ -322,15 +322,14 @@ profiles:
         status: missing
       - id: NEST-ENV-CACHE-BOUNDARY
         sourceRuleIds: [BE-IMPORTS-6]
-        applicability: { include: ['src/**/*.ts', 'apps/**/*.ts'], exclude: ['**/*.spec.ts', 'src/tests/**'] }
+        applicability: { include: ['src/**/*.{ts,mts,cts,tsx}', 'apps/**/*.{ts,mts,cts,tsx}', 'libs/**/*.{ts,mts,cts,tsx}'], exclude: ['**/*.d.ts', '**/*.d.mts', '**/*.d.cts', '**/*.spec.{ts,mts,cts,tsx}', '**/*-spec.{ts,mts,cts,tsx}', '**/*.test.{ts,mts,cts,tsx}', '**/*-test.{ts,mts,cts,tsx}', 'src/tests/**'] }
         mechanical:
           requirement: Restrict process.env to the declared parser, raw cache tokens to their owner and default exports to sanctioned Jest entries.
-          check: { kind: eslint, ruleIds: [starci-be/must-use-cache-service, starci-be/no-default-export, no-restricted-syntax] }
+          check: { kind: script, ruleIds: [NEST_ENV_ACCESS, NEST_CACHE_TOKEN_BOUNDARY, NEST_NAMED_EXPORTS] }
         semantic:
           guidance: knowledge/patterns/be/imports.yaml
           review: None; these are code-shape obligations.
-        status: conflict
-        conflict: The first two IDs exist only in the Academy repository's private plugin, not the pinned canon package; no-restricted-syntax options are repository-local.
+        status: implemented
       - id: NEST-IMPORT-FORMAT
         sourceRuleIds: [BE-IMPORTS-2]
         applicability: { include: ['**/*.ts'], exclude: ['**/*.d.ts'] }
