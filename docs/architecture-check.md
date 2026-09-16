@@ -25,6 +25,8 @@ Applications may consume package public exports. Packages must not import applic
 
 Static checking can enforce resolved dependency direction, app business-role filenames/AST shapes, route visual-owner counts, package-to-app and private-export edges, component-to-transport/world dependencies, raw fetch placement, and unresolved internal imports. It must fail closed when the target TypeScript parser/configuration or an internal target cannot be resolved.
 
+For a frontend visual function that actually calls a resolved configured hook/transport or a selected Next routing/locale lifecycle, `FE_WORLD_OWNER_RENDER_BOUNDARY` checks every nonempty return path. Each path must reach a statically resolved render function or component whose own symbol dependency closure is free of that product world. The render owner may be local to the same file, imported through aliases/re-exports, or reached through provider, Suspense, and error-boundary wrappers; it needs no `Base` suffix or mandatory twin file. Empty access/loading guards and distinct pure loading/error views are valid. Intrinsic refs, focus, disclosure, measurement, drag, reduced motion, and ordinary local state do not select the rule. Whether a custom context outside the configured lifecycle roots represents product state remains a semantic review obligation.
+
 Review and meaningful boot/render tests still decide:
 
 - whether a backend module is a cohesive capability or concealed feature orchestration;
