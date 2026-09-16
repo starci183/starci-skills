@@ -1,11 +1,12 @@
 schema: starci/knowledge-source@1
 id: coding-reference
 title: Enforced coding conventions
-purpose: Enforce the adopted responsibility pattern in docs/portable-source-architecture.md and
-  docs/backend-source-pattern.md with the applicable FE/BE topics. Academy source is inspected evidence
-  containing both useful patterns and debt, not an automatically normative file inventory. Concrete framework
-  profiles specialize one ownership model; examples do not require every project to instantiate every
-  mechanism.
+purpose: All StarCi projects use Next.js frontend and NestJS backend with the owner Academy code patterns.
+  Read architecture-rules.json before the concrete patterns. Monorepo and single-source mappings specialize
+  this fixed stack; they do not permit framework substitution. Every applicable mechanical code pattern must
+  be checked by executable scripts with complete rule/file coverage. Design choices and edge cases are
+  reviewed by agents against the Markdown guidance and actual behavior evidence. Reference debt is corrected
+  explicitly, not copied as law.
 appliesTo:
   - backend
   - frontend
@@ -93,13 +94,12 @@ rules:
   - id: REF-VERIFY-1
     title: Lint integrity and uncovered conventions
     kind: mandatory
-    requirement: |
-      Run installed convention lint rules on touched code without disabling them to obtain a
-      pass. Inspect structural rules not covered by lint explicitly against their rule IDs;
-      passing lint is not proof that uncovered conventions hold. Record actual checks and
-      remaining violations in the existing implementation/review result, without adding
-      ceremonial files. Test behavior separately. Expected typed business outcomes remain
-      outcomes; the exception convention applies to thrown failures, not to every refusal result.
+    requirement: Run executable checks for every applicable code-pattern rule and every selected production file.
+      Missing checkers, unavailable tooling, ignored files, disabled required rules or unsupported required
+      syntax block code-pattern conformance; an agent review cannot replace that check. Semantic design
+      patterns and edge cases are agent-reviewed using the applicable Markdown guide and real behavior
+      evidence. Record code coverage, design findings and limitations separately without a new ceremonial
+      checklist.
     rationale: |
       Lint success is integrity of reported results, not full structural or semantic conformance.
     verification:
@@ -123,10 +123,10 @@ rules:
   - id: REF-FE-1
     title: Frontend visual and data ownership
     kind: mandatory
-    requirement: Frontend follows the adopted route/page/feature/module/primitive responsibility graph and its
-      selected design-system profile. StarCi projects use verified installed Grammar exports; the current
-      referenced entry is @starci/grammar/common. Other projects declare their actual design-system public
-      API. Never invent component props or claim compliance without inspecting the installed contract.
+    requirement: Frontend follows the owner Academy composition/code patterns and adopted Next.js responsibility
+      graph using verified installed Grammar exports. The current referenced public entry is
+      @starci/grammar/common. Never invent component APIs or substitute another design-system pattern to
+      bypass a code rule. Check mechanical obligations by scripts and review design/edge cases separately.
     rationale: Explicit responsibility and a verified framework profile prevent both inconsistent architecture and
       needless generated layers.
     relatedExamples:
