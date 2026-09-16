@@ -97,7 +97,7 @@ profiles:
     obligations:
       - id: NEST-DEPENDENCY-DIRECTION
         sourceRuleIds: [BE-ARCHITECTURE-1, BE-FOLDER-1, BE-IMPORTS-4]
-        applicability: { include: ['**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/__tests__/**', 'test/**', 'tests/**'] }
+        applicability: { include: ['**/*.ts'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*-spec.ts', '**/*.test.ts', '**/*-test.ts', '**/__tests__/**', 'test/**', 'tests/**'] }
         mechanical:
           requirement: Resolve aliases, relative imports, literals, re-exports and packages before enforcing app to feature to module direction.
           check:
@@ -110,7 +110,7 @@ profiles:
         status: implemented
       - id: NEST-APP-COMPOSITION
         sourceRuleIds: [BE-ARCHITECTURE-2, BE-FOLDER-1]
-        applicability: { include: ['apps/**/src/**/*.ts', 'src/main.ts', 'src/app.module.ts'], exclude: ['**/*.spec.ts'] }
+        applicability: { include: ['apps/**/src/**/*.ts', 'src/main.ts', 'src/app.module.ts'], exclude: ['**/*.spec.ts', '**/*-spec.ts', '**/*.test.ts', '**/*-test.ts', '**/__tests__/**'] }
         mechanical:
           requirement: Keep app roots to entry, root-module and narrowly named bootstrap/config roles.
           check:
@@ -123,7 +123,7 @@ profiles:
         status: implemented
       - id: NEST-APPLICATION-TRANSPORT-BOUNDARY
         sourceRuleIds: [BE-ARCHITECTURE-4, BE-FOLDER-2, BE-FUNCTION-2, BE-FUNCTION-4, BE-TYPING-7]
-        applicability: { include: ['src/features/**/application/**/*.ts', 'apps/*/src/features/**/application/**/*.ts', 'libs/*/src/features/**/application/**/*.ts'], exclude: ['**/*.spec.ts'] }
+        applicability: { include: ['src/features/**/application/**/*.ts', 'apps/*/src/features/**/application/**/*.ts', 'libs/*/src/features/**/application/**/*.ts'], exclude: ['**/*.spec.ts', '**/*-spec.ts', '**/*.test.ts', '**/*-test.ts', '**/__tests__/**'] }
         mechanical:
           requirement: Application use cases and contracts cannot import transport DTOs or protocol-framework surfaces.
           check:
@@ -269,7 +269,7 @@ profiles:
         status: implemented
       - id: NEST-OWNER-PUBLIC-ENTRY
         sourceRuleIds: [BE-ARCHITECTURE-3, BE-FOLDER-4, BE-IMPORTS-1, BE-IMPORTS-4]
-        applicability: { include: ['src/features/**/*.ts', 'src/modules/**/*.ts', 'apps/*/src/features/**/*.ts', 'apps/*/src/modules/**/*.ts', 'libs/*/src/features/**/*.ts', 'libs/*/src/modules/**/*.ts'], exclude: ['**/*.spec.ts', '**/__tests__/**'] }
+        applicability: { include: ['src/features/**/*.ts', 'src/modules/**/*.ts', 'apps/*/src/features/**/*.ts', 'apps/*/src/modules/**/*.ts', 'libs/*/src/features/**/*.ts', 'libs/*/src/modules/**/*.ts'], exclude: ['**/*.spec.ts', '**/*-spec.ts', '**/*.test.ts', '**/*-test.ts', '**/__tests__/**'] }
         mechanical:
           requirement: Cross-owner imports resolve through an explicit named public entry and public entries do not export-star.
           check:
@@ -521,7 +521,7 @@ profiles:
         status: implemented
       - id: NEXT-DEPENDENCY-DIRECTION
         sourceRuleIds: [FE-ARCHITECTURE-2, FE-ARCHITECTURE-4, FE-FOLDER-1, FE-FOLDER-4, FE-IMPORTS-1, FE-IMPORTS-3, FE-IMPORTS-4]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.ts', '**/*.spec.tsx', '**/__tests__/**', 'test/**', 'tests/**'] }
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.d.ts', '**/*.spec.{ts,tsx}', '**/*-spec.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*-test.{ts,tsx}', '**/__tests__/**', 'test/**', 'tests/**'] }
         mechanical:
           requirement: Resolve real routes, tiers, transports, aliases and package exports before enforcing inward/downward dependencies.
           check:
@@ -654,7 +654,7 @@ profiles:
         status: implemented
       - id: NEXT-OWNER-PUBLIC-ENTRY
         sourceRuleIds: [FE-ARCHITECTURE-4, FE-ARCHITECTURE-5, FE-FOLDER-4, FE-IMPORTS-1, FE-IMPORTS-4, FE-IMPORTS-6, FE-IMPORTS-7]
-        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.spec.ts', '**/*.spec.tsx', '**/__tests__/**'] }
+        applicability: { include: ['**/*.{ts,tsx}'], exclude: ['**/*.spec.{ts,tsx}', '**/*-spec.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*-test.{ts,tsx}', '**/__tests__/**'] }
         mechanical:
           requirement: Cross-owner same-source imports use explicit named public entries and those entries do not export-star.
           check:
@@ -667,7 +667,7 @@ profiles:
         status: implemented
       - id: NEXT-GRAMMAR-CONTRACT
         sourceRuleIds: [FE-FOLDER-5, FE-IMPORTS-1, FE-IMPORTS-5, FE-IMPORTS-7]
-        applicability: { include: ['**/*.{ts,tsx}', 'package.json', 'packages/grammar/package.json'], exclude: ['**/*.spec.ts', '**/*.spec.tsx', '**/__tests__/**'] }
+        applicability: { include: ['**/*.{ts,tsx}', 'package.json', 'packages/grammar/package.json'], exclude: ['**/*.spec.{ts,tsx}', '**/*-spec.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*-test.{ts,tsx}', '**/__tests__/**'] }
         mechanical:
           requirement: Product imports resolve through selected installed Grammar exports and the declared peer/style family matches that package.
           check:
