@@ -129,12 +129,13 @@ test('every lane is a sequence of catalogued kinds, and every declared node shap
       if(step.optionalWhen)assert.ok(Object.hasOwn(predicatesOf({profile}),step.optionalWhen),step.optionalWhen);
     }
   }
-  assert.deepEqual(laneFor({kind:'implementation',layout:'backend'},{profile}),['backend.implement','e2e.verify','review.verify'],'a backend slice is proven through its API before it is read');
+  // The goal-gated proofs sit between the API proof and the independent read, so the review sees their evidence.
+  assert.deepEqual(laneFor({kind:'implementation',layout:'backend'},{profile}),['backend.implement','e2e.verify','security.verify','perf.verify','review.verify'],'a backend slice is proven through its API before it is read');
   // The ui node is the design record: drawn, then the artwork its candidate embeds generated - the files exist
   // before anything imports them, and that step is optional only for a record that declares no artwork slot.
   // The implementation node of the feature builds against that record and walks the result.
   assert.deepEqual(laneFor({kind:'ui',layout:null},{profile}),['interface.draw','interface.asset']);
-  assert.deepEqual(laneFor({kind:'implementation',layout:'frontend'},{profile}),['frontend.implement','uat.verify']);
+  assert.deepEqual(laneFor({kind:'implementation',layout:'frontend'},{profile}),['frontend.implement','uat.verify','security.verify','perf.verify']);
   assert.deepEqual(laneFor({kind:'uat',layout:null},{profile}),['e2e.verify'],'a scenario node outside the frontend is an API scenario');
   assert.deepEqual(laneFor({kind:'uat',layout:'frontend'},{profile}),['uat.verify'],'a frontend scenario node walks the surface');
   assert.deepEqual(laneFor({kind:'e2e',layout:null},{profile}),['e2e.verify'],'an e2e node is proven through the API');
@@ -148,16 +149,16 @@ test('every lane is a sequence of catalogued kinds, and every declared node shap
   assert.equal(laneRecordFor({kind:'brand',layout:null},{profile}).id,'brand');
   assert.equal(nextKind(laneFor({kind:'brand',layout:null},{profile}),['brand.decide'],{profile}),null);
   // A ledger node that names no layout but is delivered in a frontend repository still walks the frontend lane.
-  assert.deepEqual(laneFor({kind:'implementation',layout:null,repositoryRole:'frontend'},{profile}),['frontend.implement','uat.verify']);
+  assert.deepEqual(laneFor({kind:'implementation',layout:null,repositoryRole:'frontend'},{profile}),['frontend.implement','uat.verify','security.verify','perf.verify']);
   // A node that names neither is behind-the-interface work; a kind no lane claims is never given a default.
-  assert.deepEqual(laneFor({kind:'implementation',layout:null},{profile}),['backend.implement','e2e.verify','review.verify']);
+  assert.deepEqual(laneFor({kind:'implementation',layout:null},{profile}),['backend.implement','e2e.verify','security.verify','perf.verify','review.verify']);
   assert.deepEqual(laneFor({kind:'knowledge',layout:null},{profile}),[]);
   assert.equal(laneRecordFor({kind:'knowledge',layout:null},{profile}),null);
   assert.equal(laneRecordFor({kind:'ui',layout:null},{profile}).id,'design/ui');
   assert.equal(laneById('design/ui',{profile}).steps.length,2);
-  assert.equal(laneById('implementation/frontend',{profile}).steps.length,2);
+  assert.equal(laneById('implementation/frontend',{profile}).steps.length,4);
   assert.equal(describeLane(lane('ui'),{profile}),'design/ui: `interface.draw` -> `interface.asset` (optional when `node.hasNoArtworkSlots`)');
-  assert.equal(describeLane(lane('frontend'),{profile}),'implementation/frontend: `frontend.implement` -> `uat.verify`');
+  assert.equal(describeLane(lane('frontend'),{profile}),'implementation/frontend: `frontend.implement` -> `uat.verify` -> `security.verify` (optional when `goal.requiresSecurity`) -> `perf.verify` (optional when `goal.requiresPerf`)');
   assert.equal(describeLane('uat',{profile}),'uat: `e2e.verify`');
 });
 
@@ -168,7 +169,9 @@ test('the interface lanes are mandatory in order: the ui node is drawn then its 
   assert.equal(nextKind(ui,['interface.draw','interface.asset'],{profile}),null);
   assert.equal(nextKind(frontend,[],{profile}),'frontend.implement');
   assert.equal(nextKind(frontend,['frontend.implement'],{profile}),'uat.verify');
-  assert.equal(nextKind(frontend,['frontend.implement','uat.verify'],{profile}),null);
+  assert.equal(nextKind(frontend,['frontend.implement','uat.verify'],{profile}),'security.verify');
+  assert.equal(nextKind(frontend,['frontend.implement','uat.verify','security.verify'],{profile}),'perf.verify');
+  assert.equal(nextKind(frontend,['frontend.implement','uat.verify','security.verify','perf.verify'],{profile}),null);
   // A step cannot be skipped: with the drawing missing the ui lane asks for the drawing again, whatever else ran.
   assert.equal(nextKind(ui,['interface.asset'],{profile}),'interface.draw');
   // Nor may the walk stand in for the build: without the build the frontend lane asks for the build.
@@ -181,13 +184,14 @@ test('the interface lanes are mandatory in order: the ui node is drawn then its 
   assert.equal(nextKind('implementation/frontend',[],{profile}),'frontend.implement');
   assert.equal(nextKind(lane('backend'),[],{profile}),'backend.implement');
   assert.equal(nextKind(lane('backend'),['backend.implement'],{profile}),'e2e.verify');
-  assert.equal(nextKind(lane('backend'),['backend.implement','e2e.verify'],{profile}),'review.verify');
-  assert.equal(nextKind(lane('backend'),['backend.implement','e2e.verify','review.verify'],{profile}),null);
+  assert.equal(nextKind(lane('backend'),['backend.implement','e2e.verify'],{profile}),'security.verify');
+  assert.equal(nextKind(lane('backend'),['backend.implement','e2e.verify','security.verify','perf.verify'],{profile}),'review.verify');
+  assert.equal(nextKind(lane('backend'),['backend.implement','e2e.verify','security.verify','perf.verify','review.verify'],{profile}),null);
 });
 
 test('optionalWhen skips a step only for a named predicate the kernel satisfied',()=>{
   const ui=lane('ui');
-  assert.deepEqual(Object.keys(predicatesOf({profile})),['node.hasInterfaceDesign','node.hasNoArtworkSlots']);
+  assert.deepEqual(Object.keys(predicatesOf({profile})),['node.hasInterfaceDesign','node.hasNoArtworkSlots','goal.requiresSecurity','goal.requiresPerf']);
   assert.equal(nextKind(ui,['interface.draw'],{predicates:{'node.hasNoArtworkSlots':true},profile}),null);
   assert.equal(nextKind(ui,['interface.draw'],{predicates:{'node.hasNoArtworkSlots':()=>true},profile}),null);
   // False, absent or unknown: the default is to run the mandatory step, never to assume it away.
@@ -201,8 +205,16 @@ test('optionalWhen skips a step only for a named predicate the kernel satisfied'
   const frontend=lane('frontend');
   assert.equal(nextKind(frontend,[],{predicates:{'node.hasInterfaceDesign':true,'node.hasNoArtworkSlots':true},profile}),'frontend.implement');
   assert.equal(nextKind(frontend,['frontend.implement'],{predicates:{'node.hasInterfaceDesign':true,'node.hasNoArtworkSlots':true},profile}),'uat.verify');
-  // No step of the backend lane is optional.
-  for(const step of laneById('implementation/backend',{profile}).steps)assert.equal(step.optionalWhen,undefined);
+  // The goal predicates gate the optional proofs: a goal silent on them skips the steps, a goal that declares
+  // them (predicate unsatisfied) runs them, and the mandatory build and walk are never skipped either way.
+  const goal={'goal.requiresSecurity':true,'goal.requiresPerf':true};
+  assert.equal(nextKind(frontend,['frontend.implement','uat.verify'],{predicates:goal,profile}),null);
+  assert.equal(nextKind(frontend,['frontend.implement','uat.verify'],{predicates:{},profile}),'security.verify');
+  assert.equal(nextKind(frontend,['frontend.implement'],{predicates:goal,profile}),'uat.verify');
+  const backend=lane('backend');
+  assert.equal(nextKind(backend,['backend.implement','e2e.verify'],{predicates:goal,profile}),'review.verify');
+  // Only the two goal-gated proofs of each implementation lane are optional; the build and the walk stay mandatory.
+  assert.deepEqual(laneById('implementation/backend',{profile}).steps.filter(step=>step.optionalWhen).map(step=>[step.kind,step.optionalWhen]),[['security.verify','goal.requiresSecurity'],['perf.verify','goal.requiresPerf']]);
 });
 
 test('the artwork kind writes assets and the design record, runs on the image-model role, and a brand gap goes back to the drawing',()=>{
@@ -440,8 +452,8 @@ test('every kind declares what it reads and what it produces, over the one recor
   assert.deepEqual(readsOf('integration.verify',{profile}),['integration','sds','code']);
   assert.deepEqual(writesOf('integration.verify',{profile}),['evidence']);
   assert.deepEqual(readsOf('work.author',{profile}),['srs','sds','decision','code','record']);
-  // Evidence is what a prove kind produces, and the three prove kinds are the only ones that produce it.
-  assert.deepEqual(kindsWriting('evidence',{profile}),['uat.verify','e2e.verify','integration.verify']);
+  // Evidence is what a prove kind produces, and the five prove kinds are the only ones that produce it.
+  assert.deepEqual(kindsWriting('evidence',{profile}),['uat.verify','e2e.verify','integration.verify','security.verify','perf.verify']);
   // Which kinds read the identity is the kernel's DESIGN_KINDS, now answered from the catalog.
   assert.deepEqual(kindsReading('brand',{profile}).sort(),
     ['frontend.implement','grammar.update','interface.asset','interface.draw','uat.verify']);

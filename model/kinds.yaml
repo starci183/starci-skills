@@ -35,6 +35,28 @@ vocabularies:
   # declares nothing. A kind without `needs` runs on every host. Keep this list in step with `CAPABILITIES` of
   # `kernel/graph.mjs` and the host descriptors of `hosts/orca/calls.mjs` / `hosts/headless/host.mjs`.
   capabilities: [design-tool]
+  # What an operation is handed beside its records, declared per kind as `knowledge`, `checks` and `stacks`
+  # ref lists and resolved by the kernel to concrete paths and digests - never a repo dump. `knowledge`
+  # names entries of the `knowledge/` tree by extensionless name or directory glob (`patterns/fe/*`,
+  # `architecture-rules`, `design-patterns`, `code-pattern-enforcement`, `grammars/<name>`, `ui/*`,
+  # `application-stacks`); `checks` names executable check scripts (`scripts/check-scoped-lint.mjs`,
+  # `checks/code-patterns/*.mjs`, `checks/architecture/*.mjs`, `checks/acceptance.mjs`); `stacks` names the
+  # bound repository's `.stacks` compose manifests and the `.claude`-owned layout and schema definitions an
+  # op's artifacts obey - `schemas/work-layout.yaml` for `.starciwork` paths and filenames,
+  # `schemas/source-layout.yaml` for bound-source paths, and the `schemas/*.schema.yaml` shape each
+  # `carries` const validates against. A kind that declares an empty list is handed nothing from that
+  # domain - an explicit none, not a missing field.
+  inputs: [knowledge, checks, stacks]
+  # The schema consts a written `.starciwork`/`.stacks` artifact must carry in its `schema:` field. A kind
+  # names the exact consts of the artifacts it writes as `carries`; an op that writes none of those
+  # artifacts declares `carries: []`. The definitions are `.claude`-owned under `schemas/` and enter the op
+  # as `stacks` inputs - the const is what the output claims, the file is what the op reads to get there.
+  # `model/records.yaml` names the const and the validator of each record class, and the declared layout
+  # covers the whole `.starciwork` tree - the `_local/workflows/<id>/` run state (checks, contracts, inbox,
+  # reports) and the `features/<feature>/` record trees - so a write outside it fails checks. Layout
+  # definitions (`work-layout`, `source-layout`) and kernel transport (`op-report`) are never artifact
+  # consts, so they are absent here.
+  schemas: [work/workspace@1, work/node@2, work/resource@1, work/evidence@1, work/disposable-accounts@1, starci/source-identity@1, starci/design-review@1, starci/evidence-packet@1, starci/goal@1, starci/application-stacks@1, starci/knowledge-rule@1, starci/knowledge-source@1]
   # The blocker kinds a report may carry. `interface-gap` is this graph's addition: a frontend build or a UAT
   # walk that finds the interface design silent is not an SDS gap and must not be routed as one. `brand-gap` is
   # that same distinction one layer earlier: a drawing with no settled identity to draw inside - no colour token,
@@ -45,13 +67,17 @@ vocabularies:
   # is short a word - grown once in the grammar package, never invented beside it in a page.
   # `srs-gap` is the deepest of the record gaps and the one that was missing until 5-plus: the REQUIREMENT the
   # work is derived from does not settle the case, or settles it twice in two ways. It is not an `sds-gap` -
-  # revising the design would invent the product rule the design is supposed to realise - and it is not an
+  # revising the design would invent the product rule it is supposed to realise - and it is not an
   # `authority` block either when ordinary technical ambiguity has one safe reversible reading: the runtime may
   # revise that record towards its most reasonable reading, say why and bump the rev. A reading that changes an
   # observable product policy about money, authority or customer data remains an unresolved owner dependency.
   # The runtime prepares distinct typed outcomes and one recommendation, but cannot infer or provisionally take it.
+  # `test-gap` is the coverage gap a behaviour-invariant change reports: the slice has no regression check to
+  # pin its behaviour against, so restructuring it would be an unverifiable edit. The gap is closed by authoring
+  # the tests first - the work waits for them rather than guessing at safety - which is why the route goes to
+  # `test.author` and not to the user.
   # Keep this list in step with `BLOCKER_KINDS` of `kernel/reports.mjs`.
-  blockers: [shared-change, srs-gap, sds-gap, interface-gap, brand-gap, grammar-gap, environment, authority]
+  blockers: [shared-change, srs-gap, sds-gap, interface-gap, brand-gap, grammar-gap, test-gap, environment, authority]
   # Verdicts the kernel computes about a report (never the reporter's own claim) and routes on.
   verdicts: [pass, findings, rejected, gate-failed]
   # What happens to the operation that produced the report:
@@ -71,6 +97,17 @@ predicates:
     generated for it: the approved candidate embeds no illustration, no brand mascot, no decorative image and no
     chart placeholder that is still missing, so there is no asset left for an asset operation to generate. A
     record that was never drawn has declared nothing, and the step stays.
+  # The `goal.` predicates are read out of the workflow's frozen goal, not out of a node record: the `done`
+  # metrics block is where a requirement is declared, and a metric the goal never declares is a proof the lane
+  # does not run - the step they gate exists only for a goal that asks for it.
+  goal.requiresSecurity: |-
+    The workflow goal's `done` metrics block is where a security requirement is declared. The kernel reads the
+    frozen goal, never a judgement: the step this predicate gates runs only for a goal whose metrics declare
+    the requirement, and a goal silent on security - or a metrics block that names none - skips the proof.
+  goal.requiresPerf: |-
+    The workflow goal's `done` metrics block is where a performance budget or requirement is declared. The
+    step this predicate gates runs only for a goal whose metrics declare it; a goal silent on performance
+    skips the measurement.
 kinds:
   # The runtime never decides for the owner; it prepares the decision. This op writes the owner's decision
   # draft: the question, why it matters, the options with what each means for architecture, user stories,
@@ -90,6 +127,10 @@ kinds:
     # It reads what the question touches and writes the one thing the owner owns: the decision record.
     reads: [srs, sds, decision]
     writes: [decision]
+    knowledge: [design-patterns, architecture-rules]
+    checks: []
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/node@2]
     purpose: Prepare one canonical decision question with distinct typed outcomes, analysis and one recommendation, or answer it from already-decided records. Ordinary reversible technical ambiguity may use a recorded recommendation. Decisive product policy about money, authority or customer data waits for an exact owner answer/receipt and is never inferred from the recommendation.
     reports:
       outcomes: [done, failed]
@@ -102,6 +143,10 @@ kinds:
     # credential into custody with their own command, and this operation only confirms that it is there.
     reads: [srs, sds, integration]
     writes: []
+    knowledge: [application-stacks]
+    checks: []
+    stacks: []
+    carries: []
     purpose: Ask the owner for what only they can give - a credential, an account, a dataset, an authority, the go-ahead for an irreversible effect - exactly named, in its own terminal, and wait; verify presence, never a value.
     reports:
       outcomes: [done, blocked, failed]
@@ -113,6 +158,10 @@ kinds:
     # A requirement is settled from what the owner already decided, never from what the code happens to do.
     reads: [srs, decision]
     writes: [srs, decision]
+    knowledge: []
+    checks: []
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/node@2]
     purpose: Settle what the product must do, in the business record, before anything is designed against it.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -131,6 +180,10 @@ kinds:
     readOnly: false
     reads: [srs, decision]
     writes: [srs]
+    knowledge: []
+    checks: []
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/node@2]
     purpose: Repair a requirement record a builder found silent, confusing or self-contradictory - edit the requirement, rule or journey itself and bump its rev.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -143,6 +196,10 @@ kinds:
     # A design is derived from the requirement it realises and the decisions around it - never from source.
     reads: [srs, sds, decision]
     writes: [sds, decision]
+    knowledge: [architecture-rules, design-patterns, code-pattern-enforcement]
+    checks: []
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/node@2]
     purpose: Settle how the product realises a requirement, as a new design decision in the design record.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -155,6 +212,10 @@ kinds:
     # The repair reads the same three records the decision did; it may not open a new decision for the owner.
     reads: [srs, sds, decision]
     writes: [sds]
+    knowledge: [architecture-rules, design-patterns, code-pattern-enforcement]
+    checks: []
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/node@2]
     purpose: Repair a design record that a builder found silent or wrong - edit the text and bump its rev.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -171,6 +232,10 @@ kinds:
     # grammar that names them; an untraceable value is a question for the owner, never an invented entry.
     reads: [code, grammar]
     writes: [brand, asset]
+    knowledge: [grammars/*, ui/*]
+    checks: []
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/node@2]
     purpose: Settle the product's visual identity - colour tokens, typography, mascot, logo, imagery rules - in the one brand record every drawing and build reads.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -189,6 +254,10 @@ kinds:
     # The representative direction PNGs and their exact prompts live in the ui node's `assets/`, so `asset`
     # belongs here or `IO_DRIFT` refuses the shipped operator catalog.
     writes: [design, asset]
+    knowledge: [grammars/*, patterns/fe/*, ui/*]
+    checks: []
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/node@2]
     purpose: Generate a small representative image-first direction and map every remaining screen/state/component before interface code exists.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -205,6 +274,10 @@ kinds:
     # bound source repository at the path the design record declares, and a bound repository is `code` in the
     # record catalog. The files are asset bytes and they are product source at the same time.
     writes: [asset, design, code]
+    knowledge: [grammars/*, ui/*]
+    checks: []
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml, schemas/source-layout.yaml]
+    carries: [work/node@2]
     purpose: Generate the artwork the approved candidate embeds as real repository assets, at the size and format the design record declares.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -223,6 +296,10 @@ kinds:
     # node's `assets/`. The operation's exact allowlist confines these asset records to that node; design
     # directions and generated artwork remain owned by the separate `ui` lane.
     writes: [code, asset]
+    knowledge: [patterns/fe/*, ui/*, grammars/*, architecture-rules, code-pattern-enforcement]
+    checks: [scripts/check-scoped-lint.mjs, checks/code-patterns/*.mjs, checks/architecture/*.mjs]
+    stacks: [schemas/source-layout.yaml]
+    carries: []
     purpose: Build the interface the drawing settled, against that drawing and nothing invented beside it.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -234,6 +311,10 @@ kinds:
     readOnly: false
     reads: [srs, sds, decision, code]
     writes: [code]
+    knowledge: [patterns/be/*, architecture-rules, code-pattern-enforcement, application-stacks]
+    checks: [scripts/check-scoped-lint.mjs, checks/code-patterns/*.mjs, checks/architecture/*.mjs]
+    stacks: [schemas/source-layout.yaml]
+    carries: []
     purpose: Build one slice of behind-the-interface behaviour under the node's own allowlist.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -245,6 +326,10 @@ kinds:
     readOnly: false
     reads: [sds, code, runtime]
     writes: [runtime, code]
+    knowledge: [application-stacks]
+    checks: []
+    stacks: [.stacks/**, schemas/application-stacks.schema.yaml, schemas/work.schema.yaml, schemas/work-layout.yaml, schemas/source-layout.yaml]
+    carries: [work/resource@1, starci/application-stacks@1]
     purpose: Operate the runtime the product needs - migrations, environment, deployment, infrastructure.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -261,6 +346,10 @@ kinds:
     # unit must render inside; it writes the grammar package and the consumer bump, which is product code.
     reads: [design, grammar, brand]
     writes: [grammar, code]
+    knowledge: [grammars/*, ui/*, code-pattern-enforcement]
+    checks: [checks/code-patterns/*.mjs]
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml, schemas/source-layout.yaml]
+    carries: [work/node@2]
     purpose: "Grow the installed grammar by one semantic unit the product needs and no composition of existing contracts renders: implement it in the grammar package with its stories and tests, publish it, bump the consumer, and record it in the canon."
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -277,6 +366,10 @@ kinds:
     # Deviation from the design table, which names `evidence` alone: the walk authors its scenario and its
     # scripts inside the bound repository, which is `code`.
     writes: [evidence, code]
+    knowledge: [patterns/fe/*, ui/*, grammars/*]
+    checks: [checks/acceptance.mjs]
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml, schemas/source-layout.yaml]
+    carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Walk one end-to-end scenario on the running product and leave the scenario and its evidence.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -291,6 +384,10 @@ kinds:
     # spec per assertion inside the bound repository, which is `code`. What it may never write is product
     # code - that ceiling is the operator's allowlist, not the record catalog.
     writes: [evidence, code]
+    knowledge: [patterns/be/*, application-stacks]
+    checks: [checks/acceptance.mjs]
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml, schemas/source-layout.yaml]
+    carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Prove one delivered slice through its public API on the real stack, never a screen, and leave the scenario spec and its run output.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -306,6 +403,10 @@ kinds:
     readOnly: false
     reads: [integration, sds, code]
     writes: [evidence]
+    knowledge: [application-stacks]
+    checks: [checks/acceptance.mjs]
+    stacks: [.stacks/**, schemas/application-stacks.schema.yaml, schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/evidence@1, starci/evidence-packet@1]
     purpose: Prove one declared external integration against the real provider with the credential the owner supplies, and leave the live run as evidence.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -320,6 +421,10 @@ kinds:
     # `lane-proof-blind`.
     reads: [srs, sds, code, evidence, runtime]
     writes: []
+    knowledge: [patterns/be/*, patterns/fe/*, architecture-rules, design-patterns, code-pattern-enforcement]
+    checks: [scripts/check-scoped-lint.mjs, checks/code-patterns/*.mjs, checks/architecture/*.mjs, checks/acceptance.mjs]
+    stacks: []
+    carries: []
     purpose: Read the delivered slice against its acceptance and report findings, repairing nothing.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -340,6 +445,10 @@ kinds:
     reads: [srs, sds, decision, code, record]
     # An intake or a migration also authors the todo integration node every declared integration owes.
     writes: [record, srs, sds, decision, integration]
+    knowledge: [application-stacks]
+    checks: []
+    stacks: [.stacks/**, schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/node@2, work/disposable-accounts@1]
     purpose: Complete the authored fields of one Work node - its write scope and its checks - so the kernel can launch it; an intake authors a feature's records and reconciles them against the decided ones as three typed cases (reference, conflict, new), editing no record of another feature and reporting no gap against one; a cut splits a node too big for one operation into child nodes with disjoint write scopes, the seam first, and leaves the node a derived parent whose assertions become the group's acceptance.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
@@ -361,10 +470,226 @@ kinds:
     readOnly: false
     reads: [srs, sds, code, record]
     writes: [record]
+    knowledge: [architecture-rules, design-patterns]
+    checks: []
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/node@2]
     purpose: Cut one Work node that is too big for a single operation into child nodes with disjoint write scopes - the seam first, then one observable behaviour per child - and leave the node a derived parent whose assertions are the group's acceptance.
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [sds-gap, authority]
+  # The first link of the chain and the one kind that never runs inside the workflow: the intake is the chat
+  # app's to run, and it hands the kernel a finished scope statement rather than an operation to dispatch.
+  # `external` is the catalog's way of saying that - the kernel reads the entry for the contract, the role and
+  # the records it may cite, and no lane, route or scheduler may name it.
+  request.analyze:
+    external: true
+    family: design
+    role: plan
+    operator: request.analyze
+    readOnly: false
+    # The request and its context arrive from the chat; the existing tree is read so the scope statement never
+    # re-scopes work that is already authored. The selection and the statement are authored content, so the
+    # kind writes `record` even though nothing it produces lands in the tree directly.
+    reads: [record]
+    writes: [record]
+    knowledge: []
+    checks: []
+    stacks: []
+    carries: []
+    purpose: Read one request and its context into a workflow selection and a scope statement - run in the calling chat app, never dispatched in-workflow.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [authority]
+  scope.define:
+    family: design
+    role: decide
+    operator: scope.define
+    readOnly: false
+    # The scope is bounded by the intake statement and by the exclusions the owner already decided.
+    reads: [record, decision]
+    writes: [record]
+    knowledge: [architecture-rules, design-patterns, application-stacks]
+    checks: []
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/node@2]
+    purpose: Bound the request into a scope - the nodes the workflow walks, their dependencies, and the exclusions the owner approved.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [authority]
+  # Restructuring with the behaviour pinned: the same regression check runs before the edit and after it, so a
+  # slice with no coverage to check against is never refactored on a guess - it reports `test-gap` and the
+  # route authors the missing tests first.
+  code.refactor:
+    family: build
+    role: implement
+    operator: code.refactor
+    readOnly: false
+    reads: [sds, code]
+    writes: [code]
+    knowledge: [patterns/be/*, patterns/fe/*, architecture-rules, code-pattern-enforcement]
+    checks: [scripts/check-scoped-lint.mjs, checks/code-patterns/*.mjs, checks/architecture/*.mjs]
+    stacks: [schemas/source-layout.yaml]
+    carries: []
+    purpose: Restructure the selected code with its behaviour invariant - the existing regression check is run before and after the edit, and a slice with no coverage to pin it reports `test-gap` instead of proceeding.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, sds-gap, test-gap, environment, authority]
+  test.author:
+    family: build
+    role: implement
+    operator: test.author
+    readOnly: false
+    # Tests are code records, authored inside the bound repository's test allowlist from the design and the
+    # code they pin. This kind writes them; judging them stays the prove kinds' work.
+    reads: [sds, code]
+    writes: [code]
+    knowledge: [patterns/be/*, patterns/fe/*, code-pattern-enforcement]
+    checks: [scripts/check-scoped-lint.mjs, checks/code-patterns/*.mjs, checks/architecture/*.mjs]
+    stacks: [schemas/source-layout.yaml]
+    carries: []
+    purpose: Author the test files a slice is missing - tests are code records and this kind writes them, never judges them.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, sds-gap, environment, authority]
+  # The two goal-gated proofs. Both sit on the implementation lanes behind `optionalWhen` predicates that read
+  # the goal's metrics block, and both read `asset` as well as `code` for one reason: the frontend lane's build
+  # writes both, and a prove step blind to what its lane's build produced is `lane-proof-blind`.
+  security.verify:
+    family: prove
+    role: verify
+    operator: security.verify
+    readOnly: false
+    reads: [code, asset]
+    writes: [evidence]
+    knowledge: [code-pattern-enforcement]
+    checks: [checks/code-patterns/*.mjs]
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/evidence@1, starci/evidence-packet@1]
+    purpose: Inspect the delivered code, configuration and shipped assets for vulnerabilities and leave the findings as evidence, repairing nothing.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, environment, authority]
+  perf.verify:
+    family: prove
+    role: verify
+    operator: perf.verify
+    readOnly: false
+    reads: [code, asset]
+    writes: [evidence]
+    knowledge: [application-stacks]
+    checks: [checks/acceptance.mjs]
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/evidence@1, starci/evidence-packet@1]
+    purpose: Measure the running product against the performance budget the goal declared and leave the observed numbers as evidence.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, environment, authority]
+  docs.author:
+    family: design
+    role: write
+    operator: docs.author
+    readOnly: false
+    # Documentation is derived from what was decided and built - the records and the code as they are - and is
+    # itself kept as a record, so a doc restates sources rather than inventing them.
+    reads: [record, code]
+    writes: [record]
+    knowledge: [architecture-rules, design-patterns]
+    checks: []
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/node@2]
+    purpose: Author or update the product's documentation from the settled records and the delivered code.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, authority]
+  # The goal is dynamic through this kind alone: it produces goal v(n+1) with an explicit diff and bumps the
+  # rev, and it may never widen scope or authority silently - a change that does waits on the owner's decision.
+  goal.revise:
+    family: design
+    role: decide
+    operator: goal.revise
+    readOnly: false
+    reads: [record]
+    writes: [record]
+    knowledge: []
+    checks: []
+    stacks: [schemas/goal.schema.yaml]
+    carries: [starci/goal@1]
+    purpose: Revise the workflow's own goal - produce the next revision with an explicit diff and a bumped rev, holding authority unchanged unless the owner decides it.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [authority]
+  # The read-only side of the goal contract: it carries the `review.verify` operator contract, the same way
+  # `implementation.plan` carries `work.author`'s - the kernel reads the goal against it, no second operator.
+  goal.validate:
+    family: prove
+    role: verify
+    operator: review.verify
+    readOnly: true
+    reads: [record]
+    writes: []
+    knowledge: []
+    checks: []
+    stacks: [schemas/goal.schema.yaml]
+    carries: []
+    purpose: Read the workflow goal against its contract - a checkable `done` metrics block, stable ids, a frozen rev - and report what it finds, repairing nothing.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [authority]
+  # The three operators the registry already carried, wired into the catalog: like the revise kinds and the
+  # record authors they belong to no lane - nothing schedules them, a request or a report creates them.
+  knowledge.repair:
+    family: repair
+    role: write
+    operator: knowledge.repair
+    readOnly: false
+    # The challenged rule is read where it canonically lives - in the bound repository, and in the grammar
+    # canon when the rule is a language rule - together with the node whose evidence raised the challenge.
+    reads: [record, code, grammar]
+    writes: [code]
+    knowledge: [patterns/be/*, patterns/fe/*, code-pattern-enforcement]
+    checks: [checks/code-patterns/*.mjs]
+    stacks: [schemas/knowledge-source.schema.yaml, schemas/knowledge-rule.schema.yaml, schemas/source-layout.yaml]
+    carries: [starci/knowledge-source@1]
+    purpose: Repair one challenged canonical instruction or rule and the references it affects, from concrete applicability evidence - fixed in its canonical home, never patched around.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, authority]
+  scope.retire:
+    family: build
+    role: implement
+    operator: scope.retire
+    readOnly: false
+    # The retirement reads the nodes and repository it retires, the live consumers it must preserve and the
+    # owner decision that authorises it; it writes the retired scope's own record - removal runs only where
+    # separately authorised, and evidence is preserved rather than rewritten.
+    reads: [record, code, decision]
+    writes: [record]
+    knowledge: []
+    checks: [scripts/check-scoped-lint.mjs]
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml, schemas/source-layout.yaml]
+    carries: [work/node@2]
+    purpose: Retire exactly the selected scope - a scoped metadata decision that preserves live consumers and required evidence, with destructive effects only where separately authorised.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, environment, authority]
+  workspace.manage:
+    family: design
+    role: plan
+    operator: workspace.manage
+    readOnly: false
+    # A workspace is prepared or imported from the request, the existing tree and the owner's accepted
+    # decisions; the repositories it binds are read, never created by guesswork.
+    reads: [record, code, decision]
+    writes: [record]
+    knowledge: [application-stacks]
+    checks: []
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml, schemas/source-layout.yaml]
+    carries: [work/workspace@1, work/node@2, starci/source-identity@1]
+    purpose: Create or reconstruct one canonical workspace from a purpose or a selected existing source - verified bindings, preserved provenance, validated scope.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [environment, authority]
 # The mandatory sequence per ledger node. `match` is the node shape (`kind`, and `role` for the
 # backend/frontend side a node is delivered on, from its layout or its repository); the first lane whose
 # match fits wins, so the list runs from the most specific to the least. A step is mandatory unless it
@@ -387,17 +712,26 @@ lanes:
     purpose: |-
       Interface code is built against the drawing of its feature - the kernel holds the build until that `ui`
       node is done and asks the user when the feature has none - and it is walked end to end before it is believed.
+      The security and performance proofs exist only for a goal that declares them in its `done` metrics.
     steps:
       - kind: frontend.implement
       - kind: uat.verify
+      - kind: security.verify
+        optionalWhen: goal.requiresSecurity
+      - kind: perf.verify
+        optionalWhen: goal.requiresPerf
   - id: implementation/backend
     match:
       - {kind: implementation, role: backend}
       - {kind: implementation}
-    purpose: A node that names no frontend side is behind-the-interface work, built, proven through its API on the real stack, then independently read.
+    purpose: A node that names no frontend side is behind-the-interface work, built, proven through its API on the real stack, security- and performance-proven when the goal declares it, then independently read - the review reads the evidence the optional proofs left.
     steps:
       - kind: backend.implement
       - kind: e2e.verify
+      - kind: security.verify
+        optionalWhen: goal.requiresSecurity
+      - kind: perf.verify
+        optionalWhen: goal.requiresPerf
       - kind: review.verify
   - id: uat/frontend
     match:
@@ -472,6 +806,13 @@ routes:
     limit: 3
     then: reopen
     purpose: A red API scenario is a defect in the slice it exercised, not in the scenario.
+  - id: perf-red-repairs-the-build
+    on: {outcome: failed}
+    from: perf.verify
+    to: {kind: lane.build, origin: repair}
+    limit: 3
+    then: reopen
+    purpose: A product that misses the performance budget its goal declared is a defect in the build it measured, not in the measurement.
   - id: review-findings-repair-the-build
     on: {verdict: findings}
     from: review.verify
@@ -540,6 +881,16 @@ routes:
       A shape the grammar cannot render is grown into the grammar once, as a semantic unit, never invented
       beside it in a page. The operation that found the word missing waits for the published version and reads
       the canon again; past two rounds for one node the workflow asks the user.
+  - id: test-gap-authors-the-tests
+    on: {blocker: test-gap}
+    from: any
+    to: {kind: test.author, origin: gate}
+    limit: 2
+    then: reopen
+    purpose: |-
+      A behaviour-invariant change with no regression coverage to pin it waits for the tests to be authored,
+      then runs them before and after its edit. The coverage is authored - never assumed, and never the
+      user's to supply; past two rounds for one node the workflow asks the user.
   - id: shared-change-from-an-api-proof-is-a-backend-build
     on: {blocker: shared-change}
     from: e2e.verify
