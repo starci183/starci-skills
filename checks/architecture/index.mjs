@@ -3,6 +3,7 @@ import path from 'node:path';
 import { loadArchitectureConfig } from './config.mjs';
 import { buildTypeScriptContext, relativePath } from './typescript.mjs';
 import { checkBackend } from './backend.mjs';
+import { checkBackendContracts, PUBLIC_CONTRACT_RULE_ID, READONLY_BOUNDARY_RULE_ID } from './contracts.mjs';
 import { checkFrontend } from './frontend.mjs';
 import { checkOwners } from './owners.mjs';
 import { checkModuleRegistration, REGISTRATION_RULE_IDS } from './registration.mjs';
@@ -13,6 +14,7 @@ const LIMITATIONS = [
   'Dependencies hidden behind constructed aliases, reflection, or calls other than direct import()/require() syntax require separate review.',
   'Protocol surfaces selected through reflection, nonliteral computed properties, or aliases constructed beyond static import/re-export bindings require separate review.',
   'Backend source-shape rules classify only resolved roots, declarations, framework symbols, and static decorator arguments; cohesive capability, error, persistence, and migration ownership still require design and runtime evidence.',
+  'Backend contract rules prove selected declaration and readonly field forms only; they do not prove runtime validation, serialization compatibility, provider scope, token identity, or dependency behavior.',
 ];
 
 const COMMON_RULE_IDS = [
@@ -84,6 +86,7 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
   const violations = [];
   let moduleRegistration = { status: 'not-applicable' };
   let backendSourceShape = { status: 'not-applicable' };
+  let backendContractTypeForm = { publicContracts: { status: 'not-applicable' }, readonlyBoundaries: { status: 'not-applicable' } };
   if (context.program) violations.push(...checkOwners(config, context));
   if (context.program && config.kinds.includes('backend')) {
     violations.push(...checkBackend(config, context));
@@ -93,6 +96,9 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
     const sourceShape = checkBackendSourceShape(config, context);
     violations.push(...sourceShape.violations);
     backendSourceShape = sourceShape.coverage;
+    const contracts = checkBackendContracts(config, context);
+    violations.push(...contracts.violations);
+    backendContractTypeForm = contracts.coverage;
   }
   if (context.program && config.kinds.includes('frontend')) violations.push(...checkFrontend(config, context));
   const errors = stable(context.errors);
@@ -101,6 +107,7 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
   const missingOwnerEntries = config.owners?.filter(owner => !sourceFiles.has(canonical(path.resolve(config.root, ...owner.entry.split('/'))))) ?? [];
   const coverage = {
     sourceFiles: context.files.map(file => relativePath(config.root, canonical(file.fileName))).sort(),
+    backendContractTypeForm,
     backendSourceShape,
     moduleRegistration,
     ownerPublicApi: config.owners === null
@@ -124,6 +131,8 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
     ...(coverage.moduleRegistration.status === 'checked' ? REGISTRATION_RULE_IDS : []),
     ...(coverage.backendSourceShape.layout?.status === 'checked' ? [SOURCE_LAYOUT_RULE_ID] : []),
     ...(coverage.backendSourceShape.naming?.status === 'checked' ? [SOURCE_NAME_RULE_ID] : []),
+    ...(coverage.backendContractTypeForm.publicContracts?.status === 'checked' ? [PUBLIC_CONTRACT_RULE_ID] : []),
+    ...(coverage.backendContractTypeForm.readonlyBoundaries?.status === 'checked' ? [READONLY_BOUNDARY_RULE_ID] : []),
   ])].sort();
   return {
     schema: 'starci/architecture-check@1',
