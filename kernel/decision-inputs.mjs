@@ -110,13 +110,16 @@ export function reconcileCanonicalDecisionInputs(store,state,ctx){
     const legacy=withdrawLegacyTopicSelection(store,state,ask,ctx),withdrawn=legacy.outcome==='withdrawn';if(withdrawn)changed.add(ask.id);
     if(ask.answer||ask.ownerAnswer)continue;
     const marker=(state.needUser??[]).find(item=>item.op===ask.id&&item.kind==='decision'&&clean(item.record));if(!marker)continue;
-    const resolved=canonicalDecisionInput(state,ask,ctx),before=ask.decisionOptionsDigest??null;
+    const resolved=canonicalDecisionInput(state,ask,ctx),before=ask.decisionOptionsDigest??null,recovering=Boolean(ask.decisionInputError);
     if(!resolved.ok){const priorError=ask.decisionInputError?.code;ask.ownerRequestStatus='preparing';ask.decisionInputError={code:resolved.code,reason:resolved.reason};ask.question={...(ask.question??{}),record:clean(marker.record),
       ...(clean(resolved.question)?{text:resolved.question,subject:resolved.question}:{}),options:[]};delete ask.question.presentation;marker.options=[];
       if(before!==null){ask.ownerRequestRevision=Number(ask.ownerRequestRevision??0)+1;delete ask.decisionOptionsDigest;}
       if(priorError!==resolved.code)store.appendEvent({event:'canonical-decision-input-unavailable',ask:ask.id,record:clean(marker.record),code:resolved.code});continue;}
     ask.question={...(ask.question??{}),record:resolved.recordId,text:resolved.question,subject:resolved.question,options:resolved.options};marker.options=resolved.options.map(option=>option.label);
     if(before!==resolved.digest)delete ask.question.presentation;
+    // A failed rendering of an invalid empty choice set must not delay the corrected canonical question. The
+    // failure belonged to the stale input; once concrete options validate, presentation may use restored capacity.
+    if(recovering||before!==resolved.digest)delete ask.question.presentationFailedAt;
     if(withdrawn)ask.status='done';
     ask.ownerRequestStatus='waiting-owner';delete ask.decisionInputError;ask.decisionOptionsDigest=resolved.digest;
     if(before!==resolved.digest){ask.ownerRequestRevision=Number(ask.ownerRequestRevision??0)+1;changed.add(ask.id);store.appendEvent({event:'canonical-decision-input-reconciled',ask:ask.id,record:resolved.recordId,options:resolved.options.length,digest:resolved.digest});}

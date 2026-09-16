@@ -4,11 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
+import {sha256} from '../core/index.mjs';
 import {buildReport} from '../kernel/reports.mjs';
 import {markDone,markInProgress,readNode} from '../kernel/ledger.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {inputAsk} from './helpers/input-fixture.mjs';
-import {PRESENTATION_RETRY_MS,sweepSettledCandidates,decisionRecordOptions,releaseSettledOperationLeases,handleBlocked,publishAuthoredDecisions,presentOwnerQuestions,applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget} from '../kernel/kernel.mjs';
+import {PRESENTATION_RETRY_MS,sweepSettledCandidates,decisionRecordOptions,releaseSettledOperationLeases,handleBlocked,publishAuthoredDecisions,presentOwnerQuestions,applyOpReport,completionOutlook,languageBlock,renderContract,retryJournalTarget,sealedCandidateOwnedBaseline} from '../kernel/kernel.mjs';
 import {deriveOwnerRequests} from '../kernel/owner-requests.mjs';
 import {authoredDecisionOf} from '../kernel/owner.mjs';
 import {loadConfig} from '../scripts/config.mjs';
@@ -116,6 +117,24 @@ test('the validator is handed the declaration of the kind it judges',()=>{
 
 /* ------------------------------------------------------------------ a record the kind never declared */
 
+test('only exact unchanged bytes from a sealed candidate carry into the next attempt',t=>{
+  const repo=tmp();t.after(()=>fs.rmSync(repo,{recursive:true,force:true}));const relative='.starciwork/features/login/decision.yaml',absolute=path.join(repo,...relative.split('/'));
+  fs.mkdirSync(path.dirname(absolute),{recursive:true});fs.writeFileSync(absolute,'decision: platform-ledger\n');
+  const digest='89883f78e9fabf0ceb07abbfb300d948c3c2af59aaca2468f5feb1b3aa4a4c21';
+  const identity={workflowId:'wf',opId:'ask-3',attempt:9,generation:28,jobId:'operation-9'},op={id:'ask-3',candidate:{status:'sealed',identity}};
+  const packet={schema:'starci/candidate-root-packet@1',...identity,reportDiagnostics:{unmatched:[]},roots:[
+    {id:'source',repoRoot:repo,status:'sealed',workerWritable:true,runtimeWritable:false,changes:[{path:relative,beforeSha256:null,afterSha256:digest}],observedFiles:[
+      {rootId:'source',path:relative,displayPath:relative}]},
+    {id:'store',status:'sealed',workerWritable:false,runtimeWritable:true,observedFiles:[
+      {rootId:'store',path:'workflows/wf.md',displayPath:'workflows/wf.md'}]}
+  ]};
+  assert.deepEqual(sealedCandidateOwnedBaseline(op,{candidatePacket:()=>packet}),[relative]);
+  assert.deepEqual(sealedCandidateOwnedBaseline(op,{candidatePacket:()=>({...packet,attempt:8})}),[],'a different attempt owns no baseline');
+  assert.deepEqual(sealedCandidateOwnedBaseline(op,{candidatePacket:()=>({...packet,reportDiagnostics:{unmatched:['foreign.yaml']}})}),[],'unmatched report paths fail closed');
+  assert.deepEqual(sealedCandidateOwnedBaseline({...op,candidate:{...op.candidate,status:'quarantine'}},{candidatePacket:()=>packet}),[],'an unsealed candidate proves nothing');
+  fs.writeFileSync(absolute,'decision: externally-changed\n');assert.deepEqual(sealedCandidateOwnedBaseline(op,{candidatePacket:()=>packet}),[],'bytes changed after sealing remain user work');
+});
+
 test('a changed file whose record kind the op does not declare downgrades the report, with no model asked',()=>{
   const dir=tmp();
   try{
@@ -125,7 +144,14 @@ test('a changed file whose record kind the op does not declare downgrades the re
     op.status='running';op.dispatch='ctx_1';op.runtime='qwen3.8-flash';
     const state=stubState(store,[op]);
     const files=['src/sales/intake.ts','.starciwork/features/sales/business/rule/index.yaml'];
-    const ctx=baseCtx(dir,{git:fakeGit(files),
+    for(const [index,file] of files.entries()){const absolute=path.join(dir,...file.split('/'));fs.mkdirSync(path.dirname(absolute),{recursive:true});fs.writeFileSync(absolute,`owned-${index}\n`);}
+    const identity={workflowId:state.id,opId:op.id,attempt:op.attempt,generation:1,jobId:'operation-owned'};op.candidate={status:'running',identity};
+    const changes=files.map(file=>({path:file,beforeSha256:null,afterSha256:sha256(fs.readFileSync(path.join(dir,...file.split('/'))))}));
+    const packet={schema:'starci/candidate-root-packet@1',...identity,reportDiagnostics:{unmatched:[]},roots:[{id:'source',repoRoot:dir,status:'sealed',workerWritable:true,runtimeWritable:false,
+      changes,observedFiles:files.map(file=>({rootId:'source',path:file,displayPath:file}))}]};
+    const engine={freezeCandidate(candidate){candidate.candidate={...candidate.candidate,status:'sealed',observedFiles:files};return {status:'sealed',observedFiles:files};},
+      candidateView:()=>({source:{workerRoot:dir},roots:[]}),candidatePacket:()=>packet,incident:()=>({exhausted:false,progress:true})};
+    const ctx=baseCtx(dir,{git:fakeGit(files),engine,
       // The profile of 5-plus: this kind writes `code` and nothing else.
       kindsProfile:{kinds:{'backend.implement':{family:'build',role:'implement',reads:['srs','code'],writes:['code']}}}});
     const action=applyOpReport(null,store,state,op,doneReport({files}),ctx);
@@ -135,6 +161,8 @@ test('a changed file whose record kind the op does not declare downgrades the re
     const event=store.events.find(item=>item.event==='io-undeclared-write');
     assert.deepEqual(event.files,['.starciwork/features/sales/business/rule/index.yaml']);
     assert.equal(event.op,'build-1');
+    assert.deepEqual(op.ownedBaselinePaths,files,'the next automatic attempt inherits only the sealed candidate bytes');
+    assert.deepEqual(store.events.find(item=>item.event==='sealed-candidate-baseline-carried').paths,files);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
@@ -931,6 +959,21 @@ test('every open question is presented in the configured language once, again wh
     fs.writeFileSync(path.join(english,'config.json'),JSON.stringify({...loadConfig(),language:'en'}));
     assert.equal(presentOwnerQuestions(store,{...state,host:english,ops:[third]},{engine:waiting,now:()=>now}),null,'a page already in the record language is never presented');
     fs.rmSync(english,{recursive:true,force:true});
+  }finally{fs.rmSync(host,{recursive:true,force:true});}
+});
+
+test('a malformed canonical decision stays in preparation without presenting empty choices',()=>{
+  const host=fs.mkdtempSync(path.join(os.tmpdir(),'starci-invalid-decision-presentation-'));
+  fs.writeFileSync(path.join(host,'config.json'),JSON.stringify({...loadConfig(),language:'vi'}));
+  try{
+    let calls=0;const events=[],store={appendEvent:event=>events.push(event),saveState(){}};
+    const ask={id:'ask-1',kind:'decision.prepare',status:'ready',attempt:4,ownerRequestStatus:'preparing',
+      decisionInputError:{code:'decision-options-invalid',reason:'options must contain at least two distinct concrete policy alternatives'},
+      question:{kind:'decision',text:'Which registration policy applies?',options:[],prepared:true}};
+    const state={id:'wf',host,engine:{schema:'starci/engine@1',generation:2},needUser:[],ops:[ask]};
+    const result=presentOwnerQuestions(store,state,{engine:{model(){calls++;return {ok:true,value:{text:'Không hợp lệ',options:[]}};}}});
+    assert.equal(result,null);assert.equal(calls,0);assert.equal(ask.question.presentationFailedAt,undefined);assert.deepEqual(events,[]);
+    assert.equal(ask.status,'ready');assert.equal(ask.ownerRequestStatus,'preparing','the decision remains eligible for its repair attempt');
   }finally{fs.rmSync(host,{recursive:true,force:true});}
 });
 

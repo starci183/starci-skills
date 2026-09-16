@@ -86,14 +86,23 @@ test('mismatched raw identity and malformed mixed options fail closed',()=>{
 
 test('repairing the draft restores actionable choices without touching settled owner receipts',()=>{
   const {state,raw,ctx,store}=fixture();const actual=raw.extensions.work3.srs.options;delete raw.extensions.work3.srs.options;
-  reconcileCanonicalDecisionInputs(store,state,ctx);const unavailable=deriveOwnerRequests(state)[0];
+  reconcileCanonicalDecisionInputs(store,state,ctx);const unavailable=deriveOwnerRequests(state)[0];state.ops[0].question.presentationFailedAt=123;
   raw.extensions.work3.srs.options=actual;
   reconcileCanonicalDecisionInputs(store,state,ctx);const current=deriveOwnerRequests(state)[0];
   assert.equal(current.status,'waiting-owner');assert.equal(current.subject,raw.extensions.work3.srs.question);
+  assert.equal(state.ops[0].question.presentationFailedAt,undefined,'a stale empty-choice presentation failure does not cool down the repaired question');
   assert.equal(current.options.length,3);assert.notEqual(current.id,unavailable.id);
   assert.equal(applyOwnerAction(state,{type:'choose',workflowId:'wf',requestId:current.id,generation:6,revision:current.revision,optionsDigest:current.optionsDigest,actor,value:'1'}).ok,true);
   const frozen=structuredClone(state.ops[0]);delete raw.extensions.work3.srs.options;
   reconcileCanonicalDecisionInputs(store,state,ctx);assert.deepEqual(state.ops[0],frozen);
+});
+
+test('an unchanged valid canonical decision retains a legitimate presenter cooldown',()=>{
+  const {state,ctx,store}=fixture();reconcileCanonicalDecisionInputs(store,state,ctx);
+  const ask=state.ops[0];ask.question.presentationFailedAt=456;
+  const before=ask.decisionOptionsDigest;
+  assert.deepEqual(reconcileCanonicalDecisionInputs(store,state,ctx),[]);
+  assert.equal(ask.decisionOptionsDigest,before);assert.equal(ask.question.presentationFailedAt,456);
 });
 
 test('canonical question changes clear stale translated options and single-option drafts remain unready',()=>{

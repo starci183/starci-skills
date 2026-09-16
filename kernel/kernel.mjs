@@ -213,6 +213,10 @@ export function presentOwnerQuestions(store,state,ctx){
   for(const op of state.ops){
     if(!isAsk(op.kind)||!plain(op.question)||!String(op.question.text??'').trim())continue;
     if(['done','cancelled'].includes(op.status)||op.refusal==='superseded'||op.ownerAnswer)continue;
+    // Canonical reconciliation marks a malformed decision draft for another decision.prepare attempt. Its
+    // question text is useful repair context, but its empty choices are not an owner question yet. Presenting it
+    // would spend a bounded presenter attempt on an input the kernel already knows cannot accept an answer.
+    if(op.decisionInputError)continue;
     const labels=labelsOf(op),current=plain(op.question.presentation)?op.question.presentation:null;
     const stale=!current||String(current.language??'').toLowerCase()!==code
       ||(current.by==='kernel'&&labels.length!==(Array.isArray(current.options)?current.options:[]).length);
@@ -1328,6 +1332,22 @@ function growGrammar(store,state,op,report,blocker,ctx=null){
 
 const retryLimitFor=reason=>reason==='validator-reject'?validatorRejectLimit():RETRY_LIMIT;
 
+export function sealedCandidateOwnedBaseline(op,engine){
+  if(!engine||op?.candidate?.status!=='sealed')return [];
+  let packet;try{packet=engine.candidatePacket(op);}catch{return [];}
+  const identity=op.candidate?.identity??{},exact=['workflowId','opId','attempt','generation','jobId'].every(field=>packet?.[field]===identity[field]);
+  if(!exact||packet?.reportDiagnostics?.unmatched?.length)return [];
+  const source=(packet.roots??[]).find(root=>root.id==='source'&&root.status==='sealed'&&root.workerWritable===true&&root.runtimeWritable!==true);
+  if(!source)return [];
+  const sealedBytes=new Map((source.changes??[]).map(change=>[change.path,change.afterSha256??null]));
+  return unique((source.observedFiles??[]).filter(file=>{
+    if(file?.rootId!=='source'||file.path!==file.displayPath||!sealedBytes.has(file.path))return false;
+    const absolute=path.join(source.repoRoot,...file.path.split('/'));let current=null;
+    try{const stat=fs.lstatSync(absolute);if(!stat.isFile())return false;current=crypto.createHash('sha256').update(fs.readFileSync(absolute)).digest('hex');}catch(error){if(error?.code!=='ENOENT')return false;}
+    return current===sealedBytes.get(file.path);
+  }).map(file=>file.path));
+}
+
 function retryOp(store,state,op,findings,ctx,reason){
   op.repairs+=1;
   if(op.repairs>retryLimitFor(reason)){
@@ -1367,6 +1387,8 @@ function retryOp(store,state,op,findings,ctx,reason){
     }
   }
   if(ctx?.orca)closeOpTerminal(ctx.orca,store,state,op);
+  const carried=sealedCandidateOwnedBaseline(op,ctx?.engine);
+  if(carried.length){op.ownedBaselinePaths=unique([...(op.ownedBaselinePaths??[]),...carried]);store.appendEvent({event:'sealed-candidate-baseline-carried',op:op.id,attempt:op.attempt,paths:carried,reason});}
   op.status='ready';if(op.attemptAdvanced)delete op.attemptAdvanced;else op.attempt+=1;op.findings=findings;op.priorOpen=[];op.dispatch=null;op.terminal=null;op.nudged=false;
   store.appendEvent({event:'retry',op:op.id,attempt:op.attempt,reason,findings:findings.slice(0,3)});
   return 'retry';
