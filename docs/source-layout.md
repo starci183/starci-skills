@@ -2,6 +2,18 @@
 
 StarCi binds one explicit host to a selected project's backend and frontend repositories. The host owns the `.claude/SKILL.md` runtime identity, `.workspaces` project/route registry and bootstrap files. The selected backend owns the project's only `.starciwork`; the frontend consumes the same feature contracts and does not copy them. A host may also be the selected backend only when the binding explicitly resolves both roles to that same real directory.
 
+Backend and frontend may explicitly resolve to the **same combined repository**. That repository has
+one `.starciwork` owned through its backend role; frontend source packages consume it. The host can
+be external or that same explicitly bound owner repository. No additional runtime, Work tree or
+Git repository is created inside an app/package. Separate FE/BE repositories keep their existing
+bindings. This does not infer a backend owner for a frontend-only project.
+
+The trees below are examples, not a package-manager prescription. `pnpm-workspace.yaml` is optional;
+npm workspaces use `package.json`, and a single app needs neither workspace form. Source can live in
+`src`, `apps`, `packages`, or another declared supported source root; a monorepo need not invent a root
+`src` or `tsconfig.json`. The architecture checker validates actual per-project TypeScript configs
+and source coverage separately.
+
 ```text
 starci-host/
 ├── .git/
@@ -50,7 +62,14 @@ selected-frontend/
 
 `AGENTS.md` and `CLAUDE.md` in the host must route to `.claude/SKILL.md`. Retired runtime names such as `.claude-v3`, `.claude_legacy`, `.claude-vip` and `.claude-starci-ultimate` are forbidden. A routed source duplicates host identity only when it carries a `.claude/SKILL.md` runtime marker or a `.workspaces/projects` / `.workspaces/local/routes` registry marker. Routed backends also forbid legacy Work roots such as `.work`, `.starci` and `.starcitemp`.
 
-The frontend forbids `.starciwork` and every retired runtime or Work name, and it rejects the same runtime/registry identity markers. A repository-local `.claude` or `.workspaces` directory that contains other project metadata is not a second runtime or registry merely by name. Likewise, `.stacks` may be legitimate deployment/project knowledge in the backend, frontend or host; the topology gate does not move, delete or assign runtime authority to it. This leaves one runtime identity and one backend-owned product workspace while preserving separately owned project metadata.
+In a separate frontend repository, `.starciwork` and every retired runtime or Work name are forbidden,
+and the same runtime/registry identity markers are rejected. In an explicitly combined repository,
+the one backend-owned `.starciwork` and explicitly bound host identity are shared, not duplicates.
+A repository-local `.claude` or `.workspaces` directory containing other project metadata is not a
+second runtime or registry merely by name. Likewise, `.stacks` may be legitimate deployment/project
+knowledge in the backend, frontend or host; the topology gate does not move, delete or assign runtime
+authority to it. This leaves one runtime identity and one product workspace while preserving separately
+owned project metadata.
 
 For application deployment work, load `knowledge/application-stacks.json` and
 `docs/application-stacks.md`. One application manifest accounts for its backend,

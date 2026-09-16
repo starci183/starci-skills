@@ -44,3 +44,29 @@ test('CLI resolves the host outside .claude even when executed through compiled 
 });
 
 function makeIdentity(root){const skill=path.join(root,'.claude','SKILL.md'),projects=path.join(root,'.workspaces','projects');fs.mkdirSync(path.dirname(skill),{recursive:true});fs.writeFileSync(skill,'Duplicate synthetic runtime.');fs.mkdirSync(projects,{recursive:true});}
+
+test('an explicitly combined FE/BE repository shares one Work owner with an external host',t=>{
+ const f=fixture(t);const result=validateSourceLayout({...f,fe:f.be},contract);
+ assert.equal(result.ok,true,JSON.stringify(result.errors));assert.equal(result.roots.be,result.roots.fe);
+ assert.equal(result.workRoot,path.join(f.be,'.starciwork'));
+ makeIdentity(f.be);const duplicate=validateSourceLayout({...f,fe:f.be},contract);
+ assert.equal(duplicate.ok,false);assert.ok(duplicate.errors.some(error=>error.code==='DUPLICATE_IDENTITY'));
+});
+test('one explicit host/BE/FE repository does not need a duplicate bootstrap or Work',t=>{
+ const f=fixture(t,{hostIsBackend:true});const result=validateSourceLayout({...f,fe:f.be},contract);
+ assert.equal(result.ok,true,JSON.stringify(result.errors));
+ assert.equal(validateSourceLayout({...f,fe:f.be,workRoot:path.join(f.be,'apps','.starciwork')},contract).ok,false);
+});
+test('single apps and npm monorepos do not need pnpm manifests or synthetic root source/config',t=>{
+ const f=fixture(t);
+ for(const repo of [f.be,f.fe])fs.unlinkSync(path.join(repo,'pnpm-workspace.yaml'));
+ assert.equal(validateSourceLayout(f,contract).ok,true);
+ fs.rmdirSync(path.join(f.be,'src'));fs.unlinkSync(path.join(f.be,'tsconfig.json'));
+ fs.mkdirSync(path.join(f.be,'apps'));fs.mkdirSync(path.join(f.be,'packages'));
+ fs.writeFileSync(path.join(f.be,'package.json'),JSON.stringify({workspaces:['apps/*','packages/*']}));
+ assert.equal(validateSourceLayout({...f,fe:f.be},contract).ok,true);
+});
+test('a separate frontend-only binding still cannot impersonate the host',t=>{
+ const f=fixture(t);const result=validateSourceLayout({...f,fe:f.host},contract);
+ assert.equal(result.ok,false);assert.ok(result.errors.some(error=>error.code==='HOST_FRONTEND'));
+});

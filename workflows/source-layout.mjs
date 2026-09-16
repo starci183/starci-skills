@@ -4,6 +4,7 @@ import {readDistJson} from '../core/runtime-root.mjs';
 
 const object=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const text=value=>typeof value==='string'&&value.trim().length>0;
+const sameRoot=(left,right)=>Boolean(left&&right)&&(process.platform==='win32'?left.toLowerCase()===right.toLowerCase():left===right);
 const inside=(root,target)=>{const relative=path.relative(root,target);return relative===''||(!relative.startsWith(`..${path.sep}`)&&relative!=='..'&&!path.isAbsolute(relative));};
 
 function realDirectory(value,role,errors){
@@ -39,18 +40,18 @@ function checkEntry(root,role,entry,errors){
 export function validateSourceLayout({host,be,fe,workRoot}={},contract=readDistJson('schemas','source-layout.json')){
  validateContract(contract);
  const errors=[],roots={host:realDirectory(host,'host',errors),be:realDirectory(be,'be',errors),fe:realDirectory(fe,'fe',errors)};
- if(roots.be&&roots.fe&&roots.be.toLowerCase()===roots.fe.toLowerCase())errors.push({role:'pair',code:'SAME_ROOT',path:roots.be,message:'Backend and frontend must be distinct repositories.'});
- if(roots.host&&roots.fe&&roots.host.toLowerCase()===roots.fe.toLowerCase())errors.push({role:'pair',code:'HOST_FRONTEND',path:roots.host,message:'Frontend cannot be the StarCi host.'});
+ const sharedRepository=sameRoot(roots.be,roots.fe);
+ if(sameRoot(roots.host,roots.fe)&&!sharedRepository)errors.push({role:'pair',code:'HOST_FRONTEND',path:roots.host,message:'A frontend-only source cannot be the StarCi host; a combined repository must explicitly bind the backend owner role too.'});
  for(const role of ['host','be','fe']){
   const root=roots[role],spec=contract.roles[role];if(!root)continue;
   for(const entry of spec.required)checkEntry(root,role,entry,errors);
   for(const group of spec.requiredAny){const present=group.paths.filter(relative=>{const target=path.resolve(root,relative);return inside(root,target)&&fs.existsSync(target)&&!fs.lstatSync(target).isSymbolicLink();});if(present.length<group.minimum)errors.push({role,code:'MISSING_ANY',path:group.paths.join('|'),message:`At least ${group.minimum} source root is required for ${group.id}.`});}
-  for(const relative of spec.forbidden){const target=path.resolve(root,relative);if(inside(root,target)&&fs.existsSync(target))errors.push({role,code:'FORBIDDEN',path:relative,message:'Duplicate or retired project/runtime storage must be removed or migrated.'});}
-  const sharesHost=role==='be'&&roots.host&&roots.host.toLowerCase()===root.toLowerCase();
+  for(const relative of spec.forbidden){if(role==='fe'&&sharedRepository&&relative==='.starciwork')continue;const target=path.resolve(root,relative);if(inside(root,target)&&fs.existsSync(target))errors.push({role,code:'FORBIDDEN',path:relative,message:'Duplicate or retired project/runtime storage must be removed or migrated.'});}
+  const sharesHost=(role==='be'||role==='fe'&&sharedRepository)&&sameRoot(roots.host,root);
   if(!sharesHost)for(const identity of spec.forbiddenIdentities){const present=identity.paths.filter(relative=>{const target=path.resolve(root,relative);return inside(root,target)&&fs.existsSync(target);});if(present.length>=identity.minimum)errors.push({role,code:'DUPLICATE_IDENTITY',path:present.join('|'),message:`Routed source contains the ${identity.id} identity owned by the explicit host.`});}
   for(const rule of spec.content){const target=path.resolve(root,rule.path);if(inside(root,target)&&fs.existsSync(target)&&fs.lstatSync(target).isFile()&&!fs.readFileSync(target,'utf8').includes(rule.includes))errors.push({role,code:'CONTENT',path:rule.path,message:`File must route to ${rule.includes}.`});}
  }
- if(roots.be){const expected=path.join(roots.be,'.starciwork'),actual=text(workRoot)?path.resolve(workRoot):expected;if(!inside(roots.be,actual)||actual.toLowerCase()!==expected.toLowerCase())errors.push({role:'pair',code:'WORK_OWNER',path:actual,message:'Canonical Work root must be exactly <backend>/.starciwork.'});}
+ if(roots.be){const expected=path.join(roots.be,'.starciwork'),actual=text(workRoot)?path.resolve(workRoot):expected;if(!inside(roots.be,actual)||!sameRoot(actual,expected))errors.push({role:'pair',code:'WORK_OWNER',path:actual,message:'Canonical Work root must be exactly <backend>/.starciwork.'});}
  return {schema:'starci/source-layout-result@1',ok:errors.length===0,roots,workRoot:roots.be?path.join(roots.be,'.starciwork'):null,errors,limitations:['Filesystem shape and bootstrap routing only; this does not prove source behavior, builds, tests or deployment.']};
 }
 
