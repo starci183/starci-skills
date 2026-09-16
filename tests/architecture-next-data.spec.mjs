@@ -93,6 +93,20 @@ function check(root) {
   return checkFrontendDataLifecycle(config, context);
 }
 
+const lifecycleHeader = `import {cache,mutateCache} from '../../shared/cache';
+const QUERY_COURSE='QUERY_COURSE', MUTATE_COURSE='MUTATE_COURSE';
+const useViewerKey=():string|undefined=>'viewer';`;
+
+function sourceWithQueryKey(key, setup = '') {
+  return `${lifecycleHeader}
+export const useCourse=(params:{courseId?:string})=>{
+  const viewer=useViewerKey(); ${setup}
+  const query=cache(${key},async()=>null);
+  const {trigger:add}=mutateCache(params.courseId===undefined?null:{operation:MUTATE_COURSE,courseId:params.courseId},async()=>null);
+  return {query,add};
+};`;
+}
+
 test('checks aliased SWR2 array/object keys, multiple selected calls, and a disabled fixed query', t => {
   const root = fixture(t);
   const result = check(root);
@@ -157,4 +171,99 @@ import {mutate} from 'swr'; export const resetCourse=(courseId:string)=>mutate([
 ` } }));
   assert.equal(global.coverage.status, 'unavailable');
   assert.ok(global.coverage.details.some(item => /global mutate/.test(item)), JSON.stringify(global, null, 2));
+});
+
+test('classifies unsupported SWR bindings as unavailable and a genuine no-SWR program as not applicable', async t => {
+  const unsupported = [
+    ['CommonJS require', "const {default:useSWR}=require('swr'); export const useLocal=()=>useSWR('key');"],
+    ['aliased CommonJS require', "const load=require; export const loadSWR=()=>load('swr');"],
+    ['dynamic import', "export const loadSWR=()=>import('swr');"],
+  ];
+  for (const [name, source] of unsupported) await t.test(name, () => {
+    const root = fixture(t, { contract: null, source, extra: {
+      'src/shared/cache.ts': 'export const localCache=()=>undefined;\n',
+      'src/features/course/use-disabled.ts': 'export const useDisabled=()=>undefined;\n',
+    } });
+    const result = check(root);
+    assert.equal(result.coverage.status, 'unavailable', JSON.stringify(result, null, 2));
+    assert.deepEqual(result.coverage.ruleIds, [SWR_KEY_RULE_ID, SWR_MUTATION_RULE_ID]);
+    assert.ok(result.coverage.details.some(item => /dataLifecycle is required/.test(item)), JSON.stringify(result, null, 2));
+    assert.ok(result.coverage.details.some(item => /unsupported/.test(item)), JSON.stringify(result, null, 2));
+  });
+  const root = fixture(t, { contract: null, source: 'export const useCourse=()=>undefined;\n', extra: {
+    'src/shared/cache.ts': 'export const localCache=()=>undefined;\n',
+    'src/features/course/use-disabled.ts': 'export const useDisabled=()=>undefined;\n',
+  } });
+  const result = check(root);
+  assert.deepEqual(result.coverage, { status: 'not-applicable', ruleIds: [SWR_KEY_RULE_ID, SWR_MUTATION_RULE_ID] });
+  assert.deepEqual(result.violations, []);
+
+  const shadowed = fixture(t, { contract: null, source: "const require=(_name:string)=>({}); const load=require; export const useCourse=()=>load('swr');\n", extra: {
+    'src/shared/cache.ts': 'export const localCache=()=>undefined;\n',
+    'src/features/course/use-disabled.ts': 'export const useDisabled=()=>undefined;\n',
+  } });
+  assert.deepEqual(check(shadowed).coverage, { status: 'not-applicable', ruleIds: [SWR_KEY_RULE_ID, SWR_MUTATION_RULE_ID] });
+});
+
+test('tracks value identity on every active path and rejects mutable or overwritten key containers', async t => {
+  const cases = [
+    ['discarded comma identity', sourceWithQueryKey("()=>params.courseId===undefined?null:[QUERY_COURSE,params.courseId,(viewer,'same')]"), 'finding'],
+    ['lossy condition identity', sourceWithQueryKey("()=>params.courseId===undefined?null:[QUERY_COURSE,params.courseId,viewer?'same':'same']"), 'finding'],
+    ['condition-only identity', sourceWithQueryKey("()=>params.courseId===undefined?null:[QUERY_COURSE,params.courseId,viewer?'member':'guest']"), 'finding'],
+    ['unrelated conditional drops identity', sourceWithQueryKey("()=>params.courseId===undefined?null:[QUERY_COURSE,params.courseId,flag?viewer:'guest']", 'const flag=true;'), 'finding'],
+    ['partially gated identity', sourceWithQueryKey("()=>params.courseId===undefined?(viewer==='a'?null:[QUERY_COURSE,params.courseId,viewer]):[QUERY_COURSE,params.courseId,viewer]"), 'finding'],
+    ['mutated array key', sourceWithQueryKey('params.courseId===undefined?null:key', 'const key=[QUERY_COURSE,params.courseId,viewer]; key.pop();'), 'unavailable'],
+    ['overwritten object identity', sourceWithQueryKey("()=>params.courseId===undefined?null:{operation:QUERY_COURSE,courseId:params.courseId,viewer,viewer:'same'}"), 'unavailable'],
+    ['transparent identity alias', sourceWithQueryKey('()=>params.courseId===undefined?null:[QUERY_COURSE,params.courseId,viewerAlias]', 'const viewerAlias=viewer;'), 'checked'],
+    ['transparent object alias', sourceWithQueryKey('()=>p.courseId===undefined?null:[QUERY_COURSE,p.courseId,viewer]', 'const p=params;'), 'checked'],
+  ];
+  for (const [name, source, expected] of cases) await t.test(name, () => {
+    const result = check(fixture(t, { source }));
+    if (expected === 'checked') {
+      assert.equal(result.coverage.status, 'checked', JSON.stringify(result, null, 2));
+      assert.deepEqual(result.violations, [], JSON.stringify(result, null, 2));
+    } else if (expected === 'unavailable') {
+      assert.equal(result.coverage.status, 'unavailable', JSON.stringify(result, null, 2));
+    } else assert.ok(result.violations.length > 0 || result.coverage.status === 'unavailable', JSON.stringify(result, null, 2));
+  });
+});
+
+test('rejects source declarations below a symbolic-link or junction ancestor', t => {
+  const root = fixture(t);
+  const original = path.join(root, 'src', 'features', 'course');
+  const external = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-next-data-external-'));
+  t.after(() => fs.rmSync(external, { recursive: true, force: true }));
+  fs.cpSync(original, external, { recursive: true });
+  fs.rmSync(original, { recursive: true, force: true });
+  fs.symlinkSync(external, original, process.platform === 'win32' ? 'junction' : 'dir');
+  const result = check(root);
+  assert.equal(result.coverage.status, 'unavailable', JSON.stringify(result, null, 2));
+  assert.ok(result.coverage.details.some(item => /symbolic-link or junction ancestor/.test(item)), JSON.stringify(result, null, 2));
+});
+
+test('does not accept an SWR export symbol without a concrete installed declaration', t => {
+  const root = fixture(t, { extra: { 'node_modules/swr/index.d.ts': `
+export {default} from './missing';
+export declare function mutate(key:unknown,data?:unknown):Promise<unknown>;
+export declare function useSWRConfig():{mutate:typeof mutate};
+` } });
+  const result = check(root);
+  assert.equal(result.coverage.status, 'unavailable', JSON.stringify(result, null, 2));
+  assert.ok(result.coverage.details.some(item => /outside installed swr|no statically resolved lifecycle call/.test(item)), JSON.stringify(result, null, 2));
+});
+
+test('resolves calls through actual installed SWR 2 declarations', t => {
+  const installedManifest = require.resolve('swr/package.json');
+  const installed = path.dirname(installedManifest);
+  const manifest = JSON.parse(fs.readFileSync(installedManifest, 'utf8'));
+  assert.equal(Number.parseInt(manifest.version.split('.')[0], 10), 2, `Expected installed SWR 2, received ${manifest.version}.`);
+  const root = fixture(t, { version: manifest.version });
+  const target = path.resolve(root, 'node_modules', 'swr');
+  assert.ok(target.startsWith(`${path.resolve(root)}${path.sep}`) && path.basename(target) === 'swr', `Unsafe fixture target: ${target}`);
+  fs.rmSync(target, { recursive: true, force: true });
+  fs.symlinkSync(installed, target, process.platform === 'win32' ? 'junction' : 'dir');
+  const result = check(root);
+  assert.equal(result.coverage.status, 'checked', JSON.stringify(result, null, 2));
+  assert.deepEqual(result.violations, [], JSON.stringify(result, null, 2));
+  assert.equal(result.coverage.swr.version, manifest.version);
 });

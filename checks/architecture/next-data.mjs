@@ -16,6 +16,7 @@ const TOP_KEYS = new Set(['schema', 'swr', 'hooks']);
 const SWR_KEYS = new Set(['package', 'major']);
 const HOOK_KEYS = new Set(['id', 'path', 'export', 'kind', 'resultBinding', 'identities']);
 const IDENTITY_KEYS = new Set(['id', 'binding', 'gatesRequest', 'resource']);
+const SWR_SPECIFIERS = new Set(['swr', 'swr/immutable', 'swr/mutation']);
 
 function canonical(file) {
   const absolute = path.resolve(file);
@@ -33,6 +34,7 @@ function exactKeys(value, allowed, label) {
 }
 
 function relativeSource(repository, value, label) {
+  repository = path.resolve(repository);
   if (typeof value !== 'string' || !value.trim() || path.isAbsolute(value)) throw Error(`${label} must be a non-empty repository-relative source path.`);
   const relative = slash(value.trim()).replace(/^\.\//, '');
   if (relative.split('/').includes('..') || !SOURCE.test(relative) || /\.d\.[cm]?[jt]s$/i.test(relative)) {
@@ -40,8 +42,12 @@ function relativeSource(repository, value, label) {
   }
   const absolute = path.resolve(repository, ...relative.split('/'));
   if (!isInside(repository, absolute)) throw Error(`${label} must stay inside the repository.`);
+  for (let current = absolute; current !== repository; current = path.dirname(current)) {
+    const stat = fs.lstatSync(current);
+    if (stat.isSymbolicLink()) throw Error(`${label} must not cross a symbolic-link or junction ancestor.`);
+  }
   const stat = fs.lstatSync(absolute);
-  if (!stat.isFile() || stat.isSymbolicLink()) throw Error(`${label} must be a regular non-link source file.`);
+  if (!stat.isFile() || !isInside(canonical(repository), canonical(absolute))) throw Error(`${label} must be a regular source file inside the repository.`);
   return relative;
 }
 
@@ -154,7 +160,8 @@ function unwrap(ts, expression) {
 }
 
 function declarationsInside(symbol, root) {
-  return (symbol?.getDeclarations?.() ?? []).every(declaration => isInside(root, canonical(declaration.getSourceFile().fileName)));
+  const declarations = symbol?.getDeclarations?.() ?? [];
+  return declarations.length > 0 && declarations.every(declaration => isInside(root, canonical(declaration.getSourceFile().fileName)));
 }
 
 function officialTargets(config, context, installed, reasons) {
@@ -352,13 +359,38 @@ function accessPath(ts, checker, node) {
   return null;
 }
 
+function expandedAccessPath(ts, checker, node, seen = new Set(), depth = 0) {
+  if (!node || depth > 10) return null;
+  node = unwrap(ts, node);
+  if (ts.isIdentifier(node)) {
+    const symbol = symbolAt(ts, checker, node);
+    if (!symbol || seen.has(symbol)) return symbol ? { symbol, parts: [node.text] } : null;
+    const initializer = constInitializer(ts, symbol);
+    return initializer ? expandedAccessPath(ts, checker, initializer, new Set(seen).add(symbol), depth + 1)
+      ?? { symbol, parts: [node.text] } : { symbol, parts: [node.text] };
+  }
+  if (ts.isPropertyAccessExpression(node)) {
+    const base = expandedAccessPath(ts, checker, node.expression, seen, depth + 1);
+    return base ? { symbol: base.symbol, parts: [...base.parts, node.name.text] } : null;
+  }
+  if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) {
+    const base = expandedAccessPath(ts, checker, node.expression, seen, depth + 1);
+    return base ? { symbol: base.symbol, parts: [...base.parts, node.argumentExpression.text] } : null;
+  }
+  return null;
+}
+
+function matchesIdentityAccess(ts, checker, node, identity) {
+  const matches = access => access?.symbol === identity.symbol && access.parts.length >= identity.parts.length
+    && identity.parts.every((part, index) => access.parts[index] === part);
+  return matches(accessPath(ts, checker, node)) || matches(expandedAccessPath(ts, checker, node));
+}
+
 function expressionReferences(ts, checker, expression, identity) {
   let found = false;
   const visit = node => {
     if (found) return;
-    const access = accessPath(ts, checker, node);
-    if (access?.symbol === identity.symbol && access.parts.length >= identity.parts.length
-      && identity.parts.every((part, index) => access.parts[index] === part)) {
+    if (matchesIdentityAccess(ts, checker, node, identity)) {
       found = true;
       return;
     }
@@ -366,6 +398,78 @@ function expressionReferences(ts, checker, expression, identity) {
   };
   visit(expression);
   return found;
+}
+
+function constInitializer(ts, symbol) {
+  const declarations = symbol?.getDeclarations?.() ?? [];
+  if (declarations.length !== 1 || !ts.isVariableDeclaration(declarations[0]) || !declarations[0].initializer
+    || !(ts.getCombinedNodeFlags(declarations[0].parent) & ts.NodeFlags.Const)) return null;
+  return declarations[0].initializer;
+}
+
+function propertyKey(ts, name) {
+  if (ts.isIdentifier(name) || ts.isStringLiteralLike(name) || ts.isNumericLiteral(name)) return name.text;
+  return null;
+}
+
+function effectiveObjectValues(ts, expression) {
+  const selected = new Map();
+  for (let index = expression.properties.length - 1; index >= 0; index -= 1) {
+    const property = expression.properties[index];
+    if (ts.isSpreadAssignment(property) || ts.isMethodDeclaration(property) || ts.isGetAccessorDeclaration(property)
+      || ts.isSetAccessorDeclaration(property)) return null;
+    const key = propertyKey(ts, property.name);
+    if (key === null) return null;
+    if (!selected.has(key)) selected.set(key, ts.isShorthandPropertyAssignment(property) ? property.name : property.initializer);
+  }
+  return [...selected.entries()].sort(([left], [right]) => left.localeCompare(right));
+}
+
+function identityContribution(ts, checker, expression, identity, seen = new Set(), depth = 0) {
+  if (!expression || depth > 12) return 'unproven';
+  expression = unwrap(ts, expression);
+  if (matchesIdentityAccess(ts, checker, expression, identity)) return 'yes';
+  if (ts.isIdentifier(expression)) {
+    const symbol = symbolAt(ts, checker, expression);
+    if (!symbol || seen.has(symbol)) return 'no';
+    const initializer = constInitializer(ts, symbol);
+    return initializer ? identityContribution(ts, checker, initializer, identity, new Set(seen).add(symbol), depth + 1) : 'no';
+  }
+  if (ts.isConditionalExpression(expression)) {
+    const whenTrue = identityContribution(ts, checker, expression.whenTrue, identity, seen, depth + 1);
+    const whenFalse = identityContribution(ts, checker, expression.whenFalse, identity, seen, depth + 1);
+    if (whenTrue === 'yes' && whenFalse === 'yes') return 'yes';
+    if (whenTrue === 'unproven' || whenFalse === 'unproven') return 'unproven';
+    return 'no';
+  }
+  if (ts.isBinaryExpression(expression)) {
+    if (expression.operatorToken.kind === ts.SyntaxKind.CommaToken) return identityContribution(ts, checker, expression.right, identity, seen, depth + 1);
+    if (expression.operatorToken.kind !== ts.SyntaxKind.QuestionQuestionToken) {
+      return expressionReferences(ts, checker, expression, identity) ? 'unproven' : 'no';
+    }
+    const left = identityContribution(ts, checker, expression.left, identity, seen, depth + 1);
+    const right = identityContribution(ts, checker, expression.right, identity, seen, depth + 1);
+    return left === 'yes' || right === 'yes' ? 'yes' : left === 'unproven' || right === 'unproven' ? 'unproven' : 'no';
+  }
+  if (ts.isPrefixUnaryExpression(expression)) return expressionReferences(ts, checker, expression, identity) ? 'unproven' : 'no';
+  if (ts.isTemplateExpression(expression)) {
+    const values = expression.templateSpans.map(span => identityContribution(ts, checker, span.expression, identity, seen, depth + 1));
+    return values.includes('yes') ? 'yes' : values.includes('unproven') ? 'unproven' : 'no';
+  }
+  if (ts.isArrayLiteralExpression(expression)) {
+    if (expression.elements.some(element => ts.isSpreadElement(element))) return 'unproven';
+    const values = expression.elements.map(element => identityContribution(ts, checker, element, identity, seen, depth + 1));
+    return values.includes('yes') ? 'yes' : values.includes('unproven') ? 'unproven' : 'no';
+  }
+  if (ts.isObjectLiteralExpression(expression)) {
+    const values = effectiveObjectValues(ts, expression);
+    if (!values || values.length !== expression.properties.length) return 'unproven';
+    const states = values.map(([, value]) => identityContribution(ts, checker, value, identity, seen, depth + 1));
+    return states.includes('yes') ? 'yes' : states.includes('unproven') ? 'unproven' : 'no';
+  }
+  if (ts.isPropertyAccessExpression(expression) || ts.isElementAccessExpression(expression)) return 'no';
+  if (ts.isCallExpression(expression) || ts.isNewExpression(expression) || ts.isAwaitExpression(expression)) return 'unproven';
+  return 'no';
 }
 
 function returnedExpression(ts, fn) {
@@ -411,11 +515,11 @@ function staticKeyExpression(ts, checker, expression, identities, seen = new Set
   if (ts.isTemplateExpression(expression)) return expression.templateSpans.every(span => staticKeyExpression(ts, checker, span.expression, identities, seen, depth + 1));
   if (ts.isArrayLiteralExpression(expression)) return expression.elements.every(element => !ts.isSpreadElement(element)
     && staticKeyExpression(ts, checker, element, identities, seen, depth + 1));
-  if (ts.isObjectLiteralExpression(expression)) return expression.properties.every(property => {
-    if (ts.isShorthandPropertyAssignment(property)) return staticKeyExpression(ts, checker, property.name, identities, seen, depth + 1);
-    if (!ts.isPropertyAssignment(property) || property.name && ts.isComputedPropertyName(property.name)) return false;
-    return staticKeyExpression(ts, checker, property.initializer, identities, seen, depth + 1);
-  });
+  if (ts.isObjectLiteralExpression(expression)) {
+    const values = effectiveObjectValues(ts, expression);
+    return values !== null && values.length === expression.properties.length
+      && values.every(([, value]) => staticKeyExpression(ts, checker, value, identities, seen, depth + 1));
+  }
   if (ts.isConditionalExpression(expression)) return staticKeyExpression(ts, checker, expression.condition, identities, seen, depth + 1)
     && staticKeyExpression(ts, checker, expression.whenTrue, identities, seen, depth + 1)
     && staticKeyExpression(ts, checker, expression.whenFalse, identities, seen, depth + 1);
@@ -482,6 +586,51 @@ function violation(config, call, ruleId, message, extra = {}) {
   return { ruleId, path: relativePath(config.root, call.source.fileName), ...sourceLocation(call.source, call.node), message, ...extra };
 }
 
+function isUnshadowedCommonJsRequire(ts, checker, expression, seen = new Set(), depth = 0) {
+  expression = unwrap(ts, expression);
+  if (!ts.isIdentifier(expression) || depth > 10) return false;
+  const symbol = checker.getSymbolAtLocation(expression);
+  const declarations = symbol?.getDeclarations?.() ?? [];
+  if (expression.text === 'require' && (!symbol || declarations.length === 0
+    || declarations.every(declaration => declaration.getSourceFile().isDeclarationFile))) return true;
+  const normalized = symbolOfRequireAlias(ts, checker, expression);
+  if (!normalized || seen.has(normalized)) return false;
+  const initializer = constInitializer(ts, normalized);
+  return initializer ? isUnshadowedCommonJsRequire(ts, checker, initializer, new Set(seen).add(normalized), depth + 1) : false;
+}
+
+function symbolOfRequireAlias(ts, checker, expression) {
+  const symbol = checker.getSymbolAtLocation(expression);
+  return normalizedSymbol(ts, checker, symbol);
+}
+
+function swrReferences(config, context) {
+  let found = false;
+  const unsupported = [];
+  for (const source of context.files) {
+    const checker = context.checkerFor(source.fileName);
+    const report = (node, kind) => {
+      found = true;
+      unsupported.push(`${relativePath(config.root, source.fileName)}:${sourceLocation(source, node).line} uses unsupported ${kind} for SWR`);
+    };
+    const visit = node => {
+      if ((context.ts.isImportDeclaration(node) || context.ts.isExportDeclaration(node)) && node.moduleSpecifier
+        && context.ts.isStringLiteralLike(node.moduleSpecifier) && SWR_SPECIFIERS.has(node.moduleSpecifier.text)) found = true;
+      if (context.ts.isImportEqualsDeclaration(node) && context.ts.isExternalModuleReference(node.moduleReference)
+        && node.moduleReference.expression && context.ts.isStringLiteralLike(node.moduleReference.expression)
+        && SWR_SPECIFIERS.has(node.moduleReference.expression.text)) report(node, 'import-equals binding');
+      if (context.ts.isCallExpression(node) && node.arguments.length >= 1 && context.ts.isStringLiteralLike(node.arguments[0])
+        && SWR_SPECIFIERS.has(node.arguments[0].text)) {
+        if (node.expression.kind === context.ts.SyntaxKind.ImportKeyword) report(node, 'dynamic import binding');
+        else if (isUnshadowedCommonJsRequire(context.ts, checker, node.expression)) report(node, 'CommonJS require binding');
+      }
+      context.ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return { found, unsupported };
+}
+
 function nonNullFalsy(ts, expression) {
   expression = unwrap(ts, expression);
   return expression.kind === ts.SyntaxKind.FalseKeyword || ts.isStringLiteralLike(expression) && expression.text === ''
@@ -489,10 +638,48 @@ function nonNullFalsy(ts, expression) {
     || ts.isIdentifier(expression) && expression.text === 'undefined';
 }
 
+function containerSymbolsFromKey(ts, checker, expression, found = new Set(), seen = new Set(), depth = 0) {
+  if (!expression || depth > 12) return found;
+  expression = unwrap(ts, expression);
+  if (ts.isIdentifier(expression)) {
+    const symbol = symbolAt(ts, checker, expression);
+    if (!symbol || seen.has(symbol)) return found;
+    const initializer = constInitializer(ts, symbol);
+    if (!initializer) return found;
+    const value = unwrap(ts, initializer);
+    if (ts.isArrayLiteralExpression(value) || ts.isObjectLiteralExpression(value)) found.add(symbol);
+    containerSymbolsFromKey(ts, checker, initializer, found, new Set(seen).add(symbol), depth + 1);
+    return found;
+  }
+  ts.forEachChild(expression, child => { containerSymbolsFromKey(ts, checker, child, found, seen, depth + 1); });
+  return found;
+}
+
+function keyContainerRisks(ts, checker, key, owner) {
+  const symbols = containerSymbolsFromKey(ts, checker, key);
+  if (!symbols.size || !owner?.body) return [];
+  const declarationNames = new Set([...symbols].flatMap(symbol => (symbol.getDeclarations?.() ?? [])
+    .filter(ts.isVariableDeclaration).map(declaration => declaration.name)));
+  const risks = [];
+  const visit = node => {
+    if (ts.isIdentifier(node) && symbols.has(symbolAt(ts, checker, node)) && !declarationNames.has(node)
+      && !(node.pos >= key.pos && node.end <= key.end)) risks.push(node);
+    ts.forEachChild(node, visit);
+  };
+  visit(owner.body);
+  return risks;
+}
+
 function inspectKey(config, context, entry, call, identities, violations, reasons) {
   const key = call.node.arguments[0];
   if (!key) {
     reasons.push(`${entry.path}#${entry.export} has an SWR call without a key`);
+    return;
+  }
+  const containerRisks = keyContainerRisks(context.ts, call.checker, key, call.owner);
+  if (containerRisks.length) {
+    const locations = containerRisks.map(node => sourceLocation(call.source, node).line).filter((line, index, all) => all.indexOf(line) === index);
+    reasons.push(`${entry.path}#${entry.export} key container is referenced outside its declaration and selected SWR key${locations.length ? ` (line${locations.length === 1 ? '' : 's'} ${locations.join(', ')})` : ''}`);
     return;
   }
   const leaves = keyLeaves(context.ts, call.checker, key, identities);
@@ -504,16 +691,25 @@ function inspectKey(config, context, entry, call, identities, violations, reason
   if (active.some(leaf => nonNullFalsy(context.ts, leaf.expression))) violations.push(violation(config, call, SWR_KEY_RULE_ID,
     `${entry.id} uses explicit null, rather than another falsy value, for a disabled SWR key.`, { lifecycle: entry.id }));
   for (const identity of identities) {
-    if (active.some(leaf => !expressionReferences(context.ts, call.checker, leaf.expression, identity))) {
+    if (!active.length) {
+      violations.push(violation(config, call, entry.kind === 'mutation' && identity.resource ? SWR_MUTATION_RULE_ID : SWR_KEY_RULE_ID,
+        `${entry.id} has no active key path carrying declared identity ${identity.id} (${identity.binding}).`,
+        { lifecycle: entry.id, identity: identity.id }));
+      continue;
+    }
+    const contributions = active.map(leaf => identityContribution(context.ts, call.checker, leaf.expression, identity));
+    if (contributions.includes('unproven')) {
+      reasons.push(`${entry.path}#${entry.export} key value contribution for identity ${identity.id} (${identity.binding}) cannot be proved on every active path`);
+    } else if (contributions.includes('no')) {
       const ruleId = entry.kind === 'mutation' && identity.resource ? SWR_MUTATION_RULE_ID : SWR_KEY_RULE_ID;
       violations.push(violation(config, call, ruleId,
         `${entry.id} key must include declared ${identity.resource ? 'resource ' : ''}identity ${identity.id} (${identity.binding}) on every active key path.`,
         { lifecycle: entry.id, identity: identity.id }));
     }
     if (identity.gatesRequest) {
-      const gated = leaves.filter(leaf => leaf.kind === 'null').some(leaf => leaf.decisions.some(decision => {
+      const gated = active.every(leaf => leaf.decisions.some(decision => {
         const available = trueMeansAvailable(context.ts, call.checker, decision.condition, identity);
-        return available !== null && decision.branch !== available;
+        return available !== null && decision.branch === available;
       }));
       if (!gated) violations.push(violation(config, call, SWR_KEY_RULE_ID,
         `${entry.id} must produce an explicit null key when ${identity.id} (${identity.binding}) is unavailable.`,
@@ -527,15 +723,15 @@ export function checkFrontendDataLifecycle(config, context) {
   const ruleIds = [...SWR_DATA_RULE_IDS];
   const reasons = [];
   const violations = [];
-  const hasSWRSpecifier = context.files.some(source => source.statements.some(statement => (context.ts.isImportDeclaration(statement)
-    || context.ts.isExportDeclaration(statement)) && statement.moduleSpecifier && context.ts.isStringLiteralLike(statement.moduleSpecifier)
-    && ['swr', 'swr/immutable', 'swr/mutation'].includes(statement.moduleSpecifier.text)));
+  const references = swrReferences(config, context);
   let contract;
   try { contract = parseContract(config); } catch (error) {
     return { violations, coverage: { status: 'unavailable', ruleIds, details: [String(error.message ?? error)] } };
   }
-  if (!contract && !hasSWRSpecifier) return { violations, coverage: { status: 'not-applicable', ruleIds } };
-  if (!contract) return { violations, coverage: { status: 'unavailable', ruleIds, details: ['package.json#starci.codePatterns.next.dataLifecycle is required when production source selects SWR'] } };
+  if (!contract && !references.found) return { violations, coverage: { status: 'not-applicable', ruleIds } };
+  if (!contract) return { violations, coverage: { status: 'unavailable', ruleIds,
+    details: ['package.json#starci.codePatterns.next.dataLifecycle is required when production source selects SWR', ...references.unsupported] } };
+  reasons.push(...references.unsupported);
   let installed;
   try { installed = installedSWR(config.root); } catch (error) {
     return { violations, coverage: { status: 'unavailable', ruleIds, details: [String(error.message ?? error)] } };

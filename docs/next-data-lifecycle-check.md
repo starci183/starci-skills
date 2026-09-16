@@ -41,10 +41,14 @@ deliberately disabled key.
 The checker resolves actual imports and re-exports from `swr`, `swr/immutable`
 and `swr/mutation` with the target TypeScript program. It supports direct static
 string, template, array and object keys, immutable constant aliases, and a
-single-return key function. Missing declarations, unmatched calls, ambiguous
-selectors, installed-version drift, dynamic calls/spreads/computed keys, and
-global `mutate` calls without a declared resource-matching contract make the
-coverage unavailable. The rule IDs are then absent from
+single-return key function. It checks the value contributed by each identity
+on every active conditional path; a condition that merely reads an identity
+does not put that identity in the key. Mutable or escaped array/object key
+containers, source declarations below links or junctions, missing declarations,
+unmatched calls, ambiguous selectors, installed-version drift, dynamic calls,
+CommonJS/dynamic-import SWR bindings, spreads/computed keys, and global `mutate`
+calls without a declared resource-matching contract make coverage unavailable.
+The rule IDs are then absent from
 `coverage.checkedRuleIds`; an empty violation list is not a pass.
 
 SWR documents `null`/falsy conditional keys in
