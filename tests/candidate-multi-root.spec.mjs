@@ -8,7 +8,7 @@ import {beginDetectionCandidate,freezeDetectionCandidate,readCandidateBridge,rea
 import {prepareCandidateIntegration} from '../kernel/candidates.mjs';
 import {candidateRootBindingDigest,candidateRootBindings,resolveCandidateReferences} from '../kernel/candidate-roots.mjs';
 import {openJournal} from '../kernel/journal.mjs';
-import {retireFinishedWorkflowRows} from '../kernel/kernel.mjs';
+import {readmitCandidateRootBindingRetry,retireFinishedWorkflowRows,retryableOperation} from '../kernel/kernel.mjs';
 import {sealRuntime,verifyRuntimePin} from '../kernel/runtime-pin.mjs';
 import {createStore,WORKFLOW_STATE} from '../kernel/store.mjs';
 
@@ -196,6 +196,76 @@ test('backend-owned continuation ignores only its managed section and remains bo
   fs.writeFileSync(otherBrief,'Changed human note\n<!-- starci:continuation:start -->\nnew\n<!-- starci:continuation:end -->\n');
   const refused=freezeDetectionCandidate(other.bridge,{git,requireReported:true,reportedFiles:[]});assert.equal(refused.status,'quarantine');
   assert.ok(refused.reasons.some(reason=>reason.includes('pre-existing-user-work-modified:.starciwork/workflows/wf.md')||reason.includes('outside-allowlist:.starciwork/workflows/wf.md')));
+});
+
+test('runtime-managed continuation follows the attested workflow store when the source and loaded Work roots are worktrees',t=>{
+  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-store-root-')),source=repo(path.join(temp,'frontend-worktree'),{'src/app.js':'base\n'}),
+    worktree=repo(path.join(temp,'backend-worktree'),{'.starciwork/rule.md':'rule\n'}),storeRoot=repo(path.join(temp,'backend-store'),{'.gitignore':'/.starciwork/_local/\n'}),
+    continuation=write(storeRoot,'workflows/wf.md','Human note\n<!-- starci:continuation:start -->\nold\n<!-- starci:continuation:end -->\n');
+  t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+  const state={worktree:source},work={ledger:{repoRoot:worktree,workRoot:path.join(worktree,'.starciwork')}},op={allowlist:['src/**']},
+    managed=[{path:continuation,start:'<!-- starci:continuation:start -->',end:'<!-- starci:continuation:end -->'}],
+    bound=candidateRootBindings({state,work,op,runtimeManagedFiles:managed,runtimeStoreRoot:storeRoot});
+  const store=bound.bindings.find(root=>root.id==='store');
+  assert.equal(store.role,'workflow-store');assert.equal(store.workerWritable,false);assert.equal(store.runtimeWritable,true);
+  assert.deepEqual(store.allowlist,[]);assert.deepEqual(store.runtimeManagedFiles.map(item=>item.path),['workflows/wf.md']);
+});
+
+test('attested workflow-store routing does not admit a foreign continuation path',t=>{
+  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-store-foreign-')),source=repo(path.join(temp,'source'),{'src/app.js':'base\n'}),
+    storeRoot=repo(path.join(temp,'store'),{'.gitignore':'/.starciwork/_local/\n'}),foreign=write(path.join(temp,'foreign'),'workflows/wf.md','foreign\n');
+  t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+  assert.throws(()=>candidateRootBindings({state:{worktree:source},work:{ledger:{repoRoot:source,workRoot:path.join(source,'.starciwork')}},
+    op:{allowlist:['src/**']},runtimeStoreRoot:storeRoot,runtimeManagedFiles:[{path:foreign,start:'start',end:'end'}]}),/outside the accepted routed roots/);
+});
+
+test('workflow-store root is reserved for its exact runtime-managed continuation',t=>{
+  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-store-authority-')),source=repo(path.join(temp,'source'),{'src/app.js':'base\n'}),
+    storeRoot=repo(path.join(temp,'store'),{'workflows/wf.md':'brief\n'}),state={worktree:source},work={ledger:{repoRoot:source,workRoot:path.join(source,'.starciwork')}},
+    continuation=path.join(storeRoot,'workflows','wf.md');t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+  assert.throws(()=>candidateRootBindings({state,work,op:{allowlist:[continuation]},runtimeStoreRoot:storeRoot,
+    runtimeManagedFiles:[{path:continuation,start:'start',end:'end'}]}),/cannot claim the runtime-managed workflow-store root/);
+  assert.throws(()=>candidateRootBindings({state,work,op:{allowlist:['src/**']},runtimeStoreRoot:storeRoot,runtimePaths:[continuation],
+    runtimeManagedFiles:[{path:continuation,start:'start',end:'end'}]}),/cannot claim the runtime-managed workflow-store root/);
+});
+
+test('workflow-store bridge excludes only the managed continuation section',t=>{
+  const make=name=>{const temp=fs.mkdtempSync(path.join(os.tmpdir(),`starci-store-bridge-${name}-`)),source=repo(path.join(temp,'frontend'),{'src/app.js':'base\n'}),
+    worktree=repo(path.join(temp,'backend-worktree'),{'.starciwork/rule.md':'rule\n'}),storeRoot=repo(path.join(temp,'backend-store'),
+      {'workflows/wf.md':'Human note\n<!-- starci:continuation:start -->\nold\n<!-- starci:continuation:end -->\n'}),continuation=path.join(storeRoot,'workflows','wf.md'),
+    bound=candidateRootBindings({state:{worktree:source},work:{ledger:{repoRoot:worktree,workRoot:path.join(worktree,'.starciwork')}},op:{allowlist:['src/**']},
+      runtimeStoreRoot:storeRoot,runtimeManagedFiles:[{path:continuation,start:'<!-- starci:continuation:start -->',end:'<!-- starci:continuation:end -->'}]}),
+    bridge=beginDetectionCandidate({identity:{workflowId:'wf',opId:name,attempt:1,generation:1,jobId:`job-${name}`},workerRoot:path.join(temp,'candidate'),
+      controlRoot:path.join(temp,'control'),roots:bound.bindings,bindingDigest:bound.bindingDigest,git,environmentDigest:'env'});return {temp,source,continuation,bridge};};
+  const accepted=make('accepted');t.after(()=>fs.rmSync(accepted.temp,{recursive:true,force:true}));
+  fs.writeFileSync(accepted.continuation,'Human note\n<!-- starci:continuation:start -->\nnew\n<!-- starci:continuation:end -->\n');
+  fs.writeFileSync(path.join(accepted.source,'src/app.js'),'changed\n');
+  assert.equal(freezeDetectionCandidate(accepted.bridge,{git,requireReported:true,reportedFiles:['src/app.js']}).status,'sealed');
+  const refused=make('refused');t.after(()=>fs.rmSync(refused.temp,{recursive:true,force:true}));
+  fs.writeFileSync(refused.continuation,'Changed human note\n<!-- starci:continuation:start -->\nnew\n<!-- starci:continuation:end -->\n');
+  const frozen=freezeDetectionCandidate(refused.bridge,{git,requireReported:true,reportedFiles:[]});assert.equal(frozen.status,'quarantine');
+  assert.ok(frozen.reasons.some(reason=>reason.includes('pre-existing-user-work-modified:workflows/wf.md')||reason.includes('outside-allowlist:workflows/wf.md')),JSON.stringify(frozen.reasons));
+});
+
+test('public retry narrowly re-admits a prelaunch candidate-root refusal and its dependency-only blocks',()=>{
+  const root={id:'root',status:'blocked',refusal:'candidate-root-binding',dependsOn:[],reports:[],files:[]},
+    audit={id:'audit',status:'blocked',dependsOn:['root','dependent'],reports:[],files:[]},
+    leaf={id:'leaf',status:'blocked',dependsOn:['audit'],reports:[],files:[]},
+    dependent={id:'dependent',status:'blocked',dependsOn:['root'],reports:[],files:[]},
+    independentlyBlocked={id:'owner-blocked',status:'blocked',dependsOn:['root'],reports:[],files:[]},
+    exact='dependent can never start: it depends on root',auditExact='audit can never start: it depends on root, dependent',owner='owner-blocked can never start: it depends on root',
+    state={ops:[root,leaf,audit,dependent,independentlyBlocked],needUser:[{op:'root',kind:'environment',code:'candidate-root-binding',detail:'old route'},
+      {op:'audit',kind:'authority',detail:auditExact},{op:'dependent',kind:'authority',detail:exact},{op:'owner-blocked',kind:'authority',detail:owner},{op:'owner-blocked',kind:'decision',detail:'independent owner choice'}]},
+    recorded=[],store={readEvents:()=>[{event:'op-blocked',op:'leaf',reason:'dependency blocked'},{event:'op-blocked',op:'audit',reason:'dependency blocked'},{event:'op-blocked',op:'dependent',reason:'dependency blocked'},
+      {event:'op-blocked',op:'owner-blocked',reason:'dependency blocked'}],appendEvent:event=>recorded.push(event)};
+  assert.equal(retryableOperation(root),true);
+  assert.deepEqual(readmitCandidateRootBindingRetry(store,state),{roots:['root'],dependents:['dependent','audit','leaf']});
+  assert.equal(dependent.status,'pending');assert.equal(audit.status,'pending');assert.equal(independentlyBlocked.status,'blocked');
+  assert.equal(state.needUser.some(item=>item.op==='dependent'),false);assert.equal(state.needUser.some(item=>item.kind==='decision'),true);
+  assert.equal(recorded[0].event,'candidate-root-dependent-readmitted');
+  for(const unsafe of [{...root,reports:[{outcome:'partial'}]},{...root,files:['src/x']},{...root,head:'abc'},{...root,verdict:'fail'},
+    {...root,workerSettled:false},{...root,lease:{jobId:'live'}}])assert.equal(retryableOperation(unsafe),false,JSON.stringify(unsafe));
+  const noReceipt={...dependent,status:'blocked'};assert.deepEqual(readmitCandidateRootBindingRetry({readEvents:()=>[],appendEvent(){}},{ops:[root,noReceipt],needUser:[]}),{roots:['root'],dependents:[]});
 });
 
 test('a non-Git runtime canon is content-bound, read-only and quarantines drift',t=>{

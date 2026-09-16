@@ -74,7 +74,8 @@ function assertNoRawSecrets(value,path=[]){if(!value||typeof value!=='object')re
 export function createStore({repoRoot,id}){
   const workflowId=required(id,'workflow id');
   need(!/[\\/]/.test(workflowId),`Workflow id must be one directory segment: ${workflowId}`);
-  const dir=path.join(workflowsRoot(repoRoot),workflowId);
+  const boundRepoRoot=path.resolve(required(repoRoot,'repository root'));
+  const dir=path.join(workflowsRoot(boundRepoRoot),workflowId);
   const paths={
     state:path.join(dir,'state.json'),events:path.join(dir,'events.jsonl'),
     goal:path.join(dir,'goal.md'),goalJson:path.join(dir,'goal.json'),
@@ -83,7 +84,7 @@ export function createStore({repoRoot,id}){
     // Public human-readable projection in the Work-owning repository. A routed source repository creates its
     // store under the shared ledger owner, so both sides resolve this same backend-owned path. Journal/state stay
     // authoritative; the candidate bridge excludes only this runtime-managed section, never the rest of the file.
-    continuation:path.join(path.resolve(repoRoot),'workflows',`${workflowId}.md`)
+    continuation:path.join(boundRepoRoot,'workflows',`${workflowId}.md`)
   };
   for(const directory of [dir,paths.reports,paths.contracts,paths.checks,paths.inbox])fs.mkdirSync(directory,{recursive:true});
   let seq=null;
@@ -104,7 +105,7 @@ export function createStore({repoRoot,id}){
   };
   const project=state=>{const tmp=`${paths.state}.${process.pid}.tmp`;fs.writeFileSync(tmp,`${JSON.stringify(state,null,2)}\n`);replaceStateSnapshot(tmp,paths.state);acknowledgeFile(paths.state,'state.json','replace');return state;};
   const api={
-    schema:WORKFLOW_STATE,id:workflowId,dir,paths,
+    schema:WORKFLOW_STATE,id:workflowId,repoRoot:boundRepoRoot,dir,paths,
     /** Append one audit line. The log is never rewritten, so a reader can replay a workflow from seq 0. */
     appendEvent(event){
       need(plain(event),'An event must be an object');

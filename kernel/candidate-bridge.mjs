@@ -280,6 +280,9 @@ function beginSingleDetectionCandidate({identity,repoRoot,workerRoot,controlRoot
     acceptedHead,sourceBaseline:states(repoRoot,sourcePaths),dirtyBaseline:states(repoRoot,dirty),dirtyBaselinePaths:dirty,
     localBaseline:states(repoRoot,local),runtimeWriters:nonGit?[]:runtimeWriters(repoRoot,identity.workflowId,git),
     runtimeManagedFiles:managed,runtimeManagedBaseline:managed.map(item=>managedOutside(repoRoot,item)),
+    // A scoped non-Git binding (the canonical workflow store) does not inventory its surrounding repository.
+    // Retain the exact file states so its own continuation still enters managed-section collision checks.
+    runtimeManagedFullBaseline:nonGit?states(repoRoot,managed.map(item=>item.path)):[],
     ownedDirtyPaths:[...owned].sort(),droppedOwnedPaths,dependency:{mode:'isolated-artifact',command:dependencyInstall,
       root:path.join(controlRoot,'dependencies'),externalCache:'forbidden',symlinkedDependencies:'forbidden',assurance:'detection-only',ready:dependencyInstall===null},
     writer:runtimeWriterHint({repoRoot}),beganAt:new Date(now()).toISOString()};
@@ -372,7 +375,7 @@ export function acknowledgeRuntimeBaseline(bridge,paths=[]){
 function freezeSingleDetectionCandidate(bridge,{git,reportedFiles=[],housekeepingPaths=[],now=Date.now}={}){
   if(bridge.runtimePin){const checked=verifyRuntimePin({...bridge.runtimePin,root:bridge.repoRoot});if(!checked.ok)return {schema:DETECTION_BRIDGE,status:'quarantine',reasons:[`runtime-pin-drift:${checked.reason}`],observedFiles:[],assurance:bridge.writer};}
   const {repoRoot,snapshot}=bridge,postDirty=bridge.nonGit?[]:statusPaths(git,repoRoot).filter(file=>!runtimeInternal(file)),postLocal=bridge.nonGit?[]:runtimeLocalPaths(repoRoot),
-    before=new Map([...(bridge.sourceBaseline??[]),...bridge.dirtyBaseline,...(bridge.localBaseline??[]),...(bridge.runtimeBaseline??[])].map(item=>[item.path,item]));
+    before=new Map([...(bridge.sourceBaseline??[]),...bridge.dirtyBaseline,...(bridge.localBaseline??[]),...(bridge.runtimeBaseline??[]),...(bridge.runtimeManagedFullBaseline??[])].map(item=>[item.path,item]));
   const candidates=[...new Set([...before.keys(),...postDirty,...postLocal])].sort(),after=new Map(states(repoRoot,candidates).map(item=>[item.path,item]));
   const observed=candidates.filter(file=>!same(before.get(file)??{path:file,state:'absent'},after.get(file)??{path:file,state:'absent'}));
   const runtimeAcknowledgement=acknowledgedForeignRuntime(bridge,observed,{git}),housekeeping=new Set([...housekeepingPaths.map(clean),...runtimeAcknowledgement.paths]),
@@ -394,7 +397,7 @@ function freezeSingleDetectionCandidate(bridge,{git,reportedFiles=[],housekeepin
   // Runtime-managed-only bytes are rebound into both verifier views before the first seal. This is the same
   // narrow mechanism as other kernel-owned writes, but selected only after proving the surrounding human bytes
   // unchanged. Replays keep the immutable packet and ignore these exact paths in canonical comparison.
-  if(!alreadySealed&&managedOnly.size)bindRuntimeInputs(snapshot,{canonicalRoot:repoRoot,paths:[...managedOnly]});
+  if(!alreadySealed&&managedOnly.size&&!bridge.nonGit)bindRuntimeInputs(snapshot,{canonicalRoot:repoRoot,paths:[...managedOnly]});
   // A crash after writing candidate.json may precede the workflow-state save. Replaying that freeze must verify
   // the existing immutable packet, never overwrite the worker bytes or remove the packet to get past EEXIST.
   for(const file of alreadySealed?[]:candidateObserved){

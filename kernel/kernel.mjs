@@ -435,7 +435,7 @@ function bindOperationCandidate(store,state,op,ctx){
   op.candidateRuntimePaths=candidateRuntimePaths(state,op,ctx);
   op.resolvedReferences=candidateReferences(op,state,ctx);
   op.candidateRootBindings=buildCandidateRootBindings({state,op,work:ctx.work,resolvedReferences:op.resolvedReferences,
-    runtimePaths:op.candidateRuntimePaths,runtimeManagedFiles:candidateManagedFiles(store)});
+    runtimePaths:op.candidateRuntimePaths,runtimeManagedFiles:candidateManagedFiles(store),runtimeStoreRoot:store.repoRoot});
   return op.candidateRootBindings;
 }
 
@@ -1083,6 +1083,9 @@ function scheduleOps(orca,store,state,ctx,{orderedOpIds=null}={}){
     if(ctx.engine){
       try{bindOperationCandidate(store,state,op,ctx);}
       catch(error){
+        // Allocation happens before candidate binding so provider choice can account for shared load. Binding is
+        // still pre-reservation and pre-effect: return that provisional slot when routing refuses the candidate.
+        try{(ctx.allocator.deferred??ctx.allocator.release)?.call(ctx.allocator,allocated.runtime,{op:op.id});}catch{}
         op.status='blocked';op.refusal='candidate-root-binding';
         const detail=`${op.id} cannot bind its candidate roots and inputs: ${String(error?.message??error)}`;
         if(!state.needUser.some(item=>item.op===op.id&&item.code==='candidate-root-binding'))state.needUser.push({op:op.id,kind:'environment',code:'candidate-root-binding',detail});
@@ -3442,7 +3445,32 @@ export const TRIAGE_OPTIONS=['resume-ops','park-runtime','settle-op','restart-ke
 export function retryOwnedBaseline(state,op,git=spawnSync){const changed=changedFiles(state,op,{git},op.allowlist,{exclude:op.kernelOwned??[]}),attributed=attributedFiles(op,changed);return {changed,attributed,unclaimed:changed.filter(file=>!attributed.includes(file))};}
 /** An operation the owner's retry runs again. A settled one - done or cancelled - is never among them, whatever field it still carries. */
 export const settledOperation=op=>['done','cancelled'].includes(op?.status)&&!op?.dispatch&&!op?.terminal;
-export const retryableOperation=op=>!op?.fill&&!op?.ownerRequest&&!settledOperation(op)&&(['running','answering'].includes(op?.status)||Boolean(op?.retryReconciled)||(Boolean(op?.lease)&&(op?.refusal==='runtime-reconciliation'||op?.workerSettled===true)));
+const candidatePrelaunchInactive=op=>!op?.lease&&!op?.pending&&!op?.dispatch&&!op?.terminal&&!op?.launch&&op?.workerSettled===undefined&&op?.retryReconciled===undefined&&
+  !(op?.reports??[]).length&&!(op?.files??[]).length&&!op?.head&&!op?.verdict;
+export const retryableOperation=op=>!op?.fill&&!op?.ownerRequest&&!settledOperation(op)&&(['running','answering'].includes(op?.status)||Boolean(op?.retryReconciled)||
+  (op?.status==='blocked'&&op?.refusal==='candidate-root-binding'&&candidatePrelaunchInactive(op))||
+  (Boolean(op?.lease)&&(op?.refusal==='runtime-reconciliation'||op?.workerSettled===true)));
+
+/** Public retry re-admits only the prelaunch root-binding refusal and dependency-only blocks it created. */
+export function readmitCandidateRootBindingRetry(store,state,{events=null}={}){
+  const roots=new Set(state.ops.filter(op=>op.status==='blocked'&&op.refusal==='candidate-root-binding'&&candidatePrelaunchInactive(op)).map(op=>op.id));
+  if(!roots.size)return {roots:[],dependents:[]};
+  const history=events??store.readEvents(),dependents=[],recoverable=new Set(roots);let changed=true;
+  while(changed){changed=false;
+    for(const op of state.ops.filter(item=>item.status==='blocked'&&!item.refusal&&!item.fill&&!item.ownerRequest&&candidatePrelaunchInactive(item))){
+      const dependencies=op.dependsOn??[],blocked=dependencies.filter(id=>byId(state,id)?.status==='blocked');
+      if(!dependencies.some(id=>recoverable.has(id))||!blocked.every(id=>recoverable.has(id)))continue;
+      if(!history.some(event=>event.event==='op-blocked'&&event.op===op.id&&event.reason==='dependency blocked'))continue;
+      const exactDetail=`${op.id} can never start: it depends on ${dependencies.join(', ')}`,ownerLines=state.needUser.filter(item=>item.op===op.id);
+      if(ownerLines.some(item=>item.kind!=='authority'||item.detail!==exactDetail))continue;
+      op.status='pending';recoverable.add(op.id);
+      state.needUser=state.needUser.filter(item=>!(item.op===op.id&&item.kind==='authority'&&item.detail===exactDetail));
+      store.appendEvent({event:'candidate-root-dependent-readmitted',op:op.id,dependencies:blocked,proof:'dependency-only prelaunch candidate-root refusal'});
+      dependents.push(op.id);changed=true;
+    }
+  }
+  return {roots:[...roots],dependents};
+}
 export function noteAnomaly(store,state,signature,detail){
   state.anomalies=state.anomalies??{};
   const entry=state.anomalies[signature]=state.anomalies[signature]??{count:0,detail,firstAt:Date.now(),triaged:null};
@@ -4288,6 +4316,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const retryJobs=isEnrolled(state)?prepareGenerationRetry({journalFile:state.engine.journalFile,workflowId:state.id,generation:state.engine.generation}):{cancelled:[],unsettled:[]};
     if(retryJobs.cancelled.length)store.appendEvent({event:'retry-queued-jobs-cancelled',generation:state.engine.generation,jobs:retryJobs.cancelled,proof:'queued, unleased, and no job-spawned receipt'});
     need(!retryJobs.unsettled.length,`Current-generation durable model/check jobs must settle before retry: ${retryJobs.unsettled.join(', ')}`);
+    readmitCandidateRootBindingRetry(store,state);
     // A lease field the journal no longer backs is a stale field, not a reservation: it is cleared on the record
     // with the journal's own proof, and the operation is retried like any other unfinished one.
     for(const op of state.ops.filter(item=>item.lease)){
@@ -4335,9 +4364,9 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       op.findings=[];op.priorOpen=[];op.retryFromCanonical=true;
       if(reconciledNative)op.priorStoppedAttempt={attempt:reconciledNative.attempt,dispatch:reconciledNative.dispatch,
         candidateDigest:reconciledNative.candidateDigest??null,observedFiles:[...owned]};
-      if(op.refusal==='runtime-reconciliation')delete op.refusal;
+      if(['runtime-reconciliation','candidate-root-binding'].includes(op.refusal))delete op.refusal;
       delete op.quarantineSignature;
-      state.needUser=state.needUser.filter(item=>!(item.op===op.id&&['candidate-reconciliation','runtime-reconciliation'].includes(item.code)));
+      state.needUser=state.needUser.filter(item=>!(item.op===op.id&&['candidate-root-binding','candidate-reconciliation','runtime-reconciliation'].includes(item.code)));
       for(const key of ['lease','pending','workerSettled','retryReconciled','baseHead','kernelOwnedAt','recordBlocks'])delete op[key];
       retry.push(op.id);
       store.saveState(state);

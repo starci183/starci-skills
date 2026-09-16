@@ -26,11 +26,16 @@ const bindingShape=binding=>({id:binding.id,role:binding.role,repoRoot:slash(pat
 /** Stable identity for the exact accepted root binding; persisted candidates compare this before reuse. */
 export const candidateRootBindingDigest=bindings=>sha256(JSON.stringify((bindings??[]).map(bindingShape).sort((a,b)=>a.id.localeCompare(b.id))));
 
-export function candidateAcceptedRoots(state,work=null){
+export function candidateAcceptedRoots(state,work=null,{runtimeStoreRoot=null}={}){
   const source=path.resolve(state.worktree),owner=path.resolve(work?.ledger?.repoRoot??source),shared=owner!==source;
   const roots=[{id:'source',role:'source',repoRoot:source,primary:true}];
   if(shared)roots.push({id:'work',role:'work',repoRoot:owner,workRoot:path.resolve(work?.ledger?.workRoot??path.join(owner,'.starciwork')),primary:false});
   else roots[0]={...roots[0],role:'source+work',workRoot:path.resolve(work?.ledger?.workRoot??path.join(source,'.starciwork'))};
+  const storeRoot=runtimeStoreRoot?path.resolve(runtimeStoreRoot):null;
+  if(storeRoot&&!roots.some(root=>path.resolve(root.repoRoot)===storeRoot))
+    // This binding observes only the exact public continuation supplied below. Treating the canonical backend
+    // as an ordinary Git root would make unrelated workflows/*.md projections contaminate concurrent kernels.
+    roots.push({id:'store',role:'workflow-store',repoRoot:storeRoot,primary:false,nonGit:true});
   const runtimeRoot=state.engine?.runtimePin?.root;
   if(runtimeRoot&&fs.existsSync(runtimeRoot)){const checked=verifyRuntimePin(state.engine.runtimePin),sealedSource=checked.ok&&checked.sourceRoot?path.resolve(checked.sourceRoot):null;
     roots.push({id:'runtime',role:'runtime-input',repoRoot:path.resolve(runtimeRoot),
@@ -138,15 +143,17 @@ export function resolveCandidateReferences(op,state,ctx){
  * Partition one operation's worker writes, runtime-owned writes, inputs and retry baselines by routed root.
  * Relative source paths retain the historical shape; external Work paths are never accepted without routing.
  */
-export function candidateRootBindings({state,op,work=null,resolvedReferences=[],runtimePaths=op?.kernelOwned??[],runtimeManagedFiles=[]}={}){
-  const accepted=candidateAcceptedRoots(state,work),byId=new Map(accepted.map(root=>[root.id,{...root,allowlist:[],references:[],inputPaths:[],
+export function candidateRootBindings({state,op,work=null,resolvedReferences=[],runtimePaths=op?.kernelOwned??[],runtimeManagedFiles=[],runtimeStoreRoot=null}={}){
+  const accepted=candidateAcceptedRoots(state,work,{runtimeStoreRoot:runtimeManagedFiles.length?runtimeStoreRoot:null}),byId=new Map(accepted.map(root=>[root.id,{...root,allowlist:[],references:[],inputPaths:[],
     oraclePaths:[],ownedDirtyPaths:[],runtimePaths:[],runtimeManagedFiles:[]}])) , workRoot=accepted.find(root=>root.id==='work');
   const add=(field,value,{workRelative=false}={})=>{const {root,relative}=routePath(value,accepted,{workRelative});if(!relative)throw new Error(`candidate ${field} path is empty`);
+    if(root.role==='workflow-store')throw new Error(`candidate ${field} cannot claim the runtime-managed workflow-store root: ${slash(value)}`);
     if(root.role==='runtime-input'&&['allowlist','runtimePaths'].includes(field))throw new Error(`candidate ${field} cannot write the read-only runtime-input root: ${slash(value)}`);
     byId.get(root.id)[field].push(relative);return {root,relative};};
   for(const entry of op.allowlist??[])add('allowlist',entry);
   for(const entry of runtimePaths??[])add('runtimePaths',entry);
   for(const item of runtimeManagedFiles??[]){const {root,relative}=routePath(item.path,accepted,{workRelative:Boolean(workRoot)});if(root.role==='runtime-input')throw new Error(`candidate runtime-managed path cannot write the read-only runtime-input root: ${slash(item.path)}`);
+    if(root.role==='workflow-store'&&!/^workflows\/[^/]+\.md$/i.test(relative))throw new Error(`candidate runtime-managed workflow-store path is not a public continuation: ${slash(item.path)}`);
     const binding=byId.get(root.id);binding.runtimeManagedFiles.push({...item,path:relative});binding.runtimePaths.push(relative);}
   for(const reference of resolvedReferences??[]){
     const root=byId.get(reference.rootId??'source');if(!root)throw new Error(`candidate reference names an unaccepted root: ${reference.rootId}`);
