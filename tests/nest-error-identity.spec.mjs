@@ -178,6 +178,14 @@ export function alias(): never { try { JSON.parse('x'); } catch (error) { error 
   assert.equal(result.errors.filter(item => item.message.includes('Dynamic thrown value')).length, 2, JSON.stringify(result));
 });
 
+test('mutating a property does not replace the caught object identity', t => {
+  const f = fixture(t, { sources: { 'src/use.ts': `export function execute(): never {
+  try { JSON.parse('x'); } catch (error) { if (error instanceof Error) error.name = 'renamed'; throw error; }
+}` } });
+  const result = checkNestErrorIdentity(f.input);
+  assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
+});
+
 test('an illegally reassigned const construction cannot supply selected throw identity', t => {
   const f = fixture(t, { sources: { 'src/use.ts': `import { WidgetError } from './errors/widget-error';
 export function execute(): never { const failure = new WidgetError({}); failure = new Error('changed') as never; throw failure; }` } });

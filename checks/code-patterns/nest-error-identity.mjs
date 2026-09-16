@@ -174,10 +174,17 @@ function readContract(root, bound) {
   return { profile: value.profile, throwRoots, families, throwAllowances };
 }
 
-function containsSymbol(ts, checker, input, identity) {
-  let found = false;
-  const visit = node => { if (symbolAt(ts, checker, node) === identity) found = true; else if (!found) ts.forEachChild(node, visit); };
-  visit(input); return found;
+function assignmentTargetsIdentity(ts, checker, input, identity) {
+  const node = unwrap(ts, input);
+  if (ts.isIdentifier(node)) return symbolAt(ts, checker, node) === identity;
+  if (ts.isArrayLiteralExpression(node)) return node.elements.some(item => assignmentTargetsIdentity(ts, checker, item, identity));
+  if (ts.isObjectLiteralExpression(node)) return node.properties.some(item => {
+    if (ts.isShorthandPropertyAssignment(item)) return symbolAt(ts, checker, item.name) === identity;
+    if (ts.isPropertyAssignment(item)) return assignmentTargetsIdentity(ts, checker, item.initializer, identity);
+    if (ts.isSpreadAssignment(item)) return assignmentTargetsIdentity(ts, checker, item.expression, identity);
+    return false;
+  });
+  return false;
 }
 
 function assignedBefore(ts, checker, block, identity, before) {
@@ -185,7 +192,7 @@ function assignedBefore(ts, checker, block, identity, before) {
   const visit = node => {
     if (assigned || node.pos >= before) return;
     if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
-      && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment && containsSymbol(ts, checker, node.left, identity)) { assigned = true; return; }
+      && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment && assignmentTargetsIdentity(ts, checker, node.left, identity)) { assigned = true; return; }
     if ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
       && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(node.operator) && symbolAt(ts, checker, node.operand) === identity) { assigned = true; return; }
     ts.forEachChild(node, visit);
