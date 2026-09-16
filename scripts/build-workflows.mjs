@@ -28,6 +28,7 @@ import { compileDeclarative } from './compile-declarative.mjs';
 import { loadDeclarative } from './runtime-compile/declarative.mjs';
 import { compactJson, compactJsonBuffer, recompactJsonBytes } from './runtime-compile/emit.mjs';
 import { collectRuntimeModules } from './runtime-compile/runtime-modules.mjs';
+import { assertRuntimeImportClosure } from './runtime-compile/import-closure.mjs';
 import { publishDist } from './runtime-compile/stage.mjs';
 import { readRealFile } from './runtime-compile/paths.mjs';
 
@@ -186,6 +187,7 @@ export function buildFiles(skillRoot = root) {
     files.set(name, recompactJsonBytes(bytes));
   }
 
+  assertRuntimeImportClosure(files);
   const manifestFiles = [...files].map(([file, bytes]) => ({ path: file, sha256: hash(bytes) }));
   files.set('manifest.json', compactJsonBuffer({
     schema: 'starci/dist@1',
