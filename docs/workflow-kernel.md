@@ -1287,8 +1287,9 @@ What it changes in allocation, with `createAllocator({shared:{path, workflow}})`
 - a model/judge lease in the SQLite journal reduces the capacity and projected service visible to an operation,
   including after a controller dies or the job becomes `effect_unknown`. The reverse path uses the same atomic
   resource when a model or judge is admitted. Once a durably launched model/judge job settles, its lease is
-  released but one normalized recent-service unit remains in the journal view for six hours, so an equal-quota
-  peer pool does not return permanently to input order;
+  released but one normalized recent-service unit remains in the journal view only while it is after both the
+  current provider-window start and the six-hour cutoff, so an equal-quota peer pool does not return permanently to input order. A
+  launched cancellation or worker-only stop remains one unit; a never-launched cancellation remains zero;
 - the receipt is `allocation-adaptive {op, runtime, provider, preferredProvider, observationWindowMs, families,
   excluded, reason}`. Each family reports headroom, observed service, reserved service, authoritative admitted
   load, estimate and score; `excluded` gives the bounded reason and applicable reset/admission facts for every

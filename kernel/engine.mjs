@@ -135,17 +135,19 @@ const configuredModelRole=name=>['assessGoal','planOp','presentOwnerQuestion'].i
 const machineResource=key=>({key:`machine:${key}`,units:1});
 function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadRuntimes(),identity={},budget=null,now=Date.now,providerAdmission={}){
   if(typeof eligibility!=='function')throw Error(`Model eligibility is required for ${name}`);
-  const role=modelRole(name),requested=Array.isArray(args?.providers)?args.providers:Object.keys(runtimes.runtimes??{});
+  const at=now(),role=modelRole(name),requested=Array.isArray(args?.providers)?args.providers:Object.keys(runtimes.runtimes??{});
   const job={kind:name==='validateOp'?'judge':'model',role,input:{functionName:name,args:modelInput(args)},...identity};
   const policyTargets=typeof modelPolicy?.providerFilter==='function'?new Set(modelPolicy.providerFilter(job)):null;
   const candidates=requested.map(id=>({id,runtime:{id,...runtimes.runtimes?.[id],model:runtimes.runtimes?.[id]?.target}})).filter(({runtime})=>runtime.target&&(runtime.roles??[]).includes(role)&&(!policyTargets||policyTargets.has(runtime.target)));
-  const eligible=candidates.map((candidate,index)=>({...candidate,index,decision:eligibility(job,candidate.runtime),budget:budgetVerdict(candidate.runtime,budget,{now:now(),requireFresh:true})})).filter(item=>item.decision?.eligible===true);
+  const eligible=candidates.map((candidate,index)=>({...candidate,index,decision:eligibility(job,candidate.runtime),budget:budgetVerdict(candidate.runtime,budget,{now:at,requireFresh:true})})).filter(item=>item.decision?.eligible===true);
   const adaptive=runtimes.allocation?.policy===ADAPTIVE_CAPACITY,owner=runtimes.allocation?.ownerPolicy??{},preferred=owner.preferredProvider??null;
   const admitted=provider=>providerAdmission?.[provider]??null;
+  const recentSettled=item=>{const starts=item.budget.windows.map(window=>Number.isFinite(window.resetsAt)&&Number.isFinite(window.minutes)?window.resetsAt-window.minutes*60_000:null).filter(Number.isFinite),since=Math.max(at-6*60*60*1000,...starts);
+    return (admitted(item.runtime.provider)?.recentSettlements??[]).filter(entry=>entry.at>=since).length;};
   const available=eligible.filter(item=>item.budget.known&&!item.budget.exhausted&&(!admitted(item.runtime.provider)||admitted(item.runtime.provider).used<admitted(item.runtime.provider).capacity));
   if(adaptive)available.sort((a,b)=>{
     const score=item=>(item.budget.remaining/100)*(item.runtime.provider===preferred?(owner.preferenceMultiplier??OWNER_PREFERENCE_MULTIPLIER):1)
-      /(1+(admitted(item.runtime.provider)?.used??0)+(admitted(item.runtime.provider)?.recentSettled??0));
+      /(1+(admitted(item.runtime.provider)?.used??0)+recentSettled(item));
     return score(b)-score(a)||b.budget.remaining-a.budget.remaining||a.index-b.index;
   });
   else available.sort((a,b)=>b.budget.remaining-a.budget.remaining||a.index-b.index);
@@ -156,7 +158,7 @@ function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadR
       admitted:admitted(item.runtime.provider)?.used??null,capacity:admitted(item.runtime.provider)?.capacity??null}));}throw error;}
   const selected=available[0];return {args:{...modelInput(args),providers},runtime:selected.runtime,decision:selected.decision,job,
     considered:available.map(item=>({runtime:item.id,provider:item.runtime.provider,remaining:item.budget.remaining,active:admitted(item.runtime.provider)?.used??0,
-      recentSettled:admitted(item.runtime.provider)?.recentSettled??0,preferred:item.runtime.provider===preferred})),refused:candidates.filter(candidate=>!eligible.some(item=>item.id===candidate.id)).map(candidate=>candidate.id)};
+      recentSettled:recentSettled(item),preferred:item.runtime.provider===preferred})),refused:candidates.filter(candidate=>!eligible.some(item=>item.id===candidate.id)).map(candidate=>candidate.id)};
 }
 
 /** Opt in only at a settled workflow boundary. Canonical Work and approved goal references stay intact. */
@@ -190,22 +192,23 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
     admission.expire();
     const capacities=new Map(journal.db.prepare("SELECT resource_key,capacity FROM resources WHERE resource_key LIKE 'ai/provider:%' ORDER BY resource_key").all()
       .map(row=>[row.resource_key.slice('ai/provider:'.length),row.capacity]));
-    const providers={};for(const [provider,capacity] of capacities)providers[provider]={capacity,used:0,jobs:[],recentSettled:0,recentNonOperationSettled:0,recentOperationSettled:0};
+    const emptyProvider=(capacity=0)=>({capacity,used:0,jobs:[],recentSettled:0,recentNonOperationSettled:0,recentOperationSettled:0,recentSettlements:[]});
+    const providers={};for(const [provider,capacity] of capacities)providers[provider]=emptyProvider(capacity);
     for(const row of journal.db.prepare("SELECT l.resource_key,l.units,j.job_id,j.workflow_id,j.op_id,j.kind,j.role,j.status,j.payload_json FROM leases l JOIN jobs j ON j.job_id=l.job_id WHERE l.resource_key LIKE 'ai/provider:%' ORDER BY l.resource_key,j.created_at,j.job_id").all()){
-      const provider=row.resource_key.slice('ai/provider:'.length),entry=providers[provider]??={capacity:0,used:0,jobs:[],recentSettled:0,recentNonOperationSettled:0,recentOperationSettled:0};
+      const provider=row.resource_key.slice('ai/provider:'.length),entry=providers[provider]??=emptyProvider();
       let payload={};try{payload=JSON.parse(row.payload_json??'{}')??{};}catch{}
       entry.used+=row.units;entry.jobs.push({jobId:row.job_id,workflow:row.workflow_id,op:row.op_id,kind:row.kind,role:row.role,
         status:row.status,runtime:payload?.admission?.runtime??payload?.runtime??null,units:row.units});providers[provider]=entry;
     }
-    // Settled jobs no longer hold a lease, but they still consumed provider service. Count only jobs with a
-    // durable launch receipt, over the same six-hour horizon as operation telemetry. Flat normalized units keep
-    // the signal bounded and make equal-headroom model pools rotate instead of returning to list order forever.
+    // Completed and confirmed-stopped jobs no longer hold a provider lease, but they consumed provider service.
+    // Immutable launch plus settlement receipts distinguish them from never-launched cancellation. A worker-only
+    // stop is visible while writer custody remains, and later final settlement still counts the same job once.
     const since=now()-6*60*60*1000;
-    for(const row of journal.db.prepare("SELECT j.kind,j.payload_json FROM jobs j WHERE j.kind IN ('model','judge','operation') AND j.status IN ('succeeded','failed') AND j.updated_at>=? AND EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=j.workflow_id AND e.entity_id=j.job_id AND e.kind IN ('job-spawned','operation-launched')) ORDER BY j.updated_at,j.job_id").all(since)){
+    for(const row of journal.db.prepare("SELECT j.kind,j.payload_json,(SELECT MAX(s.created_at) FROM events s WHERE s.workflow_id=j.workflow_id AND s.entity_id=j.job_id AND s.kind IN ('job-succeeded','job-failed','job-cancelled','operation-worker-stopped')) AS service_at FROM jobs j WHERE j.kind IN ('model','judge','operation') AND EXISTS (SELECT 1 FROM events l WHERE l.workflow_id=j.workflow_id AND l.entity_id=j.job_id AND l.kind IN ('job-spawned','operation-launched')) AND EXISTS (SELECT 1 FROM events s WHERE s.workflow_id=j.workflow_id AND s.entity_id=j.job_id AND s.kind IN ('job-succeeded','job-failed','job-cancelled','operation-worker-stopped') AND s.created_at>=?) ORDER BY service_at,j.job_id").all(since)){
       let payload={};try{payload=JSON.parse(row.payload_json??'{}')??{};}catch{}
       const runtime=payload?.admission?.runtime??payload?.runtime??null,provider=runtimeProfile.runtimes?.[runtime]?.provider;
-      if(!provider)continue;const entry=providers[provider]??={capacity:0,used:0,jobs:[],recentSettled:0,recentNonOperationSettled:0,recentOperationSettled:0};
-      entry.recentSettled+=1;if(row.kind==='operation')entry.recentOperationSettled+=1;else entry.recentNonOperationSettled+=1;providers[provider]=entry;
+      if(!provider)continue;const entry=providers[provider]??=emptyProvider();
+      entry.recentSettled+=1;entry.recentSettlements.push({at:row.service_at,kind:row.kind});if(row.kind==='operation')entry.recentOperationSettled+=1;else entry.recentNonOperationSettled+=1;
     }
     return {source:'sqlite-admission',providers};
   };

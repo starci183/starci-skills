@@ -265,7 +265,8 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     const estimateMs=matching.length?matching[Math.floor(matching.length/2)]:coldEstimate(difficulty);
     // Operation history is already in the JSON ledger. Durable model/judge completions live only in SQLite;
     // include those normalized units here so operation and non-operation work influence the same family score.
-    const observedCost=history.reduce((sum,item)=>sum+serviceCost(item.durationMs),0)+(admission?.recentNonOperationSettled??0);
+    const recentNonOperationSettled=(admission?.recentSettlements??[]).filter(item=>item.at>=since&&item.kind!=='operation').length;
+    const observedCost=history.reduce((sum,item)=>sum+serviceCost(item.durationMs),0)+recentNonOperationSettled;
     let reservedCost=0,admittedCost=0;
     const admitted=new Set();
     for(const item of admission?.jobs??[]){

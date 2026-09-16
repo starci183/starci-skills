@@ -46,8 +46,10 @@ For each family the allocator derives:
 - projected work: admitted operations already reserved locally or by other
   workflows, using a median duration observed for the same role and difficulty;
 - recent service: actual settled operation duration plus one normalized unit for
-  each durably launched and settled model/judge job, bounded to a rolling six
-  hours. The SQLite journal keeps the latter pressure after its lease is freed;
+  each durably launched and settled model/judge job, counting only events after
+  both the current provider-window start and the rolling six-hour cutoff. The SQLite journal
+  keeps the latter pressure after its lease is freed. A launched cancellation
+  and a worker-only stop count once; a never-launched cancellation counts zero;
 - a conservative cold estimate of 15, 45 or 90 minutes for easy, medium or hard
   work when no suitable observation exists.
 

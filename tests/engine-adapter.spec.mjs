@@ -229,8 +229,9 @@ test('provider-family admission is atomic for concurrent model selections and un
 });
 
 test('settled model service remains durable pressure and rotates an equal-headroom peer pool',t=>{
-  const f=fixture(t);f.modelBudget.providers.codex.windows.weekly.usedPercent=20;f.modelBudget.providers.claude.windows.weekly.usedPercent=20;
-  const profile=withProviderPreference(loadRuntimes(),{mode:'adaptive',preferredProvider:null}),now=()=>Date.now(),
+  const f=fixture(t);let stamp=Date.UTC(2026,8,15,9);const now=()=>stamp;f.modelBudget.at=stamp;
+  for(const provider of ['codex','claude'])f.modelBudget.providers[provider].windows.weekly={usedPercent:20,resetsAt:stamp+60*60_000,minutes:60};
+  const profile=withProviderPreference(loadRuntimes(),{mode:'adaptive',preferredProvider:null}),
     bridge=createJobBridge({journalFile:f.state.engine.journalFile,now,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),
     runtime=createEngineRuntime({...f,now,bridge,runtimeProfile:profile,eligibility:()=>({eligible:true})});
   assert.throws(()=>runtime.model('decide',{providers:['claude-opus','gpt-5.6-sol'],situation:'first',options:['x']},{id:'first',attempt:1}),error=>error.code==='STARCI_JOB_PENDING');
@@ -239,7 +240,24 @@ test('settled model service remains durable pressure and rotates an equal-headro
   assert.equal(jobs.complete({jobId:first.job_id,workflowId:first.workflow_id,opId:first.op_id,attempt:first.attempt,generation:first.generation,leaseToken:first.lease_token,status:'succeeded',result:{ok:true}}).ok,true);
   const view=runtime.providerAdmissionView();assert.equal(view.providers.claude.used,0);assert.equal(view.providers.claude.recentSettled,1);
   assert.throws(()=>runtime.model('decide',{providers:['claude-opus','gpt-5.6-sol'],situation:'second',options:['x']},{id:'second',attempt:1}),error=>error.code==='STARCI_JOB_PENDING');
-  const second=runtime.journal.listJobs().find(job=>job.op_id==='second');assert.deepEqual(second.payload.args.providers,['gpt-5.6-sol'],'settled Claude service moves the next equal-headroom job to Codex');bridge.close();
+  const second=runtime.journal.listJobs().find(job=>job.op_id==='second');assert.deepEqual(second.payload.args.providers,['gpt-5.6-sol'],'settled Claude service moves the next equal-headroom job to Codex');
+  assert.equal(jobs.complete({jobId:second.job_id,workflowId:second.workflow_id,opId:second.op_id,attempt:second.attempt,generation:second.generation,leaseToken:second.lease_token,status:'succeeded',result:{ok:true}}).ok,true);
+  stamp+=60*60_000+1;f.modelBudget.at=stamp;for(const provider of ['codex','claude'])f.modelBudget.providers[provider].windows.weekly.resetsAt=stamp+60*60_000;
+  assert.throws(()=>runtime.model('decide',{providers:['claude-opus','gpt-5.6-sol'],situation:'new-window',options:['x']},{id:'new-window',attempt:1}),error=>error.code==='STARCI_JOB_PENDING');
+  assert.deepEqual(runtime.journal.listJobs().find(job=>job.op_id==='new-window').payload.args.providers,['claude-opus'],'the current provider-window start excludes service from the prior window');bridge.close();
+});
+
+test('launched cancellation and worker-only stop remain service pressure while never-launched cancellation does not',t=>{
+  const f=fixture(t),profile=withProviderPreference(loadRuntimes(),{mode:'adaptive',preferredProvider:null}),
+    bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true})}),runtime=createEngineRuntime({...f,bridge,runtimeProfile:profile,eligibility:()=>({eligible:true})}),
+    launched={id:'launched',kind:'backend.implement',attempt:1,status:'running',allowlist:['a.js']};
+  assert.equal(runtime.reserveOperation(launched,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'}).ok,true);launched.dispatch='ctx-launched';runtime.launched(launched);
+  assert.equal(runtime.settled(launched,{workerOnly:true,reason:'confirmed worker stop'}).ok,true);
+  let view=runtime.providerAdmissionView();assert.equal(view.providers.codex.used,0,'the stopped worker releases provider capacity');assert.equal(view.providers.codex.recentSettled,1,'its consumed service remains visible while the writer is retained');
+  assert.equal(runtime.settled(launched,{status:'cancelled',reason:'confirmed stopped generation retirement'}).ok,true);
+  view=runtime.providerAdmissionView();assert.equal(view.providers.codex.recentSettled,1,'final cancellation is the same launched service, not a second unit');
+  const never={id:'never',kind:'backend.implement',attempt:1,status:'ready',allowlist:['a.js']};assert.equal(runtime.reserveOperation(never,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'}).ok,true);
+  assert.equal(runtime.settled(never,{status:'cancelled',reason:'admission ended before native launch'}).ok,true);assert.equal(runtime.providerAdmissionView().providers.codex.recentSettled,1,'never-launched cancellation adds no service');bridge.close();
 });
 
 test('a pure model job whose worker never started settles instead of fencing the generation for good, while a command job keeps its fence',t=>{
