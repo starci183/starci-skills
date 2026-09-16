@@ -44,96 +44,124 @@ rules:
   - id: BE-ERROR-1
     title: The base
     kind: mandatory
-    requirement: In the legacy Academy exception profile, thrown failures use its AbstractException API. In the
-      adopted pattern, domain error codes/results stay with the capability and transport adapters map them
-      safely. A domain error is not required to carry HTTP status. Unexpected private causes remain internal;
-      the public protocol explicitly maps expected outcomes and unknown failures.
+    requirement: >-
+      Select the repository's error identity profile explicitly. The capability profile keeps one or more
+      Error-derived families with their owning capability and does not impose one application-wide base or
+      central error folder. The Academy profile selects its exact AbstractException hierarchy. In either
+      profile, domain identity stays independent of HTTP/GraphQL status; transport adapters own public mapping.
+      Unexpected private causes remain internal, and expected typed outcomes stay in the domain result contract.
     rationale: ""
     cases:
       - id: case-1
-        when: Shape
+        when: Capability-owned family
+        write: >-
+          A capability declares and exports its selected Error-derived base in its own error scope, with a
+          stable code property and declared cause field. Its subclasses and constructor conventions remain
+          capability-owned; Academy suffix, metadata and central-folder rules do not apply.
+      - id: case-2
+        when: Academy base shape
         write: "export class AbstractException extends Error { readonly code: string; readonly metadata?:
           Record<string, unknown>; readonly httpStatus?: number; constructor(message: string, name: string,
           metadata?: Record<string, unknown>, httpStatus?: number) { super(message); this.code = name;
           this.name = name; this.metadata = metadata; this.httpStatus = httpStatus } … }"
-      - id: case-2
-        when: Serialisation
-        write: "toJSON(): string → { message, code, metadata }; static fromJSON<T extends AbstractException>(…)"
       - id: case-3
-        when: Cause
-        write: "getOriginalError(): unknown { return this.metadata?.originalError }; export interface
-          AbstractExceptionMetadata { originalError?: unknown; normalizedError?: Error }"
+        when: Serialisation
+        write: >-
+          If the selected family crosses a storage or process boundary, its serializer is explicit and tested;
+          Academy uses toJSON()/fromJSON() for its AbstractException contract.
       - id: case-4
+        when: Cause
+        write: >-
+          The selected family declares its raw cause field. Academy uses originalError in metadata; a capability
+          family may use cause. A normalized Error may be additional diagnostic metadata.
+      - id: case-5
         when: Status
-        write: httpStatus is optional; undefined means 500 at both transports
+        write: >-
+          A domain family need not carry HTTP status. Academy may retain optional httpStatus for compatibility;
+          a transport-owned code map with an explicit fallback is equally valid.
     verification:
-      automated: []
-      manual: []
+      automated:
+        - NEST_ERROR_DECLARATION_IDENTITY
+      manual:
+        - Confirm the selected family ownership and public/private error boundary fit the accepted SDS.
     relatedExamples:
       - graphql-command
   - id: BE-ERROR-2
-    title: Declaring one exception
+    title: Declaring one selected error
     kind: mandatory
-    requirement: Declare a metadata interface first, then the class extending AbstractException with a single
-      metadata object argument.
+    requirement: >-
+      A declared error belongs to one selected Error-derived family. Capability families use their own explicit
+      declaration and constructor contract. Under the Academy profile, declare the exported class-named metadata
+      interface first, then the Exception subclass with one object-binding constructor and the exact Academy
+      super(message, UPPER_SNAKE_CLASS_CODE, metadata) flow.
     rationale: httpStatus set in 94 of 294 files at extraction, left undefined in the rest.
     cases:
       - id: case-1
-        when: Metadata interface first
-        write: "export interface ChallengeNotFoundExceptionMetadata extends AbstractExceptionMetadata { id?: string }"
+        when: Capability declaration
+        write: >-
+          Keep the family base and subclasses in the capability's declared error roots; use its selected stable
+          code/cause contract without adding Academy naming or constructor rules.
       - id: case-2
-        when: Class
+        when: Academy metadata interface first
+        write: "export interface ChallengeNotFoundExceptionMetadata extends AbstractExceptionMetadata { id?: string }"
+      - id: case-3
+        when: Academy class
         write: 'export class ChallengeNotFoundException extends AbstractException { constructor({ id, originalError }:
           ChallengeNotFoundExceptionMetadata) { super("Challenge not found", "CHALLENGE_NOT_FOUND_EXCEPTION",
           { id, originalError }) } }'
-      - id: case-3
+      - id: case-4
         when: Interpolated message
         write: super(`AI quota exhausted (${window})`, "AI_QUOTA_EXHAUSTED_EXCEPTION", { window, originalError })
-      - id: case-4
-        when: With a status
-        write: fourth argument HttpStatus.<X>
       - id: case-5
-        when: Single object argument
-        write: "always one metadata object, even when empty: throw new UserNotFoundException({}) (lint
-          require-exception-object-arg)"
+        when: With a status
+        write: The Academy compatibility base may receive fourth argument HttpStatus.<X>; capability errors need not.
+      - id: case-6
+        when: Academy construction
+        write: always one object literal, even when empty — throw new UserNotFoundException({})
     verification:
       automated:
-        - require-exception-object-arg
-      manual: []
+        - NEST_ERROR_DECLARATION_IDENTITY
+      manual:
+        - Review error message safety and whether the declared metadata is necessary for diagnosis or recovery.
     relatedExamples:
       - graphql-command
   - id: BE-ERROR-3
     title: Throwing
     kind: mandatory
-    requirement: Throw the named AbstractException for a failed operation. Do not hide failures in an ad hoc
-      success:false envelope. Explicitly specified typed business dispositions remain normal domain results.
-      Anonymous Error must not escape as the selected application failure. Constructing an Error internally for
-      a retained diagnostic or normalization is allowed when the selected named failure still carries the raw
-      cause identity.
+    requirement: >-
+      An escaping thrown application failure uses a class from the selected error family. Rethrowing the same
+      unchanged caught value is valid. Anonymous Error may be constructed internally for a diagnostic but does
+      not escape as the selected failure. A protocol-native Nest HTTP exception is allowed only through an exact
+      source-bound health-probe allowance. Explicitly specified typed business dispositions remain normal return
+      values and are not converted into exceptions by this code pattern.
     rationale: ""
     cases:
       - id: case-1
-        when: Guard in a handler
-        write: "if (!courseExists) { throw new CourseNotFoundException({ id: courseId }) }"
+        when: Capability failure
+        write: "if (!courseExists) { throw new CourseNotFoundError({ id: courseId }) } — where that class belongs
+          to the selected capability family"
       - id: case-2
-        when: Conflict
+        when: Academy failure
         write: "throw new CourseAlreadyEnrolledException({ courseId, userId: user.id })"
       - id: case-3
-        when: Thrown failures versus business outcomes
-        write: throw the named AbstractException for a failed operation; do not hide it in an ad hoc success:false
-          envelope. An explicitly specified typed business disposition (for example pending verification or
-          refused by policy) remains a normal domain result. The installed no-handler-encoded-failure rule is
-          a warning and is not authority to change SRS outcomes.
+        when: Preserve a caught failure
+        write: "catch (error) { if (shouldPropagate(error)) throw error } — do not reassign the caught binding
+          and then claim it is the original failure"
       - id: case-4
-        when: Named escaping failure
+        when: Typed business disposition
         write: >-
-          Do not throw a bare new Error as the selected application failure. A wrapper may keep
-          normalizedError: new Error(String(error)) only in addition to originalError: error.
+          pending verification, refused by policy and similar SRS-defined outcomes stay typed domain results.
+          A syntactic success/error heuristic is not authority to rewrite those outcomes as throws.
+      - id: case-5
+        when: Health probe
+        write: >-
+          A declared readiness source may throw its exact resolved @nestjs/common HTTP exception because status
+          is that protocol's result; source identity alone does not prove route or status behavior.
     verification:
-      automated: []
+      automated:
+        - NEST_THROWN_ERROR_IDENTITY
       manual:
-        - Distinguish thrown AbstractException failures from explicitly typed business disposition results
-          required by SRS.
+        - Distinguish exceptional failure from an explicitly typed SRS disposition and test health allowances.
     relatedExamples:
       - graphql-command
   - id: BE-ERROR-4
