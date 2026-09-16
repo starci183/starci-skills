@@ -24,6 +24,7 @@ function commandProtocol(command){
   if(new RegExp(`^${starci}\\s+check-stales(?:\\s|$)`,'i').test(value)||
     /^node(?:\.exe)?\s+(?:"[^"]*scripts\/check-stales\.mjs"|'[^']*scripts\/check-stales\.mjs'|\S*scripts\/check-stales\.mjs)(?:\s|$)/i.test(value))return 'stales';
   if(new RegExp(`^${starci}\\s+architecture\\s+check(?:\\s|$)`,'i').test(value))return 'architecture';
+  if(new RegExp(`^${starci}\\s+code-patterns\\s+check(?:\\s|$)`,'i').test(value))return 'code-pattern';
   if(new RegExp(`^${starci}\\s+stacks\\s+check(?:\\s|$)`,'i').test(value))return 'stacks';
   if(new RegExp(`^${starci}\\s+validate(?:\\s|$)`,'i').test(value))return 'work';
   if(/^node(?:\.exe)?\s+(?:"[^"]*scripts\/check-scoped-lint\.mjs"|'[^']*scripts\/check-scoped-lint\.mjs'|\S*scripts\/check-scoped-lint\.mjs)(?:\s|$)/i.test(value))return 'code-pattern';

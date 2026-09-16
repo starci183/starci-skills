@@ -106,6 +106,8 @@ test('a starting source root junction cannot hide unbound external tests', t => 
   fs.writeFileSync(path.join(external, 'hidden.spec.ts'), 'export {};');
   fs.symlinkSync(external, path.join(f.root, 'apps'), 'junction');
   assert.ok(discoverNestMetadataInputs(f.input).errors.some(item => item.message.includes('regular directory')));
+  fs.rmSync(external, { recursive: true, force: true });
+  assert.ok(discoverNestMetadataInputs(f.input).errors.some(item => item.message.includes('regular directory')));
 });
 
 test('import-equals and installed preset files join preflight inputs', t => {

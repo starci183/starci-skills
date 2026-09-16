@@ -45,6 +45,32 @@ Architecture obligations bind a `starci/architecture-check@1` result from `starc
 
 Repository audits use a stable script rule ID and a typed result binding. A generic command exit code, a package script with the same name, or prose saying that a check ran is insufficient. Missing tools/configuration are unavailable coverage, not a pass.
 
+The Next adapter resolves declarations with the target-installed TypeScript compiler. `FE_RETURN_TYPE_PROFILE` distinguishes JSX or explicitly owned visual functions, symbol-bound React `memo`/`forwardRef` wrappers, hooks, async utilities and primitive helpers; capitalization alone never makes a component. `FE_CLOSED_VOCABULARY_SHAPE` binds checked state/mode/Grammar unions to exact inventories, follows unaliased public type re-exports, rejects presentation enums and checks boolean prop names. `FE_CONTRACT_NAME_SHAPE` resolves public type exports to one owner and one symbol instead of comparing text aliases.
+
+A repository may declare the roles that syntax cannot supply at `package.json#starci.codePatterns.next`:
+
+```json
+{
+  "schema": "starci/next-code-pattern-contract@1",
+  "owners": [
+    { "root": "src/features/authentication", "name": "Authentication" }
+  ],
+  "closedVocabularies": [
+    {
+      "path": "src/features/authentication/view-state.ts",
+      "type": "AuthenticationPhase",
+      "inventory": "AUTHENTICATION_MODES",
+      "role": "mode"
+    }
+  ],
+  "projects": ["apps/app/tsconfig.json", "packages/ui/tsconfig.json"]
+}
+```
+
+Every declared path must be normalized, in-repository, non-redirecting and covered by the exact selected source set. Duplicate identities, missing symbols, unresolved aliases and uncovered owner paths are unavailable coverage. The aggregate runner passes canonical `starci/typescript-project-selection@1` architecture identity: config path, exact-byte SHA-256 digest and project list. `projects` in package metadata is a standalone fallback only. If both exist they must agree exactly. Every selected source must belong to a declared TypeScript program; uncovered sources or overlapping programs with conflicting compiler meaning make coverage unavailable. The result records the authority identity and selected-source count per resolved project.
+
+`FE_READONLY_PROPS_CONTRACT` follows selected imported aliases and interfaces, inheritance, recursive shapes and the resolved built-in `Readonly`/`ReadonlyArray` contracts. Mutable fields remain violations at their declaring path. Generic/computed shapes, `any`/`unknown`, shadowed built-ins and declarations outside the exact selected set are unavailable instead of syntax-only passes.
+
 ## Coverage and remaining work
 
 The manifest is the current implementation inventory; inspect each obligation's
