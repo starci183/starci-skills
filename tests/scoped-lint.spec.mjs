@@ -55,6 +55,33 @@ test('an authored source rule missing from the mechanical and semantic inventori
 
 test('an adopted legacy-rule guard requires an explicit off setting and cannot pass when the rule is merely absent',async t=>{const {root,source}=fixture(t),profile=catalog();profile.profiles.next.obligations[0].mechanical.check={kind:'eslint',ruleIds:['no-console'],expected:{severity:'off'}};const absent=await checkScopedLint(root,['src/component.tsx'],{profile:'next',profileCatalog:profile,runtime:runtime(source,{rules:{}}),architecture});assert.equal(absent.status,'findings');assert.ok(absent.issues.some(issue=>issue.code==='REQUIRED_RULE_MISSING'&&issue.ruleId==='no-console'));const disabled=await checkScopedLint(root,['src/component.tsx'],{profile:'next',profileCatalog:profile,runtime:runtime(source,{rules:{'no-console':'off'}}),architecture});assert.equal(disabled.status,'clean');});
 
+test('ESLint metadata subjects run explicitly, missing configuration fails closed, and source-only metadata remains context',async t=>{
+  const {root,source}=fixture(t),metadata=path.join(root,'jest.config.ts');fs.writeFileSync(metadata,'export default {}\n');
+  const makeProfile=sourceOnly=>{const profile=catalog({architectureStatus:'missing',inputGlobs:['jest.config.ts']});profile.profiles.next.obligations.splice(1);profile.profiles.next.obligations[0].applicability={include:['**/*.{ts,tsx}']};if(sourceOnly!==undefined)profile.profiles.next.obligations[0].mechanical.check.sourceOnly=sourceOnly;return profile;};
+  const makeRuntime=({missingMetadata=false}={})=>{const canonRule={},linted=[];return {linted,value:{package:{name:'@starci/eslint-canon-fe',version:'3.0.2',digest,files:1},canon:{rules:{'prefer-arrow-export':canonRule},recommended:{}},builtinRules:new Map(),typescriptRules:{},eslintVersion:'fixture',eslint:{
+    isPathIgnored:async()=>false,
+    calculateConfigForFile:async filePath=>missingMetadata&&path.resolve(filePath)===path.resolve(metadata)?null:{linterOptions:{noInlineConfig:true},rules:{'starci-fe/prefer-arrow-export':'error'},plugins:{'starci-fe':{rules:{'prefer-arrow-export':canonRule}}}},
+    lintFiles:async files=>{linted.push(...files.map(file=>path.resolve(file)));return files.map(filePath=>({filePath,messages:[],suppressedMessages:[],errorCount:0,warningCount:0,fatalErrorCount:0}));},
+  }}};};
+
+  const selected=makeRuntime(),metadataReport=await checkScopedLint(root,[],{profile:'next',profileCatalog:makeProfile(),runtime:selected.value,all:true,configCompiler:targetTypescript});
+  assert.equal(metadataReport.status,'clean',JSON.stringify(metadataReport.issues));
+  assert.deepEqual(selected.linted.sort(),[metadata,source].map(file=>path.resolve(file)).sort());
+  assert.ok(metadataReport.coverage.lintedFiles.includes('jest.config.ts'));
+  assert.deepEqual(metadataReport.coverage.covered,['NEXT-EXPORT']);
+
+  const incomplete=makeRuntime({missingMetadata:true}),missing=await checkScopedLint(root,[],{profile:'next',profileCatalog:makeProfile(),runtime:incomplete.value,all:true,configCompiler:targetTypescript});
+  assert.equal(missing.status,'unavailable',JSON.stringify(missing.issues));
+  assert.ok(missing.issues.some(issue=>issue.code==='REQUIRED_RULE_FILE_UNCONFIGURED'&&issue.file==='jest.config.ts'));
+  assert.ok(missing.coverage.uncovered.includes('NEXT-EXPORT'));
+
+  const sourceOnlyRuntime=makeRuntime(),sourceOnly=await checkScopedLint(root,[],{profile:'next',profileCatalog:makeProfile(true),runtime:sourceOnlyRuntime.value,all:true,configCompiler:targetTypescript});
+  assert.equal(sourceOnly.status,'clean',JSON.stringify(sourceOnly.issues));
+  assert.deepEqual(sourceOnlyRuntime.linted,[path.resolve(source)]);
+  assert.ok(sourceOnly.inputs.before.files.includes('jest.config.ts'));
+  assert.ok(!sourceOnly.obligations[0].files.includes('jest.config.ts'));
+});
+
 test('a private implementation substituted under a canonical rule ID cannot satisfy the authored obligation',async t=>{const {root,source}=fixture(t),report=await checkScopedLint(root,['src/component.tsx'],{profile:'next',profileCatalog:catalog(),runtime:runtime(source,{configuredCanonRule:{create:()=>({})}}),architecture});assert.equal(report.status,'findings');assert.ok(report.issues.some(issue=>issue.code==='REQUIRED_RULE_IMPLEMENTATION_UNAVAILABLE'&&issue.ruleId==='starci-fe/prefer-arrow-export'));});
 
 test('source and config bytes are fingerprinted before and after execution and a scan race fails unavailable',async t=>{const {root,source}=fixture(t),report=await checkScopedLint(root,['src/component.tsx'],{profile:'next',profileCatalog:catalog(),runtime:runtime(source,{onLint:()=>fs.appendFileSync(source,'// changed during scan\n')}),architecture});assert.equal(report.status,'unavailable');assert.equal(report.inputs.stable,false);assert.ok(report.issues.some(issue=>issue.code==='INPUTS_CHANGED_DURING_CHECK'));});
