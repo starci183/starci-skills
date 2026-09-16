@@ -91,15 +91,6 @@ function packageRootFromEntry(entry, expectedName) {
   throw Error('Resolved Grammar entry has no matching package manifest.');
 }
 
-function publicImportTarget(packageRoot, pkg, entry) {
-  const selected = pkg.exports?.[entry];
-  const target = typeof selected === 'string' ? selected : plain(selected) && typeof selected.import === 'string' ? selected.import : null;
-  if (!target || !target.startsWith('./')) throw Error('Standalone Grammar package has no static public import export for the selected entry.');
-  const absolute = path.resolve(packageRoot, target);
-  if (!inside(packageRoot, absolute)) throw Error('Grammar public export escapes its package root.');
-  return fs.realpathSync(absolute);
-}
-
 function resolvePackage(root, contract, spawn) {
   const specifier = `${contract.package}${contract.entry.slice(1)}`;
   if (contract.source.kind === 'installed') {
@@ -113,13 +104,53 @@ function resolvePackage(root, contract, spawn) {
   const pkg = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
   if (pkg.name !== contract.package) throw Error('Repository Grammar package identity does not match the contract.');
   const standalone = packageRoot === root;
-  if (standalone) return { root: packageRoot, entry: publicImportTarget(packageRoot, pkg, contract.entry), selection: 'standalone-export' };
   const selected = resolvePublicEntry(root, specifier, spawn);
   if (!inside(packageRoot, selected)) throw Error('Consumer resolves a stale or different Grammar package than the declared repository provider.');
-  return { root: packageRoot, entry: selected, selection: 'consumer-import' };
+  return { root: packageRoot, entry: selected, selection: standalone ? 'standalone-import' : 'consumer-import' };
 }
 
-function packageInputs(packageRoot, sourceKind, entry) {
+function staticRelativeDependencies(ts, packageRoot, entry, inventoryFiles, packageType) {
+  const inventory = new Set(inventoryFiles.map(([, file]) => path.resolve(file)));
+  const visited = new Set();
+  const pending = [entry];
+  const resolve = (source, specifier) => {
+    const base = path.resolve(path.dirname(source), specifier);
+    const candidates = [base, ...['.js', '.mjs', '.cjs', '.json'].map(extension => `${base}${extension}`),
+      ...['index.js', 'index.mjs', 'index.cjs', 'index.json'].map(name => path.join(base, name))];
+    const found = candidates.find(candidate => fs.existsSync(candidate) && fs.lstatSync(candidate).isFile());
+    if (!found) throw Error(`Grammar public entry has an unresolved relative dependency: ${specifier}`);
+    const canonical = fs.realpathSync(found);
+    if (!inside(packageRoot, canonical)) throw Error('Grammar public entry dependency escapes its canonical package root.');
+    if (!inventory.has(path.resolve(canonical))) throw Error(`Grammar public entry dependency is outside the bound package inventory: ${slash(path.relative(packageRoot, canonical))}`);
+    return canonical;
+  };
+  while (pending.length) {
+    const file = pending.pop();
+    if (visited.has(file) || !/\.[cm]?[jt]sx?$/i.test(file)) continue;
+    visited.add(file);
+    const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true);
+    const visit = node => {
+      let literal = null;
+      if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteralLike(node.moduleSpecifier)) literal = node.moduleSpecifier;
+      else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)
+        && node.moduleReference.expression && ts.isStringLiteralLike(node.moduleReference.expression)) literal = node.moduleReference.expression;
+      else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+        if (![1, 2].includes(node.arguments.length) || !ts.isStringLiteralLike(node.arguments[0])) throw Error('Grammar public entry has an unresolved dynamic import.');
+        literal = node.arguments[0];
+      } else if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'require'
+        && (file.toLowerCase().endsWith('.cjs') || (file.toLowerCase().endsWith('.js') && packageType !== 'module'))) {
+        if (node.arguments.length !== 1 || !ts.isStringLiteralLike(node.arguments[0])) throw Error('Grammar public entry has an unresolved dynamic require.');
+        literal = node.arguments[0];
+      }
+      if (literal?.text.startsWith('.')) pending.push(resolve(file, literal.text));
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return [...visited].map(file => slash(path.relative(packageRoot, file))).sort();
+}
+
+function packageInputs(ts, packageRoot, sourceKind, entry) {
   const manifest = path.join(packageRoot, 'package.json');
   const pkg = JSON.parse(fs.readFileSync(manifest, 'utf8'));
   if (!Array.isArray(pkg.files) || !pkg.files.length || pkg.files.some(value => typeof value !== 'string' || !value || /[*?{}]/.test(value)
@@ -150,23 +181,33 @@ function packageInputs(packageRoot, sourceKind, entry) {
     if (files.size > MAX_FILES || bytes > MAX_BYTES) throw Error('Grammar package identity exceeds the bounded input ceiling.');
   };
   for (const absolute of roots) visit(absolute);
-  return { pkg, files: [...files].sort(([a], [b]) => a.localeCompare(b)), bytes };
+  const sorted = [...files].sort(([a], [b]) => a.localeCompare(b));
+  return { pkg, files: sorted, bytes, dependencyFiles: staticRelativeDependencies(ts, packageRoot, entry, sorted, pkg.type) };
 }
 
 function targetInputs(root) {
   const names = ['package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'pnpm-lock.yaml', 'yarn.lock'];
-  return names.filter(name => fs.existsSync(path.join(root, name))).map(name => [name, regular(root, name)]);
+  const files = names.filter(name => fs.existsSync(path.join(root, name))).map(name => [name, regular(root, name)]);
+  if (files.length < 2) throw Error('Target Grammar selection needs a dependency lock beside package.json.');
+  return files;
 }
 
-function identity(root, resolved) {
-  const inventory = packageInputs(resolved.root, resolved.sourceKind, resolved.entry);
+function identity(ts, root, resolved) {
+  const inventory = packageInputs(ts, resolved.root, resolved.sourceKind, resolved.entry);
   const hash = crypto.createHash('sha256');
   const files = [...targetInputs(root).map(([name, file]) => [`target:${name}`, file]),
     ...inventory.files.map(([name, file]) => [`grammar:${name}`, file])].sort(([a], [b]) => a.localeCompare(b));
   for (const [name, file] of files) {
     hash.update(name); hash.update(Buffer.from([0])); hash.update(fs.readFileSync(file)); hash.update(Buffer.from([0]));
   }
-  return { digest: hash.digest('hex'), files: files.map(([name]) => name), package: inventory.pkg, bytes: inventory.bytes };
+  return { digest: hash.digest('hex'), files: files.map(([name]) => name), package: inventory.pkg, bytes: inventory.bytes,
+    dependencyFiles: inventory.dependencyFiles };
+}
+
+function permissionCapabilities() {
+  const networkDenied = process.allowedNodeEnvironmentFlags?.has?.('--allow-net') === true;
+  return { model: 'node-permission', trust: 'selected-package-is-trusted', filesystemRead: 'all', filesystemWrite: 'denied',
+    childProcess: 'denied', workerThreads: 'denied', network: networkDenied ? 'denied' : 'not-controlled-by-this-node-version' };
 }
 
 const PROBE = String.raw`
@@ -231,14 +272,14 @@ export function checkGrammarGuards({ root, files, contextFiles = [], ruleIds } =
       const providerManifest = slash(path.relative(root, path.join(resolved.root, 'package.json')));
       if (inside(root, resolved.root) && !contextFiles.includes(providerManifest) && !files.includes(providerManifest)) throw Error('Repository Grammar package is outside the bound input context.');
     }
-    const before = identity(root, resolved), probe = executeProbe(resolved, spawn), reselected = resolvePackage(root, contract, spawn);
+    const before = identity(loaded.ts, root, resolved), probe = executeProbe(resolved, spawn), reselected = resolvePackage(root, contract, spawn);
     reselected.sourceKind = contract.source.kind;
     if (reselected.root !== resolved.root || reselected.entry !== resolved.entry || reselected.selection !== resolved.selection) throw Error('The consumer Grammar package selection changed during the behavior probe.');
-    const after = identity(root, reselected);
+    const after = identity(loaded.ts, root, reselected);
     if (before.digest !== after.digest || before.files.join('\0') !== after.files.join('\0')) throw Error('Grammar package or target selection inputs changed during the behavior probe.');
-    result.execution = { engine: 'node-esm-import', node: process.version, vectorProfile: VECTOR_PROFILE,
+    result.execution = { engine: 'node-esm-import', node: process.version, permissions: permissionCapabilities(), vectorProfile: VECTOR_PROFILE,
       package: { name: before.package.name, version: before.package.version ?? null, root: slash(resolved.root), entry: slash(resolved.entry), selection: resolved.selection,
-        inputDigest: before.digest, boundFiles: before.files.length, packageBytes: before.bytes }, vectors: { requiredRules: probe.ruleCount, presentationStates: probe.stateCount,
+        inputDigest: before.digest, boundFiles: before.files.length, packageBytes: before.bytes, dependencyFiles: before.dependencyFiles }, vectors: { requiredRules: probe.ruleCount, presentationStates: probe.stateCount,
         invalidPresentationValues: 6 } };
     for (const item of probe.violations) result.violations.push({ ruleId: GRAMMAR_GUARD_RULES[0], path: result.files[0], message: `Grammar guard vector failed: ${item.vector} (${item.reason}).` });
     result.checkedRuleIds = [...GRAMMAR_GUARD_RULES];

@@ -22,14 +22,15 @@ export function defineGrammarRuleConformance(definition){
 export function assertPresentationState(value){if(!PRESENTATION_STATES.includes(value))throw new TypeError('invalid state')}
 `;
 
-function grammarPackage(moduleSource = goodModule) {
+function grammarPackage(moduleSource = goodModule, entryConditions = { import: './dist/common.js' }, packageFiles = ['dist']) {
   return {
-    package: { name: '@starci/grammar', version: '1.2.3', type: 'module', files: ['dist'], exports: { './common': { import: './dist/common.js' } } },
+    package: { name: '@starci/grammar', version: '1.2.3', type: 'module', files: packageFiles, exports: { './common': entryConditions } },
     moduleSource,
   };
 }
 
-function fixture(t, { source = 'installed', moduleSource = goodModule, mismatch = false } = {}) {
+function fixture(t, { source = 'installed', moduleSource = goodModule, mismatch = false,
+  entryConditions = { import: './dist/common.js' }, packageFiles = ['dist'] } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-grammar-guards-'));
   const write = (relative, value) => {
     const target = path.join(root, ...relative.split('/')); fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -38,7 +39,7 @@ function fixture(t, { source = 'installed', moduleSource = goodModule, mismatch 
   const contract = { schema: 'starci/grammar-guard-contract@1', package: '@starci/grammar', entry: './common',
     source: source === 'installed' ? { kind: 'installed' } : { kind: 'repository', root: source === 'standalone' ? '.' : 'packages/grammar' },
     vectorProfile: 'starci/grammar-guards-v1' };
-  const targetPackage = { private: true, ...(source === 'standalone' ? grammarPackage(moduleSource).package : {}), starci: { codePatterns: { next: { grammarGuards: contract } } } };
+  const targetPackage = { private: true, ...(source === 'standalone' ? grammarPackage(moduleSource, entryConditions, packageFiles).package : {}), starci: { codePatterns: { next: { grammarGuards: contract } } } };
   write('package.json', targetPackage); write('package-lock.json', { lockfileVersion: 3 });
   fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
   fs.symlinkSync(typescriptRoot, path.join(root, 'node_modules/typescript'), 'junction');
@@ -47,15 +48,15 @@ function fixture(t, { source = 'installed', moduleSource = goodModule, mismatch 
     provider = root; write('dist/common.js', moduleSource);
   } else if (source === 'repository') {
     provider = path.join(root, 'packages/grammar');
-    write('packages/grammar/package.json', grammarPackage(moduleSource).package); write('packages/grammar/dist/common.js', moduleSource);
+    write('packages/grammar/package.json', grammarPackage(moduleSource, entryConditions, packageFiles).package); write('packages/grammar/dist/common.js', moduleSource);
     fs.mkdirSync(path.join(root, 'node_modules/@starci'), { recursive: true });
     if (mismatch) {
-      write('other/grammar/package.json', grammarPackage(moduleSource).package); write('other/grammar/dist/common.js', moduleSource);
+      write('other/grammar/package.json', grammarPackage(moduleSource, entryConditions, packageFiles).package); write('other/grammar/dist/common.js', moduleSource);
       fs.symlinkSync(path.join(root, 'other/grammar'), path.join(root, 'node_modules/@starci/grammar'), 'junction');
     } else fs.symlinkSync(provider, path.join(root, 'node_modules/@starci/grammar'), 'junction');
   } else {
     provider = path.join(root, 'node_modules/@starci/grammar');
-    write('node_modules/@starci/grammar/package.json', grammarPackage(moduleSource).package); write('node_modules/@starci/grammar/dist/common.js', moduleSource);
+    write('node_modules/@starci/grammar/package.json', grammarPackage(moduleSource, entryConditions, packageFiles).package); write('node_modules/@starci/grammar/dist/common.js', moduleSource);
   }
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const files = source === 'repository' ? ['package.json', 'packages/grammar/package.json'] : ['package.json'];
@@ -68,6 +69,9 @@ test('installed public Grammar exports pass every bounded rule and presentation 
   assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
   assert.deepEqual(result.checkedRuleIds, [...GRAMMAR_GUARD_RULES]);
   assert.equal(result.execution.package.selection, 'installed-import');
+  assert.equal(result.execution.permissions.filesystemRead, 'all');
+  assert.equal(result.execution.permissions.filesystemWrite, 'denied');
+  assert.equal(result.execution.permissions.network, process.allowedNodeEnvironmentFlags.has('--allow-net') ? 'denied' : 'not-controlled-by-this-node-version');
   assert.deepEqual(result.execution.vectors, { requiredRules: 3, presentationStates: 3, invalidPresentationValues: 6 });
 });
 
@@ -80,7 +84,23 @@ test('repository workspace and standalone provider bind the same public export b
   await t.test('standalone provider', inner => {
     const f = fixture(inner, { source: 'standalone' }), result = checkGrammarGuards(f.input);
     assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
-    assert.equal(result.execution.package.selection, 'standalone-export');
+    assert.equal(result.execution.package.selection, 'standalone-import');
+  });
+});
+
+test('standalone package resolution follows Node export-condition precedence and default exports', async t => {
+  await t.test('node condition wins over import', inner => {
+    const permissive = goodModule.replace("if(missing.length||unknown.length)throw new TypeError('invalid conformance');", '');
+    const f = fixture(inner, { source: 'standalone', entryConditions: { node: './dist/wrong.js', import: './dist/common.js' } });
+    f.write('dist/wrong.js', permissive);
+    const result = checkGrammarGuards(f.input);
+    assert.deepEqual(result.errors, []); assert.ok(result.violations.length > 0);
+    assert.ok(result.execution.package.entry.endsWith('/dist/wrong.js'));
+  });
+  await t.test('default-only export', inner => {
+    const f = fixture(inner, { source: 'standalone', entryConditions: { default: './dist/common.js' } });
+    const result = checkGrammarGuards(f.input);
+    assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
   });
 });
 
@@ -117,6 +137,15 @@ test('missing exports and a consumer resolving a different repository package ar
     const f = fixture(inner, { source: 'repository', mismatch: true }), result = checkGrammarGuards(f.input);
     assert.ok(result.errors.some(item => item.message.includes('stale or different'))); assert.deepEqual(result.checkedRuleIds, []);
   });
+});
+
+test('a static public-entry helper outside the declared package inventory is unavailable', t => {
+  const moduleSource = `export {COMMON_UI_RULE_IDS,PRESENTATION_STATES,defineGrammarRuleConformance,assertPresentationState} from '../runtime/helper.js';`;
+  const f = fixture(t, { moduleSource, packageFiles: ['dist/common.js'] });
+  f.write('node_modules/@starci/grammar/runtime/helper.js', goodModule);
+  const result = checkGrammarGuards(f.input);
+  assert.ok(result.errors.some(item => item.message.includes('outside the bound package inventory')));
+  assert.deepEqual(result.checkedRuleIds, []);
 });
 
 test('timeout, input mutation, selection changes and an interior package link fail closed', async t => {
@@ -162,6 +191,9 @@ test('timeout, input mutation, selection changes and an interior package link fa
 test('malformed contracts and unbound repository manifests cannot claim coverage', t => {
   const f = fixture(t, { source: 'repository' });
   assert.ok(checkGrammarGuards({ ...f.input, files: ['package.json'], contextFiles: ['package.json'] }).errors.some(item => item.message.includes('outside the bound')));
+  fs.unlinkSync(path.join(f.root, 'package-lock.json'));
+  assert.ok(checkGrammarGuards(f.input).errors.some(item => item.message.includes('dependency lock')));
+  f.write('package-lock.json', { lockfileVersion: 3 });
   f.write('package.json', { private: true, starci: { codePatterns: { next: { grammarGuards: { schema: 'wrong' } } } } });
   assert.ok(checkGrammarGuards(f.input).errors.length);
   assert.ok(checkGrammarGuards({ ...f.input, ruleIds: ['UNKNOWN'] }).errors.length);

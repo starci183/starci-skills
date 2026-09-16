@@ -22,13 +22,17 @@ Use `{ "kind": "installed" }` when the consumer uses an installed package.
 Repository mode accepts an initial workspace or `file:` package link after
 resolving it to its canonical root. A monorepo consumer must resolve its public
 package import to that same provider and build. A standalone Grammar repository
-uses `root: "."` and its own public export map, without requiring a self
-dependency.
+uses `root: "."`; Node resolves its package self-reference and export conditions
+without requiring a self dependency.
 
-The adapter binds the target package manifest and lock, the exact public entry,
-the package's explicit published-file inventory, and repository `src` and
-`scripts` inputs where present. It rejects interior links and package escapes.
-The same byte identity must remain before and after the probe.
+The adapter binds the target package manifest and lock, exact public entry, the
+existing files under the package's explicit published roots, and repository
+`src` and `scripts` inputs where present. It follows static relative imports
+from the public entry and rejects a helper outside that bound inventory, dynamic
+module loading, interior links and package escapes. This is a bounded identity,
+not a claim that every file in the repository belongs to the published package.
+The same byte identity and public selection must remain before and after the
+probe.
 
 ## Finite behavior proof
 
@@ -45,9 +49,13 @@ Node's ESM import conditions and checks these finite vectors:
   each throw `TypeError`.
 
 The subprocess has a fixed timeout, no shell, a minimal non-secret environment,
-Node's permission model with filesystem writes, network, child processes and
-workers denied, bounded output and bounded package inventory. Missing packages,
-exports, static package identity, input stability,
+bounded output and bounded package inventory. Node's permission model allows
+filesystem reads and denies filesystem writes, child processes and workers.
+Network access is denied only on Node versions whose permission model exposes
+that capability; Node 22 does not. The report states the actual capability.
+This executes the selected trusted package and is a seat belt against accidental
+effects, not a sandbox for malicious code. Missing packages, exports, static
+package identity, input stability,
 or a completed probe are unavailable coverage. A completed vector with the wrong
 result or error class is a code-pattern finding.
 
@@ -59,3 +67,5 @@ presentation copy, error redaction, React rendering, npm behavior, package
 publication, browser behavior or product UAT. The `compiler` field records the
 target TypeScript tool identity required by the common script-result protocol;
 the behavior evidence is separately recorded as a Node ESM execution probe.
+Bare external dependencies are selected by Node under the bound target manifest
+and lock but are not counted as files in the Grammar package inventory.
