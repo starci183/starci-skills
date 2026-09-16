@@ -1104,3 +1104,113 @@ executionModes:
       piece: Stable selected piece slug
       flow: Selected UAT journey slug
       screen: Selected surface/state slug
+  stales:
+    id: review.verify
+    goal:
+      en: Run the deterministic source and Work freshness script and return reproducible findings without repairing or blessing inputs.
+    nodeKinds: [operations]
+    completionProfile: operations
+    sideEffects:
+      - Write only the selected attempt's audit report; inspected source, Work, stacks, published evidence and baselines remain read-only.
+    graphPolicy:
+      mode: read-only
+      location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+      prerequisiteState: done
+      dispatch: never
+    reads:
+      - id: request
+        path: selected audit request + resolved host project binding
+        purpose:
+          en: Bind the exact target IDs, source roots, accepted baseline and report destination. Inspected stale subjects are data, not prerequisites required to be done before the audit. Actual authorization and unrelated workflow prerequisites remain unchanged.
+      - id: scanner
+        path: scripts/check-stales.mjs + docs/source-staleness.md
+        purpose:
+          en: Read the installed script's supported arguments, report schema, exit codes and coverage limits. Use the same sealed runtime before and after a later authorized repair.
+      - id: subjects
+        path: bound canonical Work + repository source identities + declared stack and evidence bindings
+        purpose:
+          en: Read actual bytes, stable semantic links, covered source paths and source revisions. A stored done, changed commit, fresh hash or model assertion alone cannot establish current behavioral correctness.
+    writes:
+      - id: evidence
+        path: E/stales-report.json + E/stales-command.json
+        fields: [command, exitCode, runtimeDigest, inputBindings, report, coverage, limitations]
+        content:
+          en: Retain exact machine output, command arguments excluding credentials, exit code and runtime/input identities in the selected attempt bundle. No canonical completion, baseline or source write is authorized.
+    steps:
+      - reads: [request, scanner, subjects]
+        writes: [evidence]
+        action:
+          en: Run starci check-stales in canonical Work mode with explicit repository bindings and the selected target closure, or a separately accepted manifest mode. Capture stdout JSON and exit code. Do not replace execution with a model-written report, auto-refresh a baseline, translate unavailable input into clean, or rewrite completion hashes. Nonzero means findings or a scanner/input failure, not permission to repair. Bind every proposed repair to its actual owner and an existing effect grant; never auto-dispatch it. After a separately authorized repair an independent review operation runs the same script against current inputs and verifies the implementation's required tests. Script cleanliness alone does not complete product behavior or semantic review.
+    proofs:
+      - id: executed-scanner
+        requirement:
+          en: The report comes from an actual script execution on the stated roots and immutable baseline, with original JSON and exit code retained; all requested targets and unavailable coverage are accounted for.
+      - id: acceptance-boundary
+        requirement:
+          en: Completing an audit means findings were measured and reported. A workflow freshness gate passes only when the script's exit code is zero and its required coverage is complete; unresolved findings block affected delivery.
+    blockers:
+      - code: SCANNER_UNAVAILABLE
+        condition:
+          en: The declared script or runtime cannot execute; report unavailable instead of claiming clean.
+      - code: INPUT_UNVERIFIABLE
+        condition:
+          en: A required repository, baseline, source identity, Work link or evidence artifact cannot be verified.
+      - code: SOURCE_CHANGED
+        condition:
+          en: Inputs change during the scan; retain the failed observation and rerun at a stable checkpoint.
+    placeholders: {}
+  lint:
+    id: review.verify
+    goal:
+      en: Execute the selected architecture, Work and stack static checks and retain precise findings without repairing source or changing policy.
+    nodeKinds: [operations]
+    completionProfile: operations
+    sideEffects:
+      - Write only the selected attempt's static-check reports; no auto-fix, source mutation, stack operation or completion rewrite.
+    graphPolicy:
+      mode: read-only
+      location: .starciwork node dependsOn/refs with direct sourceRefs and collocated assets
+      prerequisiteState: done
+      dispatch: never
+    reads:
+      - id: request
+        path: selected lint request + resolved host project binding
+        purpose:
+          en: Identify exact repositories, projects, Work root and optional stack profiles. Select only required checks; do not infer deployment or repair authority.
+      - id: policy
+        path: knowledge/coding-reference.json + docs/architecture-check.md + docs/application-stacks.md
+        purpose:
+          en: Read the applicable FE/BE responsibility boundaries and static-check limits for mono or separate repositories, accepted Work ownership and selected Docker/native stack declarations.
+      - id: inputs
+        path: actual repository tsconfig and package exports + canonical Work + selected rendered stack model
+        purpose:
+          en: Resolve actual projects and TypeScript, declared aliases, source bindings and stack model. No missing project, compiler, root, profile or artifact may silently produce a green report.
+    writes:
+      - id: evidence
+        path: E/lint-reports.json + E/lint-commands.json
+        fields: [commands, exitCodes, runtimeDigest, inputBindings, reports, coverage, limitations]
+        content:
+          en: Store the actual selected checker outputs and identities in the attempt bundle, preserving violations and unknown coverage without editing inspected inputs.
+    steps:
+      - reads: [request, policy, inputs]
+        writes: [evidence]
+        action:
+          en: Execute starci architecture check for every selected FE/BE source project, starci validate for selected canonical Work, and starci stacks check for selected materialized stack profiles. Use documented explicit layout configuration when inference is insufficient. Capture each original JSON report and exit code. Do not run fix flags, hide files, lower rules or replace machine output with prose. An unavailable required checker or unresolved target fails the gate. Route measured findings to separately authorized owners; static pass never proves runtime dependency injection, live startup, browser UAT or business correctness.
+    proofs:
+      - id: executed-checks
+        requirement:
+          en: Every requested static check actually executes with declared coverage; required exit codes are zero, and reports contain no unresolved required-input failures.
+      - id: bounded-meaning
+        requirement:
+          en: The result explicitly separates static architecture/metadata conformance from runtime, behavioral and deployment proof. It grants no source repair or product completion authority.
+    blockers:
+      - code: CHECK_UNAVAILABLE
+        condition:
+          en: Required compiler, script, project config, Work binding or rendered model is absent or invalid.
+      - code: STATIC_VIOLATION
+        condition:
+          en: A required checker reports a violation; retain its file, location and rule identifier for the owning repair.
+      - code: SOURCE_CHANGED
+        condition:
+          en: Selected inputs changed during measurement and results no longer bind one coherent checkpoint.
+    placeholders: {}
