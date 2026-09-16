@@ -405,7 +405,13 @@ same workflow and its exact frozen goal identity. The file records the real owne
 separately from the coordinator's technical `apply-same-id` decision, plus a concrete effect ceiling. Added
 scope requires an exact scope-to-path binding. The command appends an idempotent amendment, replaces an active
 criterion only through an exact `from`/`to` supersession (retaining the prior wording as history), assigns added
-paths/resources/external effects to named unfinished operations inside the owner ceiling, and refreshes the continuation brief; it never rewrites the
+paths/resources/external effects to named unfinished operations inside the owner ceiling, and refreshes the continuation brief. An authorized
+plan-ledger amendment may also carry `changes.addOperations` and `changes.operationDependencies`: every new
+operation has an explicit id, one of the public `PLAN_OP_KINDS`, known ledger ids, a nonempty ceiling-bounded
+allowlist, runnable checks and acceptance; every added dependency names exact existing or simultaneously added
+operations. The runtime validates the complete prospective DAG before changing state, rejects cycles and edits
+to accepted or live operations, and records the prior dependency list of every existing operation it changes.
+Replay recognizes the amendment digest and adds neither duplicate operations nor duplicate edges. It never rewrites the
 original approval, accepted operations, decisions, evidence, receipts, jobs, leases, dispatches or candidates.
 Reusing the same owner source with different bytes is rejected. Boundary findings still block resume.
 

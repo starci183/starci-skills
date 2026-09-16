@@ -5,7 +5,7 @@ import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {stringifyYaml} from '../core/yaml.mjs';
 import {main as launcherMain} from '../hosts/orca/launch.mjs';
-import {amendmentContractLines,bindPlannedAmendmentEffects,operationAmendmentVerdict,readWorkflowAmendment} from '../kernel/amendment.mjs';
+import {amendmentContractLines,applyWorkflowAmendment,bindPlannedAmendmentEffects,operationAmendmentVerdict,readWorkflowAmendment} from '../kernel/amendment.mjs';
 import {createWorkflowState} from '../kernel/kernel.mjs';
 import {openJournal} from '../kernel/journal.mjs';
 import {createStore,stateGoalIdentity} from '../kernel/store.mjs';
@@ -49,6 +49,11 @@ function fixture(t){
   return {root,store,state,journalFile,amendment,amendmentFile};
 }
 const publicCommand=(fixture,...args)=>launcherMain([...args,'--worktree',path.relative(process.cwd(),fixture.root)],{orca:{}});
+const addOperation=(id,kind='review.verify')=>({id,kind,goal:`Run ${id} against the authorized source slice.`,ledgerIds:['frontend-slice'],
+  allowlist:['src/frontend/**'],references:['src/frontend/**'],checks:[{name:`${id}-check`,command:'node --test tests/frontend.spec.mjs'}],
+  acceptance:[`${id} records a current independent result.`],dependsOn:[]});
+const operationAmendment=(fixture)=>{const record=structuredClone(fixture.amendment);record.changes.addOperations=[addOperation('pre-source-audit'),addOperation('post-independent-review')];
+  record.changes.operationDependencies={'remaining-1':['pre-source-audit'],'post-independent-review':['remaining-1']};return record;};
 
 test('public stop and same-ID amendment preserve accepted history, owner decisions and an unknown writer',t=>{
   const f=fixture(t);
@@ -103,6 +108,56 @@ test('same owner source cannot drift and an amendment cannot reopen accepted wor
   reopen.changes.operationFindings={'accepted-1':['Run accepted work again.']};
   const reopenFile=path.join(f.root,'reopen.yaml');fs.writeFileSync(reopenFile,stringifyYaml(reopen));
   assert.throws(()=>publicCommand(f,'workflow-amend','--id',f.state.id,'--amendment',reopenFile),/cannot reopen accepted or settled operation/);
+});
+
+test('an authorized amendment atomically inserts pre-audit and post-review operations into the existing DAG',t=>{
+  const f=fixture(t),accepted=structuredClone(f.state.ops[0]),decisions=structuredClone(f.state.decisions),approval=f.state.goalDigest;
+  f.state.ledger=[{id:'frontend-slice',title:'Existing frontend refactor slice',status:'planned',evidence:[]}];
+  f.state.ops[1].status='pending';delete f.state.ops[1].lease;f.store.saveState(f.state);
+  const record=operationAmendment(f);fs.writeFileSync(f.amendmentFile,stringifyYaml(record));
+  const applied=applyWorkflowAmendment(f.store,f.state,f.amendmentFile,{now:()=>1234});assert.equal(applied.replayed,false);
+  const pre=f.state.ops.find(op=>op.id==='pre-source-audit'),remaining=f.state.ops.find(op=>op.id==='remaining-1'),post=f.state.ops.find(op=>op.id==='post-independent-review');
+  assert.equal(pre.kind,'review.verify');assert.equal(pre.origin,'amendment');assert.equal(pre.status,'pending');assert.equal(pre.amendment,applied.amendment.digest);
+  assert.deepEqual(remaining.dependsOn,['pre-source-audit']);assert.deepEqual(remaining.preAmendmentDependsOn,[]);
+  assert.deepEqual(remaining.dependencyAmendments,[{amendment:applied.amendment.digest,added:['pre-source-audit']}]);
+  assert.deepEqual(post.dependsOn,['remaining-1']);assert.equal(operationAmendmentVerdict(f.state,post,{files:['src/frontend/result.ts']}).ok,true);
+  assert.deepEqual(f.state.ops[0],accepted);assert.deepEqual(f.state.decisions,decisions);assert.equal(f.state.goalDigest,approval);assert.equal(f.state.approved,true);
+  assert.match(amendmentContractLines(f.state,post).join('\n'),/added by the amendment as review\.verify/);
+  const replay=applyWorkflowAmendment(f.store,f.state,f.amendmentFile,{now:()=>9999});assert.equal(replay.replayed,true);
+  assert.equal(f.state.ops.filter(op=>['pre-source-audit','post-independent-review'].includes(op.id)).length,2);
+  assert.deepEqual(remaining.dependsOn,['pre-source-audit']);assert.equal(f.store.readEvents().filter(event=>event.event==='workflow-amended').length,1);
+});
+
+test('invalid added operations and dependency edits fail before any workflow byte or event changes',t=>{
+  const cases={
+    collision:record=>{record.changes.addOperations[0].id='accepted-1';},
+    kind:record=>{record.changes.addOperations[0].kind='task.execute';},
+    ledger:record=>{record.changes.addOperations[0].ledgerIds=['unknown-ledger'];},
+    checks:record=>{record.changes.addOperations[0].checks=[];},
+    ceiling:record=>{record.changes.addOperations[0].allowlist=['src/backend/**'];},
+    absoluteReference:record=>{record.changes.addOperations[0].references=['C:/outside/source.ts'];},
+    unknownReference:record=>{record.changes.addOperations[0].references=['docs/unknown-source.md'];},
+    unknownDependency:record=>{record.changes.operationDependencies['post-independent-review']=['missing-op'];},
+    selfDependency:record=>{record.changes.operationDependencies['post-independent-review']=['post-independent-review'];},
+    cycle:record=>{record.changes.operationDependencies['pre-source-audit']=['post-independent-review'];},
+    acceptedTarget:record=>{record.changes.operationDependencies['accepted-1']=['pre-source-audit'];},
+  };
+  for(const [name,alter] of Object.entries(cases)){
+    const f=fixture(t);f.state.ledger=[{id:'frontend-slice',title:'Existing frontend refactor slice',status:'planned',evidence:[]}];
+    f.state.ops[1].status='pending';delete f.state.ops[1].lease;f.store.saveState(f.state);
+    const record=operationAmendment(f);alter(record);fs.writeFileSync(f.amendmentFile,stringifyYaml(record));
+    const before=structuredClone(f.state),eventCount=f.store.readEvents().length;
+    assert.throws(()=>applyWorkflowAmendment(f.store,f.state,f.amendmentFile),undefined,name);
+    assert.deepEqual(f.state,before,name);assert.deepEqual(f.store.loadState(),before,name);assert.equal(f.store.readEvents().length,eventCount,name);
+  }
+  for(const [name,status,withLease] of [['running','running',false],['paused','paused',false],['effect-unknown','blocked',true]]){
+    const f=fixture(t);f.state.ledger=[{id:'frontend-slice',title:'Existing frontend refactor slice',status:'planned',evidence:[]}];
+    f.state.ops[1].status=status;if(!withLease)delete f.state.ops[1].lease;f.store.saveState(f.state);
+    const record=operationAmendment(f);fs.writeFileSync(f.amendmentFile,stringifyYaml(record));
+    const before=structuredClone(f.state),eventCount=f.store.readEvents().length;
+    assert.throws(()=>applyWorkflowAmendment(f.store,f.state,f.amendmentFile),/accepted or live operation/,name);
+    assert.deepEqual(f.state,before,name);assert.deepEqual(f.store.loadState(),before,name);assert.equal(f.store.readEvents().length,eventCount,name);
+  }
 });
 
 test('sequential, stale-projection and replayed amendments compose every prior operation grant without a lost update',t=>{

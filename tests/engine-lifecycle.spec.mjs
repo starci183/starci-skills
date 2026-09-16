@@ -70,14 +70,16 @@ test('the supervisor retains the lock until the former kernel is confirmed dead'
 
 test('owner inbox commits the actual choice and requester continuation once',t=>{
   const root=fixture(t),store=createStore({repoRoot:root,id:'wf'}),journal=openJournal({file:path.join(root,'journal.sqlite')});
-  const state={schema:store.schema,id:'wf',job:'synthetic approval fixture',approved:true,inputs:['approved-ref'],scope:[],definitionOfDone:[],ledgerMode:'plan',engine:{schema:'starci/engine@1',generation:2},needUser:[{op:'ask',kind:'decision'}],ops:[
-    {id:'ask',kind:'decision.prepare',status:'running',attempt:1,question:{kind:'decision',text:'Choose the theme',options:['Blue','Green']},requesters:['work']},
+  const state={schema:store.schema,id:'wf',job:'synthetic approval fixture',approved:true,inputs:['approved-ref'],scope:[],definitionOfDone:[],ledgerMode:'plan',engine:{schema:'starci/engine@1',generation:2},needUser:[{op:'ask',kind:'decision',record:'decision.theme',options:['Use the blue theme.','Use the green theme.']}],ops:[
+    {id:'ask',kind:'decision.prepare',status:'running',attempt:1,ownerRequestStatus:'waiting-owner',decisionOptionsDigest:'a'.repeat(64),
+      question:{kind:'decision',record:'decision.theme',text:'Choose the theme',options:[{id:'1',label:'Use the blue theme.'},{id:'2',label:'Use the green theme.'}]},requesters:['work']},
     {id:'work',kind:'task.execute',status:'paused',waitingFor:'ask',dependsOn:['ask'],attempt:1}
   ]};store.bindJournal(journal,2,{state});
-  const request=deriveOwnerRequests(state)[0],queued=enqueueOwnerInbox(store,{schema:'starci/owner-action@1',action:{type:'choose',workflowId:'wf',requestId:request.id,generation:2,revision:request.revision,value:'2',actor:{type:'owner',receiptId:'synthetic-authenticated-server-receipt',channel:'orca'}}});
+  const request=deriveOwnerRequests(state)[0],queued=enqueueOwnerInbox(store,{schema:'starci/owner-action@1',action:{type:'choose',workflowId:'wf',requestId:request.id,generation:2,revision:request.revision,
+    optionsDigest:request.optionsDigest,value:'2',actor:{type:'owner',receiptId:'synthetic-authenticated-server-receipt',channel:'orca'}}});
   const bytes=JSON.stringify(queued.job);
   applyInbox(store,state,{engine:{journal}});
-  assert.equal(state.ops[1].status,'ready');assert.match(state.ops[1].answer,/Green/);assert.deepEqual(state.inputs,['approved-ref']);
+  assert.equal(state.ops[1].status,'ready');assert.match(state.ops[1].answer,/green theme/);assert.deepEqual(state.inputs,['approved-ref']);
   fs.writeFileSync(path.join(store.paths.inbox,'replay.json'),bytes);applyInbox(store,state,{engine:{journal}});
   assert.equal(state.ops[1].ownerContinuationReceipts.length,1);assert.equal(journal.events().filter(event=>event.kind==='owner-action-applied').length,1);
   journal.close();

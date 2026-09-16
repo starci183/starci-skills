@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
+import {PLAN_OP_KINDS} from '../models/functions.mjs';
+import {toOp} from './common.mjs';
 import {stateGoalIdentity} from './store.mjs';
 
 export const WORKFLOW_AMENDMENT='starci/workflow-amendment@1';
@@ -46,6 +48,31 @@ const replacements=(value,label)=>{
   need(Array.isArray(value),`Workflow amendment ${label} must be an array`);
   const seen=new Set();return value.map((item,index)=>{exactKeys(item,['from','to'],`${label}[${index}]`);const from=text(item.from,`${label}[${index}].from`),to=text(item.to,`${label}[${index}].to`);need(!seen.has(from),`Workflow amendment ${label} must replace each original criterion once`);seen.add(from);return {from,to};});
 };
+const operationPath=(value,label)=>{const item=text(value,label),normalized=item.replaceAll('\\','/');
+  need(!path.isAbsolute(item)&&!normalized.split('/').includes('..'),`Workflow amendment ${label} must be a path relative to the worktree`);return normalized;};
+const checks=(value,label)=>{need(Array.isArray(value)&&value.length,`Workflow amendment ${label} must be a nonempty array`);
+  const seen=new Set();return value.map((item,index)=>{exactKeys(item,['name','command'],`${label}[${index}]`);
+    const check={name:text(item.name,`${label}[${index}].name`),command:text(item.command,`${label}[${index}].command`)};
+    need(!seen.has(check.name),`Workflow amendment ${label} must use unique check names`);seen.add(check.name);return check;});};
+function addedOperation(value,index){
+  const label=`changes.addOperations[${index}]`;
+  exactKeys(value,['id','kind','goal','ledgerIds','allowlist','references','checks','acceptance','dependsOn'],label);
+  need(Object.hasOwn(value,'id'),`Workflow amendment needs ${label}.id`);
+  const raw={id:text(value.id,`${label}.id`),kind:text(value.kind,`${label}.kind`),goal:text(value.goal,`${label}.goal`),
+    ledgerIds:list(value.ledgerIds,`${label}.ledgerIds`,{required:true}),
+    allowlist:list(value.allowlist,`${label}.allowlist`,{required:true}).map((item,pathIndex)=>operationPath(item,`${label}.allowlist[${pathIndex}]`)),
+    references:list(value.references,`${label}.references`).map((item,pathIndex)=>operationPath(item,`${label}.references[${pathIndex}]`)),
+    checks:checks(value.checks,`${label}.checks`),acceptance:list(value.acceptance,`${label}.acceptance`,{required:true}),
+    dependsOn:list(value.dependsOn,`${label}.dependsOn`)};
+  const op=toOp(raw,index);need(PLAN_OP_KINDS.includes(op.kind),
+    `Workflow amendment operation ${op.id} has unsupported plan kind ${op.kind}; expected one of ${PLAN_OP_KINDS.join(', ')}`);
+  return {id:op.id,kind:op.kind,goal:op.goal,ledgerIds:op.ledgerIds,allowlist:op.allowlist,references:op.references,
+    checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn};
+}
+const addedOperations=value=>{if(value===undefined)return [];need(Array.isArray(value),'Workflow amendment changes.addOperations must be an array');
+  const result=value.map(addedOperation);need(new Set(result.map(item=>item.id)).size===result.length,'Workflow amendment changes.addOperations must use unique exact ids');return result;};
+const dependencyChanges=value=>{if(value===undefined)return {};need(plain(value),'Workflow amendment changes.operationDependencies must be an object keyed by exact operation id');
+  return Object.fromEntries(Object.entries(value).map(([opId,dependencies])=>[text(opId,'operation dependency target'),list(dependencies,`changes.operationDependencies.${opId}`,{required:true})]));};
 
 function source(value,label){
   exactKeys(value,['threadId','messageId','messageIdAvailability','quote','assurance','at'],label);
@@ -66,6 +93,47 @@ function source(value,label){
   return normalized;
 }
 const sourceKey=value=>`${value.threadId}:${value.messageIdAvailability==='available'?value.messageId:`not-exposed:${digest({quote:value.quote,at:value.at})}`}`;
+const DEPENDENCY_EDITABLE=new Set(['pending','ready','blocked']);
+const liveIdentity=op=>['lease','dispatch','terminal','task','pending'].some(key=>op?.[key]!==undefined&&op[key]!==null)||op?.workerSettled===false;
+function assertAcyclic(ops){
+  const dependencies=new Map(ops.map(op=>[op.id,[...(op.dependsOn??[])]])),visiting=new Set(),visited=new Set();
+  const walk=(id,trail=[])=>{if(visiting.has(id))throw Error(`Workflow amendment operation dependency cycle: ${[...trail,id].join(' -> ')}`);if(visited.has(id))return;
+    visiting.add(id);for(const dependency of dependencies.get(id)??[])walk(dependency,[...trail,id]);visiting.delete(id);visited.add(id);};
+  for(const id of dependencies.keys())walk(id);
+}
+
+function prepareOperationChanges(state,record,amendmentDigest){
+  const existing=Array.isArray(state.ops)?state.ops:[],existingIds=new Set(existing.map(op=>op.id)),ledgerIds=new Set((state.ledger??[]).map(item=>item.id));
+  const knownReferences=unique([...(state.inputs??[]).map(item=>item?.ref).filter(Boolean),...(state.ledger??[]).map(item=>item?.inputRef).filter(Boolean),
+    ...existing.flatMap(op=>[...(op.references??[]),...(op.allowlist??[])]),...record.changes.effectCeiling.paths]);
+  const added=record.changes.addOperations.map((raw,index)=>{
+    need(!existingIds.has(raw.id),`Amendment added operation id already exists: ${raw.id}`);
+    for(const ledgerId of raw.ledgerIds)need(ledgerIds.has(ledgerId),`Amendment operation ${raw.id} claims unknown ledger item ${ledgerId}`);
+    for(const reference of raw.references)need([...raw.allowlist,...knownReferences].some(grant=>effectPathCovered(String(grant).split('#')[0],String(reference).split('#')[0])),
+      `Amendment operation ${raw.id} names unknown reference ${reference}`);
+    const op=toOp({...raw,origin:'amendment'},existing.length+index);op.amendment=amendmentDigest;
+    op.preAmendmentAllowlist=[];op.preAmendmentResources=[];op.preAmendmentExternal=[];
+    op.amendmentEffects=[{amendment:amendmentDigest,paths:[...op.allowlist],resources:[],external:[]}];
+    return op;
+  });
+  const all=[...existing,...added],byId=new Map(all.map(op=>[op.id,op]));
+  need(byId.size===all.length,'Amendment operation ids are not unique in the workflow');
+  for(const op of added)for(const dependency of op.dependsOn){need(byId.has(dependency),`Amendment operation ${op.id} depends on unknown operation ${dependency}`);
+    need(dependency!==op.id,`Amendment operation ${op.id} cannot depend on itself`);}
+  const prospective=new Map(all.map(op=>[op.id,[...(op.dependsOn??[])]]));
+  for(const [opId,dependencies] of Object.entries(record.changes.operationDependencies)){
+    const op=byId.get(opId);need(op,`Amendment dependency change names unknown operation ${opId}`);
+    if(existingIds.has(opId))need(DEPENDENCY_EDITABLE.has(op.status)&&!liveIdentity(op),
+      `Amendment cannot edit dependencies of accepted or live operation ${opId} (${op.status})`);
+    for(const dependency of dependencies){need(byId.has(dependency),`Amendment operation ${opId} depends on unknown operation ${dependency}`);
+      need(dependency!==opId,`Amendment operation ${opId} cannot depend on itself`);}
+    prospective.set(opId,unique([...prospective.get(opId),...dependencies]));
+  }
+  assertAcyclic(all.map(op=>({id:op.id,dependsOn:prospective.get(op.id)})));
+  for(const [opId] of Object.entries(record.changes.operationEffects))need(!added.some(op=>op.id===opId),
+    `Amendment effects for added operation ${opId} must be declared by its addOperations.allowlist`);
+  return {added,prospective,existingIds};
+}
 
 /**
  * Read the bounded, explicit owner grant that overlays a frozen workflow goal. This record is not a replacement
@@ -88,7 +156,7 @@ export function readWorkflowAmendment(file){
   need(record.coordinator.decision==='apply-same-id','Workflow amendment coordinator.decision must be apply-same-id');
   const coordinator={actor:'coordinator',source:source(record.coordinator.source,'coordinator.source'),decision:'apply-same-id',
     rationale:text(record.coordinator.rationale,'coordinator.rationale')};
-  exactKeys(record.changes,['clarifications','addScope','scopeBindings','addDefinitionOfDone','supersedeDefinitionOfDone','operationFindings','operationEffects','effectCeiling'],'changes');
+  exactKeys(record.changes,['clarifications','addScope','scopeBindings','addDefinitionOfDone','supersedeDefinitionOfDone','operationFindings','operationEffects','addOperations','operationDependencies','effectCeiling'],'changes');
   const clarifications=list(record.changes.clarifications,'changes.clarifications',{required:true});
   const addScope=list(record.changes.addScope,'changes.addScope');
   const addDefinitionOfDone=list(record.changes.addDefinitionOfDone,'changes.addDefinitionOfDone');
@@ -108,10 +176,14 @@ export function readWorkflowAmendment(file){
   need(plain(operationEffects),'Workflow amendment changes.operationEffects must be an object keyed by operation id');
   const effects=Object.fromEntries(Object.entries(operationEffects).map(([opId,value])=>[text(opId,'operation effect id'),effectBlock(value,`changes.operationEffects.${opId}`)]));
   for(const [opId,value] of Object.entries(effects))need(effectSubset(value,effectCeiling),`Workflow amendment operation ${opId} exceeds changes.effectCeiling`);
+  const addOperations=addedOperations(record.changes.addOperations),operationDependencies=dependencyChanges(record.changes.operationDependencies);
+  for(const op of addOperations)need(op.allowlist.every(item=>effectCeiling.paths.some(grant=>effectPathCovered(grant,item))),
+    `Workflow amendment added operation ${op.id} exceeds changes.effectCeiling.paths`);
   need(!addScope.length||effectCeiling.paths.length,
     'Workflow amendment that adds scope must carry a nonempty changes.effectCeiling.paths owner grant');
   const normalized={schema:WORKFLOW_AMENDMENT,workflowId,baseGoalIdentity,authority,coordinator,
-    changes:{clarifications,addScope,scopeBindings:boundScopes,addDefinitionOfDone,supersedeDefinitionOfDone,operationFindings:findings,operationEffects:effects,effectCeiling}};
+    changes:{clarifications,addScope,scopeBindings:boundScopes,addDefinitionOfDone,supersedeDefinitionOfDone,operationFindings:findings,operationEffects:effects,
+      addOperations,operationDependencies,effectCeiling}};
   return {file:resolved,record:normalized,digest:digest(normalized)};
 }
 
@@ -121,31 +193,44 @@ export function applyWorkflowAmendment(store,state,file,{now=Date.now}={}){
   need(parsed.record.workflowId===state.id,`Amendment belongs to ${parsed.record.workflowId}, not workflow ${state.id}`);
   need(parsed.record.baseGoalIdentity===baseGoalIdentity,
     `Amendment base goal ${parsed.record.baseGoalIdentity} does not match frozen workflow goal ${baseGoalIdentity}`);
-  state.amendments=Array.isArray(state.amendments)?state.amendments:[];
-  const replay=state.amendments.find(item=>item.digest===parsed.digest);
+  const amendments=Array.isArray(state.amendments)?state.amendments:[];
+  const replay=amendments.find(item=>item.digest===parsed.digest);
   if(replay){
     if(!store.readEvents().some(event=>event.event==='workflow-amended'&&event.digest===replay.digest))
       store.appendEvent({event:'workflow-amended',digest:replay.digest,baseGoalIdentity:replay.baseGoalIdentity,recoveredProjection:true});
     return {ok:true,replayed:true,amendment:replay,file:parsed.file};
   }
-  const reusedGrant=state.amendments.find(item=>item.authority?.source&&sourceKey(item.authority.source)===sourceKey(parsed.record.authority.source));
+  const reusedGrant=amendments.find(item=>item.authority?.source&&sourceKey(item.authority.source)===sourceKey(parsed.record.authority.source));
   need(!reusedGrant,
     `Owner grant ${sourceKey(parsed.record.authority.source)} is already bound to amendment ${reusedGrant?.digest}`);
+  const prepared=prepareOperationChanges(state,parsed.record,parsed.digest),targets=new Map([...(state.ops??[]),...prepared.added].map(op=>[op.id,op]));
   for(const opId of unique([...Object.keys(parsed.record.changes.operationFindings),...Object.keys(parsed.record.changes.operationEffects)])){
-    const op=(state.ops??[]).find(item=>item.id===opId);
+    const op=targets.get(opId);
     need(op,`Amendment finding names unknown operation ${opId}`);
     need(!SETTLED.has(op.status),`Amendment cannot reopen accepted or settled operation ${opId} (${op.status})`);
   }
-  // Freeze the original derived identity before changing scope/criteria on old state shapes that did not persist it.
-  if(!state.goalDigest)state.goalDigest=baseGoalIdentity;
-  state.scope=unique([...(Array.isArray(state.scope)?state.scope:[]),...parsed.record.changes.addScope]);
   const priorDefinition=[...(Array.isArray(state.definitionOfDone)?state.definitionOfDone:[])];
   for(const replacement of parsed.record.changes.supersedeDefinitionOfDone)
     need(priorDefinition.filter(item=>item===replacement.from).length===1,`Amendment criterion to supersede is not exactly active once: ${replacement.from}`);
+  // Every check above is read-only. State mutation starts only after the complete operation/dependency graph,
+  // owner ceiling, criteria and target set have passed together.
+  // Freeze the original derived identity before changing scope/criteria on old state shapes that did not persist it.
+  if(!state.goalDigest)state.goalDigest=baseGoalIdentity;
+  state.amendments=amendments;
+  state.scope=unique([...(Array.isArray(state.scope)?state.scope:[]),...parsed.record.changes.addScope]);
   if(parsed.record.changes.supersedeDefinitionOfDone.length){state.definitionOfDoneHistory=Array.isArray(state.definitionOfDoneHistory)?state.definitionOfDoneHistory:[];
     state.definitionOfDoneHistory.push({amendment:parsed.digest,criteria:priorDefinition,replacements:parsed.record.changes.supersedeDefinitionOfDone});}
   const replacementMap=new Map(parsed.record.changes.supersedeDefinitionOfDone.map(item=>[item.from,item.to]));
   state.definitionOfDone=unique([...priorDefinition.map(item=>replacementMap.get(item)??item),...parsed.record.changes.addDefinitionOfDone]);
+  state.ops.push(...prepared.added);
+  for(const [opId,dependencies] of Object.entries(parsed.record.changes.operationDependencies)){
+    const op=state.ops.find(item=>item.id===opId);
+    if(prepared.existingIds.has(opId)){
+      if(!Array.isArray(op.preAmendmentDependsOn))op.preAmendmentDependsOn=[...(op.dependsOn??[])];
+      op.dependencyAmendments=[...(op.dependencyAmendments??[]),{amendment:parsed.digest,added:[...dependencies]}];
+    }
+    op.dependsOn=[...prepared.prospective.get(opId)];
+  }
   for(const [opId,items] of Object.entries(parsed.record.changes.operationFindings)){
     const op=state.ops.find(item=>item.id===opId);
     op.findings=unique([...(Array.isArray(op.findings)?op.findings:[]),...items]);
@@ -173,7 +258,8 @@ export function applyWorkflowAmendment(store,state,file,{now=Date.now}={}){
       messageIdAvailability:amendment.coordinator.source.messageIdAvailability,at:amendment.coordinator.source.at},
     addScope:amendment.changes.addScope,scopeBindings:amendment.changes.scopeBindings,addDefinitionOfDone:amendment.changes.addDefinitionOfDone,
     supersedeDefinitionOfDone:amendment.changes.supersedeDefinitionOfDone,
-    operationFindings:Object.keys(amendment.changes.operationFindings),effectCeiling:amendment.changes.effectCeiling});
+    operationFindings:Object.keys(amendment.changes.operationFindings),addOperations:amendment.changes.addOperations.map(op=>op.id),
+    operationDependencies:Object.keys(amendment.changes.operationDependencies),effectCeiling:amendment.changes.effectCeiling});
   return {ok:true,replayed:false,amendment,file:parsed.file};
 }
 
@@ -187,6 +273,10 @@ export function amendmentContractLines(state,op=null){
     lines.push(`- Amendment \`${item.digest}\`, owner grant \`${sourceKey(item.authority.source)}\`, coordinator decision \`${sourceKey(item.coordinator.source)}\``);
     for(const clarification of item.changes.clarifications)lines.push(`  - clarification: ${clarification}`);
     for(const replacement of item.changes.supersedeDefinitionOfDone??[])lines.push(`  - superseded historical criterion: ${replacement.from}`,`    effective criterion: ${replacement.to}`);
+    const added=(item.changes.addOperations??[]).find(candidate=>candidate.id===op?.id);
+    if(added)lines.push(`  - this operation was added by the amendment as ${added.kind}; its exact ledger ids are ${added.ledgerIds.join(', ')}`);
+    const dependencies=item.changes.operationDependencies?.[op?.id]??[];
+    if(dependencies.length)lines.push(`  - this operation's added dependencies: ${dependencies.join(', ')}`);
     lines.push(`  - paths: ${item.changes.effectCeiling.paths.join(', ')||'none'}`,
       `  - resources: ${item.changes.effectCeiling.resources.join(', ')||'none'}`,
       `  - external effects: ${item.changes.effectCeiling.external.join(', ')||'none'}`);
