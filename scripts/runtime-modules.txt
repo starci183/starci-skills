@@ -39,6 +39,7 @@ hosts/orca/launch.mjs
 hosts/orca/protocol.mjs
 hosts/orca/observe.mjs
 kernel/reports.mjs
+kernel/source-staleness.mjs
 models/functions.mjs
 kernel/store.mjs
 kernel/continuation.mjs
@@ -106,6 +107,7 @@ hosts/orca/adapter.mjs
 hosts/headless/host.mjs
 providers/validate.mjs
 scripts/config.mjs
+scripts/check-stales.mjs
 scripts/plan.mjs
 scripts/present-goal.mjs
 
