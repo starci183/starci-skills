@@ -85,19 +85,51 @@ function transportFrameworkEvidence(ts, sourceFile) {
         const selected = ts.isStringLiteralLike(node.argumentExpression) ? node.argumentExpression.text : null;
         if (selected === null || NEST_COMMON_TRANSPORT.has(selected)) usages.push({ node: node.argumentExpression, detail: selected ?? 'computed @nestjs/common namespace access' });
       }
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.initializer) && node.initializer.text === alias) {
+        if (!ts.isObjectBindingPattern(node.name)) {
+          usages.push({ node: node.name, detail: 'escaped @nestjs/common namespace access' });
+        } else {
+          for (const element of node.name.elements) {
+            const selected = element.dotDotDotToken
+              ? null
+              : ts.isIdentifier(element.propertyName ?? element.name)
+                ? (element.propertyName ?? element.name).text
+                : ts.isStringLiteralLike(element.propertyName)
+                  ? element.propertyName.text
+                  : null;
+            if (selected === null || NEST_COMMON_TRANSPORT.has(selected)) {
+              usages.push({ node: element, detail: selected ?? 'computed @nestjs/common namespace destructuring' });
+            }
+          }
+        }
+      }
       ts.forEachChild(node, visit);
     };
     visit(sourceFile);
     return usages;
   };
   for (const statement of sourceFile.statements) {
-    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier)) continue;
-    const specifier = statement.moduleSpecifier.text;
+    const importEqualsSpecifier = ts.isImportEqualsDeclaration(statement)
+      && ts.isExternalModuleReference(statement.moduleReference)
+      && statement.moduleReference.expression
+      && ts.isStringLiteralLike(statement.moduleReference.expression)
+      ? statement.moduleReference.expression
+      : null;
+    const importSpecifier = ts.isImportDeclaration(statement) && ts.isStringLiteralLike(statement.moduleSpecifier)
+      ? statement.moduleSpecifier
+      : importEqualsSpecifier;
+    if (!importSpecifier) continue;
+    const specifier = importSpecifier.text;
     if (TRANSPORT_PACKAGES.test(specifier)) {
-      found.push({ node: statement.moduleSpecifier, specifier, detail: specifier });
+      found.push({ node: importSpecifier, specifier, detail: specifier });
       continue;
     }
-    if (specifier !== '@nestjs/common' || !statement.importClause) continue;
+    if (specifier !== '@nestjs/common') continue;
+    if (ts.isImportEqualsDeclaration(statement)) {
+      found.push(...namespaceUsages(statement.name.text).map(item => ({ ...item, specifier })));
+      continue;
+    }
+    if (!statement.importClause) continue;
     const bindings = statement.importClause.namedBindings;
     if (bindings && ts.isNamespaceImport(bindings)) {
       found.push(...namespaceUsages(bindings.name.text).map(item => ({ ...item, specifier })));
