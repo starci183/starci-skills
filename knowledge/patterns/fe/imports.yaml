@@ -39,7 +39,7 @@ rules:
     cases:
       - id: case-1
         when: "Another owner under the same configured src root"
-        write: "Use the repository's resolved alias, such as @/features/authentication."
+        write: "Use the repository's resolved alias, such as @/features/pages/AuthenticationPage."
       - id: case-2
         when: "A Grammar object"
         write: >
@@ -56,7 +56,7 @@ rules:
       - id: case-5
         when: "Type only"
         write: >
-          import type { AuthenticationMode } from "@/features/authentication"; type-only syntax does
+          import type { AuthenticationMode } from "@/features/pages/AuthenticationPage"; type-only syntax does
           not permit bypassing an owner or package public entry.
       - id: case-6
         when: "A local file dependency or workspace package"
@@ -97,7 +97,7 @@ rules:
         when: "Own unit last"
         write: >
           import { aiChatClassNames, getAiChatBubbleClassName } from "./classNames", import {
-          AuthenticationPageBase } from "./component"
+          AuthenticationPageView } from "./component"
     verification:
       automated: []
       manual: []
@@ -107,35 +107,36 @@ rules:
     title: Data enters through the owning feature or module
     kind: mandatory
     requirement: |
-      A connected feature unit imports its data lifecycle from that feature's public or same-unit entry.
-      The data owner reaches transport through the API module's public entry. Reusable presentation does
-      not import data hooks. A repository-wide hooks barrel is optional and never substitutes for ownership.
+      Every authored custom hook lives under hooks/<domain>. Feature owners and connected blocks import
+      those hooks through a resolved hooks public entry; hooks reach transport/domain capabilities through
+      module public entries. Leaves, branches and composites may call a hooks/ui intrinsic custom hook whose
+      resolved implementation remains free of product/session/API lifecycle. They do not call product hooks.
     rationale: |
-      Feature/module entries keep scenario and transport boundaries visible. A global hook barrel groups
-      unrelated lifecycles and becomes a mock convention rather than an architecture contract.
+      One hook location makes declaration ownership auditable while resolved implementation closure keeps
+      intrinsic UI helpers distinct from product lifecycle. A root barrel is optional, not a waiver.
     cases:
       - id: case-1
         when: "Authentication owns a browser request lifecycle"
         write: >
-          import { useAuthentication } from "@/features/authentication" or use a same-feature relative
-          import while building that public entry.
+          import { useAuthentication } from "@/hooks"; its declaration is under
+          src/hooks/authentication/useAuthentication.ts.
       - id: case-2
-        when: "A feature data owner reaches GraphQL"
+        when: "A hook reaches GraphQL"
         write: >
-          Import the typed operation/client through @/modules/api or a feature-owned data adapter;
-          do not import it from presentation.
+          Import the typed operation/client through @/modules/api; do not import transport from presentation.
       - id: case-3
         when: "A presentation needs a feature model"
         write: >
           Import the feature/view type through the feature entry, not a GraphQL response or Apollo type.
       - id: case-4
-        kind: residual
-        when: "Legacy code uses src/hooks/index.ts"
+        when: "A leaf needs an intrinsic custom auto-scroll hook"
         write: >
-          Treat the barrel as a compatibility surface while moving changed scenario ownership to its
-          feature. Do not add unrelated exports merely to preserve the global barrel pattern.
+          Call hooks/ui/useAutoScroll through the selected hooks entry. The resolved hook may use React
+          refs/effects; reaching session, transport, modules or product hooks makes it product-world state.
     verification:
-      automated: []
+      automated:
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_COMPONENT_WORLD_OWNERSHIP
       manual:
         - Confirm a data lifecycle has a feature owner and reusable presentation does not import it.
     relatedExamples:
@@ -145,10 +146,11 @@ rules:
     title: Responsibility direction
     kind: mandatory
     requirement: |
-      Framework adapters import feature/page or shell owners; features import reusable modules and visual
-      contracts; modules import lower capabilities or vendors; product visuals import Grammar. Dependencies
-      never point from a module/Grammar back to a feature or app. A resolved presentation contract never
-      imports the data layer at runtime. Directory names are evidence, not an absolute total rank.
+      App adapters import internal code only through public entries below features/{pages,layouts,overlays},
+      including type-only imports and re-exports. Features compose components, hooks and modules. Components
+      never point to app/features; hooks never point to app/features/components; modules never point to
+      app/features/components/hooks. Product visuals may import Grammar. Re-export barrels and aliases obey
+      the same resolved direction.
     rationale: |
       One-way responsibility direction keeps route/product/data ownership above reusable presentation
       across single-source repositories and workspaces.
@@ -156,26 +158,26 @@ rules:
       - id: case-1
         when: "Route → feature page"
         write: >
-          import { AuthenticationPage } from "@/features/authentication"
+          import { AuthenticationPage } from "@/features/pages/AuthenticationPage"
       - id: case-2
         when: "Feature → module and visual contract"
         write: >
-          The feature data adapter imports @/modules/api; the feature view imports reusable visuals and
-          @starci/grammar/common.
+          The feature page imports @/components/blocks/… and @/hooks; its hook imports @/modules/api.
       - id: case-3
         when: "Reusable visual → Grammar and approved vendor"
         write: >
           import type { ButtonVariant } from "@starci/grammar/common"; world-reading hooks or imports
           from higher tiers are not valid leaf precedents
       - id: case-4
-        kind: residual
-        when: "Academy components/blocks/pages encode current feature composition"
-        write: "Map their actual responsibility before moving them; the folder label alone is not authority."
+        when: "App needs an internal provider/helper/type"
+        write: "Move its owner behind a feature public entry; app-local sibling imports are not a loophole."
       - id: case-5
         when: "Pure half → data layer"
         write: "never at runtime; 18 component.tsx files use import type from @/modules/api/graphql/queries/… only"
     verification:
-      automated: []
+      automated:
+        - FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES
+        - FE_FEATURE_DEPENDENCY_DIRECTION
       manual:
         - Confirm leaves do not import higher tiers or world-reading hooks.
     relatedExamples:

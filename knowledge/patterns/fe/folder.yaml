@@ -33,33 +33,33 @@ rules:
     title: Responsibility directories
     kind: mandatory
     requirement: |
-      Place code with its responsibility: app/ owns framework route/layout/provider adapters;
-      features/<feature>/ owns one product scenario and its page, UI, model and data lifecycle;
-      modules/<capability>/ owns cohesive reusable technical/domain capabilities; components/ owns
-      reusable product visuals; packages/grammar owns product-agnostic visual contracts. These roles
-      form a partial dependency graph rather than a total rank inferred from folder names.
+      Each Next source root uses app/ for framework adapters; features/{pages,layouts,overlays} for
+      route-facing product composition; components/{blocks,composites,branches,leaves} for product
+      visuals; hooks/<domain> for every authored custom hook; and modules/<capability> for cohesive
+      reusable technical/domain capabilities. No empty role folder is required. Grammar remains a
+      separate product-agnostic package.
     rationale: |
-      Stable owners remain portable across a single source root and a monorepo. Existing Academy
-      pages/blocks/hooks are source mappings to assess, not a requirement to repeat their topology.
+      Stable, explicit role roots remain portable across a single source root and a monorepo while
+      preventing app helpers, component-local hooks and feature-local transport buckets from becoming
+      undeclared owners.
     cases:
       - id: case-1
         when: "A routed authentication scenario"
-        write: "src/features/authentication/{index.ts,page/,ui/,model/,data/}"
+        write: "src/features/pages/AuthenticationPage/index.tsx"
       - id: case-2
         when: "A reusable API client or session store"
         write: >
           src/modules/api/ or src/modules/session/ with one explicit public index.ts entry
       - id: case-3
         when: "A reusable product visual without scenario ownership"
-        write: "src/components/<role>/<Name>/ according to the repository's established visual tiers"
+        write: "src/components/{blocks,composites,branches,leaves}/<Name>/index.tsx"
       - id: case-4
-        kind: residual
-        when: "Academy components/pages, components/blocks and hooks currently own a scenario"
-        write: >
-          Treat those paths as migration evidence. Changed code follows its accepted SDS and moves only
-          when the bounded refactor owns the dependency closure.
+        when: "An authored custom hook, including an intrinsic useAutoScroll helper"
+        write: "src/hooks/<domain>/useAutoScroll.ts; built-in React hook calls may remain in visuals"
     verification:
-      automated: []
+      automated:
+        - FE_SOURCE_LAYOUT_INVALID
+        - FE_CUSTOM_HOOK_LOCATION
       manual:
         - Confirm the unit's responsibility and public entry, rather than assigning it by consumer count.
     relatedExamples:
@@ -69,19 +69,20 @@ rules:
     title: Discoverable files for one unit
     kind: mandatory
     requirement: |
-      A visual unit uses the repository's sanctioned basenames. Add component.tsx and a Base export only
-      when the unit has a meaningful connected/presentational boundary. Feature model/data files are
-      named for the use case they own. classNames.ts is present only when the unit owns class strings.
+      A connected block uses index.tsx for product-world ownership and sibling component.tsx for its
+      resolved pure render owner. Pure blocks, composites, branches and leaves normally use index.tsx
+      only and never gain an empty twin by census. classNames.ts is present only when the unit owns class
+      strings; a Base suffix is not required.
     rationale: |
       Stable basenames make class, tests, and an applicable connected/presentational split discoverable
       without requiring empty forwarding twins.
     cases:
       - id: case-1
-        when: "Page unit with a connected/presentational boundary (pages/AuthenticationPage/)"
-        write: "classNames.ts · component.tsx · index.tsx"
+        when: "Connected block with product-world lifecycle"
+        write: "blocks/catalog/CatalogBlock/{index.tsx,component.tsx}; every nonempty index render reaches the sibling"
       - id: case-2
-        when: "Page unit with specs (pages/CartPage/)"
-        write: "component.tsx · index.spec.tsx · index.tsx"
+        when: "Feature page, layout or overlay"
+        write: "Use its index.tsx public entry; split further only for a real subordinate responsibility"
       - id: case-3
         when: "Block unit (blocks/ai/StarCiAiChat/)"
         write: "classNames.ts · component.spec.tsx · component.tsx · index.spec.tsx · index.tsx"
@@ -90,10 +91,8 @@ rules:
         write: >
           classNames.ts · index.tsx — no component.tsx/Base twin is required without a separate world owner
       - id: case-5
-        when: "Feature data/model"
-        write: >
-          data/use-authentication.ts, data/mapper.ts and model/auth-flow.ts; do not create empty
-          index/component pairs for nonvisual responsibilities
+        when: "Custom hook or reusable module"
+        write: "hooks/<domain>/useX.ts or modules/<capability>/...; do not create visual twins"
     notes: |
       Counts across pages (50): index.tsx 49, component.tsx 49, component.spec.tsx 42,
       index.spec.tsx 24, audit.json 22, classNames.ts 9. Across blocks (109): component.tsx 101,
@@ -112,6 +111,7 @@ rules:
       automated:
         - class-names-in-colocated-file
         - no-inline-class-name
+        - FE_CONNECTED_BLOCK_RENDER_PAIR
       manual:
         - Confirm each file owns a real responsibility; do not add a component.tsx/Base twin by census.
     relatedExamples:
@@ -131,7 +131,7 @@ rules:
         when: "A route"
         write: >
           app/[lang]/authentication/page.tsx: import { AuthenticationPage } from
-          "@/components/pages/AuthenticationPage" … const AuthenticationRoute = () =>
+          "@/features/pages/AuthenticationPage" … const AuthenticationRoute = () =>
           <AuthenticationPage {...{}} /> … export default AuthenticationRoute
       - id: case-2
         kind: exception
@@ -143,7 +143,8 @@ rules:
           app/globals.css, app/providers.tsx, app/global-error.tsx, app/sitemap.ts, app/robots.ts,
           each with a sibling .spec
     verification:
-      automated: []
+      automated:
+        - FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES
       manual:
         - Confirm visual routes have one page owner and redirect/notFound-only routes have no visual tree.
     relatedExamples: []
@@ -152,20 +153,21 @@ rules:
     title: Feature data and module placement
     kind: mandatory
     requirement: |
-      Scenario-specific request lifecycle, mapping and documents live with their feature. Generic API
-      client/link/error plumbing lives in modules/api; shared session, routing, theme and toast capabilities
-      live in their owning modules. Generated wire contracts stay in the API or feature data adapter.
-      Reusable presentation does not import them. A global hooks barrel is not required.
+      Every authored custom hook lives under hooks/<domain>, including intrinsic helpers. Hooks call
+      cohesive modules for transport/domain capabilities and never import app, features or components.
+      Generic API client/link/error plumbing and generated wire contracts live in modules/api; shared
+      session, routing, theme and feedback capabilities live in their owning modules. A root hooks barrel
+      is optional and cannot weaken domain grouping.
     rationale: |
       This separates product scenario ownership from reusable transport mechanics without creating a
       global bucket for unrelated hooks.
     cases:
       - id: case-1
         when: "Authentication request lifecycle"
-        write: "src/features/authentication/data/use-authentication.ts"
+        write: "src/hooks/authentication/useAuthentication.ts"
       - id: case-2
         when: "Feature wire mapping"
-        write: "src/features/authentication/data/mapper.ts maps generated/wire values to the feature model"
+        write: "src/hooks/authentication/useAuthentication.ts maps module results to the feature-facing lifecycle"
       - id: case-3
         when: "Generic Apollo client/link chain"
         write: "src/modules/api/client/create-apollo-client.ts"
@@ -173,11 +175,12 @@ rules:
         when: "Shared session storage"
         write: "src/modules/session/session-store.ts, exported through src/modules/session/index.ts"
       - id: case-5
-        kind: residual
-        when: "Legacy Academy data hooks under src/hooks"
-        write: "Keep compatibility imports bounded; new unrelated lifecycles do not expand the global barrel."
+        when: "Intrinsic custom helper"
+        write: "src/hooks/ui/useAutoScroll.ts; direct useRef/useState calls may remain in their visual owner"
     verification:
-      automated: []
+      automated:
+        - FE_CUSTOM_HOOK_LOCATION
+        - FE_FEATURE_DEPENDENCY_DIRECTION
       manual:
         - Confirm each lifecycle has one feature owner and transport mechanics have one module owner.
     relatedExamples:

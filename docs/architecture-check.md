@@ -15,9 +15,15 @@ Topology and architecture answer different questions. A single-project Nest appl
 
 Backend dependencies point from executable application composition to use-case features to cohesive capabilities/modules. Features orchestrate entry scenarios. Modules own cohesive domain or infrastructure capabilities and expose narrow APIs even when only one feature consumes them. Apps may bootstrap the framework, select modules/providers, install process middleware and app-wide adapters, and start the process; they do not own business handlers, services, controllers, resolvers, repositories, or entities.
 
-Frontend dependencies point from framework route adapters to a page/shell owner, then to feature/product composition, reusable visual composition, and leaf/Grammar primitives. This is a partial responsibility graph, not a total rank of folder names. A domain overlay can be feature composition. A route may resolve server-owned params, headers, cookies, session, redirects, `notFound`, or a server loader before mounting one visual owner. A redirect/notFound-only route mounts zero visual owners.
+Frontend roots are explicit: `app`, `features/{pages,layouts,overlays}`, `components/{blocks,composites,branches,leaves}`, `hooks/<domain>`, and `modules/<capability>`. App adapters may use React, Next and external framework packages, while every resolved internal import or re-export, including type-only edges, enters a feature public entry. Features compose components, hooks and modules. Components cannot point to features/app; hooks cannot point to components/features/app; modules cannot point to hooks/components/features/app. The visual tiers form a bounded dependency graph, not a requirement to pass through every tier.
 
-Connected/presentational splitting applies when product data, session, routing/locale, transport lifecycle, or scenario orchestration can be separated into one world owner and a useful render contract. Intrinsic client interaction such as refs, focus, disclosure, measurement, drag, and reduced motion may remain in one visual component. The checker must not require `component.tsx`, a `Base` export, or two specs merely because another unit uses that shape.
+Configured app, feature, component, hook and module roots are disjoint; transport may remain nested under
+modules. Discovered workspace roots are additive, so a narrow authored map cannot hide another Next app.
+When `owners` declares public entries, that list is closed and app imports may use only its exact feature
+entries. Without `owners`, the checker can validate the exact structural feature index, while owner public-API
+coverage remains unavailable and cannot support a full conformance claim.
+
+All authored custom `useX` declarations live under `hooks/<domain>`; built-in React hook calls may remain in visuals. Leaves, branches and composites own intrinsic client interaction such as refs, focus, disclosure, measurement, drag and reduced motion, but no product-world lifecycle. A block that reads product data, session, routing/locale or transport lifecycle is connected: `index.tsx` owns that world and every nonempty render path reaches a resolved pure export from sibling `component.tsx`. Pure blocks and lower tiers need no twin, `Base` suffix or paired-test census.
 
 Applications may consume package public exports. Packages must not import application internals, and cross-package consumers use declared exports. Discover package roots from root and nested manifests, workspace globs, file dependencies, and tsconfig. A `packages/` directory or two consumers does not confer shared ownership.
 
@@ -25,7 +31,7 @@ Applications may consume package public exports. Packages must not import applic
 
 Static checking can enforce resolved dependency direction, app business-role filenames/AST shapes, route visual-owner counts, package-to-app and private-export edges, component-to-transport/world dependencies, raw fetch placement, and unresolved internal imports. It must fail closed when the target TypeScript parser/configuration or an internal target cannot be resolved.
 
-For a frontend visual function that actually calls a resolved configured hook/transport or a selected Next routing/locale lifecycle, `FE_WORLD_OWNER_RENDER_BOUNDARY` checks every nonempty return path. Each path must reach a statically resolved render function or component whose own symbol dependency closure is free of that product world. The render owner may be local to the same file, imported through aliases/re-exports, or reached through provider, Suspense, and error-boundary wrappers; it needs no `Base` suffix or mandatory twin file. Empty access/loading guards and distinct pure loading/error views are valid. Intrinsic refs, focus, disclosure, measurement, drag, reduced motion, and ordinary local state do not select the rule. Whether a custom context outside the configured lifecycle roots represents product state remains a semantic review obligation.
+For a frontend visual function that actually calls a resolved configured hook/transport or selected Next routing/locale lifecycle, `FE_WORLD_OWNER_RENDER_BOUNDARY` still proves a useful resolved render boundary in general. `FE_CONNECTED_BLOCK_RENDER_PAIR` specializes the accepted block contract: the connected blocks owner is `index.tsx`, and every nonempty return path reaches the sibling `component.tsx` through resolved aliases/re-exports and supported provider/Suspense/error wrappers. `FE_CUSTOM_HOOK_LOCATION` resolves declaration and export aliases instead of judging calls by spelling. `FE_COMPONENT_WORLD_OWNERSHIP` rejects product-world ownership in leaves, branches and composites while preserving intrinsic built-in React state. Static checking does not decide whether an undeclared custom context is product state.
 
 Review and meaningful boot/render tests still decide:
 
@@ -84,8 +90,10 @@ Repositories with equivalent responsibilities at different paths may add a small
   },
   "frontend": {
     "routes": "web/app",
+    "features": "web/features",
     "components": "web/components",
     "hooks": "web/hooks",
+    "modules": "web/modules",
     "transport": "web/modules/api"
   }
 }

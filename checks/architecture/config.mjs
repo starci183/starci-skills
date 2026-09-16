@@ -5,7 +5,7 @@ const CONFIG_SCHEMA = 'starci/architecture-config@1';
 const KINDS = new Set(['backend', 'frontend']);
 const TOP_LEVEL_KEYS = new Set(['schema', 'kinds', 'tsconfig', 'projects', 'backend', 'frontend', 'owners']);
 const BACKEND_KEYS = new Set(['modules', 'features', 'apps', 'legacyRoots', 'moduleRegistration']);
-const FRONTEND_KEYS = new Set(['routes', 'components', 'hooks', 'transport', 'grammar']);
+const FRONTEND_KEYS = new Set(['routes', 'features', 'components', 'hooks', 'modules', 'transport', 'grammar']);
 const OWNER_KEYS = new Set(['id', 'root', 'entry']);
 const GRAMMAR_KEYS = new Set(['package', 'entry', 'styleEntry', 'styleSources', 'consumerManifests', 'peers']);
 const PRODUCTION_SOURCE = /\.(?:[cm]?[jt]sx?)$/i;
@@ -149,8 +149,10 @@ function inferredLayout(root, workspaces) {
   }
   return {
     routes: collect('src/app'),
+    features: collect('src/features'),
     components: [...new Set(components)],
     hooks: collect('src/hooks'),
+    modules: collect('src/modules'),
     transport: collect('src/modules/api'),
   };
 }
@@ -185,6 +187,27 @@ function pathList(value, defaults, label) {
   const normalized = list.map(item => safeRelative(item, label));
   if (new Set(normalized).size !== normalized.length) throw Error(`${label} paths must be unique.`);
   return normalized;
+}
+
+function frontendPathList(value, discovered, fallback, label) {
+  const selected = pathList(value, discovered.length ? discovered : fallback, label);
+  return [...new Set([...selected, ...discovered])];
+}
+
+function assertFrontendRolesDisjoint(root, frontend) {
+  const roles = ['routes', 'features', 'components', 'hooks', 'modules'];
+  const entries = roles.flatMap(role => frontend[role].map(relative => ({
+    role,
+    relative,
+    absolute: path.join(root, ...relative.split('/')),
+  })));
+  for (let index = 0; index < entries.length; index += 1) for (let other = index + 1; other < entries.length; other += 1) {
+    const left = entries[index];
+    const right = entries[other];
+    if (isInside(left.absolute, right.absolute) || isInside(right.absolute, left.absolute)) {
+      throw Error(`Architecture frontend role roots must be disjoint; ${left.role} ${left.relative} overlaps ${right.role} ${right.relative}.`);
+    }
+  }
 }
 
 function optionalPathList(value, label) {
@@ -287,7 +310,7 @@ export function loadArchitectureConfig(repositoryRoot, configFile) {
   exactKeys(backend, BACKEND_KEYS, 'Architecture config backend');
   exactKeys(frontend, FRONTEND_KEYS, 'Architecture config frontend');
   for (const key of ['modules', 'features', 'apps', 'legacyRoots']) requireAuthoredDirectories(root, backend[key], `Architecture backend.${key}`);
-  for (const key of ['routes', 'components', 'hooks', 'transport']) requireAuthoredDirectories(root, frontend[key], `Architecture frontend.${key}`);
+  for (const key of ['routes', 'features', 'components', 'hooks', 'modules', 'transport']) requireAuthoredDirectories(root, frontend[key], `Architecture frontend.${key}`);
   const discovered = discoveredProjects(root, workspaces);
   const projects = pathList(authored.projects ?? authored.tsconfig, discovered, 'Architecture TypeScript project');
   const resolvedBackend = {
@@ -308,6 +331,16 @@ export function loadArchitectureConfig(repositoryRoot, configFile) {
     }
   }
   const owners = configuredOwners(root, authored.owners);
+  const resolvedFrontend = {
+    routes: frontendPathList(frontend.routes, inferred.routes, ['src/app'], 'Architecture frontend.routes'),
+    features: frontendPathList(frontend.features, inferred.features, ['src/features'], 'Architecture frontend.features'),
+    components: frontendPathList(frontend.components, inferred.components, ['src/components'], 'Architecture frontend.components'),
+    hooks: frontendPathList(frontend.hooks, inferred.hooks, ['src/hooks'], 'Architecture frontend.hooks'),
+    modules: frontendPathList(frontend.modules, inferred.modules, ['src/modules'], 'Architecture frontend.modules'),
+    transport: frontendPathList(frontend.transport, inferred.transport, ['src/modules/api'], 'Architecture frontend.transport'),
+    grammar: grammarConfig(root, frontend.grammar),
+  };
+  assertFrontendRolesDisjoint(root, resolvedFrontend);
   return {
     root,
     kinds: [...kinds].sort(),
@@ -315,13 +348,7 @@ export function loadArchitectureConfig(repositoryRoot, configFile) {
     workspaces,
     owners,
     backend: resolvedBackend,
-    frontend: {
-      routes: pathList(frontend.routes, inferred.routes.length ? inferred.routes : ['src/app'], 'Architecture frontend.routes'),
-      components: pathList(frontend.components, inferred.components.length ? inferred.components : ['src/components'], 'Architecture frontend.components'),
-      hooks: pathList(frontend.hooks, inferred.hooks.length ? inferred.hooks : ['src/hooks'], 'Architecture frontend.hooks'),
-      transport: pathList(frontend.transport, inferred.transport.length ? inferred.transport : ['src/modules/api'], 'Architecture frontend.transport'),
-      grammar: grammarConfig(root, frontend.grammar),
-    },
+    frontend: resolvedFrontend,
   };
 }
 

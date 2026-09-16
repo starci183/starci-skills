@@ -20,10 +20,10 @@ consumer, a folder count, or a desire to shorten an import is not sufficient.
 
 This decision rejects three common alternatives:
 
-- A folder-rank architecture such as `page -> block -> leaf` for every file. Those names help navigation,
-  but responsibility decides dependency direction.
-- A global `hooks` or `services` layer that becomes the public door for unrelated features. It hides the
-  scenario owner and lets browser, transport, and product policy accumulate in one place.
+- A total folder rank that forces every render through every visual tier. The sanctioned tiers expose
+  responsibilities and legal dependency edges; a feature may compose the lowest useful visual directly.
+- Hooks hidden beside pages or components. All authored custom hooks live under the configured `hooks/`
+  root, grouped by product domain, while modules retain transport and reusable capability ownership.
 - Mandatory wrappers such as a presentational twin, forwarding service, CQRS command, or dynamic module.
   Use machinery only when it owns a real render, dispatch, configuration, or lifecycle boundary.
 
@@ -46,47 +46,42 @@ ownership rule.
 ```text
 src/
   app/
-    [lang]/authentication/page.tsx       # Next route adapter
-    [lang]/layout.tsx                    # server shell/locale adapter
-    providers.tsx                        # narrow client provider boundary
+    [lang]/authentication/page.tsx       # framework adapter; internal imports enter features only
+    [lang]/layout.tsx                    # framework shell adapter
   features/
-    authentication/
-      index.ts                           # public feature entry
-      page/
-        index.tsx                        # route-facing connected owner
-        component.tsx                    # optional useful render contract
-        classNames.ts
-      ui/
-        AuthenticationPanel/
-          index.tsx                      # feature state/lifecycle owner
-          component.tsx                  # optional resolved visual contract
-      model/
-        auth-flow.ts                     # pure transitions and feature types
-      data/
-        operations.graphql.ts            # feature-selected operation documents
-        mapper.ts                        # wire failures/data -> feature model
-        use-authentication.ts            # browser request lifecycle
-  modules/
-    api/
-      index.ts                           # public technical capability
-      client/create-apollo-client.ts
-      generated/                         # schema-derived wire types/documents
-    session/
-      index.ts
-      session-store.ts
-    routing/
-      index.ts
+    pages/AuthenticationPage/
+      index.tsx                          # route-facing page owner/public entry
+    layouts/AppLayout/
+      index.tsx                          # product layout owner
+    overlays/CheckoutOverlay/
+      index.tsx                          # product overlay owner
   components/
-    ...                                  # reusable product visuals without scenario ownership
+    blocks/CatalogBlock/
+      index.tsx                          # connected owner only when it reads product world
+      component.tsx                      # required sibling render owner for a connected block
+    composites/CourseCard/index.tsx
+    branches/NavigationRail/index.tsx
+    leaves/Icon/index.tsx
+  hooks/
+    authentication/useAuthentication.ts  # every authored custom hook, grouped by domain
+    catalog/useCatalog.ts
+    index.ts                             # optional explicit public entry
+  modules/
+    api/index.ts                         # transport/client capability
+    session/index.ts                     # cohesive reusable capability
+    routing/index.ts
 packages/
   grammar/
     package.json                         # declared exports are the package API
     src/common/index.ts
 ```
 
-The names under a feature may follow the repository's established basename convention. The invariant is
-the owner, not the spelling. A small feature can keep `page`, `data`, and `model` in fewer files while the
-dependencies still point in the same direction.
+The same role roots may be declared for one repository or for each Next workspace in a monorepo. Empty
+role folders are never required. `app/` may import React, Next and external framework packages, but every
+resolved internal import or re-export, including a type-only edge, enters a public `features/{pages,
+layouts,overlays}` unit. Features compose components, hooks and modules. Modules never point to hooks,
+components, features or app; hooks never point to components, features or app; components never point to
+features or app.
 
 ### Next route and client boundaries
 
@@ -98,8 +93,10 @@ dependencies still point in the same direction.
 - Intrinsic visual state stays with the visual that owns it: focus, disclosure, drag, measurement,
   reduced-motion, and an unsaved form draft do not require a connected/Base split.
 - Product data, session, route decisions, locale decisions, and request lifecycle have one connected owner.
-  Split out a render component only when the resolved props/actions form an independently useful contract.
-  A missing `component.tsx`, `Base`, or paired test is not a violation.
+  A connected block uses `index.tsx` for that owner and hands every nonempty render path to a pure export
+  from sibling `component.tsx`. A pure block and all leaves, branches and composites need no twin. Lower
+  visual tiers may call built-in React hooks for intrinsic interaction, but they cannot own product-world
+  lifecycle. Every authored custom `useX` hook, including an intrinsic helper, belongs under `hooks/`.
 - Lift state only to the closest owner that coordinates it. When identity or resource keys change, reset
   drafts at that boundary so values cannot cross workspaces, installations, accounts, or routes.
 
@@ -111,7 +108,8 @@ Keep four contracts distinct:
    documents and generated variable/result types when the GraphQL toolchain is available.
 2. A feature input/result or view model belongs to the feature and is neutral to Apollo, GraphQL, Next, and
    persistence.
-3. A mapper at the feature data boundary translates wire values and failures into that feature contract.
+3. A mapper at the owning hook/module adapter boundary translates wire values and failures into that
+   feature contract.
 4. A presentational props contract contains resolved render values and user actions. It does not runtime-
    import transport enums, response envelopes, Apollo errors, or operation types.
 
@@ -126,8 +124,8 @@ models. Grammar never imports them.
   TypeScript `paths` do not create a package API and must not bypass package exports.
 - A `file:packages/grammar` dependency is still a package boundary even when the root has no `workspaces`
   field. A workspace and a single-source repository follow the same export rule.
-- Prefer feature and module public entries. A repository-wide hook barrel is optional; it is not an
-  architecture boundary and must not obscure the owning feature.
+- Use feature and module public entries. A root hooks barrel is optional, while the `hooks/<domain>/`
+  location is mandatory for authored custom hooks and remains separate from module transport ownership.
 - Grammar imports use an installed public family entry such as `@starci/grammar/common`; verify the actual
   export before using a component or prop.
 
