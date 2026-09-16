@@ -312,14 +312,14 @@ profiles:
         status: implemented
       - id: NEST-TRANSPORT-ERROR-MAPPING
         sourceRuleIds: [BE-ERROR-4, BE-ERROR-5, BE-ERROR-6]
-        applicability: { include: ['src/features/**/transport/**/*.ts', 'src/modules/platform/**/*.ts'] }
+        applicability: { include: ['src/**/*.{ts,mts,cts,tsx}', 'apps/*/src/**/*.{ts,mts,cts,tsx}', 'libs/*/src/**/*.{ts,mts,cts,tsx}', 'packages/*/src/**/*.{ts,mts,cts,tsx}'], exclude: ['**/*.d.ts', '**/*.d.mts', '**/*.d.cts', '**/*.spec.{ts,mts,cts,tsx}', '**/*-spec.{ts,mts,cts,tsx}', '**/*.test.{ts,mts,cts,tsx}', '**/*-test.{ts,mts,cts,tsx}', '**/__tests__/**'] }
         mechanical:
-          requirement: Check the adopted HTTP/GraphQL exception mapping and preservation of a foreign originalError where wrapped.
-          check: { kind: eslint, ruleIds: [starci-be/foreign-error-keeps-cause, starci-be/transport-error-mapping] }
+          requirement: Preserve the caught input when replacing a foreign failure and verify every discovered declared HTTP/GraphQL mapper carries the selected error code, message and transport-owned status consistently.
+          check: { kind: script, ruleIds: [NEST_FOREIGN_ERROR_CAUSE, NEST_TRANSPORT_ERROR_MAPPER] }
         semantic:
-          guidance: knowledge/patterns/be/error.yaml
-          review: Verify public redaction and expected versus unknown outcome behavior.
-        status: missing
+          guidance: docs/nest-error-checks.md
+          review: Verify public redaction, retry policy and expected versus unknown outcome behavior with real transport tests.
+        status: implemented
       - id: NEST-ENV-CACHE-BOUNDARY
         sourceRuleIds: [BE-IMPORTS-6]
         applicability: { include: ['src/**/*.{ts,mts,cts,tsx}', 'apps/**/*.{ts,mts,cts,tsx}', 'libs/**/*.{ts,mts,cts,tsx}'], exclude: ['**/*.d.ts', '**/*.d.mts', '**/*.d.cts', '**/*.spec.{ts,mts,cts,tsx}', '**/*-spec.{ts,mts,cts,tsx}', '**/*.test.{ts,mts,cts,tsx}', '**/*-test.{ts,mts,cts,tsx}', 'src/tests/**'] }
