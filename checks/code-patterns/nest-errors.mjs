@@ -193,11 +193,51 @@ function exactOrigin(ts, checker, input, origin, seen = new Set()) {
   return false;
 }
 
-// true = every value path retains the caught input; false = it does not; null = dynamic/unprovable.
-function preservesOrigin(ts, checker, input, origin, seen = new Set()) {
+function assignmentTargetsIdentity(ts, checker, input, identity) {
+  const node = unwrap(ts, input);
+  if (ts.isIdentifier(node)) return symbolAt(ts, checker, node) === identity;
+  if (ts.isArrayLiteralExpression(node)) return node.elements.some(item => assignmentTargetsIdentity(ts, checker, item, identity));
+  if (ts.isObjectLiteralExpression(node)) return node.properties.some(item => {
+    if (ts.isShorthandPropertyAssignment(item)) return symbolAt(ts, checker, item.name) === identity;
+    if (ts.isPropertyAssignment(item)) return assignmentTargetsIdentity(ts, checker, item.initializer, identity);
+    if (ts.isSpreadAssignment(item)) return assignmentTargetsIdentity(ts, checker, item.expression, identity);
+    return false;
+  });
+  return false;
+}
+
+function assignedBefore(ts, checker, scope, identity, before) {
+  let assigned = false;
+  const visit = node => {
+    if (assigned || node.pos >= before) return;
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+      && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment && assignmentTargetsIdentity(ts, checker, node.left, identity)) { assigned = true; return; }
+    if ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+      && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(node.operator) && symbolAt(ts, checker, node.operand) === identity) { assigned = true; return; }
+    ts.forEachChild(node, visit);
+  };
+  visit(scope); return assigned;
+}
+
+function unchangedOrigin(ts, checker, input, origin, scope, before, seen = new Set()) {
   const node = unwrap(ts, input);
   if (!node) return false;
-  if (exactOrigin(ts, checker, node, origin, new Set(seen))) return true;
+  const identity = symbolAt(ts, checker, node);
+  if (identity === origin) return !assignedBefore(ts, checker, scope, origin, before);
+  if (!ts.isIdentifier(node) || !identity || seen.has(identity)) return false;
+  seen.add(identity);
+  const declaration = identity.valueDeclaration;
+  if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer
+    || !(ts.getCombinedNodeFlags(declaration.parent) & ts.NodeFlags.Const)
+    || assignedBefore(ts, checker, scope, identity, before)) return false;
+  return unchangedOrigin(ts, checker, declaration.initializer, origin, scope, declaration.initializer.pos, seen);
+}
+
+// true = every value path retains the caught input; false = it does not; null = dynamic/unprovable.
+function preservesOrigin(ts, checker, input, origin, scope, before, seen = new Set()) {
+  const node = unwrap(ts, input);
+  if (!node) return false;
+  if (unchangedOrigin(ts, checker, node, origin, scope, before, new Set(seen))) return true;
   if (node.kind === ts.SyntaxKind.NullKeyword || node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword
     || ts.isStringLiteralLike(node) || ts.isNumericLiteral(node)
     || (ts.isIdentifier(node) && node.text === 'undefined' && (checker.getSymbolAtLocation(node)?.declarations ?? []).every(item => item.getSourceFile().isDeclarationFile))) return false;
@@ -207,11 +247,11 @@ function preservesOrigin(ts, checker, input, origin, seen = new Set()) {
     seen.add(identity);
     const declaration = identity.valueDeclaration;
     return declaration && ts.isVariableDeclaration(declaration) && declaration.initializer
-      && (ts.getCombinedNodeFlags(declaration.parent) & ts.NodeFlags.Const) ? preservesOrigin(ts, checker, declaration.initializer, origin, seen) : null;
+      && (ts.getCombinedNodeFlags(declaration.parent) & ts.NodeFlags.Const) ? preservesOrigin(ts, checker, declaration.initializer, origin, scope, declaration.initializer.pos, seen) : null;
   }
   if (ts.isConditionalExpression(node)) {
-    const left = preservesOrigin(ts, checker, node.whenTrue, origin, new Set(seen));
-    const right = preservesOrigin(ts, checker, node.whenFalse, origin, new Set(seen));
+    const left = preservesOrigin(ts, checker, node.whenTrue, origin, scope, before, new Set(seen));
+    const right = preservesOrigin(ts, checker, node.whenFalse, origin, scope, before, new Set(seen));
     return left === null || right === null ? null : left && right;
   }
   return false;
@@ -762,7 +802,7 @@ export function checkNestErrors({ root, files, ruleIds, contextFiles = [], archi
               let nearest = item.parent;
               while (nearest && !ts.isCatchClause(nearest)) nearest = nearest.parent;
               if (nearest !== node || !item.expression) return;
-              if (origin && exactOrigin(ts, checker, item.expression, origin)) return;
+              if (origin && unchangedOrigin(ts, checker, item.expression, origin, node.block, item.pos)) return;
               const expression = unwrap(ts, item.expression);
               if (!ts.isNewExpression(expression)) return add(source, 'NEST_FOREIGN_ERROR_CAUSE', item, 'Dynamic replacement throws cannot prove caught-cause preservation.', true);
               const instance = checker.getTypeAtLocation(expression), match = contract.errorTypes.find(error => localErrorIdentities.get(error.id)
@@ -782,7 +822,7 @@ export function checkNestErrors({ root, files, ruleIds, contextFiles = [], archi
                 if (object.properties.some(property => ts.isSpreadAssignment(property) || property.name && ts.isComputedPropertyName(property.name))) unknown = true;
                 for (const cause of match.causeProperties) {
                   const value = memberValue(ts, object, cause);
-                  if (value) { const state = preservesOrigin(ts, checker, value, origin); preserved ||= state === true; unknown ||= state === null; }
+                  if (value) { const state = preservesOrigin(ts, checker, value, origin, node.block, item.pos); preserved ||= state === true; unknown ||= state === null; }
                 }
               }
               if (!preserved) add(source, 'NEST_FOREIGN_ERROR_CAUSE', expression, unknown

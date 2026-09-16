@@ -211,6 +211,30 @@ test('replacement throws preserve the caught input through the declared cause pr
   assert.ok(result.violations.some(item => item.ruleId === 'NEST_FOREIGN_ERROR_CAUSE' && item.message.includes('cause property')));
 });
 
+test('reassigned caught bindings and aliases do not masquerade as the original cause', t => {
+  const reassigned = fixture(t, { cause: `import { AppError } from './app-error';
+export function load(): void { try { JSON.parse('x'); } catch (error) { error = new Error('replacement'); throw new AppError({ originalError: error }); } }` });
+  let result = checkNestErrors(reassigned.input);
+  assert.ok([...result.errors, ...result.violations].some(item => item.ruleId === 'NEST_FOREIGN_ERROR_CAUSE' && /cause|dynamic/i.test(item.message)));
+
+  const lateAlias = fixture(t, { cause: `import { AppError } from './app-error';
+export function load(): void { try { JSON.parse('x'); } catch (error) { error = new Error('replacement'); const original = error; throw new AppError({ originalError: original }); } }` });
+  result = checkNestErrors(lateAlias.input);
+  assert.ok([...result.errors, ...result.violations].some(item => item.ruleId === 'NEST_FOREIGN_ERROR_CAUSE' && /cause|dynamic/i.test(item.message)));
+
+  const captured = fixture(t, { cause: `import { AppError } from './app-error';
+export function load(): void { try { JSON.parse('x'); } catch (error) { const original = error; error = new Error('replacement'); throw new AppError({ originalError: original }); } }` });
+  result = checkNestErrors(captured.input);
+  assert.ok(!result.errors.some(item => item.ruleId === 'NEST_FOREIGN_ERROR_CAUSE'));
+  assert.ok(!result.violations.some(item => item.ruleId === 'NEST_FOREIGN_ERROR_CAUSE'));
+
+  const propertyMutation = fixture(t, { cause: `import { AppError } from './app-error';
+export function load(): void { try { JSON.parse('x'); } catch (error) { if (error instanceof Error) error.name = 'renamed'; throw new AppError({ originalError: error }); } }` });
+  result = checkNestErrors(propertyMutation.input);
+  assert.ok(!result.errors.some(item => item.ruleId === 'NEST_FOREIGN_ERROR_CAUSE'));
+  assert.ok(!result.violations.some(item => item.ruleId === 'NEST_FOREIGN_ERROR_CAUSE'));
+});
+
 test('same-error rethrows and recovery catches do not manufacture wrapper obligations', t => {
   const f = fixture(t, { cause: `export function load(): void { try { JSON.parse('x'); } catch (error) { if (error instanceof SyntaxError) throw error; } try { JSON.parse('x'); } catch { return; } }` });
   const result = checkNestErrors(f.input);
