@@ -213,6 +213,7 @@ test('a single unknown-effect failed launch binds its exact settled Dispatch bef
     op={id:'failed-native',kind:'frontend.implement',attempt:2,status:'blocked',allowlist:['a.js']};f.state.ops=[op];
   const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})}),reserved=runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});
   assert.equal(reserved.ok,true);runtime.beginLaunchIntent(op);
+  runtime.journal.db.prepare("UPDATE jobs SET status='effect_unknown',deadline=NULL WHERE job_id=?").run(reserved.jobId);
   op.launch={ok:false,task:'task-failed',dispatch:null,effectState:'unknown',attempts:[{dispatchId:'ctx-failed',effectState:'unknown',stage:'dispatch_input'}]};
   op.candidate={identity:{workflowId:f.state.id,opId:op.id,attempt:op.attempt,generation:f.state.engine.generation,jobId:op.lease.jobId}};
   runtime.freezeCandidate=()=>{op.candidateDigest='recovered-candidate';return {status:'sealed',observedFiles:['a.js']};};
@@ -222,13 +223,14 @@ test('a single unknown-effect failed launch binds its exact settled Dispatch bef
   assert.deepEqual([event?.payload?.task,event?.payload?.dispatch],['task-failed','ctx-failed']);bridge.close();
 });
 
-test('failed-launch reconciliation rejects ambiguous attempts and mismatched candidate identity',t=>{
-  for(const variant of ['ambiguous','candidate-mismatch']){
+test('failed-launch reconciliation rejects ambiguous attempts, mismatched candidates and missing resource custody',t=>{
+  for(const variant of ['ambiguous','candidate-mismatch','missing-resources']){
     const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),
       op={id:`failed-${variant}`,kind:'frontend.implement',attempt:2,status:'blocked',allowlist:['a.js']};f.state.ops=[op];
     const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})}),reserved=runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);
     op.launch={ok:false,task:'task-failed',dispatch:null,effectState:'unknown',attempts:[{dispatchId:'ctx-failed',effectState:'unknown'},...(variant==='ambiguous'?[{dispatchId:'ctx-other',effectState:'unknown'}]:[])]};
     op.candidate={identity:{workflowId:f.state.id,opId:op.id,attempt:variant==='candidate-mismatch'?1:op.attempt,generation:f.state.engine.generation,jobId:op.lease.jobId}};
+    if(variant==='missing-resources')runtime.journal.db.prepare('DELETE FROM leases WHERE job_id=?').run(reserved.jobId);
     const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-failed',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-failed',effectState:'none'}});
     assert.equal(result.ok,false);assert.match(result.reason,/not bound/);assert.equal(runtime.journal.getJob(reserved.jobId).worker_id,null);bridge.close();
   }

@@ -360,16 +360,19 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       if(settlement?.schema!=='starci/orca-supervised-settlement@1'||settlement.dispatchId!==dispatch||effectState!=='none')return {ok:false,effectState,reason:'typed host settlement did not prove this exact native process stopped'};
       let job=journal.getJob(lease.jobId),events=journal.events({workflowId:lease.workflowId});
       const attempts=Array.isArray(op?.launch?.attempts)?op.launch.attempts:[],candidate=op?.candidate?.identity,
+        leaseRows=journal.db.prepare('SELECT resource_key,units FROM leases WHERE job_id=? AND token=? ORDER BY resource_key').all(lease.jobId,lease.leaseToken),
+        expectedResources=[...(job?.payload?.expectedResources??[])].sort((a,b)=>a.key.localeCompare(b.key)),
+        exactResources=leaseRows.length>0&&JSON.stringify(leaseRows.map(row=>({key:row.resource_key,units:row.units})))===JSON.stringify(expectedResources),
         intent=events.find(event=>event.entity_id===lease.jobId&&event.generation===lease.generation&&event.kind==='operation-launch-intent'
           &&event.payload?.opId===lease.opId&&event.payload?.attempt===lease.attempt),
         recoverable=job?.kind==='operation'&&job.workflow_id===lease.workflowId&&job.op_id===lease.opId&&job.attempt===lease.attempt&&job.generation===lease.generation
-          &&job.status==='leased'&&job.lease_token===lease.leaseToken&&!job.worker_id&&op?.launch?.ok===false&&typeof op.launch.task==='string'&&op.launch.task
+          &&['leased','effect_unknown'].includes(job.status)&&job.lease_token===lease.leaseToken&&exactResources&&!job.worker_id&&op?.launch?.ok===false&&typeof op.launch.task==='string'&&op.launch.task
           &&attempts.length===1&&attempts[0]?.dispatchId===dispatch&&attempts[0]?.effectState==='unknown'&&intent
           &&candidate?.workflowId===lease.workflowId&&candidate?.opId===lease.opId&&candidate?.attempt===lease.attempt
           &&candidate?.generation===lease.generation&&candidate?.jobId===lease.jobId;
       if(recoverable){
         const eventId=`${lease.jobId}:launch-reconciled:${dispatch}`;
-        journal.transaction(db=>{const changed=db.prepare("UPDATE jobs SET worker_id=?,updated_at=? WHERE job_id=? AND lease_token=? AND status='leased' AND worker_id IS NULL").run(dispatch,now(),lease.jobId,lease.leaseToken).changes;
+        journal.transaction(db=>{const changed=db.prepare("UPDATE jobs SET worker_id=?,updated_at=? WHERE job_id=? AND lease_token=? AND status IN ('leased','effect_unknown') AND worker_id IS NULL").run(dispatch,now(),lease.jobId,lease.leaseToken).changes;
           if(changed===1)db.prepare('INSERT OR IGNORE INTO events(event_id,workflow_id,entity_type,entity_id,generation,kind,payload_json,created_at) VALUES(?,?,?,?,?,?,?,?)')
             .run(eventId,lease.workflowId,'job',lease.jobId,lease.generation,'operation-launch-reconciled',JSON.stringify({opId:lease.opId,attempt:lease.attempt,task:op.launch.task,dispatch,proof:'single persisted unknown-effect launch attempt plus exact typed host settlement'}),now());});
         job=journal.getJob(lease.jobId);events=journal.events({workflowId:lease.workflowId});
