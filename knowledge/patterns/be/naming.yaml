@@ -96,32 +96,38 @@ rules:
     relatedExamples:
       - graphql-command
   - id: BE-NAMING-3
-    title: Exception identity
+    title: Error identity
     kind: mandatory
-    requirement: Exception class, code, metadata interface and message follow the AbstractException identity contract.
+    requirement: >-
+      Error names follow the selected identity profile. Capability-owned families keep their own stable class,
+      code and metadata vocabulary in their declared roots; they do not inherit an application-wide Exception
+      suffix or metadata-interface convention. The Academy profile uses the exact AbstractException convention:
+      <Subject>Exception, matching UPPER_SNAKE class code and exported <ClassName>Metadata interface. Messages
+      remain short diagnostics and never replace the stable code.
     rationale: ""
     cases:
       - id: case-1
-        when: Class
-        write: ChallengeNotFoundException, AiQuotaExhaustedException — ends in Exception (337 at extraction; lint
-          exception-name-ends-in-exception)
+        when: Capability family
+        write: >-
+          Use the capability's selected exported base and subclasses consistently. The family may choose Error,
+          Failure or another meaningful local form; no generic central-folder or Exception-suffix rule is inferred.
       - id: case-2
-        when: Code
-        write: '"CHALLENGE_NOT_FOUND_EXCEPTION", "AI_QUOTA_EXHAUSTED_EXCEPTION" — the class name in UPPER_SNAKE (lint
-          exception-code-matches-class-name)'
+        when: Academy class
+        write: ChallengeNotFoundException, AiQuotaExhaustedException — ends in Exception (337 at extraction)
       - id: case-3
-        when: Metadata
-        write: interface ChallengeNotFoundExceptionMetadata extends AbstractExceptionMetadata (285 of 294 files at
-          extraction; lint exception-metadata-type-named-for-class)
+        when: Academy code
+        write: '"CHALLENGE_NOT_FOUND_EXCEPTION", "AI_QUOTA_EXHAUSTED_EXCEPTION" — the class name in UPPER_SNAKE'
       - id: case-4
+        when: Academy metadata
+        write: interface ChallengeNotFoundExceptionMetadata extends AbstractExceptionMetadata (285 of 294 files at extraction)
+      - id: case-5
         when: Message
         write: 'a short sentence: "Challenge not found", `AI quota exhausted (${window})`'
     verification:
       automated:
-        - exception-name-ends-in-exception
-        - exception-code-matches-class-name
-        - exception-metadata-type-named-for-class
-      manual: []
+        - NEST_ERROR_DECLARATION_IDENTITY
+      manual:
+        - Review capability-specific vocabulary and message safety; the identity check proves only declared shape.
     relatedExamples:
       - graphql-command
   - id: BE-NAMING-4
