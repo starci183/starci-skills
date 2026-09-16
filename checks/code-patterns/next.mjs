@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { loadTargetTypeScript } from '../architecture/typescript.mjs';
 
 export const NEXT_SCRIPT_RULES = Object.freeze([
@@ -52,88 +53,140 @@ function standardType(ts, checker, node, expected) {
   return Boolean(symbol?.getDeclarations()?.some(declaration => declaration.getSourceFile().hasNoDefaultLib));
 }
 
-function checkReadonlyType(ts, checker, source, relative, node, violations, errors, membersAlreadyReadonly = false, rootContract = false) {
-  const add = (target, message) => violations.push({ ruleId: 'FE_READONLY_PROPS_CONTRACT', path: relative,
+function readonlyError(context, source, relative, node, message) {
+  context.errors.push({ ruleId: 'FE_READONLY_PROPS_CONTRACT', path: relative, ...location(source, node), message });
+}
+
+function checkReadonlyMembers(context, source, relative, members, membersAlreadyReadonly = false) {
+  const { ts } = context;
+  for (const member of members) {
+    if (ts.isPropertySignature(member)) {
+      if (!membersAlreadyReadonly && !readonlyMember(ts, member)) context.violations.push({ ruleId: 'FE_READONLY_PROPS_CONTRACT', path: relative,
+        ...location(source, member), message: 'Every props field, including a resolved nested field, is readonly.' });
+      if (member.type) checkReadonlyType(context, source, relative, member.type);
+    } else if (ts.isIndexSignatureDeclaration(member)) {
+      if (!membersAlreadyReadonly && !readonlyMember(ts, member)) context.violations.push({ ruleId: 'FE_READONLY_PROPS_CONTRACT', path: relative,
+        ...location(source, member), message: 'Every props index signature is readonly.' });
+      if (member.type) checkReadonlyType(context, source, relative, member.type);
+    }
+  }
+}
+
+function checkReadonlyDeclarations(context, originSource, originRelative, node, declarations, membersAlreadyReadonly, rootContract = false) {
+  const { ts } = context;
+  if (declarations.length === 0 || declarations.some(declaration => !ts.isTypeAliasDeclaration(declaration) && !ts.isInterfaceDeclaration(declaration))) {
+    readonlyError(context, originSource, originRelative, node,
+      `Referenced props shape ${node.getText(originSource)} has no resolvable type/interface contract.`);
+    return;
+  }
+  if (declarations.some(declaration => declaration.typeParameters?.length)) {
+    readonlyError(context, originSource, originRelative, node,
+      `Generic referenced props shape ${node.getText(originSource)} needs an explicit instantiated contract.`);
+    return;
+  }
+  for (const declaration of declarations) {
+    const targetSource = declaration.getSourceFile();
+    const targetRelative = context.selectedByFile.get(canonicalFile(targetSource.fileName));
+    if (!targetRelative) {
+      readonlyError(context, originSource, originRelative, node,
+        `Referenced props shape ${node.getText(originSource)} resolves outside the exact selected file set.`);
+      continue;
+    }
+    const key = `${declarationIdentity(declaration)}\0${membersAlreadyReadonly ? 'readonly' : 'direct'}`;
+    if (context.active.has(key) || context.complete.has(key)) continue;
+    context.active.add(key);
+    if (ts.isTypeAliasDeclaration(declaration)) {
+      checkReadonlyType(context, targetSource, targetRelative, declaration.type, membersAlreadyReadonly, rootContract);
+    } else {
+      for (const heritage of declaration.heritageClauses ?? []) for (const inherited of heritage.types) {
+        const symbol = targetSymbol(ts, context.checker, context.checker.getSymbolAtLocation(inherited.expression));
+        checkReadonlyDeclarations(context, targetSource, targetRelative, inherited, symbol?.getDeclarations?.() ?? [], membersAlreadyReadonly);
+      }
+      checkReadonlyMembers(context, targetSource, targetRelative, declaration.members, membersAlreadyReadonly);
+    }
+    context.active.delete(key);
+    context.complete.add(key);
+  }
+}
+
+function checkReadonlyType(context, source, relative, node, membersAlreadyReadonly = false, rootContract = false) {
+  const { ts, checker } = context;
+  const add = (target, message) => context.violations.push({ ruleId: 'FE_READONLY_PROPS_CONTRACT', path: relative,
     ...location(source, target), message });
-  if (ts.isParenthesizedTypeNode(node)) return checkReadonlyType(ts, checker, source, relative, node.type, violations, errors, membersAlreadyReadonly, rootContract);
+  if (ts.isParenthesizedTypeNode(node)) return checkReadonlyType(context, source, relative, node.type, membersAlreadyReadonly, rootContract);
   if (ts.isTypeOperatorNode(node) && node.operator === ts.SyntaxKind.ReadonlyKeyword) {
-    return checkReadonlyType(ts, checker, source, relative, node.type, violations, errors, true, rootContract);
+    return checkReadonlyType(context, source, relative, node.type, true, rootContract);
   }
   if (ts.isArrayTypeNode(node)) {
     add(node, 'A props collection uses ReadonlyArray<T> rather than mutable T[].');
-    return checkReadonlyType(ts, checker, source, relative, node.elementType, violations, errors);
+    return checkReadonlyType(context, source, relative, node.elementType);
   }
   if (ts.isTupleTypeNode(node)) {
     if (!membersAlreadyReadonly) add(node, 'A props tuple is declared readonly.');
-    for (const element of node.elements) checkReadonlyType(ts, checker, source, relative, element, violations, errors);
+    for (const element of node.elements) checkReadonlyType(context, source, relative, element);
     return;
   }
   if (ts.isNamedTupleMember(node) || ts.isOptionalTypeNode(node) || ts.isRestTypeNode(node)) {
-    return checkReadonlyType(ts, checker, source, relative, node.type, violations, errors);
+    return checkReadonlyType(context, source, relative, node.type);
   }
   if (ts.isTypeReferenceNode(node)) {
     if (standardType(ts, checker, node.typeName, 'Array')) {
       add(node, 'A props collection uses ReadonlyArray<T> rather than mutable Array<T>.');
-      for (const argument of node.typeArguments ?? []) checkReadonlyType(ts, checker, source, relative, argument, violations, errors);
+      for (const argument of node.typeArguments ?? []) checkReadonlyType(context, source, relative, argument);
       return;
     }
     if (standardType(ts, checker, node.typeName, 'ReadonlyArray')) {
-      for (const argument of node.typeArguments ?? []) checkReadonlyType(ts, checker, source, relative, argument, violations, errors);
+      for (const argument of node.typeArguments ?? []) checkReadonlyType(context, source, relative, argument);
       return;
     }
     if (standardType(ts, checker, node.typeName, 'Readonly')) {
-      for (const argument of node.typeArguments ?? []) checkReadonlyType(ts, checker, source, relative, argument, violations, errors, true, rootContract);
-      return;
+      if (node.typeArguments?.length !== 1) return readonlyError(context, source, relative, node, 'Built-in Readonly needs one resolved shape argument.');
+      return checkReadonlyType(context, source, relative, node.typeArguments[0], true, rootContract);
     }
-    errors.push({ ruleId: 'FE_READONLY_PROPS_CONTRACT', path: relative,
-      ...location(source, node), message: `Referenced props shape ${node.getText(source)} needs an explicit resolved contract before readonly coverage is available.` });
+    const resolved = checker.getTypeFromTypeNode(node);
+    if (dynamicReturn(ts, resolved)) return readonlyError(context, source, relative, node,
+      `Referenced props shape ${node.getText(source)} resolves to any/unknown.`);
+    if (node.typeArguments?.length) return readonlyError(context, source, relative, node,
+      `Generic referenced props shape ${node.getText(source)} needs an explicit instantiated contract.`);
+    const symbol = targetSymbol(ts, checker, checker.getSymbolAtLocation(node.typeName));
+    checkReadonlyDeclarations(context, source, relative, node, symbol?.getDeclarations?.() ?? [], membersAlreadyReadonly, rootContract);
     return;
   }
   if (ts.isTypeLiteralNode(node)) {
-    for (const member of node.members) {
-      if (ts.isPropertySignature(member)) {
-        if (!membersAlreadyReadonly && !readonlyMember(ts, member)) add(member, 'Every props field, including an inline nested field, is readonly.');
-        if (member.type) checkReadonlyType(ts, checker, source, relative, member.type, violations, errors);
-      } else if (ts.isIndexSignatureDeclaration(member)) {
-        if (!membersAlreadyReadonly && !readonlyMember(ts, member)) add(member, 'Every props index signature is readonly.');
-        if (member.type) checkReadonlyType(ts, checker, source, relative, member.type, violations, errors);
-      }
-    }
+    checkReadonlyMembers(context, source, relative, node.members, membersAlreadyReadonly);
     return;
   }
   if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) {
-    for (const part of node.types) checkReadonlyType(ts, checker, source, relative, part, violations, errors, membersAlreadyReadonly, rootContract);
+    for (const part of node.types) checkReadonlyType(context, source, relative, part, membersAlreadyReadonly, rootContract);
+    return;
+  }
+  if (node.kind === ts.SyntaxKind.AnyKeyword || node.kind === ts.SyntaxKind.UnknownKeyword) {
+    readonlyError(context, source, relative, node, 'A props shape containing any/unknown has unavailable readonly coverage.');
     return;
   }
   if (ts.isMappedTypeNode(node) || ts.isConditionalTypeNode(node) || ts.isIndexedAccessTypeNode(node)
     || ts.isImportTypeNode(node) || ts.isTypeQueryNode(node)) {
-    errors.push({ ruleId: 'FE_READONLY_PROPS_CONTRACT', path: relative, ...location(source, node),
-      message: 'This computed props shape needs an explicit resolved contract before readonly coverage is available.' });
+    readonlyError(context, source, relative, node, 'This computed props shape needs an explicit resolved contract before readonly coverage is available.');
     return;
   }
-  if (rootContract) {
-    errors.push({ ruleId: 'FE_READONLY_PROPS_CONTRACT', path: relative, ...location(source, node),
-      message: 'This exported Props alias shape needs an explicit resolved contract before readonly coverage is available.' });
-  }
+  if (rootContract) readonlyError(context, source, relative, node,
+    'This exported Props alias shape needs an explicit resolved contract before readonly coverage is available.');
 }
 
-function checkReadonlyProps(ts, checker, source, relative, violations, errors) {
+function checkReadonlyProps(ts, checker, source, relative, selectedByFile, violations, errors) {
+  const context = { ts, checker, selectedByFile, violations, errors, active: new Set(), complete: new Set() };
   for (const statement of source.statements) {
     if (!exported(ts, statement) || !statement.name?.text?.endsWith('Props')) continue;
     if (ts.isTypeAliasDeclaration(statement)) {
-      checkReadonlyType(ts, checker, source, relative, statement.type, violations, errors, false, true);
+      checkReadonlyType(context, source, relative, statement.type, false, true);
       continue;
     }
     if (!ts.isInterfaceDeclaration(statement)) continue;
-    if (statement.heritageClauses?.length) errors.push({ ruleId: 'FE_READONLY_PROPS_CONTRACT', path: relative,
-      ...location(source, statement.heritageClauses[0]), message: 'Inherited Props need an explicit resolved contract before readonly coverage is available.' });
-    for (const member of statement.members) {
-      if (!ts.isPropertySignature(member) && !ts.isIndexSignatureDeclaration(member)) continue;
-      if (!readonlyMember(ts, member)) violations.push({ ruleId: 'FE_READONLY_PROPS_CONTRACT', path: relative,
-        ...location(source, member), message: ts.isIndexSignatureDeclaration(member)
-          ? 'Every exported Props index signature is readonly.' : 'Every exported Props field is readonly.' });
-      if (member.type) checkReadonlyType(ts, checker, source, relative, member.type, violations, errors);
+    for (const heritage of statement.heritageClauses ?? []) for (const inherited of heritage.types) {
+      const symbol = targetSymbol(ts, checker, checker.getSymbolAtLocation(inherited.expression));
+      checkReadonlyDeclarations(context, source, relative, inherited, symbol?.getDeclarations?.() ?? [], false);
     }
+    checkReadonlyMembers(context, source, relative, statement.members);
   }
 }
 
@@ -584,7 +637,7 @@ function checkBooleanProps(ts, checker, source, relative, selectedFiles, violati
           message: `Props field ${property.name} has no resolvable declaration.` });
         continue;
       }
-      if (!selectedFiles.has(path.resolve(declaration.getSourceFile().fileName))) {
+      if (!selectedFiles.has(canonicalFile(declaration.getSourceFile().fileName))) {
         errors.push({ ruleId: 'FE_CLOSED_VOCABULARY_SHAPE', path: relative, ...location(source, statement.name),
           message: `Props field ${property.name} resolves outside the exact selected file set.` });
         continue;
@@ -628,7 +681,7 @@ function checkClosedVocabularies(ts, checker, source, relative, declared, select
         message: `Feature/presentation vocabulary ${statement.name.text} uses a string-literal union or discriminated object instead of enum.` });
       continue;
     }
-    if (!ts.isTypeAliasDeclaration(statement) || (!exported(ts, statement) && !exportedTypes.has(statement))) continue;
+    if (!ts.isTypeAliasDeclaration(statement) || (!exported(ts, statement) && !exportedTypes.has(declarationIdentity(statement)))) continue;
     const explicit = byType.get(statement.name.text);
     if (explicit) seenDeclared.add(`${relative}\0${statement.name.text}`);
     const type = checker.getTypeFromTypeNode(statement.type);
@@ -697,15 +750,20 @@ function targetSymbol(ts, checker, symbol) {
   return current;
 }
 
-function collectExportedTypeDeclarations(ts, checker, parsed, selectedFiles, errors) {
+function declarationIdentity(declaration) {
+  return `${canonicalFile(declaration.getSourceFile().fileName)}\0${declaration.pos}\0${declaration.end}`;
+}
+
+function collectExportedTypeDeclarations(ts, checkerByRelative, parsed, selectedFiles, errors) {
   const declarations = new Map();
   for (const [relative, source] of parsed) {
+    const checker = checkerByRelative.get(relative);
     const moduleSymbol = checker.getSymbolAtLocation(source);
     if (!moduleSymbol) continue;
     for (const exportedSymbol of checker.getExportsOfModule(moduleSymbol)) {
       const target = targetSymbol(ts, checker, exportedSymbol);
       const projectDeclarations = (target?.getDeclarations?.() ?? []).filter(declaration => !declaration.getSourceFile().isDeclarationFile);
-      const selectedDeclarations = projectDeclarations.filter(declaration => selectedFiles.has(path.resolve(declaration.getSourceFile().fileName)));
+      const selectedDeclarations = projectDeclarations.filter(declaration => selectedFiles.has(canonicalFile(declaration.getSourceFile().fileName)));
       const typeAliases = selectedDeclarations.filter(declaration => ts.isTypeAliasDeclaration(declaration));
       const closedName = /(?:State|Mode)$/.test(exportedSymbol.name);
       if (closedName && (projectDeclarations.length === 0 || selectedDeclarations.length !== projectDeclarations.length)) {
@@ -719,9 +777,10 @@ function collectExportedTypeDeclarations(ts, checker, parsed, selectedFiles, err
         continue;
       }
       for (const declaration of typeAliases) {
-        const names = declarations.get(declaration) ?? new Set();
+        const key = declarationIdentity(declaration);
+        const names = declarations.get(key) ?? new Set();
         names.add(exportedSymbol.name);
-        declarations.set(declaration, names);
+        declarations.set(key, names);
         if (closedName && declaration.name.text !== exportedSymbol.name) errors.push({
           ruleId: 'FE_CLOSED_VOCABULARY_SHAPE', path: relative,
           message: `Aliased closed-vocabulary export ${exportedSymbol.name} needs an exact declared type identity.`,
@@ -742,12 +801,13 @@ function sourceContractExports(ts, checker, source) {
     && item.declarations.some(declaration => ts.isTypeAliasDeclaration(declaration) || ts.isInterfaceDeclaration(declaration)));
 }
 
-function checkContractNames(ts, checker, parsed, owners, violations, errors) {
+function checkContractNames(ts, checkerByRelative, parsed, owners, violations, errors) {
   const visualOwners = componentOwnerNames(ts, parsed, owners);
   const contracts = new Map();
   const processed = new Map();
-  const selectedByFile = new Map([...parsed].map(([relative, source]) => [path.resolve(source.fileName), relative]));
+  const selectedByFile = new Map([...parsed].map(([relative, source]) => [canonicalFile(source.fileName), relative]));
   for (const [relative, source] of parsed) {
+    const checker = checkerByRelative.get(relative);
     const directory = path.posix.dirname(relative);
     const candidates = visualOwners.get(directory) ?? new Set();
     const configuredOwner = selectedOwner(relative, owners);
@@ -767,19 +827,20 @@ function checkContractNames(ts, checker, parsed, owners, violations, errors) {
         continue;
       }
       const sourceDeclaration = declarations[0];
-      const declarationRelative = selectedByFile.get(path.resolve(sourceDeclaration.getSourceFile().fileName));
+      const declarationRelative = selectedByFile.get(canonicalFile(sourceDeclaration.getSourceFile().fileName));
       if (!declarationRelative) {
         errors.push({ ruleId: 'FE_CONTRACT_NAME_SHAPE', path: relative,
           message: `Exported contract ${item.name} resolves outside the exact selected file set.` });
         continue;
       }
       const key = `${configuredOwner?.root ?? directory}\0${item.name}`;
+      const symbolIdentity = declarationIdentity(sourceDeclaration);
       const group = contracts.get(key) ?? new Set();
-      group.add(item.symbol);
+      group.add(symbolIdentity);
       contracts.set(key, group);
       const seen = processed.get(key) ?? new Set();
-      if (seen.has(item.symbol)) continue;
-      seen.add(item.symbol);
+      if (seen.has(symbolIdentity)) continue;
+      seen.add(symbolIdentity);
       processed.set(key, seen);
       if ((suffix === 'Props' || suffix === 'Data') && declarations.some(declaration => ts.isInterfaceDeclaration(declaration))) {
         violations.push({ ruleId: 'FE_CONTRACT_NAME_SHAPE', path: declarationRelative,
@@ -808,8 +869,85 @@ function normalizedContractPath(value) {
     && path.posix.normalize(value) === value && value !== '..' && !value.startsWith('../');
 }
 
+function exactRegularRepositoryFile(repository, relative, label) {
+  if (!normalizedContractPath(relative)) throw Error(`${label} must be a normalized repository-relative path.`);
+  const absolute = path.resolve(repository, ...relative.split('/'));
+  if (!inside(repository, absolute)) throw Error(`${label} leaves the repository.`);
+  const stat = fs.lstatSync(absolute);
+  if (!stat.isFile() || stat.isSymbolicLink()) throw Error(`${label} must be a regular non-symlink file.`);
+  for (let cursor = path.dirname(absolute); cursor !== repository; cursor = path.dirname(cursor)) {
+    if (!inside(repository, cursor) || fs.lstatSync(cursor).isSymbolicLink()) throw Error(`${label} cannot cross a symlink.`);
+  }
+  return absolute;
+}
+
+function normalizedProjectList(repository, values, label, errors) {
+  if (!Array.isArray(values) || values.length === 0 || new Set(values).size !== values.length) {
+    errors.push({ message: `${label} must declare at least one unique TypeScript project path.` });
+    return [];
+  }
+  const result = [];
+  for (const relative of values) {
+    try {
+      if (!normalizedContractPath(relative) || !/(?:^|\/)tsconfig(?:\.[a-z0-9-]+)?\.json$/i.test(relative)) {
+        throw Error('project path must be a normalized tsconfig*.json path');
+      }
+      exactRegularRepositoryFile(repository, relative, `${label} project ${relative}`);
+      result.push(relative);
+    } catch (error) { errors.push({ path: typeof relative === 'string' ? relative : undefined, message: `${label}: ${error.message}` }); }
+  }
+  return result.sort();
+}
+
+function sameStrings(left, right) {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function resolveProjectAuthority(repository, contractProjects, architectureProjects, contextFiles, errors) {
+  let bound = null;
+  const context = contextFiles === undefined ? null : new Set(Array.isArray(contextFiles) ? contextFiles : []);
+  if (contextFiles !== undefined && (!Array.isArray(contextFiles) || context.size !== contextFiles.length
+    || [...context].some(item => !normalizedContractPath(item)))) {
+    errors.push({ message: 'contextFiles must contain unique normalized repository-relative paths.' });
+  }
+  if (architectureProjects !== undefined) {
+    if (!architectureProjects || architectureProjects.schema !== 'starci/typescript-project-selection@1'
+      || !normalizedContractPath(architectureProjects.configPath) || !/^[a-f0-9]{64}$/.test(architectureProjects.configDigest ?? '')) {
+      errors.push({ message: 'architectureProjects must use starci/typescript-project-selection@1 with a normalized configPath and lowercase raw-byte SHA-256 digest.' });
+    } else {
+      let declaredProjects = null;
+      try {
+        const absolute = exactRegularRepositoryFile(repository, architectureProjects.configPath, 'Architecture config');
+        const bytes = fs.readFileSync(absolute);
+        const observed = crypto.createHash('sha256').update(bytes).digest('hex');
+        if (observed !== architectureProjects.configDigest) throw Error('architecture config digest does not match its exact bytes');
+        if (context && !context.has(architectureProjects.configPath)) throw Error('architecture config is absent from exact contextFiles');
+        const parsed = JSON.parse(bytes.toString('utf8'));
+        if (parsed?.schema !== 'starci/architecture-config@1' || !Array.isArray(parsed.projects)) {
+          throw Error('architecture config does not expose starci/architecture-config@1 projects');
+        }
+        declaredProjects = [...parsed.projects].sort();
+      } catch (error) { errors.push({ path: architectureProjects.configPath, message: `Invalid architecture project authority: ${error.message}` }); }
+      bound = normalizedProjectList(repository, architectureProjects.projects, 'architectureProjects', errors);
+      if (declaredProjects && !sameStrings(bound, declaredProjects)) {
+        errors.push({ path: architectureProjects.configPath, message: 'architectureProjects list disagrees with the bound architecture config.' });
+      }
+    }
+  }
+  const fallback = contractProjects === null ? null : normalizedProjectList(repository, contractProjects, 'package.json#starci.codePatterns.next.projects', errors);
+  if (bound && fallback && !sameStrings(bound, fallback)) {
+    errors.push({ message: 'Architecture project authority and package.json Next project fallback disagree.' });
+  }
+  const projects = bound ?? fallback ?? [];
+  if (projects.length === 0 && bound === null && fallback === null) {
+    errors.push({ message: 'Next project coverage needs canonical architectureProjects or package.json#starci.codePatterns.next.projects.' });
+  }
+  return { projects, source: bound ? 'architecture' : fallback ? 'package' : null,
+    architectureConfig: bound ? { path: architectureProjects.configPath, digest: architectureProjects.configDigest } : null };
+}
+
 function loadNextContract(repository, selected, errors) {
-  const empty = { owners: [], closedVocabularies: [] };
+  const empty = { owners: [], closedVocabularies: [], projects: null };
   let manifest;
   try { manifest = JSON.parse(fs.readFileSync(path.join(repository, 'package.json'), 'utf8')); } catch (error) {
     errors.push({ message: `Cannot read target package.json for Next role contracts: ${error.message}` });
@@ -859,7 +997,12 @@ function loadNextContract(repository, selected, errors) {
     inventoryIds.add(inventoryId);
     closedVocabularies.push({ path: item.path, type: item.type, inventory: item.inventory, role: item.role });
   }
-  return { owners, closedVocabularies };
+  let projects = null;
+  if (contract.projects !== undefined) {
+    projects = Array.isArray(contract.projects) ? [...contract.projects] : [];
+    if (!Array.isArray(contract.projects)) errors.push({ message: 'package.json#starci.codePatterns.next.projects must be an array when provided.' });
+  }
+  return { owners, closedVocabularies, projects };
 }
 
 function stable(items) {
@@ -875,13 +1018,94 @@ function stable(items) {
   return items;
 }
 
+function canonicalFile(file) {
+  try { return path.resolve(fs.realpathSync(file)); } catch { return path.resolve(file); }
+}
+
+function stableCompilerValue(value) {
+  if (Array.isArray(value)) return value.map(stableCompilerValue);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableCompilerValue(value[key])]));
+  return value;
+}
+
+function compilerOptionsIdentity(options) {
+  const ignored = new Set(['configFilePath', 'outDir', 'declarationDir', 'tsBuildInfoFile']);
+  return JSON.stringify(Object.fromEntries(Object.keys(options).filter(key => !ignored.has(key)).sort()
+    .map(key => [key, stableCompilerValue(options[key])])));
+}
+
+function projectReferencePath(ts, reference) {
+  if (typeof ts.resolveProjectReferencePath === 'function') return ts.resolveProjectReferencePath(reference);
+  return path.extname(reference.path) ? reference.path : path.join(reference.path, 'tsconfig.json');
+}
+
+function buildProjectAssignments(repository, compiler, authority, selected, errors) {
+  const projects = [];
+  const queue = [...authority.projects];
+  const seen = new Set();
+  while (queue.length) {
+    const relative = queue.shift();
+    if (seen.has(relative)) continue;
+    seen.add(relative);
+    let absolute;
+    try { absolute = exactRegularRepositoryFile(repository, relative, `TypeScript project ${relative}`); }
+    catch (error) { errors.push({ path: relative, message: error.message }); continue; }
+    const read = compiler.ts.readConfigFile(absolute, compiler.ts.sys.readFile);
+    if (read.error) {
+      errors.push({ path: relative, message: 'TypeScript project config cannot be read; Next pattern coverage is unavailable.' });
+      continue;
+    }
+    const parsed = compiler.ts.parseJsonConfigFileContent(read.config, compiler.ts.sys, path.dirname(absolute), undefined, absolute);
+    if (parsed.errors.length) {
+      errors.push({ path: relative, message: 'TypeScript project config is invalid; Next pattern coverage is unavailable.' });
+      continue;
+    }
+    for (const reference of parsed.projectReferences ?? []) {
+      const target = path.resolve(projectReferencePath(compiler.ts, reference));
+      if (!inside(repository, target)) {
+        errors.push({ path: relative, message: 'TypeScript project reference leaves the repository.' });
+        continue;
+      }
+      queue.push(slash(path.relative(repository, target)));
+    }
+    const program = compiler.ts.createProgram({ rootNames: parsed.fileNames, options: { ...parsed.options, noEmit: true },
+      projectReferences: parsed.projectReferences });
+    const rootNames = new Set(parsed.fileNames.map(canonicalFile));
+    projects.push({ relative, program, checker: program.getTypeChecker(), rootNames,
+      identity: compilerOptionsIdentity(parsed.options), selectedCount: 0 });
+  }
+  const assignments = new Map();
+  for (const item of selected) {
+    const target = canonicalFile(item.absolute);
+    const owners = projects.filter(project => project.rootNames.has(target));
+    if (owners.length === 0) {
+      errors.push({ path: item.relative, message: 'Selected source belongs to no declared TypeScript project.' });
+      continue;
+    }
+    if (new Set(owners.map(project => project.identity)).size !== 1) {
+      errors.push({ path: item.relative, message: 'Selected source belongs to overlapping TypeScript projects with conflicting compiler meaning.' });
+      continue;
+    }
+    const owner = owners[0];
+    const source = owner.program.getSourceFile(item.absolute) ?? owner.program.getSourceFile(target);
+    if (!source || owner.program.getSyntacticDiagnostics(source).length) {
+      errors.push({ path: item.relative, message: 'TypeScript syntax is invalid; code-pattern coverage is unavailable.' });
+      continue;
+    }
+    owner.selectedCount += 1;
+    assignments.set(item.relative, { ...item, source, checker: owner.checker, project: owner.relative });
+  }
+  return { assignments, projects: projects.map(project => ({ path: project.relative, selectedSourceCount: project.selectedCount })) };
+}
+
 /** Check only exact mechanically decidable Next syntax clauses over exact selected source files. */
-export function checkNextPatterns({ root, files, ruleIds } = {}) {
+export function checkNextPatterns({ root, files, ruleIds, contextFiles, architectureProjects } = {}) {
   let repository = '';
   try { repository = typeof root === 'string' ? fs.realpathSync(path.resolve(root)) : ''; } catch { repository = ''; }
   const result = { schema: 'starci/code-pattern-script@1', repository, files: [], requestedRuleIds: [], checkedRuleIds: [], violations: [], errors: [], compiler: null,
     limitations: [
-      'Readonly syntax covers directly exported Props shapes; inherited, referenced and computed object shapes fail unavailable until their contract is explicitly resolved.',
+      'Readonly coverage resolves selected imported aliases, interfaces, inheritance, cycles and the built-in Readonly/ReadonlyArray types; generic, computed, any/unknown and unselected shapes fail unavailable.',
+      'Every selected source is bound to a canonical architecture TypeScript project or an explicit package fallback; uncovered and compiler-conflicting overlaps fail unavailable.',
       'Source naming covers hook/module basenames and syntactically literal frozen inventories; it does not infer domain roles from arbitrary expressions.',
       'Spec checks cover collocated selected subjects, statically bound top-level Vitest describe forms and statically named expect snapshot matchers; unsupported dynamic forms fail coverage.',
       'Return roles cover resolved named components, hooks, async utilities and primitive helpers; overloads and any/unknown returns fail unavailable.',
@@ -895,7 +1119,7 @@ export function checkNextPatterns({ root, files, ruleIds } = {}) {
   result.requestedRuleIds = [...ruleIds].sort();
   let compiler;
   try { compiler = loadTargetTypeScript(repository); } catch (error) { return fail(String(error.message)); }
-  result.compiler = { version: compiler.version, resolved: compiler.resolved };
+  result.compiler = { version: compiler.version, resolved: compiler.resolved, projectAuthority: null, projects: [] };
   const requested = new Set(ruleIds);
   const selected = [];
   for (const relative of [...files].sort()) {
@@ -914,40 +1138,28 @@ export function checkNextPatterns({ root, files, ruleIds } = {}) {
       selected.push({ relative, absolute });
     } catch (error) { result.errors.push({ path: relative, message: String(error.message) }); }
   }
-  let program;
-  if (selected.length) {
-    const configFile = compiler.ts.findConfigFile(repository, compiler.ts.sys.fileExists, 'tsconfig.json');
-    let options = { noEmit: true, skipLibCheck: true, jsx: compiler.ts.JsxEmit.Preserve };
-    if (configFile) {
-      const read = compiler.ts.readConfigFile(configFile, compiler.ts.sys.readFile);
-      if (read.error) result.errors.push({ message: 'Target tsconfig is invalid; Next pattern coverage is unavailable.' });
-      else {
-        const parsedConfig = compiler.ts.parseJsonConfigFileContent(read.config, compiler.ts.sys, path.dirname(configFile), undefined, configFile);
-        if (parsedConfig.errors.length) result.errors.push({ message: 'Target tsconfig is invalid; Next pattern coverage is unavailable.' });
-        options = parsedConfig.options;
-      }
-    }
-    program = compiler.ts.createProgram({ rootNames: selected.map(item => item.absolute), options: { ...options, noEmit: true } });
-  }
-  const checker = program?.getTypeChecker();
-  const parsed = new Map();
-  for (const item of selected) {
-    const source = program?.getSourceFile(item.absolute);
-    if (!source || program.getSyntacticDiagnostics(source).length) {
-      result.errors.push({ path: item.relative, message: 'TypeScript syntax is invalid; code-pattern coverage is unavailable.' });
-      continue;
-    }
-    parsed.set(item.relative, source);
-    result.files.push(item.relative);
-  }
   const contract = loadNextContract(repository, selected, result.errors);
+  const authority = resolveProjectAuthority(repository, contract.projects, architectureProjects, contextFiles, result.errors);
+  result.compiler.projectAuthority = { source: authority.source, ...(authority.architectureConfig ?? {}) };
+  const projectContext = buildProjectAssignments(repository, compiler, authority, selected, result.errors);
+  result.compiler.projects = projectContext.projects;
+  const parsed = new Map();
+  const checkerByRelative = new Map();
+  for (const [relative, item] of projectContext.assignments) {
+    parsed.set(relative, item.source);
+    checkerByRelative.set(relative, item.checker);
+    result.files.push(relative);
+  }
   const ownerNames = componentOwnerNames(compiler.ts, parsed, contract.owners);
-  const selectedFiles = new Set([...parsed.values()].map(source => path.resolve(source.fileName)));
+  const selectedByFile = new Map([...parsed].map(([relative, source]) => [canonicalFile(source.fileName), relative]));
+  const selectedFiles = new Set(selectedByFile.keys());
   const exportedTypes = requested.has('FE_CLOSED_VOCABULARY_SHAPE')
-    ? collectExportedTypeDeclarations(compiler.ts, checker, parsed, selectedFiles, result.errors) : new Map();
+    ? collectExportedTypeDeclarations(compiler.ts, checkerByRelative, parsed, selectedFiles, result.errors) : new Map();
   const seenClosedDeclarations = new Set();
   for (const [relative, source] of parsed) {
-    if (requested.has('FE_READONLY_PROPS_CONTRACT') && !SPEC_FILE.test(relative)) checkReadonlyProps(compiler.ts, checker, source, relative, result.violations, result.errors);
+    const checker = checkerByRelative.get(relative);
+    if (requested.has('FE_READONLY_PROPS_CONTRACT') && !SPEC_FILE.test(relative)) checkReadonlyProps(compiler.ts, checker, source, relative,
+      selectedByFile, result.violations, result.errors);
     if (requested.has('FE_SOURCE_NAME_SHAPE')) checkSourceNames(compiler.ts, source, relative, result.violations);
     if (requested.has('FE_SPEC_SUBJECT_AND_DESCRIBE')) checkSpecSubject(compiler.ts, checker, parsed, source, relative, repository, result.violations, result.errors);
     if (requested.has('FE_SPEC_NO_SNAPSHOT') && SPEC_FILE.test(relative)) checkSnapshots(compiler.ts, checker, source, relative, result.violations, result.errors);
@@ -964,7 +1176,7 @@ export function checkNextPatterns({ root, files, ruleIds } = {}) {
       message: `Declared closed vocabulary ${declaration.type} is not one exported type alias in its exact selected source.`,
     });
   }
-  if (requested.has('FE_CONTRACT_NAME_SHAPE')) checkContractNames(compiler.ts, checker, parsed, contract.owners, result.violations, result.errors);
+  if (requested.has('FE_CONTRACT_NAME_SHAPE')) checkContractNames(compiler.ts, checkerByRelative, parsed, contract.owners, result.violations, result.errors);
   if (result.errors.length === 0) result.checkedRuleIds = [...ruleIds].sort();
   stable(result.violations);
   stable(result.errors);

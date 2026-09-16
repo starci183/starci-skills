@@ -81,6 +81,9 @@ rules:
       - id: case-4
         when: "Tuple key"
         write: "_key: readonly [string, string]"
+      - id: case-5
+        when: "Imported or inherited props shape"
+        write: "Resolve the selected alias/interface and require readonly fields at the declaring source; Readonly<T> may make only that object's fields readonly."
     verification:
       automated:
         - FE_READONLY_PROPS_CONTRACT

@@ -45,11 +45,14 @@ A repository may declare the roles that syntax cannot supply at `package.json#st
       "inventory": "AUTHENTICATION_MODES",
       "role": "mode"
     }
-  ]
+  ],
+  "projects": ["apps/app/tsconfig.json", "packages/ui/tsconfig.json"]
 }
 ```
 
-Every declared path must be normalized, in-repository, non-redirecting and covered by the exact selected source set. Duplicate identities, missing symbols, unresolved aliases and uncovered owner paths are unavailable coverage. The current direct adapter still needs one compatible owning TypeScript program for every selected source; project-aware monorepo selection remains a blocking integration item rather than an inferred pass.
+Every declared path must be normalized, in-repository, non-redirecting and covered by the exact selected source set. Duplicate identities, missing symbols, unresolved aliases and uncovered owner paths are unavailable coverage. The aggregate runner passes canonical `starci/typescript-project-selection@1` architecture identity: config path, exact-byte SHA-256 digest and project list. `projects` in package metadata is a standalone fallback only. If both exist they must agree exactly. Every selected source must belong to a declared TypeScript program; uncovered sources or overlapping programs with conflicting compiler meaning make coverage unavailable. The result records the authority identity and selected-source count per resolved project.
+
+`FE_READONLY_PROPS_CONTRACT` follows selected imported aliases and interfaces, inheritance, recursive shapes and the resolved built-in `Readonly`/`ReadonlyArray` contracts. Mutable fields remain violations at their declaring path. Generic/computed shapes, `any`/`unknown`, shadowed built-ins and declarations outside the exact selected set are unavailable instead of syntax-only passes.
 
 ## Current blocking gaps
 
@@ -59,7 +62,7 @@ The manifest deliberately remains non-green. The principal gaps are:
 2. The selected Grammar export/peer/style family needs `ARCH_GRAMMAR_EXPORT_BYPASS` and `ARCH_GRAMMAR_CONTRACT_INVALID`.
 3. The conditional frontend world-owner/render boundary needs type-resolved coverage beyond the legacy block/name heuristic. Intrinsic browser state must stay valid.
 4. Nest provider re-registration and selected handler/module registration need static coverage plus a separate boot test for real tokens and lifetime.
-5. Both profiles retain syntax gaps in names, member comments, resolved inherited readonly shapes, tests and framework-specific data/error lifecycles, listed as `missing` obligations rather than manual review. Next monorepos also need exact per-source TypeScript project selection before the new resolved checks can certify portable coverage.
+5. Both profiles retain syntax gaps in names, member comments, tests and framework-specific data/error lifecycles, listed as `missing` obligations rather than manual review. The Next adapter now resolves inherited/imported readonly shapes and exact per-source TypeScript projects, but the aggregate manifest/gate must bind those script IDs before overall code-pattern conformance can become green.
 6. Legacy BE deep-import/no-folder-barrel rules conflict with explicit owner public entries. The legacy FE block-twin rule cannot certify the adopted conditional boundary. Private Academy rules for env/cache/default exports are not shared canon rules.
 
 These gaps are an implementation queue for the owning checker/runtime work. They do not authorize product rewrites or lint-package publication.

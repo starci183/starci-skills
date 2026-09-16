@@ -2,23 +2,36 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import test from 'node:test';
 import { createRequire } from 'node:module';
 import { checkNextPatterns, NEXT_SCRIPT_RULES } from '../checks/code-patterns/next.mjs';
 
 const require = createRequire(import.meta.url);
-function fixture(t, sources) {
+function fixture(t, sources, options = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-next-pattern-'));
   fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true });
   fs.symlinkSync(path.dirname(require.resolve('typescript/package.json')), path.join(root, 'node_modules/typescript'), 'junction');
   fs.writeFileSync(path.join(root, 'package.json'), '{"private":true}');
+  const configs = options.configs ?? { 'tsconfig.json': { compilerOptions: { strict: true, target: 'ES2022', module: 'ESNext', moduleResolution: 'Node', jsx: 'preserve' },
+    include: ['**/*.ts', '**/*.tsx'] } };
+  for (const [relative, value] of Object.entries(configs)) {
+    const file = path.join(root, ...relative.split('/'));
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(value));
+  }
   for (const [relative, source] of Object.entries(sources)) {
     const file = path.join(root, ...relative.split('/'));
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, source);
   }
+  const projects = options.projects ?? Object.keys(configs).sort();
+  const architectureBytes = Buffer.from(JSON.stringify({ schema: 'starci/architecture-config@1', kinds: ['frontend'], projects }));
+  fs.writeFileSync(path.join(root, 'architecture.json'), architectureBytes);
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  return { root, files: Object.keys(sources).sort() };
+  return { root, files: Object.keys(sources).filter(relative => /\.tsx?$/.test(relative)).sort(), contextFiles: ['architecture.json', 'package.json'],
+    architectureProjects: { schema: 'starci/typescript-project-selection@1', configPath: 'architecture.json',
+      configDigest: crypto.createHash('sha256').update(architectureBytes).digest('hex'), projects } };
 }
 
 test('readonly props checks direct, nested, collection and tuple syntax without inventing domain state', t => {
@@ -44,7 +57,7 @@ export const Card = (_props: GoodProps) => null
   assert.equal(result.violations.length, 4, JSON.stringify(result, null, 2));
 });
 
-test('readonly props fails unavailable for inherited or opaque top-level aliases', t => {
+test('readonly props resolves inherited and aliased selected shapes', t => {
   const context = fixture(t, {
     'src/components/Card.tsx': `type ExternalProps = { mutable: string }
 export interface InheritedProps extends ExternalProps { readonly label: string }
@@ -52,11 +65,12 @@ export type AliasProps = ExternalProps
 `,
   });
   const result = checkNextPatterns({ ...context, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
-  assert.equal(result.errors.length, 2, JSON.stringify(result, null, 2));
-  assert.deepEqual(result.checkedRuleIds, []);
+  assert.deepEqual(result.errors, [], JSON.stringify(result, null, 2));
+  assert.deepEqual(result.checkedRuleIds, ['FE_READONLY_PROPS_CONTRACT']);
+  assert.equal(result.violations.length, 1, JSON.stringify(result, null, 2));
 });
 
-test('readonly props refuses nested referenced shapes and a shadowed Readonly alias', t => {
+test('readonly props resolves nested referenced shapes and refuses a shadowed Readonly alias', t => {
   const context = fixture(t, {
     'src/components/shapes.ts': 'export type MutableShape = { value: string }\n',
     'src/components/Card.tsx': `import type { MutableShape } from "./shapes"
@@ -66,8 +80,8 @@ export type ShadowProps = Readonly<{ value: string }>
 `,
   });
   const result = checkNextPatterns({ ...context, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
-  assert.equal(result.errors.length, 2, JSON.stringify(result, null, 2));
-  assert.ok(result.errors.some(item => /MutableShape/.test(item.message)));
+  assert.equal(result.errors.length, 1, JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.path === 'src/components/shapes.ts'));
   assert.ok(result.errors.some(item => /Readonly/.test(item.message)));
 });
 
@@ -79,7 +93,7 @@ export type TupleProps = { readonly rows: readonly [row: { value: string }] }
   });
   const result = checkNextPatterns({ ...context, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
   assert.ok(result.errors.some(item => /computed props shape/.test(item.message)), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => /inline nested field/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => /resolved nested field/.test(item.message)), JSON.stringify(result, null, 2));
 });
 
 test('readonly props checks index signatures and refuses typeof object shapes', t => {
@@ -92,6 +106,96 @@ export type QueryProps = { readonly row: typeof mutable }
   const result = checkNextPatterns({ ...context, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
   assert.ok(result.violations.some(item => /index signature/.test(item.message)), JSON.stringify(result, null, 2));
   assert.ok(result.errors.some(item => /computed props shape/.test(item.message)), JSON.stringify(result, null, 2));
+});
+
+test('readonly props follows imported aliases, inheritance, recursive shapes and built-in Readonly', t => {
+  const context = fixture(t, {
+    'src/contracts/row.ts': `export interface RowBase { readonly id: string }
+export interface Row extends RowBase { readonly children: ReadonlyArray<Row> }
+export type RowView = Readonly<Row>
+`,
+    'src/components/Table.tsx': `import type { RowView } from "../contracts/row"
+export type TableProps = { readonly row: RowView }
+`,
+  });
+  const result = checkNextPatterns({ ...context, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.deepEqual(result.errors, [], JSON.stringify(result, null, 2));
+  assert.deepEqual(result.violations, [], JSON.stringify(result, null, 2));
+  assert.deepEqual(result.checkedRuleIds, ['FE_READONLY_PROPS_CONTRACT']);
+});
+
+test('readonly props refuses unresolved selected coverage and any inside named shapes', t => {
+  const context = fixture(t, {
+    'src/contracts/row.ts': 'export type Row = { readonly value: any }\n',
+    'src/components/Table.tsx': 'import type { Row } from "../contracts/row"\nexport type TableProps = { readonly row: Row }\n',
+  });
+  const unselected = checkNextPatterns({ ...context, files: ['src/components/Table.tsx'], ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.ok(unselected.errors.some(item => /outside the exact selected file set/.test(item.message)), JSON.stringify(unselected, null, 2));
+  const selected = checkNextPatterns({ ...context, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.ok(selected.errors.some(item => /any\/unknown/.test(item.message)), JSON.stringify(selected, null, 2));
+});
+
+test('readonly props does not certify a primitive alias as an object contract', t => {
+  const context = fixture(t, {
+    'src/contracts/id.ts': 'export type Identifier = string\n',
+    'src/components/Label.tsx': 'import type { Identifier } from "../contracts/id"\nexport type LabelProps = Identifier\n',
+  });
+  const result = checkNextPatterns({ ...context, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.ok(result.errors.some(item => /exported Props alias shape/.test(item.message)), JSON.stringify(result, null, 2));
+});
+
+test('project authority assigns every selected source to its canonical TypeScript program', t => {
+  const context = fixture(t, {
+    'apps/web/src/page.tsx': 'export type PageProps = { readonly title: string }\n',
+    'packages/ui/src/Card.tsx': 'export type CardProps = { readonly label: string }\n',
+  }, { configs: {
+    'apps/web/tsconfig.json': { compilerOptions: { strict: true, jsx: 'preserve' }, include: ['src/**/*.ts', 'src/**/*.tsx'] },
+    'packages/ui/tsconfig.json': { compilerOptions: { strict: true, jsx: 'preserve' }, include: ['src/**/*.ts', 'src/**/*.tsx'] },
+  } });
+  const result = checkNextPatterns({ ...context, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.deepEqual(result.errors, [], JSON.stringify(result, null, 2));
+  assert.equal(result.compiler.projectAuthority.source, 'architecture');
+  assert.deepEqual(result.compiler.projects.map(item => [item.path, item.selectedSourceCount]), [
+    ['apps/web/tsconfig.json', 1], ['packages/ui/tsconfig.json', 1],
+  ]);
+  const stale = checkNextPatterns({ ...context, architectureProjects: { ...context.architectureProjects, configDigest: '0'.repeat(64) },
+    ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.ok(stale.errors.some(item => /digest does not match/.test(item.message)), JSON.stringify(stale, null, 2));
+  const rebound = checkNextPatterns({ ...context, architectureProjects: { ...context.architectureProjects, projects: ['apps/web/tsconfig.json'] },
+    ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.ok(rebound.errors.some(item => /list disagrees with the bound architecture config/.test(item.message)), JSON.stringify(rebound, null, 2));
+});
+
+test('package project fallback is explicit and cannot disagree with canonical architecture authority', t => {
+  const packageContract = { schema: 'starci/next-code-pattern-contract@1', owners: [], closedVocabularies: [], projects: ['tsconfig.json'] };
+  const context = fixture(t, {
+    'package.json': JSON.stringify({ private: true, starci: { codePatterns: { next: packageContract } } }),
+    'src/Card.tsx': 'export type CardProps = { readonly label: string }\n',
+  });
+  const fallback = checkNextPatterns({ root: context.root, files: context.files, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.deepEqual(fallback.errors, [], JSON.stringify(fallback, null, 2));
+  assert.equal(fallback.compiler.projectAuthority.source, 'package');
+  fs.writeFileSync(path.join(context.root, 'tsconfig.other.json'), JSON.stringify({ include: ['src/**/*.tsx'] }));
+  packageContract.projects = ['tsconfig.other.json'];
+  fs.writeFileSync(path.join(context.root, 'package.json'), JSON.stringify({ private: true, starci: { codePatterns: { next: packageContract } } }));
+  const conflict = checkNextPatterns({ ...context, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.ok(conflict.errors.some(item => /disagree/.test(item.message)), JSON.stringify(conflict, null, 2));
+});
+
+test('project coverage fails unavailable for uncovered or compiler-conflicting overlap', t => {
+  const uncovered = fixture(t, {
+    'apps/web/src/page.tsx': 'export type PageProps = { readonly title: string }\n',
+    'packages/ui/src/Card.tsx': 'export type CardProps = { readonly label: string }\n',
+  }, { configs: { 'apps/web/tsconfig.json': { include: ['src/**/*.tsx'] } } });
+  const uncoveredResult = checkNextPatterns({ ...uncovered, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.ok(uncoveredResult.errors.some(item => /belongs to no declared TypeScript project/.test(item.message)), JSON.stringify(uncoveredResult, null, 2));
+
+  const overlap = fixture(t, { 'src/Card.tsx': 'export type CardProps = { readonly label: string }\n' }, { configs: {
+    'tsconfig.a.json': { compilerOptions: { strict: true }, include: ['src/**/*.tsx'] },
+    'tsconfig.b.json': { compilerOptions: { strict: false }, include: ['src/**/*.tsx'] },
+  } });
+  const overlapResult = checkNextPatterns({ ...overlap, ruleIds: ['FE_READONLY_PROPS_CONTRACT'] });
+  assert.ok(overlapResult.errors.some(item => /conflicting compiler meaning/.test(item.message)), JSON.stringify(overlapResult, null, 2));
 });
 
 test('source names enforce hook basename, module kebab-case and syntactically frozen constants', t => {
@@ -168,7 +272,7 @@ test('spec subject coverage fails unavailable when the subject is outside the ex
     'src/components/Card.tsx': 'export const Card = () => null\n',
     'src/components/Card.spec.tsx': 'describe("Card", () => {})\n',
   });
-  const result = checkNextPatterns({ root: context.root, files: ['src/components/Card.spec.tsx'], ruleIds: ['FE_SPEC_SUBJECT_AND_DESCRIBE'] });
+  const result = checkNextPatterns({ ...context, files: ['src/components/Card.spec.tsx'], ruleIds: ['FE_SPEC_SUBJECT_AND_DESCRIBE'] });
   assert.ok(result.errors.some(item => /exact checked file set/.test(item.message)), JSON.stringify(result, null, 2));
   assert.deepEqual(result.checkedRuleIds, []);
 });
@@ -318,10 +422,10 @@ export type AuthenticationMode = "signIn" | "verify"
   assert.ok(result.errors.some(item => /AuthenticationMode.*must be declared/.test(item.message)), JSON.stringify(result, null, 2));
   assert.ok(result.errors.some(item => /Aliased closed-vocabulary export PublicMode/.test(item.message)), JSON.stringify(result, null, 2));
   assert.ok(result.errors.every(item => !/AuthenticationState/.test(item.message)), JSON.stringify(result, null, 2));
-  const outside = checkNextPatterns({ root: context.root, files: ['src/features/auth/index.ts'], ruleIds: ['FE_CLOSED_VOCABULARY_SHAPE'] });
+  const outside = checkNextPatterns({ ...context, files: ['src/features/auth/index.ts'], ruleIds: ['FE_CLOSED_VOCABULARY_SHAPE'] });
   assert.ok(outside.errors.some(item => /outside the exact selected file set/.test(item.message)), JSON.stringify(outside, null, 2));
   fs.writeFileSync(path.join(context.root, 'src/features/auth/index.ts'), 'export type { MissingState } from "./missing"\n');
-  const unresolved = checkNextPatterns({ root: context.root, files: ['src/features/auth/index.ts'], ruleIds: ['FE_CLOSED_VOCABULARY_SHAPE'] });
+  const unresolved = checkNextPatterns({ ...context, files: ['src/features/auth/index.ts'], ruleIds: ['FE_CLOSED_VOCABULARY_SHAPE'] });
   assert.ok(unresolved.errors.some(item => /MissingState.*outside the exact selected file set/.test(item.message)), JSON.stringify(unresolved, null, 2));
 });
 
@@ -366,7 +470,7 @@ test('contract names reject distinct duplicate owner contracts and unselected re
   const duplicate = checkNextPatterns({ ...context, ruleIds: ['FE_CONTRACT_NAME_SHAPE'] });
   assert.ok(duplicate.errors.some(item => /multiple distinct exported CardPageProps/.test(item.message)), JSON.stringify(duplicate, null, 2));
   fs.writeFileSync(path.join(context.root, 'src/components/pages/CardPage/index.tsx'), 'export { type CardPageProps } from "./component"\n');
-  const outside = checkNextPatterns({ root: context.root, files: ['src/components/pages/CardPage/index.tsx'], ruleIds: ['FE_CONTRACT_NAME_SHAPE'] });
+  const outside = checkNextPatterns({ ...context, files: ['src/components/pages/CardPage/index.tsx'], ruleIds: ['FE_CONTRACT_NAME_SHAPE'] });
   assert.ok(outside.errors.some(item => /outside the exact selected file set/.test(item.message)), JSON.stringify(outside, null, 2));
 });
 
