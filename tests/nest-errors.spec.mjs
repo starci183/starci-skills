@@ -105,6 +105,19 @@ test('real installed Nest declarations preserve the framework identity checks', 
   assert.deepEqual(result.errors, []); assert.deepEqual(result.violations, []);
 });
 
+test('a TypeScript path alias cannot impersonate the installed Nest framework', t => {
+  const f = fixture(t, { extra: { 'src/fake-nest.ts': `
+export function Catch(..._types: Function[]): ClassDecorator { return () => {}; }
+export interface ExceptionFilter { catch(exception: unknown, host: ArgumentsHost): void }
+export interface ArgumentsHost { getType<T extends string>(): T; switchToHttp(): { getResponse<T>(): T } }
+` } });
+  f.write('tsconfig.json', { compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler',
+    experimentalDecorators: true, baseUrl: '.', paths: { '@nestjs/common': ['src/fake-nest.ts'] } }, include: ['src/**/*.ts'] });
+  const result = checkNestErrors(f.input);
+  assert.ok(result.errors.length, JSON.stringify(result));
+  assert.deepEqual(result.checkedRuleIds, []);
+});
+
 test('public aggregate script routing invokes the isolated Nest error adapter', async t => {
   const f = fixture(t), result = await defaultScriptChecker('nest', f.input);
   assert.equal(result.schema, 'starci/code-pattern-script@1');

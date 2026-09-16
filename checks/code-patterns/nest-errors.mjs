@@ -74,8 +74,6 @@ function importedBinding(ts, checker, input) {
 }
 
 function frameworkBinding(ts, checker, input) {
-  const direct = importedBinding(ts, checker, input);
-  if (direct) return direct;
   const identity = symbolAt(ts, checker, ts.isPropertyAccessExpression(unwrap(ts, input)) ? unwrap(ts, input).name : unwrap(ts, input));
   for (const declaration of identity?.declarations ?? []) {
     const file = slash(declaration.getSourceFile().fileName);
