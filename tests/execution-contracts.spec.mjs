@@ -68,6 +68,20 @@ test('profile registry keeps the user coordinator, deterministic kernel and oper
   assert.equal(registry.executionModes.solo.maxConcurrentOperationAgents, 3);
 });
 
+test('profile registry accepts only a nonempty explicit headless model override', () => {
+  const schema = parseYaml(fs.readFileSync(new URL('../schemas/profile-registry-v3.schema.yaml', import.meta.url), 'utf8'));
+  const registry = parseYaml(fs.readFileSync(new URL('../model/registry.yaml', import.meta.url), 'utf8'));
+  const validate = new Ajv2020({strict: true}).compile(schema);
+  assert.equal(validate(registry), true, JSON.stringify(validate.errors));
+  assert.equal(registry.targets['claude-fable-5.1'].headlessModel, 'claude-fable-5-1');
+  for (const invalid of ['', null]) {
+    const candidate = structuredClone(registry);
+    candidate.targets['claude-fable-5.1'].headlessModel = invalid;
+    assert.equal(validate(candidate), false, `headlessModel ${JSON.stringify(invalid)} must fail`);
+    assert.ok(validate.errors.some(error => error.instancePath.endsWith('/headlessModel')), JSON.stringify(validate.errors));
+  }
+});
+
 test('WorkflowRequest is closed, ordered and has host-specific mode constraints', () => {
   const request = workflow();
   assert.equal(validateWorkflowRequest(request), true);

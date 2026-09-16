@@ -233,11 +233,15 @@ export function buildTypeScriptContext(config, injectedTypeScript) {
     projects.push({ relative, program, options: parsed.options });
   }
   const fileMap = new Map();
+  const checkerByFile = new Map();
   const occurrences = new Map();
   for (const project of projects) {
     for (const sourceFile of project.program.getSourceFiles().filter(file => isProductionSource(config.root, file))) {
       const name = canonical(sourceFile.fileName);
-      if (!fileMap.has(name)) fileMap.set(name, sourceFile);
+      if (!fileMap.has(name)) {
+        fileMap.set(name, sourceFile);
+        checkerByFile.set(name, project.program.getTypeChecker());
+      }
       if (!occurrences.has(name)) occurrences.set(name, []);
       occurrences.get(name).push(project);
     }
@@ -316,7 +320,9 @@ export function buildTypeScriptContext(config, injectedTypeScript) {
     }
   }
   if (projects.length && files.length === 0) errors.push({ ruleId: 'ARCH_NO_SOURCE', message: 'The configured TypeScript projects contain no production TypeScript or JavaScript source.' });
-  return { loaded, errors, files, edges, programs: projects.map(item => item.program), program: projects[0]?.program ?? null, projects, ts, workspaces, workspaceOf: file => workspaceOf(workspaces, canonical(file)) };
+  return { loaded, errors, files, edges, programs: projects.map(item => item.program), program: projects[0]?.program ?? null, projects, ts, workspaces,
+    checkerFor: file => checkerByFile.get(canonical(file)) ?? null,
+    workspaceOf: file => workspaceOf(workspaces, canonical(file)) };
 }
 
 export function relativePath(root, fileName) {
