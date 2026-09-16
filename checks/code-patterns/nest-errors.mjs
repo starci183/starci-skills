@@ -74,12 +74,10 @@ function importedBinding(ts, checker, input) {
 }
 
 function frameworkBinding(ts, checker, input) {
-  const direct = importedBinding(ts, checker, input);
-  if (direct) return direct;
   const identity = symbolAt(ts, checker, ts.isPropertyAccessExpression(unwrap(ts, input)) ? unwrap(ts, input).name : unwrap(ts, input));
   for (const declaration of identity?.declarations ?? []) {
     const file = slash(declaration.getSourceFile().fileName);
-    for (const module of ['@nestjs/common', '@nestjs/graphql']) if (file.includes(`/node_modules/${module}/`)) return { module, name: identity.name };
+    for (const module of ['@nestjs/common', '@nestjs/core', '@nestjs/graphql']) if (file.includes(`/node_modules/${module}/`)) return { module, name: identity.name };
   }
   return null;
 }
@@ -216,17 +214,6 @@ function preservesOrigin(ts, checker, input, origin, seen = new Set()) {
     const right = preservesOrigin(ts, checker, node.whenFalse, origin, new Set(seen));
     return left === null || right === null ? null : left && right;
   }
-  if (ts.isNewExpression(node)) {
-    const binding = importedBinding(ts, checker, node.expression), name = ts.isIdentifier(node.expression) ? node.expression.text : null;
-    if (!((!binding && name === 'Error') || binding?.name === 'Error') || !node.arguments?.length) return null;
-    return preservesOrigin(ts, checker, node.arguments[0], origin, seen);
-  }
-  if (ts.isCallExpression(node)) {
-    const callee = unwrap(ts, node.expression), globalString = ts.isIdentifier(callee) && callee.text === 'String'
-      && (checker.getSymbolAtLocation(callee)?.declarations ?? []).every(item => item.getSourceFile().isDeclarationFile);
-    if (!globalString || node.arguments.length !== 1) return null;
-    return preservesOrigin(ts, checker, node.arguments[0], origin, seen);
-  }
   return false;
 }
 
@@ -285,7 +272,108 @@ function localOrInitializer(ts, checker, input) {
   return declaration && ts.isVariableDeclaration(declaration) && declaration.initializer ? unwrap(ts, declaration.initializer) : node;
 }
 
-function checkHttpMapper({ ts, checker, source, mapper, errorType, errorIdentity, statusMaps, add }) {
+function decoratorsOf(ts, node) {
+  return ts.canHaveDecorators?.(node) ? ts.getDecorators(node) ?? [] : node.decorators ?? [];
+}
+
+function directIdentity(ts, checker, input, identity) {
+  const node = unwrap(ts, input);
+  return Boolean(node && symbolAt(ts, checker, node) === identity);
+}
+
+function providerRegistersExisting(ts, checker, providers, mapperIdentity) {
+  return providers.some(input => {
+    const node = unwrap(ts, input);
+    if (directIdentity(ts, checker, node, mapperIdentity)) return true;
+    if (!ts.isObjectLiteralExpression(node) || node.properties.some(item => ts.isSpreadAssignment(item) || item.name && ts.isComputedPropertyName(item.name))) return false;
+    const provide = memberValue(ts, node, 'provide'), useClass = memberValue(ts, node, 'useClass');
+    return directIdentity(ts, checker, provide, mapperIdentity) && directIdentity(ts, checker, useClass, mapperIdentity);
+  });
+}
+
+function owningClass(ts, node) {
+  for (let cursor = node; cursor; cursor = cursor.parent) if (ts.isClassDeclaration(cursor)) return cursor;
+  return null;
+}
+
+function hasNestDecorator(ts, checker, node, name) {
+  return decoratorsOf(ts, node).some(item => {
+    const expression = unwrap(ts, item.expression);
+    return ts.isCallExpression(expression) && frameworkBinding(ts, checker, expression.expression)?.module === '@nestjs/common'
+      && frameworkBinding(ts, checker, expression.expression)?.name === name;
+  });
+}
+
+// Static registration only: runtime bootstrap calls and dynamic module/provider values are unavailable.
+function httpRegistration({ ts, mapper, bindings }) {
+  let proven = null, uncertain = null;
+  for (const binding of bindings.values()) {
+    const { source, checker } = binding, mapperIdentity = identityInProgram(ts, binding, mapper);
+    if (!mapperIdentity) continue;
+    const visit = node => {
+      if (proven) return;
+      for (const decorator of decoratorsOf(ts, node)) {
+        const expression = unwrap(ts, decorator.expression);
+        if (!ts.isCallExpression(expression)) continue;
+        const origin = frameworkBinding(ts, checker, expression.expression);
+        if (origin?.module === '@nestjs/common' && origin.name === 'UseFilters') {
+          const controller = owningClass(ts, node);
+          if (!controller || !hasNestDecorator(ts, checker, controller, 'Controller')) continue;
+          for (const argument of expression.arguments) {
+            const value = unwrap(ts, argument);
+            if (ts.isSpreadElement(value)) { uncertain ??= { source, node: value }; continue; }
+            if (directIdentity(ts, checker, value, mapperIdentity)
+              || ts.isNewExpression(value) && directIdentity(ts, checker, value.expression, mapperIdentity)) {
+              proven = { source, node: value, form: '@UseFilters' }; return;
+            }
+            if (!(ts.isIdentifier(value) || ts.isPropertyAccessExpression(value) || ts.isNewExpression(value))) uncertain ??= { source, node: value };
+          }
+        }
+        if (ts.isClassDeclaration(node) && origin?.module === '@nestjs/common' && origin.name === 'Module') {
+            if (expression.arguments.length !== 1 || !ts.isObjectLiteralExpression(unwrap(ts, expression.arguments[0]))) {
+              uncertain ??= { source, node: expression }; continue;
+            }
+            const config = unwrap(ts, expression.arguments[0]);
+            if (config.properties.some(item => ts.isSpreadAssignment(item) || item.name && ts.isComputedPropertyName(item.name))) {
+              uncertain ??= { source, node: config }; continue;
+            }
+            const providersNode = memberValue(ts, config, 'providers');
+            if (!providersNode) continue;
+            const providers = unwrap(ts, providersNode);
+            if (!ts.isArrayLiteralExpression(providers)) { uncertain ??= { source, node: providers }; continue; }
+            if (providers.elements.some(item => ts.isSpreadElement(item))) { uncertain ??= { source, node: providers }; continue; }
+            const elements = [...providers.elements], existing = providerRegistersExisting(ts, checker, elements, mapperIdentity);
+            for (const element of elements) {
+              const provider = unwrap(ts, element);
+              if (!ts.isObjectLiteralExpression(provider)) continue;
+              if (provider.properties.some(item => ts.isSpreadAssignment(item) || item.name && ts.isComputedPropertyName(item.name))) {
+                uncertain ??= { source, node: provider }; continue;
+              }
+              const token = memberValue(ts, provider, 'provide');
+              const tokenOrigin = token && frameworkBinding(ts, checker, token);
+              if (tokenOrigin?.module !== '@nestjs/core' || tokenOrigin.name !== 'APP_FILTER') continue;
+              const useClass = memberValue(ts, provider, 'useClass'), useExisting = memberValue(ts, provider, 'useExisting');
+              if (useClass && directIdentity(ts, checker, useClass, mapperIdentity)) {
+                proven = { source, node: provider, form: 'APP_FILTER/useClass' }; return;
+              }
+              if (useExisting && directIdentity(ts, checker, useExisting, mapperIdentity) && existing) {
+                proven = { source, node: provider, form: 'APP_FILTER/useExisting' }; return;
+              }
+            }
+        }
+      }
+      if (ts.isCallExpression(node) && (ts.isPropertyAccessExpression(node.expression) || ts.isElementAccessExpression(node.expression))
+        && propertyName(ts, node.expression) === 'useGlobalFilters') uncertain ??= { source, node };
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return proven ? { state: 'registered', ...proven }
+    : uncertain ? { state: 'unavailable', ...uncertain }
+      : { state: 'missing' };
+}
+
+function checkHttpMapper({ ts, checker, source, mapper, errorType, errorIdentity, statusMaps, bindings, add }) {
   const identity = exportedIdentity(ts, checker, source, mapper.export), declaration = identity?.declarations?.find(item => ts.isClassDeclaration(item));
   if (!declaration) return add(source, 'NEST_TRANSPORT_ERROR_MAPPER', source, `Declared HTTP mapper export is unavailable: ${mapper.export}`, true);
   const decorators = ts.canHaveDecorators?.(declaration) ? ts.getDecorators(declaration) ?? [] : declaration.decorators ?? [];
@@ -301,6 +389,12 @@ function checkHttpMapper({ ts, checker, source, mapper, errorType, errorIdentity
     return imported?.module === '@nestjs/common' && imported.name === 'ExceptionFilter';
   });
   if (!filter) add(source, 'NEST_TRANSPORT_ERROR_MAPPER', declaration, 'HTTP mapper implements the resolved Nest ExceptionFilter contract.', true);
+  const registration = httpRegistration({ ts, mapper, bindings });
+  if (registration.state !== 'registered') add(registration.source ?? source, 'NEST_TRANSPORT_ERROR_MAPPER', registration.node ?? declaration,
+    registration.state === 'unavailable'
+      ? 'HTTP mapper registration uses a bootstrap or dynamic form and cannot prove the selected mapper is installed.'
+      : 'HTTP mapper has a resolved static APP_FILTER/useClass, APP_FILTER/useExisting provider, or @UseFilters registration.',
+    registration.state === 'unavailable');
   const method = declaration.members.filter(item => ts.isMethodDeclaration(item) && item.name?.text === mapper.method);
   if (method.length !== 1 || !method[0].body || !method[0].parameters.length) return add(source, 'NEST_TRANSPORT_ERROR_MAPPER', declaration, 'HTTP mapper method is missing or ambiguous.', true);
   const handler = method[0], errorParameter = symbolAt(ts, checker, handler.parameters[0].name), hostParameter = handler.parameters[1] && symbolAt(ts, checker, handler.parameters[1].name);
@@ -717,7 +811,7 @@ export function checkNestErrors({ root, files, ruleIds, contextFiles = [], archi
           if (mapper.status.kind === 'code-map') statusMaps.set(mapper.id, identityInProgram(ts, binding, { absolute: mapper.status.absolute, export: mapper.status.export }));
           const errorIdentity = identityInProgram(ts, binding, errorType);
           if (!errorIdentity || (mapper.status.kind === 'code-map' && !statusMaps.get(mapper.id))) add(binding.source, 'NEST_TRANSPORT_ERROR_MAPPER', binding.source, 'Mapper dependencies are outside its selected TypeScript project.', true);
-          else checkHttpMapper({ ts, checker: binding.checker, source: binding.source, mapper, errorType, errorIdentity, statusMaps, add });
+          else checkHttpMapper({ ts, checker: binding.checker, source: binding.source, mapper, errorType, errorIdentity, statusMaps, bindings, add });
         }
       }
       const declaredGraphql = contract.mappers.filter(item => item.kind === 'apollo-graphql');

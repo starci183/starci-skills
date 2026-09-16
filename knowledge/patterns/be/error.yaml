@@ -61,8 +61,8 @@ rules:
         write: "toJSON(): string → { message, code, metadata }; static fromJSON<T extends AbstractException>(…)"
       - id: case-3
         when: Cause
-        write: "getOriginalError(): Error { return this.metadata?.originalError as Error }; export interface
-          AbstractExceptionMetadata { originalError?: Error }"
+        write: "getOriginalError(): unknown { return this.metadata?.originalError }; export interface
+          AbstractExceptionMetadata { originalError?: unknown; normalizedError?: Error }"
       - id: case-4
         when: Status
         write: httpStatus is optional; undefined means 500 at both transports
@@ -107,7 +107,9 @@ rules:
     kind: mandatory
     requirement: Throw the named AbstractException for a failed operation. Do not hide failures in an ad hoc
       success:false envelope. Explicitly specified typed business dispositions remain normal domain results.
-      Never new Error in src/** outside test lanes.
+      Anonymous Error must not escape as the selected application failure. Constructing an Error internally for
+      a retained diagnostic or normalization is allowed when the selected named failure still carries the raw
+      cause identity.
     rationale: ""
     cases:
       - id: case-1
@@ -123,8 +125,10 @@ rules:
           refused by policy) remains a normal domain result. The installed no-handler-encoded-failure rule is
           a warning and is not authority to change SRS outcomes.
       - id: case-4
-        when: Never new Error
-        write: NewExpression[callee.name="Error"] is banned in src/** outside the test lanes
+        when: Named escaping failure
+        write: >-
+          Do not throw a bare new Error as the selected application failure. A wrapper may keep
+          normalizedError: new Error(String(error)) only in addition to originalError: error.
     verification:
       automated: []
       manual:
@@ -135,25 +139,28 @@ rules:
   - id: BE-ERROR-4
     title: Wrapping a foreign error
     kind: mandatory
-    requirement: Catch foreign errors and rethrow a named AbstractException carrying originalError in metadata.
+    requirement: >-
+      Catch foreign errors and rethrow the selected named error carrying the exact caught value in a declared
+      cause property. A normalized diagnostic may be additional metadata; it never replaces the raw cause.
     rationale: 25 non-exception files wrap this way at extraction.
     cases:
       - id: case-1
         when: Crypto
-        write: "catch (error) { throw new DecryptionFailedException({ originalError: error instanceof Error ? error :
-          new Error(String(error)) }) }"
+        write: "catch (error) { throw new DecryptionFailedException({ originalError: error, normalizedError:
+          error instanceof Error ? error : new Error(String(error)) }) }"
       - id: case-2
         when: Cursor parsing
-        write: "catch (error) { throw new CourseCommunityCursorException({ originalError: error as Error }) }"
+        write: "catch (error) { throw new CourseCommunityCursorException({ originalError: error }) }"
       - id: case-3
         when: At-least-once consumer
-        write: "catch (error) { const exception = new KafkaCdcMessageException({ topic, originalError: error
-          instanceof Error ? error : undefined }); … log and continue }"
+        write: "catch (error) { const exception = new KafkaCdcMessageException({ topic, originalError: error }); …
+          log and continue }"
       - id: case-4
         when: Upstream GraphQL
         write: GraphQLDataNotFoundException({ query, variables, url, originalError })
     verification:
-      automated: []
+      automated:
+        - NEST_FOREIGN_ERROR_CAUSE
       manual: []
     relatedExamples:
       - graphql-command
@@ -162,7 +169,9 @@ rules:
     title: HTTP mapping
     kind: mandatory
     requirement: AbstractExceptionHttpFilter catches AbstractException for HTTP hosts, logs, and responds with
-      status/code/message. GraphQL hosts rethrow untouched.
+      status/code/message. GraphQL hosts rethrow untouched. The exact mapper is registered through a resolved
+      static APP_FILTER useClass/useExisting provider or @UseFilters boundary; dynamic bootstrap registration
+      requires separate boot evidence and is unavailable to the static rule.
     rationale: ""
     cases:
       - id: case-1
@@ -183,7 +192,8 @@ rules:
         when: GraphQL host
         write: rethrown untouched so Apollo's pipeline owns it
     verification:
-      automated: []
+      automated:
+        - NEST_TRANSPORT_ERROR_MAPPER
       manual: []
     relatedExamples:
       - graphql-command
