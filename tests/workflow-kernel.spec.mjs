@@ -4597,7 +4597,7 @@ test('an unavailable validator never blocks a commit, is counted, and three in a
     assert.equal(state.validatorUnavailable,VALIDATOR_UNAVAILABLE_LIMIT);
     const asked=state.needUser.filter(item=>item.kind==='validator');
     assert.equal(asked.length,1,'the outage is one item, not one per op');
-    assert.match(asked[0].detail,/the validator answered nothing usable for 3 op results in a row \(claude-fable-5.1, gpt-6-astra\)/);
+    assert.match(asked[0].detail,new RegExp(`the validator answered nothing usable for 3 op results in a row \\(${critiqueRuntimes(harness.state.host).join(', ')}\\)`),'the named pair is the configured validator pool, whichever pool the host config selects');
     assert.equal(state.finished.outcome,'blocked');
     const verdicts=fs.readFileSync(path.join(harness.store.dir,'validator','verdicts.jsonl'),'utf8').trim().split('\n').map(line=>JSON.parse(line));
     assert.deepEqual(verdicts.map(item=>item.verdict),['unavailable','unavailable','unavailable']);
@@ -4696,7 +4696,7 @@ test('the goal is critiqued before the approval: a sound verdict stands above th
     assert.deepEqual(asked[0].decisions.map(item=>item.id),['demo.payments.business.overview']);
     assert.deepEqual(asked[0].records,[{id:'demo.sales.architecture.sds.intake',kind:'architecture',
       title:'The accepted intake design.',statements:[]}]);
-    assert.deepEqual(new Set(asked[0].providers),new Set(['gpt-6-astra','claude-fable-5.1']),'the injected critic sees both configured validator peers without a fallback-order promise');
+    assert.deepEqual(new Set(asked[0].providers),new Set(critiqueRuntimes(harness.state.host)),'the injected critic sees both configured validator peers without a fallback-order promise');
     assert.ok(asked[0].constraints.some(item=>/may not add, drop or rewrite a node/.test(item)));
     assert.deepEqual(harness.goal.critique,{verdict:'sound',objections:0,required:0,provider:'stub-critic'});
     assert.equal(harness.state.critique.verdict,'sound');

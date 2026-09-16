@@ -150,7 +150,8 @@ test('a changed file whose record kind the op does not declare downgrades the re
     const packet={schema:'starci/candidate-root-packet@1',...identity,reportDiagnostics:{unmatched:[]},roots:[{id:'source',repoRoot:dir,status:'sealed',workerWritable:true,runtimeWritable:false,
       changes,observedFiles:files.map(file=>({rootId:'source',path:file,displayPath:file}))}]};
     const engine={freezeCandidate(candidate){candidate.candidate={...candidate.candidate,status:'sealed',observedFiles:files};return {status:'sealed',observedFiles:files};},
-      candidateView:()=>({source:{workerRoot:dir},roots:[]}),candidatePacket:()=>packet,incident:()=>({exhausted:false,progress:true})};
+      candidateView:()=>({source:{workerRoot:dir},roots:[]}),candidatePacket:()=>packet,incident:()=>({exhausted:false,progress:true}),
+      prepareCandidateDependencies:()=>({ready:true})};
     const ctx=baseCtx(dir,{git:fakeGit(files),engine,
       // The profile of 5-plus: this kind writes `code` and nothing else.
       kindsProfile:{kinds:{'backend.implement':{family:'build',role:'implement',reads:['srs','code'],writes:['code']}}}});

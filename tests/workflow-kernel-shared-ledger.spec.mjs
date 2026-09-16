@@ -221,7 +221,10 @@ function buildFixtureContent(root){
   fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(host,'config.example.yaml'));
   const owner=path.join(root,'demo-backend'),code=path.join(root,'demo-frontend');
   // The backend owns the one Work tree of the product; the frontend owns no `.starciwork` at all.
-  repository(owner,{name:'@demo/backend',branch:'main',origin:'https://github.com/demo/demo-backend.git'});
+  // The lockfile is what the candidate dependency plan binds: `npx vitest` checks declare package tools, and a
+  // manifest without a deterministic lockfile is a refused plan, so the candidate never reaches a fake install.
+  repository(owner,{name:'@demo/backend',branch:'main',origin:'https://github.com/demo/demo-backend.git',
+    seed:{'package-lock.json':'{"name":"@demo/backend","lockfileVersion":3,"requires":true,"packages":{"":{}}}\n'}});
   const work=path.join(owner,'.starciwork');
   const put=(relative,content)=>{const file=path.join(work,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,content);};
   put('workspace.yaml','schema: work/workspace@1\nid: demo\n');
@@ -238,7 +241,8 @@ function buildFixtureContent(root){
   // The page already exists as a placeholder: an operation changes tracked code, so the worktree it starts
   // from is the one the design describes, not an empty directory.
   repository(code,{name:'demo-frontend',branch:'session/receipt',origin:'git@github.com:demo/demo-frontend.git',
-    seed:{[PAGE]:'export default function Receipt(){return null;}\n'}});
+    seed:{[PAGE]:'export default function Receipt(){return null;}\n',
+      'package-lock.json':'{"name":"demo-frontend","lockfileVersion":3,"requires":true,"packages":{"":{}}}\n'}});
   const binding=path.join(source,'.workspaces','projects','demo','work.json');
   fs.mkdirSync(path.dirname(binding),{recursive:true});
   fs.writeFileSync(binding,`${JSON.stringify({schema:'starci/workspace-binding@1',project:'demo',
@@ -495,7 +499,8 @@ test('public retry and pinned enrolled run preserve accepted history while settl
   assert.throws(()=>pinnedKernel.candidateReferences({...prePinOp,references:[foreign]},engineState,{work:{ledger:{repoRoot:run.owner,workRoot:run.work},loaded:{nodes:new Map(),list:[]}}}),
     /outside the accepted routed roots/,'a real verified pin never grants trust to an unrelated authored suffix');
   runtime=pinnedEngine.createEngineRuntime({store:pinnedStore,state:engineState,git:gitAdapter,candidateBase:path.join(run.root,'candidates'),
-    eligibility:()=>({eligible:true,mode:'qualified'}),spawnChild:()=>{throw Error('the fake host owns native execution in this fixture');}});
+    eligibility:()=>({eligible:true,mode:'qualified'}),spawnChild:()=>{throw Error('the fake host owns native execution in this fixture');},
+    exec:()=>({status:0,stdout:'dependency install skipped by the fixture',stderr:''})});
   runtime.model=name=>name==='validateOp'?{ok:true,verdict:'accept',summary:'both routed roots satisfy the bounded operation',findings:[],dropped:[],
     provider:'fixture-validator',complete:true,independentFromAttempt:true,freshContext:true,reviewerAttemptId:`validator-${Date.now()}`}:{ok:true,value:{option:'continue'}};
   runtime.manageWorkflow=snapshot=>({schema:'starci/manager-decision@1',workflowId:snapshot.workflowId,generation:snapshot.generation,version:snapshot.version,
