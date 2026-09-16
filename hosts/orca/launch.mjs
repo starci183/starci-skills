@@ -311,7 +311,32 @@ const cleanupProof=({releaseState=null,releaseReason=null,processAction=null,clo
     releaseState,processAction,residualTerminal:Boolean(releaseState==='retained'||exitedWorker?.residualTab)};
 };
 
+/** Prove an already-successful worker exited before issuing another native mutation. */
+function completedWorkerProof(orca,dispatchId,{cwd}={}){
+  let shown;try{shown=orca.invoke('worker-show',{dispatch:dispatchId},{cwd});}catch(error){return {proven:false,reason:String(error?.message??error)};}
+  if(shown?.outcome!=='ok')return {proven:false,reason:`worker-show failed: ${shown?.reason??shown?.outcome??'unknown'}`};
+  const result=resultOf(shown.receipt),dispatch=result?.dispatch,worker=result?.worker,observation=result?.observation,terminal=result?.terminal,
+    terminalResource=result?.terminalResource,ownershipState=String(terminalResource?.ownershipState??'').toLowerCase();
+  const exact=dispatch?.id===dispatchId&&worker?.dispatch_id===dispatchId&&observation?.exactWorker===true;
+  const completed=dispatch?.status==='completed'&&Boolean(dispatch?.completed_at)&&Boolean(dispatch?.capability_revoked_at)&&worker?.state==='succeeded'&&worker?.stage==='settled';
+  const terminalAbsent=!terminal,terminalDisconnected=terminal?.connected===false&&terminal?.writable===false;
+  if(ownershipState==='user_owned')return {proven:false,userOwned:true,ownershipState,reason:'the completed worker terminal is user-owned'};
+  if(!exact||!completed||observation?.status!=='exited'||(!terminalAbsent&&!terminalDisconnected))return {proven:false,ownershipState,reason:'the exact completed worker is not proved exited with an absent or disconnected terminal'};
+  const cleanup=terminalAbsent?{complete:true,proof:'exact-terminal-absent'}:
+    {complete:false,proof:null,reason:'the exited worker terminal remains recorded as disconnected',residualTerminal:true};
+  return {proven:true,dispatchStatus:dispatch.status,workerState:worker.state,workerStage:worker.stage,capabilityRevoked:true,
+    ownershipState:ownershipState||null,terminal:terminal?{handle:terminal.handle??null,connected:false,writable:false}:null,cleanup};
+}
+
 export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt',wait,terminalHandle=null,closeTerminal=false,now=Date.now}={}){
+  const completedWorker=closeTerminal?completedWorkerProof(orca,dispatchId,{cwd}):{proven:false};
+  if(completedWorker.proven)return {schema:SETTLEMENT,dispatchId,reason,effectState:'none',residualTerminal:completedWorker.cleanup.complete?null:{state:'retained',reason:completedWorker.cleanup.reason,processAction:'none'},
+    reconciliation:null,closedTerminal:null,completedWorker,cleanup:completedWorker.cleanup,
+    stop:{outcome:'skipped',effectState:'none',state:'succeeded',alreadySettled:true,reason:'exact completed worker already exited'},
+    release:{outcome:'skipped',reason:'completed worker requires no process release'}};
+  if(completedWorker.userOwned)return {schema:SETTLEMENT,dispatchId,reason,effectState:'unknown',residualTerminal:{state:'retained',reason:completedWorker.reason,processAction:'none'},
+    reconciliation:null,closedTerminal:null,completedWorker,cleanup:{complete:false,proof:null,reason:completedWorker.reason,residualTerminal:true},
+    stop:{outcome:'skipped',effectState:'unknown',state:'succeeded',alreadySettled:true,reason:completedWorker.reason},release:{outcome:'skipped',reason:completedWorker.reason}};
   let stop=orca.invoke('worker-stop',{dispatch:dispatchId},{cwd}),reconciliation=null,closedTerminal=null;
   if(closeTerminal&&terminalHandle){
     // A command-terminal attempt owns its terminal outright: the process lives only there, so closing

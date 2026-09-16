@@ -37,7 +37,7 @@ import {openJournal} from '../kernel/journal.mjs';
 import {enrollEngine} from '../kernel/engine.mjs';
 import {deriveOwnerRequests} from '../kernel/owner-requests.mjs';
 import {enqueueOwnerInbox} from '../kernel/owner-inbox.mjs';
-import {applyInbox,guardedStage,quarantineCandidate} from '../kernel/kernel.mjs';
+import {applyInbox,guardedStage,quarantineCandidate,readmitCompletedReportRetry} from '../kernel/kernel.mjs';
 import {superviseOnce} from '../kernel/supervisor.mjs';
 
 const fixture=t=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-engine-life-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return root;};
@@ -112,4 +112,25 @@ test('candidate quarantine surfaces one incident and retains the writer identity
   quarantineCandidate(store,state,op,pending);quarantineCandidate(store,state,op,pending);
   assert.equal(op.status,'blocked');assert.equal(op.lease,lease);assert.equal(op.candidate,candidate);
   assert.equal(events.length,1);assert.equal(state.needUser.length,1);assert.equal(op.refusal,'runtime-reconciliation');
+});
+
+test('public retry recovery re-admits the exact completed report under its retained writer',()=>{
+  const lease={workflowId:'wf',opId:'op-1',attempt:3,generation:8,jobId:'operation-exact'},events=[];
+  const op={id:'op-1',status:'blocked',refusal:'runtime-reconciliation',pending:{kind:'dispatch-reconciliation'},attempt:3,allowlist:['src'],
+    dispatch:'ctx-exact',terminal:'term-exact',launch:{task:'task-exact'},lease,candidate:{identity:{...lease}},workerSettled:false};
+  const report={schema:'starci/op-report@1',outcome:'done',run:'run-exact',task:'task-exact',dispatch:'ctx-exact',from:'term-exact',summary:'done',files:['src/a.ts'],
+    checks:[{name:'unit',command:'node test.mjs',exitCode:0,evidence:'pass'}],open:[],question:null,blocker:null,branch:null,head:null,gates:[],observations:[],reportedAt:'2026-09-16T15:00:00Z',signal:{type:'worker_done',orcaOutcome:'done'},sent:{messageId:'msg'}};
+  const state={id:'wf',run:'run-exact',worktree:'D:/repo',ops:[op]},store={readReports:()=>[report],reportPath:()=>'/report.json',appendEvent:event=>events.push(event),saveState(){},unbindJournal(){}};
+  let settled=false,closed=false;
+  const result=readmitCompletedReportRetry(state,op,{store,orca:{},settleHost:()=>({effectState:'none'}),createRuntime:()=>({journal:{},settled(target,{workerOnly}){assert.equal(target,op);assert.equal(workerOnly,true);settled=true;return {ok:true,writerRetained:true};},close(){closed=true;}})});
+  assert.equal(result.ok,true);assert.equal(op.status,'running');assert.equal(op.workerSettled,true);assert.equal(op.pending,undefined);assert.equal(op.lease,lease);
+  assert.equal(settled,true);assert.equal(closed,true);assert.equal(events[0].event,'completed-report-readmitted');
+});
+
+test('retained-report recovery rejects mismatched identity without settling or changing the operation',()=>{
+  const lease={workflowId:'wf',opId:'op-1',attempt:3,generation:8,jobId:'operation-exact'},op={id:'op-1',status:'blocked',refusal:'runtime-reconciliation',pending:{kind:'dispatch-reconciliation'},
+    attempt:3,allowlist:['src'],dispatch:'ctx-exact',terminal:'term-exact',launch:{task:'task-exact'},lease,candidate:{identity:{...lease,jobId:'other'}}};
+  const report={schema:'starci/op-report@1',outcome:'done',run:'run-exact',task:'task-exact',dispatch:'ctx-exact',from:'term-exact',summary:'done',files:['src/a.ts'],checks:[{name:'unit',command:'x',exitCode:0,evidence:'pass'}],open:[],question:null,blocker:null,branch:null,head:null,gates:[],observations:[],reportedAt:'2026-09-16T15:00:00Z',signal:{type:'worker_done',orcaOutcome:'done'}};
+  const result=readmitCompletedReportRetry({id:'wf',run:'run-exact'},op,{store:{readReports:()=>[report]},orca:{},settleHost(){throw Error('must not settle');},createRuntime(){throw Error('must not open runtime');}});
+  assert.equal(result.ok,false);assert.equal(op.status,'blocked');assert.equal(op.workerSettled,undefined);
 });

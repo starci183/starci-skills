@@ -600,6 +600,28 @@ export function lateReportReplayMatches(state,op,report,{store}={}){
     op.candidateDigest===late.candidateDigest&&decisionQuestionDigest(op.question)===late.questionDigest&&receipt===late.ownerReceipt&&
     op.ownerContinuationReceipt===receipt&&op.ownerRequestStatus==='answered'&&(report.question===null||report.question===undefined));
 }
+
+/** Re-admit the exact successful report whose native worker finished while its candidate writer stayed held. */
+export function readmitCompletedReportRetry(state,op,{orca,store,settleHost=settleDispatch,createRuntime=createEngineRuntime}={}){
+  const report=store?.readReports?.().find(item=>item?.dispatch===op?.dispatch),lease=op?.lease,candidate=op?.candidate?.identity;
+  const exactLease=lease&&candidate&&candidate.workflowId===state.id&&candidate.opId===op.id&&candidate.attempt===lease.attempt&&
+    candidate.generation===lease.generation&&candidate.jobId===lease.jobId;
+  const valid=report&&validateReport(report,{allowlist:op.allowlist}).ok&&report.outcome==='done'&&report.run===state.run&&report.task===op.launch?.task&&
+    report.dispatch===op.dispatch&&report.from===op.terminal;
+  if(op?.status!=='blocked'||op.refusal!=='runtime-reconciliation'||op.pending?.kind!=='dispatch-reconciliation'||!exactLease||!valid)
+    return {ok:false,reason:'blocked report, candidate writer, or exact Run/Task/Dispatch identity does not match'};
+  const settlement=settleHost(orca,op.dispatch,{cwd:state.worktree,reason:'public retry re-admits the exact completed report',terminalHandle:op.terminal,closeTerminal:true});
+  if(settlement?.effectState!=='none')return {ok:false,reason:`exact completed worker settlement remains ${settlement?.effectState??'unknown'}`};
+  const runtime=createRuntime({store,state,eligibility:()=>({eligible:false,reasons:['retained report recovery only']})});
+  let durable;try{durable=runtime.settled(op,{reason:'exact completed worker settled before retained report acceptance',workerOnly:true});}
+  finally{store.unbindJournal?.(runtime.journal);runtime.close();}
+  if(!durable?.ok)return {ok:false,reason:`retained candidate writer could not be fenced: ${durable?.reason??'unknown durable settlement failure'}`};
+  op.workerSettled=true;op.status='running';delete op.pending;delete op.refusal;
+  store.appendEvent({event:'completed-report-readmitted',op:op.id,dispatch:op.dispatch,jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,
+    proof:'public retry proved the exact completed worker exited and re-admitted its immutable report under the retained candidate writer'});
+  store.saveState(state);
+  return {ok:true,op:op.id,dispatch:op.dispatch,report:store.reportPath(op.dispatch)};
+}
 export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost=settleDispatch,createRuntime=createEngineRuntime,git=spawnSync,waitFn=sleepSync,acceptedPreparedDecision=false}={}){
   const lease=op?.lease,dispatchId=stoppedRetryDispatchId(op),taskId=op?.launch?.task,candidate=op?.candidate?.identity;
   const preparedDecision=acceptedPreparedDecision&&op?.status==='done'&&preparedOwnerDecision(op);
@@ -4512,6 +4534,11 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       if(op.status==='blocked'&&op.refusal==='runtime-reconciliation'){op.status='ready';delete op.refusal;}
     }
     let lateReportRecovery=null;
+    for(const op of state.ops.filter(item=>item.lease&&item.status==='blocked'&&item.refusal==='runtime-reconciliation'&&item.pending?.kind==='dispatch-reconciliation')){
+      const recovered=readmitCompletedReportRetry(state,op,{orca,store});
+      need(recovered.ok,`Completed report ${op.id} cannot be re-admitted for retry: ${recovered.reason}`);
+      lateReportRecovery={...recovered,retainedCompletedReport:true};
+    }
     for(const op of state.ops.filter(item=>item.lease&&item.status==='blocked'&&item.lateReportRecovery?.schema==='starci/answered-decision-late-report@1')){
       const report=store.readReports().find(item=>item.dispatch===op.dispatch);
       need(report&&lateReportReplayMatches(state,op,report,{store}),`Late decision report ${op.id} no longer matches its retained question, receipt, candidate, or report bytes`);
@@ -4530,11 +4557,11 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       state.engine.runtimePin=pin;state.launcher=checked.launcher;
       store.appendEvent({event:'recovery-runtime-adopted',generation:state.engine.generation,op:lateReportRecovery.op,
         fromDigest:priorPin?.digest??null,toDigest:pin.digest,jobId:state.ops.find(item=>item.id===lateReportRecovery.op)?.lease?.jobId??null,
-        proof:'the owner-selected verified retry pin is adopted without changing the retained job generation; only its exact late report is eligible'});
+        proof:lateReportRecovery.retainedCompletedReport?'the verified retry pin is adopted without changing the retained candidate writer; only its exact completed report is eligible':'the owner-selected verified retry pin is adopted without changing the retained job generation; only its exact late report is eligible'});
       store.saveState(state);
       const stopFile=path.join(store.dir,'stop.flag');fs.rmSync(stopFile,{force:true});store.acknowledgeRuntimeFile?.(stopFile,'stop.flag','delete');
       return {schema:WORKFLOW_KERNEL,command,ok:true,id:state.id,recoveryPending:true,runtimePin:pin.digest,...lateReportRecovery,
-      next:'The supervisor resumes this same generation on the adopted sealed runtime. The exact late report replays through ordinary verification while its writer remains held; repeat workflow-retry only after that acceptance settles.'};
+      next:`The supervisor resumes this same generation on the adopted sealed runtime. The exact ${lateReportRecovery.retainedCompletedReport?'completed':'late'} report replays through ordinary verification while its writer remains held; repeat workflow-retry only after that acceptance settles.`};
     }
     for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&!settledOperation(item)&&item.launch?.task&&stoppedRetryDispatchId(item)&&!item.dispatch&&!item.terminal&&item.candidate?.identity)){
       const reconciled=reconcileStoppedNativeRetryLease(state,op,{orca,store});

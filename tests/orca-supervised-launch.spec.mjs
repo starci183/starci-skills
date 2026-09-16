@@ -380,6 +380,31 @@ test('close failure cannot turn an unknown worker stop into proven settlement',(
   assert.equal(settleDispatch(fake.orca,'ctx_live',{cwd:'.',terminalHandle:'term_live',closeTerminal:true}).effectState,'unknown');
 });
 
+test('an exact completed exited worker settles without another native mutation',()=>{
+  const receipt={result:{dispatch:{id:'ctx_done',status:'completed',completed_at:'2026-09-16T15:00:00Z',capability_revoked_at:'2026-09-16T15:00:01Z'},
+    worker:{dispatch_id:'ctx_done',state:'succeeded',stage:'settled'},observation:{exactWorker:true,status:'exited'},
+    terminal:{handle:'term_done',connected:false,writable:false},terminalResource:{ownershipState:'retained'}}};
+  const calls=[],orca={invoke(name,args){calls.push([name,args]);assert.equal(name,'worker-show');return {outcome:'ok',receipt};}};
+  const settled=settleDispatch(orca,'ctx_done',{cwd:'.',terminalHandle:'term_done',closeTerminal:true});
+  assert.equal(settled.effectState,'none');assert.equal(settled.completedWorker.proven,true);assert.equal(settled.cleanup.complete,false);
+  assert.deepEqual(calls.map(([name])=>name),['worker-show']);
+});
+
+test('completed-worker proof rejects identity drift and an active worker',()=>{
+  const base={dispatch:{id:'ctx_done',status:'completed',completed_at:1,capability_revoked_at:2},worker:{dispatch_id:'ctx_done',state:'succeeded',stage:'settled'},observation:{exactWorker:true,status:'exited'},terminal:null,terminalResource:{ownershipState:'released'}};
+  for(const result of [{...base,worker:{...base.worker,dispatch_id:'ctx_other'}},{...base,observation:{exactWorker:true,status:'running'}}]){
+    const calls=[],orca={invoke(name){calls.push(name);if(name==='worker-show')return {outcome:'ok',receipt:{result}};if(name==='worker-stop')return {outcome:'unknown',effectState:'unknown',reason:'still active'};throw Error(`unexpected ${name}`);}};
+    assert.equal(settleDispatch(orca,'ctx_done',{cwd:'.',closeTerminal:true,wait:noWait}).effectState,'unknown');assert.ok(calls.includes('worker-stop'));
+  }
+});
+
+test('settlement never mutates a user-owned completed terminal',()=>{
+  const calls=[],orca={invoke(name){calls.push(name);assert.equal(name,'worker-show');return {outcome:'ok',receipt:{result:{dispatch:{id:'ctx_owner',status:'completed',completed_at:1,capability_revoked_at:2},
+    worker:{dispatch_id:'ctx_owner',state:'succeeded',stage:'settled'},observation:{exactWorker:true,status:'exited'},terminal:{handle:'term_owner',connected:false,writable:false},terminalResource:{ownershipState:'USER_OWNED'}}}};}};
+  const settled=settleDispatch(orca,'ctx_owner',{cwd:'.',terminalHandle:'term_owner',closeTerminal:true});
+  assert.equal(settled.effectState,'unknown');assert.equal(settled.completedWorker.userOwned,true);assert.deepEqual(calls,['worker-show']);
+});
+
 test('a worker whose tab the kernel already closed settles to none only on Orca\'s exited record with the tab gone',()=>{
   const stopFailed=()=>json(0,{ok:true,result:{dispatchId:'ctx_gone',state:'failed',alreadySettled:true,processAction:'none'}});
   const releaseUnknown=()=>json(1,{ok:false,result:{dispatchId:'ctx_gone',state:'release_unknown',processAction:'closed_agent_terminal',reason:'The agent terminal was closed but its process could not be confirmed stopped'}});

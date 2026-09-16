@@ -123,6 +123,24 @@ test('public retry durably stages same-generation late-report recovery before it
   assert.equal(reloaded.ops[0].lease.jobId,op.lease.jobId);assert.equal(reloaded.ops[0].candidate.identity.jobId,op.lease.jobId);assert.equal(reloaded.ops[0].terminal,'term-owner');assert.equal(reloaded.amendments[0].digest,'owner-amendment');
 });
 
+test('public retry re-admits a completed report without replacing its candidate writer or model attempt',t=>{
+  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-completed-report-retry-')),root=path.join(temp,'repo');fs.mkdirSync(root);t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
+  for(const args of [['init','-q'],['config','user.email','fixture@example.test'],['config','user.name','Fixture']])assert.equal(spawnSync('git',args,{cwd:root,windowsHide:true}).status,0);
+  fs.mkdirSync(path.join(root,'src'));fs.writeFileSync(path.join(root,'src','a.ts'),'export const a=1;\n');spawnSync('git',['add','.'],{cwd:root});spawnSync('git',['commit','-qm','base'],{cwd:root});
+  const store=createStore({repoRoot:root,id:'wf-completed-report'}),journalFile=path.join(temp,'runtime','journal.sqlite'),pin=sealRuntime({sourceRoot:process.cwd(),buildsRoot:path.join(temp,'builds'),version:'1.0.0'}),pinFile=path.join(temp,'pin.json');fs.writeFileSync(pinFile,JSON.stringify(pin));
+  const current=createWorkflowState({job:'Recover completed report',worktree:root,branch:'main',store}),op=toOp({id:'impl',kind:'frontend.implement',goal:'Change one file.',allowlist:['src'],checks:[{name:'unit',command:'node -e "process.exit(0)"'}],acceptance:['change accepted']},0);
+  Object.assign(current,{approved:true,phase:'run',run:'run-exact',from:'term-kernel',goalDigest:'e'.repeat(64),ops:[op],engine:{schema:'starci/engine@1',version:'1.0.0',generation:8,journalFile,runtimePin:{...pin,digest:'a'.repeat(64),root:path.join(temp,'old-build')},coordination:'agent-v1'}});
+  Object.assign(op,{attempt:3,status:'running',runtime:'gpt-5.6-luna',dispatch:'ctx-exact',terminal:'term-exact'});
+  const git=(executable,args,options={})=>spawnSync(executable,args,{encoding:'utf8',windowsHide:true,...options}),runtime=createEngineRuntime({store,state:current,git,candidateBase:path.join(temp,'runtime','candidates'),eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})});
+  assert.equal(runtime.reserveOperation(op,{role:'write',runtime:op.runtime,target:op.runtime}).ok,true);runtime.beginCandidate(op,{environmentDigest:current.engine.runtimePin.digest});runtime.beginLaunchIntent(op);op.launch={ok:true,task:'task-exact',dispatch:op.dispatch,effectState:'none',attempts:[]};runtime.recordLaunchObservation(op);runtime.launched(op);
+  const report=buildReport({outcome:'done',run:current.run,task:'task-exact',dispatch:op.dispatch,from:op.terminal,summary:'done',files:['src/a.ts'],checks:[{name:'unit',command:'node -e "process.exit(0)"',exitCode:0,evidence:'pass'}]});report.sent={messageId:'msg-exact',sentAt:2,type:'worker_done'};fs.writeFileSync(store.reportPath(op.dispatch),`${JSON.stringify(report,null,2)}\n`);
+  op.status='blocked';op.refusal='runtime-reconciliation';op.pending={kind:'dispatch-reconciliation',effectState:'unknown'};store.bindJournal(runtime.journal,8,{state:current,goalIdentity:current.goalDigest});store.saveState(current);store.unbindJournal(runtime.journal);const lease=structuredClone(op.lease),candidate=structuredClone(op.candidate.identity);runtime.close();fs.writeFileSync(path.join(store.dir,'stop.flag'),'stopped');
+  const calls=[],orca={invoke(name){calls.push(name);assert.equal(name,'worker-show');return {outcome:'ok',receipt:{result:{dispatch:{id:'ctx-exact',task_id:'task-exact',run_id:'run-exact',status:'completed',completed_at:1,capability_revoked_at:2},worker:{dispatch_id:'ctx-exact',state:'succeeded',stage:'settled'},observation:{exactWorker:true,status:'exited'},terminal:{handle:'term-exact',connected:false,writable:false},terminalResource:{ownershipState:'retained'}}}};}};
+  const result=kernelMain('workflow-retry',{id:current.id,'runtime-pin':pinFile},{orca,cwd:root});const after=store.loadState();
+  assert.equal(result.recoveryPending,true);assert.equal(result.retainedCompletedReport,true);assert.deepEqual(calls,['worker-show']);assert.equal(after.ops[0].status,'running');assert.equal(after.ops[0].attempt,3);
+  assert.deepEqual(after.ops[0].lease,lease);assert.deepEqual(after.ops[0].candidate.identity,candidate);assert.equal(after.ops[0].workerSettled,true);assert.equal(after.ops[0].pending,undefined);
+});
+
 test('public stop, valid-pin retry and pinned same-ID run preserve accepted history while completing remaining work',async t=>{
   const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-continuation-positive-')),root=path.join(temp,'repo');let runtime=null;fs.mkdirSync(root);
   t.after(()=>{try{runtime?.close();}finally{fs.rmSync(temp,{recursive:true,force:true,maxRetries:5,retryDelay:100});}});
