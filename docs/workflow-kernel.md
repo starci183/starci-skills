@@ -60,7 +60,7 @@ below is `node <skill root>/bin/starci.mjs`:
 ```
 starci workflow-goal    --job <text> [--lane [<name>]] [--inputs a,b] [--gates name=command,...] [--ledger work|plan] [--scope f1,f2] [--id <id>]
 starci workflow-amend   --id <id> --amendment <starci/workflow-amendment@1.yaml>
-starci workflow-approve --id <id> [--allocation <runtime>=<slots>[:<tiers>],...] [--allow-dynamic N] [--accept-critique "<reason>"]
+starci workflow-approve --id <id> [--allocation <runtime>=<slots>[:<tiers>][@<roles>],...] [--allow-dynamic N] [--accept-critique "<reason>"]
 starci workflow-answer  --id <id> --op <ask op> [--choice <n>] [--note "<the owner's words>"]
 starci workflow-run     --id <id> [--from <own terminal> --run <run>] [--launch-file <f>] [--max-iterations N]
 starci workflow-status  --id <id>
@@ -406,6 +406,12 @@ separately from the coordinator's technical `apply-same-id` decision, plus a con
 scope requires an exact scope-to-path binding. The command appends an idempotent amendment, replaces an active
 criterion only through an exact `from`/`to` supersession (retaining the prior wording as history), assigns added
 paths/resources/external effects to named unfinished operations inside the owner ceiling, and refreshes the continuation brief. An authorized
+amendment may replace checks on an unfinished, non-live operation through
+`changes.supersedeOperationChecks.<operationId>[]`. Every entry names the exact
+active `from: {name, command}`, an explicit `to: {name, command}`, and a nonempty
+`reason`; the runtime rejects missing or duplicate originals and duplicate
+effective check names, and retains the old list and mapping in `checkHistory`.
+Checks on accepted or live operations remain immutable. An authorized
 plan-ledger amendment may also carry `changes.addOperations` and `changes.operationDependencies`: every new
 operation has an explicit id, one of the public `PLAN_OP_KINDS`, known ledger ids, a nonempty ceiling-bounded
 allowlist, runnable checks and acceptance; every added dependency names exact existing or simultaneously added

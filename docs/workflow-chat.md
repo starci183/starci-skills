@@ -95,7 +95,7 @@ argv untouched, so no command line a person types names a module path inside the
 ```
 node <skill root>/scripts/ensure-build.mjs
 node <skill root>/bin/starci.mjs workflow-goal    --host <skill root> --job "<the owner's prompt>" [--scope f1,f2] [--lane [<name>]]
-node <skill root>/bin/starci.mjs workflow-approve --host <skill root> --id <id> [--allocation <runtime>=<slots>,...] [--allow-dynamic N] [--accept-critique "<reason>"]
+node <skill root>/bin/starci.mjs workflow-approve --host <skill root> --id <id> [--allocation <runtime>=<slots>[:<tiers>][@<roles>],...] [--allow-dynamic N] [--accept-critique "<reason>"]
 node <skill root>/bin/starci.mjs workflow-answer  --host <skill root> --id <id> --op <ask op or intake op> --choice <n> [--note "<the owner's words>"]
 node <skill root>/bin/starci.mjs workflow-run     --host <skill root> --id <id> --host-adapter headless   # detached, output appended to <dir>/kernel.log
 node <skill root>/bin/starci.mjs workflow-status  --host <skill root> --id <id> [--json true]

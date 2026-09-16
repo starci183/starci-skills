@@ -180,21 +180,24 @@ export function parseGate(gate){
   need(index>0,`A gate must be "name=command": ${value}`);
   return {name:value.slice(0,index).trim(),command:value.slice(index+1).trim(),timeoutMs:null};
 }
-/** `--allocation gpt-5.6-sol=5,claude-opus=3,qwen3.8-flash=2`: slots per runtime in priority order. */
+/** `--allocation gpt-5.6-luna=10@implement,claude-opus=3@verify+plan+decide`: capacity, preference and optional exact role eligibility. */
 export function parseQuota(value){
   if(!value)return null;
-  const order=[],slots={},tags={};
+  const order=[],slots={},tags={},roles={};
   for(const entry of String(value).split(',').map(item=>item.trim()).filter(Boolean)){
     const [id,rest]=entry.split('=');
-    const [n,tagText]=String(rest??'').split(':');
-    need(id&&Number.isFinite(Number(n)),`--allocation entries are <runtime>=<slots>[:<easy+medium+hard>]: ${entry}`);
+    const [capacity,roleText]=String(rest??'').split('@'),[n,tagText]=capacity.split(':');
+    need(id&&Number.isFinite(Number(n)),`--allocation entries are <runtime>=<slots>[:<easy+medium+hard>][@<implement+verify+decide+plan+write>]: ${entry}`);
     const runtime=id.trim();
     order.push(runtime);slots[runtime]=Number(n);
     const levels=String(tagText??'').split('+').map(level=>level.trim()).filter(Boolean);
     for(const level of levels)need(['easy','medium','hard'].includes(level),`--allocation difficulty tags are easy|medium|hard: ${entry}`);
     if(levels.length)tags[runtime]=levels;
+    const roleNames=String(roleText??'').split('+').map(role=>role.trim()).filter(Boolean);
+    for(const role of roleNames)need(['implement','verify','decide','plan','write'].includes(role),`--allocation roles are implement|verify|decide|plan|write: ${entry}`);
+    if(roleNames.length)roles[runtime]=roleNames;
   }
-  return {order,slots,tags,total:Object.values(slots).reduce((a,b)=>a+b,0)};
+  return {order,slots,tags,roles,total:Object.values(slots).reduce((a,b)=>a+b,0)};
 }
 
 /**

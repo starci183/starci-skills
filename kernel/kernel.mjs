@@ -5,7 +5,7 @@ import {applyOwnerInbox} from './owner-inbox.mjs';
 import {verifyAcceptedIntegrationOwnerRequests} from './owner-requests.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
 import {freshRuntimeBudget,probeRuntimeBudget} from './budget.mjs';
-import {acquireStartup,releaseStartup} from './startup-lock.mjs';
+import {acquireStartup,releaseStartup,reserveStartup} from './startup-lock.mjs';
 import {createWorkflowModelEligibility} from './model-policy.mjs';
 import {openJournal} from './journal.mjs';
 import {DISK_HEADROOM_CODE,headroomError,isDiskFull,measureHeadroom} from './disk.mjs';
@@ -3990,7 +3990,15 @@ const templateOf=host=>fs.readFileSync(path.join(host,'docs','supervision-templa
 /** One kernel per workflow: a pid lock in the store refuses a second process; a stop flag ends the loop cleanly. */
 function acquireKernelLock(store,{launchToken=null}={}){
   const lock=path.join(store.dir,'kernel.lock');
-  const owner=acquireStartup(store.dir,{launchToken,pid:process.pid});
+  let token=launchToken,reservation=null;
+  if(!token){
+    reservation=reserveStartup(store.dir,{pid:process.pid});
+    if(!reservation.ok)throw Object.assign(Error(`another kernel or unresolved launch owns workflow startup: ${reservation.reason}`),{code:'STARCI_KERNEL_ALREADY_RUNNING',owner:reservation.row});
+    token=reservation.token;
+  }
+  let owner;
+  try{owner=acquireStartup(store.dir,{launchToken:token,pid:process.pid});}
+  catch(error){if(reservation)releaseStartup(store.dir,reservation);throw error;}
   try{fs.writeFileSync(lock,JSON.stringify({pid:process.pid,startedAt:Date.now(),startupToken:owner.token}));}
   catch(error){releaseStartup(store.dir,owner);throw error;}
   return ()=>{releaseStartup(store.dir,owner);try{const now=JSON.parse(fs.readFileSync(lock,'utf8'));if(now.pid===process.pid&&now.startupToken===owner.token){fs.rmSync(lock);store.acknowledgeRuntimeFile?.(lock,'kernel.lock','delete');}}catch{}};

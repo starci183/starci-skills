@@ -4,11 +4,24 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
+import {parseQuota} from '../kernel/common.mjs';
 import {ADAPTIVE_CAPACITY,ALLOCATION,withProviderPreference,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,budgetBand,classifyFailure,createAllocator,sequentialRuntimes} from '../kernel/schedule.mjs';
 import {RUNTIME_LOADS,loadsFile,loadsFileFor,readLoads} from '../kernel/loads.mjs';
 
 const profile=parseYaml(fs.readFileSync(new URL('../model/runtimes.yaml',import.meta.url),'utf8'));
 const clock=start=>{const box={at:start};return {now:()=>box.at,advance:ms=>{box.at+=ms;}};};
+
+test('owner allocation preserves adaptive policy and may constrain exact operation roles',()=>{
+  const adaptive=withProviderPreference(profile,{mode:'adaptive',preferredProvider:'claude'});
+  const quota=parseQuota('gpt-5.6-luna=10@implement,claude-opus=3@verify+plan+decide');
+  assert.deepEqual(quota.roles,{'gpt-5.6-luna':['implement'],'claude-opus':['verify','plan','decide']});
+  const applied=applyQuota(adaptive,quota);
+  assert.equal(applied.allocation.policy,ADAPTIVE_CAPACITY);
+  assert.equal(applied.runtimes['gpt-5.6-luna'].maxParallel,10);
+  assert.deepEqual(Object.entries(applied.runtimes).filter(([,pool])=>pool.roles.includes('implement')).map(([id])=>id),['gpt-5.6-luna']);
+  assert.deepEqual(Object.entries(applied.runtimes).filter(([,pool])=>pool.roles.includes('plan')).map(([id])=>id),['claude-opus']);
+  assert.throws(()=>parseQuota('gpt-5.6-luna=10@implement+owner'),/allocation roles/);
+});
 /**
  * A throwaway workflows root: the shared runtime ledger beside the workflow directories, each of which may hold
  * a `kernel.lock` - the one thing that says whether the workflow that wrote an entry is still alive.

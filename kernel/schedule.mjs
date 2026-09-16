@@ -94,15 +94,18 @@ function adoptState(state,day){
   };
 }
 
-/** Apply a workflow's quota (`{order:[ids], slots:{id:n}}`) on top of the profile: slots become maxParallel, order becomes every role's preference. */
+/** Apply workflow capacity and optional role eligibility without replacing the profile's allocation policy. */
 export function applyQuota(runtimes,quota){
   if(!plain(quota)||(!Array.isArray(quota.order)&&!plain(quota.slots)))return runtimes;
   const copy=structuredClone(runtimes);
   const order=Array.isArray(quota.order)?quota.order.filter(id=>copy.runtimes?.[id]):[];
   for(const [id,n] of Object.entries(plain(quota.slots)?quota.slots:{}))if(copy.runtimes?.[id]&&Number.isFinite(Number(n)))copy.runtimes[id].maxParallel=Math.max(0,Number(n));
+  const roleConstraints=plain(quota.roles)?quota.roles:{};
+  const constrainedRoles=new Set(Object.values(roleConstraints).flatMap(value=>Array.isArray(value)?value:[]));
+  for(const [id,pool] of Object.entries(copy.runtimes??{}))if(Array.isArray(pool.roles))pool.roles=pool.roles.filter(role=>
+    !constrainedRoles.has(role)||(Array.isArray(roleConstraints[id])&&roleConstraints[id].includes(role)));
   if(order.length){
     copy.allocation=plain(copy.allocation)?copy.allocation:{};
-    copy.allocation.policy='prefer-then-overflow';
     const roles=new Set(Object.values(copy.runtimes).flatMap(rt=>rt.roles??[]));
     copy.allocation.preference={...(plain(copy.allocation.preference)?copy.allocation.preference:{})};
     for(const role of roles)copy.allocation.preference[role]=[...order.filter(id=>(copy.runtimes[id].roles??[]).includes(role)),...((copy.allocation.preference[role]??[]).filter(id=>!order.includes(id)))];

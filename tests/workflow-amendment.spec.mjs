@@ -9,6 +9,7 @@ import {amendmentContractLines,applyWorkflowAmendment,bindPlannedAmendmentEffect
 import {createWorkflowState} from '../kernel/kernel.mjs';
 import {openJournal} from '../kernel/journal.mjs';
 import {createStore,stateGoalIdentity} from '../kernel/store.mjs';
+import {acquireStartup,reserveStartup} from '../kernel/startup-lock.mjs';
 
 function fixture(t){
   const root=fs.mkdtempSync(path.join(process.cwd(),'.workflow-amendment-test-'));
@@ -110,6 +111,36 @@ test('same owner source cannot drift and an amendment cannot reopen accepted wor
   reopen.changes.operationFindings={'accepted-1':['Run accepted work again.']};
   const reopenFile=path.join(f.root,'reopen.yaml');fs.writeFileSync(reopenFile,stringifyYaml(reopen));
   assert.throws(()=>publicCommand(f,'workflow-amend','--id',f.state.id,'--amendment',reopenFile),/cannot reopen accepted or settled operation/);
+});
+
+test('an owner maps each superseded unfinished check exactly and history stays immutable',t=>{
+  const f=fixture(t),op=f.state.ops[1];op.status='pending';delete op.lease;
+  op.checks=[{name:'component-path',command:'node --test components/old.spec.mjs'},{name:'integration',command:'npm test'}];f.store.saveState(f.state);
+  f.amendment.changes.supersedeOperationChecks={'remaining-1':[
+    {from:{name:'component-path',command:'node --test components/old.spec.mjs'},to:{name:'feature-path',command:'node --test features/new.spec.mjs'},reason:'The source moved from components to features.'},
+    {from:{name:'integration',command:'npm test'},to:{name:'slice-integration',command:'node --test tests/slice.spec.mjs'},reason:'The publication gate owns the full suite.'}
+  ]};fs.writeFileSync(f.amendmentFile,stringifyYaml(f.amendment));
+  const applied=applyWorkflowAmendment(f.store,f.state,f.amendmentFile),current=f.state.ops[1];
+  assert.deepEqual(current.checks,[{name:'feature-path',command:'node --test features/new.spec.mjs'},{name:'slice-integration',command:'node --test tests/slice.spec.mjs'}]);
+  assert.deepEqual(current.checkHistory[0].checks,[{name:'component-path',command:'node --test components/old.spec.mjs'},{name:'integration',command:'npm test'}]);
+  assert.equal(current.checkHistory[0].amendment,applied.amendment.digest);
+  assert.match(amendmentContractLines(f.state,current).join('\n'),/publication gate owns the full suite/);
+  const invalid=fixture(t);invalid.state.ops[1].status='pending';delete invalid.state.ops[1].lease;invalid.state.ops[1].checks=[{name:'only',command:'npm test'}];invalid.store.saveState(invalid.state);
+  invalid.amendment.changes.supersedeOperationChecks={'remaining-1':[{from:{name:'only',command:'different'},to:{name:'slice',command:'node --test slice'},reason:'Bounded replacement.'}]};
+  fs.writeFileSync(invalid.amendmentFile,stringifyYaml(invalid.amendment));
+  assert.throws(()=>applyWorkflowAmendment(invalid.store,invalid.state,invalid.amendmentFile),/not exactly active once/);
+});
+
+test('public amendment reclaims a dead running startup row but refuses a live one',t=>{
+  const dead=fixture(t);publicCommand(dead,'workflow-stop','--id',dead.state.id);
+  const reserved=reserveStartup(dead.store.dir,{pid:999999,alive:()=>false}),running=acquireStartup(dead.store.dir,{launchToken:reserved.token,pid:999999});assert.equal(running.ok,true);
+  fs.writeFileSync(path.join(dead.store.dir,'kernel.lock'),JSON.stringify({pid:999999,startedAt:1,startupToken:running.token}));
+  assert.equal(publicCommand(dead,'workflow-amend','--id',dead.state.id,'--amendment',dead.amendmentFile).ok,true);
+  assert.equal(dead.store.loadState().ops[1].lease.jobId,'job-unknown','startup recovery does not alter unresolved operation effects');
+  const live=fixture(t);publicCommand(live,'workflow-stop','--id',live.state.id);
+  const liveReservation=reserveStartup(live.store.dir),liveRunning=acquireStartup(live.store.dir,{launchToken:liveReservation.token});
+  fs.writeFileSync(path.join(live.store.dir,'kernel.lock'),JSON.stringify({pid:process.pid,startedAt:Date.now(),startupToken:liveRunning.token}));
+  assert.throws(()=>publicCommand(live,'workflow-amend','--id',live.state.id,'--amendment',live.amendmentFile),/still running/);
 });
 
 test('an authorized amendment atomically inserts pre-audit and post-review operations into the existing DAG',t=>{

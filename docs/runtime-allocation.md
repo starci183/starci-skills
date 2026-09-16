@@ -74,6 +74,19 @@ The old `providers: ["codex", "qwen", "claude"]` form remains readable: only
 its first member becomes the preferred family; it is never interpreted as a
 try-until-success chain. No preference field means automatic adaptive capacity.
 
+A workflow allocation changes bounded slot capacity without replacing adaptive
+scoring. An optional `@` suffix constrains a role to exactly the runtimes that
+name it, for example:
+
+```text
+--allocation gpt-5.6-luna=10@implement,claude-opus=3@verify+plan+decide
+```
+
+Existing difficulty tags remain between capacity and the role suffix, such as
+`claude-opus=3:medium+hard@verify`. Role constraints narrow catalog
+qualification; they never add a role, bypass tool/model eligibility, or raise
+the workflow-wide ten-job ceiling.
+
 Every answer carries alternatives, explicit candidate exclusions and an
 `adaptive` receipt containing quota headroom, observation window, observed and
 reserved service, authoritative admission load/capacity, cost estimate,
