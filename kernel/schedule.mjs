@@ -215,7 +215,10 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
   const coldEstimate=difficulty=>COLD_ESTIMATE_MS[difficulty]??COLD_ESTIMATE_MS.default;
   const serviceCost=durationMs=>Math.max(0.25,Math.min(8,finite(durationMs,COLD_ESTIMATE_MS.default)/BASE_SERVICE_MS));
   const trimHistory=()=>{const since=now()-SERVICE_OBSERVATION_MS;for(const id of ids)live.history[id]=(live.history[id]??[]).filter(item=>item.at>=since).slice(-256);};
-  const reservationFor=(id,op=null)=>{const items=live.reservations[id]??[];return (op?items.find(item=>item.op===op):null)??items[0]??null;};
+  // An explicit operation id is an idempotency key. Once that exact reservation is gone, a repeated settlement
+  // must never consume the next operation on the same runtime. The oldest-item fallback is compatibility only
+  // for callers that do not name an operation.
+  const reservationFor=(id,op=null)=>{const items=live.reservations[id]??[];return op!==null?items.find(item=>item.op===op)??null:items[0]??null;};
   const dropReservation=(id,op=null)=>{const items=live.reservations[id]??[],found=reservationFor(id,op);if(found)live.reservations[id]=items.filter(item=>item!==found);return found;};
   // The kind graph is the authority on what role a kind takes; the profile's own map stays the fallback for a
   // kind the graph does not carry (a host profile's private kinds, and every 4.x operator id).
@@ -260,7 +263,9 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     }
     const matching=history.filter(item=>(!item.role||item.role===role)&&(!item.difficulty||item.difficulty===(difficulty??'medium'))).map(item=>item.durationMs).filter(Number.isFinite).sort((a,b)=>a-b);
     const estimateMs=matching.length?matching[Math.floor(matching.length/2)]:coldEstimate(difficulty);
-    const observedCost=history.reduce((sum,item)=>sum+serviceCost(item.durationMs),0);
+    // Operation history is already in the JSON ledger. Durable model/judge completions live only in SQLite;
+    // include those normalized units here so operation and non-operation work influence the same family score.
+    const observedCost=history.reduce((sum,item)=>sum+serviceCost(item.durationMs),0)+(admission?.recentNonOperationSettled??0);
     let reservedCost=0,admittedCost=0;
     const admitted=new Set();
     for(const item of admission?.jobs??[]){
@@ -441,6 +446,8 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     deferred(runtime,{op=null}={}){
       rollDay();
       need(Object.hasOwn(pools,runtime),`Unknown runtime ${runtime}`);
+      const reservation=reservationFor(runtime,op);
+      if(op!==null&&!reservation)return {ok:true,runtime,duplicate:true,load:load(runtime),remaining:remainingOf(runtime)};
       live.loads[runtime]=Math.max(0,load(runtime)-1);
       live.usedToday[runtime]=Math.max(0,(live.usedToday[runtime]??0)-1);
       dropReservation(runtime,op);
@@ -451,10 +458,12 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     release(runtime,{tokens=0,op=null}={}){
       rollDay();
       need(Object.hasOwn(pools,runtime),`Unknown runtime ${runtime}`);
+      const reservation=reservationFor(runtime,op);
+      if(op!==null&&!reservation)return {ok:true,runtime,duplicate:true,load:load(runtime),remaining:remainingOf(runtime)};
       live.loads[runtime]=Math.max(0,load(runtime)-1);
       spend(runtime,tokens);
       delete live.streaks[runtime];
-      const reservation=dropReservation(runtime,op),started=reservation?.launchedAt??reservation?.at??now();
+      dropReservation(runtime,op);const started=reservation?.launchedAt??reservation?.at??now();
       live.history[runtime]=[...(live.history[runtime]??[]),{workflow,op:op??reservation?.op??null,at:now(),durationMs:Math.max(0,now()-started),role:reservation?.role??null,difficulty:reservation?.difficulty??null}]
         .filter(item=>item.at>=now()-SERVICE_OBSERVATION_MS).slice(-256);
       note('released',{runtime,op,completed:true});
@@ -467,9 +476,11 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     failed(runtime,{reason='',tokens=0,op=null}={}){
       rollDay();
       need(Object.hasOwn(pools,runtime),`Unknown runtime ${runtime}`);
+      const reservation=reservationFor(runtime,op);
+      if(op!==null&&!reservation)return {ok:false,runtime,duplicate:true,observedService:false,load:load(runtime),remaining:remainingOf(runtime)};
       live.loads[runtime]=Math.max(0,load(runtime)-1);
       spend(runtime,tokens);
-      const reservation=dropReservation(runtime,op),worked=Number.isFinite(reservation?.launchedAt);
+      dropReservation(runtime,op);const worked=Number.isFinite(reservation?.launchedAt);
       if(!worked)live.usedToday[runtime]=Math.max(0,(live.usedToday[runtime]??0)-1);
       else live.history[runtime]=[...(live.history[runtime]??[]),{workflow,op:op??reservation?.op??null,at:now(),durationMs:Math.max(0,now()-reservation.launchedAt),role:reservation?.role??null,difficulty:reservation?.difficulty??null}]
         .filter(item=>item.at>=now()-SERVICE_OBSERVATION_MS).slice(-256);

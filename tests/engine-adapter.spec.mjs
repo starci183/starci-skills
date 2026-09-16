@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createJobBridge} from '../kernel/job-bridge.mjs';
+import {createJobs} from '../kernel/jobs.mjs';
 import {createEngineRuntime,settleGenerationLeases,settleNeverStartedModelJobs,unsettledGenerationJobs,prepareGenerationRetry} from '../kernel/engine.mjs';
 import {attestModelResult} from '../kernel/job-attestation.mjs';
 import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
@@ -225,6 +226,20 @@ test('provider-family admission is atomic for concurrent model selections and un
   assert.match(reviewed.blocked.find(item=>item.runtime==='gpt-5.6-sol').reason,/authoritative admission/);
   const operation=allocator.allocate('backend.implement',{restrictTo:['gpt-5.6-sol','claude-opus'],job:{opId:'native-after-unknown'}});
   assert.equal(operation.ok,true);assert.equal(profile.runtimes[operation.runtime].provider,'claude','operation scoring sees the model lease even after its controller became unknown');bridge.close();
+});
+
+test('settled model service remains durable pressure and rotates an equal-headroom peer pool',t=>{
+  const f=fixture(t);f.modelBudget.providers.codex.windows.weekly.usedPercent=20;f.modelBudget.providers.claude.windows.weekly.usedPercent=20;
+  const profile=withProviderPreference(loadRuntimes(),{mode:'adaptive',preferredProvider:null}),now=()=>Date.now(),
+    bridge=createJobBridge({journalFile:f.state.engine.journalFile,now,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),
+    runtime=createEngineRuntime({...f,now,bridge,runtimeProfile:profile,eligibility:()=>({eligible:true})});
+  assert.throws(()=>runtime.model('decide',{providers:['claude-opus','gpt-5.6-sol'],situation:'first',options:['x']},{id:'first',attempt:1}),error=>error.code==='STARCI_JOB_PENDING');
+  const first=runtime.journal.listJobs()[0];assert.deepEqual(first.payload.args.providers,['claude-opus'],'the input-order tie break selects Claude first');
+  const jobs=createJobs({journal:runtime.journal,admission:bridge.admission,now});
+  assert.equal(jobs.complete({jobId:first.job_id,workflowId:first.workflow_id,opId:first.op_id,attempt:first.attempt,generation:first.generation,leaseToken:first.lease_token,status:'succeeded',result:{ok:true}}).ok,true);
+  const view=runtime.providerAdmissionView();assert.equal(view.providers.claude.used,0);assert.equal(view.providers.claude.recentSettled,1);
+  assert.throws(()=>runtime.model('decide',{providers:['claude-opus','gpt-5.6-sol'],situation:'second',options:['x']},{id:'second',attempt:1}),error=>error.code==='STARCI_JOB_PENDING');
+  const second=runtime.journal.listJobs().find(job=>job.op_id==='second');assert.deepEqual(second.payload.args.providers,['gpt-5.6-sol'],'settled Claude service moves the next equal-headroom job to Codex');bridge.close();
 });
 
 test('a pure model job whose worker never started settles instead of fencing the generation for good, while a command job keeps its fence',t=>{

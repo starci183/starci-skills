@@ -337,7 +337,7 @@ test('a cooldown one kernel ran into parks the runtime for every kernel of the r
   shared.kernel(other);
   shared.write({'claude-fable-5.1':{live:[],cooling:{until:time.now()+600000,reason:'HTTP 429 Too Many Requests',kind:'rate-limited',workflow:other},usedToday:3,day:'2026-09-12'}});
   const allocator=createAllocator({runtimes:profile,now:time.now,shared:{path:shared.file,workflow:mine}});
-  const decided=allocator.allocate('architecture.decide');
+  const decided=allocator.allocate('architecture.decide',{job:{opId:'op-decide'}});
   assert.equal(decided.runtime,'gpt-6-astra');
   const parked=decided.blocked.find(item=>item.runtime==='claude-fable-5.1');
   assert.match(parked.reason,/cooling after a shared rate-limited until 2026-09-12T09:10:00\.000Z, seen by 20260912-100000-other/);
@@ -365,7 +365,7 @@ test('entries of a dead kernel are ignored and dropped, and an unreadable ledger
   shared.write({'claude-fable-5.1':{live:[{workflow:dead,op:'op-dead',since:1},{workflow:gone,op:'op-gone',since:2}],cooling:null,usedToday:4,day:'2026-09-12'}});
   assert.deepEqual(readLoads({path:shared.file,workflow:mine,now:()=>Date.UTC(2026,8,12,9)}).loads,{});
   const allocator=createAllocator({runtimes:profile,now:()=>Date.UTC(2026,8,12,9),shared:{path:shared.file,workflow:mine}});
-  assert.equal(allocator.allocate('architecture.decide').runtime,'claude-fable-5.1');
+  assert.equal(allocator.allocate('architecture.decide',{job:{opId:'op-mine'}}).runtime,'claude-fable-5.1');
   // The next write drops them, so the file keeps no dead kernel's claim on an expensive runtime.
   allocator.launched('claude-fable-5.1',{op:'op-mine'});
   assert.deepEqual(shared.read().runtimes['claude-fable-5.1'].live.map(item=>[item.workflow,item.op]),[[mine,'op-mine']]);
@@ -463,8 +463,8 @@ test('two kernels write the one ledger under a lock and both their launches surv
   shared.kernel(first);shared.kernel(second);
   const open=workflow=>createAllocator({runtimes:profile,now:()=>Date.UTC(2026,8,12,9),shared:{path:shared.file,workflow}});
   const one=open(first),two=open(second);
-  one.allocate('architecture.decide');one.launched('claude-fable-5.1',{op:'op-first'});
-  two.allocate('architecture.decide');two.launched('claude-fable-5.1',{op:'op-second'});
+  one.allocate('architecture.decide',{job:{opId:'op-first'}});one.launched('claude-fable-5.1',{op:'op-first'});
+  two.allocate('architecture.decide',{job:{opId:'op-second'}});two.launched('claude-fable-5.1',{op:'op-second'});
   const entry=shared.read().runtimes['claude-fable-5.1'];
   assert.deepEqual(entry.live.map(item=>[item.workflow,item.op]),[[first,'op-first'],[second,'op-second']]);
   assert.equal(entry.usedToday,0,'admitted/live reservations are not reported as completed service');
@@ -566,6 +566,25 @@ test('adaptive families count shared quota once, reject stale or unknown quota, 
   assert.equal(allocator.serialize().reservations[unknown.runtime].some(item=>item.op==='unknown-effect'),true,'unknown effects retain their reservation until settlement');
   const stale={...budget(),at:at-10*60_000};const blocked=createAllocator({runtimes:adaptive,now:time.now,budget:stale}).allocate('backend.implement');
   assert.equal(blocked.ok,false);assert.ok(blocked.blocked.filter(item=>['gpt-5.6-sol','claude-opus','qwen3.8-flash'].includes(item.runtime)).every(item=>/unknown or stale/.test(item.reason)));
+});
+
+test('an exact operation settlement is idempotent and never consumes its same-runtime neighbour',()=>{
+  const at=Date.UTC(2026,8,15,9),time=clock(at),adaptive=withProviderPreference(profile,{mode:'adaptive',preferredProvider:'codex'}),reset=at+86_400_000;
+  const budget=()=>({schema:'starci/runtime-budget@1',at:time.now(),providers:{codex:{status:'ok',windows:{weekly:{usedPercent:20,resetsAt:reset,minutes:10080}}}}});
+  const allocator=createAllocator({runtimes:adaptive,now:time.now,budget});
+  const one=allocator.allocate('backend.implement',{restrictTo:['gpt-5.6-sol'],job:{opId:'one'}}),
+    two=allocator.allocate('backend.implement',{restrictTo:['gpt-5.6-sol'],job:{opId:'two'}});
+  assert.equal(one.runtime,'gpt-5.6-sol');assert.equal(two.runtime,'gpt-5.6-sol');
+  allocator.launched(one.runtime,{op:'one'});allocator.launched(two.runtime,{op:'two'});time.advance(10*60_000);
+  allocator.release(one.runtime,{op:'one',tokens:7});
+  const settled=structuredClone(allocator.serialize());
+  assert.equal(settled.loads['gpt-5.6-sol'],1);assert.equal(settled.usedToday['gpt-5.6-sol'],2);assert.equal(settled.tokensToday['gpt-5.6-sol'],7);
+  assert.deepEqual(settled.reservations['gpt-5.6-sol'].map(item=>item.op),['two']);assert.equal(settled.history['gpt-5.6-sol'].length,1);
+  assert.equal(allocator.release(one.runtime,{op:'one',tokens:11}).duplicate,true);
+  assert.equal(allocator.deferred(one.runtime,{op:'one'}).duplicate,true);
+  assert.equal(allocator.failed(one.runtime,{op:'one',reason:'429 after prior settlement',tokens:13}).duplicate,true);
+  assert.deepEqual(allocator.serialize(),settled,'replayed settlements change no load, quota counter, tokens, history, cooldown or neighbour reservation');
+  allocator.release(two.runtime,{op:'two'});assert.equal(allocator.serialize().loads['gpt-5.6-sol'],0);
 });
 
 test('adaptive selection receipts distinguish quota unknown, exhausted, cooling and authoritative capacity exclusions',()=>{

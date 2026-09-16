@@ -1286,7 +1286,9 @@ What it changes in allocation, with `createAllocator({shared:{path, workflow}})`
   quota and eligibility remain hard constraints;
 - a model/judge lease in the SQLite journal reduces the capacity and projected service visible to an operation,
   including after a controller dies or the job becomes `effect_unknown`. The reverse path uses the same atomic
-  resource when a model or judge is admitted;
+  resource when a model or judge is admitted. Once a durably launched model/judge job settles, its lease is
+  released but one normalized recent-service unit remains in the journal view for six hours, so an equal-quota
+  peer pool does not return permanently to input order;
 - the receipt is `allocation-adaptive {op, runtime, provider, preferredProvider, observationWindowMs, families,
   excluded, reason}`. Each family reports headroom, observed service, reserved service, authoritative admitted
   load, estimate and score; `excluded` gives the bounded reason and applicable reset/admission facts for every
@@ -1575,8 +1577,10 @@ reset) and what share is left. Kernels read the file, never Orca. Adaptive alloc
 window and blocks an exhausted family until its reset. It uses the exact tightest applicable remaining
 percentage in `headroom × ownerPreference / (observedService + reservedService + estimatedNewService)`.
 Service is normalized only for relative scheduling, with a six-hour observation window and conservative
-15/45/90 minute cold estimates. This is an observed greedy heuristic rather than a claim of globally optimal
-scheduling. Unknown and stale quota authorize no adaptive launch.
+15/45/90 minute cold estimates. Settled operations contribute their observed duration; every durably launched
+and settled model/judge job contributes one bounded normalized unit from the SQLite journal. This is an observed
+greedy heuristic rather than a claim of globally optimal scheduling. Unknown and stale quota authorize no
+adaptive launch. Invalid sealed configuration fails closed instead of falling back to the compatibility profile.
 
 That probed window is the **only** budget. No pool in `model/runtimes.yaml` declares a cap of its own any
 more: one did, and it stalled a migration late in the evening while the provider still had nearly half of its

@@ -45,8 +45,9 @@ For each family the allocator derives:
   remaining percentage, with exhausted windows excluded;
 - projected work: admitted operations already reserved locally or by other
   workflows, using a median duration observed for the same role and difficulty;
-- recent service: actual settled run duration in the current provider-window
-  segment, bounded to a rolling six hours;
+- recent service: actual settled operation duration plus one normalized unit for
+  each durably launched and settled model/judge job, bounded to a rolling six
+  hours. The SQLite journal keeps the latter pressure after its lease is freed;
 - a conservative cold estimate of 15, 45 or 90 minutes for easy, medium or hard
   work when no suitable observation exists.
 
@@ -84,6 +85,10 @@ reservation idempotently. A launched attempt that did work before failing keeps
 its observed service, distinct from measured provider quota. Unknown effects
 retain both the adaptive reservation and the authoritative SQLite admission
 lease until settlement.
+
+An invalid sealed `config.json` fails closed. It is never caught and replaced
+with the authored compatibility profile, because that would silently restore a
+priority chain. A missing file still loads the validated adaptive example.
 
 No runtime available is not an error: the kernel keeps the operation queued and
 waits for a slot.

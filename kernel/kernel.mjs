@@ -3106,10 +3106,7 @@ export function withSupervisorPreference(profile,runtimes){
  * The runtime profile this workflow runs under: adaptive capacity plus the optional bounded owner preference
  * sealed in the workflow's config.json. Operation tiers remain suitability filters, never a provider chain.
  */
-export const workflowRuntimeProfile=state=>{
-  try{return withProviderPreference(loadRuntimes(),configuredAllocationPolicy(loadConfig(workflowModelConfigRoot(state))));}
-  catch{return loadRuntimes();}
-};
+export const workflowRuntimeProfile=state=>withProviderPreference(loadRuntimes(),configuredAllocationPolicy(loadConfig(workflowModelConfigRoot(state))));
 /** Closed non-operation model bindings come only from validated config.json. */
 export const supervisorRuntimes=host=>nonOperationModels('kernelManager',loadConfig(host));
 export const workflowModelConfigRoot=state=>isEnrolled(state)&&state.engine.runtimePin?.root?state.engine.runtimePin.root:state.host??'';

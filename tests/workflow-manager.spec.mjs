@@ -25,6 +25,8 @@ test('the real workflow profile binds adaptive config and treats a legacy provid
     const base={language:'vi',model:null,effort:'medium',models:{selection:'quota-aware',pools:{'fable-astra':['claude-fable-5.1','gpt-6-astra'],'opus-sol':['claude-opus','gpt-5.6-sol']},nonOperation:{planner:'fable-astra',kernelManager:'opus-sol',validator:'fable-astra'}},providers:['codex','qwen','claude']};
     fs.writeFileSync(path.join(root,'config.json'),JSON.stringify(base));const legacy=workflowRuntimeProfile({host:root});
     assert.equal(legacy.allocation.policy,ADAPTIVE_CAPACITY);assert.equal(legacy.allocation.ownerPolicy.preferredProvider,'codex');assert.equal(legacy.allocation.providerOrder,undefined);
+    fs.writeFileSync(path.join(root,'config.json'),JSON.stringify({...base,allocation:{mode:'adaptive',preferredProvider:null}}));
+    assert.throws(()=>workflowRuntimeProfile({host:root}),/use allocation or the legacy providers list/,'invalid sealed config fails closed instead of restoring the authored chain profile');
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 

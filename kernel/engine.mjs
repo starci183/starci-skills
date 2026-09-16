@@ -144,7 +144,8 @@ function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadR
   const admitted=provider=>providerAdmission?.[provider]??null;
   const available=eligible.filter(item=>item.budget.known&&!item.budget.exhausted&&(!admitted(item.runtime.provider)||admitted(item.runtime.provider).used<admitted(item.runtime.provider).capacity));
   if(adaptive)available.sort((a,b)=>{
-    const score=item=>(item.budget.remaining/100)*(item.runtime.provider===preferred?(owner.preferenceMultiplier??OWNER_PREFERENCE_MULTIPLIER):1)/(1+(admitted(item.runtime.provider)?.used??0));
+    const score=item=>(item.budget.remaining/100)*(item.runtime.provider===preferred?(owner.preferenceMultiplier??OWNER_PREFERENCE_MULTIPLIER):1)
+      /(1+(admitted(item.runtime.provider)?.used??0)+(admitted(item.runtime.provider)?.recentSettled??0));
     return score(b)-score(a)||b.budget.remaining-a.budget.remaining||a.index-b.index;
   });
   else available.sort((a,b)=>b.budget.remaining-a.budget.remaining||a.index-b.index);
@@ -155,7 +156,7 @@ function eligibleModelSelection(name,args,eligibility,modelPolicy,runtimes=loadR
       admitted:admitted(item.runtime.provider)?.used??null,capacity:admitted(item.runtime.provider)?.capacity??null}));}throw error;}
   const selected=available[0];return {args:{...modelInput(args),providers},runtime:selected.runtime,decision:selected.decision,job,
     considered:available.map(item=>({runtime:item.id,provider:item.runtime.provider,remaining:item.budget.remaining,active:admitted(item.runtime.provider)?.used??0,
-      preferred:item.runtime.provider===preferred})),refused:candidates.filter(candidate=>!eligible.some(item=>item.id===candidate.id)).map(candidate=>candidate.id)};
+      recentSettled:admitted(item.runtime.provider)?.recentSettled??0,preferred:item.runtime.provider===preferred})),refused:candidates.filter(candidate=>!eligible.some(item=>item.id===candidate.id)).map(candidate=>candidate.id)};
 }
 
 /** Opt in only at a settled workflow boundary. Canonical Work and approved goal references stay intact. */
@@ -189,12 +190,22 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
     admission.expire();
     const capacities=new Map(journal.db.prepare("SELECT resource_key,capacity FROM resources WHERE resource_key LIKE 'ai/provider:%' ORDER BY resource_key").all()
       .map(row=>[row.resource_key.slice('ai/provider:'.length),row.capacity]));
-    const providers={};for(const [provider,capacity] of capacities)providers[provider]={capacity,used:0,jobs:[]};
+    const providers={};for(const [provider,capacity] of capacities)providers[provider]={capacity,used:0,jobs:[],recentSettled:0,recentNonOperationSettled:0,recentOperationSettled:0};
     for(const row of journal.db.prepare("SELECT l.resource_key,l.units,j.job_id,j.workflow_id,j.op_id,j.kind,j.role,j.status,j.payload_json FROM leases l JOIN jobs j ON j.job_id=l.job_id WHERE l.resource_key LIKE 'ai/provider:%' ORDER BY l.resource_key,j.created_at,j.job_id").all()){
-      const provider=row.resource_key.slice('ai/provider:'.length),entry=providers[provider]??={capacity:0,used:0,jobs:[]};
+      const provider=row.resource_key.slice('ai/provider:'.length),entry=providers[provider]??={capacity:0,used:0,jobs:[],recentSettled:0,recentNonOperationSettled:0,recentOperationSettled:0};
       let payload={};try{payload=JSON.parse(row.payload_json??'{}')??{};}catch{}
       entry.used+=row.units;entry.jobs.push({jobId:row.job_id,workflow:row.workflow_id,op:row.op_id,kind:row.kind,role:row.role,
         status:row.status,runtime:payload?.admission?.runtime??payload?.runtime??null,units:row.units});providers[provider]=entry;
+    }
+    // Settled jobs no longer hold a lease, but they still consumed provider service. Count only jobs with a
+    // durable launch receipt, over the same six-hour horizon as operation telemetry. Flat normalized units keep
+    // the signal bounded and make equal-headroom model pools rotate instead of returning to list order forever.
+    const since=now()-6*60*60*1000;
+    for(const row of journal.db.prepare("SELECT j.kind,j.payload_json FROM jobs j WHERE j.kind IN ('model','judge','operation') AND j.status IN ('succeeded','failed') AND j.updated_at>=? AND EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=j.workflow_id AND e.entity_id=j.job_id AND e.kind IN ('job-spawned','operation-launched')) ORDER BY j.updated_at,j.job_id").all(since)){
+      let payload={};try{payload=JSON.parse(row.payload_json??'{}')??{};}catch{}
+      const runtime=payload?.admission?.runtime??payload?.runtime??null,provider=runtimeProfile.runtimes?.[runtime]?.provider;
+      if(!provider)continue;const entry=providers[provider]??={capacity:0,used:0,jobs:[],recentSettled:0,recentNonOperationSettled:0,recentOperationSettled:0};
+      entry.recentSettled+=1;if(row.kind==='operation')entry.recentOperationSettled+=1;else entry.recentNonOperationSettled+=1;providers[provider]=entry;
     }
     return {source:'sqlite-admission',providers};
   };
