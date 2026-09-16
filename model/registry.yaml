@@ -79,6 +79,9 @@ reasoningOps:
   - architecture.decide
   - review.verify
   - work.author
+  - request.analyze
+  - scope.define
+  - goal.revise
 targets:
   # Pool targets are named by the provider-window pool of model/runtimes.yaml; `requestedModel` stays the
   # implement-role model of the pool's models map for compatibility with consumers that read one model.
@@ -251,6 +254,15 @@ operators:
     environments:
       - {environment: codex, profiles: [codex-agent]}
       - {environment: claude, profiles: [claude-fable, claude-agent]}
+  docs.author:
+    skill: starci
+    # Authoring reference docs is write-role work over the record tree: the full writing chain.
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
   provision.ask:
     skill: starci
     # Asking for a provision is naming it exactly and waiting; the same reasoning runtimes, the same order,
@@ -268,6 +280,15 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
   content.generate:
     skill: starci
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  code.refactor:
+    skill: starci
+    # Restructuring code under a behaviour invariant is implementation work: the full coding chain.
     chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
     environments:
       - {environment: qwen, profiles: [qwen-agent]}
@@ -301,6 +322,13 @@ operators:
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
       - {environment: devin, profiles: [devin-agent]}
+  goal.revise:
+    skill: starci
+    # Revising a live goal is a decision about the work, not work on it: the reasoning chain.
+    chain: [codex-agent, claude-fable, claude-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-fable, claude-agent]}
   interface.asset:
     skill: starci
     # Generating the artwork a candidate embeds needs the same image model the drawing used, so the chain is
@@ -331,6 +359,15 @@ operators:
       - {environment: codex, profiles: [codex-agent]}
       - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
+  perf.verify:
+    skill: starci
+    # Measuring a performance budget is the same proof shape as the security audit: the verify chain.
+    chain: [codex-agent, claude-agent, qwen-agent, devin-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
   release.deliver:
     skill: starci
     chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
@@ -338,6 +375,13 @@ operators:
       - {environment: qwen, profiles: [qwen-agent]}
       - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  request.analyze:
+    skill: starci
+    # Turning a raw request into a scoped, checkable goal is planning work: the reasoning chain, the cheap pool never.
+    chain: [claude-fable, codex-agent, claude-agent]
+    environments:
+      - {environment: claude, profiles: [claude-fable, claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
   review.verify:
     skill: starci
@@ -363,8 +407,34 @@ operators:
       - {environment: devin, profiles: [devin-agent]}
       - {environment: claude, profiles: [claude-agent]}
       - {environment: codex, profiles: [codex-agent]}
+  scope.define:
+    skill: starci
+    # Cutting a goal into bounded nodes is a decision about the work: the reasoning chain.
+    chain: [codex-agent, claude-fable, claude-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-fable, claude-agent]}
+  security.verify:
+    skill: starci
+    # Auditing code against the security baseline is the same proof shape as the API proof: the verify chain.
+    chain: [codex-agent, claude-agent, qwen-agent, devin-agent]
+    environments:
+      - {environment: codex, profiles: [codex-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
   task.execute:
     skill: starci
+    chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
+    environments:
+      - {environment: qwen, profiles: [qwen-agent]}
+      - {environment: devin, profiles: [devin-agent]}
+      - {environment: claude, profiles: [claude-agent]}
+      - {environment: codex, profiles: [codex-agent]}
+  test.author:
+    skill: starci
+    # Authoring the regression check a behaviour-invariant change is measured against is implementation work:
+    # the full coding chain.
     chain: [qwen-agent, devin-agent, claude-agent, codex-agent]
     environments:
       - {environment: qwen, profiles: [qwen-agent]}

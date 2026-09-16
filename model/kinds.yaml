@@ -690,6 +690,42 @@ kinds:
     reports:
       outcomes: [done, partial, failed, ask, blocked]
       blockers: [environment, authority]
+  # The last two registry operators wired into the catalog: content production and delivery. Neither belongs
+  # to a lane - a request selects the content unit, a proven build selects delivery.
+  content.generate:
+    family: build
+    role: write
+    operator: content.generate
+    readOnly: false
+    # The brief and the settled records govern the unit; the source repository grounds the claims it may
+    # carry. Facts and testimonials the brief does not supply are not creative license.
+    reads: [record, srs, sds, design, brand, grammar, code]
+    writes: [record, asset, code]
+    knowledge: [coding-reference]
+    checks: [scripts/check-scoped-lint.mjs]
+    stacks: [schemas/work.schema.yaml, schemas/work-layout.yaml]
+    carries: [work/node@2]
+    purpose: Author or revise one selected content unit from its brief, grounded in the settled records and the selected source.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, environment, authority]
+  release.deliver:
+    family: build
+    role: implement
+    operator: release.deliver
+    readOnly: false
+    # Delivery reads the proven build, the evidence that proved it and the stack it lands on; what it writes
+    # is the verified remote outcome - publication without proof is not delivery.
+    reads: [code, evidence, runtime]
+    writes: [record]
+    knowledge: [application-stacks]
+    checks: [checks/stacks.mjs, checks/proof.mjs]
+    stacks: [schemas/application-stacks.schema.yaml]
+    carries: [starci/evidence-packet@1]
+    purpose: Deliver the proven build to the selected environment - deploy, publish or migrate as authorised - and leave the verified remote outcome as evidence.
+    reports:
+      outcomes: [done, partial, failed, ask, blocked]
+      blockers: [shared-change, environment, authority]
 # The mandatory sequence per ledger node. `match` is the node shape (`kind`, and `role` for the
 # backend/frontend side a node is delivered on, from its layout or its repository); the first lane whose
 # match fits wins, so the list runs from the most specific to the least. A step is mandatory unless it

@@ -111,6 +111,7 @@ runtimes:
       verify: swe-2-max
       write: swe-2-max
 roleOfKind:
+  request.analyze: plan
   backend.implement: implement
   frontend.implement: implement
   scope.define: decide
@@ -143,4 +144,4 @@ roleOfKind:
   work.author: plan
   implementation.plan: plan
   workspace.manage: plan
-  task.execute: implement
+

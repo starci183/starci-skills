@@ -42,7 +42,7 @@ export const ROLES=Object.freeze(['decide','plan','implement','verify','write'])
 export {RECORD_KINDS as RECORDS} from './io.mjs';
 export const ORIGINS=Object.freeze(['ledger','shared','repair','gate','verify','architecture','business']);
 export const OUTCOMES=Object.freeze(['done','partial','failed','ask','blocked']);
-export const BLOCKERS=Object.freeze(['shared-change','srs-gap','sds-gap','interface-gap','brand-gap','grammar-gap','environment','authority']);
+export const BLOCKERS=Object.freeze(['shared-change','srs-gap','sds-gap','interface-gap','brand-gap','grammar-gap','test-gap','environment','authority']);
 export const VERDICTS=Object.freeze(['pass','findings','rejected','gate-failed']);
 export const THEN=Object.freeze(['retry','reopen','pause','settle','needUser']);
 /**

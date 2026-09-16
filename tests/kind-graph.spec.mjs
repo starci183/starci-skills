@@ -91,10 +91,10 @@ test('the shipped catalog validates against the allocator profile and the operat
   assert.deepEqual(reportsOf('brand.decide',{profile}),{outcomes:['done','partial','failed','ask','blocked'],blockers:['environment','authority']});
   // Asset bytes come from the identity, ImageGen design directions/artwork, or bounded browser captures owned
   // by the frontend implementation node - nowhere else.
-  assert.deepEqual(kindsWriting('asset',{profile}),['brand.decide','interface.draw','interface.asset','frontend.implement']);
+  assert.deepEqual(kindsWriting('asset',{profile}),['brand.decide','interface.draw','interface.asset','frontend.implement','content.generate']);
   // The node's own authored fields are written by the two kinds that stand before every lane: one completes the
   // record a node needs to be launchable at all, the other cuts a node too big for one operation into children.
-  assert.deepEqual(kindsWriting('record',{profile}),['work.author','implementation.plan']);
+  assert.deepEqual(kindsWriting('record',{profile}),['work.author','implementation.plan','request.analyze','scope.define','docs.author','goal.revise','scope.retire','workspace.manage','content.generate','release.deliver']);
   // The cut is a kind of its own - that is what the goal page, the status view and the events show - but it
   // carries the record-authoring operator contract, so no second operator exists for it.
   assert.equal(familyOf('implementation.plan',{profile}),'design');
@@ -178,9 +178,10 @@ test('the interface lanes are mandatory in order: the ui node is drawn then its 
   assert.equal(nextKind(ui,['interface.draw','interface.asset'],{profile}),null);
   assert.equal(nextKind(frontend,[],{profile}),'frontend.implement');
   assert.equal(nextKind(frontend,['frontend.implement'],{profile}),'uat.verify');
-  assert.equal(nextKind(frontend,['frontend.implement','uat.verify'],{profile}),'security.verify');
-  assert.equal(nextKind(frontend,['frontend.implement','uat.verify','security.verify'],{profile}),'perf.verify');
-  assert.equal(nextKind(frontend,['frontend.implement','uat.verify','security.verify','perf.verify'],{profile}),null);
+  const fullGoal={metrics:{requiresSecurity:true,requiresPerf:true}};
+  assert.equal(nextKind(frontend,['frontend.implement','uat.verify'],{goal:fullGoal,profile}),'security.verify');
+  assert.equal(nextKind(frontend,['frontend.implement','uat.verify','security.verify'],{goal:fullGoal,profile}),'perf.verify');
+  assert.equal(nextKind(frontend,['frontend.implement','uat.verify','security.verify','perf.verify'],{goal:fullGoal,profile}),null);
   // A step cannot be skipped: with the drawing missing the ui lane asks for the drawing again, whatever else ran.
   assert.equal(nextKind(ui,['interface.asset'],{profile}),'interface.draw');
   // Nor may the walk stand in for the build: without the build the frontend lane asks for the build.
@@ -193,8 +194,10 @@ test('the interface lanes are mandatory in order: the ui node is drawn then its 
   assert.equal(nextKind('implementation/frontend',[],{profile}),'frontend.implement');
   assert.equal(nextKind(lane('backend'),[],{profile}),'backend.implement');
   assert.equal(nextKind(lane('backend'),['backend.implement'],{profile}),'e2e.verify');
-  assert.equal(nextKind(lane('backend'),['backend.implement','e2e.verify'],{profile}),'security.verify');
-  assert.equal(nextKind(lane('backend'),['backend.implement','e2e.verify','security.verify','perf.verify'],{profile}),'review.verify');
+  assert.equal(nextKind(lane('backend'),['backend.implement','e2e.verify'],{profile}),'review.verify','a goal silent on security/perf skips the optional proofs');
+  const backendGoal={goal:{metrics:{requiresSecurity:true,requiresPerf:true}}};
+  assert.equal(nextKind(lane('backend'),['backend.implement','e2e.verify'],{...backendGoal,profile}),'security.verify');
+  assert.equal(nextKind(lane('backend'),['backend.implement','e2e.verify','security.verify','perf.verify'],{...backendGoal,profile}),'review.verify');
   assert.equal(nextKind(lane('backend'),['backend.implement','e2e.verify','security.verify','perf.verify','review.verify'],{profile}),null);
 });
 
@@ -218,7 +221,8 @@ test('optionalWhen skips a step only for a named predicate the kernel satisfied'
   // them (predicate unsatisfied) runs them, and the mandatory build and walk are never skipped either way.
   const goal={'goal.requiresSecurity':true,'goal.requiresPerf':true};
   assert.equal(nextKind(frontend,['frontend.implement','uat.verify'],{predicates:goal,profile}),null);
-  assert.equal(nextKind(frontend,['frontend.implement','uat.verify'],{predicates:{},profile}),'security.verify');
+  assert.equal(nextKind(frontend,['frontend.implement','uat.verify'],{predicates:{},profile}),null,'a goal silent on the metric skips the proof');
+  assert.equal(nextKind(frontend,['frontend.implement','uat.verify'],{predicates:{},goal:{metrics:{requiresSecurity:true}},profile}),'security.verify','a goal that requires the metric runs the proof');
   assert.equal(nextKind(frontend,['frontend.implement'],{predicates:goal,profile}),'uat.verify');
   const backend=lane('backend');
   assert.equal(nextKind(backend,['backend.implement','e2e.verify'],{predicates:goal,profile}),'review.verify');
@@ -471,7 +475,7 @@ test('every kind declares what it reads and what it produces, over the one recor
   assert.deepEqual(kindsWriting('evidence',{profile}),['uat.verify','e2e.verify','integration.verify','security.verify','perf.verify']);
   // Which kinds read the identity is the kernel's DESIGN_KINDS, now answered from the catalog.
   assert.deepEqual(kindsReading('brand',{profile}).sort(),
-    ['frontend.implement','grammar.update','interface.asset','interface.draw','uat.verify']);
+    ['content.generate','frontend.implement','grammar.update','interface.asset','interface.draw','uat.verify']);
   // The read-only prover reads every side of the slice it reads back, and repairs none of them.
   assert.deepEqual(readsOf('review.verify',{profile}),['srs','sds','code','evidence','runtime']);
   assert.deepEqual(writesOf('review.verify',{profile}),[]);

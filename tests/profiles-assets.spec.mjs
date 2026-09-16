@@ -57,7 +57,8 @@ test('every operator has an ordered external-agent chain and skill-level default
   // integration.verify runs code against a real provider exactly as e2e.verify runs it against a real stack,
   // so it carries the same verify-role runtimes.
   const expectedCounts={'business.decide':3,'architecture.decide':3,'decision.prepare':3,'provision.ask':3,'brand.decide':2,'review.verify':5,'interface.draw':1,'interface.asset':1,'grammar.update':3,'work.author':3,'integration.verify':4,
-    'backend.implement':4,'content.generate':4,'e2e.verify':4,'interface.implement':4,'knowledge.repair':4,'release.deliver':4,'runtime.operate':4,'scope.retire':4,'task.execute':4,'uat.verify':4,'workspace.manage':4};
+    'backend.implement':4,'code.refactor':4,'content.generate':4,'docs.author':4,'e2e.verify':4,'interface.implement':4,'knowledge.repair':4,'perf.verify':4,'release.deliver':4,'runtime.operate':4,'scope.retire':4,'security.verify':4,'task.execute':4,'test.author':4,'uat.verify':4,'workspace.manage':4,
+    'request.analyze':3,'scope.define':3,'goal.revise':3};
   for(const op of ops){
     const route=resolveExecutionChain({skill:'starci',op});
     const expectedCount=expectedCounts[op]??3;
