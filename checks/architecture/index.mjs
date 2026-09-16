@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadArchitectureConfig } from './config.mjs';
-import { buildTypeScriptContext } from './typescript.mjs';
+import { buildTypeScriptContext, relativePath } from './typescript.mjs';
 import { checkBackend } from './backend.mjs';
 import { checkFrontend } from './frontend.mjs';
 import { checkOwners } from './owners.mjs';
@@ -11,6 +11,43 @@ const LIMITATIONS = [
   'Dynamic module names and dependencies constructed outside analyzable string-literal imports require separate review.',
   'Protocol surfaces selected through reflection, nonliteral computed properties, or aliases constructed beyond static import/re-export bindings require separate review.',
 ];
+
+const COMMON_RULE_IDS = [
+  'ARCH_INTERNAL_IMPORT_OUTSIDE',
+  'ARCH_INTERNAL_IMPORT_UNRESOLVED',
+  'ARCH_NO_SOURCE',
+  'ARCH_PACKAGE_EXPORT_BYPASS',
+  'ARCH_PACKAGE_IMPORTS_APP',
+  'ARCH_SYNTAX_INVALID',
+  'ARCH_TSCONFIG_INVALID',
+  'ARCH_TSCONFIG_MISSING',
+  'ARCH_TSCONFIG_REFERENCE_OUTSIDE',
+];
+const BACKEND_RULE_IDS = [
+  'BE_APP_BUSINESS_ROLE',
+  'BE_APP_COMPOSITION_ONLY',
+  'BE_APPLICATION_IMPORTS_TRANSPORT',
+  'BE_APPLICATION_TRANSPORT_FRAMEWORK',
+  'BE_FEATURE_IMPORTS_APP',
+  'BE_MODULE_IMPORTS_APP',
+  'BE_MODULE_IMPORTS_FEATURE',
+];
+const FRONTEND_RULE_IDS = [
+  'FE_COMPONENT_DEEP_HOOK_IMPORT',
+  'FE_COMPONENT_IMPORTS_TRANSPORT',
+  'FE_FETCH_OUTSIDE_TRANSPORT',
+  'FE_PURE_REACHES_DATA',
+  'FE_PURE_WORLD_HOOK',
+  'FE_PURE_WORLD_IMPORT',
+  'FE_ROUTE_CLIENT_BOUNDARY',
+  'FE_ROUTE_CLIENT_HOOK',
+  'FE_ROUTE_DEFAULT_EXPORT',
+  'FE_ROUTE_DRAWING_DECISION',
+  'FE_ROUTE_ONE_PAGE',
+  'FE_TIER_IMPORTS_UPWARD',
+];
+const OWNER_RULE_IDS = ['ARCH_OWNER_EXPORT_BYPASS', 'ARCH_OWNER_EXPORT_STAR'];
+const GRAMMAR_RULE_IDS = ['ARCH_GRAMMAR_CONTRACT_INVALID', 'ARCH_GRAMMAR_EXPORT_BYPASS'];
 
 function stable(items) {
   return items.sort((a, b) => `${a.path ?? ''}:${a.line ?? 0}:${a.column ?? 0}:${a.ruleId}`.localeCompare(`${b.path ?? ''}:${b.line ?? 0}:${b.column ?? 0}:${b.ruleId}`));
@@ -48,6 +85,7 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
   const sourceFiles = new Set(context.files.map(file => canonical(file.fileName)));
   const missingOwnerEntries = config.owners?.filter(owner => !sourceFiles.has(canonical(path.resolve(config.root, ...owner.entry.split('/'))))) ?? [];
   const coverage = {
+    sourceFiles: context.files.map(file => relativePath(config.root, canonical(file.fileName))).sort(),
     ownerPublicApi: config.owners === null
       ? { status: 'unavailable', reason: 'architecture.json does not declare owners and public entries' }
       : missingOwnerEntries.length
@@ -60,6 +98,13 @@ export function checkArchitecture({ repositoryRoot, configFile, injectedTypeScri
         ? { status: 'checked', package: config.frontend.grammar.package }
         : { status: 'unavailable', reason: 'architecture.json does not declare the selected Grammar contract' },
   };
+  coverage.checkedRuleIds = [...new Set([
+    ...COMMON_RULE_IDS,
+    ...(config.kinds.includes('backend') ? BACKEND_RULE_IDS : []),
+    ...(config.kinds.includes('frontend') ? FRONTEND_RULE_IDS : []),
+    ...(coverage.ownerPublicApi.status === 'checked' ? OWNER_RULE_IDS : []),
+    ...(coverage.grammarContract.status === 'checked' ? GRAMMAR_RULE_IDS : []),
+  ])].sort();
   return {
     schema: 'starci/architecture-check@1',
     ok: errors.length === 0 && violations.length === 0,

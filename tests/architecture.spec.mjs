@@ -86,6 +86,16 @@ test('backend accepts inward composition and narrow bootstrap configuration', t 
   const result = check(root);
   assert.equal(result.ok, true, JSON.stringify(result, null, 2));
   assert.equal(result.files, 5);
+  assert.deepEqual(result.coverage.sourceFiles, [
+    'apps/core/src/app.module.ts',
+    'apps/core/src/config/runtime.config.ts',
+    'apps/core/src/main.ts',
+    'src/features/http/feature.ts',
+    'src/modules/catalog/value.ts',
+  ]);
+  assert.ok(result.coverage.checkedRuleIds.includes('BE_MODULE_IMPORTS_FEATURE'));
+  assert.ok(result.coverage.checkedRuleIds.includes('ARCH_INTERNAL_IMPORT_UNRESOLVED'));
+  assert.equal(result.coverage.checkedRuleIds.some(ruleId => ruleId.startsWith('FE_')), false);
 });
 
 test('backend resolves aliases, relative imports, and re-export barrels before enforcing direction', t => {
@@ -207,8 +217,10 @@ test('omitted owner and Grammar declarations remain explicit unavailable coverag
     'src/features/feature.ts': 'export const feature=1\n',
   });
   const backendResult = check(backend);
-  assert.deepEqual(backendResult.coverage, { ownerPublicApi: { status: 'unavailable', reason: 'architecture.json does not declare owners and public entries' },
-    grammarContract: { status: 'not-applicable' } });
+  assert.deepEqual(backendResult.coverage.ownerPublicApi, { status: 'unavailable', reason: 'architecture.json does not declare owners and public entries' });
+  assert.deepEqual(backendResult.coverage.grammarContract, { status: 'not-applicable' });
+  assert.deepEqual(backendResult.coverage.sourceFiles, ['src/features/feature.ts', 'src/modules/value.ts']);
+  assert.equal(backendResult.coverage.checkedRuleIds.includes('ARCH_OWNER_EXPORT_BYPASS'), false);
   const frontend = fixture(t, 'frontend', {
     'src/app/page.tsx': 'import { HomePage } from "@/components/pages/HomePage"; export default function Route(){return <HomePage/>}\n',
     'src/components/pages/HomePage/index.tsx': 'export const HomePage=()=> <main/>\n',
@@ -451,8 +463,11 @@ test('declared Grammar contract binds public code, style entry, peers, and produ
   fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
   const valid = check(root);
   assert.equal(valid.ok, true, JSON.stringify(valid, null, 2));
-  assert.deepEqual(valid.coverage, { ownerPublicApi: { status: 'checked', declarations: 0 },
-    grammarContract: { status: 'checked', package: '@fixture/grammar' } });
+  assert.deepEqual(valid.coverage.ownerPublicApi, { status: 'checked', declarations: 0 });
+  assert.deepEqual(valid.coverage.grammarContract, { status: 'checked', package: '@fixture/grammar' });
+  for (const ruleId of ['ARCH_OWNER_EXPORT_BYPASS', 'ARCH_OWNER_EXPORT_STAR', 'ARCH_GRAMMAR_EXPORT_BYPASS', 'ARCH_GRAMMAR_CONTRACT_INVALID']) {
+    assert.ok(valid.coverage.checkedRuleIds.includes(ruleId));
+  }
 
   fs.writeFileSync(path.join(root, 'src/components/pages/ProductPage/shadow.ts'), 'export const direct=require("@fixture/grammar/private")\n');
   const realRequireBypass = check(root);
