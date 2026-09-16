@@ -52,9 +52,14 @@ guidance:
       scripts while the same Compose-owned dependencies remain managed. Bind each package to a
       repository role, immutable revision, package root, private generated env file, host ports and
       readiness. Bind container applications to the same source revision plus exact context,
-      Dockerfile and package inputs. Native connections use loopback and published dependency ports;
+      Dockerfile and package inputs, and require loopback published-port readiness or an enabled
+      Compose healthcheck. The selected native env file must already exist as a regular non-link file;
+      its contents stay unread. Ports stay within 1..65535; HTTP(S) readiness uses an absolute path
+      and TCP readiness an empty path. Native connections use loopback and published dependency ports;
       container connections use service DNS and container ports. Profiles must be mutually exclusive,
-      may reuse the same intended host ports only across profiles, and must not print env contents.
+      use one exact exclusive group for the closed inventory, may reuse the same intended host ports
+      only across profiles, and must not print env contents. Every named volume on a selected stateful
+      service has one custody/backup declaration and no other selected service mounts it.
   - id: STACK-SECRETS
     requirement: |
       Keep encrypted artifacts and public recipient metadata versioned. Store the decryption

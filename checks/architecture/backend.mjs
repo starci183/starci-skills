@@ -23,8 +23,9 @@ function appSource(config, fileName) {
     if (!isInside(appRoot, fileName)) continue;
     const parts = relativePath(appRoot, fileName).split('/');
     const sourceIndex = parts.indexOf('src');
-    if (sourceIndex < 1) return null;
-    return { appRoot, relative: parts.slice(sourceIndex + 1).join('/') };
+    if (sourceIndex >= 0) return { appRoot, relative: parts.slice(sourceIndex + 1).join('/') };
+    if (path.basename(appRoot).toLowerCase() === 'src') return { appRoot, relative: parts.join('/') };
+    return null;
   }
   return null;
 }
@@ -87,7 +88,9 @@ export function checkBackend(config, context) {
   const isApp = file => Boolean(appSource(config, file));
   for (const sourceFile of context.files) {
     const fileName = path.resolve(sourceFile.fileName);
-    const app = appSource(config, fileName);
+    const fromModules = insideAny(moduleRoots, fileName);
+    const fromFeatures = insideAny(featureRoots, fileName);
+    const app = !fromModules && !fromFeatures ? appSource(config, fileName) : null;
     if (app) {
       const evidence = roleEvidence(context.ts, sourceFile);
       if (evidence) {
@@ -107,8 +110,6 @@ export function checkBackend(config, context) {
         });
       }
     }
-    const fromModules = insideAny(moduleRoots, fileName);
-    const fromFeatures = insideAny(featureRoots, fileName);
     if (!fromModules && !fromFeatures) continue;
     for (const edge of context.edges.get(fileName) ?? []) {
       if (fromModules) {

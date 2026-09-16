@@ -37,12 +37,13 @@ function dualProfileFixture(t,selected='docker-apps'){
   fs.writeFileSync(path.join(sourceRoot,'apps','api','package.json'),JSON.stringify({private:true,scripts:{dev:'node src/main.mjs'}}));
   fs.writeFileSync(path.join(sourceRoot,'apps','api','Dockerfile'),'FROM scratch\n');
   fs.writeFileSync(path.join(sourceRoot,'apps','api','src','main.mjs'),'export {}\n');
+  fs.mkdirSync(path.join(f.root,'.stacks','dev','runtime'),{recursive:true});fs.writeFileSync(path.join(f.root,'.stacks','dev','runtime','api.env'),'# generated private env fixture\n');
   const revision='a'.repeat(40),dbImage=`postgres@sha256:${'b'.repeat(64)}`;
   f.manifest.sources=[{id:'backend',repositoryRole:'backend',rootRef:'BACKEND_SOURCE_ROOT',revision}];
   f.manifest.environments.dev.components.api={ownership:'managed',failureDomain:'selected-dev-profile'};
   f.manifest.environments.dev.profiles={
     'docker-apps':{exclusiveGroup:'dev-app-runtime',components:{
-      api:{mode:'docker-service',service:'api',source:'backend',sourceRoot:'apps/api',build:{context:'.',dockerfile:'apps/api/Dockerfile',inputs:['package.json','apps/api']},ports:[{name:'http',host:3068,container:3068}],connections:[{component:'db',variable:'DATABASE_HOST',host:'db',port:5432}]},
+      api:{mode:'docker-service',service:'api',source:'backend',sourceRoot:'apps/api',build:{context:'.',dockerfile:'apps/api/Dockerfile',inputs:['package.json','apps/api']},readiness:{scheme:'http',host:'127.0.0.1',port:3068,path:'/health'},ports:[{name:'http',host:3068,container:3068}],connections:[{component:'db',variable:'DATABASE_HOST',host:'db',port:5432}]},
       db:{mode:'docker-service',service:'db',image:dbImage,ports:[{name:'postgres',host:5432,container:5432}],storage:[{volume:'db-data',custody:'application-owner encrypted backup',backupRef:'dev-backup/postgres'}]},
       mail:{mode:'external',owner:'developer',failureDomain:'provider-account',endpointRef:'MAIL_URL'},
     }},
@@ -162,7 +163,6 @@ test('checks Docker-app and host-native dev profiles against one immutable split
   const docker=dualProfileFixture(t,'docker-apps'),dockerResult=docker.check();
   assert.equal(dockerResult.ok,true,JSON.stringify(dockerResult.errors,null,2));assert.equal(dockerResult.profile,'docker-apps');
   const native=dualProfileFixture(t,'native-apps');
-  fs.mkdirSync(path.join(native.root,'.stacks','dev','runtime'),{recursive:true});
   fs.writeFileSync(path.join(native.root,'.stacks','dev','runtime','api.env'),'PRIVATE_SENTINEL=never-echo-this\n');
   const nativeResult=native.check();assert.equal(nativeResult.ok,true,JSON.stringify(nativeResult.errors,null,2));assert.equal(nativeResult.profile,'native-apps');
   assert.equal(JSON.stringify(nativeResult).includes('PRIVATE_SENTINEL'),false,'checker never reads or returns native env contents');
@@ -193,4 +193,51 @@ test('rejects mutable dependency images, anonymous state, and rendered build-con
 test('validates closure for unselected profiles without claiming their runtime was checked',t=>{
   const f=dualProfileFixture(t,'docker-apps');delete f.manifest.environments.dev.profiles['native-apps'].components.mail;f.write();
   const result=f.check();assert.ok(result.errors.some(item=>item.code==='schema-policy-invalid'&&item.path.includes('native-apps.components.mail')));
+});
+
+test('selected native profile requires an existing private env file and one shared exclusive group',t=>{
+  const f=dualProfileFixture(t,'native-apps');fs.rmSync(path.join(f.root,'.stacks','dev','runtime','api.env'));
+  f.manifest.environments.dev.profiles['native-apps'].exclusiveGroup='different-runtime-group';f.write();
+  const codes=f.check().errors.map(item=>item.code);
+  assert.ok(codes.includes('native-env-unavailable'),codes.join(','));
+  assert.ok(codes.includes('schema-policy-invalid'),codes.join(','));
+});
+
+test('native host connections use target host ports and docker-to-host routing fails closed',t=>{
+  const f=dualProfileFixture(t,'native-apps'),source=f.sourceRoot;
+  fs.mkdirSync(path.join(source,'apps','web','src'),{recursive:true});fs.writeFileSync(path.join(source,'apps','web','package.json'),JSON.stringify({private:true,scripts:{dev:'node src/main.mjs'}}));
+  fs.writeFileSync(path.join(source,'apps','web','Dockerfile'),'FROM scratch\n');fs.writeFileSync(path.join(source,'apps','web','src','main.mjs'),'export {}\n');
+  fs.writeFileSync(path.join(f.root,'.stacks','dev','runtime','web.env'),'# generated private env fixture\n');
+  f.manifest.components.push({id:'web',role:'frontend',required:true});
+  f.manifest.sources.push({id:'frontend',repositoryRole:'frontend',rootRef:'FRONTEND_SOURCE_ROOT',revision:f.revision});
+  f.manifest.environments.dev.components.web={ownership:'managed',failureDomain:'selected-dev-profile'};
+  f.manifest.environments.vps.components.web={ownership:'external',owner:'future-vps-release',failureDomain:'vps-release',endpointRef:'WEB_URL'};
+  f.manifest.environments.dev.profiles['docker-apps'].components.web={mode:'docker-service',service:'web',source:'frontend',sourceRoot:'apps/web',build:{context:'.',dockerfile:'apps/web/Dockerfile',inputs:['package.json','apps/web']},readiness:{scheme:'http',host:'127.0.0.1',port:3067,path:'/health'},ports:[{name:'http',host:3067,container:3067}]};
+  f.manifest.environments.dev.profiles['native-apps'].components.web={mode:'host-process',source:'frontend',sourceRoot:'apps/web',command:'dev',envFile:'.stacks/dev/runtime/web.env',readiness:{scheme:'http',host:'127.0.0.1',port:3067,path:'/health'},ports:[{name:'http',host:3067}],connections:[{component:'api',variable:'API_HOST',host:'wrong-host',port:9999}]};
+  f.model['x-starci-sources'].frontend={root:source,revision:f.revision};f.write();
+  let codes=f.check().errors.map(item=>item.code);assert.ok(codes.includes('native-connection-invalid'),codes.join(','));
+  const web=f.manifest.environments.dev.profiles['native-apps'].components.web;
+  Object.assign(web,{mode:'docker-service',service:'web',build:{context:'.',dockerfile:'apps/web/Dockerfile',inputs:['package.json','apps/web']}});
+  f.model.services.web={build:{context:source,dockerfile:'apps/web/Dockerfile'},ports:['3067:3067']};f.write();
+  codes=f.check().errors.map(item=>item.code);assert.ok(codes.includes('profile-connection-mode-unsupported'),codes.join(','));
+});
+
+test('custodied state volume cannot also be mounted by another selected-profile service',t=>{
+  const f=dualProfileFixture(t,'docker-apps');f.model.services.api.volumes=['db-data:/copied-db'];f.write();
+  assert.ok(f.check().errors.some(item=>item.code==='profile-volume-owner-mismatch'));
+});
+
+test('all named stateful volumes require custody and backup declarations',t=>{
+  const f=dualProfileFixture(t,'docker-apps');f.model.volumes['untracked-data']={};f.model.services.db.volumes.push('untracked-data:/other-state');f.write();
+  assert.ok(f.check().errors.some(item=>item.code==='stateful-volume-uncustodied'));
+});
+
+test('ports and readiness syntax fail closed and Docker applications expose a readiness contract',t=>{
+  const f=dualProfileFixture(t,'docker-apps'),api=f.manifest.environments.dev.profiles['docker-apps'].components.api;
+  api.ports[0].host=-1;api.ports[0].container=-1;api.readiness={scheme:'http',host:'127.0.0.1',port:-1,path:''};f.write();
+  let codes=f.check().errors.map(item=>item.code);assert.ok(codes.includes('schema-policy-invalid'),codes.join(','));assert.ok(codes.includes('docker-readiness-missing'),codes.join(','));
+  api.ports=[{name:'http',host:3068,container:3068}];delete api.readiness;f.model.services.api.ports=['3068:3068'];f.write();
+  codes=f.check().errors.map(item=>item.code);assert.ok(codes.includes('docker-readiness-missing'),codes.join(','));
+  f.model.services.api.healthcheck={test:['CMD','node','health.js']};f.write();
+  assert.equal(f.check().errors.some(item=>item.code==='docker-readiness-missing'),false);
 });
