@@ -716,8 +716,9 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
     then live in the owner repository, while code, checks and code commits stay in this worktree. A node that
     names no repository belongs to the side its layout sits in, so implementation/frontend/** is never a
     backend job's work and implementation/backend/** is never a frontend's.
-  node bin/starci.mjs workflow-answer --id <workflow-id> --op <decision.prepare-or-provision.ask-op> [--choice <n>] [--note "<answer>"] [--host <path-to-.claude>] [--worktree <relative-path>]
+  node bin/starci.mjs workflow-answer --id <workflow-id> --op <decision.prepare-or-provision.ask-op> [--choice <n>] [--note "<answer>"] [--envelope '<json>' | --envelope-file <file>] [--host <path-to-.claude>] [--worktree <relative-path>]
     the owner's answer to a question the kernel prepared (needUser kind 'decision'): the option number and/or a note; the answer reaches the paused operation in its next contract.
+    --envelope carries the typed answer {"questionId","digest","goalRev","answers":{<field id>:<option id | [ids] | text | yes/no>}}; an answer outside the offered options is rejected and the question is asked again.
   node bin/starci.mjs workflow-approve --id <workflow-id> [--allocation <runtime=slots,...>] [--allow-dynamic N] [--accept-critique "<reason>"] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     --accept-critique is the owner overriding a goal critique that answered refuse: the reason is recorded and
     the kernel never asks for it again.

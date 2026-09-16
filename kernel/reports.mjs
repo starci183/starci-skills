@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {recordForQuestion} from './ask.mjs';
 
 /**
  * Typed outcome envelopes for the supervision protocol (4.1). An operation or a workflow ends with
@@ -32,8 +33,13 @@ export function signalFor(outcome){
 }
 
 /** Build and validate one report; throws on a contract violation so an invalid report is never written or sent. */
-export function buildReport({kind='op',outcome,run,task,dispatch,from,summary,files=[],checks=[],open=[],question=null,blocker=null,credentialRequest=null,branch=null,head=null,gates=[],observations=[],reportedAt=Date.now()}){
+export function buildReport({kind='op',outcome,run,task,dispatch,from,summary,files=[],checks=[],open=[],question=null,blocker=null,credentialRequest=null,branch=null,head=null,gates=[],observations=[],goalRev=null,reportedAt=Date.now()}){
   need(['op','workflow'].includes(kind),`Unsupported report kind: ${kind}`);
+  const asked=question?{text:text(question.text,'question text'),options:Array.isArray(question.options)?list(question.options,'question options'):[],
+    // `mechanical` (which runtime, retry, a format) is the kernel's to answer; anything else is the owner's.
+    ...(typeof question.kind==='string'&&question.kind.trim()?{kind:question.kind.trim()}:{}),
+    // The typed record travels with the report; the kernel re-issues it bound to the current goal revision.
+    typed:recordForQuestion(question,{questionId:`${task}:${dispatch}`,goalRev,context:{run,task,dispatch,from}})}:null;
   const report={
     schema:kind==='op'?OP_REPORT:WORKFLOW_REPORT,kind,outcome:text(outcome,'outcome'),
     run:text(run,'run id'),task:text(task,'task id'),dispatch:text(dispatch,'dispatch id'),from:text(from,'reporting terminal'),
@@ -43,9 +49,7 @@ export function buildReport({kind='op',outcome,run,task,dispatch,from,summary,fi
       need(plain(check)&&typeof check.name==='string'&&typeof check.command==='string'&&Number.isInteger(check.exitCode),'Each check needs name, command and an integer exitCode');
       return {name:check.name,command:check.command,exitCode:check.exitCode,evidence:typeof check.evidence==='string'?check.evidence.slice(0,400):null};
     }),
-    open:list(open,'open items'),question:question?{text:text(question.text,'question text'),options:Array.isArray(question.options)?list(question.options,'question options'):[],
-      // `mechanical` (which runtime, retry, a format) is the kernel's to answer; anything else is the owner's.
-      ...(typeof question.kind==='string'&&question.kind.trim()?{kind:question.kind.trim()}:{})}:null,
+    open:list(open,'open items'),question:asked,
     blocker:blocker?{kind:text(blocker.kind,'blocker kind'),detail:text(blocker.detail,'blocker detail')}:null,
     ...(credentialRequest!==null?{credentialRequest}:{}),
     branch:branch?text(branch,'branch'):null,head:head?text(head,'head'):null,gates:gates.map(gate=>{need(plain(gate)&&typeof gate.name==='string'&&typeof gate.status==='string','Each gate needs name and status');return {name:gate.name,status:gate.status};}),

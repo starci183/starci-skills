@@ -52,6 +52,7 @@ hosts/orca/launch.mjs
 hosts/orca/protocol.mjs
 hosts/orca/observe.mjs
 kernel/reports.mjs
+kernel/ask.mjs
 kernel/source-staleness.mjs
 kernel/audit.mjs
 models/functions.mjs
