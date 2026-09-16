@@ -44,6 +44,7 @@ machine checks (read-only; they judge bytes, not claims):
   render check <ui node dir> --brand <work root>    a provenance-marked browser capture against its kept markup (not ImageGen direction proof)
   brand check <work root> [--source <repo root>]    a brand record against the sources it names
   architecture check <repo root> [--config <repository-relative.json>]    TypeScript-resolved BE/FE dependency and composition boundaries
+  check-stales --work <work root> --repo <id>=<git root> [--target <node id>]    deterministic Work/source freshness report; no repair
   stacks check <repo root> --environment dev|vps --deployment-model <rendered.yaml-or-json>    static whole-app stack conformance
 `;
 

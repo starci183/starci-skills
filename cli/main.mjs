@@ -38,6 +38,7 @@ Usage:
   starci storage <backend-root>
   starci source-layout <backend-root> <frontend-root>
   starci architecture check <repo-root> [--config <repository-relative.json>]
+  starci check-stales --work <work-root> --repo <id>=<git-root> [--repo ...] [--target <node-id> ...]
   starci stacks check <repo-root> --environment dev|vps --deployment-model <rendered.yaml-or-json>
   starci validate <work-root>
   starci identity set <slug> --name <VAR> [--work-root <path>] [--expected-write-revision <revision|none>]   (the value is read from stdin, never printed)
@@ -177,6 +178,10 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
   try {
     const [command, ...args] = argv;
     if (!command || ['--help', '-h', 'help'].includes(command)) { emit(help); return 0; }
+    if(command==='check-stales'){
+      const {checkStalesMain}=await import('../scripts/check-stales.mjs');
+      const result=checkStalesMain(args);emit(result.report.help??result.report);return result.exitCode;
+    }
     if(command==='architecture'){
       const [action,repoRoot,...rest]=args;
       if(action!=='check'||!repoRoot||repoRoot.startsWith('--'))throw Error('Use starci architecture check <repo-root> [--config <repository-relative.json>].');

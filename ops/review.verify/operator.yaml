@@ -1140,7 +1140,7 @@ executionModes:
       - reads: [request, scanner, subjects]
         writes: [evidence]
         action:
-          en: Run starci check-stales in canonical Work mode with explicit repository bindings and the selected target closure, or a separately accepted manifest mode. Capture stdout JSON and exit code. Do not replace execution with a model-written report, auto-refresh a baseline, translate unavailable input into clean, or rewrite completion hashes. Nonzero means findings or a scanner/input failure, not permission to repair. Bind every proposed repair to its actual owner and an existing effect grant; never auto-dispatch it. After a separately authorized repair an independent review operation runs the same script against current inputs and verifies the implementation's required tests. Script cleanliness alone does not complete product behavior or semantic review.
+          en: Run starci check-stales --work WORK --repo ID=ROOT with the actual canonical Work root, explicit repository bindings and optional --target IDs for the selected closure. Capture stdout JSON and exit code. Do not replace execution with a model-written report, auto-refresh a baseline, translate unavailable input into clean, or rewrite completion hashes. Nonzero means findings or a scanner/input failure, not permission to repair. Bind every proposed repair to its actual owner and an existing effect grant; never auto-dispatch it. After a separately authorized repair an independent review operation runs the same script against current inputs and verifies the implementation's required tests. Script cleanliness alone does not complete product behavior or semantic review.
     proofs:
       - id: executed-scanner
         requirement:
@@ -1195,7 +1195,7 @@ executionModes:
       - reads: [request, policy, inputs]
         writes: [evidence]
         action:
-          en: Execute starci architecture check for every selected FE/BE source project, starci validate for selected canonical Work, and starci stacks check for selected materialized stack profiles. Use documented explicit layout configuration when inference is insufficient. Capture each original JSON report and exit code. Do not run fix flags, hide files, lower rules or replace machine output with prose. An unavailable required checker or unresolved target fails the gate. Route measured findings to separately authorized owners; static pass never proves runtime dependency injection, live startup, browser UAT or business correctness.
+          en: Execute starci architecture check for every selected FE/BE source project, starci validate for selected canonical Work, and starci stacks check for selected materialized stack profiles. Inspect each selected repository's real package scripts and run its required non-mutating lint/typecheck commands; a script that auto-fixes source is not a checking command. Use documented explicit layout configuration when inference is insufficient. Capture each original report and exit code. Do not run fix flags, hide files, lower rules or replace machine output with prose. An unavailable required checker or unresolved target fails the gate. Route measured findings to separately authorized owners; static pass never proves runtime dependency injection, live startup, browser UAT or business correctness.
     proofs:
       - id: executed-checks
         requirement:
