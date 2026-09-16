@@ -375,14 +375,17 @@ profiles:
         status: implemented
       - id: NEST-CONTRACT-TYPE-FORM
         sourceRuleIds: [BE-TYPING-1, BE-TYPING-2, BE-TYPING-3, BE-TYPING-4, BE-NAMING-7]
-        applicability: { include: ['src/**/*.ts', 'apps/*/src/**/*.ts', 'libs/*/src/**/*.ts'], exclude: ['**/*.spec.ts'] }
+        applicability: { include: ['**/*.{ts,mts,cts,tsx}'], exclude: ['**/*.d.ts', '**/*.d.mts', '**/*.d.cts', '**/*.spec.{ts,mts,cts,tsx}', '**/*-spec.{ts,mts,cts,tsx}', '**/*.test.{ts,mts,cts,tsx}', '**/*-test.{ts,mts,cts,tsx}', '**/__tests__/**', 'test/**', 'tests/**'] }
         mechanical:
           requirement: Enforce explicit named public inputs/results, readonly dependency/message fields and adopted serialized enum/type-name forms.
-          check: { kind: eslint, ruleIds: [starci-be/public-contract-shape, starci-be/readonly-boundary, starci-be/public-enum-shape] }
+          check:
+            kind: architecture
+            ruleIds: [BE_PUBLIC_CONTRACT_FORM, BE_READONLY_BOUNDARY, BE_SOURCE_NAME_INVALID]
+            externalResult: { schema: 'starci/architecture-check@1', command: 'starci architecture check' }
         semantic:
           guidance: knowledge/patterns/be/typing.yaml
           review: Decide whether a value is public, extensible or transport-owned before selecting its type form.
-        status: missing
+        status: implemented
       - id: NEST-LEGACY-BARREL-GUARD
         sourceRuleIds: [BE-FOLDER-4, BE-IMPORTS-1, BE-IMPORTS-4]
         applicability: { include: ['src/**/*.ts', 'apps/*/src/**/*.ts', 'libs/*/src/**/*.ts'] }

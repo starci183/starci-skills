@@ -204,6 +204,8 @@ export async function checkScopedLint(root,inputs,{profile:profileName,profileCa
         if(needsRegistration&&result.coverage?.moduleRegistration?.status!=='checked'){complete=false;unavailable=true;report.issues.push({code:'ARCHITECTURE_MODULE_REGISTRATION_UNAVAILABLE',obligation:item.id});}
         if(needsLayout&&result.coverage?.backendSourceShape?.layout?.status!=='checked'){complete=false;unavailable=true;report.issues.push({code:'ARCHITECTURE_SOURCE_LAYOUT_UNAVAILABLE',obligation:item.id});}
         if(needsNaming&&result.coverage?.backendSourceShape?.naming?.status!=='checked'){complete=false;unavailable=true;report.issues.push({code:'ARCHITECTURE_SOURCE_NAMING_UNAVAILABLE',obligation:item.id});}
+        if(ids.has('BE_PUBLIC_CONTRACT_FORM')&&result.coverage?.backendContractTypeForm?.publicContracts?.status!=='checked'){complete=false;unavailable=true;report.issues.push({code:'ARCHITECTURE_PUBLIC_CONTRACT_UNAVAILABLE',obligation:item.id});}
+        if(ids.has('BE_READONLY_BOUNDARY')&&result.coverage?.backendContractTypeForm?.readonlyBoundaries?.status!=='checked'){complete=false;unavailable=true;report.issues.push({code:'ARCHITECTURE_READONLY_BOUNDARY_UNAVAILABLE',obligation:item.id});}
         item.coverage=complete?'covered':'uncovered';}}
   }
   const scriptObligations=report.obligations.filter(item=>item.coverage==='pending'&&item.machine.kind==='script');

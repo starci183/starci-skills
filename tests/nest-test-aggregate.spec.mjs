@@ -63,3 +63,36 @@ describe('SampleService',
   const mixed=await checkScopedLint(fixtureRoot,[],options);
   assert.equal(mixed.status,'unavailable');
 });
+
+test('listing contract rule IDs cannot conceal unavailable ownership or readonly coverage',async t=>{
+  const fixtureRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-contract-aggregate-'));
+  t.after(()=>{
+    assert.equal(path.dirname(path.resolve(fixtureRoot)),path.resolve(os.tmpdir()));
+    assert.ok(path.basename(fixtureRoot).startsWith('starci-contract-aggregate-'));
+    fs.rmSync(fixtureRoot,{recursive:true,force:true});
+  });
+  fs.mkdirSync(path.join(fixtureRoot,'src'));
+  const source=path.join(fixtureRoot,'src','service.ts');
+  fs.writeFileSync(source,'export class Service { run():void {} }');
+  const digest='a'.repeat(64),ruleIds=['BE_PUBLIC_CONTRACT_FORM','BE_READONLY_BOUNDARY'];
+  const profileCatalog={schema:'starci/code-pattern-profile@1',profiles:{nest:{title:'Contract integration',
+    canon:{package:'@starci/eslint-canon-be',version:'1.2.1',contentDigest:{algorithm:'sha256',include:['**/*.mjs'],exclude:[],framing:'sorted-posix-relative-path-null-raw-bytes-null',value:digest,files:1}},
+    sourceRuleRoots:['knowledge/patterns/be'],expectedSourceRuleIds:['BE-TYPING-1'],sourceGlobs:['src/**/*.ts'],inputGlobs:[],
+    obligations:[{id:'NEST-CONTRACT-TYPE-FORM',sourceRuleIds:['BE-TYPING-1'],applicability:{include:['src/**/*.ts']},
+      mechanical:{requirement:'Require complete contract coverage.',check:{kind:'architecture',ruleIds}},
+      semantic:{guidance:'docs/nest-contract-check.md',review:'Review behavior separately.'},status:'implemented'}],semanticOnly:[],
+  }}};
+  const runtime={package:{name:'@starci/eslint-canon-be',version:'1.2.1',digest,files:1},canon:{rules:{},recommended:{}},builtinRules:new Map(),typescriptRules:{},eslintVersion:'fixture',eslint:{
+    isPathIgnored:async()=>false,calculateConfigForFile:async()=>({linterOptions:{noInlineConfig:true},rules:{},plugins:{}}),
+    lintFiles:async()=>[{filePath:source,messages:[],suppressedMessages:[],errorCount:0,warningCount:0,fatalErrorCount:0}],
+  }};
+  const architecture=status=>({schema:'starci/architecture-check@1',ok:true,repository:fixtureRoot,kinds:['backend'],files:1,compiler:{version:'fixture'},violations:[],errors:[],
+    coverage:{sourceFiles:['src/service.ts'],checkedRuleIds:ruleIds,backendContractTypeForm:{publicContracts:{status},readonlyBoundaries:{status}}},limitations:['static'],
+  });
+  const options={profile:'nest',profileCatalog,runtime,all:true};
+  assert.equal((await checkScopedLint(fixtureRoot,[],{...options,architecture:()=>architecture('checked')})).status,'clean');
+  const blocked=await checkScopedLint(fixtureRoot,[],{...options,architecture:()=>architecture('unavailable')});
+  assert.equal(blocked.status,'unavailable');
+  assert.ok(blocked.issues.some(issue=>issue.code==='ARCHITECTURE_PUBLIC_CONTRACT_UNAVAILABLE'));
+  assert.ok(blocked.issues.some(issue=>issue.code==='ARCHITECTURE_READONLY_BOUNDARY_UNAVAILABLE'));
+});
