@@ -105,15 +105,26 @@ const row=cells=>`| ${cells.map(text).join(' | ')} |`;
 const bullets=items=>items.length?items.map(item=>`- ${text(item)}`).join('\n'):'- None';
 
 const storeRepoRoot=store=>path.dirname(path.dirname(path.dirname(path.dirname(store.dir))));
+function assertContinuationTarget(root,target){
+  const parts=path.relative(root,target).split(path.sep);let current=root;
+  for(const [index,part] of parts.entries()){
+    current=path.join(current,part);let stat;
+    try{stat=fs.lstatSync(current);}catch(error){if(error.code==='ENOENT')return;throw error;}
+    const leaf=index===parts.length-1;
+    if(stat.isSymbolicLink()||(leaf?!stat.isFile():!stat.isDirectory())||(leaf&&stat.size>1024*1024))
+      throw Error('Public continuation must use real directories and a bounded regular Markdown file, never a link');
+  }
+}
 export function bindContinuationPath(store,state=null){
   const root=storeRepoRoot(store),workflows=path.join(root,'workflows'),id=String(state?.id??store.id??'');
   const explicit=state?.continuation?.publicFile??state?.continuationFile??null;
   if(typeof explicit==='string'&&explicit.trim()){
     const target=path.resolve(root,explicit),relative=path.relative(workflows,target);
     if(relative.startsWith('..')||path.isAbsolute(relative)||path.extname(target).toLowerCase()!=='.md')throw Error('Public continuation binding must be a Markdown file under workflows/');
-    store.paths.continuation=target;return target;
+    assertContinuationTarget(root,target);store.paths.continuation=target;return target;
   }
   const canonical=path.join(workflows,`${id}.md`);
+  assertContinuationTarget(root,canonical);
   if(fs.existsSync(canonical)){store.paths.continuation=canonical;return canonical;}
   // Friendly briefs need an explicit identity declaration. A goal index can mention many workflow IDs and
   // must never become a workflow's checkpoint just because its prose (or an old generated section) names one.
@@ -131,7 +142,7 @@ export function bindContinuationPath(store,state=null){
       return body.startsWith(`<!-- ${CONTINUATION_BRIEF} -->\n# Workflow continuation: ${id}\n`)||body.startsWith(`<!-- ${CONTINUATION_BRIEF} -->\r\n# Workflow continuation: ${id}\r\n`);
     }catch{return false;}
   });}catch{matched=[];}
-  store.paths.continuation=matched.length===1?matched[0]:canonical;return store.paths.continuation;
+  store.paths.continuation=matched.length===1?matched[0]:canonical;assertContinuationTarget(root,store.paths.continuation);return store.paths.continuation;
 }
 export function continuationPath(store,state=null){return bindContinuationPath(store,state);}
 

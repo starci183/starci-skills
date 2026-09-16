@@ -46,3 +46,20 @@ test('conflicting identity declarations and malformed generated sections do not 
   write('malformed.md',`${CONTINUATION_SECTION_START}\nWorkflow ID: wf-one\n`);
   assert.equal(bindContinuationPath(store,{id:'wf-one'}),canonical);
 });
+
+test('canonical and explicit bindings reject non-files and oversized human briefs before reading them',t=>{
+  const {store,write,canonical}=fixture(t);
+  fs.mkdirSync(canonical);
+  assert.throws(()=>bindContinuationPath(store,{id:'wf-one'}),/bounded regular Markdown/);
+  fs.rmdirSync(canonical);write('large.md','x'.repeat(1024*1024+1));
+  assert.throws(()=>bindContinuationPath(store,{id:'wf-one',continuationFile:'workflows/large.md'}),/bounded regular Markdown/);
+});
+
+test('a linked continuation parent cannot read external notes through canonical or explicit bindings',t=>{
+  const {store}=fixture(t),folder=path.dirname(store.paths.continuation),outside=path.join(path.dirname(folder),'outside');
+  fs.mkdirSync(outside);fs.writeFileSync(path.join(outside,'wf-one.md'),'External text must remain outside the public brief.');
+  fs.rmdirSync(folder);fs.symlinkSync(outside,folder,process.platform==='win32'?'junction':'dir');
+  assert.throws(()=>bindContinuationPath(store,{id:'wf-one'}),/never a link/);
+  assert.throws(()=>bindContinuationPath(store,{id:'wf-one',continuationFile:'workflows/wf-one.md'}),/never a link/);
+  assert.equal(fs.readFileSync(path.join(outside,'wf-one.md'),'utf8'),'External text must remain outside the public brief.');
+});
