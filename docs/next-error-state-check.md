@@ -73,7 +73,7 @@ The target `package.json` owns `starci.codePatterns.next.errorState`:
 }
 ```
 
-Paths are normalized repository-relative regular files and every named export is resolved through the owning TypeScript program. The parent may supply the canonical architecture config; direct invocation may use inferred project authority, which is recorded with a null config path and the resolved project list. `contextFiles` accepts the aggregate's exact mixed source/metadata inventory and may overlap selected source; the checker validates every path, forms one deduplicated source context internally, and preserves `files` as the exact requested result set. All owning-program sources below `sourceRoots` must appear in that selected/context source set; otherwise omission detection is unavailable and the check fails closed.
+Paths are normalized repository-relative regular files and every named export is resolved through the owning TypeScript program. The parent may supply the canonical architecture config; direct invocation may use inferred project authority, which is recorded with a null config path and the resolved project list. `contextFiles` accepts the aggregate's exact mixed source/metadata inventory and may overlap selected source. The optional `sourceContextFiles` role set identifies which of those bound context paths are production source; every entry must also be selected or present in `contextFiles`. Other context remains validated and fingerprinted metadata without becoming application code merely because it uses a TypeScript extension. When the role set is absent, standalone use derives production context from the canonical TypeScript program and declared `sourceRoots`. All owning-program production sources below those roots must appear in the selected/source-context set; otherwise omission detection fails closed.
 
 `transports` records whether a selected root uses a typed envelope or throws transport failures. A throwing-only inventory needs no invented envelope. Empty world-state, feedback-write, or Next-boundary declarations are checked only when source inventory supports absence: resolved world/transport calls or an undeclared reserved `error.tsx`/`global-error.tsx` make coverage unavailable. This absence proof does not decide whether an existing write deserves user feedback; that selection remains design review. The checker binds whichever feedback helper the project declares and does not require a generic `runGraphQL` name, GraphQL, a toast, or an additional network wrapper.
 
@@ -82,7 +82,7 @@ Paths are normalized repository-relative regular files and every named export is
 The uniform adapter is:
 
 ```js
-checkNextErrors({ root, files, contextFiles, ruleIds, architectureConfig })
+checkNextErrors({ root, files, contextFiles, sourceContextFiles, ruleIds, architectureConfig })
 ```
 
 It returns `starci/code-pattern-script@1`. `checkedRuleIds` stays empty when contract, compiler, installed Next or static source proof is unavailable.

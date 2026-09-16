@@ -89,7 +89,7 @@ function identity(input, label) {
   return { path: relative, export: input.export };
 }
 
-function parseContract(repository, bound) {
+function readContract(repository) {
   const manifest = regular(repository, 'package.json', 'Next code-pattern manifest');
   const parsed = JSON.parse(fs.readFileSync(manifest, 'utf8'));
   const contract = parsed?.starci?.codePatterns?.next?.errorState;
@@ -99,6 +99,11 @@ function parseContract(repository, bound) {
   if (new Set(sourceRoots).size !== sourceRoots.length || sourceRoots.some((root, index) => sourceRoots.some((other, otherIndex) => index !== otherIndex && (root.startsWith(`${other}/`) || other.startsWith(`${root}/`))))) {
     throw Error('errorState.sourceRoots must be unique and nonoverlapping.');
   }
+  return { contract, sourceRoots };
+}
+
+function parseContract(repository, bound, document = readContract(repository)) {
+  const { contract, sourceRoots } = document;
   const seenIds = new Set();
   const bind = (value, label) => {
     const item = identity(value, label);
@@ -220,9 +225,10 @@ function parseContract(repository, bound) {
 
 function projectFor(context, repository, relative) {
   const absolute = key(path.resolve(repository, relative));
-  const owners = context.projects.filter(project => project.program.getRootFileNames().some(file => key(file) === absolute));
+  const sourceFor = project => project.program.getSourceFiles().find(file => key(file.fileName) === absolute);
+  const owners = context.projects.filter(project => sourceFor(project));
   if (!owners.length || new Set(owners.map(project => stableCompiler(project.options))).size !== 1) throw Error(`Source needs one compatible owning TypeScript project: ${relative}`);
-  const source = owners[0].program.getSourceFile(path.resolve(repository, relative));
+  const source = sourceFor(owners[0]);
   if (!source || owners[0].program.getSyntacticDiagnostics(source).length) throw Error(`Source is not syntactically valid: ${relative}`);
   return { project: owners[0], source, checker: owners[0].program.getTypeChecker(), ts: context.ts };
 }
@@ -1311,19 +1317,51 @@ function checkBoundary(entry, env, result, next) {
   if (entry.role === 'global' && (!html || !body)) add(fn, 'A global Next error boundary renders its required html and body shell.');
 }
 
+function programSourceFiles(context, repository) {
+  const files = new Set();
+  for (const project of context.projects) for (const source of project.program.getSourceFiles()) {
+    if (source.isDeclarationFile) continue;
+    const absolute = path.resolve(source.fileName);
+    if (!isInside(repository, absolute)) continue;
+    const relative = slash(path.relative(repository, absolute));
+    if (SOURCE.test(relative) && !TEST_SOURCE.test(relative)) files.add(relative);
+  }
+  return files;
+}
+
+function insideSourceRoots(relative, roots) {
+  return roots.some(root => relative === root || relative.startsWith(`${root}/`));
+}
+
 /** Check explicitly selected Next error-state contracts without running application code. */
-export function checkNextErrors({ root, files, ruleIds, contextFiles = [], architectureConfig } = {}) {
+export function checkNextErrors({ root, files, ruleIds, contextFiles = [], sourceContextFiles, architectureConfig } = {}) {
   const result = { schema: 'starci/code-pattern-script@1', repository: '', files: [], requestedRuleIds: ruleIds ?? [], checkedRuleIds: [], violations: [], errors: [], compiler: null };
   try {
     const repository = fs.realpathSync(path.resolve(root)); result.repository = repository;
     if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length || files.some(file => !SOURCE.test(file))) throw Error('Exact unique selected Next source files are required.');
     if (!Array.isArray(contextFiles) || new Set(contextFiles).size !== contextFiles.length) throw Error('Next context files must be an exact unique array.');
+    if (sourceContextFiles !== undefined && (!Array.isArray(sourceContextFiles) || new Set(sourceContextFiles).size !== sourceContextFiles.length
+      || sourceContextFiles.some(file => typeof file !== 'string' || !SOURCE.test(file) || TEST_SOURCE.test(file)))) throw Error('Next sourceContextFiles must be an exact unique production-source path array when supplied.');
     if (!Array.isArray(ruleIds) || !ruleIds.length || new Set(ruleIds).size !== ruleIds.length || ruleIds.some(id => !NEXT_ERROR_RULES.includes(id))) throw Error('Unique supported Next error-state rule IDs are required.');
     for (const relative of files) regular(repository, relative, 'Selected Next error-state source');
     for (const relative of contextFiles) regular(repository, relative, 'Next error-state context');
-    const bound = new Set([...files, ...contextFiles.filter(file => SOURCE.test(file))]);
-    const contract = parseContract(repository, bound), config = loadArchitectureConfig(repository, architectureConfig), context = buildTypeScriptContext(config);
+    const available = new Set([...files, ...contextFiles]);
+    if (sourceContextFiles !== undefined && sourceContextFiles.some(file => !available.has(file))) throw Error('Every Next sourceContextFiles path must also be selected or present in contextFiles.');
+    const document = readContract(repository), config = loadArchitectureConfig(repository, architectureConfig), context = buildTypeScriptContext(config);
     if (context.errors.length) throw Error(context.errors.map(error => error.message).join('; '));
+    const coverageRoots = [...new Set([
+      ...document.sourceRoots,
+      ...(ruleIds.includes('FE_NEXT_ERROR_BOUNDARY_LOCATION') ? config.frontend.routes : []),
+    ])];
+    const programSources = programSourceFiles(context, repository);
+    const ownedSources = new Set([...programSources].filter(relative => insideSourceRoots(relative, coverageRoots)));
+    const sourceContext = sourceContextFiles === undefined
+      ? contextFiles.filter(relative => ownedSources.has(relative))
+      : sourceContextFiles;
+    const bound = new Set([...files, ...sourceContext]);
+    const contract = parseContract(repository, bound, document);
+    const missing = [...ownedSources].filter(relative => !bound.has(relative));
+    if (missing.length) throw Error(`errorState.sourceRoots coverage is incomplete; bind every owning-program source (${missing.slice(0, 4).join(', ')}${missing.length > 4 ? ', …' : ''}).`);
     const explicitArchitectureConfig = architectureConfig === undefined || architectureConfig === null ? null : exactRelative(architectureConfig, 'architectureConfig');
     if (explicitArchitectureConfig) regular(repository, explicitArchitectureConfig, 'Architecture config authority');
     result.compiler = {
@@ -1331,19 +1369,8 @@ export function checkNextErrors({ root, files, ruleIds, contextFiles = [], archi
       resolved: context.loaded.resolved,
       architectureConfig: explicitArchitectureConfig,
       projects: [...config.projects].sort(),
-      metadataFiles: [...new Set(contextFiles.filter(file => !SOURCE.test(file)))].sort(),
+      metadataFiles: contextFiles.filter(file => !bound.has(file)).sort(),
     };
-    const coverageRoots = [...new Set([
-      ...contract.sourceRoots,
-      ...(ruleIds.includes('FE_NEXT_ERROR_BOUNDARY_LOCATION') ? config.frontend.routes : []),
-    ])];
-    const covered = new Set();
-    for (const project of context.projects) for (const file of project.program.getRootFileNames()) {
-      const relative = slash(path.relative(repository, file));
-      if (SOURCE.test(relative) && coverageRoots.some(root => relative === root || relative.startsWith(`${root}/`))) covered.add(relative);
-    }
-    const missing = [...covered].filter(relative => !bound.has(relative));
-    if (missing.length) throw Error(`errorState.sourceRoots coverage is incomplete; bind every owning-program source (${missing.slice(0, 4).join(', ')}${missing.length > 4 ? ', …' : ''}).`);
     const env = { repository, bound, contract, config, context };
     const surfaceInventory = sourceSurfaceInventory(env);
     const unavailable = (ruleId, message) => result.errors.push({ ruleId, path: null, line: null, column: null, message });
