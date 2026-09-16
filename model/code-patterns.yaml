@@ -360,28 +360,32 @@ profiles:
           guidance: knowledge/patterns/be/typing.yaml
           review: Decide whether a value is public, extensible or transport-owned before selecting its type form.
         status: missing
-      - id: NEST-LEGACY-BARREL-RULES
+      - id: NEST-LEGACY-BARREL-GUARD
         sourceRuleIds: [BE-FOLDER-4, BE-IMPORTS-1, BE-IMPORTS-4]
         applicability: { include: ['src/**/*.ts'] }
         mechanical:
-          requirement: Use explicit owner public entries under the adopted architecture.
-          check: { kind: eslint, ruleIds: [starci-be/must-deep-module-import, starci-be/no-folder-reexport] }
+          requirement: Keep legacy private-file and no-public-entry heuristics explicitly disabled while the owner public-entry architecture check enforces the adopted boundary.
+          check:
+            kind: eslint
+            ruleIds: [starci-be/must-deep-module-import, starci-be/no-folder-reexport]
+            expected: { severity: off }
         semantic:
           guidance: docs/backend-source-pattern.md
-          review: None; the machine conflicts with the adopted public-entry rule.
-        status: conflict
-        conflict: These legacy rules require private declaring-file imports and reject index public entries; they cannot certify the adopted owner API.
-      - id: NEST-HANDLER-TWIN-COUNT
+          review: Confirm the replacement NEST-OWNER-PUBLIC-ENTRY architecture obligation is configured for every applicable owner.
+        status: implemented
+      - id: NEST-HANDLER-TWIN-COUNT-GUARD
         sourceRuleIds: [BE-FOLDER-7, BE-TEST-1]
         applicability: { include: ['src/**/*.handler.ts'] }
         mechanical:
-          requirement: Tests follow actual behavior/risk, not a filename count.
-          check: { kind: eslint, ruleIds: [starci-be/handler-has-twin-spec] }
+          requirement: Keep the filename-count twin heuristic explicitly disabled; test selection follows actual behavior and risk.
+          check:
+            kind: eslint
+            ruleIds: [starci-be/handler-has-twin-spec]
+            expected: { severity: off }
         semantic:
           guidance: knowledge/patterns/be/test.yaml
           review: Select meaningful handler/use-case proof from effects.
-        status: conflict
-        conflict: The available rule is off and requires a twin by filename; current standard rejects count-only test requirements.
+        status: implemented
     semanticOnly:
       - id: NEST-COHESIVE-ORCHESTRATION
         sourceRuleIds: [BE-FUNCTION-3, BE-FUNCTION-7, BE-TYPING-6]
@@ -697,17 +701,19 @@ profiles:
           guidance: knowledge/patterns/fe/test.yaml
           review: Connected/pure test responsibilities apply only when production owns that meaningful split.
         status: missing
-      - id: NEXT-LEGACY-BLOCK-TWIN
+      - id: NEXT-LEGACY-BLOCK-TWIN-GUARD
         sourceRuleIds: [FE-ARCHITECTURE-3, FE-FUNCTION-4, FE-TEST-1]
         applicability: { include: ['src/components/blocks/**/index.tsx'] }
         mechanical:
-          requirement: Apply the adopted conditional world-owner boundary across configured owners without manufacturing twins for intrinsic state.
-          check: { kind: eslint, ruleIds: [starci-fe/connected-block-has-presentational-twin, starci-fe/no-resting-twin-component, starci-fe/no-resting-branch-at-call-site, starci-fe/presentational-purity] }
+          requirement: Keep the unconditional filename twin heuristic explicitly disabled; the conditional world-owner architecture check is the replacement.
+          check:
+            kind: eslint
+            ruleIds: [starci-fe/connected-block-has-presentational-twin]
+            expected: { severity: off }
         semantic:
           guidance: docs/portable-source-architecture.md
-          review: None; this machine is narrower/different from the adopted obligation.
-        status: conflict
-        conflict: The available checker is block/path/name heuristic and cannot certify the adopted conditional any-tier boundary; use NEXT-CONDITIONAL-RENDER-BOUNDARY when implemented.
+          review: Classify product-world ownership before applying NEXT-CONDITIONAL-RENDER-BOUNDARY; intrinsic state does not manufacture a twin.
+        status: implemented
     semanticOnly:
       - id: NEXT-COMMENT-QUALITY
         sourceRuleIds: [FE-COMMENT-2, FE-COMMENT-3, FE-COMMENT-4]
