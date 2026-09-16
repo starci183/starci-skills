@@ -45,6 +45,18 @@ test('binds resolved aliases and real runner discovery with exact metadata input
   assert.ok(result.inputFiles.includes('src/modules/store.ts'));
 });
 
+test('lifecycle exception evidence includes only source-bound actual runner entries', t => {
+  const f = fixture(t);
+  f.write('src/tests/global-setup.ts', 'throw new Error("Must not run setup"); export default function setup() {}');
+  f.state.configs[0].globalSetup = path.join(f.root, 'src/tests/global-setup.ts');
+  f.state.configs[0].globalTeardown = path.resolve(f.root, '../dependency-owned-hook.js');
+  f.save();
+  const result = checkNestMetadata(f.input);
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.lifecycleEntries, ['src/tests/global-setup.ts']);
+  assert.equal(result.inputs.stable, true);
+});
+
 test('discovers config helper and inherited TypeScript inputs before execution', t => {
   const f = fixture(t);
   f.write('jest.config.cjs', 'module.exports = require("./config/jest-base.cjs");');

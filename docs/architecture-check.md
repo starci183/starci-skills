@@ -39,6 +39,8 @@ Nest modules export their public provider API. A consumer should import the owni
 
 When a backend explicitly selects `exported-class-token` registration checking, the checker discovers every resolved Nest `@Module`, `@CommandHandler`, and `@QueryHandler` in the checked production TypeScript program. A class-token provider that a module both provides and exports has one static owner; another module listing that same class token must import the owner instead. A provider object with a different named token remains a distinct registration. Selected CQRS decorators must have exactly one direct module registration. Dynamic/spread provider metadata, an unresolved framework binding, or a discovered handler decorator omitted from the selected set makes registration coverage unavailable rather than passing an incomplete inventory. This static relation does not prove runtime scope, dynamic-module options, or a bootable DI container.
 
+Resolved backend feature/module roots use the adopted domain-first source shape without an enablement flag. Recognized application roles live under `application/`; recognized protocol roles live under `transport/<protocol>/`. Resolved GraphQL DTO decorators bind DTOs to `transport/graphql`, while resolved TypeORM entity/migration identities cannot make a feature the schema owner. The naming check covers kebab-case role files, exported class role suffixes, application object contracts whose roles are known, enum declarations, and static GraphQL field/argument names. It does not invent a role for an arbitrary helper or infer persistence/error ownership from a folder string. An unclassified role, constructed decorator binding, dynamic GraphQL name, or declared unsupported legacy root makes the applicable layout or naming coverage unavailable and omits that rule ID from `coverage.checkedRuleIds`.
+
 ## Research basis and counterexamples
 
 Reviewed 2026-09-16:
@@ -57,7 +59,7 @@ Local reference evidence is pinned, and includes debt rather than being copied a
 
 ## Optional layout config
 
-Repositories with equivalent responsibilities at different paths may add a small JSON config. It changes roots and role mappings; it cannot contain baselines, ignores, suppressions, or legacy waivers.
+Repositories with equivalent responsibilities at different paths may add a small JSON config. It changes roots and role mappings; it cannot contain baselines, ignores, or suppressions. `legacyRoots` records an existing unsupported source profile and deliberately makes source-shape coverage unavailable; it never turns that source green or excludes it from `coverage.sourceFiles`.
 
 ```json
 {
@@ -68,6 +70,7 @@ Repositories with equivalent responsibilities at different paths may add a small
     "modules": "server/modules",
     "features": "server/features",
     "apps": ["server/apps"],
+    "legacyRoots": ["server/features/legacy-transport-first"],
     "moduleRegistration": {
       "providerIdentity": "exported-class-token",
       "handlerDecorators": ["CommandHandler", "QueryHandler"]

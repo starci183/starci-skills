@@ -174,16 +174,20 @@ rules:
   - id: BE-IMPORTS-6
     title: Forbidden
     kind: mandatory
-    requirement: No default exports (except Jest lifecycle carve-outs). process.env only via envConfig outside
-      parse-env. No console.* or Nest Logger in src/**. Raw cache tokens outside the cache module are banned.
+    requirement: Source exports are named; a default-export exception must be a declared source-bound actual
+      Jest globalSetup/globalTeardown entry. Raw environment access belongs to exact declared parser files;
+      other source consumes the typed configuration API. Raw cache tokens stay inside their declared cache
+      owner and aliases retain the same identity. Bind these owners in the target package's Nest boundary
+      contract; the runtime script verifies them using canonical TypeScript projects. No console.* or Nest
+      Logger in application source; use the selected logging owner.
     rationale: 188 files log through WinstonService at extraction; 12 residual console. sites recorded as debt.
     cases:
       - id: case-1
         when: Default export
-        write: none (lint no-default-export; Jest lifecycle entries carved out)
+        write: named exports; the actual normalized Jest configuration proves a lifecycle exception, not its filename
       - id: case-2
         when: process.env
-        write: only src/modules/platform/env/utils/parse-env.ts; everyone else calls envConfig()
+        write: Academy's parser path is src/modules/platform/env/utils/parse-env.ts; other projects declare their actual parser path and typed config API
       - id: case-3
         when: console.*
         write: lint error in src/**; residual console. sites are debt, not a pattern
@@ -192,11 +196,12 @@ rules:
         write: not used (lint no-nest-logger, no-framework-logger)
       - id: case-5
         when: Raw cache tokens outside the cache module
-        write: lint must-use-cache-service
+        write: declare the cache owner and its exported raw tokens; the script follows renamed imports, re-exports and constant aliases
     verification:
       automated:
-        - no-default-export
-        - must-use-cache-service
+        - NEST_NAMED_EXPORTS
+        - NEST_ENV_ACCESS
+        - NEST_CACHE_TOKEN_BOUNDARY
         - no-nest-logger
         - no-framework-logger
       manual: []
