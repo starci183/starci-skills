@@ -522,8 +522,15 @@ export function reconcileFailedLaunchLease(state,op,{orca,store,settle=settleGen
   return {ok:true,jobId:lease.jobId,dispatch:dispatch.id};
 }
 /** Recover a launched native lease only from the exact stopped Orca worker and its still-fenced candidate. */
+function stoppedRetryDispatchId(op){
+  const direct=op?.launch?.dispatch;if(typeof direct==='string'&&direct)return direct;
+  const attempts=Array.isArray(op?.launch?.attempts)?op.launch.attempts:[];
+  if(attempts.length!==1)return null;
+  const persisted=attempts[0]?.dispatchId;
+  return typeof persisted==='string'&&persisted?persisted:null;
+}
 export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost=settleDispatch,createRuntime=createEngineRuntime,git=spawnSync,waitFn=sleepSync}={}){
-  const lease=op?.lease,dispatchId=op?.launch?.dispatch,taskId=op?.launch?.task,candidate=op?.candidate?.identity;
+  const lease=op?.lease,dispatchId=stoppedRetryDispatchId(op),taskId=op?.launch?.task,candidate=op?.candidate?.identity;
   if(!lease||!dispatchId||!taskId||op.dispatch||op.terminal)return {ok:false,reason:'stopped native retry identity is incomplete or still active'};
   // The exact binding is lease <-> candidate identity, attempt for attempt. The operation's own counter may sit
   // past the lease (a partial report advanced it before the attempt was settled) - never behind it.
@@ -4326,7 +4333,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       for(const key of ['lease','pending','workerSettled','retryReconciled'])delete op[key];
       if(op.status==='blocked'&&op.refusal==='runtime-reconciliation'){op.status='ready';delete op.refusal;}
     }
-    for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&!settledOperation(item)&&item.launch?.task&&item.launch?.dispatch&&!item.dispatch&&!item.terminal&&item.candidate?.identity)){
+    for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&!settledOperation(item)&&item.launch?.task&&stoppedRetryDispatchId(item)&&!item.dispatch&&!item.terminal&&item.candidate?.identity)){
       const reconciled=reconcileStoppedNativeRetryLease(state,op,{orca,store});
       need(reconciled.ok,`Stopped native lease ${op.lease?.jobId??op.id} cannot be reconciled for retry: ${reconciled.reason}`);
     }

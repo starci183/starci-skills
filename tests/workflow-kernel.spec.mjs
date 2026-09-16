@@ -5214,6 +5214,16 @@ test('public retry reconciles only the exact exited native attempt before releas
   const orca={invoke:()=>({outcome:'ok',receipt:{result}})},createRuntime=()=>({settleStoppedOperation(candidate,{dispatch,settlement}){assert.equal(candidate,op);assert.equal(dispatch,'ctx-native');assert.equal(settlement.effectState,'none');settled++;delete candidate.lease;candidate.ownedBaselinePaths=['src/real.ts'];candidate.retryReconciled={schema:'starci/native-retry-reconciliation@1',jobId:'operation-job',attempt:3,generation:7,dispatch,observedFiles:['src/real.ts'],candidateDigest:'candidate'};return {ok:true,observedFiles:['src/real.ts'],candidateDigest:'candidate'};},close(){closed++;}});
   const recovered=reconcileStoppedNativeRetryLease(state,op,{orca,store,createRuntime,settleHost:(_host,dispatch)=>({schema:'starci/orca-supervised-settlement@1',dispatchId:dispatch,effectState:'none'})});
   assert.equal(recovered.ok,true);assert.equal(settled,1);assert.equal(closed,1);assert.deepEqual(op.ownedBaselinePaths,['src/real.ts']);assert.equal(events.at(-1).event,'retry-native-attempt-reconciled');
+  const attemptLease={...lease},attemptIdentity={...identity},attemptOnly={id:'author',attempt:3,status:'ready',lease:attemptLease,candidate:{identity:attemptIdentity},
+    launch:{task:'task-native',dispatch:null,attempts:[{target:'claude-opus',dispatchId:'ctx-native',stage:'dispatch_input',effectState:'unknown'}]}};
+  let attemptSettled=0;
+  const attemptRecovered=reconcileStoppedNativeRetryLease(state,attemptOnly,{orca,store,
+    createRuntime:()=>({settleStoppedOperation(candidate,{dispatch,settlement}){assert.equal(candidate,attemptOnly);assert.equal(dispatch,'ctx-native');assert.equal(settlement.effectState,'none');attemptSettled++;delete candidate.lease;return {ok:true,observedFiles:[],candidateDigest:'attempt-candidate'};},close(){}}),
+    settleHost:(_host,dispatch)=>({schema:'starci/orca-supervised-settlement@1',dispatchId:dispatch,effectState:'none'})});
+  assert.equal(attemptRecovered.ok,true,attemptRecovered.reason);assert.equal(attemptSettled,1,'one exact persisted attempt supplies the missing top-level dispatch identity');
+  const ambiguous={...attemptOnly,lease:{...lease},candidate:{identity:{...identity}},launch:{...attemptOnly.launch,attempts:[{dispatchId:'ctx-native'},{dispatchId:'ctx-other'}]}};
+  const ambiguousResult=reconcileStoppedNativeRetryLease(state,ambiguous,{orca,store,createRuntime(){throw Error('must not create runtime');},settleHost(){throw Error('must not settle');}});
+  assert.equal(ambiguousResult.ok,false);assert.match(ambiguousResult.reason,/identity is incomplete/,'multiple persisted attempts stay unknown instead of choosing one');
   const mismatched={...op,lease:lease,candidate:{identity},launch:{task:'task-native',dispatch:'ctx-other'}};
   const denied=reconcileStoppedNativeRetryLease(state,mismatched,{orca,store,createRuntime(){throw Error('must not create runtime');},settleHost(){throw Error('must not settle');}});
   assert.equal(denied.ok,false);assert.match(denied.reason,/exact current Run\/Task\/Dispatch/);
