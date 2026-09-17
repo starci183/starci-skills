@@ -16,8 +16,49 @@ composes:
     module: src/auth/sign-in
   - rule: br.login.session.restores
     module: src/auth/session
-proven:
-  by: [uat.login.sign-in]
-  evidence: composes-sign-in
-  at: 2026-09-18T04:39:00.000Z
 
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- auth/sign-in
+  uat:
+    required: true
+  perf:
+    optional: true
+    command: node scripts/load/sign-in-timing.mjs
+
+# provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
+# An agent-authored provenBy is refused: it would be this record speaking for another one.
+provenBy:
+  unit: [impl.login.todo-app.auth]
+  e2e:
+    - command: npm run test:e2e -- auth/sign-in
+      exit: 0
+      at: 6f1e4b7d
+  uat: [uat.login.sign-in]
+  perf: []
+
+# evidence is written by starci-kernel when it settles the operation: the assertions below are
+# the checks it re-ran itself, not what the worker reported. An operation may edit this file, so
+# the kernel overwrites this block on every settle - that overwrite is what makes it proof.
+evidence:
+  recordDigest: daac990af7cee3df2afebec68bb66574538022629af2ec4db9eacf02fc6d6335
+  outcome: pass
+  note: This proves the composed flow, not the rules. Each rule is proven in its own module; what is observed here is that the flow wires them in the right order and passes the right actor.
+  assertions:
+    - id: flow-creates-one-session
+      outcome: pass
+      observation: uat run 20260918-sign-in step 2 captured the list and one session row
+    - id: refusal-path-reaches-the-guard
+      outcome: pass
+      observation: npm run test:e2e -- auth/sign-in exited 0
+  provenance:
+    actor: starci-kernel
+    tool: starci-kernel
+    environment: local
+    servedVersions:
+      - repository: todo-app
+        commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+        artifact: worktree
+    capturedAt: 2026-09-18 04:39:00+00:00

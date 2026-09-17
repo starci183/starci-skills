@@ -7,8 +7,38 @@ steps:
   - {actor: person, does: Signs up, expects: Lands on an empty list that says what to do next.}
   - {actor: person, does: Returns the next day, expects: Still signed in.}
 requirements: [fr.login.sign-in]
-proven:
-  by: [uat.login.sign-in]
-  evidence: walks-first-sign-in
-  at: 2026-09-18T04:39:00.000Z
 
+requiresProof:
+  uat:
+    required: true
+  requirements:
+    forEach: requirements
+
+# provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
+# An agent-authored provenBy is refused: it would be this record speaking for another one.
+provenBy:
+  uat: [uat.login.sign-in]
+  requirements: [fr.login.sign-in]
+
+# evidence is written by starci-kernel when it settles the operation: the assertions below are
+# the checks it re-ran itself, not what the worker reported. An operation may edit this file, so
+# the kernel overwrites this block on every settle - that overwrite is what makes it proof.
+evidence:
+  recordDigest: 055afe19000823d18507849ca9416aa870b7db7aa2b64507e193b4788f68a6ba
+  outcome: pass
+  assertions:
+    - id: empty-state-explains-itself
+      outcome: pass
+      observation: uat run 20260918-sign-in step 2 captured the guidance
+    - id: session-survives-a-day
+      outcome: pass
+      observation: uat run 20260918-sign-in step 3 captured the restored session
+  provenance:
+    actor: starci-kernel
+    tool: starci-kernel
+    environment: local
+    servedVersions:
+      - repository: todo-app
+        commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+        artifact: worktree
+    capturedAt: 2026-09-18 04:39:00+00:00

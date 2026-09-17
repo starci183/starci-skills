@@ -1,0 +1,52 @@
+schema: work/integration
+id: integration.login.keycloak
+title: Keycloak issues and validates the person's identity
+state: done
+provider: keycloak
+boundary: The product never stores a password. Keycloak owns the credential; this product owns the session
+  row that follows a successful token exchange.
+endpoints:
+  - {name: token, method: POST, path: /realms/todo/protocol/openid-connect/token}
+  - {name: userinfo, method: GET, path: /realms/todo/protocol/openid-connect/userinfo}
+credential:
+  name: KEYCLOAK_ADMIN_PASSWORD_FILE
+  providedBy: owner
+  where: .starcistacks/dev/runtime/files/keycloak-admin-password.key.enc
+sandbox: The dev environment runs its own Keycloak on 8089 with an imported realm; it is a real Keycloak,
+  not a stub, which is why a run against it counts.
+refs: [br.login.password.sign-in]
+
+requiresProof:
+  live:
+    required: true
+    note: A run against the real provider. Evidence must carry proof.boundary live and an empty fakes list.
+
+provenBy:
+  live: [impl.login.todo-app.auth]
+
+# evidence is written by starci-kernel when it settles the operation: the assertions below are the
+# checks it re-ran itself, not what the worker reported.
+
+evidence:
+  recordDigest: 9e2d7a5c3f8e1b6d4a9c2f5b8e1d4a7c0f3b6e9d2a5c8f1b4e7d0a3c6f9b24c1
+  outcome: pass
+  proof:
+    boundary: live
+    fakes: []
+  assertions:
+    - id: token-exchange-returns-a-subject
+      outcome: pass
+      observation: npm run test:integration -- auth/keycloak exited 0 against localhost:8089
+    - id: a-wrong-pair-returns-no-subject
+      outcome: pass
+      observation: npm run test:integration -- auth/keycloak/refusal exited 0 against localhost:8089
+  provenance:
+    actor: starci-kernel
+    tool: starci-kernel
+    environment: dev
+    servedVersions:
+      - repository: todo-app
+        commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+        artifact: worktree
+    capturedAt: 2026-09-18T04:44:00.000Z
+

@@ -9,5 +9,23 @@ revision: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
 proves: [nfr.task.list.latency]
 verification: [npm run test:unit -- src/task/list exited 0]
 verificationSource: kernel-observed
-evidence: proves-list-module
 
+# evidence is written by starci-kernel when it settles the operation: the assertions below are
+# the checks it re-ran itself, not what the worker reported. An operation may edit this file, so
+# the kernel overwrites this block on every settle - that overwrite is what makes it proof.
+evidence:
+  recordDigest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  outcome: pass
+  assertions:
+    - id: unit-suite-green-at-the-recorded-revision
+      outcome: pass
+      observation: npm run test:unit -- src/task/list exited 0
+  provenance:
+    actor: starci-kernel
+    tool: starci-kernel
+    environment: local
+    servedVersions:
+      - repository: todo-app
+        commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+        artifact: worktree
+    capturedAt: 2026-09-18 04:38:00+00:00
