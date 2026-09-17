@@ -61,8 +61,11 @@ export const kindRole=kind=>{try{return graph.roleOf(kind);}catch{return null;}}
 /** The durable engine's identity in workflow state: a schema, not a number, so a build is named by what it is. */
 export const ENGINE_SCHEMA='starci/engine@1';
 export const isEnrolled=state=>state?.engine?.schema===ENGINE_SCHEMA;
-/** A state enrolled by a build that wrote the engine as a numbered marker: it runs only through workflow-retry, which migrates it. */
-export const predatesEngineSchema=state=>Boolean(state?.engine)&&typeof state.engine==='object'&&!state.engine.schema&&typeof state.engine.journalFile==='string';
+/**
+ * A state enrolled by a build that wrote the engine as a numbered marker - or any state that still names the
+ * retired journal (`journalFile` without `ledgerFile`): it runs only through workflow-retry, which migrates it.
+ */
+export const predatesEngineSchema=state=>Boolean(state?.engine)&&typeof state.engine==='object'&&typeof state.engine.journalFile==='string'&&typeof state.engine.ledgerFile!=='string';
 /** The sealed build a durable workflow runs from, whatever shape its engine record has. */
 export const sealedRuntimeOf=state=>{const pin=state?.engine?.runtimePin;return pin&&typeof pin==='object'&&typeof pin.root==='string'?pin:null;};
 export const AUTHOR_KIND='work.author';
@@ -114,6 +117,11 @@ export const allowlistsOverlap=(a=[],b=[])=>a.some(one=>b.some(other=>covers(one
 export const inside=(file,allowlist=[])=>allowlist.some(entry=>{const root=allowRoot(entry);return file===root||file.startsWith(`${root}/`);});
 /** A path inside a Work tree, in either spelling: the tree-relative `.starciwork/...` or the owner's absolute one. */
 export const isWorkTreePath=entry=>/(^|\/)\.starciwork(\/|$)/.test(slash(entry));
+/**
+ * A write scope that would reach the workflow record itself: `.starciwork/**`, the `.starciwork` root, or one
+ * of the ledger database files. Asymmetric - a narrow `.starciwork/...` scope names a product path and is legal.
+ */
+export const coversLedgerScope=entry=>{const root=allowRoot(entry);return ['.starciwork','.starciwork/runtime.sqlite','.starciwork/runtime.sqlite-journal','.starciwork/runtime.sqlite-wal','.starciwork/runtime.sqlite-shm'].some(target=>target===root||target.startsWith(`${root}/`));};
 /**
  * A build or a repair scope composed from OTHER operations' allowlists: the code they touched, never the Work
  * tree. One tree is shared by a project's repositories, so a `.starciwork` entry inherited from a design op puts
