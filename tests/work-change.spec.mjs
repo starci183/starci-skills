@@ -19,6 +19,8 @@ const runtime=path.resolve(import.meta.dirname,'..');
 const EXAMPLE=path.join(runtime,'examples/todo-app/.starciwork');
 const AT='2026-01-01T00:00:00.000Z';
 const LATER='2026-02-01T00:00:00.000Z';
+/** A manifest says what it was proved against; these stand in for the capturing kernel's own tokens. */
+const REV1='d'.repeat(64),REV2='e'.repeat(64);
 
 function world(t){
   const base=sameDriveTmp();fs.mkdirSync(base,{recursive:true});
@@ -46,7 +48,8 @@ function plant(root,{statements=['A task is created only with a non-empty title.
       `rule: br.demo.rule`,`given: A person at the form`,`when: They submit it`,'then:',quoted(then),''].join('\n'));
   for(const [id,proof] of Object.entries(evidence))
     write(path.join(dir,'evidence',id,'manifest.yaml'),[`schema: work/evidence`,`id: ${id}`,`record: br.demo.rule`,
-      `outcome: pass`,...(proof.stale===undefined?[]:[`stale: ${proof.stale}`]),
+      `outcome: pass`,...(proof.recordDigest===null?[]:[`recordDigest: ${proof.recordDigest??REV1}`]),
+      ...(proof.stale===undefined?[]:[`stale: ${proof.stale}`]),
       ...(proof.staleReason?[`staleReason: ${JSON.stringify(proof.staleReason)}`]:[]),'assertions:',
       ...(proof.assertions??['ac.demo.rule.refuses-empty']).flatMap(id=>[`  - id: ${id}`,'    outcome: pass',
         '    observation: npm run test:unit -- src/demo/rule exited 0']),
@@ -199,6 +202,23 @@ test('a rule whose whole proof became history cannot stay done',t=>{
   assert.deepEqual(codes(report),['STATE_RESTS_ON_STALE_EVIDENCE']);
 });
 
+test('a manifest that does not say what it was proved against is named',t=>{
+  const report=solo(t,{evidence:{'proves-rule':{stale:false,recordDigest:null}}});
+  assert.deepEqual(codes(report),['EVIDENCE_DIGEST_MISSING']);
+  assert.match(report.limitations.join(' '),/recordDigest is the capturing kernel's own token and is not recomputed here/);
+});
+
+test('a clarifying addition never expires proof the old criteria still hold',t=>{
+  const statements=['A complete task is never reopened.'];
+  const report=pair(t,{statements,criteria:{'refuses-empty':['The creation is refused.']},evidence:{'proves-rule':{stale:false}}},
+    {statements,criteria:{'refuses-empty':['The creation is refused.'],'names-the-rule':['The refusal names the rule.']},
+      change:{rev:2,kind:'clarifying',at:LATER},evidence:{'proves-rule':{stale:false}}});
+  // The record's normative digest moved and the manifest still carries the token of the revision
+  // before it - and that is not staleness: what the old criterion proved is untouched.
+  assert.deepEqual(report.findings,[]);
+  assert.equal(only(report,'br.demo.rule').computedKind,'clarifying');
+});
+
 test('a record that cannot be read is not a clean record',t=>{
   const dir=world(t);const root=plant(path.join(dir,'only'));
   write(path.join(root,'features/demo/br/rule/evidence/broken/manifest.yaml'),'schema: work/evidence\noutcome: pass\noutcome: fail\n');
@@ -233,14 +253,16 @@ test('a clarifying addition leaves the existing criteria proven and only the new
 
 test('a breaking edit marks the right evidence stale and leaves later proof alone',t=>{
   const clause='A complete task is never reopened.';
+  // Both manifests were captured against rev 1. After the break one is re-run - its manifest carries
+  // the token of what replaced the broken content - and the other is left as the history it now is.
   const before={statements:[clause],criteria:{'refuses-empty':['The creation is refused.'],'is-reversible':['The task reads incomplete.']},
     evidence:{'proves-the-clause':{stale:false,capturedAt:AT,assertions:['ac.demo.rule.refuses-empty']},
-      're-proves-after':{stale:false,capturedAt:'2026-03-01T00:00:00.000Z',assertions:['ac.demo.rule.is-reversible']}}};
+      're-proves-after':{stale:false,capturedAt:AT,assertions:['ac.demo.rule.is-reversible']}}};
   const after={statements:['A complete task may be reopened by its owner.'],state:'todo',
     criteria:before.criteria,change:{rev:2,kind:'breaking',at:LATER,withdraws:[clause]},
     evidence:{'proves-the-clause':{stale:true,capturedAt:AT,assertions:['ac.demo.rule.refuses-empty'],
       staleReason:'Proven against rev 1, whose never-reopen clause rev 2 withdrew. Kept as history.'},
-      're-proves-after':{stale:false,capturedAt:'2026-03-01T00:00:00.000Z',assertions:['ac.demo.rule.is-reversible']}}};
+      're-proves-after':{stale:false,recordDigest:REV2,capturedAt:'2026-03-01T00:00:00.000Z',assertions:['ac.demo.rule.is-reversible']}}};
   const clean=pair(t,before,after);
   assert.deepEqual(clean.findings,[]);
   assert.deepEqual(only(clean,'br.demo.rule').evidence.map(proof=>[proof.id,proof.stale]),

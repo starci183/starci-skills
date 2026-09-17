@@ -48,7 +48,7 @@ const PROSE=new Set(['title','description','summary','note','notes','reason','ra
  * is this record itself - none of them are the content being promised, and a todo->done move must not
  * read as an edit nobody declared.
  */
-const LIFECYCLE=new Set(['change','state','activity','blockers','blockedBy','evidence','proven','completion','history']);
+const LIFECYCLE=new Set(['change','state','activity','blockers','blockedBy','evidence','proven','provenBy','completion','history']);
 
 class WorkChangeInputError extends Error{constructor(message,code='INVALID_INPUT'){super(message);this.name='WorkChangeInputError';this.code=code;}}
 export {WorkChangeInputError};
@@ -219,17 +219,30 @@ export function checkWorkChange({workRoot,baselineRoot=null}={}){
     // A break stales the evidence it expired; the clause words are what the reason must name.
     const clause=new Set([...withdraws.flatMap(item=>[...stems(item)]),
       ...(baseline&&previous?list(previous.meta.statements).filter(text).filter(item=>!statements.includes(item.trim())).flatMap(item=>[...stems(item)]):[])]);
+    const broke=declared==='breaking'||computed==='breaking';
     for(const proof of bound.sort((a,b)=>a.id.localeCompare(b.id))){
       const capturedAt=moment(proof.meta.provenance?.capturedAt);
-      const predates=capturedAt===null||changeAt===null||capturedAt<changeAt;
+      const before=baseline?baseline.evidence.get(`${record.id}/${proof.id}`)??null:null;
+      /**
+       * What the manifest says it was proved against. `recordDigest` is written by the capturing
+       * kernel, and this check does not recompute it - see the limitation below - so it is used the
+       * one way that needs no agreement about the function: a manifest carrying the same token it
+       * carried before a break was not re-captured against what replaced the broken content. Capture
+       * time is the fallback where there is no baseline to compare the token against.
+       */
+      const recaptured=before!==null&&text(proof.meta.recordDigest)&&proof.meta.recordDigest!==before.meta.recordDigest;
+      const predates=before!==null?!recaptured:capturedAt===null||changeAt===null||capturedAt<changeAt;
       const stale=proof.meta.stale===true;
-      if(declared==='breaking'&&predates&&!stale)
+      if(!text(proof.meta.recordDigest))
+        add('EVIDENCE_DIGEST_MISSING',record,'a manifest that does not say what it was proved against cannot be judged expired later',{observed:proof.path});
+      // Only a break expires evidence. A clarification adds a criterion the old proof never covered;
+      // marking healthy proof expired for that makes people re-run what never broke.
+      if(broke&&predates&&!stale)
         add('EVIDENCE_STALE_UNMARKED',record,'a breaking change expires the evidence bound to the content it changed',{observed:proof.path,expected:'stale: true with a staleReason'});
       if(stale&&!(namesRevision(proof.meta.staleReason)&&(clause.size===0||[...stems(proof.meta.staleReason)].filter(word=>clause.has(word)).length>=2)))
         add('STALE_REASON_UNNAMED',record,'stale evidence names the revision that expired it and the clause that went',{observed:proof.path});
       if(baseline){
-        const before=baseline.evidence.get(`${record.id}/${proof.id}`);
-        if(before&&before.meta.stale!==true&&stale&&declared!=='breaking')
+        if(before&&before.meta.stale!==true&&stale&&!broke)
           add('EVIDENCE_STALED_WITHOUT_BREAK',record,'only a breaking change expires evidence; prose and clarifications leave existing proof standing',{observed:proof.path,computed:computed??declared});
       }
     }
@@ -256,6 +269,8 @@ export function checkWorkChange({workRoot,baselineRoot=null}={}){
     findings:findings.sort((a,b)=>a.code.localeCompare(b.code)||a.id.localeCompare(b.id)||String(a.observed??'').localeCompare(String(b.observed??''))),
     limitations:[baseline?'The transition is computed between two given trees; neither is independently authenticated as the revision it claims to be.':'No baseline was given, so no transition was computed: the declared kind was not verified against the edit, withdrawals were not matched to a previous revision, and an undeclared edit cannot be seen. Pass --against a previous Work tree for those.',
       'Prose and lifecycle keys are excluded from the normative digest by name, so a normative obligation written into a description travels nowhere.',
-      'Evidence staleness is judged from the manifest and its capture time; no proof was re-run and no assertion was re-observed.',
+      'Evidence staleness is judged from the manifest, its recordDigest and its capture time; no proof was re-run and no assertion was re-observed.',
+      'A manifest\'s recordDigest is the capturing kernel\'s own token and is not recomputed here: this module owns what an edit is, not what a record hashes to. It is compared between revisions, never to a value this check derives.',
+      'Which proof kinds a record still owes (requiresProof) is a different question from how far its edit travelled, and is not decided here.',
       'This check reports and never repairs: it writes nothing into the Work tree.']};
 }
