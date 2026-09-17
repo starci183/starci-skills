@@ -709,8 +709,10 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
   node bin/starci.mjs settle --dispatch <dispatch> [--worktree <relative-path>] [--terminal <own-agent-terminal>] [--close true]
   node bin/starci.mjs sweep --worktree <relative-path> --from <monitor-terminal> [--keep <handle,handle>]
   node bin/starci.mjs notify --terminal <monitor-terminal> (--file <message-file> | --text <text>) [--worktree <relative-path>]
-  node bin/starci.mjs report --run <run> --from <own-terminal> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--credential-request-file <safe JSON>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--reports-dir <dir>] [--capability <dcap>] [--worktree <relative-path>]
-  node bin/starci.mjs wait --run <run> --from <own-terminal> [--timeout-ms 900000] [--tick-ms 120000] [--reports-dir <dir>] [--stalled-after-ms <ms>] [--worktree <relative-path>]
+  node bin/starci.mjs report --run <run> --from <own-terminal> --workflow <workflow-id> --task <task> --dispatch <dispatch> --outcome <done|partial|failed|ask|blocked> --summary <text> [--op <op>] [--attempt N] [--files a,b] [--checks-file <json>] [--open a,b] [--question <text> --options a,b] [--blocker <kind:detail>] [--credential-request-file <safe JSON>] [--kind op|workflow --branch <b> --head <sha> --gates name=status,...] [--capability <dcap>] [--worktree <relative-path>]
+    §8/§9: the report row is written to the workflow's own ledger (INSERT INTO reports), never a file; --workflow
+    is the id the contract already told the worker, the same one op-contract was read with.
+  node bin/starci.mjs wait --run <run> --from <own-terminal> --workflow <workflow-id> [--timeout-ms 900000] [--tick-ms 120000] [--stalled-after-ms <ms>] [--worktree <relative-path>]
   node bin/starci.mjs workflow-goal --job <text> [--id <workflow-id>] [--lane [<name>]] [--inputs a,b] [--gates a,b] [--ledger work|plan] [--scope feature1,feature2] [--reintake feature] [--migrate feature1,feature2|all] [--ledger-root <path>] [--allocation codex-agent=5,claude-agent=3,qwen-agent=2] [--host <path-to-.claude>] [--worktree <relative-path>]
     --lane gives the workflow a worktree of its own: an Orca worktree of this repository on a new branch cut
     from the branch you are on, as the top-level row [Workflow] <id> (default name: the workflow id). The
