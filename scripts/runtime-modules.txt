@@ -113,6 +113,7 @@ kernel/loads.mjs
 kernel/graph.mjs
 kernel/graph-invalidation.mjs
 kernel/ledger.mjs
+kernel/work-status.mjs
 kernel/manager.mjs
 kernel/progress.mjs
 kernel/decision-inputs.mjs

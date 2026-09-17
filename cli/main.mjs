@@ -55,6 +55,7 @@ Usage:
   starci identity fill <slug> --name <VAR> [--name <VAR>] [--work-root <path>]   (it asks for each one here, with the echo off)
   starci brand check <work-root> [--source <repository-root>] [--json]
   starci render check <ui-node-dir> --brand <work-root> [--family <id>] [--json]
+  starci work status --work <work-root> [--feature <id>] [--json true]
   starci tree <work-root>
   starci impact <work-root> <node-or-resource-id>
   starci stale <work-root>
@@ -441,6 +442,29 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       emit(readPolicyDocument('common.json'));
       emit(JSON.stringify(operator, null, 2));
       return 0;
+    }
+    if(command==='work'){
+      // Read-only: it counts what the records author and derives what no record may author for itself -
+      // a parent's state, the agreed/proven gap, and which leaves a dependency is holding up.
+      const [action,...input]=args;
+      if(action!=='status')throw Error('Use starci work status --work <work-root> [--feature <id>] [--json true].');
+      const rest=[...input];
+      const option=name=>{
+        const at=rest.indexOf(`--${name}`);
+        if(at===-1)return null;
+        const value=rest[at+1];
+        if(!value||value.startsWith('--'))throw Error(`--${name} needs one value.`);
+        rest.splice(at,2);
+        return value;
+      };
+      const json=option('json'),feature=option('feature');
+      const given=option('work')??rest.shift();
+      if(!given)throw Error('work status needs the Work tree: --work <work-root>.');
+      exactArgs(rest,0);
+      const {workStatus,formatWorkStatus}=await import('../kernel/work-status.mjs');
+      const status=workStatus({workRoot:directory(given),feature});
+      emit(json==='true'?status:formatWorkStatus(status));
+      return status.ok?0:1;
     }
     if (command === 'validate' || command === 'tree') {
       exactArgs(args, 1);
