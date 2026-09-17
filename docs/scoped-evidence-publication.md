@@ -15,8 +15,9 @@ Malformed manifests, wrong ownership, stale bindings, unsafe paths, missing or
 changed assets and unsealed files cannot be dismissed as unrelated diagnostics.
 
 `publishEvidence` uses this same preview, verifies the staged seal and renames
-one direct `_local/evidence-staging/<name>` directory into a fresh canonical
-evidence directory. Existing proof is never overwritten. Its original return
+one direct `<staging>/<name>` directory into a fresh canonical evidence
+directory, where `<staging>` is the transient area outside Work,
+`os.tmpdir()/starci/evidence-staging/<digest of the Work root's real path>`. Existing proof is never overwritten. Its original return
 fields (`path`, `nodeId`, `seal`, `published`) remain, with `globalOk` and
 `remainingErrors` added. Retain those diagnostics in the result report.
 

@@ -86,10 +86,25 @@ const BOOTSTRAP = readFileSync(path.join(packageRoot, 'init/AGENTS.md'), 'utf8')
 const CLAUDE_BOOTSTRAP = readFileSync(path.join(packageRoot, 'init/CLAUDE.md'), 'utf8');
 const DEVIN_BOOTSTRAP = readFileSync(path.join(packageRoot, 'init/DEVIN.md'), 'utf8');
 const PROMPT_ENTRY = BOOTSTRAP.match(/<!-- starci:prompt-entry -->[\s\S]*?<!-- \/starci:prompt-entry -->/)?.[0];
-const SPLIT_STORAGE_BOOTSTRAP = BOOTSTRAP.replace("The project's backend owns shared `.starciwork`; Plan/run state lives inside `.starciwork/_local/plans` for both backend and frontend.", "The project's backend owns the shared `.starciwork` and sibling `.starcitemp` for both backend and frontend.");
-const SPLIT_STORAGE_ENTRY = SPLIT_STORAGE_BOOTSTRAP.match(/<!-- starci:prompt-entry -->[\s\S]*?<!-- \/starci:prompt-entry -->/)?.[0];
+// The storage sentence this bootstrap carries today, and every sentence it carried before. `update` has to
+// RECOGNIZE an already-installed older bootstrap to replace it, otherwise the host ends up with two homes
+// for the same rule - so each historical variant is reconstructed from the CURRENT template by putting its
+// own sentence back. `_local/plans` is the variant the 1.0.4 cutover retires (docs/ledger-db.md §13); it
+// stays here as something to recognize, never as something to install.
+const STORAGE_SENTENCE = "The project's backend owns shared `.starciwork`; its runtime record is the ledger `.starciwork/runtime.sqlite` for both backend and frontend.";
+const PLAN_STORAGE_SENTENCE = "The project's backend owns shared `.starciwork`; Plan/run state lives inside `.starciwork/_local/plans` for both backend and frontend.";
+const SPLIT_STORAGE_SENTENCE = "The project's backend owns the shared `.starciwork` and sibling `.starcitemp` for both backend and frontend.";
+const entryOf = text => text.match(/<!-- starci:prompt-entry -->[\s\S]*?<!-- \/starci:prompt-entry -->/)?.[0];
+const withStorageSentence = sentence => BOOTSTRAP.replace(STORAGE_SENTENCE, sentence);
+const PLAN_STORAGE_BOOTSTRAP = withStorageSentence(PLAN_STORAGE_SENTENCE);
+const PLAN_STORAGE_ENTRY = entryOf(PLAN_STORAGE_BOOTSTRAP);
+const SPLIT_STORAGE_BOOTSTRAP = withStorageSentence(SPLIT_STORAGE_SENTENCE);
+const SPLIT_STORAGE_ENTRY = entryOf(SPLIT_STORAGE_BOOTSTRAP);
 const PRE_RENAME_BOOTSTRAP = SPLIT_STORAGE_BOOTSTRAP.replaceAll('.starciwork', '.work').replaceAll('.starcitemp', '.starci');
-const PRE_RENAME_ENTRY = PRE_RENAME_BOOTSTRAP.match(/<!-- starci:prompt-entry -->[\s\S]*?<!-- \/starci:prompt-entry -->/)?.[0];
+const PRE_RENAME_ENTRY = entryOf(PRE_RENAME_BOOTSTRAP);
+// Without this the reconstruction above degrades into a no-op the moment the template is reworded, and every
+// older installed bootstrap silently stops being recognized - which reads as "nothing to migrate", not as a bug.
+if (!BOOTSTRAP.includes(STORAGE_SENTENCE)) throw new Error('Host bootstrap no longer carries the storage sentence its legacy variants are built from');
 if (!PROMPT_ENTRY || CLAUDE_BOOTSTRAP !== BOOTSTRAP || DEVIN_BOOTSTRAP !== BOOTSTRAP) throw new Error('Host bootstrap templates must share the same runtime entry');
 
 const LEGACY_LITE_ENTRY = `${ENTRY_MARKER}
@@ -198,13 +213,13 @@ function bootstrapPlan(repo, profile) {
     const file = path.join(repo, name);
     if (!existsSync(file)) return { name, file, text: bootstrap, action: 'wrote' };
     const current = readFileSync(file, 'utf8');
-    const customProtocol = [PROMPT_ENTRY, SPLIT_STORAGE_ENTRY, PRE_RENAME_ENTRY, DIRECT_TASK_PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
+    const customProtocol = [PROMPT_ENTRY, PLAN_STORAGE_ENTRY, SPLIT_STORAGE_ENTRY, PRE_RENAME_ENTRY, DIRECT_TASK_PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].reduce((text, managed) => text.replace(managed, ''), current.replace(/\r\n/g, '\n'));
     if (/session-open\.mjs|plan-chain\.mjs|validated request\.json|Nothing is designed, written or committed outside a session/.test(customProtocol)) {
       throw new Error(name + ': custom v2 session/chain protocol conflicts with v3; reconcile it or use --no-bootstrap before changing payload');
     }
     const legacyBootstrap = BOOTSTRAP.replace(PROMPT_ENTRY, LEGACY_PROMPT_ENTRY);
     const legacyLiteBootstrap = LITE_BOOTSTRAP.replace(LITE_ENTRY, LEGACY_LITE_ENTRY);
-    for (const known of [BOOTSTRAP, SPLIT_STORAGE_BOOTSTRAP, PRE_RENAME_BOOTSTRAP, PREVIOUS_BOOTSTRAP, ...[PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, LEGACY_PROMPT_ENTRY].map(entry => PREVIOUS_BOOTSTRAP.replace(DIRECT_TASK_PROMPT_ENTRY, entry)), BOOTSTRAP.replace(PROMPT_ENTRY, PRESET_PROMPT_ENTRY), LITE_BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY), BOOTSTRAP.replace(PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY), LITE_BOOTSTRAP.replace(LITE_ENTRY, PREVIOUS_V3_LITE_ENTRY), legacyBootstrap, legacyLiteBootstrap]) {
+    for (const known of [BOOTSTRAP, PLAN_STORAGE_BOOTSTRAP, SPLIT_STORAGE_BOOTSTRAP, PRE_RENAME_BOOTSTRAP, PREVIOUS_BOOTSTRAP, ...[PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, LEGACY_PROMPT_ENTRY].map(entry => PREVIOUS_BOOTSTRAP.replace(DIRECT_TASK_PROMPT_ENTRY, entry)), BOOTSTRAP.replace(PROMPT_ENTRY, PRESET_PROMPT_ENTRY), LITE_BOOTSTRAP, BOOTSTRAP.replace(PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY), BOOTSTRAP.replace(PROMPT_ENTRY, PREVIOUS_V3_PROMPT_ENTRY), LITE_BOOTSTRAP.replace(LITE_ENTRY, PREVIOUS_V3_LITE_ENTRY), legacyBootstrap, legacyLiteBootstrap]) {
       const normalized = current.replace(/\r\n/g, '\n'), authored = known.replace(/\r\n/g, '\n');
       if (normalized.startsWith(authored)) {
         let end = 0, count = 0;
@@ -213,7 +228,7 @@ function bootstrapPlan(repo, profile) {
         return { name, file, text: bootstrap + suffix, action: 'updated' };
       }
     }
-    const managed = [PROMPT_ENTRY, SPLIT_STORAGE_ENTRY, PRE_RENAME_ENTRY, DIRECT_TASK_PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
+    const managed = [PROMPT_ENTRY, PLAN_STORAGE_ENTRY, SPLIT_STORAGE_ENTRY, PRE_RENAME_ENTRY, DIRECT_TASK_PROMPT_ENTRY, PRESET_PROMPT_ENTRY, CAPPED_V3_PROMPT_ENTRY, LITE_ENTRY, PREVIOUS_V3_PROMPT_ENTRY, PREVIOUS_V3_LITE_ENTRY, LEGACY_PROMPT_ENTRY, LEGACY_LITE_ENTRY].find(value => current.includes(value));
     if (managed) {
       return { name, file, text: current.replace(managed, entry), action: 'updated' };
     }
@@ -541,8 +556,9 @@ const HELP = `${pkg.name} ${pkg.version}
 
 init    copies source payload into <repo>/.claude, builds/verifies local .dist, then records the
         install manifest. Adds the StarCi entry once to CLAUDE.md and AGENTS.md while preserving
-        custom instructions. Project data lives in backend .starciwork; local Plan/run/evidence
-        staging lives in .starciwork/_local. FE is source only. Refuses a .claude it did not
+        custom instructions. Project data lives in backend .starciwork, whose runtime record is the
+        ledger .starciwork/runtime.sqlite; a Plan bundle goes in a directory you name, and evidence
+        staging is transient and outside Work. FE is source only. Refuses a .claude it did not
         install unless --force; --no-bootstrap keeps host files unchanged. A failed build does
         not record a successful install/version.
 update  replaces current runtime paths; locally changed current files are kept unless --force.

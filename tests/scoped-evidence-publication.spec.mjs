@@ -6,11 +6,19 @@ import os from 'node:os';
 import {validateWorkspace,previewEvidence,sha256} from '../core/index.mjs';
 import {stringifyYaml,parseYaml} from '../core/yaml.mjs';
 import {publishEvidence,previewEvidencePublication} from '../workflows/evidence.mjs';
+import {evidenceStagingRoot} from '../core/index.mjs';
 
 function fixture(t){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-scoped-publication-'));
- t.after(()=>{assert.equal(path.dirname(dir),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(dir).startsWith('starci-scoped-publication-'));fs.rmSync(dir,{recursive:true,force:true});});
  const root=path.join(dir,'.starciwork');
+ // Staging now lives outside the Work root (os.tmpdir()/starci/evidence-staging/<work-root digest>), so the
+ // fixture owns two directories and must remove both - and must do it whether or not publication worked.
+ const staging=evidenceStagingRoot(root);
+ t.after(()=>{
+  assert.equal(path.dirname(dir),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(dir).startsWith('starci-scoped-publication-'));
+  assert.equal(path.dirname(staging),path.join(fs.realpathSync(os.tmpdir()),'starci','evidence-staging'));
+  fs.rmSync(dir,{recursive:true,force:true});fs.rmSync(staging,{recursive:true,force:true});
+ });
  const put=(relative,value)=>{const file=path.join(root,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,stringifyYaml(value));return file;};
  const node=(id,extra={})=>put(id+'/index.yaml',{schema:'work/node@2',id:id.replaceAll('/','.'),kind:'operations',required:true,state:'todo',description:'Synthetic publication fixture, not product evidence.',assertions:['verified'],...extra});
  const read=id=>parseYaml(fs.readFileSync(path.join(root,id+'/index.yaml'),'utf8'));
@@ -18,9 +26,9 @@ function fixture(t){
  const manifest=(id='owner',name='proof')=>({schema:'work/evidence@1',id:name.replaceAll('/','.'),nodeId:id.replaceAll('/','.'),inputDigest:current(id).inputDigest,outcome:'pass',assertions:[{id:'verified',outcome:'pass',observation:'Synthetic checked result'}],assets:[]});
  const done=id=>{const m=manifest(id,id+'-old-proof');put(id+'/evidence/old-proof/manifest.yaml',m);put(id+'/index.yaml',{...read(id),state:'done',completion:{inputDigest:m.inputDigest,evidence:[m.id]}});};
  const stale=id=>{done(id);put(id+'/index.yaml',{...read(id),description:'Changed synthetic semantic input'});};
- const stage=(name='fresh',m=manifest('owner',name))=>{put('_local/evidence-staging/'+name+'/manifest.yaml',m);return path.join(root,'_local/evidence-staging',name);};
+ const stage=(name='fresh',m=manifest('owner',name))=>{const directory=path.join(staging,name);fs.mkdirSync(directory,{recursive:true});fs.writeFileSync(path.join(directory,'manifest.yaml'),stringifyYaml(m));return directory;};
  put('workspace.yaml',{schema:'work/workspace@1',id:'synthetic-scoped-publication'});node('owner');node('unrelated');
- return {dir,root,put,node,read,current,manifest,done,stale,stage};
+ return {dir,root,staging,put,node,read,current,manifest,done,stale,stage};
 }
 
 test('publishes current owner proof while preserving unrelated recoverable stale diagnostics',t=>{
@@ -132,5 +140,5 @@ test('safe fresh-name publication never overwrites prior canonical bytes',t=>{
 test('links in staged bundles or staging locations remain forbidden',t=>{
  const f=fixture(t),directory=f.stage(),external=path.join(f.dir,'external');fs.mkdirSync(external);
  fs.symlinkSync(external,path.join(directory,'linked'),process.platform==='win32'?'junction':'dir');assert.equal(previewEvidencePublication(f.root,{directory,nodeId:'owner',name:'fresh'}).ok,false);assert.throws(()=>publishEvidence(f.root,{directory,nodeId:'owner',name:'fresh'}),/links/);
- const alias=path.join(f.root,'_local/evidence-staging/alias');fs.symlinkSync(directory,alias,process.platform==='win32'?'junction':'dir');assert.equal(previewEvidencePublication(f.root,{directory:alias,nodeId:'owner',name:'fresh'}).ok,false);assert.throws(()=>publishEvidence(f.root,{directory:alias,nodeId:'owner',name:'fresh'}),/staging/);
+ const alias=path.join(f.staging,'alias');fs.symlinkSync(directory,alias,process.platform==='win32'?'junction':'dir');assert.equal(previewEvidencePublication(f.root,{directory:alias,nodeId:'owner',name:'fresh'}).ok,false);assert.throws(()=>publishEvidence(f.root,{directory:alias,nodeId:'owner',name:'fresh'}),/staging/);
 });

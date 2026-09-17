@@ -6,10 +6,36 @@ import {classifySRSPath,validateSRSGraph,SRS_AGGREGATE_SCHEMA} from '../specific
 import { validateSRSV3Bindings, SRS_V3_SCHEMA } from '../specifications/srs-v3.mjs';
 import { readDistJson } from './runtime-root.mjs';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 
 export const profiles = Object.freeze(readDistJson('schemas', 'profiles.json'));
+
+/**
+ * Where a sealed evidence bundle waits between being produced and being published into its node's own
+ * `evidence/<id>/` folder - which is in git and IS the record. Staging is transient by definition, so it
+ * lives where docs/ledger-db.md §9 already puts transient host files, never inside the Work root: a
+ * `.starciwork/_local/evidence-staging` does not survive the 1.0.4 cutover (§13), and a staging directory
+ * inside canonical Work is a directory the validator then has to be taught to ignore.
+ *
+ * The segment is a digest of the Work root's own real path, NOT its `workspace.yaml` id: ids are not unique
+ * (every fixture in this repository declares a fixed one, and two checkouts of the same project share it),
+ * and two Work roots sharing one staging area is how a bundle gets published against the wrong owner. The
+ * real path is the identity that is actually unique, and it is stable for the same root across processes,
+ * which is what a stage-then-publish handoff needs.
+ */
+export function evidenceStagingRoot(workRoot) {
+  const absolute = path.resolve(workRoot);
+  let real = absolute;
+  try { real = fs.realpathSync(absolute); } catch { real = absolute; }
+  // The base is realpath'd here, not at the comparison sites: os.tmpdir() is a symlink on macOS and can be
+  // an 8.3 short path on Windows, and a staging check compares this against fs.realpathSync of a real
+  // directory. Only the base can be resolved - the per-root segment need not exist yet.
+  let base = os.tmpdir();
+  try { base = fs.realpathSync(base); } catch { base = os.tmpdir(); }
+  return path.join(base, 'starci', 'evidence-staging', digest(real.toLowerCase()).slice(0, 16));
+}
 const metadataSchema = readDistJson('schemas', 'work.schema.json');
 const text = v => typeof v === 'string' && v.trim().length > 0;
 const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -128,7 +154,12 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
   // none of it is a Work record, so reading it as one makes every tree that has ever been run invalid on
   // `JSON_ARTIFACT` - and an invalid tree derives no node at all, which strands the whole run.
   const runtimeCustody=new Set(['runtime.sqlite','runtime.sqlite-journal','runtime.sqlite-wal','runtime.sqlite-shm','ledger-anchor.json']);
-  const runtimeCustodyDirectories=new Set(['kernel-evidence','kernel-strays']);
+  // `kernel-strays` is the quarantine `kernel/sync.mjs` moves an untracked stray into. `kernel-headless` is
+  // the headless host's table, mailbox and dispatch logs for a lane opened before any store is bound
+  // (hosts/headless/host.mjs), and `kernel-approvals` holds the scoped delegation mandates
+  // (workflows/delegation.mjs). All three used to live under `_local`, which 1.0.4 retires
+  // (docs/ledger-db.md §13); all three are kernel-owned working state with a real lifetime, not Work records.
+  const runtimeCustodyDirectories=new Set(['kernel-evidence','kernel-strays','kernel-headless','kernel-approvals']);
   function walk(dir, inAssets=false) {
     let entries;
     try { entries=fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name)); } catch { issue('READ_DIRECTORY',rel(dir),'Cannot enumerate directory.'); return; }
@@ -168,7 +199,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
   if(candidate) {
     if(!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(candidate.name))throw Error('Unsafe evidence name');
     const owner=nodes.find(n=>n.meta.id===candidate.nodeId),stage=fs.realpathSync(candidate.directory);
-    const localStaging=path.join(absolute,'_local','evidence-staging');
+    const localStaging=evidenceStagingRoot(absolute);
     const directLocalStage=path.dirname(stage)===localStaging;
     if(!owner||fs.lstatSync(candidate.directory).isSymbolicLink()||(within(absolute,stage)&&!directLocalStage)||!fs.statSync(stage).isDirectory())throw Error('Invalid evidence staging ownership');
     const meta=parseYaml(fs.readFileSync(path.join(stage,'manifest.yaml'),'utf8'));

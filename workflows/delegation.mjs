@@ -31,9 +31,23 @@ function noLinks(root,file) {
  let cursor=file;while(cursor!==root){requireThat(inside(root,cursor),'Delegation ancestor escaped Work');requireThat(!fs.existsSync(cursor)||!fs.lstatSync(cursor).isSymbolicLink(),'Delegation state cannot follow links');const parent=path.dirname(cursor);requireThat(parent!==cursor,'Delegation ancestor walk reached filesystem root');cursor=parent;}
  requireThat(fs.existsSync(root)&&!fs.lstatSync(root).isSymbolicLink(),'Real Work root required');
 }
+/**
+ * A scoped mandate is kernel-owned state with a real lifetime - the same class as a validation receipt - so
+ * it lives in the ledger's own corner beside `kernel-evidence/`, `kernel-strays/` and `kernel-headless/`, not
+ * in `_local/approvals`, which does not survive the 1.0.4 cutover (docs/ledger-db.md §13). `core/index.mjs`
+ * excludes the corner from Work validation for the same reason it excludes the others.
+ *
+ * The path is derived from the LEDGER repo root, so a Work root that already is `.starciwork` does not get a
+ * nested one; `noLinks` still walks from the Work root, because in both shapes the corner is inside it.
+ */
+export function mandateRoot(workRoot) {
+ const root=path.resolve(workRoot);
+ const repoRoot=path.basename(root)==='.starciwork'?path.dirname(root):root;
+ return path.join(repoRoot,'.starciwork','kernel-approvals');
+}
 function stateFile(workRoot,id) {
  requireThat(text(workRoot)&&path.isAbsolute(workRoot)&&/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id),'Absolute Work root and safe delegation ID required');
- const file=path.join(workRoot,'_local','approvals',id+'.yaml');noLinks(workRoot,file);return file;
+ const file=path.join(mandateRoot(workRoot),id+'.yaml');noLinks(workRoot,file);return file;
 }
 function bindings(workRoot,repositories) {
  requireThat(path.isAbsolute(workRoot)&&fs.existsSync(workRoot)&&repositories&&Object.values(repositories).every(p=>text(p)&&path.isAbsolute(p)&&fs.existsSync(p)),'Resolve actual Work and repository roots');

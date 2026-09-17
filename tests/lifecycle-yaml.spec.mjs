@@ -1,29 +1,36 @@
 import test from 'node:test';import {fileURLToPath,pathToFileURL} from 'node:url';import assert from 'node:assert/strict';import fs from 'node:fs';import path from 'node:path';import os from 'node:os';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';import {validateWorkspace,sha256} from '../core/index.mjs';
+import {assertNewStoragePath,inspectStorage} from '../workflows/storage.mjs';
+import {planProgress} from '../workflows/plan.mjs';
 test('saving a Plan before Work exists still routes to preparation without overwriting the Plan',t=>{
  const f=fixture(t,true),run=propose(f.goal,{workRoot:f.root});
- const dir=saveRun(run,'bootstrap-plan'),file=path.join(dir,'goal/index.yaml'),before=fs.readFileSync(file);
+ // The Plan bundle that used to be written here is retired with `_local` (docs/ledger-db.md §13). What it
+ // proved is unchanged and is the point of the test: routing follows the Work root's real state, and a run
+ // already in hand is a frozen value that preparing Work does not touch.
+ const frozen=structuredClone(run);
  assert.equal(propose(f.goal,{workRoot:f.root}).route,'prepare-work');
  f.create();assert.equal(propose(f.goal,{workRoot:f.root}).route,f.goal.workflow);
- assert.deepEqual(fs.readFileSync(file),before);
+ assert.deepEqual(run,frozen);
+ assert.equal(fs.existsSync(path.join(f.root,'_local')),false);
 });
-test('existing synthetic legacy bundle resumes without rebinding; new legacy bundles are refused',t=>{
+/**
+ * The legacy `.work` -> `.starci/plans` bundle this used to seed and resume is retired with the whole plan
+ * writer (docs/ledger-db.md §13); `stateRoot`, the only thing that ever resolved a `.work` root to a
+ * `.starci` sibling, is gone with it. The guard that is NOT about a bundle is the one that still matters
+ * and still runs: a legacy root is refused as a home for anything new, and refusing it writes nothing.
+ */
+test('a legacy .work root is refused for new work and nothing is created beside it',t=>{
  const f=fixture(t),legacy=path.join(f.dir,'.work');
  f.put(path.join(legacy,'workspace.yaml'),{schema:'work/workspace@1',id:'synthetic-legacy'});
- const run=propose(f.goal,{workRoot:legacy});
- assert.throws(()=>saveRun(run,'legacy'),/migration-required/);
+ assert.throws(()=>assertNewStoragePath(path.join(legacy,'anything')),/migration-required/);
+ assert.equal(inspectStorage(f.dir).status,'conflict');
+ assert.equal(inspectStorage(f.dir).newWorkAllowed,false);
  assert.equal(fs.existsSync(path.join(f.dir,'.starci')),false);
- // Seed the historical persistence shape directly; this is not a receipt migration.
- const dir=path.join(f.dir,'.starci/plans/legacy'),planDigest=run.goalDigest;
- f.put(path.join(dir,'goal/index.yaml'),{schema:'starci/plan-goal@1',planDigest,plan:null,jobs:{}});
- f.put(path.join(dir,'approval/index.yaml'),{schema:'starci/plan-approval@1',planDigest,jobs:{}});
- f.put(path.join(dir,'run/index.yaml'),{schema:'starci/plan-run@1',planDigest,jobs:{}});
- assert.equal(saveRun(run,'legacy'),dir);
- const saved=parseYaml(fs.readFileSync(path.join(dir,'goal/index.yaml'),'utf8')).jobs[run.goal.id];
- assert.equal(saved.workRoot,legacy);assert.equal(saved.goalDigest,run.goalDigest);
- assert.throws(()=>saveRun(run,'new-legacy'),/migration-required/);
+ // A run may still be proposed against it: proposing reads, it never creates a home.
+ assert.equal(propose(f.goal,{workRoot:legacy}).workRoot,legacy);
+ assert.equal(fs.existsSync(path.join(f.dir,'.starci')),false);
 });
-import {propose,approveGoal as approvePresentedGoal,presentGoal,requestCell,acceptCell,acceptDelivery,markWorkDone,resumeFromBootstrap,saveRun,workflowDigest,validateGoal,resolveProjectSkillPath} from '../workflows/lifecycle.mjs';
+import {propose,approveGoal as approvePresentedGoal,presentGoal,requestCell,acceptCell,acceptDelivery,markWorkDone,resumeFromBootstrap,workflowDigest,validateGoal,resolveProjectSkillPath,planStatus} from '../workflows/lifecycle.mjs';
 function fixture(t,missing=false){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-goal-'));t.after(()=>{assert.equal(path.dirname(dir),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(dir).startsWith('starci-goal-'));fs.rmSync(dir,{recursive:true,force:true});});const root=path.join(dir,'.starciwork');const put=(p,x)=>{fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,stringifyYaml(x));};const create=()=>{put(path.join(root,'workspace.yaml'),{schema:'work/workspace@1',id:'synthetic'});put(path.join(root,'piece/index.yaml'),{schema:'work/node@1',id:'piece',kind:'operations',required:true,state:'todo',description:'Synthetic unit scenario, not product acceptance.',assertions:['outcome']});};if(!missing)create();fs.writeFileSync(path.join(dir,'proof.log'),'Synthetic observed result');const goal={schema:'starci/goal@1',id:'goal-1',workflow:'operate-runtime',requestId:'request-1',originalRequest:'Synthetic check of runtime and Work metadata.',finalOutcome:'Synthetic runtime returns ready and owned Work records proof.',scope:{business:['synthetic-runtime'],paths:[],resources:['runtime:test','work:test'],exclusions:['production']},criteria:['outcome'],businessChanges:['Only synthetic runtime readiness changes; no real business policy change.'],impacts:[],resourceEffects:[{target:'runtime:test',operation:'inspect',postcondition:'ready'}],inputs:{request:'synthetic original'},cells:[{id:'operate-runtime',op:'runtime.operate',operation:'service',purpose:'Return actual synthetic readiness result',finalOutput:'Result equals ready',criteria:['outcome'],inputs:{request:{from:'request',key:'request'}},outputSchema:{type:'object',properties:{result:{type:'string'}},required:['result'],additionalProperties:false}}],workTargets:['piece']};const receipt=(phase,digest)=>({actor:'user',phase,digest,approved:true,messageId:'synthetic-'+phase,quote:'Synthetic user confirmation from unit harness.'});const response=request=>({cell:request.cell,op:request.op,operation:request.operation,goalDigest:request.goalDigest,scopeDigest:request.scopeDigest,requestDigest:workflowDigest(request),status:'pass',criteria:[{id:'outcome',status:'pass',observation:'Synthetic unit observation',evidence:['log']}],outputs:{result:'ready'},artifacts:[{id:'log',path:'proof.log',sha256:sha256(fs.readFileSync(path.join(dir,'proof.log')))}]});return {dir,root,goal,create,put,receipt,response};}
 test('missing Work routes to bootstrap; approval alone cannot bypass Work',t=>{const f=fixture(t,true);const run=propose(f.goal,{workRoot:f.root});assert.equal(run.route,'prepare-work');assert.throws(()=>requestCell(run,'operate-runtime'));const approved=approveGoal(run,f.receipt('goal',run.goalDigest));assert.equal(approved.status,'awaiting-bootstrap');assert.throws(()=>requestCell(approved,'execute'));assert.equal(fs.existsSync(f.root),false);});
 test('an absent catalog workflow cannot create a run or dispatch effects',t=>{const f=fixture(t),goal=structuredClone(f.goal);goal.workflow='manual-agent-work';assert.throws(()=>propose(goal,{workRoot:f.root}),/Unknown workflow/);});
@@ -36,7 +43,21 @@ test('YAML accepts readable node metadata but rejects ambiguous keys and unsafe 
 
 test('two workflow sessions contribute to one checklist item without duplicate work or early done',t=>{const f=fixture(t);const nodeFile=path.join(f.root,'piece/index.yaml');const meta=parseYaml(fs.readFileSync(nodeFile,'utf8'));meta.assertions=['check-a','check-b'];f.put(nodeFile,meta);const inputDigest=validateWorkspace(f.root).nodes[0].inputDigest;let last;for(const check of ['check-a','check-b']){const goal=structuredClone(f.goal);goal.id=check;goal.criteria=[check];goal.cells[0].criteria=[check];let run=propose(goal,{workRoot:f.root});run=approveGoal(run,f.receipt('goal',run.goalDigest));const issued=requestCell(run,'operate-runtime');const response=f.response(issued.request);response.criteria[0].id=check;run=acceptCell(issued.run,response,{evidenceRoot:f.dir});run=acceptDelivery(run,f.receipt('acceptance',run.resultDigest));f.put(path.join(f.root,'piece/evidence',check,'manifest.yaml'),{schema:'work/evidence@1',id:check,nodeId:'piece',inputDigest,outcome:'pass',assertions:[{id:check,outcome:'pass',observation:'Synthetic contribution from '+check}],assets:[]});if(check==='check-a'){assert.throws(()=>markWorkDone(run,{piece:{inputDigest,evidence:[check]}}));assert.equal(validateWorkspace(f.root).nodes[0].effectiveState,'todo');}last=run;}assert.equal(markWorkDone(last,{piece:{inputDigest,evidence:['check-a','check-b']}}).status,'done');const checked=validateWorkspace(f.root);assert.equal(checked.nodes.length,1);assert.equal(checked.nodes[0].id,'piece');assert.equal(fs.existsSync(path.join(f.root,'piece/workflow')),false);assert.deepEqual(fs.readdirSync(path.join(f.root,'piece/evidence')).sort(),['check-a','check-b']);});
 
-test('workflow histories stay outside canonical Work and cannot overwrite another goal',t=>{const f=fixture(t);const run=propose(f.goal,{workRoot:f.root});const before=validateWorkspace(f.root);const sessions=path.join(path.dirname(f.root),'.starciwork/_local','plans'),dir=saveRun(run,'run-1');assert.equal(dir,path.join(sessions,'run-1'));assert.equal(parseYaml(fs.readFileSync(path.join(dir,'run/index.yaml'),'utf8')).jobs['goal-1'].status,'awaiting-goal-approval');assert.deepEqual(validateWorkspace(f.root),before);assert.equal(fs.existsSync(path.join(f.root,'_workflows')),false);const other=propose({...f.goal,id:'another'},{workRoot:f.root});assert.throws(()=>saveRun(other,'run-1'));assert.equal(saveRun(other,'run-2'),path.join(sessions,'run-2'));assert.equal(fs.existsSync(path.join(f.root,'piece/workflow')),false);});
+/**
+ * The half of this that was about a directory (a bundle under `_local/plans`, one per Plan id) retires with
+ * the writer. The half that is about Work is the reason the test exists and is asserted harder here: running
+ * the lifecycle writes NOTHING into canonical Work - not a history folder, not a workflow record, not a byte
+ * of the validated tree - and two runs of different goals stay two distinct frozen values.
+ */
+test('running a workflow writes nothing into canonical Work and distinct goals stay distinct',t=>{
+ const f=fixture(t);const before=validateWorkspace(f.root);
+ const run=propose(f.goal,{workRoot:f.root});
+ const other=propose({...f.goal,id:'another'},{workRoot:f.root});
+ assert.notEqual(run.goalDigest,other.goalDigest);
+ assert.equal(run.status,'awaiting-goal-approval');
+ assert.deepEqual(validateWorkspace(f.root),before);
+ for(const absent of ['_workflows','_local','piece/workflow'])assert.equal(fs.existsSync(path.join(f.root,absent)),false,absent);
+});
 
 test('v2 dispatch binds current Work inputs and rejects semantic drift before accepting effects',t=>{const f=fixture(t),yaml=path.join(f.root,'piece/index.yaml');f.put(yaml,{schema:'work/node@2',id:'piece',kind:'operations',required:true,state:'todo',assertions:['outcome'],description:'Synthetic v2 work scope with observable completion.'});let run=propose(f.goal,{workRoot:f.root});run=approveGoal(run,f.receipt('goal',run.goalDigest));const issued=requestCell(run,'operate-runtime');assert.equal(issued.request.workBindings.length,1);assert.equal(issued.request.workBindings[0].id,'piece');const meta=parseYaml(fs.readFileSync(yaml,'utf8'));f.put(yaml,{...meta,description:meta.description+' Changed after dispatch.'});assert.throws(()=>acceptCell(issued.run,f.response(issued.request),{evidenceRoot:f.dir}),/Work inputs changed/);});
 
@@ -68,15 +89,23 @@ test('original request cannot approve a subsequently presented goal',t=>{
  assert.throws(()=>approvePresentedGoal(shown,{...f.receipt('goal',run.goalDigest),replyTo:'synthetic-presentation'}),/Present/);
 });
 
-test('Plan bundle separates goal approval and current execution without duplicating goals',t=>{
- const f=fixture(t),run=propose(f.goal,{workRoot:f.root});const dir=saveRun(run,'accounting-plan');
- const read=p=>parseYaml(fs.readFileSync(path.join(dir,p),'utf8'));
- assert.deepEqual(Object.keys(read('index.yaml')).sort(),['approval','goal','id','run','schema']);
- assert.equal(read('approval/index.yaml').jobs['goal-1'].status,'pending');
- assert.equal(read('run/index.yaml').jobs['goal-1'].goal,undefined);
- assert.equal(read('goal/index.yaml').jobs['goal-1'].goal.finalOutcome,f.goal.finalOutcome);
- assert.equal(fs.existsSync(path.join(path.dirname(f.root),'.starciwork/_local','runs')),false);
- assert.throws(()=>saveRun(run,'../escape'),/Unsafe/);
+/**
+ * The four-document split (index/goal/approval/run) was the bundle's file layout, and it goes with the
+ * bundle. What it encoded is a property of the run value itself, which is what is asserted now: a proposed
+ * run carries its goal and its approval state separately and exactly once, so reading approval can never be
+ * reading a second copy of the goal. `scripts/plan.mjs create` still writes the four documents, to a
+ * caller-named directory; `tests/plan-coverage.spec.mjs` owns that.
+ */
+test('a run separates goal from approval state without duplicating the goal',t=>{
+ const f=fixture(t),run=propose(f.goal,{workRoot:f.root});
+ assert.equal(run.goal.finalOutcome,f.goal.finalOutcome);
+ assert.deepEqual(run.approvals,[]);
+ assert.equal(run.status,'awaiting-goal-approval');
+ assert.equal(run.presentation,undefined,'an unapproved run carries no presentation to mistake for one');
+ const approvedRun=approveGoal(run,f.receipt('goal',run.goalDigest));
+ assert.equal(approvedRun.approvals.length,1);
+ assert.equal(approvedRun.goalDigest,run.goalDigest,'approving does not restate the goal');
+ assert.deepEqual(approvedRun.goal,run.goal);
 });
 
 test('future workflow questions stay in the complete Plan without blocking the current goal',t=>{
@@ -88,13 +117,16 @@ test('future workflow questions stay in the complete Plan without blocking the c
  const shown=presentGoal(run,{messageId:'current-checkpoint',scope,jobId:'job'});
  const approved=approvePresentedGoal(shown,{...f.receipt('goal',shown.goalDigest),replyTo:'current-checkpoint'});
  assert.equal(approved.status,'approved');
- const dir=saveRun(approved),read=rel=>parseYaml(fs.readFileSync(path.join(dir,rel),'utf8'));
- assert.equal(read('goal/index.yaml').plan.finalOutcome,scope.finalOutcome);
- assert.equal(read('run/index.yaml').status,'in-progress');
- assert.equal(read('run/index.yaml').jobs.future.status,'planned');
- assert.equal(read('approval/index.yaml').jobs.future.status,'pending');
- assert.deepEqual(read('approval/index.yaml').jobs.future.receipts,[]);
- assert.throws(()=>saveRun(approved,'new-plan-for-first-workflow'),/one presented Plan/);
+ // The bundle these facts used to be read out of is retired (docs/ledger-db.md §13); the facts are not, and
+ // they were always properties of the Plan and the run, never of the four YAML documents. `planProgress` is
+ // the same function `saveRun` called to fill `run/index.yaml`'s status - it is asked directly here.
+ assert.equal(approved.presentation.scope.finalOutcome,scope.finalOutcome);
+ assert.equal(approved.presentation.jobId,'job');
+ const runsSoFar={job:approved};
+ assert.equal(planProgress(scope,runsSoFar),'in-progress');
+ assert.equal(planStatus(scope,runsSoFar),'in-progress','a Plan with work left owes no review yet');
+ assert.equal(runsSoFar.future,undefined,'the future job has not started and carries no receipts');
+ assert.equal(approved.approvals.length,1,'approving this goal approves this goal only');
 
  const nextGoal={...structuredClone(f.goal),id:'goal-2'};
  let next=propose(nextGoal,{workRoot:f.root});
@@ -105,14 +137,19 @@ test('future workflow questions stay in the complete Plan without blocking the c
   const bad=presentGoal(propose(badGoal,{workRoot:f.root}),{messageId:'bad-checkpoint',scope,jobId:'future'});
   assert.throws(()=>approvePresentedGoal(bad,{...f.receipt('goal',bad.goalDigest),replyTo:'bad-checkpoint'}),/this workflow goal questions/);
  }
+ const firstReceipts=structuredClone(approved.approvals);
  nextGoal.inputs.planQuestionAnswers=[{question:future.openQuestions[0],answer:'Return the readiness observation, without production effects.'}];
  next=presentGoal(propose(nextGoal,{workRoot:f.root}),{messageId:'answered-checkpoint',scope,jobId:'future'});
  next=approvePresentedGoal(next,{...f.receipt('goal',next.goalDigest),replyTo:'answered-checkpoint'});
- const firstReceipts=read('approval/index.yaml').jobs.job.receipts;
- assert.equal(saveRun(next),dir);
- assert.deepEqual(read('approval/index.yaml').jobs.job.receipts,firstReceipts);
- assert.deepEqual(read('goal/index.yaml').plan,scope);
- assert.equal(read('run/index.yaml').status,'in-progress');
+ // Approving the future job leaves the first job's receipts exactly as they were. `saveRun` had to MERGE to
+ // keep that true across a shared bundle; with no bundle there is nothing to clobber, which is the stronger
+ // version of the same guarantee - asserted, not assumed.
+ assert.deepEqual(approved.approvals,firstReceipts);
+ assert.equal(next.approvals.length,1);
+ assert.notEqual(next.goalDigest,approved.goalDigest);
+ assert.deepEqual(next.presentation.scope,scope,'both jobs are bound to the one unchanged presented Plan');
+ assert.deepEqual(approved.presentation.scope,scope);
+ assert.equal(planProgress(scope,{job:approved,future:next}),'in-progress');
 });
 
 test('terminal Plan questions still block every new goal and legacy presentations cannot bypass v2',t=>{

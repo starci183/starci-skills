@@ -7,7 +7,7 @@ purpose: |-
   Plan at the start of a new large, unclear or multi-workflow outcome. A clear bounded single workflow executes standalone, without a one-job Plan wrapper; small low-risk fixes use flash. Resume existing Plans instead of recreating them per prompt. Within a Plan, preserve the complete outcome across bounded workflows.
 contract: |-
   New Plans use starci/plan@2. Existing v1 Plans are readable but do not prove full coverage; never silently migrate their hashes or approvals. A new Plan-bound workflow goal requires an explicitly reviewed v2 Plan; standalone workflow presentation follows docs/standalone-workflow.md instead.
-location: <backend-repository>/.starciwork/_local/plans/<task-name>/index.yaml
+location: <chosen plan directory>/index.yaml, named on the `plan.mjs create` command line
 format: |-
   English YAML; present the goal to the user in config.language
 stage: |-
@@ -65,7 +65,7 @@ cleanup: |-
 legacy: |-
   Already running jobs without a presented goal must pause and present their current changes and revised scope; never manufacture retroactive approval.
 ownership: |-
-  Backend owns .starciwork/_local and canonical .starciwork; frontend resolves them through workspace bindings. Keep .starciwork/_local local and ignored by Git.
+  Backend owns canonical .starciwork; frontend resolves it through workspace bindings. A Plan bundle is not Work and never goes inside it: .starciwork holds canonical Work and the runtime ledger, and .starciwork/_local does not survive the 1.0.4 cutover.
 files:
   index.yaml: |-
     Stable Plan ID and relative pointers only; no duplicate execution state.
@@ -76,7 +76,7 @@ files:
   run/index.yaml: |-
     Current job states, requests, accepted responses, typed handoffs and evidence references. Preserve every completed producer needed by later jobs. No attempt history.
 storage: |-
-  One backend-owned .starciwork/_local/plans/<plan-id>/ bundle. All workflows in the same Plan share this directory; never create a separate runs tree or a new Plan per workflow.
+  One bundle directory per Plan, chosen by the caller and passed to `plan.mjs create`: the repository when repository writes are allowed, otherwise the allowed task draft directory. Never inside .starciwork, and never .starciwork/_local, which does not survive the 1.0.4 cutover. All workflows in the same Plan share this one directory; never create a separate runs tree or a new Plan per workflow.
 recovery: |-
   Incomplete writes or mismatched Plan digests block resumption; never treat file presence as approval. Keep unfinished bundles. Goal revisions require renewed approval, not overwriting a running goal.
 template: plan.template.json

@@ -6,11 +6,24 @@ import path from 'node:path';
 import {validateWorkspace,sha256} from '../core/index.mjs';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import {documentSDS} from '../fixtures/sds.mjs';
-import {propose,presentGoal,approveGoal,presentDelegatedGoal,authorizeDelegatedGoal,authorizeAutoGoal,requestCell,acceptCell,acceptDelivery,acceptAutoDelivery,acceptDelegatedDelivery,preflightCompletion,markWorkDone,workflowDigest,saveRun,loadPlanRuns} from '../workflows/lifecycle.mjs';
+import {propose,presentGoal,approveGoal,presentDelegatedGoal,authorizeDelegatedGoal,authorizeAutoGoal,requestCell,acceptCell,acceptDelivery,acceptAutoDelivery,acceptDelegatedDelivery,preflightCompletion,markWorkDone,workflowDigest} from '../workflows/lifecycle.mjs';
 import {registerScopedMandate,delegatedContext,hasDelegatedAcceptance} from '../workflows/delegation.mjs';
 import {presentAutoPlan,approveAutoPlan,verifyAutoEvidence,verifyAutoPredecessors} from '../workflows/auto.mjs';
 import {verifyRunWork} from '../workflows/work-binding.mjs';
 import {verifyProducerResult} from '../workflows/producer-verification.mjs';
+
+/**
+ * A run used to be carried across a process boundary by `saveRun` + `loadPlanRuns`, a four-document YAML
+ * bundle under `.starciwork/_local/plans/<id>/`. That bundle is retired with `_local` (docs/ledger-db.md
+ * §13) and nothing executable ever called those two functions - the reload was always a test vehicle.
+ *
+ * What the vehicle was for is untouched: verification re-reads the Work tree and the evidence bytes every
+ * time, so a run that verified a moment ago stops verifying once the disk moves under it. `carried` is the
+ * same vehicle without the writer, and a stricter one: a JSON round-trip keeps no schema knowledge of its
+ * own and would surface any non-serializable state the bundle used to drop on the floor.
+ */
+const carried=run=>JSON.parse(JSON.stringify(run));
+
 
 // All authority/proof below is an isolated synthetic fixture, never product acceptance.
 function fixture(t,{mode='manual',legacy=false,ui=false}={}){
@@ -58,8 +71,8 @@ for(const mode of ['manual','auto','delegated'])test(`${mode}: author two exact 
  const f=fixture(t,{mode}),issued=f.issue(f.approve()),before=structuredClone(issued.request);f.edit();f.edit(f.files[1]);const result=f.result(issued);
  assert.deepEqual(result.requests['design-architecture'],before);assert.equal(before.schema,'starci/cell-request@2');assert.notDeepEqual(result.responses['design-architecture'].workResult.bindings,before.workBindings);
  assert.equal(preflightCompletion(result,f.completions()).ok,true);const done=markWorkDone(f.accept(result),f.completions());assert.equal(done.status,'done');verifyAutoEvidence(done);
- saveRun(done);const loaded=loadPlanRuns(f.plan,f.root).design;assert.deepEqual(loaded.responses,done.responses);assert.deepEqual(loaded.requests,done.requests);verifyRunWork(loaded);
- f.edit();const stale=loadPlanRuns(f.plan,f.root).design;assert.throws(()=>verifyRunWork(stale),/changed/);if(mode==='delegated')assert.equal(hasDelegatedAcceptance(stale),false);
+ const loaded=carried(done);assert.deepEqual(loaded.responses,done.responses);assert.deepEqual(loaded.requests,done.requests);verifyRunWork(loaded);
+ f.edit();const stale=carried(done);assert.throws(()=>verifyRunWork(stale),/changed/);if(mode==='delegated')assert.equal(hasDelegatedAcceptance(stale),false);
 });
 
 test('legacy requests remain strict and cannot receive retroactive authored fields',t=>{
@@ -147,8 +160,8 @@ for(const mode of ['manual','auto','delegated'])for(const drift of ['design','im
  fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6X8AAAAASUVORK5CYII=','base64'));
  f.put(f.files[0],{...f.read(f.files[0]),assets:[{path:asset}]});
  const issued=f.issue(f.approve());f.edit();f.edit(f.files[1]);const response=f.response(issued);response.artifacts.push({id:'drawing',path:path.relative(f.dir,file),sha256:sha256(fs.readFileSync(file))});response.criteria[0].evidence.push('drawing');
- const result=acceptCell(issued.run,response,{evidenceRoot:f.dir}),done=markWorkDone(f.accept(result),f.completions());saveRun(done);
- const loaded=loadPlanRuns(f.plan,f.root).design;assert.equal(loaded.status,'done');assert.deepEqual(loaded.responses,done.responses);assert.equal(verifyProducerResult(loaded),true);
+ const result=acceptCell(issued.run,response,{evidenceRoot:f.dir}),done=markWorkDone(f.accept(result),f.completions());
+ const loaded=carried(done);assert.equal(loaded.status,'done');assert.deepEqual(loaded.responses,done.responses);assert.equal(verifyProducerResult(loaded),true);
  if(mode==='delegated')assert.equal(hasDelegatedAcceptance(loaded),true);
  if(drift==='design')f.edit();if(drift==='image')fs.appendFileSync(file,'changed');if(drift==='review')fs.appendFileSync(path.join(f.dir,'review.log'),'changed');if(drift==='completion'){const n=f.read(f.files[0]);delete n.completion;f.put(f.files[0],n);}
  assert.throws(()=>verifyProducerResult(loaded));if(mode==='delegated')assert.equal(hasDelegatedAcceptance(loaded),false);
@@ -159,8 +172,8 @@ test('historical raw-canonical receipt remains inspectable but cannot gain a ret
  // Construct the old transport shape in this synthetic fixture only. The new
  // acceptCell rejects this shape; producer verification must not silently relax it.
  const response=historical.responses[f.workflow];response.artifacts.push({id:'historical-canonical',path:path.relative(f.dir,file),sha256:sha256(fs.readFileSync(file))});response.criteria[0].evidence.push('historical-canonical');historical.resultDigest=workflowDigest({goalDigest:historical.goalDigest,responses:historical.responses});
- const accepted=f.accept(historical),done=markWorkDone(accepted,f.completions());saveRun(done);
- const loaded=loadPlanRuns(f.plan,f.root).design;assert.equal(loaded.status,'done');assert.deepEqual(loaded.responses,done.responses);assert.equal(verifyRunWork(loaded),true);assert.throws(()=>verifyProducerResult(loaded),/evidence/);assert.equal(hasDelegatedAcceptance(loaded),false);
+ const accepted=f.accept(historical),done=markWorkDone(accepted,f.completions());
+ const loaded=carried(done);assert.equal(loaded.status,'done');assert.deepEqual(loaded.responses,done.responses);assert.equal(verifyRunWork(loaded),true);assert.throws(()=>verifyProducerResult(loaded),/evidence/);assert.equal(hasDelegatedAcceptance(loaded),false);
 });
 
 for(const mode of ['manual','auto'])test(`${mode}: frontend successor rechecks both sealed draw content and artifacts before new effects`,t=>{

@@ -5,11 +5,20 @@ import path from 'node:path';
 import os from 'node:os';
 import {sha256,validateWorkspace} from '../core/index.mjs';
 import {stringifyYaml,parseYaml} from '../core/yaml.mjs';
-import {validatePlan} from '../workflows/plan.mjs';
+import {validatePlan,planProgress} from '../workflows/plan.mjs';
 import {renderPlan,createBundle} from '../scripts/plan.mjs';
 import {autoASAPWindow,autoASAPStatus} from '../workflows/auto.mjs';
-import {presentAutoPlan,approveAutoPlan,assessAutoGoal,nextAutoJob,hasAutoAcceptance,assertAutoAuthority} from '../workflows/auto.mjs';
-import {propose,presentGoal,authorizeAutoGoal,requestCell,acceptCell,acceptAutoDelivery,markWorkDone,saveRun,saveAutoCompletion,workflowDigest} from '../workflows/lifecycle.mjs';
+import {presentAutoPlan,approveAutoPlan,assessAutoGoal,nextAutoJob,hasAutoAcceptance,assertAutoAuthority,completeAutoPlan} from '../workflows/auto.mjs';
+/**
+ * `saveRun` and `saveAutoCompletion` retire with `.starciwork/_local` (docs/ledger-db.md §13): the bundle
+ * they wrote is gone and nothing executable ever called them. `saveAutoCompletion` was `completeAutoPlan`
+ * plus a write, so the verification it performed is `completeAutoPlan`, called directly. `carried` replaces
+ * the reload with a JSON round-trip, which proves the same thing the bundle did - a run survives being
+ * carried whole - without knowing any schema.
+ */
+const carried=run=>JSON.parse(JSON.stringify(run));
+
+import {propose,presentGoal,authorizeAutoGoal,requestCell,acceptCell,acceptAutoDelivery,markWorkDone,workflowDigest,planStatus} from '../workflows/lifecycle.mjs';
 import {validBackendRun} from '../workflows/select.mjs';
 import {readWorkflow, readExample, readPublicJson} from './helpers/read-public.mjs';
 const catalog=readWorkflow('catalog.json');
@@ -55,14 +64,16 @@ test('ASAP cooks two proved jobs before a later question without truncating the 
  const authorization=f.approval(),runs={};
  for(let i=0;i<2;i++){
   assert.equal(autoASAPStatus(f.plan,{authorization,runs}).jobId,'job-'+i);
-  runs['job-'+i]=f.finish(authorizeAutoGoal(f.shown(i),{authorization,assessment:f.assessment,priorRuns:runs}),i);
-  saveRun(runs['job-'+i]);
+  runs['job-'+i]=carried(f.finish(authorizeAutoGoal(f.shown(i),{authorization,assessment:f.assessment,priorRuns:runs}),i));
  }
  const waiting=autoASAPStatus(f.plan,{authorization,runs});
  assert.equal(waiting.status,'needs-user');assert.deepEqual(waiting.candidateJobIds,[]);assert.deepEqual(waiting.laterJobIds,['job-2']);
  assert.equal(f.plan.workflows.length,3);
- const persisted=parseYaml(fs.readFileSync(path.join(f.dir,'.starciwork/_local/plans',f.plan.id,'run/index.yaml'),'utf8'));
- assert.notEqual(persisted.status,'done');assert.equal(persisted.jobs['job-2'].status,'planned');
+ // The Plan is not truncated to the two jobs that ran: the third is still in it, unstarted, and the Plan is
+ // not done. Read off the Plan and the runs, which is where it was always true - the bundle only copied it.
+ assert.equal(planProgress(f.plan,runs),'in-progress');
+ assert.equal(runs['job-2'],undefined);
+ assert.deepEqual(f.plan.workflows.map(j=>j.id),['job-0','job-1','job-2']);
  fs.writeFileSync(path.join(f.dir,'proof-0.log'),'stale');
  assert.throws(()=>autoASAPStatus(f.plan,{authorization,runs}),/evidence/);
 });
@@ -91,9 +102,8 @@ test('new Plan bundles refuse legacy destinations or a parallel canonical tree',
   assert.equal(fs.existsSync(path.join(f.dir,name)),false);
  }
  fs.mkdirSync(path.join(f.dir,'.starci'));
- assert.throws(()=>createBundle(f.plan,path.join(f.dir,'.starciwork/_local/plans/new')),/conflict/);
- assert.throws(()=>saveRun(f.shown()),/conflict/);
- assert.equal(fs.existsSync(path.join(f.dir,'.starciwork/_local')),false);
+ assert.throws(()=>createBundle(f.plan,path.join(f.dir,'.starciwork/plans/new')),/conflict/);
+ assert.equal(fs.existsSync(path.join(f.dir,'.starciwork/plans')),false);
 });
 
 test('manual remains default; auto needs explicit bounded delegation policy',t=>{
@@ -143,19 +153,23 @@ test('auto completes all ordered workflows without fake per-job user receipts an
   let run=authorizeAutoGoal(f.shown(i),{authorization,assessment:f.assessment,priorRuns:runs});
   run=f.finish(run,i);runs['job-'+i]=run;
   assert.equal(hasAutoAcceptance(run),true);assert.equal(run.approvals.some(a=>a.actor==='user'),false);
-  saveRun(run);
+  runs['job-'+i]=carried(run);
  }
  assert.equal(nextAutoJob(f.plan,{authorization,runs}).status,'awaiting-terminal-review');
- const bundle=path.join(f.dir,'.starciwork/_local/plans',f.plan.id),read=p=>parseYaml(fs.readFileSync(path.join(bundle,p),'utf8'));
- assert.deepEqual(read('goal/index.yaml').plan,f.plan);assert.equal(Object.keys(read('run/index.yaml').jobs).length,2);
- assert.equal(read('run/index.yaml').jobs['job-1'].automatic.authorization.receipt.messageId,'subsequent-user-auto');
- assert.equal(read('approval/index.yaml').jobs['job-0'].receipts.at(-1).actor,'assistant');
- assert.equal(read('run/index.yaml').status,'awaiting-terminal-review');
- assert.throws(()=>saveAutoCompletion(f.plan,{authorization,criteria:[]}),/terminal criterion/);
+ // The Plan's own status says the same thing, from the Plan and its runs alone.
+ assert.equal(planStatus(f.plan,runs),'awaiting-terminal-review');
+ // Every fact the bundle was read back for is a fact about the runs themselves, and they survive carrying.
+ assert.deepEqual(Object.keys(runs).sort(),['job-0','job-1']);
+ assert.deepEqual(runs['job-0'].presentation.scope,f.plan);
+ assert.equal(runs['job-1'].automatic.authorization.receipt.messageId,'subsequent-user-auto');
+ assert.equal(runs['job-0'].approvals.at(-1).actor,'assistant');
+ assert.throws(()=>completeAutoPlan(f.plan,{authorization,runs,criteria:[]}),/terminal criterion/);
  const criteria=[{id:'terminal',status:'pass',observation:'Both synthetic outputs have current proof.',evidence:[0,1].map(i=>({jobId:'job-'+i,cellId:'define-business',criterionId:'outcome'}))}];
- assert.equal(saveAutoCompletion(f.plan,{authorization,criteria}).actor,'assistant');
- assert.equal(read('run/index.yaml').status,'done');
- saveRun(runs['job-1']);assert.equal(read('run/index.yaml').status,'done');
+ const completion=completeAutoPlan(f.plan,{authorization,runs,criteria});
+ assert.equal(completion.actor,'assistant');assert.equal(completion.status,'done');
+ assert.equal(planStatus(f.plan,runs,{completion}),'done');
+ // Terminal review is what makes the Plan done; the runs it reviewed are unchanged by it.
+ assert.deepEqual(runs['job-1'],carried(runs['job-1']));
 });
 test('auto cannot accept failed missing or stale evidence or mark Work done early',t=>{
  const f=fixture(t),authorization=f.approval();let run=authorizeAutoGoal(f.shown(),{authorization,assessment:f.assessment});

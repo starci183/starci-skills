@@ -7,7 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {sha256,validateWorkspace} from '../core/index.mjs';
 import {stringifyYaml,parseYaml} from '../core/yaml.mjs';
 import {registerScopedMandate,readScopedMandate,revokeScopedMandate,delegatedContext,hasDelegatedAcceptance} from '../workflows/delegation.mjs';
-import {propose,presentGoal,approveGoal,presentDelegatedGoal,authorizeDelegatedGoal,requestCell,acceptCell,acceptDelivery,acceptDelegatedDelivery,markWorkDone,authorizeAutoGoal,acceptAutoDelivery,saveRun,loadPlanRuns,saveDelegatedCompletion,workflowDigest} from '../workflows/lifecycle.mjs';
+import {propose,presentGoal,approveGoal,presentDelegatedGoal,authorizeDelegatedGoal,requestCell,acceptCell,acceptDelivery,acceptDelegatedDelivery,markWorkDone,authorizeAutoGoal,acceptAutoDelivery,workflowDigest} from '../workflows/lifecycle.mjs';
 import {validBackendRun,selectJobPlan} from '../workflows/select.mjs';
 
 const source=(actor,threadId,quote)=>({actor,threadId,messageId:null,messageIdAvailability:'not-exposed',quote,assurance:'conversation-context-not-authenticated'});
@@ -46,6 +46,19 @@ import {verifyProducerResult} from '../workflows/producer-verification.mjs';
 import {hasDirectProducerAcceptance} from '../workflows/producer-verification.mjs';
 
 import {readWorkflow, readExample, readPublicJson} from './helpers/read-public.mjs';
+
+/**
+ * A run used to be carried across a process boundary by `saveRun` + `loadPlanRuns`, a four-document YAML
+ * bundle under `.starciwork/_local/plans/<id>/`. That bundle is retired with `_local` (docs/ledger-db.md
+ * §13) and nothing executable ever called those two functions - the reload was always a test vehicle.
+ *
+ * What the vehicle was for is untouched: verification re-reads the Work tree and the evidence bytes every
+ * time, so a run that verified a moment ago stops verifying once the disk moves under it. `carried` is the
+ * same vehicle without the writer, and a stricter one: a JSON round-trip keeps no schema knowledge of its
+ * own and would surface any non-serializable state the bundle used to drop on the floor.
+ */
+const carried=run=>JSON.parse(JSON.stringify(run));
+
 const catalog=readWorkflow('catalog.json');
 const consumer=run=>selectJobPlan(catalog,{actions:[{action:'implement-frontend',effectful:true,requiresBackend:true}],acceptedBackendRun:run});
 const reseal=run=>{for(const [id,r]of Object.entries(run.responses))r.requestDigest=workflowDigest(run.requests[id]);run.resultDigest=workflowDigest({goalDigest:run.goalDigest,responses:run.responses});for(const a of run.approvals)if(a.phase.includes('acceptance'))a.digest=run.resultDigest;};
@@ -138,8 +151,8 @@ for(const mode of ['manual','auto','delegated']){
   assert.equal(validateWorkspace(f.root).ok,false);assert.equal(validBackendRun(f.run),true);assert.doesNotThrow(()=>consumer(f.run));
  });
  test(mode+' stale saved history remains inspectable but cannot qualify for frontend',t=>{
-  const f=backend(t,mode);saveRun(f.run);fs.appendFileSync(path.join(f.dir,'proof-0.log'),' drift');
-  const loaded=loadPlanRuns(f.plan,f.root)['job-0'];assert.equal(loaded.resultDigest,f.run.resultDigest);assert.equal(validBackendRun(loaded),false);assert.throws(()=>consumer(loaded));
+  const f=backend(t,mode);const held=carried(f.run);fs.appendFileSync(path.join(f.dir,'proof-0.log'),' drift');
+  const loaded=held;assert.equal(loaded.resultDigest,f.run.resultDigest);assert.equal(validBackendRun(loaded),false);assert.throws(()=>consumer(loaded));
  });
  test(mode+' reopened referenced design cannot qualify despite unchanged semantic hashes',t=>{
   const f=backend(t,mode,{upstream:true,referenceInput:true});assert.equal(validBackendRun(f.run),true);
@@ -272,7 +285,7 @@ for(const mode of ['manual','auto','delegated']){
   assert.equal(mode==='manual'?hasDirectProducerAcceptance(run):mode==='auto'?hasAutoAcceptance(run):hasDelegatedAcceptance(run),false);
  });
  test(mode+' completed frontend rechecks embedded backend but stale history remains loadable',t=>{
-  const f=frontend(t,mode);let run=f.frontRun;for(const id of ['draw','implement','uat'])run=f.advance(run,id);run=markWorkDone(f.accept(run),f.completions());saveRun(run);f.corrupt();
-  const loaded=loadPlanRuns(f.frontPlan,f.root).front;assert.equal(loaded.resultDigest,run.resultDigest);assert.throws(()=>verifyProducerResult(loaded),/backend producer/);
+  const f=frontend(t,mode);let run=f.frontRun;for(const id of ['draw','implement','uat'])run=f.advance(run,id);run=markWorkDone(f.accept(run),f.completions());const held=carried(run);f.corrupt();
+  const loaded=held;assert.equal(loaded.resultDigest,run.resultDigest);assert.throws(()=>verifyProducerResult(loaded),/backend producer/);
  });
 }

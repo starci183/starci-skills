@@ -360,7 +360,7 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       const root = path.resolve(args[0]);
       assertNewStoragePath(root);
       const localOnly=isLocalOnlyWorkspace(root);
-      if (fs.existsSync(root)&&!localOnly) throw new Error('Init requires a new root or only reserved _local state; existing Work will not be modified.');
+      if (fs.existsSync(root)&&!localOnly) throw new Error('Init requires a new root or only reserved runtime state; existing Work will not be modified.');
       directory(path.dirname(root));
       loadConfig(undefined, {initialize:true});
       if(!localOnly)fs.mkdirSync(root);
@@ -368,7 +368,12 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       fs.mkdirSync(path.join(root,'_schema'));
       for(const name of ['work.schema'])fs.writeFileSync(path.join(root,'_schema',name+'.yaml'),stringifyYaml(readDistJson('schemas',name+'.json')));
       fs.writeFileSync(path.join(root,'_schema/work-layout.yaml'),stringifyYaml(readDistJson('schemas','work-layout.json')));
-      fs.writeFileSync(path.join(root, '.gitignore'), '_local/\n_workflows/\n', { flag: 'wx' });
+      // The ledger and its WAL siblings are untracked by design (docs/ledger-db.md §2); `ledger-anchor.json`
+      // beside them is tracked ON PURPOSE (§12) - it is the counter-record a re-clone carries, and ignoring
+      // it would turn a lost ledger into a silent restart at generation 0 instead of a refusal. `_local/`
+      // stays listed only while `ledger-migrate` still reads it as an import source (§13); a migrated root
+      // has no `_local`, and the line goes when the migrator does.
+      fs.writeFileSync(path.join(root, '.gitignore'), 'runtime.sqlite\nruntime.sqlite-wal\nruntime.sqlite-shm\nkernel-evidence/\nkernel-headless/\n_local/\n_workflows/\n', { flag: 'wx' });
       emit({ ok: true, created: root, workspaceId: args[2], productWorkExecuted: false });
       return 0;
     }
