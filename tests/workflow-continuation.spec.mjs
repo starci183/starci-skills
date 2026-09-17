@@ -208,7 +208,9 @@ test('public retry re-admits a completed report without replacing its candidate 
 
 test('public stop, valid-pin retry and pinned same-ID run preserve accepted history while completing remaining work',async t=>{
   const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-continuation-positive-')),root=path.join(temp,'repo');let runtime=null,pinnedStore=null;fs.mkdirSync(root);
-  t.after(()=>{try{runtime?.close();store.close();pinnedStore?.close();}finally{fs.rmSync(temp,{recursive:true,force:true,maxRetries:5,retryDelay:100});}});
+  // Each handle closes on its own: one close that throws must not leave the next two open, or the removal EPERMs.
+  t.after(()=>{for(const handle of [runtime,pinnedStore,store])try{handle?.close();}catch{}
+    fs.rmSync(temp,{recursive:true,force:true,maxRetries:20,retryDelay:100});});
   assert.equal(spawnSync('git',['init','-q'],{cwd:root,windowsHide:true}).status,0);
   assert.equal(spawnSync('git',['config','user.email','fixture@example.test'],{cwd:root,windowsHide:true}).status,0);
   assert.equal(spawnSync('git',['config','user.name','Fixture'],{cwd:root,windowsHide:true}).status,0);
@@ -234,6 +236,7 @@ test('public stop, valid-pin retry and pinned same-ID run preserve accepted hist
   assert.equal(stopped.id,current.id);assert.ok(fs.existsSync(path.join(root,'workflows',`${current.id}.md`)));
   const retried=kernelMain('workflow-retry',{id:current.id},{orca:{},cwd:root});
   assert.equal(retried.ok,true);assert.equal(retried.id,current.id);assert.equal(retried.generation,2);assert.deepEqual(retried.retried,[]);
+  assert.ok(store.readEvents().some(event=>event.event==='workflow-retried'),'the retry is on the record it retried');
   const afterRetry=store.loadState();assert.equal(afterRetry.engine.coordination,'agent-v1');assert.equal(afterRetry.ops.find(op=>op.id==='accepted').status,'done');
   assert.deepEqual(afterRetry.decisions,current.decisions);assert.equal(afterRetry.ops.find(op=>op.id==='remaining').status,'ready');
 
@@ -247,7 +250,7 @@ test('public stop, valid-pin retry and pinned same-ID run preserve accepted hist
   runtime.model=(name)=>name==='validateOp'?{ok:true,verdict:'accept',summary:'fixture validator reproduced the bounded change',findings:[],dropped:[],
     provider:'fixture-validator',complete:true,independentFromAttempt:true,freshContext:true,reviewerAttemptId:'validator-positive'}:
     {ok:true,value:{option:'continue'}};
-  let managerCalls=0;runtime.manageWorkflow=snapshot=>{managerCalls+=1;return {schema:'starci/manager-decision@1',workflowId:snapshot.workflowId,generation:snapshot.generation,
+  let managerCalls=0;runtime.manageWorkflow=snapshot=>{managerCalls+=1;captureLiveEvents();return {schema:'starci/manager-decision@1',workflowId:snapshot.workflowId,generation:snapshot.generation,
     version:snapshot.version,digest:snapshot.digest,decisionId:snapshot.decisionId,basisDigest:snapshot.basisDigest,
     orderedActionIds:snapshot.actions.map(action=>action.id),rationale:'dispatch the remaining authorized operation'};};
   runtime.check=(command,options={})=>spawnSync(command,{shell:true,encoding:'utf8',windowsHide:true,...options});
@@ -294,7 +297,12 @@ test('public stop, valid-pin retry and pinned same-ID run preserve accepted hist
     workerLive=true;deliverPending=true;
     return {ok:true,effectState:'committed',selection:{target:'gpt-5.6-sol'},task:{id:'task-positive'},dispatchId:dispatch,terminal:'term-worker'};
   };
-  let clock=Date.now();const now=()=>{clock+=1000;return clock;},wait=ms=>{clock+=Math.max(0,Number(ms)||0);};
+  let clock=Date.now();const now=()=>{clock+=1000;return clock;};
+  // The run's own events are read while it is still live: finishing retires a workflow's rows by design
+  // (§13), so `run-resumed` is gone from the ledger by the time kernelMain returns.
+  const liveEvents=new Set();
+  const captureLiveEvents=()=>{for(const event of pinnedStore.readEvents())liveEvents.add(event.event);};
+  const wait=ms=>{clock+=Math.max(0,Number(ms)||0);};
   const finished=pinnedKernel.kernelMain('workflow-run',{id:current.id,from:'term-positive',run:'run-positive','max-iterations':'8'},
     {orca,cwd:root,wait,functions:{engineRuntime:runtime,allocator,launch,guards,git,reconcileInputs:()=>{},refreshPreparation:()=>{},deferPreparation:()=>false,
       now,wait,waitTimeoutMs:5000,tickMs:1000,pollMs:1000}});
@@ -313,6 +321,5 @@ test('public stop, valid-pin retry and pinned same-ID run preserve accepted hist
     assert.deepEqual(settledJournal.liveRows(current.id),{leases:[],jobs:[]});
   }finally{settledJournal.close();}
   assert.equal(fs.readFileSync(path.join(root,'src','app.txt'),'utf8'),'ready\n');
-  assert.ok(pinnedStore.readEvents().some(event=>event.event==='run-resumed'));
-  assert.ok(pinnedStore.readEvents().some(event=>event.event==='workflow-retried'));
+  assert.ok(liveEvents.has('run-resumed'),'the kernel joined the run it was given instead of binding a new one');
 });

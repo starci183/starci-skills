@@ -1,5 +1,3 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import crypto from 'node:crypto';
 import {applyOwnerAction} from './owner-requests.mjs';
 
@@ -15,16 +13,19 @@ export function parseOwnerInboxCommand(payload){
   return {ok:true,command:{schema:'starci/owner-action@1',action:structuredClone(action)}};
 }
 
-/** HTTP seam: atomically queues bytes only. It has no workflow state parameter and grants no authority. */
+/**
+ * HTTP seam: atomically queues one row only. It has no workflow state parameter and grants no authority.
+ * §8: `paths.inbox` is removed — the queue is the ledger's `inbox` table, so the enqueue is one INSERT
+ * inside the ledger's transaction rather than a temp file and a rename.
+ */
 export function enqueueOwnerInbox(store,payload,{now=Date.now,random=()=>crypto.randomBytes(8).toString('hex')}={}){
   const parsed=parseOwnerInboxCommand(payload);if(!parsed.ok)return parsed;
-  const directory=store?.paths?.inbox;if(!directory)return {ok:false,code:'inbox-unavailable'};
-  fs.mkdirSync(directory,{recursive:true});
-  const id=`owner-${now()}-${random()}`,target=path.join(directory,`${id}.json`),temporary=`${target}.tmp`,action=parsed.command.action;
+  if(typeof store?.inbox?.push!=='function')return {ok:false,code:'inbox-unavailable'};
+  const id=`owner-${now()}-${random()}`,action=parsed.command.action;
   const job={schema:'starci/job@1',eventId:id,workflowId:action.workflowId,opId:clean(action.opId),attempt:Number(action.attempt??0),generation:action.generation,
     jobId:clean(action.jobId)||id,kind:'owner-action',role:'owner',payload:{requestId:action.requestId,action:parsed.command},status:'queued'};
-  fs.writeFileSync(temporary,JSON.stringify(job));fs.renameSync(temporary,target);
-  return {ok:true,code:'queued',id,eventId:id,job};
+  const row=store.inbox.push({kind:'owner-action',key:action.requestId,payload:job});
+  return {ok:true,code:'queued',id,eventId:id,inboxId:row?.id??null,job};
 }
 
 /** Kernel seam: applies one already-read command and journals its outcome. */

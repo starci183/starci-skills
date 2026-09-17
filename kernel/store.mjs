@@ -82,7 +82,15 @@ export function createStore({repoRoot,id}){
   // The tab speaks the host's configured language; the events it renders stay as recorded.
   const reportProgress=createProgressReporter({language:configuredProgressLanguage(),debug:configuredProgressDebug()});
   const bound=()=>durable?.ledger.db??db;
-  const insertEvent=(inner,{eventId=newToken(),generation=durable?.generation??0,entityType='workflow',entityId=workflowId,kind,payload=null,createdAt=now(),ignore=false}={})=>{
+  /**
+   * The generation an unbound append belongs to. Not 0: a kernel records its host, its preflight and its
+   * `run-bound`/`run-resumed` before `runLoop` binds the ledger, and the very next thing that loop does is retire
+   * every generation below the bound one - which deleted exactly those rows, so a resumed run could never show
+   * that it resumed. The `workflows` row carries the workflow's current generation (bindJournal maintains it),
+   * and a workflow that has never enrolled is still legitimately 0.
+   */
+  const currentGeneration=inner=>inner.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId)?.generation??0;
+  const insertEvent=(inner,{eventId=newToken(),generation=durable?.generation??currentGeneration(inner),entityType='workflow',entityId=workflowId,kind,payload=null,createdAt=now(),ignore=false}={})=>{
     const payloadJson=json(payload),prevDigest=eventsHead(inner,workflowId);
     inner.prepare(`INSERT ${ignore?'OR IGNORE ':''}INTO events(event_id,workflow_id,generation,entity_type,entity_id,kind,payload_json,prev_digest,digest,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)`)
       .run(eventId,workflowId,generation,entityType,entityId,kind,payloadJson,prevDigest,eventDigest({prevDigest,eventId,kind,payloadJson,createdAt}),createdAt);
@@ -315,6 +323,20 @@ export function createStore({repoRoot,id}){
         return next;
       });
       return {revision,identity:goalIdentity};
+    },
+    /**
+     * Re-render the current revision's page in place. goal.md used to be a file, so splicing a section into it
+     * (the critique, the lane header) was an edit of that file. The page is a `goals` row now, and routing those
+     * splices through `setGoal` made each one a new *revision* of the goal - which bumps `state.goalRev`, strands
+     * the revision the phase just returned and staleness-checks every question asked against it. The goal record
+     * and its identity are untouched here: only how the same goal reads.
+     */
+    setGoalMarkdown(markdown){
+      need(typeof markdown==='string','setGoalMarkdown needs goal markdown');
+      const row=bound().prepare('SELECT revision,goal_identity FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
+      need(row,'setGoalMarkdown needs a goal revision to re-render; call setGoal first');
+      (durable?.ledger??ledger).transaction(inner=>inner.prepare('UPDATE goals SET markdown=? WHERE workflow_id=? AND revision=?').run(markdown,workflowId,row.revision));
+      return {revision:row.revision,identity:row.goal_identity};
     },
     /** `workflow-export`: today's `_local` file layout, written under `dir` for humans. Never the record. */
     exportTo(dir){

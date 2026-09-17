@@ -154,10 +154,20 @@ export function readInput(db,{workflowId,key}={}){
   need(sha256(row.bytes)===row.sha256,'input-digest-mismatch');
   return {...row,ref:inputRef(row.workflow_id,row.key,row.sha256)};
 }
-/** Walk one workflow's events by seq, recomputing the chain: {ok,checked,brokenAt} where brokenAt is a seq. */
+/**
+ * Walk one workflow's events by seq, recomputing the chain: {ok,checked,brokenAt} where brokenAt is a seq.
+ *
+ * The walk starts from the FIRST SURVIVING row's own `prev_digest`, not from null: `pruneRetiredGenerations`
+ * deletes a retired generation's events by design (§13 - the ledger holds what a live workflow continues from),
+ * and every enrolled workflow prunes generation 0 the moment it binds generation 1. Insisting the first row link
+ * to null would therefore fail every enrolled workflow's own continuation check. What the chain still proves is
+ * exactly what it should: nothing in the surviving history was altered, reordered or removed from its middle -
+ * a deleted row breaks the link at the row that followed it. A rewritten or rolled-back history as a whole is the
+ * tracked anchor's question (§12), never this one's.
+ */
 export function verifyChain(db,{workflowId}={}){
   need(workflowId,'verifyChain needs a workflow id');
-  let prev=null,checked=0;
+  let prev=db.prepare('SELECT prev_digest FROM events WHERE workflow_id=? ORDER BY seq LIMIT 1').get(workflowId)?.prev_digest??null,checked=0;
   for(const row of db.prepare('SELECT seq,event_id,kind,payload_json,created_at,prev_digest,digest FROM events WHERE workflow_id=? ORDER BY seq').all(workflowId)){
     if((row.prev_digest??null)!==prev||digestOf(prev,row)!==row.digest)return {ok:false,checked,brokenAt:row.seq};
     prev=row.digest;checked+=1;

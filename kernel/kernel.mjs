@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import crypto from 'node:crypto';
-import {ENGINE_SCHEMA,ENGINE_VERSION,candidateBaseFor,createEngineRuntime,enrollEngine,isEnrolled,isJobPending,predatesEngineSchema,relocateJournal,settleGenerationLeases,prepareGenerationRetry,staleLeaseProof,validateCandidateRoot} from './engine.mjs';
+import {ENGINE_SCHEMA,ENGINE_VERSION,candidateBaseFor,carriesNumberedEngineMarker,createEngineRuntime,enrollEngine,isEnrolled,isJobPending,predatesEngineSchema,relocateJournal,settleGenerationLeases,prepareGenerationRetry,staleLeaseProof,validateCandidateRoot} from './engine.mjs';
 import {applyOwnerInbox} from './owner-inbox.mjs';
 import {verifyAcceptedIntegrationOwnerRequests} from './owner-requests.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
@@ -3245,6 +3245,8 @@ function settleFromTab(orca,store,state,op,ctx,observed){
  * freeze its byte delta while the canonical writer fence is still held, preserve that delta as the next attempt's
  * owned baseline, and only then release the durable job. An ambiguous stop or candidate never becomes a retry.
  */
+/** The seam `reconcileWithOrca` settles a dead native attempt through: null when the workflow is not enrolled. */
+const nativeReconciler=(store,state,ctx)=>ctx.engine?((op,settlement,reason)=>reconcileStoppedNativeAttempt(store,state,op,ctx,settlement,reason)):null;
 function reconcileStoppedNativeAttempt(store,state,op,ctx,settlement,reason){
   if(!ctx.engine)return true;
   const reconciled=ctx.engine.settleStoppedOperation(op,{dispatch:op.dispatch,settlement,reason,foreignAllowlists:foreignAllowlistsOf(state,op)});
@@ -4092,7 +4094,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   // Operations created before a rule change carry their old check lists: the kernel-owned checks are stripped on load.
   reconcileCanonicalDecisionInputs(store,state,ctx);
   for(const op of state.ops)if(Array.isArray(op.checks))op.checks=op.checks.filter(check=>!KERNEL_CHECK.test(check.name??''));
-  reconcileWithOrca(orca,store,state,{cwd,wait,allocator});
+  reconcileWithOrca(orca,store,state,{cwd,wait,allocator,reconcileNative:nativeReconciler(store,state,ctx)});
   // The shared runtime ledger is a repository-wide file: this kernel's own entries for operations that are no
   // longer running are leftovers of a crashed start and would hold a slot of an expensive runtime for everybody.
   const swept=allocator.sharedSync?.(state.ops.filter(op=>op.status==='running').map(op=>op.id));
@@ -4122,7 +4124,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     ctx.currentOp=null;
     if(iteration>0)headroom();
     ctx.engine?.pulse();
-    if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator});if(!ctx.engine)sweepTreeStrays(store,state,ctx);}
+    if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator,reconcileNative:nativeReconciler(store,state,ctx)});if(!ctx.engine)sweepTreeStrays(store,state,ctx);}
     if((iteration>0&&iteration%RECONCILE_EVERY===0)||now()-(state.lastSweepAt??0)>=SWEEP_MS){sweepStaleTerminals(orca,store,state,{cwd,now});reviveSupervisor(store,state,ctx,{now});}
     if(stopRequested(store)){store.appendEvent({event:'stopped',reason:'stop flag'});releaseKernelTab(orca,store,state,{cwd,reason:'paused by stop flag'});store.saveState(state);return state;}
     reconcileCanonicalDecisionInputs(store,state,ctx);
@@ -4417,7 +4419,7 @@ export function buildStamp(){try{return KERNEL_MODULE?Math.round(fs.statSync(KER
  * their own control roots, the engine record given its schema. Nothing is answered, settled or refunded here.
  */
 export function migrateEngineState(store,state){
-  if(!predatesEngineSchema(state))return {migrated:false};
+  if(!carriesNumberedEngineMarker(state))return {migrated:false};
   const prefix=`v${state.engine.major}`,renamed=[],candidates=[],dropped=[];
   const renameOf=key=>Number.isInteger(state.engine.major)&&key.startsWith(prefix)&&/^[A-Z]/.test(key.slice(prefix.length))?key.charAt(prefix.length).toLowerCase()+key.slice(prefix.length+1):null;
   for(const op of state.ops??[]){
@@ -4459,6 +4461,16 @@ export function retireFinishedWorkflowRows(store,state){
 /** Every CLI command is one self-contained unit of work against the ledger: whatever store(s) it opened
  * along the way are closed before it returns, so a caller inside one long-lived process (a test, a daemon)
  * never accumulates open sqlite handles across commands. */
+/**
+ * Register something `{close()}`-shaped with this command's cleanup. The allocator opens the repository's shared
+ * runtime ledger (`sharedLedger`, one more SQLite connection on the same file) and owns it; nothing closed it, so
+ * every `workflow-run` in one process leaked a connection and, on Windows, pinned the ledger file open for good.
+ */
+const trackStore=(openedStores,handle)=>{
+  const owned=handle?.sharedLedger?.close?handle.sharedLedger:null;
+  if(owned)openedStores?.push(owned);
+  return handle;
+};
 export function kernelMain(command,options={},ctx={}){
   const openedStores=[];
   try{return kernelMainDispatch(command,options,ctx,openedStores);}
@@ -4820,6 +4832,11 @@ function kernelMainDispatch(command,options={},{orca,cwd=process.cwd(),wait=slee
     // stays where it is. Either way the former journal must hold nothing live of this workflow before it is left.
     const previousJournal=state.engine?.ledgerFile??null;
     const targetJournal=retryJournalTarget({option:options['journal-file']??null,previous:previousJournal,chosen:state.engine?.journalChosen===true,fallback:ledgerFileFor(store.repoRoot)});
+    // §8: a repository has exactly one ledger and the store is already open on it, so the only target a retry can
+    // bind is that file. Relocation still moves a record INTO it (that is how a pre-1.0.4 journal migrates), but an
+    // operator naming some other path is refused here, by name, instead of failing deep inside `bindJournal`.
+    need(targetJournal===path.resolve(ledgerFileFor(store.repoRoot)),
+      `--journal-file names ${targetJournal}, but ${state.id} lives in this repository's one ledger ${ledgerFileFor(store.repoRoot)}; move the repository, not the record`);
     const relocation=previousJournal&&path.resolve(previousJournal)!==targetJournal?relocateJournal({from:previousJournal,to:targetJournal,workflowId:state.id}):null;
     need(!relocation||relocation.ok,`The journal ${previousJournal} still binds ${state.id}: ${relocation?.reason??''}`);
     // The retired generation's log closes here: everything the retry settled above is its story; the enrollment opens the next.
@@ -4956,7 +4973,7 @@ function kernelMainDispatch(command,options={},{orca,cwd=process.cwd(),wait=slee
       // Every kernel of this repository shares one runtime ledger beside the workflow directories, so an
       // expensive runtime another workflow is on is load here too and a provider cooldown is seen by all.
       // A sequential host (headless) caps the allocator at one operation whatever the approved quota says.
-      allocator:createAllocator({runtimes:runtimeProfile,state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:store.ledgerFile,workflow:state.id},budget:{path:path.join(store.repoRoot,'.starciwork')},sequential:host.sequential,executionHost:host.name,eligibility}),template:templateOf(isEnrolled(state)?state.engine.runtimePin.root:state.host),host,
+      allocator:trackStore(openedStores,createAllocator({runtimes:runtimeProfile,state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:store.ledgerFile,workflow:state.id},budget:{path:path.join(store.repoRoot,'.starciwork')},sequential:host.sequential,executionHost:host.name,eligibility})),template:templateOf(isEnrolled(state)?state.engine.runtimePin.root:state.host),host,
       modelEligibility:eligibility,modelPolicy,runtimeBinding,
       ledgerRoot:options['ledger-root']??null,
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});

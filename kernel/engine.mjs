@@ -14,7 +14,7 @@ import {reconcilePureModelJobs} from './job-reconcile.mjs';
 import {inspectLedger,ledgerFileFor,machineFileFor,openLedger,openMachine} from './ledger-db.mjs';
 import {GLOBAL_AI_RESOURCE,createAdmission} from './admission.mjs';
 import {resourceLocks} from './guards.mjs';
-import {ENGINE_SCHEMA,isEnrolled,kindRole,predatesEngineSchema,sealedRuntimeOf} from './common.mjs';
+import {ENGINE_SCHEMA,carriesNumberedEngineMarker,isEnrolled,kindRole,predatesEngineSchema,sealedRuntimeOf} from './common.mjs';
 import {nonOperationModels} from '../scripts/config.mjs';
 import {budgetVerdict,readRuntimeBudget} from './budget.mjs';
 import {pidAlive,readLoads} from './loads.mjs';
@@ -22,7 +22,7 @@ import {readDistJson} from '../core/runtime-root.mjs';
 
 /** The engine version is the package version: one build, one name. */
 export const ENGINE_VERSION=readDistJson('manifest.json').version;
-export {ENGINE_SCHEMA,isEnrolled,predatesEngineSchema,sealedRuntimeOf};
+export {ENGINE_SCHEMA,carriesNumberedEngineMarker,isEnrolled,predatesEngineSchema,sealedRuntimeOf};
 export const isJobPending=error=>error?.code==='STARCI_JOB_PENDING';
 export function deferJob(result){
   const error=new Error(result.reasons?.join('; ')||`Waiting for ${result.identity?.jobId??'durable job'}`);
@@ -469,8 +469,13 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
         journal.appendEvent({eventId:`${op.lease.jobId}:worker-stopped`,workflowId:state.id,entityType:'job',entityId:op.lease.jobId,generation:state.engine.generation,kind:'operation-worker-stopped',payload:{reason,writerRetained:true}});
         return {ok:true,writerRetained:true};
       }
+      // Same rule the workerOnly branch above obeys: `jobs.complete` drops the ledger's lease rows and knows
+      // nothing of the machine tokens they pair with, so the refs are read before the rows go and released after.
+      // Skipping this held every failed launch's `ai/global` and provider reservation in the machine arbiter
+      // until its TTL swept it, throttling every other workflow on the machine meanwhile.
+      const refs=machineRefs(journal,op.lease.jobId);
       const result=jobs.complete({...op.lease,eventId:`${op.lease.jobId}:settled`,status,result:{reason}});
-      if(result.ok)delete op.lease;
+      if(result.ok){releaseRefs(admission.machine,refs);delete op.lease;}
       return result;
     },
     /**

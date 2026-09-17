@@ -233,7 +233,7 @@ export function writeLastWordsReport(store,state,op,words){
   store.writeReport({dispatchId:op.dispatch,opId:op.id,attempt:op.attempt,report,fromTerminal:op.terminal??state.from??'kernel'});
   return report;
 }
-export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=sleepSync,allocator=null}={}){
+export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=sleepSync,allocator=null,reconcileNative=null}={}){
   const listed=orca.invoke('worker-list',{run:state.run},{cwd});
   if(listed.outcome!=='ok')return {orphans:[],dead:[],reason:listed.reason};
   const live=(getPath(listed.receipt,'result.workers')??[]).filter(w=>['ready','running','starting'].includes(w.workerState)||(w.workerState==='unsupervised'&&['dispatched','pending','ready'].includes(w.dispatchStatus)));
@@ -272,6 +272,14 @@ export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=slee
       const report=writeLastWordsReport(store,state,op,words.report);
       store.appendEvent({event:'dispatch-last-words',op:op.id,dispatch:op.dispatch,outcome:report.outcome,subject:heard?.subject??null});
       dead.push({...entry,cause:'worker-report',restarts:op.restarts});
+      continue;
+    }
+    // An enrolled op's durable lease is the engine's, not this loop's: queueing the op again while its lease
+    // still stands leaves it ineligible for ever (the manager only offers a ready op with no live lease), so the
+    // stopped native attempt is reconciled - lease released, byte delta preserved as the next attempt's baseline -
+    // before the op is readmitted. A reconciliation that refuses has quarantined the candidate and says so.
+    if(reconcileNative&&!reconcileNative(op,settlement,'dead: no worker and no terminal')){
+      dead.push({...entry,cause:'native-stop-unreconciled',restarts:op.restarts});
       continue;
     }
     if(allocator&&op.runtime)allocator.release(op.runtime,{op:op.id});

@@ -66,6 +66,12 @@ export const isEnrolled=state=>state?.engine?.schema===ENGINE_SCHEMA;
  * retired journal (`journalFile` without `ledgerFile`): it runs only through workflow-retry, which migrates it.
  */
 export const predatesEngineSchema=state=>Boolean(state?.engine)&&typeof state.engine==='object'&&typeof state.engine.journalFile==='string'&&typeof state.engine.ledgerFile!=='string';
+/**
+ * The narrower half of that pair: the engine record itself is still the numbered pre-schema marker. Only the
+ * one-time field rename (`migrateEngineState`) asks this - it is answered once and for all by the schema tag,
+ * so a record already carrying it is never renamed a second time, whatever ledger it still names.
+ */
+export const carriesNumberedEngineMarker=state=>predatesEngineSchema(state)&&typeof state.engine.schema!=='string';
 /** The sealed build a durable workflow runs from, whatever shape its engine record has. */
 export const sealedRuntimeOf=state=>{const pin=state?.engine?.runtimePin;return pin&&typeof pin==='object'&&typeof pin.root==='string'?pin:null;};
 export const AUTHOR_KIND='work.author';

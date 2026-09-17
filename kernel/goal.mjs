@@ -62,7 +62,7 @@ export function noteLaneInGoal(store,state){
   const title=lines.findIndex(line=>line.startsWith('# '));
   const header=['',...laneHeaderLines(state)];
   lines.splice(title<0?0:title+1,0,...header);
-  store.setGoal({markdown:lines.join('\n'),json:current?.json??{schema:GOAL_RECORD,id:state.id},amendment:current?.amendment??null});
+  store.setGoalMarkdown(lines.join('\n'));
 }
 
 /* ------------------------------------------------------------------ the critique of the goal */
@@ -424,7 +424,7 @@ export function noteCritiqueInGoal(store,state){
     lines.splice(heading>=0?heading:title<0?lines.length:title+1,0,...section);
   }
   const text=lines.join('\n');
-  store.setGoal({markdown:text.endsWith('\n')?text:`${text}\n`,json:current?.json??{schema:GOAL_RECORD,id:state.id},amendment:current?.amendment??null});
+  store.setGoalMarkdown(text.endsWith('\n')?text:`${text}\n`);
 }
 
 /* ------------------------------------------------------------------ phase: goal on a plan ledger */

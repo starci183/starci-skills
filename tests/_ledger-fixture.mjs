@@ -35,12 +35,16 @@ export function trackHandles(t){
  * the test's duration so no code path can reach the real machine arbiter; the after hook restores it,
  * closes both handles (and anything `track`ed) and removes the tree.
  *
+ * `base` moves the temp world off `os.tmpdir()`: a worktree a kernel must name RELATIVE to
+ * `process.cwd()` cannot live on another drive, so such a spec passes `{base:sameDriveTmp()}`.
+ *
  *   withLedger(t,({repoRoot,ledger,machine,ledgerFile,machineFile,track})=>{
  *     const store=track(createStore({repoRoot,id}));   // closed automatically, same as ledger/machine
  *   });
  */
-export function withLedger(t,fn){
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-ledger-'));
+export function withLedger(t,fn,{base=os.tmpdir()}={}){
+  fs.mkdirSync(base,{recursive:true});
+  const root=fs.mkdtempSync(path.join(base,'starci-ledger-'));
   const repoRoot=path.join(root,'repo');
   fs.mkdirSync(path.join(repoRoot,'.starciwork'),{recursive:true});
   const machineHome=path.join(root,'machine');
@@ -60,6 +64,9 @@ export function withLedger(t,fn){
   });
   return fn({root,repoRoot,machineHome,ledger,machine,ledgerFile,machineFile,track});
 }
+
+/** A temp base on the drive `process.cwd()` is on, for a fixture whose worktree must stay relative to it. Never inside the runtime tree. */
+export const sameDriveTmp=()=>path.join(path.parse(process.cwd()).root,'starci-tmp');
 
 /**
  * Seed one workflow's rows into an open ledger. `state` becomes the bound-generation snapshot;
