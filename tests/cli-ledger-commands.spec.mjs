@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {main} from '../hosts/orca/launch.mjs';
 import {createStore} from '../kernel/store.mjs';
-import {ledgerFileFor,ledgerIdFor} from '../kernel/ledger-db.mjs';
+import {ledgerFileFor,ledgerIdOf} from '../kernel/ledger-db.mjs';
 
 const anchorFileFor=repo=>path.join(repo,'.starciwork','ledger-anchor.json');
 
@@ -136,7 +136,7 @@ test('ledger-anchor --write regenerates the tracked head, and ledger-verify chec
   assert.equal(written.file,anchorFileFor(repo));
   const onDisk=JSON.parse(fs.readFileSync(anchorFileFor(repo),'utf8'));
   assert.equal(onDisk.schema,'starci/ledger-anchor@1');
-  assert.equal(onDisk.ledgerId,ledgerIdFor(ledgerFileFor(repo)));
+  assert.equal(onDisk.ledgerId,ledgerIdOf(store.ledger));
   const lastSeq=store.ledger.db.prepare('SELECT max(seq) seq FROM events WHERE workflow_id=?').get(ID).seq;
   assert.equal(onDisk.workflows[ID].seq,lastSeq);
   // A tracked anchor with no entry yet for a workflow is fine (never having reached it is not "behind").
@@ -165,7 +165,9 @@ test('ledger-verify reports ledger-missing for a tracked anchor whose ledger fil
   // Closed explicitly (not tracked) before its file is deleted below - Windows denies deleting an open handle.
   const store=createStore({repoRoot:repo,id:ID});
   store.appendEvent({event:'workflow.start'});
-  main(['ledger-anchor','--write','--repo',repo]);
+  store.saveState({schema:'starci/workflow-state@1',phase:'run'});
+  const anchored=main(['ledger-anchor','--write','--repo',repo]);
+  assert.deepEqual(anchored.written,[ID]);
   store.close();
   for(const suffix of ['','-journal','-wal','-shm']){const file=`${ledgerFileFor(repo)}${suffix}`;if(fs.existsSync(file))fs.rmSync(file);}
   const result=main(['ledger-verify','--repo',repo]);
@@ -203,7 +205,7 @@ test('ledger-anchor --write refuses to anchor a workflow whose chain does not ve
   assert.deepEqual(result.written,[]);
   assert.equal(result.refused[0].workflowId,ID);
   assert.equal(result.refused[0].reason,'ledger-chain-broken');
-  assert.deepEqual(JSON.parse(fs.readFileSync(anchorFileFor(repo),'utf8')).workflows,{});
+  assert.equal(fs.existsSync(anchorFileFor(repo)),false,'nothing was anchored, so no anchor file was ever written');
 });
 
 test('journal-prune and journal-retire are redirected to their renamed verb and exit 2',async t=>{
