@@ -117,7 +117,8 @@ const globExpression=value=>{
   const escaped=clean(value).replace(/[.+^${}()|[\]\\]/g,'\\$&').replaceAll('**','\0').replaceAll('*','[^/]*').replaceAll('\0','.*');
   return new RegExp(`^${escaped}$`);
 };
-const matches=(file,scopes)=>scopes.some(scope=>{const normalized=clean(scope);if(!normalized.includes('*'))return file===normalized||file.startsWith(`${normalized.replace(/\/$/,'')}/`);try{return globExpression(normalized).test(file);}catch{return false;}});
+export const scopeMatches=(file,scopes)=>scopes.some(scope=>{const normalized=clean(scope);if(!normalized.includes('*'))return file===normalized||file.startsWith(`${normalized.replace(/\/$/,'')}/`);try{return globExpression(normalized).test(file);}catch{return false;}});
+const matches=scopeMatches;
 const trackedFor=(git,root,scopes)=>{
   if(!scopes.length)return [];
   return execGit(git,root,['ls-files','-z','--',...scopes]).split('\0').map(clean).filter(Boolean);

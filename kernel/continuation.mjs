@@ -72,9 +72,12 @@ export function continuationBoundary(state,{journalView=readJournal(state),contr
     claimed.add(op.lease.jobId);
     const job=jobs.get(op.lease.jobId),held=leasesByJob.get(op.lease.jobId)??[];
     if(!job){issue('lease-job-unproven','state carries an operation lease whose durable job is absent',identity);continue;}
+    // The lease generation binds the durable job, not the current enrollment: a writer reservation retained
+    // across a retry deliberately predates `state.engine.generation` (the reconcile passes re-prove it), so
+    // the exact identity here is job <-> lease <-> lease rows, all still fenced in the same journal.
     const exact=job.workflow_id===state.id&&job.op_id===op.id&&job.attempt===op.lease.attempt&&
       job.generation===op.lease.generation&&job.kind==='operation'&&op.lease.workflowId===state.id&&
-      op.lease.opId===op.id&&op.lease.attempt===op.attempt&&op.lease.generation===state.engine?.generation;
+      op.lease.opId===op.id&&op.lease.attempt===op.attempt;
     if(!exact)issue('lease-identity-drift','state, operation lease and durable job do not share the full workflow/op/attempt/generation identity',identity);
     if(job.lease_token!==op.lease.leaseToken)issue('lease-token-drift','the durable job is fenced by a different lease token',identity);
     if(!held.length&&!SETTLED.has(job.status))issue('writer-reservation-missing','an unsettled operation job has no durable resource lease',identity);

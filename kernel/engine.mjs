@@ -7,7 +7,7 @@ import {createJobs} from './jobs.mjs';
 import {rankJobs,updateProgressBudget,progressExhausted} from './scheduler.mjs';
 import {ADAPTIVE_CAPACITY,OWNER_PREFERENCE_MULTIPLIER,loadRuntimes} from './schedule.mjs';
 import {canonicalTarget} from './chains.mjs';
-import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateBindingWriterResource,candidateRecord,candidateWriterResource,freezeDetectionCandidate,maxConcurrentWriters,prepareCandidateDependencies,readCandidateBridge,readCandidatePacket,readCandidateSnapshot} from './candidate-bridge.mjs';
+import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateBindingWriterResource,candidateRecord,candidateWriterResource,freezeDetectionCandidate,maxConcurrentWriters,prepareCandidateDependencies,readCandidateBridge,readCandidatePacket,readCandidateSnapshot,scopeMatches} from './candidate-bridge.mjs';
 import {candidateRootBindingDigest} from './candidate-roots.mjs';
 import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
 import {reconcilePureModelJobs} from './job-reconcile.mjs';
@@ -458,7 +458,30 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       let frozen;
       try{frozen=this.freezeCandidate(op,{reportedFiles:[],foreignAllowlists:[...foreignAllowlists,...concurrentScopes]});}
       catch(error){return {ok:false,effectState:'unknown',reason:`candidate freeze failed after native stop: ${String(error?.message??error)}`};}
-      if(frozen.status!=='sealed')return {ok:false,effectState:'unknown',reason:'candidate effects could not be sealed',pending:frozen};
+      // `canonical-head-drift` alone is the ordinary residue of a stopped parallel attempt: a sibling commit
+      // moved the canonical head, so this candidate's bytes can never be promoted - but the freeze already
+      // proved every observed path is in-scope and attributable. Preserve the in-scope delta as the next
+      // attempt's owned baseline, complete the durable job and release the writer fence. Any violation reason
+      // (outside-allowlist, baseline-touched, kernel-owned drift, binding drift) keeps the fence: those paths
+      // are never laundered into the retry baseline.
+      const sealReasons=[...(frozen.reasons??[])],
+        unpromotableOnly=sealReasons.length>0&&sealReasons.every(reason=>/(^|:)canonical-head-drift$/.test(String(reason)));
+      if(frozen.status!=='sealed'&&(!unpromotableOnly||acceptedPreparedDecision))
+        return {ok:false,effectState:'unknown',reason:'candidate effects could not be sealed',pending:frozen};
+      if(frozen.status!=='sealed'){
+        const observed=[...new Set(frozen.observedFiles??[])].sort(),owned=observed.filter(file=>scopeMatches(file,op.allowlist??[]));
+        op.ownedBaselinePaths=owned;
+        op.retryReconciled={schema:'starci/native-retry-reconciliation@1',jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,
+          dispatch,observedFiles:owned,abandonedFiles:observed,abandonedReasons:sealReasons,candidateDigest:op.candidateDigest??null};
+        journal.appendEvent({eventId:`${lease.jobId}:stopped-effects-abandoned`,workflowId:lease.workflowId,entityType:'job',entityId:lease.jobId,
+          generation:lease.generation,kind:'operation-stopped-effects-abandoned',payload:{dispatch,reason,observedFiles:observed,ownedBaseline:owned,
+            unsealableReasons:sealReasons,candidateDigest:op.candidateDigest??null,historicalEffectState:observed.length?'partial':'none-observed'}});
+        store.saveState(state);
+        const completed=this.settled(op,{status:'failed',reason:`${reason}; worker stopped and its candidate is unpromotable (${sealReasons.join('; ')}); ${owned.length} in-scope path(s) preserved for a fresh attempt`});
+        if(completed.ok)store.saveState(state);
+        return completed.ok?{ok:true,effectState:'none',observedFiles:owned,abandonedFiles:observed,abandoned:true,candidateDigest:op.candidateDigest??null}:
+          {ok:false,effectState:'unknown',reason:completed.reason??'durable native job could not be completed'};
+      }
       const observed=[...new Set(frozen.observedFiles??[])].sort();
       if(acceptedPreparedDecision){
         if(observed.length)return {ok:false,effectState:'partial',reason:'prepared decision retry produced candidate changes that were never accepted',observedFiles:observed,candidateDigest:op.candidateDigest??null};

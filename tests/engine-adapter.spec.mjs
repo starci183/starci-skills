@@ -309,6 +309,25 @@ test('a stopped native attempt with unsealable scope drift retains its writer an
   const resources=runtime.journal.db.prepare('SELECT resource_key FROM leases WHERE job_id=?').all(op.lease.jobId).map(row=>row.resource_key);assert.equal(resources.includes('ai/global'),false);assert.equal(resources.some(key=>key.startsWith('canonical-writer:')),true);assert.equal(runtime.journal.getJob(op.lease.jobId).status,'running');bridge.close();
 });
 
+test('a stopped native attempt unpromotable only by head drift preserves in-scope effects and releases its writer',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'drifted',kind:'backend.implement',attempt:1,status:'running',allowlist:['src/**'],dispatch:'ctx-drifted'};f.state.ops=[op];
+  const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-drifted',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
+  runtime.freezeCandidate=()=>({status:'quarantined',observedFiles:['outside.txt','src/a.ts'],reasons:['source:canonical-head-drift']});
+  const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-drifted',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-drifted',effectState:'none'},reason:'retry proved exit'});
+  assert.equal(result.ok,true);assert.equal(result.abandoned,true);assert.deepEqual(result.observedFiles,['src/a.ts'],'only in-scope paths enter the retry baseline');
+  assert.deepEqual(op.ownedBaselinePaths,['src/a.ts']);assert.equal(op.lease,undefined);assert.deepEqual(op.retryReconciled.observedFiles,['src/a.ts']);assert.deepEqual(op.retryReconciled.abandonedFiles,['outside.txt','src/a.ts']);assert.deepEqual(op.retryReconciled.abandonedReasons,['source:canonical-head-drift']);
+  const job=runtime.journal.listJobs().find(item=>item.op_id==='drifted');assert.equal(job.status,'failed');assert.equal(runtime.journal.db.prepare('SELECT count(*) AS n FROM leases WHERE job_id=?').get(job.job_id).n,0);
+  assert.equal(runtime.journal.events({workflowId:'wf'}).some(event=>event.kind==='operation-stopped-effects-abandoned'&&event.payload.dispatch==='ctx-drifted'),true);bridge.close();
+});
+
+test('a stopped native attempt with head drift plus a real violation still retains its writer',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'drift-violation',kind:'backend.implement',attempt:1,status:'running',allowlist:['src/**'],dispatch:'ctx-drifted-violation'};f.state.ops=[op];
+  const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-drifted-violation',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
+  runtime.freezeCandidate=()=>({status:'quarantined',observedFiles:['src/a.ts','outside.txt'],reasons:['source:canonical-head-drift','source:outside-allowlist:outside.txt']});
+  const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-drifted-violation',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-drifted-violation',effectState:'none'}});
+  assert.equal(result.ok,false);assert.equal(op.ownedBaselinePaths,undefined);assert.ok(op.lease,'a violation reason keeps the writer fence attached');bridge.close();
+});
+
 test('machine guard resources serialize native workers and detached checks while retaining only the writer',t=>{
   const f=fixture(t),spawned=[],bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>{spawned.push(true);return {pid:1,once(){},unref(){}};}});
   const first={id:'one',kind:'backend.implement',attempt:1,status:'running',allowlist:['a.js'],checks:[{command:'docker compose up'}]};
