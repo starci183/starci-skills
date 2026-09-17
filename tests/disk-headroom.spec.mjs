@@ -6,6 +6,7 @@ import path from 'node:path';
 import {DEFAULT_HEADROOM_BYTES,DISK_HEADROOM_CODE,HEADROOM_ENV,headroomThreshold,isDiskFull,measureHeadroom} from '../kernel/disk.mjs';
 import {assertHeadroom,guardedStage} from '../kernel/kernel.mjs';
 import {inspectWorkflow,superviseOnce,supervisorAction} from '../kernel/supervisor.mjs';
+import {createStore,listWorkflows} from '../kernel/store.mjs';
 
 /**
  * The disk is measured, never assumed: a kernel stops on the record below a printed threshold, the supervisor
@@ -38,10 +39,10 @@ test('a refused write is recognised whatever spelled it',()=>{
 });
 
 test('the kernel records one event and stops with its own code when the disk is below the threshold; nothing is saved',()=>{
-  const events=[],store={dir:'D:/store',appendEvent:event=>events.push(event),saveState(){throw Error('must not save on a full disk');}},state={id:'wf',worktree:'D:/repo',engine:{schema:'starci/engine@1',journalFile:'D:/journal/journal.sqlite'}};
+  const events=[],store={ledgerFile:'D:/store/.starciwork/runtime.sqlite',appendEvent:event=>events.push(event),saveState(){throw Error('must not save on a full disk');}},state={id:'wf',worktree:'D:/repo',engine:{schema:'starci/engine@1',ledgerFile:store.ledgerFile,machineFile:'D:/machine/machine.sqlite'}};
   const measure=paths=>({ok:false,thresholdBytes:5,checks:[],exhausted:paths.map(at=>({path:at,freeBytes:1,thresholdBytes:5,exhausted:true}))});
   assert.throws(()=>assertHeadroom(store,state,{measure}),error=>error.code===DISK_HEADROOM_CODE&&/disk headroom below 5 bytes/.test(error.message));
-  assert.deepEqual(events,[{event:'disk-headroom-exhausted',thresholdBytes:5,volumes:[{path:'D:/store',freeBytes:1},{path:'D:/repo',freeBytes:1},{path:'D:/journal/journal.sqlite',freeBytes:1}]}]);
+  assert.deepEqual(events,[{event:'disk-headroom-exhausted',thresholdBytes:5,volumes:[{path:store.ledgerFile,freeBytes:1},{path:'D:/repo',freeBytes:1},{path:'D:/machine/machine.sqlite',freeBytes:1}]}]);
   assert.equal(assertHeadroom(store,state,{measure:()=>({ok:true,thresholdBytes:5,checks:[],exhausted:[]})}).ok,true);
 });
 
@@ -53,14 +54,19 @@ test('a stage that meets a full disk raises the headroom stop instead of countin
 });
 
 test('the supervisor leaves a workflow alone while its volume has no room, logging the change once, and starts it again when room returns',t=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-headroom-supervisor-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  const dir=path.join(root,'.starciwork','_local','workflows','wf');fs.mkdirSync(dir,{recursive:true});
-  fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id:'wf',approved:true,finished:null,worktree:root,host:'H'}));
-  fs.writeFileSync(path.join(dir,'events.jsonl'),JSON.stringify({at:1,seq:1,event:'tick'})+'\n');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-headroom-supervisor-'));
+  const store=createStore({repoRoot:root,id:'wf'});
+  t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});
+  // `.starciwork/_local` is retired kernel authority (never read by the supervisor); a workflow it can see is a
+  // ledger row, so the fixture is a real ledger via createStore/saveState, read back through listWorkflows -
+  // exactly what superviseOnce itself does.
+  store.saveState({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id:'wf',approved:true,finished:null,worktree:root,host:'H'});
+  store.appendEvent({event:'tick'});
   const measureExhausted=()=>({ok:false,thresholdBytes:9,checks:[],exhausted:[{path:root,freeBytes:2,thresholdBytes:9,exhausted:true}]}),measureFine=()=>({ok:true,thresholdBytes:9,checks:[],exhausted:[]});
-  const info=inspectWorkflow({id:'wf',dir},{now:()=>10,measure:measureExhausted});
+  const [entry]=listWorkflows(root);
+  const info=inspectWorkflow(entry,{now:()=>10,measure:measureExhausted});
   assert.deepEqual(supervisorAction(info),{action:'leave',reason:'disk headroom below threshold',headroom:info.headroom});
-  assert.equal(supervisorAction(inspectWorkflow({id:'wf',dir},{now:()=>10,measure:measureFine})).action,'start');
+  assert.equal(supervisorAction(inspectWorkflow(entry,{now:()=>10,measure:measureFine})).action,'start');
   const log=[],spawns=[];
   const round=measure=>superviseOnce({repoRoot:root,launcher:'launch.mjs',now:()=>10,log:event=>log.push(event),measure,spawnFn:()=>{spawns.push(1);return {pid:4242,unref(){},once(){}};}});
   round(measureExhausted);round(measureExhausted);
