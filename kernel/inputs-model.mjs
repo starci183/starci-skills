@@ -7,25 +7,40 @@ import {credentialVersionChanged} from './inputs-replacement.mjs';
 import {fillWaitingAsks,workRootOf} from './fill.mjs';
 import {integrationReadiness} from './inputs-readiness.mjs';
 import {deriveOwnerRequests} from './owner-requests.mjs';
-import {enqueueOwnerInbox} from './owner-inbox.mjs';
+import {parseOwnerInboxCommand} from './owner-inbox.mjs';
+import {createStore} from './store.mjs';
 
 const same=(a,b)=>path.resolve(a)===path.resolve(b);
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const keyOf=(slug,name,preparation,replacement)=>crypto.createHash('sha256').update(`${slug}:${name}:${JSON.stringify([preparation??null,replacement??null])}`).digest('hex').slice(0,24);
 
-/** Freeze the workflow's actual ledger binding; the HTTP client never supplies a path or identity. */
-export function inputBinding(state,dir){
+/**
+ * Freeze the workflow's actual ledger binding; the HTTP client never supplies a path or identity.
+ *
+ * Runtime 1.0.4: a workflow owns no directory (`store.dir` is gone), so the binding carries the
+ * ledger's `repoRoot` instead - enough for anything holding the binding (the detached input helper,
+ * a later poll) to open its own `store` and read the one ledger every writer shares.
+ */
+export function inputBinding(state,store){
   const workRoot=workRootOf(state);
-  if(!state?.approved||!state.id||!state.host||!state.worktree||!workRoot)throw Error('Workflow input binding is incomplete.');
-  return {id:state.id,dir:path.resolve(dir),workRoot:path.resolve(workRoot),worktree:path.resolve(state.worktree),host:path.resolve(state.host)};
+  if(!state?.approved||!state.id||!state.host||!state.worktree||!workRoot||!store?.repoRoot)throw Error('Workflow input binding is incomplete.');
+  return {id:state.id,repoRoot:path.resolve(store.repoRoot),workRoot:path.resolve(workRoot),worktree:path.resolve(state.worktree),host:path.resolve(state.host)};
+}
+
+/** One short-lived store, opened from a binding and always closed - callers never hold the handle. */
+function withBoundStore(binding,fn){
+  const store=createStore({repoRoot:binding.repoRoot,id:binding.id});
+  try{return fn(store);}finally{store.close();}
 }
 
 export function readInputState(binding){
   try{
-    const state=JSON.parse(fs.readFileSync(path.join(binding.dir,'state.json'),'utf8'));
-    if(!state.approved||state.id!==binding.id||!same(state.worktree,binding.worktree)||!same(state.host,binding.host)
-      ||!same(workRootOf(state),binding.workRoot))return null;
-    return state;
+    return withBoundStore(binding,store=>{
+      const state=store.loadState();
+      if(!state||!state.approved||state.id!==binding.id||!same(state.worktree,binding.worktree)||!same(state.host,binding.host)
+        ||!same(workRootOf(state),binding.workRoot))return null;
+      return state;
+    });
   }catch{return null;}
 }
 
@@ -122,9 +137,19 @@ export function writeInputCredential({binding,field,value,spawnProcess=spawn}){
   });
 }
 
+/** The one command the ledger's `inbox` table accepts from this helper: a validated owner action row, applied by `applyOwnerInbox` on the kernel's own tick (never here). */
+const enqueueOwnerAction=(binding,payload)=>{
+  const parsed=parseOwnerInboxCommand(payload);
+  if(!parsed.ok)return parsed;
+  return withBoundStore(binding,store=>{
+    const row=store.inbox.push({kind:'owner-action',key:parsed.command.action.requestId,payload:parsed.command});
+    return {ok:true,code:'queued',id:row.id,eventId:String(row.id),job:parsed.command};
+  });
+};
+
 /** This helper owns no workflow state. The kernel independently settles satisfied asks on its next tick. */
 export function createInputModel({binding,read=()=>readInputState(binding),present=presenceReader(),write=writeInputCredential,version=identitySecretVersion,
-  enqueue=payload=>enqueueOwnerInbox({paths:{inbox:path.join(binding.dir,'inbox')}},payload)}){
+  enqueue=payload=>enqueueOwnerAction(binding,payload)}){
   const replacementWritten=field=>!field.replacement||credentialVersionChanged(field.replacement.baseline,
     version({workRoot:binding.workRoot,slug:field.slug,name:field.name}));
   let writes=Promise.resolve();

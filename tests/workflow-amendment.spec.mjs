@@ -13,9 +13,11 @@ import {acquireStartup,reserveStartup} from '../kernel/launch.mjs';
 
 function fixture(t){
   const root=fs.mkdtempSync(path.join(process.cwd(),'.workflow-amendment-test-'));
-  t.after(()=>{assert.equal(path.dirname(root),process.cwd());assert.ok(path.basename(root).startsWith('.workflow-amendment-test-'));fs.rmSync(root,{recursive:true,force:true});});
   assert.equal(spawnSync('git',['init','-q'],{cwd:root,windowsHide:true}).status,0);
   const store=createStore({repoRoot:root,id:'wf-existing'});
+  // Runtime 1.0.4: the store holds a real ledger handle; it must close before the temp directory is
+  // removed, or Windows refuses to delete the file still open underneath it.
+  t.after(()=>{store.close();assert.equal(path.dirname(root),process.cwd());assert.ok(path.basename(root).startsWith('.workflow-amendment-test-'));fs.rmSync(root,{recursive:true,force:true});});
   const state=createWorkflowState({job:'Deliver the originally approved slice',worktree:root,branch:'main',store,scope:['features/existing']});
   state.phase='finished';state.approved=true;state.goalDigest='a'.repeat(64);state.definitionOfDone=['Original acceptance'];
   state.decisions=[{id:'decision-1',answer:'Keep historical decision'}];
@@ -24,7 +26,7 @@ function fixture(t){
     {id:'remaining-1',kind:'frontend.implement',status:'blocked',attempt:3,findings:['Historical blocker'],files:[],reports:[],
       lease:{workflowId:'wf-existing',opId:'remaining-1',attempt:3,generation:2,jobId:'job-unknown',leaseToken:'lease-token'}}
   ];
-  state.finished={outcome:'blocked',reason:'owner clarification required',report:store.paths.final};
+  state.finished={outcome:'blocked',reason:'owner clarification required',report:'signal:final-report'};
   const journalFile=path.join(root,'runtime','journal.sqlite'),journal=openJournal({file:journalFile});
   const now=Date.now();
   journal.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,priority_json,lease_token,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,'effect_unknown',?,?,?,?)")

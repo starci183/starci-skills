@@ -65,8 +65,8 @@ Repair is a bounded route back upstream, never a parallel invention.
 | architecture.decide | SRS → SDS | decide |
 | architecture.revise | sds-gap → SDS revised | decide |
 | brand.decide | → brand record | write |
-| interface.draw | SRS+SDS+brand+grammar → screens/flows — **allows: gpt-5.6-sol only** | write |
-| interface.asset | design → artwork assets — **allows: gpt-5.6-sol only** | write |
+| interface.draw | SRS+SDS+brand+grammar → screens/flows — **allows: the codex-agent pool only, no fallback** (ImageGen names the operation agent, not an image-model version; the resolved model is whatever `write` is pinned to) | write |
+| interface.asset | design → artwork assets — **allows: the codex-agent pool only, no fallback** (same route as interface.draw) | write |
 
 ### D. PLAN
 
