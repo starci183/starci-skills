@@ -10,6 +10,13 @@ import {ledgerFileFor} from '../kernel/ledger-db.mjs';
 import {approve,kernelMain,laneRowTitle,runLoop,validateWorkTree} from '../kernel/kernel.mjs';
 import {fakeAllocator,passing,scriptedOrca} from './helpers/kernel-harness.mjs';
 
+/** A one-off read of a workflow's store: the store holds a real ledger handle now, so it is closed the
+ * instant its answer is in hand, never left open for Windows to trip over when the fixture cleans up. */
+function withStore(run,fn){
+  const store=createStore({repoRoot:run.repo,id:run.goal.id});
+  try{return fn(store);}finally{store.close();}
+}
+
 /**
  * One workflow, one lane, one Orca worktree row. Everything here is real except the runtimes and Orca itself:
  * a git repository with an authored Work tree, a lane created by a real `git worktree add` behind the fake
@@ -21,6 +28,8 @@ const noWait=()=>{};
 const INTAKE='demo.sales.implementation.backend.intake';
 const FILE='src/sales/intake.ts';
 const CHECK='npx vitest run intake';
+/** The ledger (docs §3: WAL by default) leaves these untracked in the base repo - no `_local` directory any more. */
+const LEDGER_UNTRACKED=['?? .starciwork/ledger-anchor.json','?? .starciwork/runtime.sqlite','?? .starciwork/runtime.sqlite-shm','?? .starciwork/runtime.sqlite-wal'];
 
 const NODE=`schema: work/node@2
 id: ${INTAKE}
@@ -66,10 +75,17 @@ const statusOf=cwd=>(gitMaybe(cwd,'status','--porcelain').stdout??'').split(Stri
  */
 function fixture(t){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-lanes-'));
+  // `node:test` runs `t.after` hooks in registration order, not reverse order: a store `walked()` opens after
+  // this call would still be open when a `t.after` registered here ran first. Every store a helper below opens
+  // registers its own close through this instead, so nothing outlives the worktree removal that follows it.
+  const closers=[];
   t.after(()=>{
+    for(const close of closers)try{close();}catch{}
     assert.equal(path.dirname(root),fs.realpathSync(os.tmpdir()));
     assert.ok(path.basename(root).startsWith('starci-lanes-'));
-    fs.rmSync(root,{recursive:true,force:true});
+    // SQLite on Windows can still hold the file mapping open a moment past close(); the removal retries through it.
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,150);
+    fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:150});
   });
   const repo=path.join(root,'demo-backend'),host=path.join(root,'source','.claude');
   const workspaces=path.join(root,'workspaces','demo-backend');
@@ -110,7 +126,7 @@ function fixture(t){
   };
   // The node record as it stands in any checkout of this repository: the base worktree, or a lane of it.
   const record=(at=repo)=>parseYaml(fs.readFileSync(path.join(at,'.starciwork','features','sales','implementation','backend','intake','index.yaml'),'utf8'));
-  return {root,repo,host,workspaces,worktrees,record};
+  return {root,repo,host,workspaces,worktrees,record,onClose:fn=>closers.push(fn)};
 }
 
 const assessGoal=({ledger})=>({ok:true,provider:'fake',value:{definitionOfDone:[`the ${ledger.length} listed nodes are done`],risks:[],questions:[]}});
@@ -143,7 +159,7 @@ test('workflow-goal --lane creates the workflow its own Orca worktree row, runs 
   const laneDir=path.join(run.workspaces,'20260913-090000-intake');
   assert.equal(lane.worktree,laneDir.replaceAll('\\','/'));
   assert.ok(fs.existsSync(path.join(laneDir,FILE)));
-  const state=createStore({repoRoot:run.repo,id:run.goal.id}).loadState();
+  const state=withStore(run,store=>store.loadState());
   assert.equal(state.worktree,laneDir);
   assert.equal(state.repoRoot,laneDir);
   assert.equal(state.branch,'orca/20260913-090000-intake');
@@ -156,7 +172,7 @@ test('workflow-goal --lane creates the workflow its own Orca worktree row, runs 
   assert.equal(kernelMain('workflow-status',{id:run.goal.id,host:run.host},{orca:null,cwd:laneDir}).dir,run.goal.dir,
     'the same workflow is reached from inside the lane');
   // goal.md names the lane and the base it goes home to, under the title.
-  const page=fs.readFileSync(run.goal.goal,'utf8');
+  const page=withStore(run,store=>store.goal().markdown);
   assert.match(page,/Lane `20260913-090000-intake` - worktree `.*20260913-090000-intake` on branch `orca\/20260913-090000-intake`/);
   assert.match(page,/merged into `main` in `.*demo-backend`/);
   // The Orca calls: one create as a top-level row with setup skipped, then the row title and its status.
@@ -164,7 +180,7 @@ test('workflow-goal --lane creates the workflow its own Orca worktree row, runs 
     {call:'create',name:'20260913-090000-intake',repo:`path:${run.repo.replaceAll('\\','/')}`,baseBranch:'main',setup:'skip',noParent:true},
     {call:'set',worktree:`path:${laneDir.replaceAll('\\','/')}`,displayName:laneRowTitle(run.goal.id),workspaceStatus:'in-progress',noParent:false}]);
   assert.equal(laneRowTitle(run.goal.id),'[Workflow] 20260913-090000-intake');
-  const created=createStore({repoRoot:run.repo,id:run.goal.id}).readEvents().find(event=>event.event==='lane-created');
+  const created=withStore(run,store=>store.readEvents()).find(event=>event.event==='lane-created');
   assert.equal(created.row,'[Workflow] 20260913-090000-intake');
   assert.equal(created.branch,'orca/20260913-090000-intake');
   assert.equal(created.base.branch,'main');
@@ -190,6 +206,10 @@ function walked(t,{dirtyBase=null,moveBase=null,id='20260913-100000-intake'}={})
   const run=openedLane(t,{id});
   const laneDir=path.join(run.workspaces,id);
   const store=createStore({repoRoot:run.repo,id:run.goal.id});
+  // This store outlives walked() itself (the test body reads from it afterward), so it closes through the
+  // fixture's own closer list - registered here, run before the worktree removal, not after it (node:test
+  // runs t.after hooks in registration order, and fixture()'s own removal was registered first).
+  run.onClose(()=>store.close());
   const state=store.loadState();
   approve(store,state);
   state.run='run_wf';state.from='term_kernel';
@@ -256,8 +276,8 @@ test('a base worktree that carries an uncommitted change the lane also changed b
   assert.deepEqual(run.finished.lane.conflict.files,[FILE]);
   // Nothing in the base was stashed, reset or half-merged: the owner's pending change is exactly as it was.
   assert.equal(git(run.repo,'rev-parse','HEAD'),run.baseHead);
-  assert.deepEqual(statusOf(run.repo),[` M ${FILE}`,'?? .starciwork/_local/'],
-    'only the owner pending change and the kernel runtime directory, no half-merge');
+  assert.deepEqual(statusOf(run.repo),[` M ${FILE}`,...LEDGER_UNTRACKED],
+    'only the owner pending change and the ledger WAL set, no half-merge');
   assert.equal(fs.existsSync(path.join(run.repo,'.git','MERGE_HEAD')),false);
   assert.match(fs.readFileSync(path.join(run.repo,FILE),'utf8'),/the owner is editing this right now/);
   // The work itself is not lost: it is recorded and committed in the lane, waiting for the merge the owner does.
@@ -312,5 +332,5 @@ test('a base worktree that has moved to another branch is not merged into by acc
   // Neither branch moved: the lane keeps its commits and main is exactly where it was.
   assert.equal(git(run.repo,'rev-parse','session/elsewhere'),run.baseHead);
   assert.equal(git(run.repo,'rev-parse','main'),run.baseHead);
-  assert.deepEqual(statusOf(run.repo),['?? .starciwork/_local/']);
+  assert.deepEqual(statusOf(run.repo),LEDGER_UNTRACKED);
 });
