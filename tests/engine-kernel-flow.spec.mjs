@@ -19,6 +19,8 @@ function fixture(t){
   fs.writeFileSync(path.join(root,'test','oracle.test.mjs'),
     "import fs from 'node:fs';\nconst ok=fs.readFileSync('app.txt','utf8').includes('ready');\nconsole.log(ok?'ready':'expected-pending');\nprocess.exit(ok?0:1);\n");
   assert.equal(git('git',['init','-q'],{cwd:root}).status,0);
+  // The kernel writes evidence under .starciwork/ beside the ledger (§7); a real repo excludes it.
+  fs.appendFileSync(path.join(root,'.git','info','exclude'),'.starciwork/\n');
   assert.equal(git('git',['config','user.email','fixture@example.test'],{cwd:root}).status,0);
   assert.equal(git('git',['config','user.name','Fixture'],{cwd:root}).status,0);
   assert.equal(git('git',['add','.'],{cwd:root}).status,0);
@@ -26,7 +28,7 @@ function fixture(t){
   const head=git('git',['rev-parse','HEAD'],{cwd:root}).stdout.trim();
   const dir=path.join(temp,'kernel');
   const events=[];
-  const store={id:'wf-engine-flow',dir,events,paths:{},appendEvent(event){events.push(event);return event;},saveState(){},
+  const store={id:'wf-engine-flow',dir,repoRoot:root,events,paths:{},appendEvent(event){events.push(event);return event;},saveState(){},
     writeChecks(){},readChecks(){return null;}};
   const op={id:'implement-ready',kind:'backend.implement',goal:'Make the application ready.',acceptance:['app.txt contains the exact ready state'],
     allowlist:['app.txt'],checks:[{name:'ready-oracle',command}],attempt:1,status:'running',runtime:'gpt-5.6-sol',dispatch:'ctx-1',
@@ -67,8 +69,18 @@ function lateDecisionFixture(t){
     question:{kind:'decision',text:'Which ledger?',options:[{id:'1',label:'Customer'},{id:'2',label:'Platform'}],prepared:true},
     ownerRequestStatus:'answered',ownerAnswer:{receiptId:receipt,value:'2'},ownerContinuationReceipt:receipt});
   f.report={...f.report,from:'term-owner',summary:'decision: demo.ledger recommended: 2\n1. Customer\n2. Platform',sent:{messageId:'msg-late',sentAt:2,type:'worker_done'}};
-  const reportFile=path.join(f.store.dir,'reports',`${f.op.dispatch}.json`);fs.mkdirSync(path.dirname(reportFile),{recursive:true});fs.writeFileSync(reportFile,`${JSON.stringify(f.report,null,2)}\n`);
-  Object.assign(f.store,{reportPath:id=>path.join(f.store.dir,'reports',`${id}.json`),readReports:()=>[JSON.parse(fs.readFileSync(reportFile,'utf8'))],acknowledgeRuntimeFile(){},saveState(){}});
+  const reportFile=path.join(f.store.dir,'reports',`${f.op.dispatch}.json`);fs.mkdirSync(path.dirname(reportFile),{recursive:true});
+  const reportJson=`${JSON.stringify(f.report,null,2)}\n`;fs.writeFileSync(reportFile,reportJson);
+  // stageAnsweredDecisionLateReport hashes the report's immutable bytes straight off the `reports` row
+  // (kernel.mjs's reportJsonBytes/reportDigest: store.ledger.db, the same handle this fixture's runtime
+  // already has open), the ledger's replacement for a report file's own sha256 - so the row has to exist
+  // there too, byte-identical to what readReports() below replays.
+  f.store.ledger=f.runtime.journal;
+  f.runtime.journal.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
+    .run(f.state.id,f.op.dispatch,f.op.id,f.op.attempt,f.state.engine.generation,f.report.outcome,reportJson.replace(/\n$/,''),f.op.terminal,Date.now());
+  // readReports() (kernel/store.mjs) always adds `dispatchId` from the reports row alongside the raw
+  // report JSON's own `dispatch` field; stageAnsweredDecisionLateReport looks the row up by `dispatchId`.
+  Object.assign(f.store,{reportPath:id=>path.join(f.store.dir,'reports',`${id}.json`),readReports:()=>[{...JSON.parse(fs.readFileSync(reportFile,'utf8')),dispatchId:f.op.dispatch}],acknowledgeRuntimeFile(){},saveState(){}});
   const staged=stageAnsweredDecisionLateReport(f.state,f.op,{store:f.store,runtime:f.runtime,dispatchId:f.op.dispatch,taskId:f.report.task});assert.equal(staged.ok,true,staged.reason);
   f.ctx.allocator={snapshot:()=>({cooling:[]}),release(){}};
   f.ctx.kindsProfile={kinds:{'decision.prepare':{family:'design',role:'decide',readOnly:false,reads:[],writes:['code']}}};
@@ -87,7 +99,7 @@ test('real applyOpReport commits only a sealed candidate with reproduced checks 
   assert.equal(f.op.verifiedChecks[0].name,'ready-oracle');
   assert.equal(f.op.proof.verdict,'pass');
   assert.ok(f.store.events.some(event=>event.event==='op-done'));
-  assert.ok(fs.existsSync(path.join(f.store.dir,'evidence',`${f.op.candidate.identity.jobId}-validation.json`)));
+  assert.ok(fs.existsSync(path.join(f.store.repoRoot,'.starciwork','kernel-evidence',f.store.id,'evidence',`${f.op.candidate.identity.jobId}-validation.json`)));
 });
 
 test('real applyOpReport refuses canonical drift after candidate freeze without committing or completing the op',t=>{
