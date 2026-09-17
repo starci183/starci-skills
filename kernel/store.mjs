@@ -256,6 +256,22 @@ export function createStore({repoRoot,id}){
       },
       clear(scope,key){return bound().prepare('DELETE FROM signals WHERE scope=? AND key=?').run(scope,key).changes>0;}
     },
+    inputs:{
+      put({key,goalRevision,bytes,origin,mediaType=null}={}){
+        const named=required(key,'input key');need(Number.isInteger(goalRevision)&&goalRevision>0,'inputs.put needs a positive goal revision');
+        return (durable?.ledger??ledger).inputs.put({workflowId,key:named,goalRevision,bytes,origin:required(origin,'input origin'),mediaType});
+      },
+      get(key){
+        const row=(durable?.ledger??ledger).inputs.get({workflowId,key:required(key,'input key')});
+        return row?{key:row.key,goalRevision:row.goal_revision,sha256:row.sha256,size:row.size,mediaType:row.media_type,origin:row.origin,bytes:row.bytes,createdAt:row.created_at,ref:row.ref}:null;
+      },
+      list(){
+        return (durable?.ledger??ledger).inputs.list({workflowId}).map(row=>({key:row.key,goalRevision:row.goal_revision,sha256:row.sha256,size:row.size,mediaType:row.media_type,origin:row.origin,createdAt:row.created_at,ref:row.ref}));
+      },
+      materialise(key,dir){
+        return (durable?.ledger??ledger).inputs.materialise({workflowId,key:required(key,'input key'),dir:path.resolve(required(dir,'materialise directory'))});
+      }
+    },
     /** The current goal revision; anything that needs the goal reads this, never a file. */
     goal(){
       const row=bound().prepare('SELECT * FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
@@ -278,6 +294,8 @@ export function createStore({repoRoot,id}){
     exportTo(dir){
       const target=path.resolve(required(dir,'export directory'));
       fs.mkdirSync(target,{recursive:true});
+      // WAL makes the ledger three files; truncate it into runtime.sqlite before reading so an archive of this export stays one file (§3).
+      bound().exec('PRAGMA wal_checkpoint(TRUNCATE)');
       const files=[],write=(name,content)=>{const file=path.join(target,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,content);files.push(slash(name));};
       const pretty=value=>`${JSON.stringify(value,null,2)}\n`;
       const latest=api.loadState();

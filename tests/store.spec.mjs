@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {WORKFLOW_STATE,createStore,eventDigest,eventsHead,listWorkflows,newWorkflowId,replaceStateSnapshot,repositoryRoot,workflowsRoot} from '../kernel/store.mjs';
 import {ledgerFileFor,openLedger} from '../kernel/ledger-db.mjs';
 
@@ -193,6 +194,32 @@ test('signals carry locks and payloads, workflow-scoped or ledger-wide',t=>{
   assert.equal(store.signal.get(ID,'stop'),null);
   assert.equal(store.signal.clear(ID,'stop'),false);
   assert.equal(store.signal.get(ID,'kernel-lock').token,'tok','clearing one key leaves the others');
+});
+
+test('inputs are frozen bytes bound by sha256, materialised digest-checked for a worker',t=>{
+  const fx=fixture(t),repo=fx.repo(),store=fx.track(createStore({repoRoot:repo,id:ID}));
+  assert.equal(store.inputs.get('1-brief.md'),null);
+  assert.deepEqual(store.inputs.list(),[]);
+  const bytes=Buffer.from('# Brief\ncontents');
+  const put=store.inputs.put({key:'1-brief.md',goalRevision:1,bytes,origin:'C:/owner/brief.md',mediaType:'text/markdown'});
+  assert.equal(put.sha256,crypto.createHash('sha256').update(bytes).digest('hex'));
+  assert.match(put.ref,new RegExp(`^ledger://inputs/${ID}/1-brief\\.md#sha256=${put.sha256}$`));
+  const got=store.inputs.get('1-brief.md');
+  assert.deepEqual(Buffer.from(got.bytes),bytes);
+  assert.equal(got.sha256,put.sha256);
+  assert.equal(got.mediaType,'text/markdown');
+  assert.equal(got.goalRevision,1);
+  assert.equal(got.origin,'C:/owner/brief.md');
+  assert.deepEqual(store.inputs.list().map(row=>row.key),['1-brief.md']);
+  assert.equal(store.inputs.list()[0].ref,put.ref);
+  const dir=fx.repo(),materialised=store.inputs.materialise('1-brief.md',dir);
+  assert.equal(materialised.sha256,put.sha256);
+  assert.equal(fs.readFileSync(materialised.file,'utf8'),bytes.toString());
+  assert.throws(()=>store.inputs.materialise('missing.md',dir),/inputs\.materialise needs a known input/);
+  assert.throws(()=>store.inputs.put({key:'x',goalRevision:0,bytes,origin:'o'}),/positive goal revision/);
+  const replaced=store.inputs.put({key:'1-brief.md',goalRevision:2,bytes:Buffer.from('v2'),origin:'C:/owner/brief.md'});
+  assert.notEqual(replaced.sha256,put.sha256,'same key overwrites in place, keyed by (workflow,key)');
+  assert.equal(store.inputs.get('1-brief.md').goalRevision,2);
 });
 
 test('goal revisions append and workflows.goal_identity follows the latest',t=>{
