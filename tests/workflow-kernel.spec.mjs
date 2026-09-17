@@ -2316,7 +2316,7 @@ test('kernel startup discovers existing credential waits before the first tick, 
     requester.status='paused';requester.waitingFor=ask.id;requester.dependsOn.push(ask.id);state.ops.push(ask);
     const owner='demo.sales.architecture.sds.intake',file=harness.node(owner),record=parseYaml(fs.readFileSync(file,'utf8')),entry=preparedEntry();
     delete entry.preparation;record.extensions??={};record.extensions.work3??={};record.extensions.work3.integrations=[entry];fs.writeFileSync(file,stringifyYaml(record));
-    const files=inputFiles(inputScratchDir(state.id)),browserCalls=[];let launches=0;
+    const files=inputFiles(inputScratchDir(state.id,store.repoRoot)),browserCalls=[];let launches=0;
     const browser={verify:()=>({ok:true}),invoke:(name,params)=>{
       browserCalls.push({name,params});
       if(name==='tab-list')return {outcome:'ok',receipt:{result:{tabs:[]}}};
@@ -4921,7 +4921,11 @@ test('a critic no provider could answer is recorded as unavailable and the workf
  * exactly the way the scripted Orca's check finishes a live operation.
  */
 function headlessFake({store,scripts}){
+  // Keyed by the workflow id, which this spec fixes, so the root is the same path on every run. Left alone it
+  // accumulates: the assertion below counts this run's three logs and was reading 102 from thirty-four earlier
+  // runs. A fixture that inherits its predecessor's output is not a fixture.
   const root=path.join(os.tmpdir(),'starci',store.id,'headless');
+  fs.rmSync(root,{recursive:true,force:true});
   const children=[];const alive=new Set();let pid=7000;
   const opOf=text=>(String(text).match(/op `([^`]+)`/)??[null,'unknown'])[1];
   const spawn=(executable,args,options)=>{const child={pid:++pid,executable,args,options,input:'',stdin:{write(text){child.input+=text;},end(){}},on(){},unref(){}};alive.add(child.pid);children.push(child);return child;};
@@ -4979,7 +4983,12 @@ test('on the headless host a workflow runs end to end one operation at a time: e
       assert.match(child.input,/=== HEADLESS PREAMBLE ===[\s\S]*# Operation contract/);
     }
     assert.equal(fs.readdirSync(harness.fake.root).filter(name=>name.endsWith('.log')).length,3);
-    assert.equal(fs.readFileSync(path.join(harness.fake.root,'mailbox.jsonl'),'utf8').trim().split('\n').length,3);
+    // This fake writes each report straight to the ledger (see headlessFake) and never calls `send`, so the
+    // mailbox is not what this run produces - the three lines it used to count were a fossil from an older
+    // shape of the fixture, surviving because the root was never cleaned. The claim is that three reports
+    // arrived, one per op, and the ledger is where the kernel reads them. The mailbox itself is exercised
+    // against the real host in tests/orca-headless.spec.mjs.
+    assert.deepEqual(harness.store.readReports().map(report=>report.outcome),['done','done','done']);
     assert.deepEqual(state.ops.map(op=>[op.id,op.status]),[['op-intake','done'],['op-catalog','done'],['verify-1','done']]);
     // Accepted ops released their processes: nothing is listed on the host any more.
     assert.deepEqual(harness.fake.orca.invoke('worker-list',{run:state.run}).receipt.result.workers,[]);
