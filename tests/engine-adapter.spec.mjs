@@ -11,6 +11,7 @@ import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
 import {validateOp} from '../models/functions.mjs';
 import {createWorkflowModelEligibility} from '../kernel/model-policy.mjs';
 import {createAllocator,loadRuntimes,withProviderPreference} from '../kernel/schedule.mjs';
+import {openMachine} from '../kernel/ledger-db.mjs';
 import {persistPrelaunchReservation,retryOwnedBaseline,retryableOperation} from '../kernel/kernel.mjs';
 
 const fixture=t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-engine-adapter-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const state={id:'wf',worktree:dir,head:'a'.repeat(40),createdAt:1,engine:{schema:'starci/engine@1',generation:2,ledgerFile:path.join(dir,'.starciwork','runtime.sqlite'),machineFile:path.join(dir,'machine.sqlite')},ops:[]};const store={dir:path.join(dir,'workflow'),appendEvent(){},saveState(){}},modelBudget={schema:'starci/runtime-budget@1',at:Date.now(),providers:{codex:{status:'ok',windows:{weekly:{usedPercent:10,resetsAt:null}}},claude:{status:'ok',windows:{weekly:{usedPercent:20,resetsAt:null}}},qwen:{status:'ok',windows:{weekly:{usedPercent:30,resetsAt:null}}}}};return {dir,state,store,modelBudget};};
@@ -101,6 +102,41 @@ test('restart adopts the exact prelaunch reservation once and incomplete or unkn
   const firstBridge=createJobBridge({ledgerFile:f.state.engine.ledgerFile,machineFile:f.state.engine.machineFile,eligibility:()=>({eligible:true}),spawnChild:()=>{throw Error('no native launch');}}),first=createEngineRuntime({...f,bridge:firstBridge,eligibility:()=>({eligible:true,mode:'probation'}),modelPolicy:policy});const reserved=first.reserveOperation(op,{runtime:'gpt-5.6-sol',target:'gpt-5.6-sol',role:'implement'});assert.equal(consumed,1);delete op.lease;firstBridge.close();
   const reloadedState={...f.state,ops:[{id:'reload',kind:'backend.implement',attempt:1,status:'ready',allowlist:['src/']}]},secondBridge=createJobBridge({ledgerFile:f.state.engine.ledgerFile,machineFile:f.state.engine.machineFile,eligibility:()=>({eligible:true}),spawnChild:()=>{throw Error('no native launch');}}),second=createEngineRuntime({...f,state:reloadedState,bridge:secondBridge,eligibility:()=>({eligible:false,reasons:['fresh admission changed']}),modelPolicy:policy});second.pulse();const restored=reloadedState.ops[0];assert.equal(restored.lease.jobId,reserved.jobId);assert.deepEqual(second.reservationPhase(restored),{phase:'reserved',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol',role:'implement'});assert.equal(second.reserveOperation(restored,{runtime:'gpt-5.6-sol',target:'gpt-5.6-sol',role:'implement'}).reattached,true,'already admitted reservation does not run fresh eligibility again');second.beginLaunchIntent(restored);assert.equal(consumed,1,'restart does not consume probation or create another job');assert.equal(second.journal.listJobs().filter(job=>job.op_id==='reload').length,1);
   second.journal.db.prepare("UPDATE jobs SET status='effect_unknown' WHERE job_id=?").run(restored.lease.jobId);assert.throws(()=>second.beginLaunchIntent(restored),error=>error.effectState==='unknown');assert.equal(second.journal.getJob(restored.lease.jobId).status,'effect_unknown');secondBridge.close();
+});
+
+test('settling an operation releases the machine reservations its ledger leases paired with, not just the rows',t=>{
+  // This test owns its temp world rather than `fixture(t)`: the sqlite handles must close BEFORE the tree is
+  // removed, and `fixture`'s own removal hook is registered first, so it would run first and EPERM on Windows.
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-engine-machine-leases-'));
+  const allocated={runtime:'gpt-5.6-sol',target:'gpt-5.6-sol',role:'implement'};
+  const state={id:'wf',worktree:dir,head:'a'.repeat(40),createdAt:1,ops:[],
+    engine:{schema:'starci/engine@1',generation:2,ledgerFile:path.join(dir,'.starciwork','runtime.sqlite'),machineFile:path.join(dir,'machine.sqlite')}};
+  const store={dir:path.join(dir,'workflow'),appendEvent(){},saveState(){}};
+  const bridge=createJobBridge({ledgerFile:state.engine.ledgerFile,machineFile:state.engine.machineFile,
+    eligibility:()=>({eligible:true}),spawnChild:()=>({pid:11,once(){},unref(){}})});
+  // A second handle on the same arbiter file: what another workflow on this machine would see.
+  const observer=openMachine({file:state.engine.machineFile});
+  // One hook, closes first, removes whatever happened above: never conditional on the code under test.
+  t.after(()=>{for(const handle of [observer,bridge])try{handle?.close();}catch{}
+    fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
+  const runtime=createEngineRuntime({store,state,bridge,eligibility:()=>({eligible:true})});
+  const op={id:'op',kind:'backend.implement',attempt:1,status:'ready',allowlist:['src/']};state.ops=[op];
+  const held=()=>observer.db.prepare('SELECT resource_key FROM leases WHERE job_id=? ORDER BY resource_key').all(op.lease?.jobId??'none').map(row=>row.resource_key);
+
+  assert.equal(runtime.reserveOperation(op,allocated).ok,true);
+  const reserved=held();
+  assert.ok(reserved.includes('ai/global'),`the reservation is real in the machine arbiter: ${JSON.stringify(reserved)}`);
+  assert.ok(reserved.some(key=>key.startsWith('ai/provider:')),'and it holds the provider slot too');
+
+  // The failed-launch path: `jobs.complete` drops the ledger's lease rows, which says nothing about the
+  // machine tokens they mirror. Leaving those held kept `ai/global` and the provider slot until their TTL,
+  // so every failed launch throttled every other workflow on this machine.
+  const jobId=op.lease.jobId;
+  assert.equal(runtime.settled(op,{status:'failed',reason:'launch proved no effect'}).ok,true);
+  assert.equal(op.lease,undefined,'a settled operation holds no lease');
+  assert.deepEqual(observer.db.prepare('SELECT resource_key FROM leases WHERE job_id=?').all(jobId),[],
+    'the machine arbiter holds nothing for the settled job');
+  assert.equal(observer.db.prepare('SELECT count(*) AS n FROM leases').get().n,0,'and nothing at all');
 });
 
 test('reservation phase rejects a missing canonical writer resource',t=>{const f=fixture(t),bridge=createJobBridge({ledgerFile:f.state.engine.ledgerFile,machineFile:f.state.engine.machineFile,eligibility:()=>({eligible:true}),spawnChild:()=>{}}),runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})}),op={id:'writer',kind:'backend.implement',attempt:1,status:'ready',allowlist:['src/']};runtime.reserveOperation(op,{runtime:'gpt-5.6-sol',target:'gpt-5.6-sol',role:'implement'});runtime.journal.db.prepare("DELETE FROM leases WHERE job_id=? AND resource_key LIKE 'canonical-writer:%'").run(op.lease.jobId);assert.equal(runtime.reservationPhase(op).phase,'unknown');assert.throws(()=>runtime.beginLaunchIntent(op),error=>error.effectState==='unknown');bridge.close();});

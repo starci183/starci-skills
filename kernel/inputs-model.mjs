@@ -7,7 +7,7 @@ import {credentialVersionChanged} from './inputs-replacement.mjs';
 import {fillWaitingAsks,workRootOf} from './fill.mjs';
 import {integrationReadiness} from './inputs-readiness.mjs';
 import {deriveOwnerRequests} from './owner-requests.mjs';
-import {parseOwnerInboxCommand} from './owner-inbox.mjs';
+import {enqueueOwnerInbox,parseOwnerInboxCommand} from './owner-inbox.mjs';
 import {createStore} from './store.mjs';
 
 const same=(a,b)=>path.resolve(a)===path.resolve(b);
@@ -137,14 +137,20 @@ export function writeInputCredential({binding,field,value,spawnProcess=spawn}){
   });
 }
 
-/** The one command the ledger's `inbox` table accepts from this helper: a validated owner action row, applied by `applyOwnerInbox` on the kernel's own tick (never here). */
+/**
+ * The one command the ledger's `inbox` table accepts from this helper: a validated owner action row, applied by
+ * `applyOwnerInbox` on the kernel's own tick (never here).
+ *
+ * It queues through `enqueueOwnerInbox` rather than pushing the row itself, because the envelope is what makes the
+ * command legible: `applyInbox` recognises an owner action only as `starci/job@1` with `kind:'owner-action'`. A bare
+ * `starci/owner-action@1` fell through every branch, was settled `applied` and left one `inbox-ignored` event - the
+ * owner's answer accepted here and then discarded, with the ask still waiting. The parse stays ahead of the store so
+ * an invalid command is still refused without opening one.
+ */
 const enqueueOwnerAction=(binding,payload)=>{
   const parsed=parseOwnerInboxCommand(payload);
   if(!parsed.ok)return parsed;
-  return withBoundStore(binding,store=>{
-    const row=store.inbox.push({kind:'owner-action',key:parsed.command.action.requestId,payload:parsed.command});
-    return {ok:true,code:'queued',id:row.id,eventId:String(row.id),job:parsed.command};
-  });
+  return withBoundStore(binding,store=>enqueueOwnerInbox(store,payload));
 };
 
 /** This helper owns no workflow state. The kernel independently settles satisfied asks on its next tick. */

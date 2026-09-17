@@ -14,7 +14,7 @@ import {goalPhase,approve} from '../kernel/goal.mjs';
 import {enrollEngine,createEngineRuntime} from '../kernel/engine.mjs';
 import {MANAGER_DECISION} from '../models/manager-contract.mjs';
 import {fakeAllocator} from './helpers/kernel-harness.mjs';
-import {withLedger} from './_ledger-fixture.mjs';
+import {withLedger,sameDriveTmp} from './_ledger-fixture.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const json=(status,value)=>({status,stdout:JSON.stringify(value),stderr:''});
@@ -273,7 +273,7 @@ test('§11 restart proof: kill mid-op, delete and recreate the worktree, resume 
     assert.equal(fs.existsSync(path.join(repoRoot,'.starciwork','_local')),false,'resume still wrote nothing under _local');
   // The kernel hands the launcher a worktree relative to `process.cwd()` and refuses an absolute one, so this
   // world has to sit on the same volume as the runtime checkout - never inside it (runtime-tree-hygiene).
-  },{parentDir:path.join(path.parse(process.cwd()).root,'starci-tmp')});
+  },{parentDir:sameDriveTmp()});
 });
 
 test('§5/§6 identity: a relocated ledger keeps its machine leases; a path rebuilt fresh does not inherit them',async t=>{

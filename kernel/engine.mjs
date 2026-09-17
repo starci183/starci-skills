@@ -476,8 +476,13 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
         journal.appendEvent({eventId:`${op.lease.jobId}:worker-stopped`,workflowId:state.id,entityType:'job',entityId:op.lease.jobId,generation:state.engine.generation,kind:'operation-worker-stopped',payload:{reason,writerRetained:true}});
         return {ok:true,writerRetained:true};
       }
+      // Same rule the workerOnly branch above obeys: `jobs.complete` drops the ledger's lease rows and knows
+      // nothing of the machine tokens they pair with, so the refs are read before the rows go and released after.
+      // Skipping this held every failed launch's `ai/global` and provider reservation in the machine arbiter
+      // until its TTL swept it, throttling every other workflow on the machine meanwhile.
+      const refs=machineRefs(journal,op.lease.jobId);
       const result=jobs.complete({...op.lease,eventId:`${op.lease.jobId}:settled`,status,result:{reason}});
-      if(result.ok)delete op.lease;
+      if(result.ok){releaseRefs(admission.machine,refs);delete op.lease;}
       return result;
     },
     /**

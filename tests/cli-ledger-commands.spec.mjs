@@ -5,6 +5,7 @@ import path from 'node:path';
 import {main} from '../hosts/orca/launch.mjs';
 import {createStore} from '../kernel/store.mjs';
 import {ledgerFileFor,ledgerIdOf} from '../kernel/ledger-db.mjs';
+import {sameDriveTmp} from './_ledger-fixture.mjs';
 
 const anchorFileFor=repo=>path.join(repo,'.starciwork','ledger-anchor.json');
 
@@ -21,7 +22,7 @@ const rel=dir=>path.relative(process.cwd(),dir);
  * so path.relative() handed the launcher an absolute path back. The fixture lives on the current drive's
  * root instead: relative from this checkout, and outside the runtime tree (tests/runtime-tree-hygiene).
  */
-const SUITE_TEMP=path.join(path.parse(process.cwd()).root,'starci-tmp');
+const SUITE_TEMP=sameDriveTmp();
 const fixture=t=>{
   const closers=[],dirs=[];
   // Cleanup never depends on the code under test succeeding: a throwing close() must not strand a fixture.

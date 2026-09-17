@@ -4828,6 +4828,11 @@ function kernelMainDispatch(command,options={},{orca,cwd=process.cwd(),wait=slee
     // stays where it is. Either way the former journal must hold nothing live of this workflow before it is left.
     const previousJournal=state.engine?.ledgerFile??null;
     const targetJournal=retryJournalTarget({option:options['journal-file']??null,previous:previousJournal,chosen:state.engine?.journalChosen===true,fallback:ledgerFileFor(store.repoRoot)});
+    // §8: a repository has exactly one ledger and the store is already open on it, so the only target a retry can
+    // bind is that file. Relocation still moves a record INTO it (that is how a pre-1.0.4 journal migrates), but an
+    // operator naming some other path is refused here, by name, instead of failing deep inside `bindJournal`.
+    need(targetJournal===path.resolve(ledgerFileFor(store.repoRoot)),
+      `--journal-file names ${targetJournal}, but ${state.id} lives in this repository's one ledger ${ledgerFileFor(store.repoRoot)}; move the repository, not the record`);
     const relocation=previousJournal&&path.resolve(previousJournal)!==targetJournal?relocateJournal({from:previousJournal,to:targetJournal,workflowId:state.id}):null;
     need(!relocation||relocation.ok,`The journal ${previousJournal} still binds ${state.id}: ${relocation?.reason??''}`);
     // The retired generation's log closes here: everything the retry settled above is its story; the enrollment opens the next.

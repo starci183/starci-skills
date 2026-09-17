@@ -50,3 +50,28 @@ test('public retry first enrolls an approved workflow without inventing a retire
   try{assert.deepEqual(ledger.liveRows(state.id),{leases:[],jobs:[]});}finally{ledger.close();}
   assert.equal(fs.existsSync(path.join(root,'.starciwork','_local')),false,'the enrollment wrote nothing under _local');
 });
+
+// The docstring above says `--journal-file <somewhere else>` is no longer a thing a retry can be told. That was
+// true of the outcome and not of the message: the option was still read, and the refusal surfaced as
+// `ledger-binding-mismatch:<id>` thrown from inside `bindJournal`, which names neither the option nor the file.
+test('a retry told to put the record in another file is refused by name, not by a binding mismatch',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-retry-target-'));
+  const store=createStore({repoRoot:root,id:'retry-target'});
+  t.after(()=>{
+    try{store.close();}catch{}
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,150);
+    fs.rmSync(root,{recursive:true,force:true,maxRetries:30,retryDelay:150});
+  });
+  const state=createWorkflowState({job:'Refuse a foreign ledger target',worktree:root,branch:'main',store});
+  Object.assign(state,{approved:true,phase:'run',goalDigest:'a'.repeat(64),definitionOfDone:['Refuse it']});
+  store.saveState(state);
+  const pin=sealRuntime({sourceRoot:process.cwd(),buildsRoot:path.join(root,'builds'),version:'1.0.0'});
+  const pinFile=path.join(root,'pin.json');fs.writeFileSync(pinFile,JSON.stringify(pin));
+  const orca={invoke(){throw Error('A refused retry must not launch a worker');}};
+  const elsewhere=path.join(root,'elsewhere','runtime.sqlite');
+  assert.throws(()=>kernelMain('workflow-retry',{id:state.id,'runtime-pin':pinFile,'journal-file':elsewhere},{orca,cwd:root}),
+    error=>/--journal-file/.test(error.message)&&error.message.includes(path.resolve(elsewhere))&&error.message.includes(ledgerFileFor(root)),
+    'the refusal names the option, the path it was given and the one ledger the repository has');
+  assert.equal(fs.existsSync(elsewhere),false,'and it created no second ledger on the way to refusing');
+  assert.equal(store.loadState().engine,undefined,'a refused retry enrolls nothing');
+});

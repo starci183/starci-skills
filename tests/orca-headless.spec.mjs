@@ -12,6 +12,7 @@ import {observe} from '../hosts/orca/observe.mjs';
 import {HOST_ADAPTERS,createHostRunner,hostAdapterOf,main,startOperation} from '../hosts/orca/launch.mjs';
 import {inspectWorkflow,startKernel} from '../kernel/supervisor.mjs';
 import {resolveExecutionChain} from '../kernel/chains.mjs';
+import {sameDriveTmp} from './_ledger-fixture.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const tmp=()=>{const dir=path.join(os.tmpdir(),'starci-headless-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);fs.mkdirSync(dir,{recursive:true});return dir;};
@@ -294,7 +295,7 @@ test('the real launcher drives a managed launch through the host end to end and 
   // `orca-dispatch-ctx_*.md` artifacts into the real `fixtures/` tree, so the fixture lives outside the
   // runtime tree and `worktree` is its path relative to cwd. A relative path only exists between two paths
   // on one drive and os.tmpdir() is on another drive here, so the fixture goes to this drive's root.
-  const suiteTemp=path.join(path.parse(process.cwd()).root,'starci-tmp');
+  const suiteTemp=sameDriveTmp();
   fs.mkdirSync(suiteTemp,{recursive:true});
   const wtRoot=fs.mkdtempSync(path.join(suiteTemp,'orca-headless-wt-'));
   try{

@@ -16,7 +16,7 @@ import {reconcileWorkflowInputs,recoverWorkflowInputReferences,inputScratchDir} 
 import {integrationReadiness,prepareCredentialAsk,preparationFingerprint,relatedIntegrations} from '../kernel/inputs-readiness.mjs';
 import {settleFilledAsks,ownerFillLines,askFillLine} from '../kernel/fill.mjs';
 import {ownerItems} from '../kernel/owner.mjs';
-import {createWorkflowState,deferForIntegrationPreparation,refreshCredentialPreparation,applyOpReport} from '../kernel/kernel.mjs';
+import {applyInbox,createWorkflowState,deferForIntegrationPreparation,refreshCredentialPreparation,applyOpReport} from '../kernel/kernel.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {declaredIntegrations} from '../kernel/ledger.mjs';
 import {createStore} from '../kernel/store.mjs';
@@ -431,6 +431,41 @@ test('the same Orca input page queues noncredential owner actions with a server-
   assert.equal(result.ok,true);assert.equal(queued[0].action.actor.type,'owner');assert.equal(queued[0].action.actor.channel,'orca-input');assert.ok(queued[0].action.actor.receiptId.length>=32);
   assert.deepEqual([queued[0].action.workflowId,queued[0].action.opId,queued[0].action.attempt,queued[0].action.generation],[f.state.id,'ask-policy',1,Number(f.state.generation??0)]);
   assert.equal(model.submitOwnerAction({requestId:request.id,revision:0,type:'choose',value:'short',actor:{type:'model'}}).code,'invalid-request');
+});
+
+// The test above stubs `enqueue`, so it proves the payload the model builds and nothing about what becomes of it.
+// This one uses the real queue: the input model's own `enqueueOwnerAction`, then the kernel's `applyInbox`.
+// It pushed a bare `starci/owner-action@1`, and `applyInbox` recognises an owner action only as `starci/job@1`
+// with `kind:'owner-action'` - so the row matched no branch, was settled `applied`, and the owner's choice was
+// gone with one `inbox-ignored` event behind it while the ask went on waiting.
+test('an owner action queued through the input page is applied by the kernel, not settled and dropped',t=>{
+  const f=fixture(t);
+  f.state.ops=[{id:'work',kind:'backend.implement',status:'paused',waitingFor:'ask-policy',attempt:1,dependsOn:['ask-policy']},
+    {id:'ask-policy',kind:'decision.prepare',status:'running',attempt:1,requesters:['work'],
+      question:{kind:'business-decision',subject:'Choose the retention policy',record:'RETENTION',text:'Choose one policy',
+        options:[{id:'short',label:'30 days'},{id:'long',label:'1 year'}]}}];
+  f.store.saveState(f.state);
+  // No `enqueue` override: this is the module's own path to the ledger.
+  const model=createInputModel({binding:f.binding,read:()=>f.state});
+  const request=model.snapshot().ownerRequests[0];
+  assert.equal(model.submitOwnerAction({requestId:request.id,revision:request.revision,type:'choose',value:'short'}).ok,true);
+
+  const pending=f.store.inbox.pending();
+  assert.equal(pending.length,1,'the action is one inbox row');
+  assert.deepEqual([pending[0].payload.schema,pending[0].payload.kind],['starci/job@1','owner-action'],
+    'queued in the envelope applyInbox reads, not as a bare owner-action');
+
+  applyInbox(f.store,f.state,{});
+  assert.deepEqual(f.store.inbox.pending(),[],'the row is consumed');
+  // The apply is journalled onto the state's own receipt (applyInbox collects those events there), so that is
+  // where the outcome is read; the store only shows what the loop itself recorded.
+  const receipts=Object.values(f.state.ownerInboxReceipts??{});
+  assert.equal(receipts.length,1,'exactly one owner receipt');
+  assert.equal(receipts[0].ok,true,`the owner's choice was applied: ${JSON.stringify(receipts[0])}`);
+  assert.ok(receipts[0].events.some(event=>event.event==='owner-inbox-applied'));
+  assert.equal(f.store.readEvents().some(event=>event.event==='inbox-ignored'),false,'and nothing was ignored on the way');
+  assert.equal(f.state.ops[1].ownerAnswer?.selectedLabel,'30 days','the ask carries the answer the owner gave');
+  assert.equal(f.state.ops[0].status,'ready','and its requester was resumed');
 });
 
 test('the rendered owner page includes the choice control while credentials are still preparing',async t=>{

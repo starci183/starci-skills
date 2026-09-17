@@ -10,11 +10,12 @@ import {amendmentContractLines,applyWorkflowAmendment,bindPlannedAmendmentEffect
 import {createWorkflowState} from '../kernel/kernel.mjs';
 import {createStore,stateGoalIdentity} from '../kernel/store.mjs';
 import {acquireStartup,releaseStartup,reserveStartup} from '../kernel/launch.mjs';
+import {sameDriveTmp} from './_ledger-fixture.mjs';
 
 function fixture(t){
   // A worktree input must be relative (hosts/orca/launch.mjs) and os.tmpdir() is on another drive here, so
   // the fixture lives on the current drive's root: relative from this checkout, outside the runtime tree.
-  const suiteTemp=path.join(path.parse(process.cwd()).root,'starci-tmp');
+  const suiteTemp=sameDriveTmp();
   fs.mkdirSync(suiteTemp,{recursive:true});
   const root=fs.mkdtempSync(path.join(suiteTemp,'workflow-amendment-'));
   assert.equal(spawnSync('git',['init','-q'],{cwd:root,windowsHide:true}).status,0);

@@ -9,13 +9,14 @@ import {resolveExecutionChain} from '../kernel/chains.mjs';
 import {buildOperationLaunch,defaultOrcaExecutable,main,notifyTerminal,parseSkip,promptDelivery,qwenLaunchMode,resolveSupervisorChain,settleDispatch,startOperation,sweepWorktree} from '../hosts/orca/launch.mjs';
 import {ensureAgentTrust} from '../hosts/orca/launch.mjs';
 import {dispatchLastWords,parseLastFailure,workerLastWords} from '../hosts/orca/launch.mjs';
+import {sameDriveTmp} from './_ledger-fixture.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 // Fake launch writes must not race installers copying the packaged fixtures, and a worktree input must be
 // relative (hosts/orca/launch.mjs), which rules out `os.tmpdir()` here: it is on another drive, so
 // `path.relative` from this checkout answers with an absolute path. The fixture therefore lives on the
 // current drive's root - relative from here, and outside both the runtime tree and every payload root.
-const suiteTemp=path.join(path.parse(process.cwd()).root,'starci-tmp');
+const suiteTemp=sameDriveTmp();
 fs.mkdirSync(suiteTemp,{recursive:true});
 const suiteRoot=fs.mkdtempSync(path.join(suiteTemp,'orca-launch-'));
 const worktree=path.relative(process.cwd(),suiteRoot);
