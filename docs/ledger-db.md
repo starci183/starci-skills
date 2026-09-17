@@ -148,6 +148,18 @@ CREATE TABLE signals(
   PRIMARY KEY(scope,key));
 -- today's runtime-loads.json / runtimes.json (supervisor's provider load view)
 CREATE TABLE runtime_loads(runtime TEXT PRIMARY KEY, loads_json TEXT NOT NULL, at INTEGER NOT NULL);
+-- owner-named external inputs, frozen at goal time (today: copies under the WORKTREE's `.starciwork/_local/inputs/<wf>/`,
+-- which die with the worktree — restart test 2026-09-17 lost `1-be-architecture-business-handoff.md` and
+-- `1-architecture-partition.md` this way). The bytes are the record; an op binds them by `sha256`, never by path.
+CREATE TABLE inputs(
+  workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), key TEXT NOT NULL,      -- '<index>-<basename>' as today
+  goal_revision INTEGER NOT NULL, sha256 TEXT NOT NULL, size INTEGER NOT NULL, media_type TEXT,
+  origin TEXT NOT NULL,           -- the owner's original absolute path or URL, for provenance only
+  bytes BLOB NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(workflow_id,key));
+-- input ref inside goal/state/contracts: `ledger://inputs/<workflow_id>/<key>#sha256=<hex>`. The candidate bridge
+-- and root binding resolve that scheme from the ledger (materialising to `os.tmpdir()/starci/inputs/<wf>/<key>` when a
+-- worker needs a file, digest-checked on read); a `.starciwork/_local/inputs/...` ref in a 1.0.4 state is
+-- `ledger-unmigrated`. The migrator imports the directory when it still exists and otherwise records the loss.
 -- what the ledger imported, so a second migrate is a no-op and an audit can see provenance
 CREATE TABLE migrations(source TEXT PRIMARY KEY, kind TEXT NOT NULL, rows_json TEXT NOT NULL, at INTEGER NOT NULL);
 ```
@@ -216,6 +228,7 @@ the continuation boundary (`ledger-verify` runs there, fails closed with `ledger
 | `checksPath(op)` | file path | `writeChecks({opId,attempt,checks})` / `readChecks(opId,attempt)`. |
 | `paths.inbox` | dir | `inbox.push({kind,key,payload})` / `inbox.pending()` / `inbox.settle(id,status,disposition)` |
 | `paths.state/events/goal…` | files | **removed**. Anything that needs the goal reads `goal()` → `{markdown,json,revision,identity}`. |
+| new | | `inputs.put({key,goalRevision,bytes,origin,mediaType})` → `{ref,sha256}` / `inputs.get(key)` → `{bytes,sha256,…}` / `inputs.list()` / `inputs.materialise(key,dir)` (digest-checked file copy for a worker) |
 | new | | `signal.set(scope,key,{pid,token,value,ttl})` / `signal.get` / `signal.clear` (kernel.lock, stop.flag, …) |
 | new | | `exportTo(dir)` — writes today's file layout for humans (`workflow-export`). |
 
