@@ -100,7 +100,7 @@ export function bindRuntimeInputs(snapshot,{canonicalRoot,paths=[]}={}){
   fs.writeFileSync(path.join(snapshot.controlRoot,'snapshot.json'),`${JSON.stringify(snapshot,null,2)}\n`);
   return snapshot.source;
 }
-const walkFiles=(root,current=root,out=[])=>{
+export const walkFiles=(root,current=root,out=[])=>{
   for(const dirent of fs.readdirSync(current,{withFileTypes:true})){
     const absolute=path.join(current,dirent.name),relative=slash(path.relative(root,absolute));
     if(relative==='.git'||relative.startsWith('.git/'))throw new Error('candidate worker root contains forbidden Git metadata');
