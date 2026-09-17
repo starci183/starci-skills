@@ -7,9 +7,8 @@ import {stringifyYaml} from '../core/yaml.mjs';
 import {main as launcherMain} from '../hosts/orca/launch.mjs';
 import {amendmentContractLines,applyWorkflowAmendment,bindPlannedAmendmentEffects,operationAmendmentVerdict,readWorkflowAmendment} from '../kernel/amendment.mjs';
 import {createWorkflowState} from '../kernel/kernel.mjs';
-import {openJournal} from '../kernel/journal.mjs';
 import {createStore,stateGoalIdentity} from '../kernel/store.mjs';
-import {acquireStartup,reserveStartup} from '../kernel/launch.mjs';
+import {acquireStartup,releaseStartup,reserveStartup} from '../kernel/launch.mjs';
 
 function fixture(t){
   const root=fs.mkdtempSync(path.join(process.cwd(),'.workflow-amendment-test-'));
@@ -27,14 +26,15 @@ function fixture(t){
       lease:{workflowId:'wf-existing',opId:'remaining-1',attempt:3,generation:2,jobId:'job-unknown',leaseToken:'lease-token'}}
   ];
   state.finished={outcome:'blocked',reason:'owner clarification required',report:'signal:final-report'};
-  const journalFile=path.join(root,'runtime','journal.sqlite'),journal=openJournal({file:journalFile});
+  // Runtime 1.0.4: `jobs`/`leases` live in the same ledger `store` already has open (docs/ledger-db.md §4),
+  // not a separate journal.sqlite - kernel.mjs's own `openJournal` alias now opens this exact file
+  // (kernel/ledger-db.mjs's `openLedger`, keyed by `state.engine.ledgerFile`).
   const now=Date.now();
-  journal.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,priority_json,lease_token,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,'effect_unknown',?,?,?,?)")
+  store.ledger.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,priority_json,lease_token,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,'effect_unknown',?,?,?,?)")
     .run('job-unknown',state.id,'remaining-1',3,2,'operation','implement','{}','{}','lease-token',now,now);
-  journal.db.prepare('INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+  store.ledger.db.prepare('INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
     .run('canonical-writer:fixture','job-unknown',state.id,'remaining-1',3,2,'lease-token',1,now,now+60000);
-  journal.close();
-  state.engine={schema:'starci/engine@1',version:'1.0.0',generation:2,journalFile,runtimePin:{root:root,digest:'c'.repeat(64)}};
+  state.engine={schema:'starci/engine@1',version:'1.0.0',generation:2,ledgerFile:store.ledgerFile,runtimePin:{root:root,digest:'c'.repeat(64)}};
   store.saveState(state);
   const amendment={schema:'starci/workflow-amendment@1',workflowId:state.id,baseGoalIdentity:stateGoalIdentity(state),
     authority:{actor:'owner',source:{threadId:'owner-codex-chat',messageId:null,messageIdAvailability:'not-exposed',
@@ -49,7 +49,7 @@ function fixture(t){
       operationEffects:{'remaining-1':{paths:['src/frontend/**'],resources:[],external:[]}},
       effectCeiling:{paths:['.starciwork/features/frontend-recovery/**','src/frontend/**'],resources:[],external:[]}}};
   const amendmentFile=path.join(root,'amendment.yaml');fs.writeFileSync(amendmentFile,stringifyYaml(amendment));
-  return {root,store,state,journalFile,amendment,amendmentFile};
+  return {root,store,state,amendment,amendmentFile};
 }
 const publicCommand=(fixture,...args)=>launcherMain([...args,'--worktree',path.relative(process.cwd(),fixture.root)],{orca:{}});
 const addOperation=(id,kind='review.verify',operation=null)=>({id,kind,...(operation?{operation}:{}),goal:`Run ${id} against the authorized source slice.`,ledgerIds:['frontend-slice'],
@@ -65,9 +65,12 @@ test('public stop and same-ID amendment preserve accepted history, owner decisio
   assert.throws(()=>publicCommand(f,'workflow-amend','--id',f.state.id,'--amendment',f.amendmentFile),/not paused/);
   const stopped=publicCommand(f,'workflow-stop','--id',f.state.id);
   assert.equal(stopped.id,f.state.id);assert.ok(fs.existsSync(stopped.continuation));
-  fs.writeFileSync(path.join(f.store.dir,'kernel.lock'),JSON.stringify({pid:process.pid,startedAt:Date.now(),startupToken:'owned'}));
+  // kernel.lock is the ledger's `kernel-lock` signal now (docs/ledger-db.md §4); a live pid on it is what
+  // `kernelAlive` reads to refuse an amendment while a kernel is still running.
+  const reservation=reserveStartup(f.store.ledger,f.state.id,{pid:process.pid});
+  const owner=acquireStartup(f.store.ledger,f.state.id,{launchToken:reservation.token,pid:process.pid});
   assert.throws(()=>publicCommand(f,'workflow-amend','--id',f.state.id,'--amendment',f.amendmentFile),/still running/);
-  fs.rmSync(path.join(f.store.dir,'kernel.lock'));
+  releaseStartup(f.store.ledger,f.state.id,owner);
   const amended=publicCommand(f,'workflow-amend','--id',f.state.id,'--amendment',f.amendmentFile);
   assert.equal(amended.ok,true);assert.equal(amended.replayed,false);assert.equal(amended.id,f.state.id);
   assert.equal(amended.amendment.baseGoalIdentity,'a'.repeat(64));
@@ -88,13 +91,11 @@ test('public stop and same-ID amendment preserve accepted history, owner decisio
   assert.equal(current.amendments[0].authority.source.at,null,'an unavailable native owner-event timestamp is not invented');
   assert.equal(current.amendments[0].coordinator.source.messageId,'coord-msg-9');
   assert.equal(current.amendments[0].approvalDigest,undefined,'an amendment digest is never presented as owner approval');
-  const journal=openJournal({file:f.journalFile});
-  assert.equal(journal.getJob('job-unknown').status,'effect_unknown');
-  assert.equal(journal.db.prepare('SELECT count(*) AS n FROM leases WHERE job_id=?').get('job-unknown').n,1);
-  const durable=journal.db.prepare('SELECT state_json FROM state_snapshots WHERE workflow_id=? AND generation=? ORDER BY snapshot_id DESC LIMIT 1').get(f.state.id,2);
+  assert.equal(f.store.ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get('job-unknown').status,'effect_unknown');
+  assert.equal(f.store.ledger.db.prepare('SELECT count(*) AS n FROM leases WHERE job_id=?').get('job-unknown').n,1);
+  const durable=f.store.ledger.db.prepare('SELECT state_json FROM state_snapshots WHERE workflow_id=? AND generation=? ORDER BY snapshot_id DESC LIMIT 1').get(f.state.id,2);
   assert.equal(JSON.parse(durable.state_json).amendments[0].digest,current.amendments[0].digest,
     'the current-generation durable checkpoint contains the amendment that resume will load');
-  journal.close();
   const brief=fs.readFileSync(amended.continuation,'utf8');
   for(const expected of ['Authorized same-workflow amendments','owner-codex-chat','not exposed','coord-msg-9','features/frontend-recovery','job-unknown','Unknown or live effects are intentionally preserved'])
     assert.match(brief,new RegExp(expected));
@@ -226,10 +227,15 @@ test('invalid added operations and dependency edits fail before any workflow byt
   }
 });
 
-test('sequential, stale-projection and replayed amendments compose every prior operation grant without a lost update',t=>{
-  const f=fixture(t);publicCommand(f,'workflow-stop','--id',f.state.id);const stale=f.store.loadState();
+// The pre-1.0.4 version of this test also wrote a stale snapshot to `store.paths.state`, the plain
+// projection file `open()` never actually read for an enrolled workflow (it read the durable journal, the
+// projection was a side channel for humans) - proving the kernel was immune to that side channel going
+// stale. Under 1.0.4 the ledger row IS the record, with no parallel projection to race: every writer that
+// matters goes through `saveState`, itself serialized by the same startup-row lock `workflow-amend` holds
+// (kernel.mjs's own comment on `acquireKernelLock`), so there is no side channel left to prove immunity to.
+test('sequential and replayed amendments compose every prior operation grant without a lost update',t=>{
+  const f=fixture(t);publicCommand(f,'workflow-stop','--id',f.state.id);
   publicCommand(f,'workflow-amend','--id',f.state.id,'--amendment',f.amendmentFile);
-  fs.writeFileSync(f.store.paths.state,`${JSON.stringify(stale,null,2)}\n`,'utf8');
   const second=structuredClone(f.amendment);second.authority.source.at='2026-09-16T01:02:00Z';second.authority.source.quote='Retain the first amendment and add its validation criterion.';second.authority.statement=second.authority.source.quote;
   second.coordinator.source.messageId='coord-msg-11';second.coordinator.source.at='2026-09-16T01:06:00Z';
   second.changes={clarifications:['The second overlay composes with the first durable overlay.'],addScope:[],scopeBindings:{},
@@ -240,7 +246,7 @@ test('sequential, stale-projection and replayed amendments compose every prior o
   const result=publicCommand(f,'workflow-amend','--id',f.state.id,'--amendment',file);assert.equal(result.replayed,false);
   const current=f.store.loadState();assert.equal(current.amendments.length,2);assert.ok(current.scope.includes('features/frontend-recovery'));
   assert.ok(current.definitionOfDone.includes('The bounded repair has a current validation receipt'));
-  assert.ok(current.ops[1].allowlist.includes('src/frontend/**'),'the first operation grant survives the stale projection');
+  assert.ok(current.ops[1].allowlist.includes('src/frontend/**'),'the first operation grant survives the second amendment');
   assert.ok(current.ops[1].allowlist.includes('src/frontend-validation/**'),'the later operation grant composes with the first');
   assert.equal(operationAmendmentVerdict(current,current.ops[1],{files:['src/frontend/login.tsx','src/frontend-validation/receipt.json']}).ok,true);
   const replay=publicCommand(f,'workflow-amend','--id',f.state.id,'--amendment',file);assert.equal(replay.replayed,true);
@@ -255,14 +261,41 @@ test('a legacy amendment reloads the final controller checkpoint after its initi
   latest.controllerFinalCheckpoint={receipt:'controller-save-after-open',sequence:7};
   const latestFile=path.join(f.root,'latest-state.json');fs.writeFileSync(latestFile,`${JSON.stringify(latest,null,2)}\n`);
   const sentinel=path.join(f.root,'state-intercepted.txt');
-  const preload=`import fs from 'node:fs';
-const read=fs.readFileSync.bind(fs),target=process.env.STARCI_AMEND_INTERCEPT_TARGET,source=process.env.STARCI_AMEND_INTERCEPT_SOURCE,sentinel=process.env.STARCI_AMEND_INTERCEPT_SENTINEL;
+  // Runtime 1.0.4: there is no `state.json` file to intercept `fs.readFileSync` on any more - the state is a
+  // row in `state_snapshots` (docs/ledger-db.md §4). The equivalent interception point is the SELECT
+  // `open()`'s first `store.loadState()` runs: patch `DatabaseSync.prototype.prepare` (the one chokepoint
+  // every ledger read goes through) so the first matching read, after returning its real result, inserts the
+  // "final controller save" as a newer row - exactly the pre-1.0.4 script's timing (the swap happens right
+  // after the value the first read already committed to is captured, so only the SECOND read, after lock
+  // acquisition, sees it).
+  const preload=`import {DatabaseSync} from 'node:sqlite';
+import fs from 'node:fs';
+const workflowId=process.env.STARCI_AMEND_INTERCEPT_WORKFLOW,source=process.env.STARCI_AMEND_INTERCEPT_SOURCE,
+  sentinel=process.env.STARCI_AMEND_INTERCEPT_SENTINEL,generation=Number(process.env.STARCI_AMEND_INTERCEPT_GENERATION),
+  goalIdentity=process.env.STARCI_AMEND_INTERCEPT_GOAL_IDENTITY,stateJson=fs.readFileSync(source,'utf8');
+const originalPrepare=DatabaseSync.prototype.prepare;
 let intercepted=false;
-fs.readFileSync=function(file,...args){const value=read(file,...args);if(!intercepted&&String(file)===target){intercepted=true;const tmp=target+'.intercept.tmp';fs.writeFileSync(tmp,read(source));fs.renameSync(tmp,target);fs.writeFileSync(sentinel,'after-open-before-lock');}return value;};`;
+DatabaseSync.prototype.prepare=function(sql){
+  const statement=originalPrepare.call(this,sql);
+  if(intercepted||typeof sql!=='string'||!sql.includes('FROM state_snapshots')||!sql.includes('ORDER BY snapshot_id DESC'))return statement;
+  const db=this,originalGet=statement.get.bind(statement);
+  statement.get=(...args)=>{
+    const result=originalGet(...args);
+    if(!intercepted&&args[0]===workflowId){
+      intercepted=true;
+      db.prepare('INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at) VALUES(?,?,?,?,?,?)')
+        .run('test-late-write:'+Date.now(),workflowId,generation,goalIdentity,stateJson,Date.now());
+      fs.writeFileSync(sentinel,'after-open-before-lock');
+    }
+    return result;
+  };
+  return statement;
+};`;
   const invoked=spawnSync(process.execPath,['--import',`data:text/javascript,${encodeURIComponent(preload)}`,path.resolve('hosts/orca/launch.mjs'),
     'workflow-amend','--id',f.state.id,'--amendment',f.amendmentFile,'--worktree',path.relative(process.cwd(),f.root)],
-  {cwd:process.cwd(),windowsHide:true,encoding:'utf8',env:{...process.env,STARCI_AMEND_INTERCEPT_TARGET:f.store.paths.state,
-    STARCI_AMEND_INTERCEPT_SOURCE:latestFile,STARCI_AMEND_INTERCEPT_SENTINEL:sentinel}});
+  {cwd:process.cwd(),windowsHide:true,encoding:'utf8',env:{...process.env,STARCI_AMEND_INTERCEPT_WORKFLOW:f.state.id,
+    STARCI_AMEND_INTERCEPT_SOURCE:latestFile,STARCI_AMEND_INTERCEPT_SENTINEL:sentinel,
+    STARCI_AMEND_INTERCEPT_GENERATION:'0',STARCI_AMEND_INTERCEPT_GOAL_IDENTITY:stateGoalIdentity(latest)}});
   assert.equal(invoked.status,0,invoked.stderr||invoked.stdout);assert.equal(fs.readFileSync(sentinel,'utf8'),'after-open-before-lock');
   const current=f.store.loadState();
   assert.deepEqual(current.ops[0].reports.at(-1),latest.ops[0].reports.at(-1),'the accepted receipt from the final controller save survives');
