@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {stringifyYaml} from '../core/yaml.mjs';
@@ -11,12 +12,18 @@ import {createStore,stateGoalIdentity} from '../kernel/store.mjs';
 import {acquireStartup,releaseStartup,reserveStartup} from '../kernel/launch.mjs';
 
 function fixture(t){
-  const root=fs.mkdtempSync(path.join(process.cwd(),'.workflow-amendment-test-'));
+  // A worktree input must be relative (hosts/orca/launch.mjs) and os.tmpdir() is on another drive here, so
+  // the fixture lives on the current drive's root: relative from this checkout, outside the runtime tree.
+  const suiteTemp=path.join(path.parse(process.cwd()).root,'starci-tmp');
+  fs.mkdirSync(suiteTemp,{recursive:true});
+  const root=fs.mkdtempSync(path.join(suiteTemp,'workflow-amendment-'));
   assert.equal(spawnSync('git',['init','-q'],{cwd:root,windowsHide:true}).status,0);
   const store=createStore({repoRoot:root,id:'wf-existing'});
   // Runtime 1.0.4: the store holds a real ledger handle; it must close before the temp directory is
   // removed, or Windows refuses to delete the file still open underneath it.
-  t.after(()=>{store.close();assert.equal(path.dirname(root),process.cwd());assert.ok(path.basename(root).startsWith('.workflow-amendment-test-'));fs.rmSync(root,{recursive:true,force:true});});
+  // Cleanup must not depend on the code under test succeeding: while close() threw, this fixture's rmSync
+  // never ran and thirteen roots accumulated inside the runtime tree, where the next run reads them as real.
+  t.after(()=>{try{store.close();}catch{}assert.equal(path.dirname(root),suiteTemp);fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25});});
   const state=createWorkflowState({job:'Deliver the originally approved slice',worktree:root,branch:'main',store,scope:['features/existing']});
   state.phase='finished';state.approved=true;state.goalDigest='a'.repeat(64);state.definitionOfDone=['Original acceptance'];
   state.decisions=[{id:'decision-1',answer:'Keep historical decision'}];
