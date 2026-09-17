@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import {covers,kernelGuards,kindRole,normalize,parseRef,plain,slash,unique} from './common.mjs';
-import {CUT_ASSERTIONS,CUT_COMPONENTS,CUT_FILES,FAN_OUT,cutGroup,cutParentOf,fanOutDeferral} from './sync.mjs';
+import {FAN_OUT,cutGroup,cutParentOf,effectiveDifficulty,fanOutDeferral,opCutGroup,opCutReason} from './sync.mjs';
 import {isAsk} from './owner.mjs';
 import {DEFAULT_MAX_PARALLEL_OPS} from './schedule.mjs';
 
@@ -32,8 +32,8 @@ import {DEFAULT_MAX_PARALLEL_OPS} from './schedule.mjs';
  *
  * An op whose declared write scope is past the cut bounds - more than CUT_FILES files, more than
  * CUT_ASSERTIONS assertions, or CUT_COMPONENTS design components, the same measures `sync.mjs` applies to a
- * node - is not launched at all: it is cut, and the `implementation.plan` operation it becomes is what
- * launches next.
+ * node - is not launched at all: it is cut, and its disjoint children are what launch next (the minting lives
+ * in `sync.mjs`'s `cutOversizedOps`; the plan only names the op as a cut).
  */
 
 const IN_FLIGHT=['running','answering'];
@@ -101,22 +101,18 @@ export function opScopes(op,state){
 }
 
 const roleOf=op=>kindRole(op?.kind)??(typeof op?.role==='string'?op.role:null);
-const groupOf=(state,op)=>cutParentOf(state,op?.nodeId??(op?.ledgerIds??[])[0]??'');
+// A group member is a node-cut child (its nodeId sits inside the parent's group) or an op-cut child
+// (`cutChildOf` names the parent op; the slice itself is no ledger node and keeps nodeId null).
+const groupOf=(state,op)=>op?.cutChildOf??cutParentOf(state,op?.nodeId??(op?.ledgerIds??[])[0]??'');
+const groupKeyOf=op=>op?.cutChildOf?op.id:op?.nodeId;
+const groupFor=(state,op,parent)=>op?.cutChildOf?opCutGroup(state,parent):cutGroup(state,parent);
 
 /**
- * Why this op is `implementation.plan` work instead of a launch, or null. Only an implement-role op is
- * measured: a plan, a decision or a proof is one answer by construction, whatever its allowlist names.
+ * Why this op is cut before its first launch instead of launched as one build, or null. `opCutReason` in
+ * sync.mjs is the measuring gate - the same three bounds `cutReason` reads off a Work node, on the op's own
+ * declared scope.
  */
-export function cutSizeReason(op){
-  if(roleOf(op)!=='implement')return null;
-  const files=(op?.allowlist??[]).length;
-  const assertions=(Array.isArray(op?.assertions)?op.assertions:Array.isArray(op?.acceptance)?op.acceptance:[]).length;
-  const components=(Array.isArray(op?.components)?op.components:Array.isArray(op?.sdsComponents)?op.sdsComponents:[]).length;
-  if(files>CUT_FILES)return `its declared write scope names ${files} files, past the ${CUT_FILES} one operation may hold`;
-  if(assertions>CUT_ASSERTIONS)return `it states ${assertions} assertions, past the ${CUT_ASSERTIONS} one operation may prove`;
-  if(components>=CUT_COMPONENTS)return `the design it references names ${components} components, which is more than one operation builds`;
-  return null;
-}
+export const cutSizeReason=opCutReason;
 
 /** The first file-level collision between a candidate and an op already in flight (or already planned). */
 function firstConflict(op,other,state){
@@ -147,10 +143,10 @@ function firstLease(op,other){
 function fanOutReason(state,op,holders,candidateNodes,policy){
   const parent=groupOf(state,op);
   if(parent&&policy.seamFirst!==false){
-    const seam=cutGroup(state,parent)?.seam??null;
+    const seam=groupFor(state,op,parent)?.seam??null;
     // The seam launches alone and first, in whichever order the candidates arrived: a sibling that shares a
     // tick with its unlaunched seam waits exactly as it waits for a running one.
-    if(seam&&op.nodeId!==seam&&candidateNodes.has(seam))return `the seam ${seam} of ${parent} launches first and runs alone`;
+    if(seam&&groupKeyOf(op)!==seam&&candidateNodes.has(seam))return `the seam ${seam} of ${parent} launches first and runs alone`;
   }
   const hit=fanOutDeferral(state,op,holders,{allocator:{fanOut:policy}});
   return hit?.reason??null;
@@ -174,7 +170,7 @@ export function planDispatch(state,ops=[],allocator=null){
   const policy=plain(allocator?.fanOut)?allocator.fanOut:FAN_OUT;
   const busy=(state?.ops??[]).filter(item=>IN_FLIGHT.includes(item?.status)&&!item?.fill);
   const candidates=(ops??[]).filter(op=>op&&!IN_FLIGHT.includes(op.status));
-  const candidateNodes=new Set(candidates.map(op=>op.nodeId).filter(Boolean));
+  const candidateNodes=new Set(candidates.map(groupKeyOf).filter(Boolean));
   const launch=[],cut=[],wait=[],reasons={},planned=[],reserved={};
   const holders=()=>[...busy,...planned];
   const defer=(op,reason,extra={})=>{wait.push({op:op.id,reason,...extra});reasons[op.id]=reason;};
@@ -195,7 +191,7 @@ export function planDispatch(state,ops=[],allocator=null){
     let runtime=null;
     if(typeof allocator?.review==='function'){
       const role=roleOf(op)??'implement',avoid=unique([...(op.avoidRuntimes??[]),...verifyAvoids(state,op)]);
-      const view=allocator.review(op.kind,{avoid,restrictTo:op.restrictTo??null,difficulty:op.difficulty??null,job:{...op,opId:op.id,role}});
+      const view=allocator.review(op.kind,{avoid,restrictTo:op.restrictTo??null,difficulty:effectiveDifficulty(op),job:{...op,opId:op.id,role}});
       const freeable=(view?.ready??[]).filter(item=>finite(item?.free,1)-(reserved[item.runtime]??0)>0);
       if(view&&!freeable.length){
         const blocked=(view?.blocked??[]).map(item=>`${item.runtime} (${item.reason})`).join(', ');
