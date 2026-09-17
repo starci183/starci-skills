@@ -223,6 +223,53 @@ test('signals carry locks and payloads, workflow-scoped or ledger-wide',t=>{
   assert.equal(store.signal.get(ID,'kernel-lock').token,'tok','clearing one key leaves the others');
 });
 
+test('signal values round-trip every shape a real caller writes: string, array, object and explicit null',t=>{
+  const fx=fixture(t),repo=fx.repo(),store=fx.track(createStore({repoRoot:repo,id:ID}));
+  // rulingsText/setRulingsText (kernel/common.mjs) — a trimmed string.
+  store.signal.set(ID,'rulings',{value:'Bind writes to the sales schema only.'});
+  assert.equal(store.signal.get(ID,'rulings').value,'Bind writes to the sales schema only.');
+  assert.equal(typeof store.signal.get(ID,'rulings').value,'string');
+  // validator verdicts (kernel/verify.mjs) — an array of objects.
+  const verdicts=[{op:'op-1',verdict:'pass',at:1},{op:'op-2',verdict:'fail',at:2}];
+  store.signal.set(ID,'validator-verdicts',{value:verdicts});
+  assert.deepEqual(store.signal.get(ID,'validator-verdicts').value,verdicts);
+  assert.ok(Array.isArray(store.signal.get(ID,'validator-verdicts').value));
+  // an object shape, already exercised above for '*' scope; also confirmed workflow-scoped here.
+  store.signal.set(ID,'shape-object',{value:{nested:{count:3},list:[1,2]}});
+  assert.deepEqual(store.signal.get(ID,'shape-object').value,{nested:{count:3},list:[1,2]});
+  // an explicit null value is indistinguishable from "no value given", and both round-trip to null, not undefined.
+  store.signal.set(ID,'shape-null',{value:null});
+  assert.equal(store.signal.get(ID,'shape-null').value,null);
+  store.signal.set(ID,'shape-omitted');
+  assert.equal(store.signal.get(ID,'shape-omitted').value,null);
+  // a missing row and a cleared row both read back as null, never undefined.
+  assert.equal(store.signal.get(ID,'never-set'),null);
+  store.signal.set(ID,'to-clear',{value:'x'});
+  assert.equal(store.signal.clear(ID,'to-clear'),true);
+  const cleared=store.signal.get(ID,'to-clear');
+  assert.equal(cleared,null);
+  assert.notEqual(cleared,undefined);
+});
+
+test('signal rows are scoped per workflow: one workflow can never read or clear another\'s',t=>{
+  const fx=fixture(t),repo=fx.repo();
+  const other='20260913-000000-other';
+  const store=fx.track(createStore({repoRoot:repo,id:ID})),otherStore=fx.track(createStore({repoRoot:repo,id:other}));
+  // Same ledger file (one repo, one ledger — §1), same key, different workflow scopes: no crosstalk either way.
+  store.signal.set(store.id,'rulings',{value:'Only touch apps/sales.'});
+  otherStore.signal.set(otherStore.id,'rulings',{value:'Only touch apps/accounting.'});
+  assert.equal(store.signal.get(store.id,'rulings').value,'Only touch apps/sales.');
+  assert.equal(otherStore.signal.get(otherStore.id,'rulings').value,'Only touch apps/accounting.');
+  assert.equal(store.signal.get(other,'rulings').value,'Only touch apps/accounting.','the scope column is the isolation boundary, not the calling store');
+  assert.equal(otherStore.signal.get(ID,'rulings').value,'Only touch apps/sales.');
+  // Neither workflow's own-scoped get sees the other's row under the same key.
+  assert.notEqual(store.signal.get(store.id,'rulings').value,otherStore.signal.get(otherStore.id,'rulings').value);
+  // Clearing one workflow's key never touches the other's row under the same key.
+  assert.equal(store.signal.clear(store.id,'rulings'),true);
+  assert.equal(store.signal.get(store.id,'rulings'),null);
+  assert.equal(otherStore.signal.get(otherStore.id,'rulings').value,'Only touch apps/accounting.','clearing one workflow leaves the other intact');
+});
+
 test('inputs are frozen bytes bound by sha256, materialised digest-checked for a worker',t=>{
   const fx=fixture(t),repo=fx.repo(),store=fx.track(createStore({repoRoot:repo,id:ID}));
   assert.equal(store.inputs.get('1-brief.md'),null);
