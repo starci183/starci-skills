@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {parseYaml} from '../core/yaml.mjs';
-import {createStore} from '../kernel/store.mjs';
+import {createStore,listWorkflows} from '../kernel/store.mjs';
+import {ledgerFileFor} from '../kernel/ledger-db.mjs';
 import {approve,kernelMain,laneRowTitle,runLoop,validateWorkTree} from '../kernel/kernel.mjs';
 import {fakeAllocator,passing,scriptedOrca} from './helpers/kernel-harness.mjs';
 
@@ -121,7 +122,9 @@ const acceptAll=()=>({ok:true,verdict:'accept',summary:'stub validator: accepted
 /** `workflow-goal --lane` from the base worktree: the lane is created, named and the goal phase runs inside it. */
 function openedLane(t,{lane=true,id=null}={}){
   const fixed=fixture(t);
-  const fake=scriptedOrca({reportsDir:path.join(fixed.root,'unused-reports'),scripts:{},worktree:fixed.repo,worktrees:fixed.worktrees});
+  // The goal phase dispatches nothing, so no report is ever written or read here; the store is created by
+  // the `workflow-goal` call this fake Orca is about to drive, not before it.
+  const fake=scriptedOrca({store:null,scripts:{},worktree:fixed.repo,worktrees:fixed.worktrees});
   const goal=kernelMain('workflow-goal',{job:'Persist an order on intake',host:fixed.host,lane,...(id?{id}:{})},
     {orca:fake.orca,cwd:fixed.repo,functions:{assessGoal,critiqueGoal}});
   return {...fixed,fake,goal};
@@ -148,8 +151,8 @@ test('workflow-goal --lane creates the workflow its own Orca worktree row, runs 
     orcaId:`path:${run.repo.replaceAll('\\','/')}::${laneDir.replaceAll('\\','/')}`,
     base:{worktree:run.repo,branch:'main'}});
   // The store stays in the repository, so the supervisor finds it from the base worktree and from the lane.
-  assert.equal(run.goal.dir,path.join(run.repo,'.starciwork','_local','workflows',run.goal.id));
-  assert.equal(fs.existsSync(path.join(laneDir,'.starciwork','_local')),false);
+  assert.equal(run.goal.dir,ledgerFileFor(run.repo));
+  assert.equal(fs.existsSync(path.join(laneDir,'.starciwork','runtime.sqlite')),false,'the lane worktree carries no ledger of its own');
   assert.equal(kernelMain('workflow-status',{id:run.goal.id,host:run.host},{orca:null,cwd:laneDir}).dir,run.goal.dir,
     'the same workflow is reached from inside the lane');
   // goal.md names the lane and the base it goes home to, under the title.
@@ -179,7 +182,7 @@ test('a lane never opens a lane of its own, and a taken lane name is Orca refusa
   assert.throws(()=>kernelMain('workflow-goal',{job:'A second workflow on the same name',host:run.host,
     lane:'20260913-090001-intake'},{orca:run.fake.orca,cwd:run.repo,functions:{assessGoal,critiqueGoal}}),/worktree_name_taken/);
   // Neither refusal left a second workflow behind in the store.
-  assert.deepEqual(fs.readdirSync(path.join(run.repo,'.starciwork','_local','workflows')),['20260913-090001-intake']);
+  assert.deepEqual(listWorkflows(run.repo).map(entry=>entry.id),['20260913-090001-intake']);
 });
 
 /** Approve, run the lane to `done`, and let `finish` take the branch home. */
@@ -190,7 +193,7 @@ function walked(t,{dirtyBase=null,moveBase=null,id='20260913-100000-intake'}={})
   const state=store.loadState();
   approve(store,state);
   state.run='run_wf';state.from='term_kernel';
-  const fake=scriptedOrca({reportsDir:store.paths.reports,worktree:laneDir,worktrees:run.worktrees,
+  const fake=scriptedOrca({store,worktree:laneDir,worktrees:run.worktrees,
     scripts:{[INTAKE]:[{outcome:'done',summary:'Intake persists an order.',files:[FILE],
       checks:[passing('unit-tests-pass',CHECK)],
       effect:()=>fs.writeFileSync(path.join(laneDir,FILE),'export const intake=order=>order;\n')}],
@@ -233,7 +236,7 @@ test('a finished lane merges its own branch into the base branch, in the base wo
   // Orca is told the row is done, and the worktree is left in place for the owner to read.
   assert.deepEqual(run.fake.worktreeCalls.filter(call=>call.call==='set').map(call=>call.workspaceStatus),['completed']);
   assert.ok(fs.existsSync(run.laneDir));
-  const final=JSON.parse(fs.readFileSync(run.store.paths.final,'utf8'));
+  const final=run.store.signal.get(run.id,'final-report').value;
   assert.equal(final.outcome,'done');
   assert.equal(final.lane.merged.commit,merged.commit);
   assert.equal(final.lane.base.branch,'main');
@@ -242,7 +245,7 @@ test('a finished lane merges its own branch into the base branch, in the base wo
 test('a base worktree that carries an uncommitted change the lane also changed blocks the workflow instead of being overwritten',t=>{
   const run=walked(t,{dirtyBase:FILE,id:'20260913-110000-intake'});
   assert.equal(run.finished.finished?.outcome,'blocked',JSON.stringify({ops:run.finished.ops.map(op=>[op.id,op.status]),
-    events:run.store.readEvents().map(event=>`${event.seq} ${event.event} ${event.op??event.node??''} ${event.reason??event.result??''}`)}));
+    events:run.store.readEvents().map(event=>`${event.seq} ${event.event} ${event.op??event.node??''} ${event.reason??event.result??event.message??''}`)}));
   const conflict=run.store.readEvents().find(event=>event.event==='lane-merge-conflict');
   assert.deepEqual(conflict.files,[FILE]);
   assert.equal(conflict.branch,`orca/${run.id}`);
@@ -260,7 +263,7 @@ test('a base worktree that carries an uncommitted change the lane also changed b
   // The work itself is not lost: it is recorded and committed in the lane, waiting for the merge the owner does.
   assert.equal(run.record(run.laneDir).state,'done');
   assert.equal(run.record().state,'todo','the base branch never received the record the merge would have brought');
-  const final=JSON.parse(fs.readFileSync(run.store.paths.final,'utf8'));
+  const final=run.store.signal.get(run.id,'final-report').value;
   assert.equal(final.outcome,'blocked');
   assert.match(final.reason,/does not merge into main/);
   assert.equal(final.lane.merged,null);
@@ -275,10 +278,10 @@ test('workflow-lane-close refuses an unmerged lane and a live kernel, and remove
 
   const run=walked(t,{id:'20260913-130000-intake'});
   assert.equal(run.finished.finished.outcome,'done',JSON.stringify({needUser:run.finished.needUser,ops:run.finished.ops.map(op=>[op.id,op.status])}));
-  fs.writeFileSync(path.join(run.store.dir,'kernel.lock'),JSON.stringify({pid:process.pid,startedAt:Date.now()}));
+  run.store.signal.set(run.id,'kernel-lock',{pid:process.pid,value:{phase:'running'}});
   assert.throws(()=>kernelMain('workflow-lane-close',{id:run.id,host:run.host},{orca:run.fake.orca,cwd:run.repo}),
     /kernel of 20260913-130000-intake is still running/);
-  fs.rmSync(path.join(run.store.dir,'kernel.lock'));
+  run.store.signal.clear(run.id,'kernel-lock');
   const closed=kernelMain('workflow-lane-close',{id:run.id,host:run.host},{orca:run.fake.orca,cwd:run.repo});
   assert.equal(closed.closed,true);
   assert.equal(closed.lane.closed.preservedBranch,`orca/${run.id}`);

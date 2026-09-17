@@ -106,7 +106,6 @@ kernel/contract.mjs
 kernel/view.mjs
 kernel/guards.mjs
 kernel/supervisor.mjs
-kernel/startup-lock.mjs
 checks/proof.mjs
 kernel/schedule.mjs
 kernel/budget.mjs

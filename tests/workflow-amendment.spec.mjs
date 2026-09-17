@@ -9,7 +9,7 @@ import {amendmentContractLines,applyWorkflowAmendment,bindPlannedAmendmentEffect
 import {createWorkflowState} from '../kernel/kernel.mjs';
 import {openJournal} from '../kernel/journal.mjs';
 import {createStore,stateGoalIdentity} from '../kernel/store.mjs';
-import {acquireStartup,reserveStartup} from '../kernel/startup-lock.mjs';
+import {acquireStartup,reserveStartup} from '../kernel/launch.mjs';
 
 function fixture(t){
   const root=fs.mkdtempSync(path.join(process.cwd(),'.workflow-amendment-test-'));
@@ -133,13 +133,13 @@ test('an owner maps each superseded unfinished check exactly and history stays i
 
 test('public amendment reclaims a dead running startup row but refuses a live one',t=>{
   const dead=fixture(t);publicCommand(dead,'workflow-stop','--id',dead.state.id);
-  const reserved=reserveStartup(dead.store.dir,{pid:999999,alive:()=>false}),running=acquireStartup(dead.store.dir,{launchToken:reserved.token,pid:999999});assert.equal(running.ok,true);
-  fs.writeFileSync(path.join(dead.store.dir,'kernel.lock'),JSON.stringify({pid:999999,startedAt:1,startupToken:running.token}));
+  // acquireStartup already sets the ledger's kernel-lock signal to 'running' with this pid; kernelAlive()
+  // reads that signal directly, so no separate file stands in for it under the ledger model.
+  const reserved=reserveStartup(dead.store.ledger,dead.state.id,{pid:999999,alive:()=>false}),running=acquireStartup(dead.store.ledger,dead.state.id,{launchToken:reserved.token,pid:999999});assert.equal(running.ok,true);
   assert.equal(publicCommand(dead,'workflow-amend','--id',dead.state.id,'--amendment',dead.amendmentFile).ok,true);
   assert.equal(dead.store.loadState().ops[1].lease.jobId,'job-unknown','startup recovery does not alter unresolved operation effects');
   const live=fixture(t);publicCommand(live,'workflow-stop','--id',live.state.id);
-  const liveReservation=reserveStartup(live.store.dir),liveRunning=acquireStartup(live.store.dir,{launchToken:liveReservation.token});
-  fs.writeFileSync(path.join(live.store.dir,'kernel.lock'),JSON.stringify({pid:process.pid,startedAt:Date.now(),startupToken:liveRunning.token}));
+  const liveReservation=reserveStartup(live.store.ledger,live.state.id),liveRunning=acquireStartup(live.store.ledger,live.state.id,{launchToken:liveReservation.token});
   assert.throws(()=>publicCommand(live,'workflow-amend','--id',live.state.id,'--amendment',live.amendmentFile),/still running/);
 });
 
