@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import {ensureStoredDependencies,linkDependencies,withinStore} from './dependency-store.mjs';
 import {CANDIDATE_PACKET,CANDIDATE_SNAPSHOT,bindRuntimeInputs,createCandidateSnapshot,sealCandidate,verifyCandidateIdentity,walkFiles} from './candidates.mjs';
 import {coversLedgerScope,parseRef} from './common.mjs';
 import {candidateDisplayPath,candidateRootBindingDigest,pathInCandidateRoots} from './candidate-roots.mjs';
@@ -145,9 +146,13 @@ export const candidateChecksNeedDependencies=checks=>(checks??[]).some(check=>{
   const command=String(check?.command??check??'').trim();
   return /(?:^|[\s"'=])(?:\.?[\\/])?node_modules[\\/]|\b(?:npm|pnpm|yarn|bun)\s+(?:run|exec|test|build|lint|typecheck)\b|\bnpx\b|(?:^|[;&|]\s*)(?:[^\s"']*[\\/])?(?:tsc|eslint|jest|vitest|next|nest)(?:\.cmd)?(?:\s|$)/i.test(command);
 });
-function externalDependencyLinks(candidateRoot){
+function externalDependencyLinks(candidateRoot,{env=process.env}={}){
   const base=path.resolve(candidateRoot),outside=[];
   const within=(target,link)=>{let resolved;try{resolved=fs.realpathSync(target);}catch{outside.push(clean(path.relative(base,link)));return false;}
+    // The dependency store is the runtime's own immutable, lockfile-keyed tree: base and candidate point at the
+    // same bytes on purpose, which is what makes their comparison a comparison of code. Any other outside
+    // target is still drift.
+    if(withinStore(resolved,{env}))return true;
     const relative=path.relative(base,resolved);if(relative.startsWith('..')||path.isAbsolute(relative)){outside.push(clean(path.relative(base,link)));return false;}return true;};
   const inspectModules=modules=>{const stat=fs.lstatSync(modules);if(stat.isSymbolicLink()&&!within(modules,modules))return;
     let entries=[];try{entries=fs.readdirSync(modules,{withFileTypes:true});}catch{return;}
@@ -623,16 +628,37 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],requireRep
 }
 
 /** Build an isolated dependency artifact. Checks keep candidate cwd and receive PATH/NODE_PATH explicitly. */
-export function prepareCandidateDependencies(bridge,{exec,command=bridge?.dependency?.command,timeoutMs=20*60*1000}={}){
+export function prepareCandidateDependencies(bridge,{exec,command=bridge?.dependency?.command,timeoutMs=20*60*1000,env=process.env}={}){
   if(bridge?.schema===ROOT_DETECTION_BRIDGE){const source=bridge.roots.find(root=>root.id==='source')??bridge.roots[0];return prepareCandidateDependencies(source.bridge,{exec,command:source.bridge?.dependency?.command,timeoutMs});}
   const candidateRoot=bridge.snapshot.workerRoot,plan=command?{...bridge.dependency,command}:candidateDependencyPlan(candidateRoot);
   if(!plan.command)return {...bridge.dependency,...plan,ready:Boolean(plan.ready)};
   const dependencyRoot=bridge.dependency.root;fs.mkdirSync(dependencyRoot,{recursive:true});
+  // One install per lockfile, shared by every root of this operation. The base root is provisioned here too:
+  // an unprovisioned base is why a protected proof of a dependency-using slice returned `inconclusive` rather
+  // than a verdict, and a base running a different tree would not be a baseline at all.
+  const stored=ensureStoredDependencies(candidateRoot,{exec,command:plan.command,timeoutMs,env});
+  if(stored.ready){
+    const roots=[candidateRoot,bridge.snapshot.baseRoot,bridge.snapshot.oracleRoot]
+      .filter(root=>typeof root==='string'&&root&&fs.existsSync(root)).filter((root,index,all)=>all.indexOf(root)===index);
+    const links=roots.map(root=>({root,...linkDependencies(root,stored.nodeModules)}));
+    const refused=links.filter(link=>!link.linked);
+    if(!refused.length){
+      const linkedExternals=externalDependencyLinks(candidateRoot,{env});
+      return {...bridge.dependency,...plan,mode:'shared-dependency-store',ready:!linkedExternals.length,exitCode:0,
+        key:stored.key,store:stored.path,reusedStore:Boolean(stored.reused),linkedRoots:links.map(link=>link.root),
+        evidence:linkedExternals.length?`dependency install created external links: ${linkedExternals.join(', ')}`
+          :`${stored.reused?'reused':'installed'} dependency store ${stored.key} for ${links.length} root(s)`,
+        candidateRoot,checkEnv:{NODE_PATH:path.join(candidateRoot,'node_modules'),PATH:`${path.join(candidateRoot,'node_modules','.bin')}${path.delimiter}${process.env.PATH??''}`}};
+    }
+  }
+  // A root that already holds its own real `node_modules`, or a store install that did not come up, falls back
+  // to the candidate-local install: slower and base-blind, but never a mixed tree.
   const result=exec(plan.command,{cwd:candidateRoot,shell:true,encoding:'utf8',windowsHide:true,timeout:timeoutMs,timeoutMs,maxBuffer:64*1024*1024,
     env:{...process.env,npm_config_cache:path.join(dependencyRoot,'.cache')}});
-  const externalLinks=Number.isInteger(result?.status)&&result.status===0?externalDependencyLinks(candidateRoot):[];
+  const externalLinks=Number.isInteger(result?.status)&&result.status===0?externalDependencyLinks(candidateRoot,{env}):[];
   const ready=Number.isInteger(result?.status)&&result.status===0&&!externalLinks.length;
-  return {...bridge.dependency,...plan,ready,exitCode:Number.isInteger(result?.status)?result.status:1,
+  return {...bridge.dependency,...plan,mode:'candidate-local-install',ready,exitCode:Number.isInteger(result?.status)?result.status:1,
+    storeReason:stored.ready?'a root already holds its own node_modules':stored.reason??'dependency store unavailable',
     evidence:externalLinks.length?`dependency install created external links: ${externalLinks.join(', ')}`:String(`${result?.stdout??''}${result?.stderr??''}`).slice(-2000),candidateRoot,
     checkEnv:{NODE_PATH:path.join(candidateRoot,'node_modules'),PATH:`${path.join(candidateRoot,'node_modules','.bin')}${path.delimiter}${process.env.PATH??''}`}};
 }
