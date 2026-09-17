@@ -223,3 +223,16 @@ existing event stream, unchanged.
 - **Per-op allow override.** `allows(op)` defaults to the role set and may only narrow.
 - **Pool = quota window.** Runtime pools model real capacity boundaries; models are pinned and
   attested inside.
+
+## Amendment — 2026-09-17
+
+- **Concurrent disjoint writers on one repository are permitted.** Conflicts resolve at two
+  fences, never by serializing the workflow: launch-time allowlist fencing keeps write scopes
+  disjoint, and seal-time CAS/quarantine isolates a candidate whose sealed delta does not match
+  what its report declared.
+- **Big ops are cut before first launch.** An op too large for one attempt is decomposed into
+  disjoint children and fanned out across provider pools (`implementation.plan`) before any of
+  them launches — parallelism is created by the cut, not recovered after a failure.
+- **No silent fences.** Every blocked `pending.kind` carries either a reconcile path (journal
+  settle, exact-report re-admission, retry) or a named owner action (`needUser`, refusal). A
+  writer lease that nothing can reconcile is a defect, not a wait state.

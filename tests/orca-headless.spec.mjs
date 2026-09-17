@@ -290,8 +290,12 @@ test('providerFor maps the launcher\'s agent and model, or a terminal command li
 
 test('the real launcher drives a managed launch through the host end to end and attests the process it started',()=>{
   const base=tmp();
+  // The launcher requires a filesystem-relative worktree; a repo-relative fixture path would leak
+  // `orca-dispatch-ctx_*.md` artifacts into the real `fixtures/` tree, so it lives under a temp root
+  // inside the process cwd and is removed with the test.
+  const wtRoot=fs.mkdtempSync(path.join(process.cwd(),'.orca-headless-wt-'));
   try{
-    const worktree='fixtures/orca/agentos-r14-sales',cwd=path.resolve(worktree);
+    const worktree=path.join(path.basename(wtRoot),'agentos-r14-sales'),cwd=path.resolve(worktree);
     const {host,processes}=hostIn({root:path.join(base,'h'),cwd});
     const run=host.invoke('run-create',{objective:'w',from:'term_kernel'}).receipt.result.run.id;
     const candidate=resolveExecutionChain({skill:'starci',op:'architecture.decide'}).candidates[0];
@@ -305,7 +309,7 @@ test('the real launcher drives a managed launch through the host end to end and 
     assert.equal(processes.spawned[0].options.cwd,cwd);
     assert.equal(ids(processes.spawned[0].input).dispatch,launched.dispatchId);
     assert.equal(host.invoke('worker-show',{dispatch:launched.dispatchId}).receipt.result.terminal.title,'[Op] architecture.decide - op-d');
-  }finally{fs.rmSync(base,{recursive:true,force:true});}
+  }finally{fs.rmSync(base,{recursive:true,force:true});fs.rmSync(wtRoot,{recursive:true,force:true});}
 });
 
 test('lane worktrees are git worktrees: create, set, show and rm, with the branch preserved',()=>{
