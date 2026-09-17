@@ -27,10 +27,13 @@ import {sealRuntime} from '../kernel/runtime-pin.mjs';
 const git=(executable,args,options={})=>spawnSync(executable,args,{encoding:'utf8',windowsHide:true,...options});
 const GENERATION=8,DIGEST='e'.repeat(64);
 // A Git worktree whose `repo/` commit is HEAD: candidate snapshots diff against it.
+// `t.after` hooks run in registration order, not LIFO: a hook registered here before the caller's own
+// store/runtime-closing hook would remove `root` first and EPERM on the still-open ledger underneath it.
+// Returning `cleanup` instead of self-registering lets every caller register it last, after its own handles
+// are already queued to close first.
 function gitRepo(t){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'w1-reconcile-')),work=path.join(root,'repo');
   fs.mkdirSync(work,{recursive:true});
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   for(const args of [['init'],['config','user.email','w1@test'],['config','user.name','W1']])
     assert.equal(git('git',args,{cwd:work}).status,0);
   fs.mkdirSync(path.join(work,'src'),{recursive:true});
@@ -38,7 +41,7 @@ function gitRepo(t){
   fs.writeFileSync(path.join(work,'src','a.ts'),'export const a=1;\n');
   assert.equal(git('git',['add','.'],{cwd:work}).status,0);
   assert.equal(git('git',['commit','-m','base'],{cwd:work}).status,0);
-  return {root,work};
+  return {root,work,cleanup:()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25})};
 }
 // Orca proof that the exact recorded Dispatch stopped: completed Dispatch, detached worker,
 // succeeded observation, disconnected terminal — everything `completedWorkerProof` requires.
@@ -66,9 +69,10 @@ const retryOpSpec=(id= 'impl-1')=>({id,kind:'backend.implement',goal:'Change one
 // An op that launched, held its durable lease, then quarantined mid-generation. Returns the op after
 // `quarantineCandidate` fenced it, plus the lease clone and the journal file for assertions.
 function quarantinedFixture(t,{id='impl-1',pending={kind:'native-stop-reconciliation',effectState:'unknown',reasons:['fixture quarantine']},change='export const a=2;\n',dispatch=true}={}){
-  const {root,work}=gitRepo(t);
+  const {root,work,cleanup}=gitRepo(t);
   const store=createStore({repoRoot:work,id:`wf-w1-${id}`});
   t.after(()=>{try{store.close();}catch{}});
+  t.after(cleanup);
   // One shared ledger per repo (§3/§8): the engine's own handle must open the SAME file the store
   // does, or `store.bindJournal` refuses it as `ledger-binding-mismatch` - a second, repo-external
   // `journal.sqlite` is the retired two-file 1.0.3 shape.
@@ -195,11 +199,12 @@ test('workflow retry settles an unknown pending kind whose dispatch is provably 
 });
 
 test('candidate custody lost returns the staged late report to retry without re-quarantine',t=>{
-  const {root,work}=gitRepo(t),taskId='task-late',dispatchId='ctx-late',receipt='receipt-owner';
+  const {root,work,cleanup}=gitRepo(t),taskId='task-late',dispatchId='ctx-late',receipt='receipt-owner';
   const temp=fs.mkdtempSync(path.join(os.tmpdir(),'w1-late-'));
   let runtime=null;
   const store=createStore({repoRoot:work,id:'wf-w1-late'});
   t.after(()=>{try{runtime?.close();}finally{try{store.close();}catch{}fs.rmSync(temp,{recursive:true,force:true,maxRetries:5,retryDelay:100});}});
+  t.after(cleanup);
   const pin=sealRuntime({sourceRoot:process.cwd(),buildsRoot:path.join(temp,'builds'),version:'1.0.0'});
   const current=createWorkflowState({job:'Ship a late report',worktree:work,branch:'main',store});
   const op=toOp({id:'decide-1',kind:'decision.prepare',goal:'Prepare the platform decision.',allowlist:['app.txt'],

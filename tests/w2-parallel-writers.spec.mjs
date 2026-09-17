@@ -37,7 +37,9 @@ const candidate=(t,root,options={})=>{
 const engineFixture=(t,{allocation={},root=null}={})=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-w2-engine-'));t.after(()=>{try{fs.rmSync(dir,{recursive:true,force:true});}catch{}});
   const worktree=root??path.join(dir,'repo');fs.mkdirSync(worktree,{recursive:true});
-  const state={id:'wf-w2',worktree,head:'a'.repeat(40),createdAt:1,engine:{schema:'starci/engine@1',generation:1,ledgerFile:path.join(dir,'runtime.sqlite')},ops:[]};
+  // An isolated machineFile, or every run of this suite shares - and can exhaust - the one real
+  // ai/global capacity at the default machineFileFor() location.
+  const state={id:'wf-w2',worktree,head:'a'.repeat(40),createdAt:1,engine:{schema:'starci/engine@1',generation:1,ledgerFile:path.join(dir,'runtime.sqlite'),machineFile:path.join(dir,'machine.sqlite')},ops:[]};
   const store={dir:path.join(dir,'workflow'),appendEvent(){},saveState(){}};
   const runtime=createEngineRuntime({store,state,git,eligibility:()=>({eligible:true,mode:'qualified'}),
     spawnChild:()=>({pid:1,once(){},unref(){}}),runtimeProfile:{schema:'starci/runtimes@1',runtimes:{},allocation}});
