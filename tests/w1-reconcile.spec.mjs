@@ -20,7 +20,7 @@ import {buildReport} from '../kernel/reports.mjs';
 import {acceptReports,createWorkflowState,kernelMain,quarantineCandidate,stageAnsweredDecisionLateReport} from '../kernel/kernel.mjs';
 import {createEngineRuntime} from '../kernel/engine.mjs';
 import {createStore} from '../kernel/store.mjs';
-import {openJournal} from '../kernel/journal.mjs';
+import {ledgerFileFor,inspectLedger} from '../kernel/ledger-db.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {sealRuntime} from '../kernel/runtime-pin.mjs';
 
@@ -68,7 +68,11 @@ const retryOpSpec=(id= 'impl-1')=>({id,kind:'backend.implement',goal:'Change one
 function quarantinedFixture(t,{id='impl-1',pending={kind:'native-stop-reconciliation',effectState:'unknown',reasons:['fixture quarantine']},change='export const a=2;\n',dispatch=true}={}){
   const {root,work}=gitRepo(t);
   const store=createStore({repoRoot:work,id:`wf-w1-${id}`});
-  const journalFile=path.join(root,'runtime','journal.sqlite'),machineFile=path.join(root,'runtime','machine.sqlite');
+  t.after(()=>{try{store.close();}catch{}});
+  // One shared ledger per repo (§3/§8): the engine's own handle must open the SAME file the store
+  // does, or `store.bindJournal` refuses it as `ledger-binding-mismatch` - a second, repo-external
+  // `journal.sqlite` is the retired two-file 1.0.3 shape.
+  const journalFile=ledgerFileFor(work),machineFile=path.join(root,'runtime','machine.sqlite');
   const pin=sealRuntime({sourceRoot:process.cwd(),buildsRoot:path.join(root,'builds'),version:'1.0.0'});
   const current=createWorkflowState({job:'Reconcile a quarantined native stop',worktree:work,branch:'main',store});
   const op=toOp(retryOpSpec(id),0);
@@ -93,15 +97,15 @@ function quarantinedFixture(t,{id='impl-1',pending={kind:'native-stop-reconcilia
   store.signal.set(store.id,'stop',{value:{at:Date.now()}});
   return {root,work,store,state:current,op,lease,journalFile};
 }
-const heldLease=(journalFile,jobId)=>{
-  const journal=openJournal({file:journalFile});
-  try{return journal.db.prepare('SELECT count(*) AS n FROM leases WHERE job_id=?').get(jobId).n;}
-  finally{journal.close();}
+const heldLease=(file,jobId)=>{
+  const ledger=inspectLedger({file});
+  try{return ledger.db.prepare('SELECT count(*) AS n FROM leases WHERE job_id=?').get(jobId).n;}
+  finally{ledger.close();}
 };
-const jobStatus=(journalFile,jobId)=>{
-  const journal=openJournal({file:journalFile});
-  try{return journal.getJob(jobId).status;}
-  finally{journal.close();}
+const jobStatus=(file,jobId)=>{
+  const ledger=inspectLedger({file});
+  try{return ledger.db.prepare('SELECT status FROM jobs WHERE job_id=?').get(jobId).status;}
+  finally{ledger.close();}
 };
 
 test('workflow retry reconciles a blocked native stop and re-admits the op',t=>{
@@ -194,15 +198,15 @@ test('candidate custody lost returns the staged late report to retry without re-
   const {root,work}=gitRepo(t),taskId='task-late',dispatchId='ctx-late',receipt='receipt-owner';
   const temp=fs.mkdtempSync(path.join(os.tmpdir(),'w1-late-'));
   let runtime=null;
-  t.after(()=>{try{runtime?.close();}finally{fs.rmSync(temp,{recursive:true,force:true,maxRetries:5,retryDelay:100});}});
   const store=createStore({repoRoot:work,id:'wf-w1-late'});
+  t.after(()=>{try{runtime?.close();}finally{try{store.close();}catch{}fs.rmSync(temp,{recursive:true,force:true,maxRetries:5,retryDelay:100});}});
   const pin=sealRuntime({sourceRoot:process.cwd(),buildsRoot:path.join(temp,'builds'),version:'1.0.0'});
   const current=createWorkflowState({job:'Ship a late report',worktree:work,branch:'main',store});
   const op=toOp({id:'decide-1',kind:'decision.prepare',goal:'Prepare the platform decision.',allowlist:['app.txt'],
     checks:[{name:'decision-shape',command:'node -e "process.exit(0)"'}],acceptance:['the exact decision draft is preserved']},0);
   Object.assign(current,{approved:true,phase:'run',run:'run-late',from:'term-kernel',goalDigest:'d'.repeat(64),repoRoot:work,ops:[op],
     head:git('git',['rev-parse','HEAD'],{cwd:work}).stdout.trim(),
-    engine:{schema:'starci/engine@1',version:'1.0.0',generation:1,ledgerFile:path.join(temp,'runtime','journal.sqlite'),machineFile:path.join(temp,'runtime','machine.sqlite'),runtimePin:pin,coordination:'agent-v1'}});
+    engine:{schema:'starci/engine@1',version:'1.0.0',generation:1,ledgerFile:ledgerFileFor(work),machineFile:path.join(temp,'runtime','machine.sqlite'),runtimePin:pin,coordination:'agent-v1'}});
   Object.assign(op,{status:'running',runtime:'gpt-5.6-luna',dispatch:dispatchId,terminal:'term-owner',workerSettled:true,
     question:{kind:'decision',text:'Which ledger?',options:[{id:'1',label:'Customer'},{id:'2',label:'Platform'}],prepared:true},
     ownerRequestStatus:'answered',ownerAnswer:{receiptId:receipt,value:'2'},ownerContinuationReceipt:receipt});
