@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {parseRef,plain,slash,unique} from './common.mjs';
+import {coversLedgerScope,parseRef,plain,slash,unique} from './common.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
 
 const sha256=value=>crypto.createHash('sha256').update(value).digest('hex');
@@ -183,6 +183,9 @@ export function candidateRootBindings({state,op,work=null,resolvedReferences=[],
   const add=(field,value,{workRelative=false}={})=>{const {root,relative}=routePath(value,accepted,{workRelative});if(!relative)throw new Error(`candidate ${field} path is empty`);
     if(root.role==='workflow-store')throw new Error(`candidate ${field} cannot claim the runtime-managed workflow-store root: ${slash(value)}`);
     if(root.role==='runtime-input'&&['allowlist','runtimePaths'].includes(field))throw new Error(`candidate ${field} cannot write the read-only runtime-input root: ${slash(value)}`);
+    // The ledger record sits inside a routable root but outside every operation allowlist: a scope that covers
+    // `runtime.sqlite*` or `.starciwork/**` is refused at compile time, whatever it routed to.
+    if(field==='allowlist'&&coversLedgerScope(relative))throw new Error(`scope-covers-ledger: candidate allowlist cannot cover the workflow record: ${slash(value)}`);
     byId.get(root.id)[field].push(relative);return {root,relative};};
   for(const entry of op.allowlist??[])add('allowlist',entry);
   for(const entry of runtimePaths??[])add('runtimePaths',entry);
