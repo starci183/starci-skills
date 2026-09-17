@@ -1,0 +1,210 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {createRequire} from 'node:module';
+import {migrateLedger,verifyChain} from '../scripts/ledger-migrate.mjs';
+import {openJournal} from '../kernel/journal.mjs';
+import {WORKFLOW_STATE,workflowsRoot} from '../kernel/store.mjs';
+
+const require=createRequire(import.meta.url);
+const temporary=()=>fs.mkdtempSync(path.join(os.tmpdir(),'starci-ledger-migrate-'));
+
+/**
+ * The ledger/machine schema of docs/ledger-db.md §4/§5, stood up verbatim so this spec runs before
+ * `kernel/ledger-db.mjs` (s0) lands; the real `openLedger`/`openMachine` take over through `deps` then.
+ */
+const LEDGER_SQL=`
+  PRAGMA user_version=1; PRAGMA auto_vacuum=INCREMENTAL;
+  CREATE TABLE workflows(workflow_id TEXT PRIMARY KEY,title TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,ledger_mode TEXT,source_roots_json TEXT,generation INTEGER NOT NULL DEFAULT 0,goal_identity TEXT,phase TEXT,finished_json TEXT,pin_digest TEXT,archived_at INTEGER);
+  CREATE TABLE goals(goal_seq INTEGER PRIMARY KEY AUTOINCREMENT,workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id),revision INTEGER NOT NULL,goal_identity TEXT NOT NULL,markdown TEXT NOT NULL,json TEXT NOT NULL,amendment_json TEXT,created_at INTEGER NOT NULL,UNIQUE(workflow_id,revision));
+  CREATE TABLE state_snapshots(snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT,checkpoint_id TEXT NOT NULL UNIQUE,workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id),generation INTEGER NOT NULL,goal_identity TEXT NOT NULL,state_json TEXT NOT NULL,events_head TEXT,created_at INTEGER NOT NULL);
+  CREATE INDEX state_snapshots_lookup ON state_snapshots(workflow_id,generation,goal_identity,snapshot_id);
+  CREATE TABLE events(seq INTEGER PRIMARY KEY AUTOINCREMENT,event_id TEXT NOT NULL UNIQUE,workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id),generation INTEGER NOT NULL,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,kind TEXT NOT NULL,payload_json TEXT,prev_digest TEXT,digest TEXT NOT NULL,created_at INTEGER NOT NULL);
+  CREATE INDEX events_entity ON events(workflow_id,entity_type,entity_id,seq);
+  CREATE INDEX events_kind ON events(workflow_id,kind,seq);
+  CREATE TABLE jobs(job_id TEXT PRIMARY KEY,workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id),op_id TEXT,attempt INTEGER NOT NULL,generation INTEGER NOT NULL,kind TEXT NOT NULL,role TEXT,payload_json TEXT,status TEXT NOT NULL,priority_json TEXT,lease_token TEXT,worker_id TEXT,deadline INTEGER,result_json TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
+  CREATE INDEX jobs_queue ON jobs(status,kind,created_at,job_id);
+  CREATE INDEX jobs_op ON jobs(workflow_id,op_id,attempt);
+  CREATE TABLE resources(resource_key TEXT PRIMARY KEY,capacity INTEGER NOT NULL CHECK(capacity>=0));
+  CREATE TABLE leases(resource_key TEXT NOT NULL,job_id TEXT NOT NULL REFERENCES jobs(job_id) ON DELETE CASCADE,workflow_id TEXT NOT NULL,op_id TEXT,attempt INTEGER NOT NULL,generation INTEGER NOT NULL,token TEXT NOT NULL,units INTEGER NOT NULL CHECK(units>0),acquired_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,machine_ref TEXT,PRIMARY KEY(resource_key,job_id));
+  CREATE INDEX leases_expiry ON leases(expires_at);
+  CREATE TRIGGER leases_match_job BEFORE INSERT ON leases FOR EACH ROW BEGIN
+    SELECT RAISE(ABORT,'lease-identity-drift') WHERE NOT EXISTS(SELECT 1 FROM jobs j WHERE j.job_id=NEW.job_id AND j.workflow_id=NEW.workflow_id AND j.op_id IS NEW.op_id AND j.attempt=NEW.attempt AND j.generation=NEW.generation AND j.lease_token IS NEW.token);
+  END;
+  CREATE TABLE budgets(scope_key TEXT PRIMARY KEY,limit_value INTEGER NOT NULL CHECK(limit_value>=0),used_value INTEGER NOT NULL DEFAULT 0 CHECK(used_value>=0),reserved_value INTEGER NOT NULL DEFAULT 0 CHECK(reserved_value>=0));
+  CREATE TABLE budget_reservations(scope_key TEXT NOT NULL REFERENCES budgets(scope_key),job_id TEXT NOT NULL REFERENCES jobs(job_id) ON DELETE CASCADE,units INTEGER NOT NULL CHECK(units>0),PRIMARY KEY(scope_key,job_id));
+  CREATE TABLE incidents(incident_id TEXT PRIMARY KEY,workflow_id TEXT NOT NULL,op_id TEXT,attempts INTEGER NOT NULL DEFAULT 0,model_calls INTEGER NOT NULL DEFAULT 0,tokens INTEGER NOT NULL DEFAULT 0,elapsed_ms INTEGER NOT NULL DEFAULT 0,last_progress TEXT,status TEXT NOT NULL,updated_at INTEGER NOT NULL);
+  CREATE TABLE reports(report_id INTEGER PRIMARY KEY AUTOINCREMENT,workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id),dispatch_id TEXT NOT NULL,op_id TEXT,attempt INTEGER,generation INTEGER,outcome TEXT NOT NULL,report_json TEXT NOT NULL,from_terminal TEXT,consumed_at INTEGER,created_at INTEGER NOT NULL,UNIQUE(workflow_id,dispatch_id));
+  CREATE TABLE contracts(workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id),op_id TEXT NOT NULL,attempt INTEGER NOT NULL,dispatch_id TEXT,markdown TEXT NOT NULL,context_json TEXT,created_at INTEGER NOT NULL,PRIMARY KEY(workflow_id,op_id,attempt));
+  CREATE TABLE checks(workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id),op_id TEXT NOT NULL,attempt INTEGER NOT NULL,checks_json TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(workflow_id,op_id,attempt));
+  CREATE TABLE inbox(inbox_id INTEGER PRIMARY KEY AUTOINCREMENT,workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id),kind TEXT NOT NULL,key TEXT,payload_json TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending',disposition_json TEXT,created_at INTEGER NOT NULL,applied_at INTEGER);
+  CREATE TABLE signals(scope TEXT NOT NULL,key TEXT NOT NULL,holder_pid INTEGER,token TEXT,value_json TEXT,at INTEGER NOT NULL,expires_at INTEGER,PRIMARY KEY(scope,key));
+  CREATE TABLE runtime_loads(runtime TEXT PRIMARY KEY,loads_json TEXT NOT NULL,at INTEGER NOT NULL);
+  CREATE TABLE migrations(source TEXT PRIMARY KEY,kind TEXT NOT NULL,rows_json TEXT NOT NULL,at INTEGER NOT NULL);`;
+const MACHINE_SQL=`
+  PRAGMA user_version=1;
+  CREATE TABLE ledgers(ledger_id TEXT PRIMARY KEY,file TEXT NOT NULL,registered_at INTEGER NOT NULL,seen_at INTEGER NOT NULL);
+  CREATE TABLE resources(resource_key TEXT PRIMARY KEY,capacity INTEGER NOT NULL CHECK(capacity>=0));
+  CREATE TABLE leases(resource_key TEXT NOT NULL,token TEXT NOT NULL,ledger_id TEXT NOT NULL REFERENCES ledgers(ledger_id),workflow_id TEXT NOT NULL,job_id TEXT NOT NULL,units INTEGER NOT NULL CHECK(units>0),acquired_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,PRIMARY KEY(resource_key,token));
+  CREATE INDEX machine_leases_expiry ON leases(expires_at);
+  CREATE TABLE budgets(scope_key TEXT PRIMARY KEY,limit_value INTEGER NOT NULL,used_value INTEGER NOT NULL DEFAULT 0,reserved_value INTEGER NOT NULL DEFAULT 0);
+  CREATE TABLE budget_reservations(scope_key TEXT NOT NULL,ledger_id TEXT NOT NULL,job_id TEXT NOT NULL,units INTEGER NOT NULL,PRIMARY KEY(scope_key,ledger_id,job_id));`;
+
+const openSpec=file=>sql=>{
+  const {DatabaseSync}=require('node:sqlite');
+  fs.mkdirSync(path.dirname(file),{recursive:true});
+  const db=new DatabaseSync(file,{timeout:5000});
+  db.exec('PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;');
+  if(Number(db.prepare('PRAGMA user_version').get().user_version)===0)db.exec(sql);
+  const transaction=fn=>{db.exec('BEGIN IMMEDIATE');try{const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}};
+  return {db,transaction,file,path:path.resolve(file),now:Date.now,close(){db.close();}};
+};
+const specDeps=()=>({openLedger:({file})=>openSpec(file)(LEDGER_SQL),openMachine:({file})=>openSpec(file)(MACHINE_SQL)});
+
+const ID='20260912-104251-demo';
+/** A realistic `_local/workflows/<id>` per the brief: goal files, state, one retired segment + live log, and one of each sibling artifact. */
+function makeWorkflow(repo,id=ID,{generation=2,journalFile=null}={}){
+  const dir=path.join(workflowsRoot(repo),id);
+  for(const sub of ['reports','contracts','checks','inbox'])fs.mkdirSync(path.join(dir,sub),{recursive:true});
+  fs.writeFileSync(path.join(dir,'goal.md'),'# Ship the board\n\nBuild the weekly league board.\n');
+  fs.writeFileSync(path.join(dir,'goal.json'),JSON.stringify({schema:'starci/goal-record@1',id,rev:1,job:{title:'Ship the board'},inputs:{},ledgerMode:'work'})+'\n');
+  const engine={schema:'starci/engine@1',version:1,generation,journalFile,enrolledAt:1};
+  fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:WORKFLOW_STATE,id,phase:'run',createdAt:1000,ledgerMode:'work',goalDigest:'goal-identity-1',worktree:repo,job:{title:'Ship the board'},inputs:{},engine})+'\n');
+  fs.writeFileSync(path.join(dir,'events.g1.jsonl'),[1,2].map(seq=>JSON.stringify({at:1000+seq,seq,event:'op-created',op:'op-1'})).join('\n')+'\n');
+  fs.writeFileSync(path.join(dir,'events.jsonl'),[3,4,5].map(seq=>JSON.stringify({at:1000+seq,seq,event:seq===5?'op-report':'op-dispatch',op:'op-1'})).join('\n')+'\n');
+  fs.writeFileSync(path.join(dir,'reports','d-1.json'),JSON.stringify({schema:'starci/op-report@1',dispatch:'d-1',task:'op-1',outcome:'done',from:'term-1',reportedAt:2000,summary:'done it'}));
+  fs.writeFileSync(path.join(dir,'reports','d-2.json'),JSON.stringify({schema:'starci/op-report@1',dispatch:'d-2',task:'op-1',outcome:'failed',from:'term-1',reportedAt:3000,summary:'nope'}));
+  fs.writeFileSync(path.join(dir,'contracts','op-1.md'),'## op-1\n\nDo the thing.\n');
+  fs.writeFileSync(path.join(dir,'checks','op-1.json'),JSON.stringify({op:'op-1',attempt:1,checks:[{name:'t',command:'npm test',exitCode:0}]}));
+  fs.writeFileSync(path.join(dir,'inbox','1700000000000-a1b2.json'),JSON.stringify({kind:'answer',op:'op-1',choice:'yes',at:'2026-09-12T10:43:00.000Z'}));
+  return dir;
+}
+
+/** Old-schema journal rows for the workflow: a settled job, a repo-fenced leased job, one ai/* lease, snapshots. */
+function makeJournal(file,id=ID,{generation=2}={}){
+  const journal=openJournal({file});
+  journal.enqueueJob({jobId:`${id}:op-1:1`,workflowId:id,opId:'op-1',attempt:1,generation:1,kind:'operation',payload:{op:'op-1'},createdAt:1100});
+  journal.db.prepare("UPDATE jobs SET status='succeeded',result_json=? WHERE job_id=?").run(JSON.stringify({ok:true}),`${id}:op-1:1`);
+  journal.enqueueJob({jobId:`${id}:op-2:1`,workflowId:id,opId:'op-2',attempt:1,generation,kind:'operation',payload:{op:'op-2'},createdAt:1200});
+  journal.db.prepare("UPDATE jobs SET status='leased',lease_token=? WHERE job_id=?").run('token-op2',`${id}:op-2:1`);
+  const lease=(jobId,resource,token,gen)=>journal.db.prepare('INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run(resource,jobId,id,'op-2',1,gen,token,1,1200,999999);
+  lease(`${id}:op-2:1`,'canonical-writer:src','token-op2',generation);
+  lease(`${id}:op-2:1`,'ai/openai','token-op2',generation);
+  journal.db.prepare('INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at) VALUES(?,?,?,?,?,?)').run(`save:${id}:1:old`,id,1,'goal-identity-1','{"phase":"run","old":true}',1150);
+  journal.appendEvent({eventId:`${id}:op-1:1:done`,workflowId:id,entityType:'job',entityId:`${id}:op-1:1`,generation:1,kind:'job-succeeded',createdAt:1300});
+  journal.close();
+  return file;
+}
+
+const ledgerDb=repo=>{const {DatabaseSync}=require('node:sqlite');return new DatabaseSync(path.join(repo,'.starciwork','runtime.sqlite'),{readOnly:true});};
+
+test('a `_local` workflow plus its journal rows import whole into the ledger, atomically per workflow',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  const summary=await migrateLedger({repoRoot:repo,journalFile,machineFile,deps:specDeps()});
+  assert.equal(summary.ok,true);
+  assert.deepEqual(summary.refused,[]);assert.deepEqual(summary.skipped,[]);
+  assert.deepEqual(summary.workflows,[{id:ID,imported:{events:6,snapshots:2,jobs:2,leases:2,reports:2,contracts:1,checks:1,inbox:1,goals:1}}]);
+  const db=ledgerDb(repo);
+  try{
+  const workflow=db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(ID);
+  assert.equal(workflow.generation,2);assert.equal(workflow.ledger_mode,'work');assert.equal(workflow.phase,'run');assert.equal(workflow.title,'Ship the board');
+  assert.equal(db.prepare('SELECT count(*) n FROM goals WHERE workflow_id=? AND revision=1').get(ID).n,1);
+  const snapshots=db.prepare('SELECT * FROM state_snapshots WHERE workflow_id=? ORDER BY snapshot_id').all(ID);
+  assert.equal(snapshots.at(-1).checkpoint_id,`import:${ID}:2`,'the file state lands as the newest checkpoint');
+  const imported=JSON.parse(snapshots.at(-1).state_json);
+  assert.equal(imported.engine.ledgerFile,path.join(repo,'.starciwork','runtime.sqlite'),'journalFile is rewritten to the ledger file');
+  assert.equal(imported.engine.machineFile,machineFile);assert.equal(imported.engine.journalFile,undefined);
+  assert.ok(snapshots.at(-1).events_head,'the import checkpoint seals the event head');
+  const events=db.prepare('SELECT * FROM events WHERE workflow_id=? ORDER BY seq').all(ID);
+  assert.deepEqual(events.slice(0,5).map(row=>row.kind),['op-created','op-created','op-dispatch','op-dispatch','op-report']);
+  assert.equal(events.at(-1).kind,'job-succeeded','journal custody events follow the file audit');
+  assert.equal(JSON.parse(events[0].payload_json)._seq,1,'the original jsonl seq is kept');
+  assert.equal(events[0].generation,1);assert.equal(events[4].generation,2,'generations stay on the column, not the filename');
+  assert.equal(verifyChain(db,ID).ok,true,'the hash chain verifies after import');
+  const lease=db.prepare("SELECT * FROM leases WHERE resource_key='ai/openai'").get();
+  assert.equal(lease.machine_ref,'token-op2','the ai/* lease is mirrored ledger-side with its machine token');
+  const machine=new (require('node:sqlite').DatabaseSync)(machineFile,{readOnly:true});
+  assert.equal(machine.prepare("SELECT count(*) n FROM leases WHERE resource_key='ai/openai' AND job_id=?").get(`${ID}:op-2:1`).n,1,'the machine DB owns the ai/* lease');
+  machine.close();
+  const report=db.prepare('SELECT * FROM reports WHERE workflow_id=? AND dispatch_id=?').get(ID,'d-1');
+  assert.equal(report.outcome,'done');assert.equal(report.op_id,'op-1');
+  assert.equal(db.prepare('SELECT count(*) n FROM contracts WHERE workflow_id=?').get(ID).n,1);
+  assert.equal(db.prepare('SELECT count(*) n FROM checks WHERE workflow_id=?').get(ID).n,1);
+  assert.equal(db.prepare("SELECT count(*) n FROM inbox WHERE workflow_id=? AND status='pending'").get(ID).n,1);
+  assert.ok(fs.existsSync(path.join(workflowsRoot(repo),ID)),'nothing is deleted without --archive');
+  }finally{db.close();}
+});
+
+test('a second run is a no-op: recorded sources are skipped and nothing double-imports',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  await migrateLedger({repoRoot:repo,journalFile,machineFile,deps:specDeps()});
+  const again=await migrateLedger({repoRoot:repo,journalFile,machineFile,deps:specDeps()});
+  assert.equal(again.ok,true);
+  assert.deepEqual(again.workflows,[]);
+  assert.deepEqual(again.skipped,[{id:ID,reason:'already-migrated'}]);
+  const db=ledgerDb(repo);
+  try{
+  assert.equal(db.prepare('SELECT count(*) n FROM events WHERE workflow_id=?').get(ID).n,6,'no duplicated events');
+  assert.equal(db.prepare('SELECT count(*) n FROM jobs WHERE workflow_id=?').get(ID).n,2);
+  }finally{db.close();}
+});
+
+test('a live kernel lock refuses the workflow and writes nothing',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  const wdir=makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  fs.writeFileSync(path.join(wdir,'kernel.lock'),JSON.stringify({pid:process.pid,at:Date.now()}));
+  const summary=await migrateLedger({repoRoot:repo,journalFile,machineFile,deps:specDeps()});
+  assert.equal(summary.ok,false);
+  assert.deepEqual(summary.workflows,[]);
+  assert.deepEqual(summary.refused,[{id:ID,reason:'kernel-lock-held'}]);
+  const db=ledgerDb(repo);
+  try{
+  assert.equal(db.prepare('SELECT count(*) n FROM workflows').get().n,0,'a refused workflow writes nothing');
+  }finally{db.close();}
+});
+
+test('an unsettled journal job behind the file state generation refuses as kernel work, not migrator work',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  makeWorkflow(repo,ID,{generation:3,journalFile});
+  const journal=openJournal({file:journalFile});
+  journal.enqueueJob({jobId:`${ID}:stale:1`,workflowId:ID,opId:'op-1',attempt:1,generation:2,kind:'operation',createdAt:1100});
+  journal.close();
+  const summary=await migrateLedger({repoRoot:repo,journalFile,machineFile,deps:specDeps()});
+  assert.equal(summary.ok,false);
+  assert.deepEqual(summary.refused,[{id:ID,reason:'kernel-reconcile-required'}]);
+  const db=ledgerDb(repo);
+  try{
+  assert.equal(db.prepare('SELECT count(*) n FROM workflows').get().n,0);
+  }finally{db.close();}
+});
+
+test('a dead kernel lock does not refuse; --dry-run writes nothing at all',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  const wdir=makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  fs.writeFileSync(path.join(wdir,'kernel.lock'),JSON.stringify({pid:999999,at:Date.now()-86400000}));
+  const dry=await migrateLedger({repoRoot:repo,journalFile,machineFile,dryRun:true,pidAliveFn:()=>false,deps:specDeps()});
+  assert.equal(dry.ok,true);
+  assert.equal(dry.workflows[0].id,ID);
+  assert.equal(fs.existsSync(path.join(repo,'.starciwork','runtime.sqlite')),false,'dry-run never creates the ledger');
+  assert.equal(fs.existsSync(machineFile),false,'dry-run never creates the machine DB');
+  assert.ok(fs.existsSync(path.join(wdir,'state.json')),'dry-run never moves sources');
+});
+
+test('--archive moves an imported directory to workflows-archive/<id>.migrated',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  const summary=await migrateLedger({repoRoot:repo,journalFile,machineFile,archive:true,deps:specDeps()});
+  assert.equal(summary.ok,true);
+  assert.equal(fs.existsSync(path.join(workflowsRoot(repo),ID)),false);
+  assert.ok(fs.existsSync(path.join(repo,'.starciwork','_local','workflows-archive',`${ID}.migrated`,'state.json')));
+});
