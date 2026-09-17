@@ -93,16 +93,22 @@ rules:
     stable semantic IDs. Parent indexes aggregate; they never repeat descendant detail.
   - Create a detailed child only for an actual FR, NFR, rule, decision, data definition or journey.
     Further folders may group large scopes, but each parent still owns only aggregate metadata.
-  - "Only leaves author state: uninvestigate, todo, suspended or done. todo is confirmed incomplete work and
-    requires no investigation receipt. suspended is work that WAS done and whose bound input changed: it keeps
-    its completion, its evidence and its history, and the work it schedules is re-verification against the new
-    input, never re-authoring - which is why it is a state and not a deletion. done is the only state that
-    requires bound proof. activity is auxiliary: idle, investigating, implementing or verifying. blockers[]
-    explains impediments without becoming lifecycle state. Parents author no state or completion and derive
-    progress from required descendants."
-  - "A state with no producer is vocabulary, not a state. Every authored value has a writer named in the
-    runtime and a lane that can pick it up: a node the scheduler never offers is work that disappeared
-    quietly, which is worse than work that failed loudly."
+  - "Only leaves author state: uninvestigate, todo or done. todo is confirmed incomplete work and requires no
+    investigation receipt. done is the only state that requires bound proof. activity is auxiliary: idle,
+    investigating, implementing or verifying. blockers[] explains impediments without becoming lifecycle
+    state. Parents author no state or completion and derive progress from required descendants."
+  - "Authored state is a claim; effective state is the runtime's computation, and they are deliberately not the
+    same field. A node whose bound input changed keeps `state: done` with its completion, its evidence and its
+    history intact, and the validator derives `effectiveState: suspended` with a reason. Historical proof is
+    never rewritten to say the work was not done - it was; what changed is the input it was proved against."
+  - "Authored `suspended` is a different word for a different thing - imported or unapproved scope, which
+    carries a suspensionReason and never satisfies a prerequisite. The two meanings must not be merged: a
+    re-verification of proven work and an unapproved import are opposite situations, and one word for both
+    would schedule each as the other."
+  - "A derived state still needs a lane. A node with `effectiveState: suspended` is currently skipped by every
+    scheduling filter, because they admit `state === 'todo'` alone - so an input-changed node keeps its proof
+    and is never re-verified. The lane admits the derived signal, tagged as re-verification against the changed
+    input, and the work it schedules is never re-authoring."
   - When investigation occurs, investigation.contextDigest binds semantic context, excluding child
     rollup and auxiliary activity, blockers and history. A semantic parent change makes every
     affected descendant effectively uninvestigate while preserving stored done, completion, history

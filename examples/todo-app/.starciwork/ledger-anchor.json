@@ -1,0 +1,15 @@
+{
+  "schema": "starci/ledger-anchor",
+  "ledgerId": "0f9b24c1-f0b9-4e2d-9a5c-3f8e1b6d4a9c",
+  "updatedAt": 1789700000000,
+  "workflows": {
+    "todo-task-delivery-20260918": {
+      "generation": 3,
+      "checkpointId": "save:todo-task-delivery-20260918:3:9c2f5b8e",
+      "eventsHead": "b1d4a7c0f3b6e9d2a5c8f1b4e7d0a3c6f9b24c1f0b9e2d7a5c3f8e1b6d4a9c2f",
+      "seq": 412,
+      "at": 1789700000000
+    }
+  }
+}
+

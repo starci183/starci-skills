@@ -1,0 +1,12 @@
+.starciwork/runtime.sqlite
+.starciwork/runtime.sqlite-wal
+.starciwork/runtime.sqlite-shm
+.starciwork/kernel-evidence/
+.starciwork/kernel-strays/
+.starciwork/kernel-headless/
+.starciwork/kernel-approvals/
+.starcistacks/*/secrets/*
+!.starcistacks/*/secrets/*.enc
+.starcistacks/*/runtime/env/*.env
+!.starcistacks/*/runtime/env/*.env.enc
+
