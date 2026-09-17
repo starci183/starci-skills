@@ -4,8 +4,8 @@ record: br.login.session.restores
 outcome: pass
 assertions:
   - id: ac.login.session.restores.returning-within-the-window-stays-signed-in
-outcome: pass
-observation: npm run test:e2e -- auth/session exited 0
+    outcome: pass
+    observation: npm run test:e2e -- auth/session exited 0
 provenance:
   actor: starci-kernel
   tool: starci-kernel

@@ -4,8 +4,8 @@ record: sds.login.session-store
 outcome: pass
 assertions:
   - id: expiry-is-enforced-on-read
-outcome: pass
-observation: npm run test:unit -- src/auth/session/expiry exited 0
+    outcome: pass
+    observation: npm run test:unit -- src/auth/session/expiry exited 0
 provenance:
   actor: starci-kernel
   tool: starci-kernel

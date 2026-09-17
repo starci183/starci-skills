@@ -56,6 +56,7 @@ machine checks (read-only; they judge bytes, not claims):
   code-patterns check --profile nest|next --root <repo root> --all    complete declared static code-rule coverage; optional --architecture-config <file>
   check-stales --work <work root> --repo <id>=<git root> [--target <node id>]    deterministic Work/source freshness report; no repair
   stacks check <repo root> --environment dev|vps --deployment-model <rendered.yaml-or-json>    static whole-app stack conformance
+  work-layout check --work <work root>    reports where a .starciwork tree disagrees with schemas/work-layout.yaml; report-only
 `;
 
 const args=process.argv.slice(2);
