@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {openJournal} from './journal.mjs';
+import {machineFileFor,openLedger,openMachine} from './ledger-db.mjs';
 import {createAdmission} from './admission.mjs';
 import {createJobs} from './jobs.mjs';
 
@@ -24,15 +24,17 @@ async function completeWithRetry(complete,spec,{attempts=4,wait=delay,onFailure=
   throw last;
 }
 
-export async function runDurableJob({journalFile,jobId,leaseToken,open=openJournal,spawnChild=spawn,wait=delay,admissionFactory=createAdmission,jobsFactory=createJobs}={}){
-  const lifecycle=receiptFile(journalFile,jobId);receipt(lifecycle,'wrapper-started',{jobIdDigest:digest(jobId)});let journal,job,jobs,admission,providerRan=false,resultDigest=null,bound=false;
+export async function runDurableJob({journalFile,ledgerFile,machineFile=null,jobId,leaseToken,open=openLedger,openMachineFn=openMachine,spawnChild=spawn,wait=delay,admissionFactory=createAdmission,jobsFactory=createJobs}={}){
+  const file=ledgerFile??journalFile;
+  const lifecycle=receiptFile(file,jobId);receipt(lifecycle,'wrapper-started',{jobIdDigest:digest(jobId)});let journal,machine,job,jobs,admission,providerRan=false,resultDigest=null,bound=false;
   const event=(kind,payload={})=>{receipt(lifecycle,kind,payload);try{journal?.appendEvent({eventId:`${jobId}:${kind}${Number.isInteger(payload.attempt)?`:${payload.attempt}`:''}`,workflowId:job?.workflow_id??'unbound',entityType:'job',entityId:jobId,generation:job?.generation??0,kind:`job-${kind}`,payload});}catch{}};
   try{
-    journal=open({file:journalFile});admission=admissionFactory({journal});jobs=jobsFactory({journal,admission});job=journal.getJob(jobId);
+    machine=openMachineFn({file:machineFile??machineFileFor()});
+    journal=open({file,machine});admission=admissionFactory({journal,machine});jobs=jobsFactory({journal,admission});job=journal.getJob(jobId);
     if(!job)throw Object.assign(Error('stale durable job fence'),{code:'STARCI_STALE_JOB'});
     if(['succeeded','failed','cancelled'].includes(job.status))throw Object.assign(Error('durable job is already terminal'),{code:'STARCI_INACTIVE_JOB'});
     if(job.lease_token!==leaseToken)throw Object.assign(Error('stale durable job fence'),{code:'STARCI_STALE_JOB'});
-    const stagedReplay=job.status==='effect_unknown'?readStagedResult(journalFile,job):null;
+    const stagedReplay=job.status==='effect_unknown'?readStagedResult(file,job):null;
     const initial=job.status==='leased'&&job.worker_id==null,replay=(job.status==='running'&&job.worker_id==='completion-replay-pending')||Boolean(stagedReplay);
     if(!initial&&!replay)throw Object.assign(Error('durable job is not available for this wrapper'),{code:'STARCI_INACTIVE_JOB'});
     const claimed=initial
@@ -41,14 +43,14 @@ export async function runDurableJob({journalFile,jobId,leaseToken,open=openJourn
         ?journal.db.prepare("UPDATE jobs SET status='running',worker_id=?,updated_at=? WHERE job_id=? AND lease_token=? AND status='effect_unknown'").run(`pid:${process.pid}`,Date.now(),jobId,leaseToken)
         :journal.db.prepare("UPDATE jobs SET worker_id=?,updated_at=? WHERE job_id=? AND lease_token=? AND status='running' AND worker_id='completion-replay-pending'").run(`pid:${process.pid}`,Date.now(),jobId,leaseToken);
     if(claimed.changes!==1)throw Object.assign(Error('durable job active-state fence changed'),{code:'STARCI_STALE_JOB'});bound=true;event('wrapper-bound',{workerPid:process.pid,replay});
-    const staged=stagedReplay??readStagedResult(journalFile,job);let result;
+    const staged=stagedReplay??readStagedResult(file,job);let result;
     if(staged){result=staged.result;resultDigest=staged.resultDigest;event('result-replayed',{resultDigest});}
-    else{if(job.payload.handler==='model-function'){providerRan=true;result=(await runModelWithHeartbeat(job,leaseToken,{journalFile,admission,spawnChild,event})).result;}
+    else{if(job.payload.handler==='model-function'){providerRan=true;result=(await runModelWithHeartbeat(job,leaseToken,{journalFile:file,admission,spawnChild,event})).result;}
       else if(job.payload.handler==='command'){providerRan=true;result=await runCommand(job.payload,job,leaseToken,{admission,spawnChild,event});}
       else throw Object.assign(Error(`Unknown durable job handler`),{code:'STARCI_UNKNOWN_HANDLER'});
-      resultDigest=digest(JSON.stringify(result));const saved=stageResult(journalFile,job,result);if(saved.resultDigest!==resultDigest)throw Object.assign(Error('staged result digest changed'),{code:'STARCI_STAGED_RESULT_CONFLICT',effectUnknown:true});event('result-ready',{resultDigest});}
-    await completeWithRetry(spec=>jobs.complete(spec),{jobId,workflowId:job.workflow_id,opId:job.op_id,attempt:job.attempt,generation:job.generation,leaseToken,eventId:`${jobId}:${job.generation}:terminal`,status:'succeeded',result},{wait,onFailure:(error,attempt)=>event('completion-retry',{attempt,...safeError(error),resultDigest})});
-    try{fs.unlinkSync(stagedResultFile(journalFile,jobId));}catch(error){if(error?.code!=='ENOENT')event('staged-result-cleanup-failed',{...safeError(error),resultDigest});}
+      resultDigest=digest(JSON.stringify(result));const saved=stageResult(file,job,result);if(saved.resultDigest!==resultDigest)throw Object.assign(Error('staged result digest changed'),{code:'STARCI_STAGED_RESULT_CONFLICT',effectUnknown:true});event('result-ready',{resultDigest});}
+    await completeWithRetry(spec=>completeSettled(jobs,journal,machine,spec),{jobId,workflowId:job.workflow_id,opId:job.op_id,attempt:job.attempt,generation:job.generation,leaseToken,eventId:`${jobId}:${job.generation}:terminal`,status:'succeeded',result},{wait,onFailure:(error,attempt)=>event('completion-retry',{attempt,...safeError(error),resultDigest})});
+    try{fs.unlinkSync(stagedResultFile(file,jobId));}catch(error){if(error?.code!=='ENOENT')event('staged-result-cleanup-failed',{...safeError(error),resultDigest});}
     event('wrapper-completed',{status:'succeeded',resultDigest});return {ok:true};
   }catch(error){
     event('wrapper-failed',{providerRan,...safeError(error)});
@@ -56,11 +58,18 @@ export async function runDurableJob({journalFile,jobId,leaseToken,open=openJourn
       try{
         if(resultDigest){journal.db.prepare("UPDATE jobs SET status='effect_unknown',deadline=NULL,result_json=?,updated_at=? WHERE job_id=? AND lease_token=?").run(JSON.stringify({reason:'terminal persistence failed after result',resultDigest}),Date.now(),jobId,leaseToken);event('completion-uncommitted',{providerRan,resultDigest,...safeError(error)});}
         else if(error?.effectUnknown){journal.db.prepare("UPDATE jobs SET status='effect_unknown',deadline=NULL,result_json=?,updated_at=? WHERE job_id=? AND lease_token=?").run(JSON.stringify({reasonDigest:digest(error.message)}),Date.now(),jobId,leaseToken);event('effect-unknown',{pid:error.pid??null,...safeError(error)});}
-        else await completeWithRetry(spec=>jobs.complete(spec),{jobId,workflowId:job.workflow_id,opId:job.op_id,attempt:job.attempt,generation:job.generation,leaseToken,eventId:`${jobId}:${job.generation}:terminal`,status:'failed',result:{reason:String(error?.stack??error)}},{wait,onFailure:(failure,attempt)=>event('failure-completion-retry',{attempt,...safeError(failure)})});
+        else await completeWithRetry(spec=>completeSettled(jobs,journal,machine,spec),{jobId,workflowId:job.workflow_id,opId:job.op_id,attempt:job.attempt,generation:job.generation,leaseToken,eventId:`${jobId}:${job.generation}:terminal`,status:'failed',result:{reason:String(error?.stack??error)}},{wait,onFailure:(failure,attempt)=>event('failure-completion-retry',{attempt,...safeError(failure)})});
       }catch(completionError){try{journal.db.prepare("UPDATE jobs SET status='effect_unknown',deadline=NULL,result_json=?,updated_at=? WHERE job_id=? AND lease_token=?").run(JSON.stringify({reason:'terminal persistence failed',error:safeError(completionError)}),Date.now(),jobId,leaseToken);}catch{}event('completion-uncommitted',{providerRan,...safeError(completionError)});}
     }
     return {ok:false,error};
-  }finally{try{journal?.close();}catch(error){receipt(lifecycle,'journal-close-failed',safeError(error));}}
+  }finally{try{journal?.close();}catch(error){receipt(lifecycle,'journal-close-failed',safeError(error));}try{machine?.close();}catch(error){receipt(lifecycle,'machine-close-failed',safeError(error));}}
+}
+/** `jobs.complete` (jobs.mjs) drops lease rows but does not know about paired machine tokens; release them here. */
+function completeSettled(jobs,journal,machine,spec){
+  const refs=journal.db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(spec.jobId).map(row=>row.machine_ref);
+  const result=jobs.complete(spec);
+  if(result?.ok)for(const ref of refs){try{machine.release(ref);}catch{}}
+  return result;
 }
 
 function runCommand({command,args=[],shellCommand,cwd,timeoutMs,env=null},ownedJob,token,{admission,spawnChild,event}){return new Promise((resolve,reject)=>{const options={cwd,env:env?{...process.env,...env}:process.env,windowsHide:true,stdio:['ignore','pipe','pipe']};const child=shellCommand?spawnChild(shellCommand,{...options,shell:true}):spawnChild(command,args,options);event('nested-started',{nestedPid:child.pid??null,handler:'command'});let stdout='',stderr='',timedOut=false;const pulse=setInterval(()=>admission.renew({jobId:ownedJob.job_id,generation:ownedJob.generation,leaseToken:token,ttlMs:15*60*1000}),5*60*1000),timer=setTimeout(async()=>{timedOut=true;clearInterval(pulse);const stopped=await stopOwnedTree(child.pid,spawnChild);reject(stopped?Error(`Command timed out after ${timeoutMs}ms and its process tree was stopped`):Object.assign(Error(`Command timed out after ${timeoutMs}ms; process-tree termination is unconfirmed`),{effectUnknown:true,pid:child.pid}));},timeoutMs);child.stdout.on('data',data=>stdout+=data);child.stderr.on('data',data=>stderr+=data);child.on('error',error=>{clearInterval(pulse);clearTimeout(timer);event('nested-error',{nestedPid:child.pid??null,...safeError(error)});reject(error);});child.on('close',(status,signal)=>{clearInterval(pulse);clearTimeout(timer);event('nested-closed',{nestedPid:child.pid??null,status:Number.isInteger(status)?status:null,signal:signal??null,stdoutDigest:digest(stdout),stderrDigest:digest(stderr)});if(!timedOut)resolve({status,stdout,stderr});});});}
