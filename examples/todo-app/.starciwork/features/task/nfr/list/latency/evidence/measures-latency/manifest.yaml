@@ -1,6 +1,7 @@
 schema: work/evidence
 id: measures-latency
 record: nfr.task.list.latency
+recordDigest: cf540bcef9f757265bc7735d6ac6432fd19415459223adae2392f979627a238f
 outcome: pass
 assertions:
   - id: p95-under-200ms

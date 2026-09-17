@@ -1,6 +1,7 @@
 schema: work/evidence
 id: proves-completion
 record: br.task.complete.once
+recordDigest: 0000000013b2847d653c57bd812f5ce1c2e06cd28f54cb5b7503096d3629ede3
 outcome: pass
 stale: true
 staleReason: Proven against rev 1, whose never-reopen clause rev 2 withdrew. Kept as

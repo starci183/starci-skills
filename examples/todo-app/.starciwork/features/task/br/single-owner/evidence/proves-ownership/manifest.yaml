@@ -1,6 +1,7 @@
 schema: work/evidence
 id: proves-ownership
 record: br.task.single-owner
+recordDigest: 566b5549a49b1799b9c7e7701cc7d8d26d062e55accf5c327eb148235477b304
 outcome: pass
 assertions:
   - id: ac.task.single-owner.refuses-stranger

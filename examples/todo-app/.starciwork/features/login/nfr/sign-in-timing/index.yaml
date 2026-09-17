@@ -10,8 +10,13 @@ measurement:
   threshold: p95 delta < 10ms
   environment: dev
 appliesTo: [br.login.password.sign-in]
-proven:
-  by: [impl.login.todo-app.auth]
-  evidence: measures-timing
-  at: 2026-09-18T04:41:00.000Z
+evidence: measures-timing
 
+requiresProof:
+  measurement:
+    required: true
+
+# provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
+# An agent-authored provenBy is refused: it would be this record speaking for another one.
+provenBy:
+  measurement: [measures-timing]

@@ -1,6 +1,7 @@
 schema: work/evidence
 id: proves-auth
 record: impl.login.todo-app.auth
+recordDigest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 outcome: pass
 assertions:
   - id: unit-suite-green-at-the-recorded-revision

@@ -1,6 +1,7 @@
 schema: work/evidence
 id: proves-title
 record: br.task.title.required
+recordDigest: ec97228bc4446014a7ce15f08930a29001947b5d0d872052b4a1409558912c07
 outcome: pass
 assertions:
   - id: ac.task.title.required.refuses-empty
