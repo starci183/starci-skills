@@ -39,6 +39,7 @@ checks/architecture/owners.mjs
 checks/architecture/registration.mjs
 checks/architecture/source-names.mjs
 checks/stacks.mjs
+checks/work-change.mjs
 checks/render.mjs
 execution/contracts.mjs
 execution/api.mjs

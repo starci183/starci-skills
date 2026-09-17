@@ -49,6 +49,7 @@ Usage:
   starci architecture check <repo-root> [--config <repository-relative.json>]
   starci code-patterns check --profile <nest|next> --root <repo-root> --all [--architecture-config <file>]
   starci check-stales --work <work-root> --repo <id>=<git-root> [--repo ...] [--target <node-id> ...]
+  starci work-change check --work <work-root> [--against <previous-work-root>]
   starci stacks check <repo-root> --environment dev|vps --deployment-model <rendered.yaml-or-json>
   starci validate <work-root>
   starci identity set <slug> --name <VAR> [--work-root <path>] [--expected-write-revision <revision|none>]   (the value is read from stdin, never printed)
@@ -208,6 +209,21 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       const {checkArchitecture}=await import('../checks/architecture.mjs');
       const result=checkArchitecture({repositoryRoot:repoRoot,configFile});
       emit(result);return result.ok?0:1;
+    }
+    if(command==='work-change'){
+      const [action,...rest]=args;
+      if(action!=='check')throw Error('Use starci work-change check --work <work-root> [--against <previous-work-root>].');
+      const options={};
+      for(let index=0;index<rest.length;index+=2){
+        const key=rest[index],value=rest[index+1];
+        if(!['--work','--against'].includes(key)||!value||value.startsWith('--')||Object.hasOwn(options,key))throw Error('Invalid work-change check options.');
+        options[key]=value;
+      }
+      if(!options['--work'])throw Error('work-change check requires --work.');
+      const {checkWorkChange}=await import('../checks/work-change.mjs');
+      // Report-only, like check-stales: a script that judges and repairs is wrong twice when it is wrong.
+      const result=checkWorkChange({workRoot:options['--work'],baselineRoot:options['--against']??null});
+      emit(result);return result.clean?0:1;
     }
     if(command==='stacks'){
       const [action,repoRoot,...rest]=args;

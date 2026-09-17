@@ -4,8 +4,8 @@ record: impl.login.todo-app.auth
 outcome: pass
 assertions:
   - id: unit-suite-green-at-the-recorded-revision
-outcome: pass
-observation: npm run test:unit -- src/auth exited 0
+    outcome: pass
+    observation: npm run test:unit -- src/auth exited 0
 provenance:
   actor: starci-kernel
   tool: starci-kernel

@@ -55,6 +55,7 @@ machine checks (read-only; they judge bytes, not claims):
   architecture check <repo root> [--config <repository-relative.json>]    TypeScript-resolved BE/FE dependency and composition boundaries
   code-patterns check --profile nest|next --root <repo root> --all    complete declared static code-rule coverage; optional --architecture-config <file>
   check-stales --work <work root> --repo <id>=<git root> [--target <node id>]    deterministic Work/source freshness report; no repair
+  work-change check --work <work root> [--against <previous work root>]    how far each declared edit travels: prose, clarification or break; no repair
   stacks check <repo root> --environment dev|vps --deployment-model <rendered.yaml-or-json>    static whole-app stack conformance
 `;
 
