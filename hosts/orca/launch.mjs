@@ -14,7 +14,7 @@ import {kernelMain,OP_DEADLINE_MS} from '../../kernel/kernel.mjs';
 import {roleOf as operationRoleOf} from '../../kernel/graph.mjs';
 import {supervisorMain} from '../../kernel/supervisor.mjs';
 import {serveWorkflowInputs} from '../../kernel/inputs-server.mjs';
-import {QUIET_EVENTS,WORKFLOW_LIST,buildList,buildView,readWorkflowEvents,renderEventLine,renderEventTail,renderList,renderView} from '../../kernel/view.mjs';
+import {QUIET_EVENTS,WORKFLOW_LIST,WORKFLOW_OPS,buildList,buildOpsView,buildView,readWorkflowEvents,renderEventLine,renderEventTail,renderList,renderOpsView,renderView} from '../../kernel/view.mjs';
 import {repositoryRoot} from '../../kernel/store.mjs';
 import {journalMaintenanceMain} from '../../kernel/journal-maintenance.mjs';
 import {DISK_HEADROOM_CODE} from '../../kernel/disk.mjs';
@@ -759,6 +759,10 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
     proven work green, waits and deferrals yellow, blocks and failures red, owner and manager events magenta.
     --follow keeps the tail open; heartbeat noise is hidden unless --all asks for it; colour follows the
     terminal unless --color or NO_COLOR says otherwise. --json true prints the raw events instead.
+  node bin/starci.mjs workflow-ops --id <workflow-id> [--watch true] [--poll-ms 2000] [--color true|false] [--json true] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+    the schedule on one screen: each live op's runtime and pinned model with the last allocation reason,
+    what each waiting op is held by, what each blocked op is blocked on, and how oversized work was split.
+    --watch repaints every --poll-ms; the screen clears only on a terminal. --json true prints the digest record.
   node bin/starci.mjs workflow-stop --id <workflow-id> [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     approve, status and stop find the workflow directory where the goal put it, so a job whose ledger is
     owned by another repository is reached with the same --host (or --ledger-root) the goal was given.
@@ -775,7 +779,7 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
   capability the headless host lacks (interface.asset needs design-tool, which model/hosts.yaml declares only
   for the Orca host) is refused as host-unsupported.`;}
 
-const KERNEL_COMMANDS=['workflow-goal','workflow-amend','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status','workflow-tail','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs'];
+const KERNEL_COMMANDS=['workflow-goal','workflow-amend','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status','workflow-tail','workflow-ops','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs'];
 /** Read-only views of the workflow store: they open no kernel, call no Orca and never write. */
 const VIEW_COMMANDS=['workflow-list'];
 /** Operator maintenance of a local journal: no kernel, no Orca; the store roots named on the command line are the proof. */
@@ -837,6 +841,25 @@ export function main(argv=process.argv.slice(2),{orca,wait,env=process.env}={}){
         if(fresh.length)process.stdout.write(`${fresh.map(event=>renderEventLine(event,{color})).join('\n')}\n`);
       };
       return new Promise(()=>{setInterval(pump,pollMs);});
+    }
+    if(command==='workflow-ops'){
+      // The same directory resolution as status and tail, then the digest the workflow's own records support.
+      const status=kernelMain('workflow-status',options,{orca:runner,cwd,wait});
+      const dir=status.dir??null;
+      need(dir,'No workflow directory resolved');
+      const color=options.color!=='false'&&!env.NO_COLOR&&(options.color==='true'||Boolean(process.stdout.isTTY));
+      const render=()=>renderOpsView(buildOpsView({dir}),{color});
+      if(options.json==='true')return {schema:WORKFLOW_OPS,command,id:required(options.id,'workflow id'),dir,view:buildOpsView({dir})};
+      if(options.watch!=='true')return printed(WORKFLOW_OPS,command,render(),{id:required(options.id,'workflow id'),dir});
+      // Watch repaints the whole digest on a poll. The clear-screen escape is a terminal courtesy: a piped
+      // stdout gets the pages one after another, separated by a blank line.
+      const pollMs=Math.max(200,Number.isFinite(Number(options['poll-ms']))?Number(options['poll-ms']):2000);
+      const paint=()=>{
+        let text;try{text=render();}catch(error){text=`workflow-ops: ${error.message}\n`;}
+        process.stdout.write(`${process.stdout.isTTY?'\x1b[2J\x1b[H':'\n'}${text}`);
+      };
+      paint();
+      return new Promise(()=>{setInterval(paint,pollMs);});
     }
     return kernelMain(command,options,{orca:runner,cwd,wait});
   }

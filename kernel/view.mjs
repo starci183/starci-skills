@@ -4,6 +4,8 @@ import {listWorkflows,workflowsRoot} from './store.mjs';
 import {integrationProofStatus,readLedgerTree} from './ledger.mjs';
 import {ownerItems,ownerSection} from './owner.mjs';
 import {askFillLine,fillWaitingAsks,inputReadyAsks} from './fill.mjs';
+import {loadRuntimes} from './schedule.mjs';
+import {roleOf} from './graph.mjs';
 
 /**
  * One truthful status view of a workflow. This is what replaces "go and watch the agents": every number
@@ -377,6 +379,176 @@ export function readWorkflowEvents(dir){return readJsonLines(path.join(dir,'even
 export function renderEventTail(events,{color=true,all=false,lines=40}={}){
   const shown=(all?events:events.filter(event=>!QUIET_EVENTS.has(event?.event))).slice(-lines);
   return `${shown.map(event=>renderEventLine(event,{color})).join('\n')}\n`;
+}
+
+/* ------------------------------------------------------------------ ops schedule digest */
+
+export const WORKFLOW_OPS='starci/workflow-ops@1';
+/** The allocation events that say why an op sits on its runtime; the last one for the op is the reason printed. */
+const OPS_WHY=['allocation-adaptive','allocation-shared','allocation-budgeted'];
+/** The deferral events that say what holds a waiting op back. */
+const OPS_WAIT=['schedule-deferred','admission-deferred','allocation-deferred','launch-cooling','launch-cap-reached'];
+/** Buckets of the digest: in-flight, queued, fenced and settled. `paused` waits on a shared change, so it queues. */
+const OPS_RUNNING=['running','answering'],OPS_QUEUED=['pending','ready','paused'],OPS_DONE=['done'];
+
+/** The role an operation kind allocates under, resolved the way the allocator resolves it. */
+const opsRole=(kind,profile)=>{try{const role=roleOf(kind);if(typeof role==='string'&&role)return role;}catch{}return profile?.roleOfKind?.[kind]??'implement';};
+/** The model a pool pins for one role (`models[role]`, then its default, then the pool's own), or null when the profile names none. */
+const poolModel=(profile,runtime,role)=>{
+  const pool=plain(profile?.runtimes?.[runtime])?profile.runtimes[runtime]:null;
+  if(!pool)return null;
+  const models=plain(pool.models)?pool.models:{};
+  const named=models[role]??models.default??models['*'];
+  return typeof named==='string'&&named.trim()?named.trim():(typeof pool.model==='string'&&pool.model.trim()?pool.model.trim():null);
+};
+
+/**
+ * The compact schedule digest behind `workflow-ops`: which op runs on which runtime and model and why, what
+ * each waiting op is held by, what each blocked op is blocked on, and how oversized work was split. Every
+ * line is read off the workflow's own `state.json` and `events.jsonl` - a `why`/`waits` text is the last
+ * event that decided it, never a guess - plus the allocator's own runtimes profile for the pinned model.
+ * Like the status page it opens no store and writes nothing; a missing file yields an empty section.
+ */
+export function buildOpsView({dir,now=Date.now(),runtimes=null}={}){
+  const stamp=typeof now==='function'?now():now;
+  const resolved=path.resolve(required(dir,'workflow dir'));
+  const state=readJson(path.join(resolved,'state.json'));
+  need(plain(state),`No workflow state in ${resolved.replaceAll('\\','/')}`);
+  const events=readJsonLines(path.join(resolved,'events.jsonl'));
+  const ops=Array.isArray(state.ops)?state.ops:[];
+  const lock=readJson(path.join(resolved,'kernel.lock'));
+  const profile=runtimes??(()=>{try{return loadRuntimes();}catch{return null;}})();
+  const lastFor=(op,kinds)=>last(events,event=>event.op===op.id&&kinds.includes(event.event));
+
+  // The pool's model for the op's role when the profile resolves it; else the last `model-selected` event's.
+  const modelOf=op=>{
+    if(typeof op.runtime==='string'&&op.runtime){
+      const named=poolModel(profile,op.runtime,opsRole(op.kind,profile));
+      if(named)return named;
+    }
+    const selected=lastFor(op,['model-selected']);
+    const named=selected?.runtime??selected?.model;
+    return typeof named==='string'&&named.trim()?named.trim():null;
+  };
+  // Why the op is where it is: the last allocation event that decided its CURRENT runtime, else the launch itself.
+  const whyOf=op=>{
+    for(let index=events.length-1;index>=0;index-=1){
+      const event=events[index];
+      if(event.op!==op.id||!OPS_WHY.includes(event.event))continue;
+      if(typeof event.runtime==='string'&&event.runtime&&typeof op.runtime==='string'&&op.runtime&&event.runtime!==op.runtime)continue;
+      if(event.event==='allocation-adaptive')return String(event.reason??'').trim()||null;
+      if(event.event==='allocation-shared')return `shared ledger: ${(Array.isArray(event.preferredOver)?event.preferredOver:[]).join(', ')||'the preferred runtime'} carried other work`;
+      return `provider budget: ${(Array.isArray(event.sparedOver)?event.sparedOver:[]).join(', ')||'the other runtimes'} had less window left`;
+    }
+    const launched=lastFor(op,['launched','op-relaunched']);
+    return launched?`launched on ${launched.runtime??op.runtime??'?'}${Number.isFinite(launched.attempt)&&launched.attempt>1?`, attempt ${launched.attempt}`:''}`:null;
+  };
+  // What a queued op waits on: the last deferral event, its resource/holder fields appended when the reason
+  // does not already name them; then the state's own waiting fields; then its bare status word.
+  const waitsOf=op=>{
+    const event=lastFor(op,OPS_WAIT);
+    if(event){
+      const reason=String(event.reason??event.event).trim();
+      const resources=[...(Array.isArray(event.resources)?event.resources:[]),...(typeof event.lease==='string'?[event.lease]:[])].map(String);
+      const holders=[...(Array.isArray(event.clashes)?event.clashes:[]),...(typeof event.holder==='string'?[event.holder]:[])].map(String);
+      const extras=[];
+      if(resources.length&&!resources.some(item=>reason.includes(item)))extras.push(resources.join(', '));
+      if(holders.length&&!holders.some(item=>reason.includes(item)))extras.push(`held by ${holders.join(', ')}`);
+      if(typeof event.parent==='string'&&event.parent&&!reason.includes(event.parent))extras.push(`group ${event.parent}`);
+      return extras.length?`${reason} (${extras.join('; ')})`:reason;
+    }
+    if(typeof op.deferral?.reason==='string'&&op.deferral.reason)return op.deferral.reason;
+    if(typeof op.waitingFor==='string'&&op.waitingFor)return `waiting on ${op.waitingFor}`;
+    if(op.fill)return 'credential custody is not filled yet';
+    return op.status??'waiting';
+  };
+  // What a blocked op is blocked on: the pending reconciliation kind or the refusal, plus its held lease.
+  const blockedOf=op=>{
+    const label=typeof op.pending?.kind==='string'&&op.pending.kind?op.pending.kind
+      :typeof op.refusal==='string'&&op.refusal?op.refusal:'blocked';
+    const qualifiers=[];
+    const detail=typeof op.pending?.detail==='string'?op.pending.detail
+      :Array.isArray(op.pending?.reasons)&&op.pending.reasons.length?String(op.pending.reasons[0])
+      :typeof op.pending?.reason==='string'?op.pending.reason:null;
+    if(detail)qualifiers.push(clip(detail,90));
+    if(plain(op.lease))qualifiers.push('lease held');
+    if(typeof op.waitingFor==='string'&&op.waitingFor)qualifiers.push(`waiting on ${op.waitingFor}`);
+    return `${label}${qualifiers.length?` (${qualifiers.join(', ')})`:''}`;
+  };
+
+  const rowOf=op=>({id:op.id,kind:op.kind??null,runtime:typeof op.runtime==='string'&&op.runtime?op.runtime:null,
+    model:modelOf(op),node:op.nodeId??null});
+  // The op that speaks for a child node: its builder when there is one, else the latest op on the node.
+  const opForNode=nodeId=>{
+    const mine=ops.filter(item=>item.nodeId===nodeId);
+    return mine.find(item=>opsRole(item.kind,profile)==='implement')??mine.at(-1)??null;
+  };
+  // Split groups: node-level cut groups (`state.cuts`, reasoned by the cut op's `cut.reason` or the cut events)
+  // and op-level retry splits (`origin`/`op-created` reason `split of <op>`).
+  const groups=new Map();
+  const note=(parent,label,runtime)=>{const group=groups.get(parent)??{children:[],reason:null};group.children.push({label,runtime:runtime??null});groups.set(parent,group);};
+  for(const [parent,group] of Object.entries(plain(state.cuts)?state.cuts:{}))
+    for(const childId of Array.isArray(group?.children)?group.children:[]){const child=opForNode(childId);note(String(parent),child?.id??String(childId),child?.runtime??null);}
+  for(const op of ops){
+    const fromOrigin=/^split of\s+(\S+)/.exec(String(op.origin??''));
+    const created=lastFor(op,['op-created']);
+    const fromEvent=/^split of\s+(\S+)/.exec(String(created?.reason??''));
+    const parent=fromOrigin?.[1]??fromEvent?.[1];
+    if(parent)note(parent,op.id,op.runtime);
+  }
+  const splits=[...groups.entries()].map(([parent,group])=>{
+    const cutOp=ops.find(item=>plain(item.cut)&&(item.cut.node===parent||item.id===parent));
+    const planned=last(events,event=>['cut-planned','cut-authored'].includes(event.event)&&(event.node===parent||event.op===parent||event.op===cutOp?.id));
+    const decided=last(events,event=>event.event==='decide'&&event.op===parent&&event.option==='split');
+    return {parent,children:group.children,
+      reason:(typeof cutOp?.cut?.reason==='string'&&cutOp.cut.reason)||(typeof planned?.reason==='string'&&planned.reason)
+        ||(typeof decided?.rationale==='string'&&decided.rationale)||null};
+  });
+
+  return {schema:WORKFLOW_OPS,id:state.id??null,dir:resolved,at:stamp,
+    phase:state.phase??null,finished:state.finished??null,
+    generation:Number.isFinite(state.engine?.generation)?state.engine.generation:null,
+    pin:typeof state.engine?.runtimePin?.digest==='string'?state.engine.runtimePin.digest.slice(0,8):null,
+    kernel:{alive:processAlive(lock?.pid),pid:lock?.pid??null},
+    running:ops.filter(op=>OPS_RUNNING.includes(op.status)).map(op=>({...rowOf(op),why:whyOf(op)})),
+    waiting:ops.filter(op=>OPS_QUEUED.includes(op.status)).map(op=>({...rowOf(op),waits:waitsOf(op)})),
+    blocked:ops.filter(op=>![...OPS_RUNNING,...OPS_QUEUED,...OPS_DONE].includes(op.status)).map(op=>({...rowOf(op),blocked:blockedOf(op)})),
+    done:ops.filter(op=>OPS_DONE.includes(op.status)).map(rowOf),
+    splits};
+}
+
+const OPS_TONE={running:ANSI.cyan,waiting:ANSI.yellow,blocked:ANSI.red,done:ANSI.green,split:ANSI.magenta};
+/**
+ * The digest as one terminal page: fixed-width-ish columns, `why`/`waits`/`blocked`/`reason` dimmed, section
+ * names in the same tones the tail uses (cyan running, yellow waiting, red blocked, green done). `color:false`
+ * - or a piped stdout, decided by the caller - yields the plain page.
+ */
+export function renderOpsView(view,{color=true}={}){
+  const paint=(text,tone)=>color&&tone?`${tone}${ANSI.bold}${text}${ANSI.off}`:text;
+  const dim=text=>color?`${ANSI.dim}${text}${ANSI.off}`:text;
+  const fit=(value,width)=>{const text=String(value??'-');return text.length>width?`${text.slice(0,width-1)}…`:text.padEnd(width);};
+  // The model is only printed for the op it currently drives: a queued op's pool is decided at dispatch.
+  const place=(op,withModel)=>op.runtime?`${op.runtime}${withModel&&op.model?` (${op.model})`:''}`:'-';
+  const sections=[['RUNNING',OPS_TONE.running,view.running,op=>op.why?`why: ${op.why}`:null,true],
+    ['WAITING',OPS_TONE.waiting,view.waiting,op=>`waits: ${op.waits}`,false],
+    ['BLOCKED',OPS_TONE.blocked,view.blocked,op=>`blocked: ${op.blocked}`,false],
+    ['DONE',OPS_TONE.done,view.done,()=>null,false]];
+  const all=sections.flatMap(([,,list,,withModel])=>list.map(op=>({op,withModel})));
+  const idW=Math.min(32,Math.max(...all.map(({op})=>String(op.id).length),2))+2;
+  const kindW=Math.min(24,Math.max(...all.map(({op})=>String(op.kind??'-').length),2))+2;
+  const placeW=Math.min(40,Math.max(...all.map(({op,withModel})=>place(op,withModel).length),1))+2;
+  const line=(op,suffix,withModel)=>`  ${fit(op.id,idW)}${fit(op.kind,kindW)}${fit(place(op,withModel),placeW)}${suffix?dim(suffix):''}`.trimEnd();
+  const lines=[paint(`workflow ${view.id??'?'}  phase=${view.phase??'-'}  gen=${view.generation??'-'}  kernel=${view.kernel.alive?'alive':view.kernel.pid?'dead':'none'}  pin=${view.pin??'-'}`,ANSI.bold)];
+  for(const [name,tone,list,suffixOf,withModel] of sections){
+    lines.push(paint(`${name} (${list.length})`,tone));
+    for(const op of list)lines.push(line(op,suffixOf(op),withModel));
+  }
+  if(view.splits.length){
+    lines.push(paint('SPLIT',OPS_TONE.split));
+    for(const split of view.splits)
+      lines.push(`  ${split.parent}  →  ${split.children.map(child=>`${child.label}${child.runtime?` (${child.runtime})`:''}`).join(', ')}${split.reason?`   ${dim(`reason: ${split.reason}`)}`:''}`);
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 /** The terminal page. Plain text with markdown tables: no colour codes, no cursor control, safe in a log. */

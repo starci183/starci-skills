@@ -21,6 +21,7 @@ Usage:
   starci workflow-retry --id <id> --runtime-pin <file>
   starci workflow-status --id <id> [--json true]
   starci workflow-tail --id <id> [--lines 40] [--follow true] [--color true|false]
+  starci workflow-ops --id <id> [--watch true] [--poll-ms 2000] [--color true|false]
   starci workflow-list [--json true]
   starci workflow-stop --id <id>  # exports backend-owned workflows/<id>.md
   starci workflow-lane-close --id <id>

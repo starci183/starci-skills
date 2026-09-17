@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
  * module path, and the launcher's own direct-run entry keeps working exactly as before.
  */
 const LAUNCHER_COMMANDS=['workflow-goal','workflow-amend','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status',
-  'workflow-tail','workflow-list','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs',
+  'workflow-tail','workflow-ops','workflow-list','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs',
   'journal-prune','journal-retire',
   'start-op','settle','sweep','notify','report','wait','verify'];
 
@@ -32,6 +32,7 @@ workflow kernel (forwarded to the launcher; add --host <skill root> to reach a W
                        --candidate-root <absolute-local-dir>: store only new attempt candidates below this directory
   workflow-status      print what one workflow is doing now, from its own files
   workflow-tail        the workflow's event log coloured by what each event means; --follow keeps it open
+  workflow-ops         one-screen schedule digest: each op's runtime, model and why, waits, blocks, splits; --watch repaints
   workflow-list        one line per workflow of this repository
   workflow-stop        checkpoint/pause at the next tick and export backend-owned workflows/<id>.md
   workflow-lane-close  remove a merged workflow's worktree, keeping its branch
