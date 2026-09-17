@@ -528,7 +528,7 @@ test('the goal phase writes goal.md and goal.json and stops: nothing is launched
     // A plan-mode backend.implement op without a Work node still gets the implement.ledger working order.
     assert.match(contract,/## Working order \(mandatory, in this order\)\nSequence `implement\.ledger`\./);
     assert.match(contract,/## Definition of done for this kind/);
-    assert.match(contract,/node L\.mjs report --run run_wf/);
+    assert.match(contract,/node L\.mjs report --workflow \S+ --run run_wf/,'the report command names the workflow whose reports table the row lands in, then its run');
     assert.match(contract,/- `apps\/agentos-controlplane\/src\/sales\/intake\.ts`/);
     assert.doesNotMatch(contract,/<launcher>|<nested run>|<runtime dir>|<reports dir>/);
   }finally{harness.cleanup();}
@@ -4000,17 +4000,17 @@ test('the preflight runs once at the start, its problems become needUser items, 
 
 test('a second workflow-run process is refused before run binding or terminal effects',async()=>{
   const repo=tmp(),host=path.resolve('.'),functions={assessGoal:()=>({ok:true,provider:'fake',value:salesPlan}),critiqueGoal:soundCritique,extractMaterial:()=>[]};
-  const fake=scriptedOrca({store:null,scripts:{}});let child;
+  const fake=scriptedOrca({store:null,scripts:{}});let child,store;
   try{
     const created=kernelMain('workflow-goal',{job:'Lock the sales slice',host},{orca:fake.orca,cwd:repo,functions});kernelMain('workflow-approve',{id:created.id},{orca:fake.orca,cwd:repo});
     child=spawn(process.execPath,['-e','setTimeout(()=>{},30000)'],{stdio:'ignore',windowsHide:true});
-    const store=createStore({repoRoot:repo,id:created.id});
+    store=createStore({repoRoot:repo,id:created.id});
     store.signal.set(store.id,'kernel-lock',{pid:child.pid,token:'sim-launch-token'});
     fake.terminals.set('term_live_worker',{handle:'term_live_worker',title:'[Op] live',status:'running',sent:true,worktreePath:repo});
     const before=fake.terminals.size;assert.throws(()=>kernelMain('workflow-run',{id:created.id,'max-iterations':'0'},{orca:fake.orca,cwd:repo,functions}),/another kernel or unresolved launch/);
     assert.equal(fake.terminals.size,before,'no coordinator terminal was created or native worker swept');assert.equal(fake.terminals.has('term_live_worker'),true);
     assert.equal(store.readEvents().some(event=>['run-bound','run-resumed'].includes(event.event)),false);
-  }finally{if(child)try{child.kill();}catch{}fs.rmSync(repo,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+  }finally{if(child)try{child.kill();}catch{}try{store?.close();}catch{}fs.rmSync(repo,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 });
 
 test('a kernel that already has its run records run-resumed; only a real bind records run-bound',()=>{
