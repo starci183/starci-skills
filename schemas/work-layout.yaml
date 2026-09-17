@@ -18,12 +18,12 @@ tree: |
     brand/index.yaml                       at most one, the whole product's brand
     features/<feature>/index.yaml          the feature, aggregate only
         br/<name...>/index.yaml            + ac/<name>/index.yaml
-                                           + evidence/<id>/manifest.yaml
         fr/<name...>/index.yaml
         nfr/<name...>/index.yaml
         data/<name...>/index.yaml
         journey/<name...>/index.yaml
         decision/<name...>/index.yaml
+        integration/<provider>/index.yaml
         sds/<name...>/index.yaml
         ui/<name...>/index.yaml
         impl/<repository>/<name...>/index.yaml
@@ -41,6 +41,7 @@ families:
   - {name: data, of: data definition, idPrefix: data}
   - {name: journey, of: customer journey, idPrefix: journey}
   - {name: decision, of: open policy decision, idPrefix: decision}
+  - {name: integration, of: an external system this product talks to, idPrefix: integration}
   - {name: sds, of: design component, idPrefix: sds}
   - {name: ui, of: screen, idPrefix: ui}
   - {name: impl, of: implementation, idPrefix: impl}
@@ -55,7 +56,8 @@ shape:
   record: features/<feature>/<family>/<name...>/index.yaml
   sharedRecord: shared/<family>/<name...>/index.yaml
   acceptanceCriterion: features/<feature>/br/<name...>/ac/<criterion>/index.yaml
-  evidence: <record>/evidence/<id>/manifest.yaml
+  integration: features/<feature>/integration/<provider>/index.yaml
+  evidence: "the record's own index.yaml, under its evidence: key - never a file of its own"
   uatAccounts: features/<feature>/uat/<name...>/accounts.yaml
   assets: <record>/assets/**/<file-in-original-format>
   ledgerAnchor: ledger-anchor.json
@@ -68,7 +70,7 @@ ids:
   sharedRecord: <family>.shared.<name...>       # br.shared.audit.trail at shared/br/audit/trail
   implementation: impl.<feature>.<repository>.<name...>   # impl.task.todo-app.list
   acceptanceCriterion: ac.<feature>.<rule-name...>.<criterion>   # ac.task.title.required.refuses-empty
-  evidence: <directory name>                    # local to its record; the record names it by that name
+  integration: integration.<feature>.<provider>   # integration.login.keycloak
   feature: <directory name>
   case: lowercase; a segment is a hyphenated word, never an underscore or a capital
   reserved: >-
@@ -95,13 +97,14 @@ rules:
 
   - >-
       Parents aggregate and author no state. The catalog, a feature index and any record that has records
-      below it derive their progress from their descendants; they never carry state, proven, evidence or
-      completion of their own. A parent that authors state is a second opinion about work it does not do.
+      below it derive their progress from their descendants; they never carry state, requiresProof,
+      provenBy, evidence or completion of their own. A parent that authors state is a second opinion about
+      work it does not do.
 
   - >-
-      Ten families, no eleventh. A feature directory holds its index.yaml and family directories from the
-      fixed set; a new kind of record is a change to this layout, discussed once, not a directory someone
-      creates on a Tuesday. A family directory with no record in it is scaffolding and is removed.
+      Eleven families, no twelfth. A feature directory holds its index.yaml and family directories from
+      the fixed set; a new kind of record is a change to this layout, discussed once, not a directory
+      someone creates on a Tuesday. A family directory with no record in it is scaffolding and is removed.
 
   - >-
       shared/ exists only for a record more than one feature is accountable for. One accountable feature
@@ -115,9 +118,13 @@ rules:
       rule is already a br.
 
   - >-
-      Evidence is written by whoever ran the thing, and never by hand. <record>/evidence/<id>/manifest.yaml
-      names the record it proves, the outcome, the assertions observed and the provenance: actor, tool,
-      environment, the served versions and when. Its id is its directory name and the record names it.
+      Evidence lives inside the record it proves. A record authors requiresProof - what it demands of
+      itself before it may be done - and the kernel writes back two blocks: provenBy, the join naming who
+      supplied each required proof, and evidence, carrying recordDigest (the normative digest of the
+      record at the moment of capture), the outcome, the assertions it re-ran itself and the provenance.
+      There is no evidence file and no evidence directory: proof kept beside a record rather than in it is
+      proof nobody re-runs when the record changes, and a digest that no longer matches is how a tree says
+      so out loud. An evidence block that names a record other than the one it sits in is misplaced.
 
   - >-
       Assets are payload, not nodes. An assets/ directory holds images, video, diagrams and sample documents
@@ -140,15 +147,17 @@ rules:
       read by the runtime rather than by a person. Underscore-prefixed directories are not canonical Work.
 
   - >-
-      Specification is upstream of code. br, fr, nfr, data, journey and decision say what must be true; sds
-      says how it is designed; ui, impl and uat are where it is shown to work. Current code proves a record
-      or exposes a gap, and never quietly becomes the record.
+      Specification is upstream of code. br, fr, nfr, data, journey and decision say what must be true;
+      sds says how it is designed; integration names each external system the design talks to, its
+      credential by variable name and its sandbox; ui, impl and uat are where it is shown to work. Current
+      code proves a record or exposes a gap, and never quietly becomes the record.
 
   - >-
-      Agreed and demonstrated are separate facts in separate fields. state: done says a record is agreed and
-      implementable; proven names the nodes that demonstrated it and when. An empty proven on a done record
-      is honest. Collapsing the two into one word makes an agreed record indistinguishable from a proven
-      one, and every claim in the tree then rests on a distinction nobody can check.
+      Agreed and demonstrated are separate facts in separate fields. state: done says a record is agreed
+      and implementable; requiresProof says what it demands of itself, and provenBy says who supplied
+      each of those proofs. An empty provenBy on a done record is honest. Collapsing them into one word
+      makes an agreed record indistinguishable from a demonstrated one, and every claim in the tree then
+      rests on a distinction nobody can check.
 
   - >-
       ui, impl and uat keep their own state. They are proof of a specification and assets with a lifetime of

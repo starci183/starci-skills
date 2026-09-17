@@ -9,11 +9,12 @@ import {parseYaml} from '../core/yaml.mjs';
  * about its own input: a root that does not exist, or a tree so large that walking it is not a check but an
  * accident.
  *
- * What it can see is the shape: the three custodies at the root, the ten families, one directory per
+ * What it can see is the shape: the three custodies at the root, the eleven families, one directory per
  * record, the node file that makes a directory a record, assets that stay payload, parents that aggregate,
  * and the id that mirrors the path. What is inside a record - its fields, its refs, whether its evidence
- * actually proves anything - belongs to the record schemas and the record checker, and is deliberately not
- * read here beyond the one field this check is about: `id`.
+ * actually proves anything - belongs to the record schemas and the record checker. Three keys are read
+ * here and no others: `id`, because the layout is about where a record's name puts it; `schema`, to catch
+ * a brand record outside brand/; and `evidence.record`, to catch proof stored away from its subject.
  */
 export const RESULT='starci/work-layout-check@1';
 
@@ -21,8 +22,8 @@ const MAX_ENTRIES=200000;
 const NODE='index.yaml';
 const EVIDENCE_NODE='manifest.yaml';
 
-/** The ten families. A feature directory holds these and nothing else. */
-export const FAMILIES=Object.freeze(['br','fr','nfr','data','journey','decision','sds','ui','impl','uat']);
+/** The eleven families. A feature directory holds these and nothing else. */
+export const FAMILIES=Object.freeze(['br','fr','nfr','data','journey','decision','integration','sds','ui','impl','uat']);
 
 /** Untracked runtime custody: legal at the root of the tree, drift anywhere below it. */
 const RUNTIME_ROOT_FILES=new Set(['runtime.sqlite','runtime.sqlite-wal','runtime.sqlite-shm']);
@@ -32,7 +33,7 @@ const CANONICAL_ROOT_FILES=new Set(['workspace.yaml','index.yaml','ledger-anchor
 const CANONICAL_ROOT_DIRS=new Set(['brand','features','shared']);
 
 /** Keys only a leaf may author; a parent that carries one is claiming work it does not do. */
-const STATE_KEYS=['state','proven','evidence','completion','activity'];
+const STATE_KEYS=['state','proven','provenBy','requiresProof','evidence','completion','activity'];
 
 const slash=value=>String(value??'').replaceAll('\\','/');
 const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
@@ -81,7 +82,8 @@ function walkScope(context,dir,segments){
     if(isFile(entry)){
       if(entry.name===NODE)continue;
       if(entry.name==='accounts.yaml'&&context.family==='uat'&&hasNode)continue;
-      if(RUNTIME_ROOT_FILES.has(entry.name))add('WORK_RUNTIME_IN_CANONICAL',rel(child),'runtime custody belongs at the root of the tree, never inside canonical Work');
+      if(entry.name===EVIDENCE_NODE)add('WORK_EVIDENCE_MISPLACED',rel(child),"evidence is written into the record it proves, under the record's own evidence: key; a manifest beside it is proof separated from its subject");
+      else if(RUNTIME_ROOT_FILES.has(entry.name))add('WORK_RUNTIME_IN_CANONICAL',rel(child),'runtime custody belongs at the root of the tree, never inside canonical Work');
       else add('WORK_UNKNOWN_RECORD_ENTRY',rel(child),`a record directory holds ${NODE}, its sub-parts and assets/; this file is none of them`);
       continue;
     }
@@ -96,8 +98,7 @@ function walkScope(context,dir,segments){
       continue;
     }
     if(entry.name==='evidence'){
-      if(!hasNode)add('WORK_RECORD_MISSING_INDEX',rel(dir),`evidence/ belongs to a record, and this directory has no ${NODE}`);
-      else checkEvidence(context,child);
+      add('WORK_EVIDENCE_MISPLACED',rel(child),"evidence is written into the record it proves, under the record's own evidence: key; a directory beside the record is proof that has drifted from its subject");
       continue;
     }
     scopeChildren+=1;
@@ -119,6 +120,11 @@ function walkScope(context,dir,segments){
       }
       if(String(record.id??'')!==expected)
         add('WORK_ID_PATH_MISMATCH',rel(nodeFile),`id is "${record.id??''}"; this directory says "${expected}"`);
+      // The evidence block is written into the record it proves. If it names a record at all, it names
+      // this one: a block that names another is proof stored where nobody will re-run it.
+      const named=object(record.evidence)?record.evidence.record:undefined;
+      if(named!==undefined&&String(named)!==expected)
+        add('WORK_EVIDENCE_MISPLACED',rel(nodeFile),`the evidence block names record "${named}"; it is stored in "${expected}"`);
     }
   }else if(!descendantRecord&&scopeChildren===0){
     // Only the deepest directory that lost its node is named. A grouping segment above it is quiet: its
@@ -150,22 +156,6 @@ function checkAcceptance(context,dir,ruleSegments){
     for(const inner of entries(child))
       if(isDir(inner)&&inner.name!=='assets')add('WORK_UNKNOWN_RECORD_ENTRY',rel(path.join(child,inner.name)),'a criterion is a leaf; it holds no further record');
       else if(isDir(inner))checkAssets(context,path.join(child,inner.name));
-  }
-}
-
-function checkEvidence(context,dir){
-  const {add,rel}=context;
-  for(const entry of entries(dir)){
-    const child=path.join(dir,entry.name);
-    if(isFile(entry)){add('WORK_UNKNOWN_RECORD_ENTRY',rel(child),'evidence/ holds one directory per run');continue;}
-    if(!isDir(entry))continue;
-    const manifest=path.join(child,EVIDENCE_NODE);
-    if(!regularFile(manifest)){add('WORK_RECORD_MISSING_INDEX',rel(child),`an evidence run needs ${EVIDENCE_NODE}`);continue;}
-    const record=readId(manifest);
-    if(record===null)add('WORK_RECORD_MISSING_INDEX',rel(manifest),'the manifest is unreadable YAML');
-    else if(String(record.id??'')!==entry.name)
-      add('WORK_ID_PATH_MISMATCH',rel(manifest),`id is "${record.id??''}"; this directory says "${entry.name}"`);
-    for(const inner of entries(child))if(isDir(inner)&&inner.name==='assets')checkAssets(context,path.join(child,inner.name));
   }
 }
 

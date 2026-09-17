@@ -84,13 +84,56 @@ test('WORK_RECORD_MISSING_INDEX names the deepest loss, not every segment above 
   assert.deepEqual(at(result,'WORK_RECORD_MISSING_INDEX'),['features/task/br/delete/final/soon']);
 });
 
-test('WORK_RECORD_MISSING_INDEX: an evidence run with no manifest, and a criterion with no node',t=>{
+test('WORK_RECORD_MISSING_INDEX: a criterion directory with no node',t=>{
   const root=tree(t);
-  fs.mkdirSync(path.join(root,'features/task/br/title/required/evidence/proves-title'),{recursive:true});
   fs.mkdirSync(path.join(root,'features/task/br/title/required/ac/refuses-empty'),{recursive:true});
   const result=checkWorkLayout({workRoot:root});
-  assert.deepEqual(at(result,'WORK_RECORD_MISSING_INDEX').sort(),
-    ['features/task/br/title/required/ac/refuses-empty','features/task/br/title/required/evidence/proves-title']);
+  assert.deepEqual(at(result,'WORK_RECORD_MISSING_INDEX'),['features/task/br/title/required/ac/refuses-empty']);
+});
+
+test('WORK_EVIDENCE_MISPLACED: proof kept beside a record instead of inside it',t=>{
+  const root=tree(t);
+  const run=path.join(root,'features/task/br/title/required/evidence/proves-title');
+  fs.mkdirSync(run,{recursive:true});
+  fs.writeFileSync(path.join(run,'manifest.yaml'),'schema: work/evidence\nid: proves-title\n');
+  fs.writeFileSync(path.join(root,'features/task/br/title/required/manifest.yaml'),'schema: work/evidence\n');
+  const result=checkWorkLayout({workRoot:root});
+  assert.deepEqual(codes(result),['WORK_EVIDENCE_MISPLACED','WORK_EVIDENCE_MISPLACED']);
+  assert.deepEqual(at(result,'WORK_EVIDENCE_MISPLACED').sort(),
+    ['features/task/br/title/required/evidence','features/task/br/title/required/manifest.yaml']);
+});
+
+test('WORK_EVIDENCE_MISPLACED: an evidence block that names another record',t=>{
+  const result=checkWorkLayout({workRoot:tree(t,{
+    'features/task/br/title/required/index.yaml':
+      'schema: work/business-rule\nid: br.task.title.required\nstate: done\n'+
+      'evidence:\n  record: br.task.single-owner\n  recordDigest: abc\n  outcome: pass\n',
+  })});
+  assert.deepEqual(codes(result),['WORK_EVIDENCE_MISPLACED']);
+  assert.match(result.findings[0].detail,/br\.task\.single-owner/);
+});
+
+test('an evidence block written into its own record is the layout',t=>{
+  const result=checkWorkLayout({workRoot:tree(t,{
+    'features/task/br/title/required/index.yaml':
+      'schema: work/business-rule\nid: br.task.title.required\nstate: done\n'+
+      'requiresProof:\n  unit:\n    command: npm run test:unit\n'+
+      'provenBy:\n  unit: [impl.task.todo-app.create]\n'+
+      'evidence:\n  recordDigest: abc\n  outcome: pass\n',
+  })});
+  assert.deepEqual(result.findings,[],formatWorkLayout(result));
+});
+
+test('integration is the eleventh family, and its id names the provider',t=>{
+  assert.equal(FAMILIES.length,11);
+  const clean=checkWorkLayout({workRoot:tree(t,{
+    'features/task/integration/postgres/index.yaml':'schema: work/integration\nid: integration.task.postgres\nstate: todo\n',
+  })});
+  assert.deepEqual(clean.findings,[],formatWorkLayout(clean));
+  const wrong=checkWorkLayout({workRoot:tree(t,{
+    'features/task/integration/postgres/index.yaml':'schema: work/integration\nid: integration.task.pg\nstate: todo\n',
+  })});
+  assert.deepEqual(codes(wrong),['WORK_ID_PATH_MISMATCH']);
 });
 
 test('WORK_ID_PATH_MISMATCH: the id and the directory are two names for one thing',t=>{
@@ -101,16 +144,13 @@ test('WORK_ID_PATH_MISMATCH: the id and the directory are two names for one thin
   assert.match(result.findings[0].detail,/br\.task\.title\.required/);
 });
 
-test('WORK_ID_PATH_MISMATCH: a criterion is named after its rule, and evidence after its directory',t=>{
+test('WORK_ID_PATH_MISMATCH: a criterion is named after its rule',t=>{
   const result=checkWorkLayout({workRoot:tree(t,{
     'features/task/br/title/required/ac/refuses-empty/index.yaml':
       'schema: work/acceptance-criterion\nid: ac.task.refuses-empty\n',
-    'features/task/br/title/required/evidence/proves-title/manifest.yaml':
-      'schema: work/evidence\nid: proves-the-title\nrecord: br.task.title.required\n',
   })});
-  assert.deepEqual(codes(result),['WORK_ID_PATH_MISMATCH','WORK_ID_PATH_MISMATCH']);
-  assert.match(result.findings.find(f=>f.path.includes('/ac/')).detail,/ac\.task\.title\.required\.refuses-empty/);
-  assert.match(result.findings.find(f=>f.path.includes('/evidence/')).detail,/proves-title/);
+  assert.deepEqual(codes(result),['WORK_ID_PATH_MISMATCH']);
+  assert.match(result.findings[0].detail,/ac\.task\.title\.required\.refuses-empty/);
 });
 
 test('WORK_SECOND_BRAND: a product has one brand or none',t=>{
@@ -142,7 +182,7 @@ test('WORK_ASSET_AS_NODE: a node hidden in the payload',t=>{
 test('WORK_PARENT_AUTHORS_STATE: the catalog, a feature and a record with records below it',t=>{
   const result=checkWorkLayout({workRoot:tree(t,{
     'index.yaml':'schema: work/catalog\nid: todo\nstate: done\nfeatures: []\n',
-    'features/task/index.yaml':'schema: work/feature\nid: task\nstate: done\nproven: {by: []}\n',
+    'features/task/index.yaml':'schema: work/feature\nid: task\nstate: done\nprovenBy: {unit: []}\n',
     'features/task/br/title/index.yaml':'schema: work/business-rule\nid: br.task.title\nstate: done\n',
   })});
   assert.deepEqual(codes(result),['features/task/br/title/index.yaml','features/task/index.yaml','index.yaml']
@@ -173,7 +213,7 @@ test('runtime custody at the root is legal and hashed by nobody',t=>{
   assert.deepEqual(result.findings,[],formatWorkLayout(result));
 });
 
-test('WORK_UNKNOWN_FAMILY: a directory under a feature that is not one of the ten',t=>{
+test('WORK_UNKNOWN_FAMILY: a directory under a feature that is not one of the eleven',t=>{
   const root=tree(t);
   fs.mkdirSync(path.join(root,'features/task/business/srs'),{recursive:true});
   fs.writeFileSync(path.join(root,'features/task/readme.md'),'x\n');
