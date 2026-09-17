@@ -77,6 +77,31 @@ export function openLane(orca,{id,name,repoRoot,base,baseBranch,cwd=base,git=spa
   return {name,worktree:row.worktree,branch,orcaId:row.orcaId,
     base:{worktree:path.resolve(base),branch:baseBranch}};
 }
+/**
+ * A lane's worktree is gone from disk - the checkout was deleted, but its branch lives on in the repository -
+ * and the kernel needs a place to run again before it can resume. `reopenLane` recreates it through the same
+ * Orca call `openLane` uses, naming the recorded branch as the base so the reopened tree starts from its own
+ * last commit; the row is retitled exactly as a fresh lane's is, so Orca never shows two rows for one workflow.
+ *
+ * `providers/orca/calls.yaml` documents no `worktree-create` flag that checks out an existing branch instead
+ * of cutting a new one from a base - only `base-branch`. Until that lands, the recorded branch is passed as
+ * `base-branch` (the closest lever the contract offers) and the exact `path` is passed alongside as a hint a
+ * host adapter may honour; the worktree Orca actually reports is what the caller gets back, never guessed.
+ */
+export function reopenLane(orca,{workflowId,branch,path:recordedPath,repoRoot,cwd=repoRoot}){
+  need(plain(orca)&&typeof orca.invoke==='function','reopenLane needs an Orca runner: the lane is an Orca worktree');
+  const id=required(workflowId,'workflow id'),recordedBranch=required(branch,'lane branch'),target=required(recordedPath,'lane worktree path');
+  const base=required(repoRoot,'repository root the lane was cut from');
+  const name=path.basename(target);
+  const created=orca.invoke('worktree-create',{repo:`path:${slash(path.resolve(base))}`,name,'base-branch':recordedBranch,path:slash(target),
+    setup:'skip','no-parent':true},{cwd});
+  need(created.outcome==='ok',`orca worktree create --name ${name} failed to reopen the lane (${created.effectState??'unknown'}): ${created.reason??'no reason'}`);
+  const row=laneReceipt(created.receipt);
+  need(row.worktree&&fs.existsSync(row.worktree),`orca worktree create --name ${name} reported no worktree on disk while reopening the lane: ${slash(row.worktree??'')}`);
+  const titled=orca.invoke('worktree-set',{worktree:`path:${slash(row.worktree)}`,'display-name':laneRowTitle(id),'workspace-status':'in-progress'},{cwd});
+  need(titled.outcome==='ok',`orca worktree set --display-name "${laneRowTitle(id)}" failed while reopening the lane: ${titled.reason??'no reason'}`);
+  return {name,worktree:row.worktree,branch:row.branch??recordedBranch,orcaId:row.orcaId};
+}
 /** The lane as a reader sees it: both trees, both branches, and the merge that took it home. */
 export function laneView(state){
   const lane=state?.lane;
