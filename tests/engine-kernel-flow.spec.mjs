@@ -27,11 +27,11 @@ function fixture(t){
   const dir=path.join(temp,'kernel');
   const events=[];
   const store={id:'wf-engine-flow',dir,events,paths:{},appendEvent(event){events.push(event);return event;},saveState(){},
-    checksPath:id=>path.join(dir,'checks',`${id}.json`)};
+    writeChecks(){},readChecks(){return null;}};
   const op={id:'implement-ready',kind:'backend.implement',goal:'Make the application ready.',acceptance:['app.txt contains the exact ready state'],
     allowlist:['app.txt'],checks:[{name:'ready-oracle',command}],attempt:1,status:'running',runtime:'gpt-5.6-sol',dispatch:'ctx-1',
     launchedAt:Date.now(),baseHead:head,reports:[],findings:[],dependsOn:[],ledgerIds:[],expectedBaseFailures:{'test/oracle.test.mjs':'expected-pending'}};
-  const state={id:store.id,dir,job:'fixture',worktree:root,branch:'main',head,approved:true,engine:{schema:'starci/engine@1',generation:1,journalFile:path.join(dir,'journal.sqlite')},
+  const state={id:store.id,dir,job:'fixture',worktree:root,branch:'main',head,approved:true,engine:{schema:'starci/engine@1',generation:1,ledgerFile:path.join(dir,'.starciwork','runtime.sqlite'),machineFile:path.join(dir,'machine.sqlite')},
     ops:[op],inputs:[],ledger:[],needUser:[],lanes:{},gates:[],gateResults:[],verifyRounds:{},gateRounds:0,counters:{},iterations:1,
     decisions:[],sharedQueue:[],silences:{},dynamicOps:0,dynamicOpsBudget:8,stalls:0};
   fs.mkdirSync(dir,{recursive:true});

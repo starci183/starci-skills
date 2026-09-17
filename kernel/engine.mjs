@@ -17,7 +17,7 @@ import {resourceLocks} from './guards.mjs';
 import {ENGINE_SCHEMA,isEnrolled,kindRole,predatesEngineSchema,sealedRuntimeOf} from './common.mjs';
 import {nonOperationModels} from '../scripts/config.mjs';
 import {budgetVerdict,readRuntimeBudget} from './budget.mjs';
-import {loadsFileFor,pidAlive,readLoads} from './loads.mjs';
+import {pidAlive,readLoads} from './loads.mjs';
 import {readDistJson} from '../core/runtime-root.mjs';
 
 /** The engine version is the package version: one build, one name. */
@@ -83,7 +83,9 @@ export function staleLeaseProof({ledgerFile,journalFile,lease}={}){
   if(!file||!fs.existsSync(file)||!lease?.jobId)return null;
   const ledger=inspectLedger({file});
   try{
-    const job=ledger.getJob(lease.jobId);
+    // inspectLedger is read-only and exposes only {liveRows,workflows,eventsHead,verifyChain} beyond `db`
+    // (§3) - no getJob/listJobs convenience, so query the row directly.
+    const job=ledger.db.prepare('SELECT * FROM jobs WHERE job_id=?').get(lease.jobId)??null;
     const held=ledger.db.prepare('SELECT COUNT(*) AS n FROM leases WHERE job_id=?').get(lease.jobId)?.n??0;
     if(held>0)return null;
     if(!job)return `the ledger holds neither job ${lease.jobId} nor a lease for it`;
@@ -147,7 +149,9 @@ export function unsettledGenerationJobs({ledgerFile,journalFile,workflowId,gener
   const file=ledgerFile??journalFile;
   if(!file||!fs.existsSync(file))return [];
   const ledger=inspectLedger({file});
-  try{return ledger.listJobs().filter(job=>job.workflow_id===workflowId&&job.generation===generation&&['model','judge','check'].includes(job.kind)&&!['succeeded','failed','cancelled'].includes(job.status)).map(job=>job.job_id);}
+  // Same restricted read-only surface as staleLeaseProof above: no listJobs, query the rows directly.
+  try{return ledger.db.prepare('SELECT * FROM jobs WHERE workflow_id=? AND generation=?').all(workflowId,generation)
+    .filter(job=>['model','judge','check'].includes(job.kind)&&!['succeeded','failed','cancelled'].includes(job.status)).map(job=>job.job_id);}
   finally{ledger.close();}
 }
 /** Cancel only never-launched queued pure jobs, then report every job whose effect still needs settlement. */
@@ -256,8 +260,12 @@ export function validateCandidateRoot(value){
 
 export const candidateBaseFor=(state,explicit=null)=>explicit??path.join(state?.engine?.candidateRoot??path.join(path.dirname(state.engine.machineFile??machineFileFor()),'candidates'),state.id);
 
-export function enrollEngine(store,state,{ledgerFile=ledgerFileFor(store.repoRoot),machineFile=machineFileFor(),runtimePin=null,candidateRoot=null,now=Date.now}={}){
+export function enrollEngine(store,state,{ledgerFile,machineFile,runtimePin=null,candidateRoot=null,now=Date.now}={}){
   if(state.ops.some(op=>op.dispatch&&['running','answering'].includes(op.status)))throw Error('Settle live operation dispatches before enrolling a workflow in the durable engine');
+  // Defaults computed here, not in the parameter list: a param default is evaluated eagerly at call time,
+  // before this guard runs, so a caller with no usable store.repoRoot (or none at all) would fail on the
+  // ledger path instead of on the actual precondition above.
+  ledgerFile??=ledgerFileFor(store.repoRoot);machineFile??=machineFileFor();
   const previous=state.engine,generation=(previous?.generation??0)+1;
   const machine=openMachine({file:machineFile,now});
   let ledger;
@@ -292,7 +300,8 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
     // Expiry moves an unproved timed-out worker to effect_unknown and deliberately retains its lease. It also
     // clears residue only for already settled jobs, so this read never turns uncertainty into free capacity.
     admission.expire();
-    const capacities=new Map(journal.db.prepare("SELECT resource_key,capacity FROM resources WHERE resource_key LIKE 'ai/provider:%' ORDER BY resource_key").all()
+    // ai/* capacity lives on the machine DB, never the ledger (§6); only the mirrored lease rows are here.
+    const capacities=new Map(admission.machine.db.prepare("SELECT resource_key,capacity FROM resources WHERE resource_key LIKE 'ai/provider:%' ORDER BY resource_key").all()
       .map(row=>[row.resource_key.slice('ai/provider:'.length),row.capacity]));
     const emptyProvider=(capacity=0)=>({capacity,used:0,jobs:[],recentSettled:0,recentNonOperationSettled:0,recentOperationSettled:0,recentSettlements:[]});
     const providers={};for(const [provider,capacity] of capacities)providers[provider]=emptyProvider(capacity);
@@ -328,7 +337,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
     if(!selected){const legacy=legacyModelReplay({journal,state,name,base,bound});if(legacy){saved=legacy.saved;selected=legacy.selected;}}
     if(!selected){const budget=typeof modelBudget==='function'?modelBudget():modelBudget??readRuntimeBudget(path.dirname(store.dir));
       const providerAdmission=providerAdmissionView().providers;
-      const cooling=[...Object.entries(state.allocation?.cooling??{}),...Object.entries(readLoads({path:loadsFileFor(store.dir),workflow:state.id,now}).cooling)]
+      const cooling=[...Object.entries(state.allocation?.cooling??{}),...Object.entries(readLoads({ledger:journal,workflow:state.id,now}).cooling)]
         .map(([runtime,value])=>({runtime,until:value?.until}));
       if(typeof modelCooling==='function')cooling.push(...modelCooling());
       selected=eligibleModelSelection(name,args,eligibility,modelPolicy,runtimeProfile,bound,budget,now,providerAdmission,cooling);saved={provider:selected.args.providers[0],runtime:selected.runtime.pool??selected.runtime.id,mode:selected.decision.mode??'qualified'};state.engine.modelSelections[selectionKey]=saved;
@@ -440,7 +449,15 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       if(workerOnly){
         const heldProviders=journal.db.prepare("SELECT resource_key FROM leases WHERE job_id=? AND token=? AND resource_key LIKE 'ai/provider:%'").all(op.lease.jobId,op.lease.leaseToken).map(row=>row.resource_key);
         const releasable=new Set(['ai/global',...heldProviders,...(op.lease.machineResources??[])]);
-        journal.transaction(db=>{const remove=db.prepare('DELETE FROM leases WHERE job_id=? AND token=? AND resource_key=?');for(const key of releasable)remove.run(op.lease.jobId,op.lease.leaseToken,key);});
+        // Every key here is machine-scoped (ai/*, machine:*, §6): dropping only the ledger's mirror row leaves
+        // the real reservation held in the machine DB forever (until TTL sweep). Read each row's machine_ref
+        // before deleting it and release those tokens too.
+        const refs=journal.transaction(db=>{
+          const select=db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND token=? AND resource_key=?'),remove=db.prepare('DELETE FROM leases WHERE job_id=? AND token=? AND resource_key=?'),collected=[];
+          for(const key of releasable){const row=select.get(op.lease.jobId,op.lease.leaseToken,key);if(row?.machine_ref)collected.push(row.machine_ref);remove.run(op.lease.jobId,op.lease.leaseToken,key);}
+          return collected;
+        });
+        for(const ref of refs){try{admission.machine.release(ref);}catch{}}
         journal.appendEvent({eventId:`${op.lease.jobId}:worker-stopped`,workflowId:state.id,entityType:'job',entityId:op.lease.jobId,generation:state.engine.generation,kind:'operation-worker-stopped',payload:{reason,writerRetained:true}});
         return {ok:true,writerRetained:true};
       }
@@ -475,8 +492,11 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       if(recoverable){
         const eventId=`${lease.jobId}:launch-reconciled:${dispatch}`;
         journal.transaction(db=>{const changed=db.prepare("UPDATE jobs SET worker_id=?,updated_at=? WHERE job_id=? AND lease_token=? AND status IN ('leased','effect_unknown') AND worker_id IS NULL").run(dispatch,now(),lease.jobId,lease.leaseToken).changes;
-          if(changed===1)db.prepare('INSERT OR IGNORE INTO events(event_id,workflow_id,entity_type,entity_id,generation,kind,payload_json,created_at) VALUES(?,?,?,?,?,?,?,?)')
-            .run(eventId,lease.workflowId,'job',lease.jobId,lease.generation,'operation-launch-reconciled',JSON.stringify({opId:lease.opId,attempt:lease.attempt,task:op.launch.task,dispatch,proof:'single persisted unknown-effect launch attempt plus exact typed host settlement'}),now());});
+          // A raw INSERT INTO events must not be hand-rolled here: the digest chain (§4) is NOT NULL with no
+          // default, and `INSERT OR IGNORE` silently swallows that violation instead of throwing, so a
+          // hand-rolled row never lands and this reconciliation event would vanish without any error.
+          if(changed===1)journal.appendEvent({eventId,workflowId:lease.workflowId,entityType:'job',entityId:lease.jobId,generation:lease.generation,
+            kind:'operation-launch-reconciled',payload:{opId:lease.opId,attempt:lease.attempt,task:op.launch.task,dispatch,proof:'single persisted unknown-effect launch attempt plus exact typed host settlement'},createdAt:now()});});
         job=journal.getJob(lease.jobId);events=journal.events({workflowId:lease.workflowId});
       }
       const exact=job&&job.kind==='operation'&&job.workflow_id===lease.workflowId&&job.op_id===lease.opId&&job.attempt===lease.attempt
