@@ -1,0 +1,18 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: start-dev --import-realm
+    depends_on:
+      - postgres
+    environment:
+      KC_DB: postgres
+      KC_HTTP_PORT: "8089"
+      KEYCLOAK_ADMIN_PASSWORD_FILE: /run/secrets/keycloak-admin-password
+    secrets:
+      - keycloak-admin-password
+    ports:
+      - "8089:8089"
+secrets:
+  keycloak-admin-password:
+    file: ../../runtime/files/keycloak-admin-password.key
+

@@ -1,0 +1,23 @@
+schema: work/functional-requirement
+id: fr.login.sign-in
+title: Sign in
+state: done
+actors: [person]
+trigger: The person submits an email and a password.
+mainFlow:
+  - The pair is checked.
+  - A session is created and the person lands on their list.
+exceptionFlows:
+  - A wrong pair is refused without naming which half was wrong.
+postconditions:
+  - Exactly one live session exists for that person.
+composes:
+  - rule: br.login.password.sign-in
+    module: src/auth/sign-in
+  - rule: br.login.session.restores
+    module: src/auth/session
+proven:
+  by: [uat.login.sign-in]
+  evidence: composes-sign-in
+  at: 2026-09-18T04:39:00.000Z
+

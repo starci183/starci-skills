@@ -1,5 +1,0 @@
-schema: work/node@2
-id: module
-kind: business
-required: true
-description: Synthetic module containing one complete Business compatibility tree.

@@ -1,5 +1,0 @@
-schema: work/node@2
-id: srs-brs
-kind: business
-required: true
-description: Business rule aggregate.

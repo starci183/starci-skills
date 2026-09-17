@@ -1,0 +1,14 @@
+schema: work/uat-flow
+id: uat.task.create
+title: Create a task, and fail to delete somebody else's
+state: done
+accounts: accounts.yaml
+steps:
+  - Sign in as the owner.
+  - Create a task with a title.
+  - Read the list and see exactly that task.
+  - Sign in as the stranger and attempt to delete it.
+  - See the refusal, and the owner's list unchanged.
+proves: [fr.task.create, br.task.single-owner]
+evidence: walks-create
+

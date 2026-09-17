@@ -1,4 +1,0 @@
-.stacks/*/secrets.yaml
-.stacks/*/.initialized
-*.agekey
-.env

@@ -1,0 +1,4 @@
+# SOPS-encrypted seed configuration: the realm, its clients and the first workspace owner.
+ENC[AES256_GCM,data:c2VlZCBjb25maWd1cmF0aW9u,type:str]
+sops_version: 3.9.0
+

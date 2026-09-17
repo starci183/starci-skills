@@ -1,0 +1,20 @@
+schema: work/evidence
+id: proves-completion
+record: br.task.complete.once
+outcome: pass
+stale: true
+staleReason: Proven against rev 1, whose never-reopen clause rev 2 withdrew. Kept as
+  history; ac.task.complete.once.is-reversible has no evidence yet.
+assertions:
+  - id: ac.task.complete.once.is-idempotent
+    outcome: pass
+    observation: npm run test:unit -- src/task/complete exited 0
+provenance:
+  actor: starci-kernel
+  tool: starci-kernel
+  environment: local
+  servedVersions:
+    - repository: todo-app
+      commit: 0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1b4e7d0a3
+      artifact: worktree
+  capturedAt: 2026-09-17T19:38:00.000Z

@@ -1,0 +1,21 @@
+schema: work/functional-requirement
+id: fr.task.create
+title: Create a task
+state: done
+actors: [owner]
+trigger: The owner submits a title.
+mainFlow:
+  - The owner submits a non-empty title.
+  - The task is created, owned by the submitter, not complete.
+exceptionFlows:
+  - An empty title is refused and nothing is created.
+postconditions:
+  - Exactly one task exists for that submission.
+composes:
+  - {rule: br.task.single-owner, module: src/task/ownership}
+  - {rule: br.task.title.required, module: src/task/create}
+proven:
+  by: [uat.task.create]
+  evidence: composes-create
+  at: 2026-09-18T04:39:00.000Z
+

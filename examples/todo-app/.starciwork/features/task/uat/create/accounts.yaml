@@ -1,0 +1,5 @@
+schema: work/disposable-accounts
+accounts:
+  - {role: owner, username: uat-owner, password: uat-owner-disposable}
+  - {role: stranger, username: uat-stranger, password: uat-stranger-disposable}
+

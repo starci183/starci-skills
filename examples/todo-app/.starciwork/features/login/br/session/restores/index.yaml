@@ -1,0 +1,13 @@
+schema: work/business-rule
+id: br.login.session.restores
+title: A session survives a browser restart
+state: done
+statements:
+  - A signed-in person who returns within thirty days is still signed in.
+  - A session that has expired is refused without an error the person must understand.
+acceptanceCriteria:
+  - returning-within-the-window-stays-signed-in
+module: src/auth/session
+evidence: proves-session
+change: {rev: 1, kind: initial, at: 2026-09-18T01:02:00.000Z}
+

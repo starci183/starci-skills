@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16
+    volumes:
+      - todo-postgres:/var/lib/postgresql/data
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: start --optimized
+    secrets:
+      - keycloak-admin-password
+  redis:
+    image: redis:7
+  minio:
+    image: minio/minio:latest
+    command: server /data
+    secrets:
+      - minio-root-password
+    volumes:
+      - todo-minio:/data
+  api:
+    image: todo-app/api
+    env_file:
+      - ../runtime/env/app.env
+    deploy:
+      replicas: 2
+  web:
+    image: todo-app/web
+    deploy:
+      replicas: 2
+secrets:
+  keycloak-admin-password:
+    external: true
+  minio-root-password:
+    external: true
+volumes:
+  todo-postgres: {}
+  todo-minio: {}
+

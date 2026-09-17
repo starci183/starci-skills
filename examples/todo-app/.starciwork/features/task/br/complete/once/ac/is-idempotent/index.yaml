@@ -1,0 +1,9 @@
+schema: work/acceptance-criterion
+id: ac.task.complete.once.is-idempotent
+rule: br.task.complete.once
+given: A task already complete
+when: It is completed again
+then:
+  - The task is unchanged.
+  - The response is success, not an error.
+

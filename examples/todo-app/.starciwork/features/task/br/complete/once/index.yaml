@@ -1,0 +1,18 @@
+schema: work/business-rule
+id: br.task.complete.once
+title: Completing a task twice changes nothing
+state: todo
+statements:
+  - Completing a task that is already complete leaves it unchanged and is not an error.
+  - The owner may reopen a task they completed.
+acceptanceCriteria: [is-idempotent, is-reversible]
+module: src/task/complete
+evidence: proves-completion
+change:
+  rev: 2
+  kind: breaking
+  at: 2026-09-18T05:02:00.000Z
+  withdraws: ["A complete task is never reopened."]
+  reason: The owner decided completion is reversible. The withdrawn clause was proven, so its evidence
+    becomes history and the rule returns to todo until the reversible statement is proven in its place.
+

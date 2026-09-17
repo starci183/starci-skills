@@ -1,0 +1,13 @@
+schema: work/implementation
+id: impl.task.todo-app.ownership
+title: Ownership binding and its guard
+state: done
+repository: todo-app
+directory: src/task/ownership
+files: [ownership.guard.ts, task.repository.ts]
+revision: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+proves: [br.task.single-owner, sds.task.ownership-guard]
+verification: [npm run test:unit -- src/task/ownership exited 0]
+verificationSource: kernel-observed
+evidence: proves-ownership-module
+

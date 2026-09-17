@@ -1,0 +1,13 @@
+schema: work/business-rule
+id: br.task.single-owner
+title: A task has exactly one owner
+state: done
+statements:
+  - A task belongs to exactly one person, and only that person may complete or delete it.
+authorityRefs:
+  - "owner-intent: One person's list is private to them; sharing is a later product, not a default."
+acceptanceCriteria: [refuses-stranger]
+module: src/task/ownership
+evidence: proves-ownership
+change: {rev: 1, kind: initial, at: 2026-09-18T02:10:00.000Z}
+

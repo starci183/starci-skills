@@ -1,0 +1,17 @@
+schema: work/non-functional-requirement
+id: nfr.task.list.latency
+title: A list read feels immediate
+quality: latency
+state: done
+observableCriterion: The list endpoint answers in under 200 ms at the 95th percentile for a person with
+  1000 tasks.
+measurement:
+  how: k6 run scripts/load/list.js with 1000 seeded tasks and 50 virtual users for 60 seconds
+  threshold: p95 < 200ms
+  environment: dev
+appliesTo: [br.task.list.owned]
+proven:
+  by: [impl.task.todo-app.list]
+  evidence: measures-latency
+  at: 2026-09-18T04:41:00.000Z
+

@@ -1,0 +1,10 @@
+schema: work/ui-screen
+id: ui.task.list
+title: The task list and its create form
+state: todo
+states: [empty, one-task, many-tasks, refused]
+brand: {rev: 2}
+refs: [fr.task.create]
+blockedBy:
+  - Captures exist for brand rev 1 only; rev 2 changed the primary colour token.
+

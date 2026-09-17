@@ -1,0 +1,16 @@
+schema: work/business-rule
+id: br.login.password.sign-in
+title: A person signs in with an email and a password
+state: done
+statements:
+  - A sign-in succeeds only when the email is known and the password matches its stored hash.
+  - A failed sign-in says only that the pair is wrong, never which half.
+authorityRefs:
+  - "owner-intent: Telling an attacker that an email exists is a leak, and it buys the person nothing."
+acceptanceCriteria:
+  - wrong-pair-is-refused
+  - refusal-does-not-name-the-half
+module: src/auth/sign-in
+evidence: proves-sign-in
+change: {rev: 1, kind: initial, at: 2026-09-18T01:00:00.000Z}
+

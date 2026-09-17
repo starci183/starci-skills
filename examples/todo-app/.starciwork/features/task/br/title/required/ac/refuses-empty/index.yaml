@@ -1,0 +1,9 @@
+schema: work/acceptance-criterion
+id: ac.task.title.required.refuses-empty
+rule: br.task.title.required
+given: A creation request
+when: Its title is empty or only whitespace
+then:
+  - Creation is refused.
+  - Nothing is written.
+

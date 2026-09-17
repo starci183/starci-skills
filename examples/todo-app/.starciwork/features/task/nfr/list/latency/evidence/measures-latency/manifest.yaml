@@ -1,0 +1,17 @@
+schema: work/evidence
+id: measures-latency
+record: nfr.task.list.latency
+outcome: pass
+assertions:
+  - id: p95-under-200ms
+    outcome: pass
+    observation: k6 reported p95=118ms over 60s, 50 VUs, 1000 seeded tasks
+provenance:
+  actor: starci-kernel
+  tool: starci-kernel
+  environment: local
+  servedVersions:
+    - repository: todo-app
+      commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+      artifact: worktree
+  capturedAt: 2026-09-18T04:41:00.000Z

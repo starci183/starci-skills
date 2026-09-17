@@ -1,0 +1,5 @@
+schema: work/feature
+id: login
+title: Getting into the product and staying in
+description: Sign-in, session restoration, and the person a task belongs to.
+

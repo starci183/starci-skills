@@ -1,0 +1,11 @@
+schema: work/catalog
+id: todo
+description: Product catalog. One entry per feature; every record of a feature lives under its directory.
+features:
+  - id: login
+    directory: features/login
+    description: Getting into the product and staying in.
+  - id: task
+    directory: features/task
+    description: A task a person creates, completes and deletes.
+

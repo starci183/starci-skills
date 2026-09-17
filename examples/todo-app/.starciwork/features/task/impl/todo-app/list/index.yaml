@@ -1,0 +1,13 @@
+schema: work/implementation
+id: impl.task.todo-app.list
+title: The owned-list query
+state: done
+repository: todo-app
+directory: src/task/list
+files: [list.service.ts]
+revision: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+proves: [nfr.task.list.latency]
+verification: [npm run test:unit -- src/task/list exited 0]
+verificationSource: kernel-observed
+evidence: proves-list-module
+

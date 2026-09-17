@@ -1,0 +1,9 @@
+schema: work/sds-component
+id: sds.task.completion-state
+title: How completion is stored
+state: todo
+responsibility: A boolean column with a timestamp, both cleared when the owner reopens the task.
+refs: [br.task.complete.once]
+blockedBy:
+  - br.task.complete.once is todo at rev 2; the reversible design is not settled.
+

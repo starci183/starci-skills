@@ -5,13 +5,13 @@ import os from 'node:os';
 import path from 'node:path';
 import {checkApplicationStacks} from '../checks/stacks.mjs';
 
-const source=path.resolve(import.meta.dirname,'../examples/application-stacks/tiny-stateful');
+const source=path.resolve(import.meta.dirname,'../examples/todo-app');
 
 test('portable application-stack kit is complete and statically safe in dev and vps',t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-application-kit-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   fs.cpSync(source,root,{recursive:true});
   for(const environment of ['dev','vps']){
-    const env=path.join(root,'.stacks',environment);fs.writeFileSync(path.join(env,'secrets.yaml.enc'),'app_token: ENC[AES256_GCM,data:c3ludGhldGlj,iv:AA==,tag:AA==,type:str]\nsops:\n  age: []\n');
+    const env=path.join(root,'.starcistacks',environment);fs.writeFileSync(path.join(env,'secrets.yaml.enc'),'app_token: ENC[AES256_GCM,data:c3ludGhldGlj,iv:AA==,tag:AA==,type:str]\nsops:\n  age: []\n');
     if(environment==='dev')fs.writeFileSync(path.join(env,'secrets.yaml'),'app_token: '+('a'.repeat(64))+'\n');
     const service={image:'synthetic:1',deploy:{replicas:1},healthcheck:{test:['CMD','true']},networks:['app-net']};
     const model=environment==='dev'

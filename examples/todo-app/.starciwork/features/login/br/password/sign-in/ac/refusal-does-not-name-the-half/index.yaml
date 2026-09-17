@@ -1,0 +1,9 @@
+schema: work/acceptance-criterion
+id: ac.login.password.sign-in.refusal-does-not-name-the-half
+rule: br.login.password.sign-in
+given: An unknown email and a known email with a wrong password
+when: Each is submitted
+then:
+  - Both refusals carry the same message and the same status.
+  - Their response times do not separate the two cases.
+

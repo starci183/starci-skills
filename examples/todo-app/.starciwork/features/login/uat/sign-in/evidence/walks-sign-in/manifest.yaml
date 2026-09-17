@@ -1,0 +1,20 @@
+schema: work/evidence
+id: walks-sign-in
+record: uat.login.sign-in
+outcome: pass
+assertions:
+  - id: signed-in-and-restored
+    outcome: pass
+    observation: step 3 captured the list after a restart with no password
+  - id: refusal-is-uniform
+    outcome: pass
+    observation: step 4 captured the same message as an unknown email
+provenance:
+  actor: starci-kernel
+  tool: starci-kernel
+  environment: local
+  servedVersions:
+    - repository: todo-app
+      commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+      artifact: worktree
+  capturedAt: 2026-09-18T04:39:00.000Z

@@ -1,0 +1,20 @@
+schema: work/evidence
+id: walks-first-task
+record: journey.task.first-task
+outcome: pass
+assertions:
+  - id: empty-state-explains-itself
+    outcome: pass
+    observation: uat run 20260918-create step 1 captured the guidance
+  - id: task-survives-a-new-session
+    outcome: pass
+    observation: uat run 20260918-create step 6 captured the same row after signing in again
+provenance:
+  actor: starci-kernel
+  tool: starci-kernel
+  environment: local
+  servedVersions:
+    - repository: todo-app
+      commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+      artifact: worktree
+  capturedAt: 2026-09-18T04:39:00.000Z

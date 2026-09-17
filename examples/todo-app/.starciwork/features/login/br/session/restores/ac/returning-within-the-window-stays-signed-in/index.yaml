@@ -1,0 +1,8 @@
+schema: work/acceptance-criterion
+id: ac.login.session.restores.returning-within-the-window-stays-signed-in
+rule: br.login.session.restores
+given: A person signed in yesterday
+when: They open the product again
+then:
+  - They are signed in without typing a password.
+

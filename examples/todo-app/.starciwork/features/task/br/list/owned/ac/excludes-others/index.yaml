@@ -1,0 +1,9 @@
+schema: work/acceptance-criterion
+id: ac.task.list.owned.excludes-others
+rule: br.task.list.owned
+given: Two people each own tasks
+when: One of them reads their list
+then:
+  - Every row belongs to the reader.
+  - No row of the other person appears.
+

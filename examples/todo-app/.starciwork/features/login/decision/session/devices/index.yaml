@@ -1,0 +1,21 @@
+schema: work/policy-decision
+id: decision.login.session.devices
+title: How many devices may hold a live session
+state: todo
+outcome: open
+question: A person with a phone and a laptop signs in on both. Does the second sign-in end the first?
+options:
+  - id: single-device
+    summary: One live session; a new sign-in ends the previous one.
+    consequence: Simplest to reason about and to revoke; hostile to a person with two devices.
+  - id: many-devices
+    summary: Any number of live sessions, each revocable.
+    consequence: Expected by people; needs a session list, a revoke path and a device name.
+  - id: two-devices
+    summary: At most two live sessions, oldest evicted.
+    consequence: A compromise nobody asked for, and a number that will be argued about forever.
+recommendation: many-devices
+recommendationReason: Single-device is the only option that makes a normal person's normal behaviour look
+  like an attack. The revoke path it needs is also what an account-recovery flow will need anyway.
+blocks: [br.login.session.single-device]
+

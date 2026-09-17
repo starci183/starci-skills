@@ -1,0 +1,13 @@
+schema: work/uat-flow
+id: uat.login.sign-in
+title: Sign in, close the browser, come back
+state: done
+accounts: accounts.yaml
+steps:
+  - Sign in with the seeded person.
+  - See the empty task list.
+  - Close the session cookie and return; still signed in.
+  - Submit a wrong password and read the refusal.
+proves: [fr.login.sign-in, br.login.password.sign-in, br.login.session.restores]
+evidence: walks-sign-in
+

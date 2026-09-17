@@ -1,0 +1,17 @@
+schema: work/functional-requirement
+id: fr.task.complete
+title: Complete a task
+state: todo
+actors: [owner]
+trigger: The owner marks a task complete.
+mainFlow:
+  - The owner names one of their own tasks.
+  - The task becomes complete.
+exceptionFlows:
+  - A task the reader does not own is refused.
+composes:
+  - {rule: br.task.single-owner, module: src/task/ownership}
+  - {rule: br.task.complete.once, module: src/task/complete}
+blockedBy:
+  - br.task.complete.once is todo at rev 2; its reversible statement has no evidence yet.
+

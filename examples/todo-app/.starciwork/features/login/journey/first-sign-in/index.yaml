@@ -1,0 +1,14 @@
+schema: work/customer-journey
+id: journey.login.first-sign-in
+title: A new person gets in and stays in
+state: done
+crossesFeatures: [login, task]
+steps:
+  - {actor: person, does: Signs up, expects: Lands on an empty list that says what to do next.}
+  - {actor: person, does: Returns the next day, expects: Still signed in.}
+requirements: [fr.login.sign-in]
+proven:
+  by: [uat.login.sign-in]
+  evidence: walks-first-sign-in
+  at: 2026-09-18T04:39:00.000Z
+

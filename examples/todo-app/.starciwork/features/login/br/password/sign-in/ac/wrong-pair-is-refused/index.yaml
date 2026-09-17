@@ -1,0 +1,8 @@
+schema: work/acceptance-criterion
+id: ac.login.password.sign-in.wrong-pair-is-refused
+rule: br.login.password.sign-in
+given: A known email
+when: The password does not match
+then:
+  - Sign-in is refused and no session is created.
+

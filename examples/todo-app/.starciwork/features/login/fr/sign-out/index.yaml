@@ -1,0 +1,16 @@
+schema: work/functional-requirement
+id: fr.login.sign-out
+title: Sign out
+state: todo
+actors: [person]
+trigger: The person signs out.
+mainFlow:
+  - The session ends and the next request is unauthenticated.
+composes:
+  - rule: br.login.session.restores
+    module: src/auth/session
+  - rule: br.login.session.single-device
+    module: src/auth/session
+blockedBy:
+  - br.login.session.single-device is todo; the device rule it composes has no evidence yet.
+

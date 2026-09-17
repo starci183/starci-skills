@@ -1,0 +1,14 @@
+schema: work/implementation
+id: impl.task.todo-app-web.task-list
+title: The list screen and the create form
+state: todo
+repository: todo-app-web
+directory: app/tasks
+files: [task-list.tsx, create-task-form.tsx]
+revision: 0a3c6f9b24c1f0b9e2d7a5c3f8e1b6d4a9c2f5b8
+proves: [ui.task.list]
+verification: [source inspection only; no fresh focused test run]
+verificationSource: authored-claim
+blockedBy:
+  - The brand revision changed the primary colour token this screen binds; the capture set is not re-taken.
+

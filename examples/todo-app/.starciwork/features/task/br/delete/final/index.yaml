@@ -1,0 +1,10 @@
+schema: work/business-rule
+id: br.task.delete.final
+title: A deleted task does not come back
+state: todo
+statements:
+  - Deleting a task removes it; there is no recovery path in this product.
+acceptanceCriteria: [stays-gone]
+module: src/task/delete
+change: {rev: 1, kind: initial, at: 2026-09-18T02:13:00.000Z}
+

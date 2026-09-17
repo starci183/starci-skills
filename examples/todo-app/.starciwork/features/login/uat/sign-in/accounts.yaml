@@ -1,0 +1,4 @@
+schema: work/disposable-accounts
+accounts:
+  - {role: person, username: uat-person, password: uat-person-disposable}
+

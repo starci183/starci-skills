@@ -1,0 +1,14 @@
+schema: work/data
+id: data.login.person
+title: Person
+state: done
+fields:
+  - {name: id, type: text, required: true, note: Opaque, assigned at sign-up, never reused.}
+  - {name: email, type: text, required: true, note: Unique, lowercased on write.}
+  - {name: passwordHash, type: text, required: true}
+  - {name: createdAt, type: timestamp, required: true}
+invariants:
+  - email is unique across every person, compared lowercased.
+  - passwordHash is never read back out of the product.
+appliesTo: [br.login.password.sign-in]
+

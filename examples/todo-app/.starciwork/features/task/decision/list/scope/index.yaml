@@ -1,0 +1,24 @@
+schema: work/policy-decision
+id: decision.task.list.scope
+title: Does an organization owner see the tasks of its members
+state: todo
+outcome: open
+question: A workspace belongs to an organization and a person owns the organization. Does that person read
+  the task lists of the people in it, or is a list private to its owner without exception?
+options:
+  - id: private-always
+    summary: A list is private to its owner; an organization owner sees no member task.
+    consequence: Simplest to reason about and to prove; an organization owner cannot help a member.
+  - id: owner-reads-all
+    summary: An organization owner reads every list in the organization.
+    consequence: Useful for support; makes br.task.list.owned conditional on a role, and every read must
+      then name the organization it is read under.
+  - id: member-grants
+    summary: A member may grant read access to the organization owner.
+    consequence: Most faithful to consent; adds a grant record, its lifetime and its revocation.
+recommendation: private-always
+recommendationReason: It is the only option that keeps br.task.list.owned a single unconditional statement.
+  The other two can be added later without withdrawing anything; starting with them cannot be undone
+  without withdrawing a proven rule.
+blocks: [br.task.list.owned]
+

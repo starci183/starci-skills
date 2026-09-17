@@ -1,0 +1,9 @@
+schema: work/acceptance-criterion
+id: ac.task.single-owner.refuses-stranger
+rule: br.task.single-owner
+given: A task exists with an owner
+when: Somebody who is not the owner attempts to complete or delete it
+then:
+  - The attempt is refused.
+  - The task is unchanged, now and after a restart.
+

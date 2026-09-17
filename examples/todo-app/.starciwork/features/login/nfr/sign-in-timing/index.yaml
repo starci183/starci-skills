@@ -1,0 +1,17 @@
+schema: work/non-functional-requirement
+id: nfr.login.sign-in-timing
+title: A refusal does not leak through timing
+quality: security
+state: done
+observableCriterion: The refusal for an unknown email and for a wrong password differ by less than 10 ms
+  at the 95th percentile over 1000 attempts.
+measurement:
+  how: node scripts/load/sign-in-timing.mjs with 1000 attempts of each shape
+  threshold: p95 delta < 10ms
+  environment: dev
+appliesTo: [br.login.password.sign-in]
+proven:
+  by: [impl.login.todo-app.auth]
+  evidence: measures-timing
+  at: 2026-09-18T04:41:00.000Z
+

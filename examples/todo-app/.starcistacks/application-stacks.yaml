@@ -2,43 +2,88 @@ schema: starci/application-stacks
 sources:
   - repository: todo-app
 components:
-  api:
-    image: todo-app/api
-    role: service
-  web:
-    image: todo-app/web
-    role: service
   postgres:
     image: postgres:16
     role: stateful
+    compose: infra/compose/postgres.yaml
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    role: stateful
+    compose: infra/compose/keycloak.yaml
+  redis:
+    image: redis:7
+    role: stateful
+    compose: infra/compose/redis.yaml
+  minio:
+    image: minio/minio:latest
+    role: stateful
+    compose: infra/compose/minio.yaml
+  prometheus:
+    image: prom/prometheus:latest
+    role: observability
+    compose: infra/compose/prometheus.yaml
+  api:
+    image: todo-app/api
+    role: service
+    compose: infra/compose/api.yaml
+  web:
+    image: todo-app/web
+    role: service
+    compose: infra/compose/web.yaml
 environments:
   dev:
     status: supported
     runtime: docker-compose
     composeFiles:
-      - compose.yaml
+      - infra/compose/compose.yaml
     components:
-      api: {}
-      web: {}
-      postgres: {}
+      postgres:
+        port: 5432
+      keycloak:
+        port: 8089
+      redis:
+        port: 6379
+      minio:
+        port: 9000
+      prometheus:
+        port: 9090
+      api:
+        port: 3001
+      web:
+        port: 3000
     runbook: README.md
     secrets:
+      - name: app.env
+        where: runtime/env/app.env
+      - name: seed.yaml
+        where: runtime/config/seed.yaml
+      - name: keycloak-admin-password.key
+        where: runtime/files/keycloak-admin-password.key
+      - name: minio-root-password.key
+        where: runtime/files/minio-root-password.key
       - name: uat
         where: secrets/uat
   vps:
     status: supported
     runtime: docker-swarm
     composeFiles:
-      - stack.yaml
+      - infra/stack.yaml
     components:
-      api: {}
-      web: {}
       postgres: {}
+      keycloak: {}
+      redis: {}
+      minio: {}
+      api:
+        replicas: 2
+      web:
+        replicas: 2
     runbook: README.md
     secrets:
+      - name: app.env
+        where: runtime/env/app.env
       - name: uat
         where: secrets/uat
 k8s:
   status: deferred
-  reason: One VPS serves the current load; a cluster would add a control plane nobody operates yet.
+  reason: One host serves the current load; a cluster would add a control plane nobody operates yet.
 

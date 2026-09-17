@@ -1,0 +1,12 @@
+services:
+  api:
+    image: todo-app/api
+    depends_on:
+      - postgres
+      - keycloak
+      - redis
+    env_file:
+      - ../../runtime/env/app.env
+    ports:
+      - "3001:3001"
+

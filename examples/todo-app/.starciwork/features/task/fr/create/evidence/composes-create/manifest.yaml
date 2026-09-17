@@ -1,0 +1,22 @@
+schema: work/evidence
+id: composes-create
+record: fr.task.create
+outcome: pass
+note: This proves the composed flow, not the rules. Each rule is proven in its own module; what is
+  observed here is that the flow wires them in the right order and passes the right actor.
+assertions:
+  - id: main-flow-creates-one-task
+    outcome: pass
+    observation: uat run 20260918-create step 3 captured a list with exactly one row
+  - id: guard-is-reached-on-the-create-path
+    outcome: pass
+    observation: npm run test:e2e -- tasks/create exited 0
+provenance:
+  actor: starci-kernel
+  tool: starci-kernel
+  environment: local
+  servedVersions:
+    - repository: todo-app
+      commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+      artifact: worktree
+  capturedAt: 2026-09-18T04:39:00.000Z
