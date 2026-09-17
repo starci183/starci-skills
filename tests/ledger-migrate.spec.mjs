@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
 import {migrateLedger} from '../scripts/ledger-migrate.mjs';
 import {verifyChain,inspectLedger} from '../kernel/ledger-db.mjs';
@@ -56,7 +57,7 @@ test('a `_local` workflow plus its journal rows import whole into the ledger, at
   const summary=await migrateLedger({repoRoot:repo,journalFile,machineFile});
   assert.equal(summary.ok,true);
   assert.deepEqual(summary.refused,[]);assert.deepEqual(summary.skipped,[]);
-  assert.deepEqual(summary.workflows,[{id:ID,imported:{events:6,snapshots:2,jobs:2,leases:2,reports:2,contracts:1,checks:1,inbox:1,goals:1}}]);
+  assert.deepEqual(summary.workflows,[{id:ID,imported:{events:6,snapshots:2,jobs:2,leases:2,reports:2,contracts:1,checks:1,inbox:1,goals:1,inputs:0}}]);
   const db=ledgerDb(repo);
   try{
     const workflow=db.prepare('SELECT * FROM workflows WHERE workflow_id=?').get(ID);
@@ -152,4 +153,104 @@ test('--archive moves an imported directory to workflows-archive/<id>.migrated',
   assert.equal(summary.ok,true);
   assert.equal(fs.existsSync(path.join(workflowsRoot(repo),ID)),false);
   assert.ok(fs.existsSync(path.join(repo,'.starciwork','_local','workflows-archive',`${ID}.migrated`,'state.json')));
+});
+
+/** goal.mjs's `stageExternalInputs` copies an owner file here; declare it on both `state.json` and `goal.json`. */
+function declareInputs(wdir,id,entries){
+  const inputsDir=path.join(path.dirname(path.dirname(wdir)),'inputs',id);
+  fs.mkdirSync(inputsDir,{recursive:true});
+  const declared=entries.map((entry,index)=>{
+    const key=`${index+1}-${entry.name}`;
+    if(entry.bytes!==undefined)fs.writeFileSync(path.join(inputsDir,key),entry.bytes);
+    return {kind:'file',ref:`.starciwork/_local/inputs/${id}/${key}`,sourceRef:entry.sourceRef,sha256:entry.bytes?crypto.createHash('sha256').update(entry.bytes).digest('hex'):undefined};
+  });
+  for(const file of ['state.json','goal.json']){
+    const parsed=JSON.parse(fs.readFileSync(path.join(wdir,file),'utf8'));
+    parsed.inputs=declared;
+    fs.writeFileSync(path.join(wdir,file),JSON.stringify(parsed));
+  }
+  return inputsDir;
+}
+
+test('owner-named inputs staged under `_local/inputs/<id>` import into the `inputs` table; a declared file that is gone is reported lost, not refused',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  const wdir=makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  const bytes=Buffer.from('the SRS, verbatim.\n');
+  declareInputs(wdir,ID,[{name:'srs.md',bytes,sourceRef:'/owner/srs.md'},{name:'gone.md',sourceRef:'/owner/gone.md'}]);
+  const summary=await migrateLedger({repoRoot:repo,journalFile,machineFile});
+  assert.equal(summary.ok,true);
+  assert.equal(summary.workflows[0].imported.inputs,1,'the missing file does not count as imported');
+  assert.deepEqual(summary.workflows[0].inputsLost,[{key:'2-gone.md',reason:'input-file-missing'}]);
+  const db=ledgerDb(repo);
+  try{
+    assert.equal(db.prepare('SELECT count(*) n FROM inputs WHERE workflow_id=?').get(ID).n,1,'declared twice (state.json + goal.json) imports once, the lost one writes nothing');
+    const row=db.prepare('SELECT * FROM inputs WHERE workflow_id=? AND key=?').get(ID,'1-srs.md');
+    assert.equal(row.sha256,crypto.createHash('sha256').update(bytes).digest('hex'));
+    assert.equal(row.size,bytes.length);assert.equal(row.origin,'/owner/srs.md','the owner original path is kept for provenance');
+    assert.equal(row.goal_revision,1);
+    assert.equal(Buffer.from(row.bytes).toString(),bytes.toString());
+    const workflow=db.prepare('SELECT updated_at FROM workflows WHERE workflow_id=?').get(ID);
+    assert.equal(workflow.updated_at,1300,'importing inputs does not clobber the updated_at the events computed');
+  }finally{db.close();}
+});
+
+test('a second run of an inputs import is a no-op',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  const wdir=makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  declareInputs(wdir,ID,[{name:'srs.md',bytes:Buffer.from('v1'),sourceRef:'/owner/srs.md'}]);
+  await migrateLedger({repoRoot:repo,journalFile,machineFile});
+  const again=await migrateLedger({repoRoot:repo,journalFile,machineFile});
+  assert.deepEqual(again.skipped,[{id:ID,reason:'already-migrated'}]);
+  const db=ledgerDb(repo);
+  try{assert.equal(db.prepare('SELECT count(*) n FROM inputs WHERE workflow_id=?').get(ID).n,1);}finally{db.close();}
+});
+
+test('the migrator seeds `meta` on the ledger it creates and writes the initial `ledger-anchor.json` for every workflow it imports',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  const summary=await migrateLedger({repoRoot:repo,journalFile,machineFile});
+  assert.equal(summary.ok,true);
+  const db=ledgerDb(repo);
+  let ledgerId;
+  try{
+    const rows=Object.fromEntries(db.prepare('SELECT key,value FROM meta').all().map(row=>[row.key,row.value]));
+    ledgerId=rows.ledger_id;
+    assert.match(ledgerId,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,'ledger_id is a randomUUID');
+    assert.equal(rows.schema,'starci/ledger-db@1');
+    assert.equal(rows.journal_mode,'delete');
+    assert.ok(Number.isFinite(Number(rows.created_at)));
+    assert.equal(db.prepare("SELECT count(*) n FROM migrations WHERE source=?").get(path.join(repo,'.starciwork','runtime.sqlite')+'#meta').n,1);
+    assert.equal(db.prepare("SELECT count(*) n FROM migrations WHERE source=?").get(path.join(workflowsRoot(repo),ID)+'#anchor').n,1);
+  }finally{db.close();}
+  const anchorPath=path.join(repo,'.starciwork','ledger-anchor.json');
+  const anchor=JSON.parse(fs.readFileSync(anchorPath,'utf8'));
+  assert.equal(anchor.schema,'starci/ledger-anchor@1');
+  assert.equal(anchor.ledgerId,ledgerId);
+  assert.ok(Number.isFinite(anchor.updatedAt));
+  const entry=anchor.workflows[ID];
+  assert.equal(entry.generation,2);
+  assert.equal(entry.checkpointId,`import:${ID}:2`);
+  assert.ok(entry.eventsHead,'the anchor carries the digest chain head');
+  assert.ok(Number.isInteger(entry.seq)&&entry.seq>0,'the anchor carries the last event seq');
+});
+
+test('a second run neither reseeds `meta` nor rewrites the anchor entry it already wrote',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  await migrateLedger({repoRoot:repo,journalFile,machineFile});
+  const anchorPath=path.join(repo,'.starciwork','ledger-anchor.json');
+  const before=fs.readFileSync(anchorPath,'utf8');
+  const db1=ledgerDb(repo);let ledgerIdBefore;try{ledgerIdBefore=db1.prepare("SELECT value FROM meta WHERE key='ledger_id'").get().value;}finally{db1.close();}
+  const again=await migrateLedger({repoRoot:repo,journalFile,machineFile});
+  assert.deepEqual(again.skipped,[{id:ID,reason:'already-migrated'}]);
+  assert.equal(fs.readFileSync(anchorPath,'utf8'),before,'the anchor is untouched for a workflow the migrator does not revisit');
+  const db2=ledgerDb(repo);
+  try{
+    assert.equal(db2.prepare("SELECT count(*) n FROM meta WHERE key='ledger_id'").get().n,1,'meta is never rewritten');
+    assert.equal(db2.prepare("SELECT value FROM meta WHERE key='ledger_id'").get().value,ledgerIdBefore);
+  }finally{db2.close();}
 });
