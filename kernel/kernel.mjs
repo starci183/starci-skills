@@ -8,6 +8,7 @@ import {verifyRuntimePin} from './runtime-pin.mjs';
 import {freshRuntimeBudget,probeRuntimeBudget} from './budget.mjs';
 import {createWorkflowModelEligibility} from './model-policy.mjs';
 import * as ledgerDb from './ledger-db.mjs';
+import * as launchDb from './launch.mjs';
 const {ledgerFileFor,openLedger:openJournal}=ledgerDb;
 import {DISK_HEADROOM_CODE,headroomError,isDiskFull,measureHeadroom} from './disk.mjs';
 import path from 'node:path';
@@ -22,7 +23,6 @@ import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot} from './store.m
 import {grammarRepository,resolveLedgerRoot,sharedLedgerStatus} from './routing.mjs';
 import {createAllocator,loadRuntimes,withProviderPreference} from './schedule.mjs';
 import {resolveExecutionChain} from './chains.mjs';
-import {loadsFile} from './loads.mjs';
 import {planProtectedProof,proofApplies,proofFinding,proofPlan,protectedProofFinding,runAtBase,runProtectedProof} from '../checks/proof.mjs';
 import {evaluateAcceptance,kernelVerificationReceipt,resolveEvidencePacket} from '../checks/acceptance.mjs';
 import {candidateChecksNeedDependencies,persistInlineCandidate,protectedOracleManifest} from './candidate-bridge.mjs';
@@ -140,9 +140,8 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
   codeRole=null,codeSide=null,lane=null}){
   need(plain(store)&&typeof store.id==='string','A workflow store is required');
   need(LEDGER_MODES.includes(ledgerMode),`Unsupported ledger mode ${ledgerMode}; use ${LEDGER_MODES.join(' or ')}`);
-  // `dir` is no longer a real directory (no `_local` workflow dir is created): it stays the stand-in shared
-  // loads/budget root a few other modules (goal.mjs's `loadsFileFor`) still key off of, one path segment up.
-  return {schema:WORKFLOW_STATE,kernel:WORKFLOW_KERNEL,id:store.id,dir:path.join(sharedRuntimeRootFor(store.repoRoot),store.id),
+  // `dir` is no longer a real directory: no `_local` workflow dir is created, same as `store.dir`.
+  return {schema:WORKFLOW_STATE,kernel:WORKFLOW_KERNEL,id:store.id,dir:null,
     job:required(job,'job'),inputs:inputs.map(parseRef),worktree:path.resolve(required(worktree,'worktree')),
     branch:required(branch,'branch'),gates:gates.map(parseGate),host,launcher,
     // The worktree above is this workflow's lane when it owns one: the tree it runs in, and the branch that is
@@ -174,14 +173,6 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
     head:null,iterations:0,counters:{},stalls:0,allocation:null,finished:null,createdAt:Date.now()};
 }
 
-/**
- * The allocator's cross-workflow load view and the machine-scoped budget file are repo-scoped, not
- * `.starciwork`-scoped - `runtime_loads`/machine budgets belong to the ledger contract (docs/ledger-db.md
- * §4-5) but neither `kernel/store.mjs` nor `kernel/schedule.mjs` exposes that yet. Until they do, this is a
- * stable stand-in beside the store's own machine root, keyed by repo so concurrent workflows of one repo
- * still share it; see notes/s3.md.
- */
-const sharedRuntimeRootFor=repoRoot=>path.join(os.tmpdir(),'starci-shared',crypto.createHash('sha256').update(String(repoRoot)).digest('hex').slice(0,16));
 const componentKey=ledgerIds=>[...ledgerIds].sort().join('+')||'-';
 /**
  * The key a review round is counted against: the reviewed item set. Counting per module burned a feature's
@@ -4275,12 +4266,12 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
 /* ------------------------------------------------------------------ cli */
 
 /** Wait for the launch handle the terminal's creator writes (own handle, optional Orca run): a file when the
- * operator names one explicitly (`--launch-file`), the workflow's `launch` signal otherwise. */
+ * operator names one explicitly (`--launch-file`), the workflow's `launch` signal (kernel/launch.mjs) otherwise. */
 export function awaitLaunch(source,{wait=sleepSync,timeoutMs=LAUNCH_WAIT_MS,intervalMs=2000,now=Date.now}={}){
   const fromFile=typeof source==='string';
   const started=now();
   for(;;){
-    const launch=fromFile?readJson(source,null):source.signal.get(source.id,'launch')?.value??null;
+    const launch=fromFile?readJson(source,null):launchDb.readLaunch(source.ledger,source.id);
     if(launch?.from)return launch;
     need(now()-started<=timeoutMs,`No launch handle ${fromFile?`in ${slash(source)}`:`recorded for workflow ${source.id}`} within ${timeoutMs} ms; pass --from <own terminal>`);
     wait(intervalMs);
@@ -4307,7 +4298,7 @@ const launcherOf=host=>slash(path.join(host,'.dist','hosts','orca','launch.mjs')
 export const SUPERVISOR_STALE_MS=5*60*1000;
 export const SUPERVISOR_REVIVE_EVERY_MS=10*60*1000;
 export function reviveSupervisor(store,state,ctx,{now=Date.now,spawn=spawnDetached,alive=pidAlive}={}){
-  const lock=store.signal.get('*','supervisor-lock');
+  const lock=launchDb.readSupervisor(store.ledger);
   if(!lock||typeof lock.at!=='number')return null;
   if(now()-lock.at<SUPERVISOR_STALE_MS)return null;
   if(lock.pid&&alive(lock.pid))return null;
@@ -4338,31 +4329,26 @@ export function relocateLauncher(store,state){
 }
 const templateOf=host=>fs.readFileSync(path.join(host,'docs','supervision-templates','op.md'),'utf8');
 
-/** One kernel per workflow: a pid lock in the ledger refuses a second process; a stop signal ends the loop cleanly. */
+/** One kernel per workflow: kernel/launch.mjs's kernel-lock signal refuses a second process; a stop
+ * signal ends the loop cleanly. Same reservation state machine `startup-lock.mjs` used, now ledger-backed
+ * so terminals.mjs/supervisor.mjs (kernel/launch.mjs's other callers) see the same row. */
 function acquireKernelLock(store,{launchToken=null}={}){
-  const existing=store.signal.get(store.id,'kernel-lock');
-  if(launchToken){
-    if(!existing||existing.token!==launchToken)throw Object.assign(Error('kernel launch token is no longer current'),{code:'STARCI_KERNEL_STARTUP_STALE'});
-  }else if(existing){
-    const holderAlive=Number.isInteger(existing.pid)&&existing.pid>0&&pidAlive(existing.pid);
-    if(holderAlive)throw Object.assign(Error('another kernel or unresolved launch owns workflow startup: kernel process already runs'),{code:'STARCI_KERNEL_ALREADY_RUNNING',owner:existing});
+  let token=launchToken,reservation=null;
+  if(!token){
+    reservation=launchDb.reserveStartup(store.ledger,store.id,{pid:process.pid});
+    if(!reservation.ok)throw Object.assign(Error(`another kernel or unresolved launch owns workflow startup: ${reservation.reason}`),{code:'STARCI_KERNEL_ALREADY_RUNNING',owner:reservation.row});
+    token=reservation.token;
   }
-  const token=launchToken??crypto.randomBytes(18).toString('hex');
-  store.signal.set(store.id,'kernel-lock',{pid:process.pid,token,value:{startedAt:store.ledger.now()}});
-  return ()=>{
-    const row=store.signal.get(store.id,'kernel-lock');
-    if(row?.pid===process.pid&&row?.token===token)store.signal.clear(store.id,'kernel-lock');
-  };
+  const owner=launchDb.acquireStartup(store.ledger,store.id,{launchToken:token,pid:process.pid});
+  return ()=>{launchDb.releaseStartup(store.ledger,store.id,owner);};
 }
 export function stopRequested(store){return Boolean(store.signal.get(store.id,'stop'));}
 /** Whether a command waits in the inbox: the wait between ticks ends for it. */
 export function inboxPending(store){return store.inbox.pending().length>0;}
 /** Whether the kernel of this store is a live process, by its lock. */
 export function kernelAlive(store){
-  const lock=store.signal.get(store.id,'kernel-lock');
-  const pid=Number(lock?.pid);
-  if(!Number.isInteger(pid)||pid<=0)return false;
-  try{process.kill(pid,0);return true;}catch{return false;}
+  const lock=launchDb.inspectStartup(store.ledger,store.id);
+  return lock?.phase==='running'&&pidAlive(Number(lock.pid));
 }
 /**
  * A command for a running kernel is an inbox row, never a write to its state: the kernel holds the state in
@@ -4970,7 +4956,7 @@ function kernelMainDispatch(command,options={},{orca,cwd=process.cwd(),wait=slee
       // Every kernel of this repository shares one runtime ledger beside the workflow directories, so an
       // expensive runtime another workflow is on is load here too and a provider cooldown is seen by all.
       // A sequential host (headless) caps the allocator at one operation whatever the approved quota says.
-      allocator:createAllocator({runtimes:runtimeProfile,state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:loadsFile(sharedRuntimeRootFor(store.repoRoot)),workflow:state.id},budget:{path:sharedRuntimeRootFor(store.repoRoot)},sequential:host.sequential,executionHost:host.name,eligibility}),template:templateOf(isEnrolled(state)?state.engine.runtimePin.root:state.host),host,
+      allocator:createAllocator({runtimes:runtimeProfile,state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:store.ledgerFile,workflow:state.id},budget:{path:path.join(store.repoRoot,'.starciwork')},sequential:host.sequential,executionHost:host.name,eligibility}),template:templateOf(isEnrolled(state)?state.engine.runtimePin.root:state.host),host,
       modelEligibility:eligibility,modelPolicy,runtimeBinding,
       ledgerRoot:options['ledger-root']??null,
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});
