@@ -66,6 +66,20 @@ test('a write under .starciwork quarantines as custody-path-touched, never as or
   assert.equal(result.reasons.some(reason=>reason.startsWith('outside-allowlist:')),false,'a custody-path write is never reported as ordinary scope drift');
 });
 
+test('the tracked ledger anchor is invisible to candidate observation, exactly like the untracked ledger files',t=>{
+  // §12: the anchor is rewritten on every store.saveState() checkpoint - kernel-owned churn unrelated to any
+  // candidate or worker, so a freeze mid-op must never see it as custody-path-touched (or anything else).
+  const f=fixture(t);fs.mkdirSync(path.join(f.root,'.starciwork'),{recursive:true});
+  fs.writeFileSync(path.join(f.root,'.starciwork','ledger-anchor.json'),JSON.stringify({schema:'starci/ledger-anchor@1',ledgerId:'x',updatedAt:0,workflows:{}}));
+  fs.writeFileSync(path.join(f.root,'src','app.js'),'two\n');
+  const sealed=freezeDetectionCandidate(f.bridge,{git,reportedFiles:['src/app.js']});
+  assert.equal(sealed.status,'sealed',JSON.stringify(sealed.reasons));
+  assert.deepEqual(sealed.observedFiles,['src/app.js']);
+  fs.writeFileSync(path.join(f.root,'.starciwork','ledger-anchor.json'),JSON.stringify({schema:'starci/ledger-anchor@1',ledgerId:'x',updatedAt:1,workflows:{wf:{generation:1}}}));
+  const replay=freezeDetectionCandidate(f.bridge,{git,reportedFiles:['src/app.js']});
+  assert.equal(replay.status,'sealed',JSON.stringify(replay.reasons));
+});
+
 test('an allowlist covering the ledger record is refused at candidate open, not observed later',t=>{
   const root=cloneTemplate(t,appBase,'starci-ledger-scope-'),parent=path.dirname(root);
   const identity={workflowId:'wf',opId:'op',attempt:1,generation:1,jobId:'job-ledger'};

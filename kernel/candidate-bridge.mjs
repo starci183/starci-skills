@@ -128,7 +128,7 @@ const trackedFor=(git,root,scopes)=>{
 // may enter a candidate baseline, reference or oracle. The Work tree's product files stay readable.
 const DEFAULT_EXCLUDED=[/(^|\/)\.git(\/|$)/,/(^|\/)node_modules(\/|$)/,/(^|\/)(dist|build|coverage|\.cache)(\/|$)/,
   /(^|\/)\.env([^/]*)$/,/(^|\/)(secrets?|credentials?)(\.|\/|$)/,/\.(pem|p12|pfx|key|enc)$/i,/(^|\/)\.starciwork\/_local(\/|$)/,
-  /(^|\/)\.starciwork\/runtime\.sqlite(-journal|-wal|-shm)?$/,/(^|\/)\.starciwork\/_resources(\/|$)/];
+  /(^|\/)\.starciwork\/runtime\.sqlite(-journal|-wal|-shm)?$/,/(^|\/)\.starciwork\/ledger-anchor\.json$/,/(^|\/)\.starciwork\/_resources(\/|$)/];
 const safeTracked=file=>!DEFAULT_EXCLUDED.some(pattern=>pattern.test(clean(file)));
 export function candidateDependencyPlan(root,{declared=null,required=true}={}){
   if(typeof declared==='string'&&declared.trim())return {manager:'declared',command:declared.trim(),lifecycleScripts:'caller-declared'};
@@ -166,7 +166,10 @@ function externalDependencyLinks(candidateRoot,{env=process.env}={}){
 // The whole `.starciwork` subtree is runtime custody, never Git-stream drift: Work-tree writes reach the
 // candidate through the ledger inventory below, and the record file itself is never inventoried at all.
 const runtimeInternal=file=>/(^|\/)\.starciwork(\/|$)/.test(clean(file));
-const ledgerRecord=file=>/(^|\/)\.starciwork\/runtime\.sqlite(-journal|-wal|-shm)?$/.test(clean(file));
+// The tracked anchor (§12, `.starciwork/ledger-anchor.json`) is rewritten by the kernel on every checkpoint
+// (`store.saveState`), exactly like the untracked ledger files it counter-signs: neither is candidate-owned
+// churn, so both are excluded the same way, whatever a Git status scan or this walk would otherwise see.
+const ledgerRecord=file=>/(^|\/)\.starciwork\/(runtime\.sqlite(-journal|-wal|-shm)?|ledger-anchor\.json)$/.test(clean(file));
 // Runtime state is intentionally absent from candidate/model payloads, but it is still inventoried here.
 // This walk includes Git-ignored files and hashes only their state; it never copies their bytes into a snapshot.
 const runtimeLocalPaths=root=>{
@@ -552,7 +555,7 @@ const housekeepingIdentity=(bridge,value)=>{
 // is belt-and-braces for a caller that ever inventories it). Until every writer of `.starciwork/_local` has
 // migrated off it (store.mjs still projects there today), this exact operation's own dispatch artifacts stay
 // exempt too, named by the caller's trusted identity - every other `.starciwork` change is custody evidence.
-const LEDGER_HOUSEKEEPING_FILES=['.starciwork/runtime.sqlite','.starciwork/runtime.sqlite-journal','.starciwork/runtime.sqlite-wal','.starciwork/runtime.sqlite-shm'];
+const LEDGER_HOUSEKEEPING_FILES=['.starciwork/runtime.sqlite','.starciwork/runtime.sqlite-journal','.starciwork/runtime.sqlite-wal','.starciwork/runtime.sqlite-shm','.starciwork/ledger-anchor.json'];
 const housekeepingFiles=identity=>{
   if(!identity)return LEDGER_HOUSEKEEPING_FILES;
   const root=`.starciwork/_local/workflows/${identity.workflowId}`,files=[...LEDGER_HOUSEKEEPING_FILES,

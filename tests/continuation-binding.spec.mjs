@@ -56,7 +56,7 @@ test('canonical and explicit bindings reject non-files and oversized human brief
 });
 
 test('a linked continuation parent cannot read external notes through canonical or explicit bindings',t=>{
-  const {store}=fixture(t),folder=path.dirname(store.paths.continuation),outside=path.join(path.dirname(folder),'outside');
+  const {store}=fixture(t),folder=path.dirname(store.continuation),outside=path.join(path.dirname(folder),'outside');
   fs.mkdirSync(outside);fs.writeFileSync(path.join(outside,'wf-one.md'),'External text must remain outside the public brief.');
   fs.rmdirSync(folder);fs.symlinkSync(outside,folder,process.platform==='win32'?'junction':'dir');
   assert.throws(()=>bindContinuationPath(store,{id:'wf-one'}),/never a link/);
