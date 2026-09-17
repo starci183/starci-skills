@@ -8,11 +8,16 @@ const activeStatuses="'leased','running'";
 const machineScoped=key=>String(key).startsWith('ai/')||String(key).startsWith('machine:');
 /**
  * The ledger's own identity (docs §3/§5): a `meta.ledger_id` uuid, never a realpath digest — a renamed,
- * junctioned or UNC-reached checkout must keep its machine leases. `ledgerIdOf` isn't shipped by the
- * linked `ledger-db.mjs` yet (namespace import so this never throws on the missing export meanwhile);
- * until it lands this falls back to the handle's own `.ledgerId`, which `openLedger` already sets.
+ * junctioned or UNC-reached checkout must keep its machine leases. Namespace import so this resolves the
+ * real `ledgerDb.ledgerIdOf` the moment it's linked, never a digest computed here. A handle that isn't a
+ * ledger-db one (the retired `journal.mjs`'s, still a valid `createAdmission` caller in its own tests) has
+ * no `meta` table to query; that failure is caught and the identity is simply unknown (`null`), not fatal
+ * - nothing in this module keys anything by `admission.ledgerId`, it is informational only.
  */
-const ledgerIdOf=handle=>typeof ledgerDb.ledgerIdOf==='function'?ledgerDb.ledgerIdOf(handle):handle.ledgerId;
+const ledgerIdOf=handle=>{
+  if(typeof ledgerDb.ledgerIdOf==='function'){try{const id=ledgerDb.ledgerIdOf(handle);if(id)return id;}catch{}}
+  return handle.ledgerId??null;
+};
 /**
  * `leases_match_job` makes lease-identity drift impossible to persist: where a post-hoc check used to find a
  * drifted row, the trigger now aborts the write. The abort is mapped back to the same named failure so the
@@ -73,7 +78,11 @@ export function createAdmission({journal,machine=null,machineFile=null,now=Date.
         if(existing.status!=='queued')return {ok:false,reasons:[`job is ${existing.status}`]};
         const {leases,machineNeeds}=splitResources(resources);
         const result=reserveTwoPhase(journal,machine,{job:{jobId,workflowId,opId,attempt,generation,kind:existing.kind,role:existing.role,payload:existing.payload},leases,machineNeeds,ttlMs});
-        if(!result.ok)return result;
+        // Repo-capacity failure already carries `reasons`; a machine-side (ai/*) reservation failure from
+        // reserveTwoPhase only carries a singular `reason` (it stops at the first exhausted resource). Every
+        // caller here treats `reasons` as the informative array, so normalize rather than let a machine
+        // rejection fall back to a bare "waiting for job X" with the actual cause dropped.
+        if(!result.ok)return {...result,reasons:result.reasons??(result.reason?[result.reason]:[])};
         const budgeted=reserveBudgets(jobId,budgets);
         if(!budgeted.ok){
           releaseTwoPhase(journal,machine,{jobId});

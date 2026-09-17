@@ -39,8 +39,9 @@ test('durable validator excludes cooling choices before selecting its single pro
 test('model calls respect shared and local cooldown and admit the same waiting job after expiry',t=>{
   const f=fixture(t);let stamp=Date.now();const now=()=>stamp;
   f.state.allocation={cooling:{'gpt-5.6-sol':{until:stamp+1000,kind:'rate-limited'}}};
-  fs.writeFileSync(path.join(f.dir,'runtime-loads.json'),JSON.stringify({schema:'starci/runtime-loads@1',runtimes:{'claude-opus':{cooling:{until:stamp+1000,kind:'quota',workflow:'peer'}}}}));
   const bridge=createJobBridge({ledgerFile:f.state.engine.ledgerFile,machineFile:f.state.engine.machineFile,now,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})}),runtime=createEngineRuntime({...f,now,bridge,eligibility:()=>({eligible:true})}),args={providers:['gpt-5.6-sol','claude-opus'],situation:'route',options:['a']},op={id:'manager',attempt:1};
+  // A peer kernel's shared cooldown lives in the ledger's `runtime_loads` table now (§4), not `runtime-loads.json`.
+  bridge.journal.db.prepare('INSERT INTO runtime_loads(runtime,loads_json,at) VALUES(?,?,?)').run('claude-opus',JSON.stringify({live:[],cooling:{until:stamp+1000,kind:'quota',workflow:'peer'}}),stamp);
   assert.throws(()=>runtime.model('decide',args,op),error=>error.code==='STARCI_MODEL_QUOTA_WAIT'&&error.waitKind==='provider-cooldown');assert.equal(runtime.journal.listJobs().length,0);
   stamp+=1001;assert.throws(()=>runtime.model('decide',args,op),error=>error.code==='STARCI_JOB_PENDING');assert.equal(runtime.journal.listJobs().length,1);bridge.close();
 });
@@ -321,7 +322,7 @@ test('a stopped native attempt unpromotable only by head drift preserves in-scop
 });
 
 test('a stopped native attempt whose only drift is now-clean user work abandons without laundering it',t=>{
-  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'wiped-user-work',kind:'backend.implement',attempt:1,status:'running',allowlist:['src/**'],dispatch:'ctx-wiped'};f.state.ops=[op];
+  const f=fixture(t),bridge=createJobBridge({ledgerFile:f.state.engine.ledgerFile,machineFile:f.state.engine.machineFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'wiped-user-work',kind:'backend.implement',attempt:1,status:'running',allowlist:['src/**'],dispatch:'ctx-wiped'};f.state.ops=[op];
   const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-wiped',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
   runtime.freezeCandidate=()=>({status:'quarantined',observedFiles:['src/a.ts','f1.ts','f2.ts'],reasons:['source:pre-existing-user-work-modified:f1.ts','source:pre-existing-user-work-modified:f2.ts'],baselineTouched:['f1.ts','f2.ts'],cleanNow:['f1.ts','f2.ts']});
   const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-wiped',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-wiped',effectState:'none'},reason:'retry proved exit'});
@@ -331,7 +332,7 @@ test('a stopped native attempt whose only drift is now-clean user work abandons 
 });
 
 test('a stopped native attempt with a still-dirty pre-existing file retains its writer',t=>{
-  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'dirty-user-work',kind:'backend.implement',attempt:1,status:'running',allowlist:['src/**'],dispatch:'ctx-dirty'};f.state.ops=[op];
+  const f=fixture(t),bridge=createJobBridge({ledgerFile:f.state.engine.ledgerFile,machineFile:f.state.engine.machineFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'dirty-user-work',kind:'backend.implement',attempt:1,status:'running',allowlist:['src/**'],dispatch:'ctx-dirty'};f.state.ops=[op];
   const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-dirty',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
   runtime.freezeCandidate=()=>({status:'quarantined',observedFiles:['src/a.ts','f1.ts'],reasons:['source:pre-existing-user-work-modified:f1.ts'],baselineTouched:['f1.ts'],cleanNow:[]});
   const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-dirty',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-dirty',effectState:'none'}});
@@ -470,7 +471,7 @@ test('launched cancellation and worker-only stop remain service pressure while n
 
 test('a pure model job whose worker never started settles instead of fencing the generation for good, while a command job keeps its fence',t=>{
   const f=fixture(t),file=f.state.engine.ledgerFile;
-  const bridge=createJobBridge({ledgerFile:file,eligibility:()=>({eligible:true}),
+  const bridge=createJobBridge({ledgerFile:file,machineFile:f.state.engine.machineFile,eligibility:()=>({eligible:true}),
     spawnChild:()=>{throw Error('EPERM: the worker could not be spawned');}});
   // The spawn fails, so the job is effect_unknown with no answer and no staged result.
   bridge.request({workflowId:'wf',opId:'manager-1',attempt:1,generation:2,kind:'model',role:'decide',
@@ -496,7 +497,7 @@ test('a pure model job whose worker never started settles instead of fencing the
 });
 test('missing model output is not proof of a never-started worker',t=>{
   const f=fixture(t),file=f.state.engine.ledgerFile;
-  const bridge=createJobBridge({ledgerFile:file,eligibility:()=>({eligible:true}),
+  const bridge=createJobBridge({ledgerFile:file,machineFile:f.state.engine.machineFile,eligibility:()=>({eligible:true}),
     spawnChild:()=>({pid:process.pid,once(){},unref(){}})});
   const request=opId=>bridge.request({workflowId:'wf',opId,attempt:1,generation:2,kind:'model',role:'decide',
     input:{handler:'model-function',functionName:'manageWorkflow',args:{providers:['gpt-5.6-sol']}}});

@@ -99,7 +99,7 @@ test('enrollment refuses an unsettled worker without changing approved inputs',(
 test('explicit enrollment starts fresh agent coordination without carrying an old manager binding',()=>{
   const events=[],state={id:'wf',worktree:'C:/fixture',ops:[],inputs:['approved-ref'],engine:{generation:4,coordination:'legacy',modelSelections:{old:{}},manager:{decisionId:'stale'}}};
   const store={appendEvent:event=>events.push(event),saveState(){}};
-  const enrolled=enrollEngine(store,state,{journalFile:'C:/fixture/journal.sqlite',now:()=>123});
+  const enrolled=enrollEngine(store,state,{ledgerFile:'C:/fixture/.starciwork/runtime.sqlite',now:()=>123});
   assert.equal(enrolled.coordination,'agent-v1');assert.equal(enrolled.generation,5);
   assert.equal(enrolled.modelSelections,undefined);assert.equal(enrolled.manager,undefined);
   assert.equal(events[0].coordination,'agent-v1');assert.deepEqual(state.inputs,['approved-ref']);
