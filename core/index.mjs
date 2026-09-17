@@ -128,7 +128,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
   // none of it is a Work record, so reading it as one makes every tree that has ever been run invalid on
   // `JSON_ARTIFACT` - and an invalid tree derives no node at all, which strands the whole run.
   const runtimeCustody=new Set(['runtime.sqlite','runtime.sqlite-journal','runtime.sqlite-wal','runtime.sqlite-shm','ledger-anchor.json']);
-  const runtimeCustodyDirectories=new Set(['kernel-evidence']);
+  const runtimeCustodyDirectories=new Set(['kernel-evidence','kernel-strays']);
   function walk(dir, inAssets=false) {
     let entries;
     try { entries=fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name)); } catch { issue('READ_DIRECTORY',rel(dir),'Cannot enumerate directory.'); return; }
