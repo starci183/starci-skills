@@ -89,6 +89,16 @@ test('a partial budget failure after resources are reserved leaves nothing held'
   assert.equal(journal.getJob('job-1').status,'queued');
 }));
 
+test('admission keys the machine side by the ledger’s own identity, never a path digest it computes itself',()=>withPair((journal,machine)=>{
+  // docs §3/§5: ledger identity comes from `ledgerIdOf(handle)` / the handle's own `.ledgerId`, seeded
+  // from `meta.ledger_id` once ledger-db.mjs ships it — never a realpath digest admission.mjs derives on
+  // its own. This just pins that admission.ledgerId is exactly the handle's identity, not something this
+  // module recomputed from a path.
+  const admission=createAdmission({journal,machine});
+  assert.equal(admission.ledgerId,journal.ledgerId);
+  assert.ok(admission.ledgerId,'the ledger must expose a non-empty identity');
+}));
+
 test('a lease-identity trigger abort maps back to the named reconciliation failure',()=>withPair((journal,machine)=>{
   const admission=createAdmission({journal,machine});
   journal.enqueueJob(identity(1));

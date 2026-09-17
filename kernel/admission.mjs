@@ -1,10 +1,18 @@
-import {ledgerIdFor,machineFileFor,openMachine,releaseTwoPhase,reserveTwoPhase} from './ledger-db.mjs';
+import * as ledgerDb from './ledger-db.mjs';
+const {machineFileFor,openMachine,releaseTwoPhase,reserveTwoPhase}=ledgerDb;
 
 export const GLOBAL_AI_RESOURCE='ai/global';
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const activeStatuses="'leased','running'";
 /** Cross-ledger needs: provider quota and machine-wide locks. Everything else is a repo-scoped ledger fence. */
 const machineScoped=key=>String(key).startsWith('ai/')||String(key).startsWith('machine:');
+/**
+ * The ledger's own identity (docs §3/§5): a `meta.ledger_id` uuid, never a realpath digest — a renamed,
+ * junctioned or UNC-reached checkout must keep its machine leases. `ledgerIdOf` isn't shipped by the
+ * linked `ledger-db.mjs` yet (namespace import so this never throws on the missing export meanwhile);
+ * until it lands this falls back to the handle's own `.ledgerId`, which `openLedger` already sets.
+ */
+const ledgerIdOf=handle=>typeof ledgerDb.ledgerIdOf==='function'?ledgerDb.ledgerIdOf(handle):handle.ledgerId;
 /**
  * `leases_match_job` makes lease-identity drift impossible to persist: where a post-hoc check used to find a
  * drifted row, the trigger now aborts the write. The abort is mapped back to the same named failure so the
@@ -24,7 +32,7 @@ export function createAdmission({journal,machine=null,machineFile=null,now=Date.
   need(journal?.transaction,'createAdmission needs a journal');
   const ownsMachine=!machine;
   machine??=openMachine({file:machineFile??machineFileFor(),now});
-  const ledgerId=journal.ledgerId??ledgerIdFor(journal.path??journal.file);
+  const ledgerId=ledgerIdOf(journal);
   const dbFor=key=>machineScoped(key)?machine.db:journal.db;
   const setCapacity=(resourceKey,capacity)=>dbFor(resourceKey).prepare('INSERT INTO resources(resource_key,capacity) VALUES(?,?) ON CONFLICT(resource_key) DO UPDATE SET capacity=excluded.capacity').run(resourceKey,capacity);
   setCapacity(GLOBAL_AI_RESOURCE,defaultAiCapacity);
