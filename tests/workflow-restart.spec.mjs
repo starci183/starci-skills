@@ -248,22 +248,29 @@ test('§5/§6 identity: a relocated ledger keeps its machine leases; a path rebu
   assert.equal(machine.db.prepare('SELECT count(*) AS n FROM leases').get().n,1,'the lease is kept across the move');
   movedLedger.close();
 
-  // ---- a path rebuilt with a fresh ledger does not inherit the old registration: pathA is re-created from
-  // nothing (new meta.ledger_id), but the OLD ledgers row for idA never learned about the move to pathB in
-  // this branch of the scenario - a second, independent lease is taken under idA still pointed at pathA,
-  // proving the fresh file at pathA is never mistaken for idA's backing store.
-  const secondLedgerA=openLedger({file:pathA,machine});   // idA "never moved" here; still registered at pathA
-  const secondReserve=reserveTwoPhase(secondLedgerA,machine,{job:job('job-a2','wf-a'),machineNeeds:[{resourceKey:'ai/test',units:1}]});
-  assert.equal(secondReserve.ok,true,secondReserve.reason);
-  secondLedgerA.close();
-  fs.rmSync(pathA);
-  const freshC=openLedger({file:pathA,machine});   // a brand new ledger rebuilt at the same path: fresh meta.ledger_id
-  const idC=ledgerIdOf(freshC);
-  assert.notEqual(idC,idA,'a rebuilt file at the same path is a different ledger, never the old one');
-  assert.equal(machine.db.prepare('SELECT count(*) AS n FROM leases WHERE ledger_id=?').get(idC).n,0,
+  // ---- a path rebuilt with a fresh ledger does not inherit the OLD registration at that same path: ledger
+  // D takes a lease and is registered at pathD; the file is then replaced (not moved) by a brand new ledger
+  // (fresh meta.ledger_id) without ever re-registering D at a new location. Per §5/§6 a registered ledger is
+  // only trusted to prove its own leases gone when `meta.ledger_id` still matches at its registered file - a
+  // path that now holds a *different* ledger proves the old one moved, never that its leases are live, so
+  // sweep leaves D's lease alone (same as a path it cannot inspect at all) rather than crediting it to the
+  // newcomer or silently dropping it. The newcomer starts, and stays, at zero.
+  const pathD=path.join(root,'d','runtime.sqlite');
+  const ledgerD=openLedger({file:pathD,machine});
+  const idD=ledgerIdOf(ledgerD);
+  const reservedD=reserveTwoPhase(ledgerD,machine,{job:job('job-d','wf-d'),machineNeeds:[{resourceKey:'ai/test',units:1}]});
+  assert.equal(reservedD.ok,true,reservedD.reason);
+  ledgerD.close();
+  fs.rmSync(pathD);
+  const freshE=openLedger({file:pathD,machine});   // rebuilt at D's old path: a fresh identity, D's registration untouched
+  const idE=ledgerIdOf(freshE);
+  assert.notEqual(idE,idD,'a rebuilt file at the same path is a different ledger, never the old one');
+  assert.equal(machine.db.prepare('SELECT count(*) AS n FROM leases WHERE ledger_id=?').get(idE).n,0,
     'the fresh ledger inherits none of the old leases - it has never taken any of its own');
-  swept=machine.sweep({inspectLedger,at:secondReserve.expiresAt-1});
-  assert.equal(machine.db.prepare('SELECT count(*) AS n FROM leases WHERE ledger_id=?').get(idA).n,0,
-    'idA\'s lease is released: pathA now opens as idC, so idA is proven unbacked, not silently kept');
-  freshC.close();machine.close();
+  swept=machine.sweep({inspectLedger,at:reservedD.expiresAt-1});
+  assert.equal(swept.orphaned,0,'D\'s stale registration cannot be proven dead through a file that now answers as E');
+  assert.equal(machine.db.prepare('SELECT count(*) AS n FROM leases WHERE ledger_id=?').get(idD).n,1,
+    'D\'s lease is left exactly where it was - not transferred to E, not silently cleared, until its TTL passes');
+  assert.equal(machine.db.prepare('SELECT count(*) AS n FROM leases WHERE ledger_id=?').get(idE).n,0,'still nothing for E');
+  freshE.close();machine.close();
 });

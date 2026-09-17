@@ -2,27 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {ledgerFileFor,openLedger,inspectLedger,ledgerIdOf,anchorFileFor,readAnchor,writeAnchor,checkAnchor} from '../kernel/ledger-db.mjs';
+import {openLedger,inspectLedger,ledgerIdOf,anchorFileFor,readAnchor,writeAnchor,verifyAnchor} from '../kernel/ledger-db.mjs';
 import {withLedger,seedWorkflow} from './_ledger-fixture.mjs';
 
 /**
- * §12 assumed surface (kernel/ledger-db.mjs does not implement the anchor yet - this spec is written
- * against the contract, flagged in notes/s8.md for s0):
- *   anchorFileFor(repoRoot) -> <repoRoot>/.starciwork/ledger-anchor.json
- *   readAnchor(repoRoot) -> {schema,ledgerId,updatedAt,workflows:{<id>:{generation,checkpointId,eventsHead,seq,at}}} | null
- *   writeAnchor(repoRoot,{ledgerId,workflowId,generation,checkpointId,eventsHead,seq,at}) -> the full anchor
- *     object, atomically written (temp+rename), merging into any existing workflows map.
- *   checkAnchor({repoRoot,workflowId}) -> {ok:true} | {ok:false,reason:'ledger-missing'|'ledger-identity-mismatch'|'ledger-behind-anchor'}
- *     - no anchor file, or no entry for workflowId: {ok:true} (first boot).
- *     - anchor entry present, ledgerFileFor(repoRoot) absent: {ok:false,reason:'ledger-missing'}.
- *     - anchor entry present, the ledger's own meta.ledger_id (ledgerIdOf) differs from the anchor's
- *       ledgerId: {ok:false,reason:'ledger-identity-mismatch'}.
- *     - anchor entry present, ledger identity matches, but the anchor's (seq,eventsHead) is not the
- *       digest of that workflow's event at that seq, or state_snapshots holds no checkpoint at or after
- *       the anchor's generation: {ok:false,reason:'ledger-behind-anchor'}.
- *     - otherwise: {ok:true}.
- * `store.saveState` (s1) is expected to call `writeAnchor` inside the same call that commits a checkpoint
- * (§12); this spec exercises the ledger-db.mjs primitive directly rather than depending on store.mjs.
+ * §12: `.starciwork/ledger-anchor.json`, the small tracked counter-record proving which ledger history is
+ * agreed, since the ledger file itself is untracked and self-consistent (anyone able to write it can
+ * recompute its own chain). `writeAnchor`/`readAnchor`/`anchorFileFor`/`verifyAnchor` are kernel/ledger-db.mjs's
+ * own exports (landed by s0 after this spec was first drafted against the contract text alone).
+ * `verifyAnchor(ledger,repoRoot)` checks every workflow head the tracked anchor holds against `ledger` (a
+ * handle exposing `.db`/`.ledgerId`, e.g. from `openLedger` or `inspectLedger`; `null`/`undefined` for a
+ * ledger that could not be opened at all) - it is anchor-wide, not scoped to one workflow id.
  */
 
 const checkpointFrom=(ledger,workflowId)=>{
@@ -30,13 +20,15 @@ const checkpointFrom=(ledger,workflowId)=>{
   const snap=ledger.db.prepare('SELECT checkpoint_id,generation FROM state_snapshots WHERE workflow_id=? ORDER BY snapshot_id DESC LIMIT 1').get(workflowId);
   return {ledgerId:ledgerIdOf(ledger),workflowId,generation:snap.generation,checkpointId:snap.checkpoint_id,eventsHead:head,seq:seqRow.seq};
 };
-
-/** Copy the ledger file's current bytes aside (and back), standing in for a restored/foreign backup. */
-const snapshotFile=file=>fs.readFileSync(file);
-const restoreFile=(file,bytes)=>fs.writeFileSync(file,bytes);
+/** §3: every copy checkpoints WAL into the main file first, so a byte-copy of it alone is self-contained. */
+const snapshotFile=(ledger,file)=>{ledger.checkpoint();return fs.readFileSync(file);};
+const restoreFile=(file,bytes)=>{
+  fs.writeFileSync(file,bytes);
+  for(const suffix of ['-wal','-shm'])fs.rmSync(`${file}${suffix}`,{force:true});
+};
 
 test('§12 anchor: written at every checkpoint',async t=>{
-  await withLedger(t,({repoRoot,ledger,ledgerFile})=>{
+  await withLedger(t,({repoRoot,ledger})=>{
     const id='wf-anchor-checkpoints';
     seedWorkflow(ledger,{id,state:{id,job:'anchor test',phase:'run'},events:[{event:'goal-approved'}],generation:1});
     const first=checkpointFrom(ledger,id);
@@ -58,18 +50,20 @@ test('§12 anchor: a ledger restored behind its anchor refuses with ledger-behin
   await withLedger(t,({repoRoot,ledger,ledgerFile})=>{
     const id='wf-anchor-restored';
     seedWorkflow(ledger,{id,state:{id,job:'restore test',phase:'run'},events:[{event:'goal-approved'}],generation:1});
-    const backup=snapshotFile(ledgerFile);   // "backup" taken right after the first checkpoint
+    writeAnchor(repoRoot,checkpointFrom(ledger,id));
+    const backup=snapshotFile(ledger,ledgerFile);   // a "backup" taken right after the first checkpoint's anchor
 
     seedWorkflow(ledger,{id,events:[{event:'op-done',op:'op-1'}],generation:1});
-    const latest=checkpointFrom(ledger,id);
-    writeAnchor(repoRoot,latest);   // the anchor is committed for the LATEST checkpoint
-    assert.equal(checkAnchor({repoRoot,workflowId:id}).ok,true,'the live ledger matches its own anchor');
-
+    writeAnchor(repoRoot,checkpointFrom(ledger,id));   // the anchor now tracks the LATEST checkpoint
     ledger.close();
+
     restoreFile(ledgerFile,backup);   // the checkout is restored from the earlier backup
-    const result=checkAnchor({repoRoot,workflowId:id});
-    assert.equal(result.ok,false);
-    assert.equal(result.reason,'ledger-behind-anchor');
+    const inspection=inspectLedger({file:ledgerFile});
+    try{
+      const result=verifyAnchor(inspection,repoRoot);
+      assert.equal(result.ok,false);
+      assert.equal(result.reason,'ledger-behind-anchor');
+    }finally{inspection.close();}
   });
 });
 
@@ -81,7 +75,7 @@ test('§12 anchor: a missing ledger with a tracked anchor refuses with ledger-mi
     ledger.close();
     fs.rmSync(ledgerFile);
     assert.equal(fs.existsSync(anchorFileFor(repoRoot)),true,'the anchor is tracked and survives the ledger file going away');
-    const result=checkAnchor({repoRoot,workflowId:id});
+    const result=verifyAnchor(null,repoRoot);   // the continuation boundary could not open a ledger at all
     assert.equal(result.ok,false);
     assert.equal(result.reason,'ledger-missing');
   });
@@ -97,25 +91,30 @@ test('§12 anchor: a foreign ledger dropped into the checkout refuses with ledge
     const foreignFile=path.join(root,'foreign.sqlite');
     const foreign=openLedger({file:foreignFile});
     seedWorkflow(foreign,{id,state:{id,job:'a different history',phase:'run'},events:[{event:'goal-approved'}],generation:1});
-    const foreignBytes=snapshotFile(foreignFile);
+    const foreignBytes=snapshotFile(foreign,foreignFile);
     foreign.close();
 
     restoreFile(ledgerFile,foreignBytes);   // a different ledger's bytes now sit at the tracked path
-    const result=checkAnchor({repoRoot,workflowId:id});
-    assert.equal(result.ok,false);
-    assert.equal(result.reason,'ledger-identity-mismatch');
+    const inspection=inspectLedger({file:ledgerFile});
+    try{
+      assert.notEqual(inspection.ledgerId,readAnchor(repoRoot).ledgerId,'the dropped-in file really is a different ledger');
+      const result=verifyAnchor(inspection,repoRoot);
+      assert.equal(result.ok,false);
+      assert.equal(result.reason,'ledger-identity-mismatch');
+    }finally{inspection.close();}
   });
 });
 
 test('§12 anchor: an anchor-less first boot is legitimate',async t=>{
   await withLedger(t,({repoRoot,ledger})=>{
     assert.equal(fs.existsSync(anchorFileFor(repoRoot)),false,'no anchor was ever written in this checkout');
-    assert.equal(checkAnchor({repoRoot,workflowId:'wf-never-anchored'}).ok,true,'no tracked anchor at all is a legitimate first boot');
+    assert.deepEqual(verifyAnchor(ledger,repoRoot),{ok:true,checked:0},'no tracked anchor at all is a legitimate first boot');
 
-    const id='wf-partial-anchor';
     seedWorkflow(ledger,{id:'wf-other',state:{id:'wf-other',job:'unrelated',phase:'run'},events:[{event:'goal-approved'}],generation:1});
     writeAnchor(repoRoot,checkpointFrom(ledger,'wf-other'));
     assert.equal(fs.existsSync(anchorFileFor(repoRoot)),true);
-    assert.equal(checkAnchor({repoRoot,workflowId:id}).ok,true,'an anchor file with no entry for THIS workflow is still its first boot');
+    const result=verifyAnchor(ledger,repoRoot);
+    assert.equal(result.ok,true,'the one anchored workflow still matches its own ledger');
+    assert.equal(result.checked,1);
   });
 });
