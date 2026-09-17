@@ -124,15 +124,18 @@ export function decidedRecords(api,at,loaded,{scope=[],max=40}={}){
 
 /**
  * The declared inputs, as the worktree can reach them. A `file:` input the owner named by an absolute path outside
- * the worktree is copied under the worktree's own `.starciwork/_local/inputs/<workflow>/` and the input refers to
- * that copy from now on - relative, digest-bound, frozen at goal time like everything else the owner approved.
- * Every op reference the plan derives from it then resolves inside the repository, where the candidate provenance
- * rule can read it; the first plan-ledger trial failed its first launch on an input that lived in another folder.
- * A relative input, a `branch:`/`history:` ref that is no path, a directory, a missing file: left as declared.
+ * the worktree is put into the ledger's own `inputs` table (`store.inputs.put`), never copied under the
+ * worktree's `.starciwork/_local/inputs/<workflow>/` - that copy died with the worktree (restart test
+ * 2026-09-17 lost two staged inputs this way), while the ledger bytes are the record and outlive it. The input's
+ * `ref` becomes `ledger://inputs/<workflow_id>/<key>#sha256=<hex>`; the candidate bridge and root binding
+ * resolve that scheme, materialising a digest-checked copy under `os.tmpdir()/starci/inputs/<wf>/<key>` only
+ * when a worker actually needs a file on disk. A relative input, a `branch:`/`history:` ref that is no path, a
+ * directory, a missing file: left as declared.
  */
 export function stageExternalInputs(store,state,{worktree}={}){
   const root=path.resolve(worktree??state.worktree);
   const staged=[];
+  const goalRevision=Number.isInteger(state.goalRev)&&state.goalRev>0?state.goalRev:1;
   state.inputs=(state.inputs??[]).map((input,index)=>{
     const ref=String(input?.ref??'');
     if(!ref||!path.isAbsolute(ref))return input;
@@ -140,13 +143,10 @@ export function stageExternalInputs(store,state,{worktree}={}){
     if(!stat.isFile())return input;
     const inside=path.relative(root,ref);
     if(inside&&!inside.startsWith('..')&&!path.isAbsolute(inside))return {...input,ref:slash(inside)};
-    const target=path.join(root,'.starciwork','_local','inputs',state.id,`${index+1}-${path.basename(ref)}`);
-    fs.mkdirSync(path.dirname(target),{recursive:true});
-    fs.copyFileSync(ref,target);
-    const sha256=crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex');
-    const relative=slash(path.relative(root,target));
-    staged.push({kind:input.kind,from:slash(ref),to:relative,sha256});
-    return {...input,ref:relative,sourceRef:slash(ref),sha256};
+    const key=`${index+1}-${path.basename(ref)}`;
+    const {ref:ledgerRef,sha256}=store.inputs.put({key,goalRevision,bytes:fs.readFileSync(ref),origin:slash(ref)});
+    staged.push({kind:input.kind,from:slash(ref),to:ledgerRef,sha256});
+    return {...input,ref:ledgerRef,sourceRef:slash(ref),sha256};
   });
   if(staged.length)store.appendEvent({event:'inputs-staged',inputs:staged});
   return staged;

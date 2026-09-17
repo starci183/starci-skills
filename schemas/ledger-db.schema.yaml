@@ -8,7 +8,8 @@ description: >
   (an operator inspection, `ledger-verify`) and is not itself run against the DB; the executable
   contract is the `CREATE TABLE` statements in docs/ledger-db.md §4/§5, which this schema mirrors
   and must never drift from silently — a mismatch is a documentation bug, filed against whichever
-  changed last.
+  changed last. `.starciwork/ledger-anchor.json` (docs/ledger-db.md §12) is a separate, git-tracked
+  file beside this DB, not a table of it, and is out of this catalog's scope.
 type: object
 required:
   - schema
@@ -24,6 +25,7 @@ properties:
     type: object
     description: Tables of the ledger DB (`runtime.sqlite`), keyed by table name.
     required:
+      - meta
       - workflows
       - goals
       - state_snapshots
@@ -40,8 +42,15 @@ properties:
       - inbox
       - signals
       - runtime_loads
+      - inputs
       - migrations
     properties:
+      meta:
+        $ref: "#/$defs/table"
+        description: >
+          `key`/`value` rows seeded once at create and never rewritten: `ledger_id` (a `randomUUID()`
+          minted at create — THE identity, never derived from the path), `schema`, `created_at`,
+          `journal_mode` (`wal` or `delete`, whichever `openLedger` actually got).
       workflows:
         $ref: "#/$defs/table"
         description: One row per workflow the ledger owns; `generation` is the bound engine generation.
@@ -62,6 +71,12 @@ properties:
         description: >
           `PRIMARY KEY(scope,key)`. Known keys: `kernel-lock`, `supervisor-lock`, `stop`,
           `inputs-lock`, `launch`, `final-report`. `scope` is a workflow id, or `*` ledger-wide.
+      inputs:
+        $ref: "#/$defs/table"
+        description: >
+          Owner-named external inputs, frozen at goal time as bytes (`store.inputs.put`), keyed
+          `(workflow_id,key)`. The bytes are the record; an op binds them by `sha256`, never by a
+          worktree path, through the `ledger://inputs/<workflow_id>/<key>#sha256=<hex>` ref scheme.
       state_snapshots: {$ref: "#/$defs/table"}
       jobs: {$ref: "#/$defs/table"}
       resources: {$ref: "#/$defs/table"}

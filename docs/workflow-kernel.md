@@ -83,12 +83,18 @@ reinstates the operations the dynamic-op gate refused. Re-approving is how a use
 Runtime 1.0.4: everything a workflow needs lives in one ledger, `<ledger repo>/.starciwork/runtime.sqlite`
 (`kernel/store.mjs` over `kernel/ledger-db.mjs`) — state snapshots, the append-only hash-chained event log,
 the goal (a `goals` row per revision, never a `goal.md`/`goal.json` file), jobs, leases, reports, contracts,
-checks, inbox and signals (`kernel.lock`/`supervisor.lock`/`stop.flag`/`inputs-lock`/`launch`/`final-report`,
-formerly separate files). `.starciwork/_local` is import/export only: `ledger-migrate` reads it once,
-`workflow-export --id <id> --to <dir>` writes today's file layout back out for a human to read, and the kernel
-itself never opens it. See [ledger-db.md](ledger-db.md) for the schema, the module API and the migration and
-verification bar; see **Persistence** in `goal.md` for the rule in one paragraph. Linked branch checkouts can
-keep their authored Work root on the branch while their ledger resolves through Git's common directory;
+checks, inbox, signals (`kernel.lock`/`supervisor.lock`/`stop.flag`/`inputs-lock`/`launch`/`final-report`,
+formerly separate files) and owner-named inputs as bytes. `.starciwork/_local` is import/export only:
+`ledger-migrate` reads it once, `workflow-export --id <id> --to <dir>` writes today's file layout back out for
+a human to read, and the kernel itself never opens it. The ledger's identity is a UUID minted into its own
+`meta` row (never derived from its path) and it opens WAL by default; `.starciwork/ledger-anchor.json` is the
+small, git-tracked head this ledger is checked against at the continuation boundary — a re-clone or a restored
+backup keeps the anchor even though the untracked ledger file does not travel with it, so a lost or rolled-back
+ledger is a named refusal (`ledger-missing` / `ledger-behind-anchor`), never a silent restart at generation 0.
+See [ledger-db.md](ledger-db.md) §3–§6 and §12 for the schema, the module API, identity/WAL and the anchor, and
+the migration and verification bar; see **Persistence** in `goal.md` for the rule in one paragraph. Linked
+branch checkouts can keep their authored Work root on the branch while their ledger resolves through Git's
+common directory;
 candidates recognize concurrent foreign runtime writes only through the latest exact post-baseline receipts,
 not through a live process, plausible event JSON or an operation-shaped filename.
 

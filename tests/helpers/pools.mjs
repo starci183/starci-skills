@@ -35,7 +35,7 @@ export const distinctPools=ids=>[...new Set(ids.map(poolOf))];
 export const namingOf=profile=>Object.keys(profile?.runtimes??{}).some(id=>GOAL_POOLS.includes(id))?'pool':'model';
 
 /** goal §3 pool caps and the global ceiling, for assertions that name a number. */
-export const GOAL_POOL_CAPS=Object.freeze({'codex-agent':8,'claude-agent':6,'claude-fable':2,'qwen-agent':4,'devin-agent':0});
+export const GOAL_POOL_CAPS=Object.freeze({'codex-agent':10,'claude-agent':6,'claude-fable':2,'qwen-agent':4,'devin-agent':0});
 export const GOAL_MAX_PARALLEL_OPS=20;
 
 /** A pool that opens only through an explicit owner quota slot (goal §3 `devin-agent`). */

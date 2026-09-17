@@ -122,7 +122,7 @@ and attested at launch — never inferred from the pool name.
 
 ```yaml
 devin-agent:   {provider: devin,  maxParallel: 0..10 owner-grant, models: {implement/verify/write: swe-2-max}, gate: explicit-workflow-quota}
-codex-agent:   {provider: codex,  maxParallel: 8,  models: {implement/verify/write: gpt-5.6-sol(+luna easy), decide/plan: gpt-6-astra}}
+codex-agent:   {provider: codex,  maxParallel: 10, models: {implement/write: gpt-5.6-luna, verify: gpt-5.6-sol, decide/plan: gpt-6-astra}}
 claude-agent:  {provider: claude, maxParallel: 6,  models: {all roles: claude-opus-5}}
 claude-fable:  {provider: claude, maxParallel: 2,  models: {verify/decide/plan/write: claude-fable-5-1}, budgetWindow: fableWeekly}
 qwen-agent:    {provider: qwen,   maxParallel: 4,  models: {implement/verify/write: qwen3.8-flash(+max)}}
@@ -196,13 +196,20 @@ Everything a workflow needs lives in `.starciwork/runtime.sqlite`; the kernel ne
 reads `.starciwork/_local` again.
 
 - **The ledger DB is the record.** `<ledger repo>/.starciwork/runtime.sqlite` holds state, events,
-  jobs, leases, goals, reports, contracts, checks, inbox, signals, loads and budgets — everything a
-  workflow needs to continue, to be audited and to be archived. See `docs/ledger-db.md` for the
-  schema, module API, two-phase reservation and migration.
+  jobs, leases, goals, reports, contracts, checks, inbox, signals, loads, budgets and owner-named
+  inputs (as bytes, not paths) — everything a workflow needs to continue, to be audited and to be
+  archived. See `docs/ledger-db.md` for the schema, module API, two-phase reservation and migration.
+  Its identity is a UUID minted once into its own `meta` row, never derived from the path — renaming
+  the checkout, a junction, a case change or a UNC path cannot re-key it. It opens `journal_mode=WAL`
+  by default (readers of `starci op-contract` never block the kernel's writes) and falls back to
+  DELETE, recorded in `meta`, on a path WAL cannot use.
 - **`_local` is import/export only.** `.starciwork/_local/workflows/<id>/` is never written or read
   by the kernel. `ledger-migrate` imports it once; `workflow-export` writes today's file layout back
   out for a human to read. A kernel that finds a `_local` workflow directory with no matching
-  `workflows` row fails closed with `ledger-unmigrated` — it never reads the files as authority.
+  `workflows` row fails closed with `ledger-unmigrated` — it never reads the files as authority. An
+  owner-named external input is put into the ledger's `inputs` table at goal time
+  (`store.inputs.put`), never copied under `_local/inputs/<workflow>/`; a worker that needs the bytes
+  on disk gets a digest-checked materialised copy under `os.tmpdir()/starci/inputs/`.
 - **The machine DB holds only `ai/*` and machine budgets.** `%LOCALAPPDATA%/StarCi/runtime/machine.sqlite`
   is the cross-ledger arbiter for provider quota and machine budgets, which span ledgers by
   construction; nothing else lives there. Every other resource (repo fences, `maxConcurrentWriters`)
@@ -212,11 +219,21 @@ reads `.starciwork/_local` again.
   `_local`.
 - **Worktrees are scratch.** A worktree holds code and the git history; nothing durable lives
   there except what git tracks. Coordination files a detached worker needs (an owner-input helper's
-  session token, a dispatch context file a host adapter must put on disk) live under
-  `os.tmpdir()/starci/`, never under `.starciwork`.
-- **Ignore it in the host repository, not here.** `.starciwork/runtime.sqlite*` is a runtime file of
-  the *product* repository this skill is installed into, not of this skill's own repository — add it
-  to the product repository's own `.gitignore` (it is never product completion storage, the same as
+  session token, a materialised input, a dispatch context file a host adapter must put on disk) live
+  under `os.tmpdir()/starci/`, never under `.starciwork`.
+- **The anchor is a tracked head, not the record.** `.starciwork/ledger-anchor.json` is small,
+  human-readable and **committed to git** — the opposite of the ledger file itself. It names, per
+  workflow, the last checkpoint's generation, its event-chain head digest and seq, written atomically
+  right after that checkpoint's ledger transaction commits. A repository re-clone or a restored
+  backup keeps the anchor even though `.starciwork/runtime.sqlite*` is untracked and does not travel
+  with it; that is exactly what turns a lost ledger into a named refusal (`ledger-missing`, or
+  `ledger-behind-anchor` when a stale file is restored in its place) instead of a silent restart at
+  generation 0. The record stays the ledger — the anchor holds no state, only heads, and a healthy
+  ledger regenerates it (`starci ledger-anchor --write`).
+- **Ignore the ledger file in the host repository, not here — but track its anchor.**
+  `.starciwork/runtime.sqlite*` (the WAL mode makes it three files) is a runtime file of the
+  *product* repository this skill is installed into, not of this skill's own repository — add it to
+  the product repository's own `.gitignore` (it is never product completion storage, the same as
   `worktrees/`). This runtime's own `.gitignore` gains no such rule unless a test starts creating one
   in-tree.
 - **Deletion of a worktree resumes at the checkpoint.** Because the record is the ledger DB and the
