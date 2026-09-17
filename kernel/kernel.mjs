@@ -1,11 +1,11 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import crypto from 'node:crypto';
 import {ENGINE_SCHEMA,ENGINE_VERSION,createEngineRuntime,enrollEngine,isEnrolled,isJobPending,journalFileFor,predatesEngineSchema,relocateJournal,settleGenerationLeases,prepareGenerationRetry,staleLeaseProof,validateCandidateRoot} from './engine.mjs';
 import {applyOwnerInbox} from './owner-inbox.mjs';
 import {verifyAcceptedIntegrationOwnerRequests} from './owner-requests.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
 import {freshRuntimeBudget,probeRuntimeBudget} from './budget.mjs';
-import {acquireStartup,releaseStartup,reserveStartup} from './startup-lock.mjs';
 import {createWorkflowModelEligibility} from './model-policy.mjs';
 import {openJournal} from './journal.mjs';
 import {DISK_HEADROOM_CODE,headroomError,isDiskFull,measureHeadroom} from './disk.mjs';
@@ -171,6 +171,14 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
     head:null,iterations:0,counters:{},stalls:0,allocation:null,finished:null,createdAt:Date.now()};
 }
 
+/**
+ * The allocator's cross-workflow load view and the machine-scoped budget file are repo-scoped, not
+ * `.starciwork`-scoped - `runtime_loads`/machine budgets belong to the ledger contract (docs/ledger-db.md
+ * §4-5) but neither `kernel/store.mjs` nor `kernel/schedule.mjs` exposes that yet. Until they do, this is a
+ * stable stand-in beside the store's own machine root, keyed by repo so concurrent workflows of one repo
+ * still share it; see notes/s3.md.
+ */
+const sharedRuntimeRootFor=repoRoot=>path.join(os.tmpdir(),'starci-shared',crypto.createHash('sha256').update(String(repoRoot)).digest('hex').slice(0,16));
 const componentKey=ledgerIds=>[...ledgerIds].sort().join('+')||'-';
 /**
  * The key a review round is counted against: the reviewed item set. Counting per module burned a feature's
@@ -350,9 +358,8 @@ export function renderContract({template,op,state,store,launcher=state.launcher,
     `## Ping (mandatory)${processText.split('## Ping (mandatory)')[1]}`.replace(/\s+$/,'')
   ].join('\n'):`## Cook until done${processText}`.replace(/\s+$/,'');
   const never=`## Never${text.split('## Never')[1]}`.replace(/\s+$/,'');
-  const checksFile=slash(store.checksPath(op.id));
+  const checksFile=slash(path.join(os.tmpdir(),'starci',`${op.id}-${op.attempt}.checks.json`));
   const credentialRequestFile=checksFile.replace(/\.json$/,'.credential-request.json');
-  const reportsDir=slash(store.paths.reports);
   const items=(op.ledgerIds??[]).map(id=>{const item=ledgerItem(state,id);return `- \`${id}\` ${item?.title??'(unknown goal item)'}${item?.inputRef?` - ${item.inputRef}`:''}`;});
   const locks=guards.resourceLocks(op);
   const owned=protectedPaths??op.kernelOwned??[];
@@ -473,7 +480,7 @@ function candidateRuntimePaths(state,op,ctx){
   return unique(paths);
 }
 function candidateManagedFiles(store){
-  return store.paths.continuation?[{path:path.resolve(store.paths.continuation),start:CONTINUATION_SECTION_START,end:CONTINUATION_SECTION_END}]:[];
+  return store.continuation?[{path:path.resolve(store.continuation),start:CONTINUATION_SECTION_START,end:CONTINUATION_SECTION_END}]:[];
 }
 function bindOperationCandidate(store,state,op,ctx){
   if(!ctx.engine)op.kernelOwned=kernelOwnedPaths(state,op,ctx);
@@ -583,6 +590,9 @@ const decisionQuestionDigest=question=>crypto.createHash('sha256').update(JSON.s
 const questionDigestMatches=(question,digest)=>decisionQuestionDigest(question)===digest||
   (plain(question)&&'goalRev' in question&&decisionQuestionDigest(Object.fromEntries(Object.entries(question).filter(([key])=>key!=='goalRev')))===digest);
 const fileDigest=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+/** The immutable bytes a report row was written with — the ledger's replacement for a report file's own sha256. */
+const reportJsonBytes=(store,dispatchId)=>store.ledger.db.prepare('SELECT report_json FROM reports WHERE workflow_id=? AND dispatch_id=?').get(store.id,dispatchId)?.report_json??null;
+const reportDigest=(store,dispatchId)=>{const raw=reportJsonBytes(store,dispatchId);return raw===null?null:crypto.createHash('sha256').update(raw).digest('hex');};
 /**
  * Allowlists of every OTHER op that may hold a canonical-writer lease — running/answering ops plus blocked
  * ops that retained their reservation. Concurrent disjoint writers legitimately share the canonical worktree;
@@ -598,7 +608,7 @@ const foreignAllowlistsOf=(state,op)=>state.ops
  * carries only enough immutable identity to let the stopped kernel replay that exact report on its next run.
  */
 export function stageAnsweredDecisionLateReport(state,op,{store,runtime,dispatchId,taskId}={}){
-  const reportFile=store?.reportPath?.(dispatchId),report=reportFile&&fs.existsSync(reportFile)?readJson(reportFile,null):null,
+  const report=store?.readReports?.().find(item=>item?.dispatchId===dispatchId)??null,
     receipt=op?.ownerAnswer?.receiptId,identity=op?.candidate?.identity;
   if(!report||report.schema!=='starci/op-report@1'||report.outcome!=='done'||report.run!==state.run||report.task!==taskId||report.dispatch!==dispatchId||
     report.from!==op.terminal||report.signal?.type!=='worker_done'||report.signal?.orcaOutcome!=='succeeded'||report.sent?.type!=='worker_done')
@@ -623,15 +633,15 @@ export function stageAnsweredDecisionLateReport(state,op,{store,runtime,dispatch
       return {ok:false,reason:`canonical bytes no longer match the sealed candidate: ${item.displayPath}`};
   }
   op.lateReportRecovery={schema:'starci/answered-decision-late-report@1',dispatch:dispatchId,task:taskId,run:state.run,
-    reportSha256:fileDigest(reportFile),candidateDigest:packet.candidateDigest,questionDigest:decisionQuestionDigest(op.question),ownerReceipt:receipt};
+    reportSha256:reportDigest(store,dispatchId),candidateDigest:packet.candidateDigest,questionDigest:decisionQuestionDigest(op.question),ownerReceipt:receipt};
   op.retainedOwnerTerminal={schema:'starci/retained-owner-terminal@1',handle:op.terminal,dispatch:dispatchId,ownership:'user_owned'};
   op.status='running';delete op.pending;
-  return {ok:true,lateReportPending:true,report:reportFile,observedFiles:observed.map(item=>item.displayPath),candidateDigest:packet.candidateDigest};
+  return {ok:true,lateReportPending:true,report:dispatchId,observedFiles:observed.map(item=>item.displayPath),candidateDigest:packet.candidateDigest};
 }
 export function lateReportReplayMatches(state,op,report,{store}={}){
-  const late=op?.lateReportRecovery,reportFile=store?.reportPath?.(op?.dispatch),receipt=op?.ownerAnswer?.receiptId;
+  const late=op?.lateReportRecovery,receipt=op?.ownerAnswer?.receiptId,digest=op?.dispatch?reportDigest(store,op.dispatch):null;
   return Boolean(late?.schema==='starci/answered-decision-late-report@1'&&late.dispatch===op.dispatch&&late.task===report?.task&&late.run===report?.run&&
-    report.run===state.run&&report.task===op.launch?.task&&report.from===op.terminal&&reportFile&&fs.existsSync(reportFile)&&fileDigest(reportFile)===late.reportSha256&&
+    report.run===state.run&&report.task===op.launch?.task&&report.from===op.terminal&&digest&&digest===late.reportSha256&&
     op.candidateDigest===late.candidateDigest&&questionDigestMatches(op.question,late.questionDigest)&&receipt===late.ownerReceipt&&
     op.ownerContinuationReceipt===receipt&&op.ownerRequestStatus==='answered'&&(report.question===null||report.question===undefined));
 }
@@ -662,7 +672,7 @@ export function readmitCompletedReportRetry(state,op,{orca,store,settleHost=sett
   store.appendEvent({event:'completed-report-readmitted',op:op.id,dispatch:op.dispatch,jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,
     proof:'public retry proved the exact completed worker exited and re-admitted its immutable report under the retained candidate writer'});
   store.saveState(state);
-  return {ok:true,op:op.id,dispatch:op.dispatch,report:store.reportPath(op.dispatch)};
+  return {ok:true,op:op.id,dispatch:op.dispatch,report:op.dispatch};
 }
 export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost=settleDispatch,createRuntime=createEngineRuntime,git=spawnSync,waitFn=sleepSync,acceptedPreparedDecision=false}={}){
   const lease=op?.lease,dispatchId=stoppedRetryDispatchId(op),taskId=op?.launch?.task,candidate=op?.candidate?.identity;
@@ -776,9 +786,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
   op.goalRev=goalRevOf(state);op.inputDigests=opInputDigests(state,op,ctx);delete op.goalStale;delete op.inputsHeld;
   op.kernelOwned=kernelOwnedPaths(state,op,ctx);
   const contract=renderContract({template:ctx.template,op,state,store,guards:ctx.guards,protectedPaths:op.kernelOwned});
-  fs.writeFileSync(store.contractPath(op.id),contract);
-  store.acknowledgeRuntimeFile?.(store.contractPath(op.id),`contracts/${op.id}.md`,'replace');
-  op.contractFile=store.contractPath(op.id);
+  store.writeContract({opId:op.id,attempt:op.attempt,dispatchId:op.dispatch??null,markdown:contract});
   // How much the agent is told to read before it may do anything: the grace before the first stall verdict.
   op.contractBytes=Buffer.byteLength(contract,'utf8');
   const relative=path.relative(process.cwd(),state.worktree)||'.';
@@ -797,7 +805,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
     if(ctx.engine)ctx.engine.beginLaunchIntent(op);
     workerEffectStarted=true;
     launched=ctx.launch(orca,{cwd:state.worktree,run:state.run,workflowTask:state.workflowTask??state.id,from:state.from,
-      worktree:relative,operation:launchOperator(op.kind),kind:op.kind,scope:op.id,spec:operationSpec(op,contract),candidate:allocated.candidate,runtime:allocated.runtime,timeoutMs:opDeadlineFor(op),wait:ctx.wait});
+      worktree:relative,operation:launchOperator(op.kind),kind:op.kind,scope:op.id,spec:operationSpec(state.id,op,contract),candidate:allocated.candidate,runtime:allocated.runtime,timeoutMs:opDeadlineFor(op),wait:ctx.wait});
   }catch(error){
     const typedNoEffect=['ORCA_COORDINATOR_MISMATCH','ORCA_TASK_CREATE_FAILED'].includes(error?.code)&&error?.effectState==='none';
     const effectState=error?.effectState==='unknown'?'unknown':typedNoEffect?'none':workerEffectStarted?'unknown':'none';
@@ -1615,7 +1623,6 @@ export function reconcileContinuationPreflight(store,state,{now=Date.now}={}){
   const runtime=createEngineRuntime({store,state,now});
   try{
     store.bindJournal?.(runtime.journal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
-    store.acknowledgeRuntimeFile?.(path.join(store.dir,'kernel.lock'),'kernel.lock','replace');
     const durable=store.loadState();
     need(plain(durable)&&durable.id===state.id&&durable.engine?.generation===state.engine.generation,
       `Workflow ${state.id} has no matching durable continuation checkpoint for generation ${state.engine.generation}`);
@@ -1868,10 +1875,9 @@ function authorSharedNode(store,state,op,ctx,{paths,detail,open}){
   return author;
 }
 
-const archiveOpReport=(store,op)=>{const dispatch=op.dispatch,file=store.reportPath(dispatch);if(!fs.existsSync(file))return null;
-  const target=`${file}.answered-${op.reports.length}`;fs.renameSync(file,target);
-  store.acknowledgeRuntimeFile?.(file,`reports/${dispatch}.json`,'delete');
-  store.acknowledgeRuntimeFile?.(target,`reports/${dispatch}.json.answered-${op.reports.length}`,'rename');return target;};
+const archiveOpReport=(store,op)=>{const dispatch=op.dispatch;if(!dispatch)return null;
+  store.ledger.db.prepare('UPDATE reports SET consumed_at=? WHERE workflow_id=? AND dispatch_id=? AND consumed_at IS NULL').run(store.ledger.now(),store.id,dispatch);
+  return dispatch;};
 
 /** One shared request: merge into an existing shared op, create one, or queue it for the next iteration. */
 function requestSharedChange(store,state,op,{paths,detail,open=[]},ctx=null){
@@ -2287,8 +2293,7 @@ function settleAuditMeasurement(orca,store,state,op,report,ctx){
   const result={schema:'starci/audit-measurement@1',operation:op.operation,
     outcome:failures.length?'failed':measurement.outcome,checks:measurement.checks,
     findingCount:measurement.findings??0,reportFindingCount:reportedFindings.length,failures};
-  writeJson(store.checksPath(`${op.id}-audit`),result);
-  store.acknowledgeRuntimeFile?.(store.checksPath(`${op.id}-audit`),`checks/${op.id}-audit.json`,'replace');
+  store.writeChecks({opId:`${op.id}-audit`,attempt:op.attempt,checks:result});
   if(failures.length){
     const action=rejectAuditMeasurement(store,state,op,ctx,failures,measurement.checks);op.audit=result;return action;
   }
@@ -2316,11 +2321,6 @@ export function applyOpReport(orca,store,state,op,report,ctx){
   op.reports.push({attempt:op.attempt,runtime:op.runtime,outcome:report.outcome,summary:report.summary,
     files:report.files,open:report.open,checks:report.checks,blocker:report.blocker,question:report.question,goalRev:op.goalRev??goalRevOf(state),
     ...(checked.ok&&report.credentialRequest?{credentialRequest:report.credentialRequest}:{}),valid:checked.ok});
-  if(ctx.engine&&typeof store.acknowledgeRuntimeFile==='function'){
-    const reportDispatch=[op.dispatch,report.dispatch].find(item=>typeof item==='string'&&item.length>0&&!/[\\/]/.test(item))??null;
-    if(reportDispatch&&fs.existsSync(store.reportPath(reportDispatch)))store.acknowledgeRuntimeFile?.(store.reportPath(reportDispatch),`reports/${reportDispatch}.json`,'replace');
-    if(fs.existsSync(store.checksPath(op.id)))store.acknowledgeRuntimeFile?.(store.checksPath(op.id),`checks/${op.id}.json`,'replace');
-  }
   if(!checked.ok){
     store.appendEvent({event:'report-rejected',op:op.id,errors:checked.errors});
     if(isAuditOperation(op))return rejectAuditMeasurement(store,state,op,ctx,checked.errors.map(error=>`invalid audit report: ${error}`));
@@ -2423,9 +2423,8 @@ export function applyOpReport(orca,store,state,op,report,ctx){
         verified.failed=[...verified.failed,verified.checks.at(-1)];
       }
     }
-    writeJson(store.checksPath(`${op.id}-kernel`),{schema:'starci/workflow-kernel-checks@1',op:op.id,attempt:op.attempt,
-      runtime:op.runtime,checks:verified.checks,verifiedAt:Date.now()});
-    store.acknowledgeRuntimeFile?.(store.checksPath(`${op.id}-kernel`),`checks/${op.id}-kernel.json`,'replace');
+    store.writeChecks({opId:`${op.id}-kernel`,attempt:op.attempt,checks:{schema:'starci/workflow-kernel-checks@1',op:op.id,attempt:op.attempt,
+      runtime:op.runtime,checks:verified.checks,verifiedAt:Date.now()}});
     if(!verified.ok){
       op.reports.at(-1).downgradedTo='failed';
       store.appendEvent({event:'machine-verify-failed',op:op.id,failed:verified.failed.map(check=>`${check.name}=${check.exitCode}`)});
@@ -3092,8 +3091,8 @@ function finish(store,state,outcome,reason=null,ctx=null){
       allowlist:op.allowlist,ledgerIds:op.ledgerIds,head:op.head,ledgerCommit:op.ledgerCommit??null,verdict:op.verdict,validation:op.validation??null,
       audit:op.audit??null,provisional:[...(op.provisional??[])],files:op.files})),
     iterations:state.iterations,finishedAt:Date.now()};
-  writeJson(store.paths.final,final);
-  state.finished={outcome,reason,report:store.paths.final};
+  store.signal.set(store.id,'final-report',{value:final});
+  state.finished={outcome,reason,report:true};
   state.phase='finished';
   store.appendEvent({event:'finished',outcome,reason,ledger:state.ledger.map(item=>`${item.id}=${item.status}`)});
   store.saveState(state);
@@ -3218,7 +3217,7 @@ function settleFromTab(orca,store,state,op,ctx,observed){
   const report=tabReport(state,op,read,text);
   if(!report)return null;
   const dispatch=op.dispatch,runtime=op.runtime,terminal=op.terminal;
-  try{fs.writeFileSync(store.reportPath(dispatch),JSON.stringify(report,null,2));store.acknowledgeRuntimeFile?.(store.reportPath(dispatch),`reports/${dispatch}.json`,'replace');}catch{}
+  store.writeReport({dispatchId:dispatch,opId:op.id,attempt:op.attempt,report,fromTerminal:terminal});
   applyOpReport(orca,store,state,op,report,{...ctx,orca});
   // Exactly what an accepted report releases - unless the kernel answered the question, in which case the tab
   // is still the only place that answer can be typed.
@@ -3428,15 +3427,15 @@ export const validatorRuntimes=host=>nonOperationModels('validator',loadConfig(h
  * Orca pastes the task spec into the agent's terminal and fails the Dispatch when the TUI has not consumed it
  * within its start timeout: a 12k paste sat behind a "[Pasted Content]" marker on Claude and Codex alike
  * (`agent_prompt_stalled`) and no drawing launched for an afternoon. A short spec - the head plus the pointer to
- * the complete contract file - is consumed at once, and the agent reads the rest from disk.
+ * the complete contract - is consumed at once, and the agent fetches the rest from the ledger.
  */
 export const SPEC_LIMIT=4000;
-export function operationSpec(op,contract){
+export function operationSpec(workflowId,op,contract){
   const text=String(contract??'');
   if(text.length<=SPEC_LIMIT)return text;
-  const file=slash(String(op?.contractFile??''));
+  const command=`starci op-contract --workflow ${workflowId} --op ${op.id} --attempt ${op.attempt}`;
   const head=text.slice(0,SPEC_LIMIT-900);
-  return `${head}\n\n[...]\n\nThis contract is longer than a task can carry (${text.length} characters). The COMPLETE contract - the allowlist, the working order, the report command and every rule after this point - is in the file \`${file}\`. Read that file in full before you do anything: it is the task, and a rule you did not read still binds you.`;
+  return `${head}\n\n[...]\n\nThis contract is longer than a task can carry (${text.length} characters). The COMPLETE contract - the allowlist, the working order, the report command and every rule after this point - is printed by \`${command}\`. Run that command in full before you do anything: it is the task, and a rule you did not read still binds you.`;
 }
 export const TRIAGE_AFTER=3;
 /**
@@ -3857,7 +3856,6 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     // same model/judge/operation leases that admission will atomically enforce, including effect_unknown jobs.
     ctx.allocator.bindProviderAdmission?.(()=>ctx.engine.providerAdmissionView());
     store.bindJournal?.(ctx.engine.journal,state.engine.generation,{state});
-    store.acknowledgeRuntimeFile?.(path.join(store.dir,'kernel.lock'),'kernel.lock','replace');
     const retired=ctx.engine.journal.retireGenerations?.({workflowId:state.id,generation:state.engine.generation})??null;
     if(retired&&(retired.jobs||retired.events))store.appendEvent({event:'journal-generations-retired',before:state.engine.generation,jobs:retired.jobs,events:retired.events});
     const checkpoint=store.loadState();
@@ -4176,7 +4174,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
       const inputWait=fillWaitingAsks(state).length>0;
       const tick=waitTick(orca,{cwd:state.worktree,run:state.run,from:state.from,
         timeoutMs:inputWait?Math.min(waitTimeoutMs,5000):waitTimeoutMs,tickMs:inputWait?Math.min(tickMs,5000):tickMs,
-        reportsDir:store.paths.reports,now,wait,wake:()=>inboxPending(store)||stopRequested(store)});
+        now,wait,wake:()=>inboxPending(store)||stopRequested(store)});
       if(tick.event==='check-failed'){noteAnomaly(store,state,`check-failed:${tick.check?.reason??'unknown'}`,{reason:tick.check?.reason??null});triageAnomaly(store,state,`check-failed:${tick.check?.reason??'unknown'}`,{...ctx,orca});}
     store.appendEvent({event:'wait',result:tick.event,ticks:tick.ticks,
         liveness:(tick.liveness??[]).map(item=>`${item.dispatch}:${item.liveness}`)});
@@ -4255,13 +4253,15 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
 
 /* ------------------------------------------------------------------ cli */
 
-/** Wait for the launch handle the terminal's creator writes (own handle, optional Orca run). */
-export function awaitLaunch(file,{wait=sleepSync,timeoutMs=LAUNCH_WAIT_MS,intervalMs=2000,now=Date.now}={}){
+/** Wait for the launch handle the terminal's creator writes (own handle, optional Orca run): a file when the
+ * operator names one explicitly (`--launch-file`), the workflow's `launch` signal otherwise. */
+export function awaitLaunch(source,{wait=sleepSync,timeoutMs=LAUNCH_WAIT_MS,intervalMs=2000,now=Date.now}={}){
+  const fromFile=typeof source==='string';
   const started=now();
   for(;;){
-    const launch=readJson(file,null);
+    const launch=fromFile?readJson(source,null):source.signal.get(source.id,'launch')?.value??null;
     if(launch?.from)return launch;
-    need(now()-started<=timeoutMs,`No launch handle in ${slash(file)} within ${timeoutMs} ms; pass --from <own terminal>`);
+    need(now()-started<=timeoutMs,`No launch handle ${fromFile?`in ${slash(source)}`:`recorded for workflow ${source.id}`} within ${timeoutMs} ms; pass --from <own terminal>`);
     wait(intervalMs);
   }
 }
@@ -4286,8 +4286,7 @@ const launcherOf=host=>slash(path.join(host,'.dist','hosts','orca','launch.mjs')
 export const SUPERVISOR_STALE_MS=5*60*1000;
 export const SUPERVISOR_REVIVE_EVERY_MS=10*60*1000;
 export function reviveSupervisor(store,state,ctx,{now=Date.now,spawn=spawnDetached,alive=pidAlive}={}){
-  const file=path.join(path.dirname(store.dir),'supervisor.lock');
-  let lock=null;try{lock=JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}
+  const lock=store.signal.get('*','supervisor-lock');
   if(!lock||typeof lock.at!=='number')return null;
   if(now()-lock.at<SUPERVISOR_STALE_MS)return null;
   if(lock.pid&&alive(lock.pid))return null;
@@ -4318,52 +4317,46 @@ export function relocateLauncher(store,state){
 }
 const templateOf=host=>fs.readFileSync(path.join(host,'docs','supervision-templates','op.md'),'utf8');
 
-/** One kernel per workflow: a pid lock in the store refuses a second process; a stop flag ends the loop cleanly. */
+/** One kernel per workflow: a pid lock in the ledger refuses a second process; a stop signal ends the loop cleanly. */
 function acquireKernelLock(store,{launchToken=null}={}){
-  const lock=path.join(store.dir,'kernel.lock');
-  let token=launchToken,reservation=null;
-  if(!token){
-    reservation=reserveStartup(store.dir,{pid:process.pid});
-    if(!reservation.ok)throw Object.assign(Error(`another kernel or unresolved launch owns workflow startup: ${reservation.reason}`),{code:'STARCI_KERNEL_ALREADY_RUNNING',owner:reservation.row});
-    token=reservation.token;
+  const existing=store.signal.get(store.id,'kernel-lock');
+  if(launchToken){
+    if(!existing||existing.token!==launchToken)throw Object.assign(Error('kernel launch token is no longer current'),{code:'STARCI_KERNEL_STARTUP_STALE'});
+  }else if(existing){
+    const holderAlive=Number.isInteger(existing.pid)&&existing.pid>0&&pidAlive(existing.pid);
+    if(holderAlive)throw Object.assign(Error('another kernel or unresolved launch owns workflow startup: kernel process already runs'),{code:'STARCI_KERNEL_ALREADY_RUNNING',owner:existing});
   }
-  let owner;
-  try{owner=acquireStartup(store.dir,{launchToken:token,pid:process.pid});}
-  catch(error){if(reservation)releaseStartup(store.dir,reservation);throw error;}
-  try{fs.writeFileSync(lock,JSON.stringify({pid:process.pid,startedAt:Date.now(),startupToken:owner.token}));}
-  catch(error){releaseStartup(store.dir,owner);throw error;}
-  return ()=>{releaseStartup(store.dir,owner);try{const now=JSON.parse(fs.readFileSync(lock,'utf8'));if(now.pid===process.pid&&now.startupToken===owner.token){fs.rmSync(lock);store.acknowledgeRuntimeFile?.(lock,'kernel.lock','delete');}}catch{}};
+  const token=launchToken??crypto.randomBytes(18).toString('hex');
+  store.signal.set(store.id,'kernel-lock',{pid:process.pid,token,value:{startedAt:store.ledger.now()}});
+  return ()=>{
+    const row=store.signal.get(store.id,'kernel-lock');
+    if(row?.pid===process.pid&&row?.token===token)store.signal.clear(store.id,'kernel-lock');
+  };
 }
-export function stopRequested(store){return fs.existsSync(path.join(store.dir,'stop.flag'));}
+export function stopRequested(store){return Boolean(store.signal.get(store.id,'stop'));}
 /** Whether a command waits in the inbox: the wait between ticks ends for it. */
-export function inboxPending(store){try{return fs.readdirSync(store.paths.inbox).some(name=>name.endsWith('.json'));}catch{return false;}}
+export function inboxPending(store){return store.inbox.pending().length>0;}
 /** Whether the kernel of this store is a live process, by its lock. */
 export function kernelAlive(store){
-  const lock=readJson(path.join(store.dir,'kernel.lock'),null);
+  const lock=store.signal.get(store.id,'kernel-lock');
   const pid=Number(lock?.pid);
   if(!Number.isInteger(pid)||pid<=0)return false;
   try{process.kill(pid,0);return true;}catch{return false;}
 }
 /**
- * A command for a running kernel is a file in the store's inbox, never a write to its state: the kernel holds
- * the state in memory and would save over the change at its next tick. The kernel applies inbox commands at the
- * start of every iteration, in order, and records each (`inbox-applied`).
+ * A command for a running kernel is an inbox row, never a write to its state: the kernel holds the state in
+ * memory and would save over the change at its next tick. The kernel applies inbox commands at the start of
+ * every iteration, in order, and records each (`inbox-applied`).
  */
 export function queueInbox(store,command){
-  const file=path.join(store.paths.inbox,`${Date.now()}-${Math.random().toString(16).slice(2,8)}.json`);
-  fs.writeFileSync(file,JSON.stringify({...command,at:new Date().toISOString()}));
-  return file;
+  return store.inbox.push({kind:command.kind,payload:{...command,at:new Date().toISOString()}});
 }
 export function applyInbox(store,state,ctx){
-  let files=[];
-  try{files=fs.readdirSync(store.paths.inbox).filter(name=>name.endsWith('.json')).sort();}catch{return;}
-  for(const name of files){
-    const file=path.join(store.paths.inbox,name);
-    let command=null;
-    try{command=JSON.parse(fs.readFileSync(file,'utf8'));}catch{command=null;}
-    if(!plain(command))continue;
+  for(const item of store.inbox.pending()){
+    const command=item.payload;
+    if(!plain(command)){store.inbox.settle(item.id,'applied',{ignored:true});continue;}
     if(command.schema==='starci/job@1'&&command.kind==='owner-action'){
-      const eventId=command.eventId??name;
+      const eventId=command.eventId??`inbox-${item.id}`;
       const apply=next=>{
         next.ownerInboxReceipts??={};
         if(next.ownerInboxReceipts[eventId])return;
@@ -4378,10 +4371,10 @@ export function applyInbox(store,state,ctx){
       };
       if(ctx.engine&&store.transition){const next=store.transition(state,{transitionId:eventId,event:{kind:'owner-action-applied',payload:{eventId}},apply});Object.assign(state,next);}
       else {apply(state);store.saveState(state);}
-      try{fs.rmSync(file,{force:true});}catch{}
+      store.inbox.settle(item.id,'applied',{kind:command.kind});
       continue;
     }
-    try{fs.rmSync(file,{force:true});}catch{}
+    store.inbox.settle(item.id,'applied',{kind:command.kind??null});
     if(command.kind==='approve'){
       const before={budget:dynamicBudget(state),quota:JSON.stringify(state.quota??null)};
       approve(store,state,{allocation:command.allocation??null,allowDynamic:command.allowDynamic??null,acceptCritique:command.acceptCritique??null,host:ctx.host});
@@ -4440,7 +4433,7 @@ export function migrateEngineState(store,state){
  * kernel records one event and stops with its own code; it does not save state on a disk that has no room for it.
  */
 export function assertHeadroom(store,state,{measure=measureHeadroom}={}){
-  const found=measure([store.dir,state.worktree,...(isEnrolled(state)?[state.engine.journalFile]:[])]);
+  const found=measure([store.ledgerFile,state.worktree,...(isEnrolled(state)?[state.engine.journalFile]:[])]);
   if(found.ok)return found;
   try{store.appendEvent({event:'disk-headroom-exhausted',thresholdBytes:found.thresholdBytes,volumes:found.exhausted.map(item=>({path:item.path,freeBytes:item.freeBytes}))});}catch{}
   throw headroomError(found);
@@ -4451,7 +4444,6 @@ export function retireFinishedWorkflowRows(store,state){
   let journal;
   try{store.unbindJournal?.();journal=openJournal({file:state.engine.journalFile});store.bindJournal?.(journal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
     const live=journal.liveRows(state.id);if(live.leases.length||live.jobs.length){store.appendEvent({event:'journal-workflow-retained',reason:'the workflow still holds live reservations or unsettled jobs',live});return {ok:false,workflowId:state.id,live,reason:'the workflow still holds live reservations or unsettled jobs'};}
-    store.acknowledgeRuntimeFile?.(store.paths.state,'state.json','replace');
     store.appendEvent({event:'journal-workflow-custody-retained',policy:'final state plus latest exact runtime-file receipt per path; operational jobs and history retired'});
     return journal.retireWorkflow(state.id,{preserveRuntimeCustody:true});}
   catch(error){store.appendEvent({event:'journal-workflow-retained',reason:String(error?.message??error).slice(0,240)});return {ok:false,reason:String(error?.message??error)};}
@@ -4548,7 +4540,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     let stopJournal=null,continuation;
     try{
       if(isEnrolled(state)){stopJournal=openJournal({file:state.engine.journalFile});store.bindJournal(stopJournal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});}
-      const stopFile=path.join(store.dir,'stop.flag');fs.writeFileSync(stopFile,String(Date.now()));store.acknowledgeRuntimeFile?.(stopFile,'stop.flag','replace');
+      store.signal.set(store.id,'stop',{value:{at:Date.now()}});
       continuation=exportContinuationBrief(store,state);
       store.appendEvent({event:'continuation-exported',file:slash(continuation.file),stateDigest:continuation.stateDigest,
         boundaryFindings:continuation.boundary.findings.map(item=>item.code)});
@@ -4559,7 +4551,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
   }
   if(command==='workflow-amend'){
     const {store,state}=open(options.id);
-    need(fs.existsSync(path.join(store.dir,'stop.flag')),
+    need(store.signal.get(store.id,'stop'),
       `Workflow ${state.id} is not paused; run workflow-stop --id ${state.id} and wait for its controller to exit`);
     need(!kernelAlive(store),`The kernel of ${state.id} is still running; wait for the stopped controller to exit before amending it`);
     // The startup ownership row is the same exact fence workflow-run takes. Holding it across durable reload,
@@ -4568,12 +4560,11 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const releaseAmendment=acquireKernelLock(store);
     let amendmentJournal=null,applied,continuation;
     try{
-      need(fs.existsSync(path.join(store.dir,'stop.flag')),`Workflow ${state.id} ceased to be paused before its amendment lock was acquired`);
+      need(store.signal.get(store.id,'stop'),`Workflow ${state.id} ceased to be paused before its amendment lock was acquired`);
       const enrolled=isEnrolled(state);
       if(enrolled){
         amendmentJournal=openJournal({file:state.engine.journalFile});
         store.bindJournal(amendmentJournal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
-        store.acknowledgeRuntimeFile?.(path.join(store.dir,'kernel.lock'),'kernel.lock','replace');
       }
       const durable=store.loadState();
       need(plain(durable)&&durable.id===state.id,
@@ -4681,7 +4672,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       const report=store.readReports().find(item=>item.dispatch===op.dispatch);
       need(report&&lateReportReplayMatches(state,op,report,{store}),`Late decision report ${op.id} no longer matches its retained question, receipt, candidate, or report bytes`);
       op.status='running';delete op.pending;delete op.refusal;
-      lateReportRecovery={op:op.id,dispatch:op.dispatch,report:store.reportPath(op.dispatch),observedFiles:[...(op.candidate?.observedFiles??[])]};
+      lateReportRecovery={op:op.id,dispatch:op.dispatch,report:op.dispatch,observedFiles:[...(op.candidate?.observedFiles??[])]};
       store.appendEvent({event:'prepared-decision-late-report-readmitted',op:op.id,dispatch:op.dispatch,jobId:op.lease?.jobId??null,
         proof:'public retry re-admitted the same immutable report and retained writer after a prior acceptance gate did not pass'});
     }
@@ -4700,7 +4691,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
         fromDigest:priorPin?.digest??null,toDigest:pin.digest,jobId:state.ops.find(item=>item.id===lateReportRecovery.op)?.lease?.jobId??null,
         proof:lateReportRecovery.retainedCompletedReport?'the verified retry pin is adopted without changing the retained candidate writer; only its exact completed report is eligible':'the owner-selected verified retry pin is adopted without changing the retained job generation; only its exact late report is eligible'});
       store.saveState(state);
-      const stopFile=path.join(store.dir,'stop.flag');fs.rmSync(stopFile,{force:true});store.acknowledgeRuntimeFile?.(stopFile,'stop.flag','delete');
+      store.signal.clear(store.id,'stop');
       return {schema:WORKFLOW_KERNEL,command,ok:true,id:state.id,recoveryPending:true,runtimePin:pin.digest,...lateReportRecovery,
       next:`The supervisor resumes this same generation on the adopted sealed runtime. The exact ${lateReportRecovery.retainedCompletedReport?'completed':'late'} report replays through ordinary verification while its writer remains held; repeat workflow-retry only after that acceptance settles.`};
     }
@@ -4817,11 +4808,6 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const retryJournal=openJournal({file:targetJournal});
     try{
       store.bindJournal(retryJournal,engine.generation,{state,goalIdentity:state.goalDigest??undefined});
-      // Enrollment and rotation happen before the new generation can be bound. Bind their exact resulting bytes
-      // now, so a concurrently running candidate can distinguish this public retry from an arbitrary rewrite.
-      store.acknowledgeRuntimeFile?.(store.paths.state,'state.json','replace');
-      store.acknowledgeRuntimeFile?.(store.paths.events,'events.jsonl','replace');
-      if(rotated?.rotated)store.acknowledgeRuntimeFile?.(rotated.rotated,path.basename(rotated.rotated),'rename');
       if(journalChosen)state.engine.journalChosen=true;
       if(relocation)store.appendEvent({event:'journal-relocated',from:relocation.from,to:relocation.to,retired:relocation.retired,copied:relocation.copied});
       if(options['candidate-root'])store.appendEvent({event:'candidate-root-selected',from:previousCandidateRoot,to:state.engine.candidateRoot,
@@ -4835,7 +4821,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       }
       store.appendEvent({event:'workflow-retried',engine:ENGINE_VERSION,generation:engine.generation,ops:retry,context:'fresh agents from canonical approved inputs and Work'});
       store.saveState(state);
-      const stopFile=path.join(store.dir,'stop.flag');fs.rmSync(stopFile,{force:true});store.acknowledgeRuntimeFile?.(stopFile,'stop.flag','delete');
+      store.signal.clear(store.id,'stop');
       return {schema:WORKFLOW_KERNEL,command,ok:true,id:state.id,engine:ENGINE_VERSION,generation:engine.generation,retried:retry,
         candidateRoot:state.engine.candidateRoot??null,
         next:'The supervisor starts the approved workflow on its sealed runtime. This is a resumed workflow trial, not a clean end-to-end trial.'};
@@ -4882,7 +4868,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       ownerFill:inputReadyAsks(state).map(ask=>({op:ask.id,variables:[...(ask.credential?.variables??[])],
         custody:ask.credential?.custody??null,command:ask.fillCommand??null,requesters:[...(ask.requesters??[])]})),
       finished:state.finished,
-      events:store.readEvents().slice(-20),final:readJson(store.paths.final,null)};
+      events:store.readEvents().slice(-20),final:store.signal.get(store.id,'final-report')?.value??null};
   }
   if(command==='workflow-run'){
     const {store,state}=open(options.id);
@@ -4892,7 +4878,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     try{
     const recovered=reconcileContinuationPreflight(store,state);
     const resumeBoundary=recovered.boundary;
-    need(resumeBoundary.ok,`Workflow resume boundary is inconsistent; inspect ${slash(store.paths.continuation)}: ${resumeBoundary.findings.map(item=>`${item.code}: ${item.detail}`).join('; ')}`);
+    need(resumeBoundary.ok,`Workflow resume boundary is inconsistent; inspect ${slash(store.continuation)}: ${resumeBoundary.findings.map(item=>`${item.code}: ${item.detail}`).join('; ')}`);
     const host=hostDescriptorOf(orca);
     if(isEnrolled(state)){
       const pinned=verifyRuntimePin(state.engine.runtimePin);need(pinned.ok,`Runtime pin verification failed: ${pinned.reason??''}`);
@@ -4900,12 +4886,12 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       state.launcher=pinned.launcher;
     }
     // A host that keeps files (the headless table, mailbox and dispatch logs) keeps them beside this workflow's own.
-    if(typeof orca?.bindStore==='function')orca.bindStore(store.dir);
+    if(typeof orca?.bindStore==='function')orca.bindStore(path.join(os.tmpdir(),'starci',state.id));
     // The supervisor starts the next kernel of this workflow on the same host, so the host is a fact of the state.
     state.hostAdapter=host.name;
-    const launchFile=options['launch-file']?path.resolve(worktree,options['launch-file']):store.paths.launch;
+    const launchFile=options['launch-file']?path.resolve(worktree,options['launch-file']):null;
     let from=options.from??state.from,run=options.run??state.run,launchTask=null,openedKernelTerminal=false;
-    if(!from&&fs.existsSync(launchFile)){const launch=awaitLaunch(launchFile,{wait});from=launch.from;run=run??launch.run??null;launchTask=launch.task??null;if(launchTask)state.workflowTask=launchTask;}
+    if(!from&&(launchFile?fs.existsSync(launchFile):store.signal.get(store.id,'launch'))){const launch=awaitLaunch(launchFile??store,{wait});from=launch.from;run=run??launch.run??null;launchTask=launch.task??null;if(launchTask)state.workflowTask=launchTask;}
     if(!from){
       // No coordinator terminal handed this kernel a handle (the supervisor started it): the kernel is its own
       // Orca terminal in the worktree - the one titled after it, reused across restarts, never a new tab per start.
@@ -4939,14 +4925,14 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
         checks:op.checks};
       return modelPolicy.eligibility(actual,runtime);
     }):null;
-    fs.rmSync(path.join(store.dir,'stop.flag'),{force:true});
+    store.signal.clear(store.id,'stop');
     const finished=runLoop(orca,store,state,{cwd:worktree,wait,
       // Slots are derived from the operations that are actually running; saved loads may belong to a dead kernel.
       supervisor:supervisorRuntimes(workflowModelConfigRoot(state)),validator:validatorRuntimes(workflowModelConfigRoot(state)),
       // Every kernel of this repository shares one runtime ledger beside the workflow directories, so an
       // expensive runtime another workflow is on is load here too and a provider cooldown is seen by all.
       // A sequential host (headless) caps the allocator at one operation whatever the approved quota says.
-      allocator:createAllocator({runtimes:runtimeProfile,state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:loadsFileFor(store.dir),workflow:state.id},budget:{path:path.dirname(store.dir)},sequential:host.sequential,executionHost:host.name,eligibility}),template:templateOf(isEnrolled(state)?state.engine.runtimePin.root:state.host),host,
+      allocator:createAllocator({runtimes:runtimeProfile,state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:loadsFileFor(sharedRuntimeRootFor(store.repoRoot)),workflow:state.id},budget:{path:sharedRuntimeRootFor(store.repoRoot)},sequential:host.sequential,executionHost:host.name,eligibility}),template:templateOf(isEnrolled(state)?state.engine.runtimePin.root:state.host),host,
       modelEligibility:eligibility,modelPolicy,runtimeBinding,
       ledgerRoot:options['ledger-root']??null,
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});
