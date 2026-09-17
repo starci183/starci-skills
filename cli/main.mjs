@@ -27,8 +27,15 @@ Usage:
   starci workflow-lane-close --id <id>
   starci workflow-supervise --host <skill root> [--once true] [--poll-ms 60000]
   starci workflow-inputs --session <kernel-owned-session-file>
-  starci journal-prune --journal-file <file> [--store-root <root,..>] [--retire <id,..>] [--vacuum true] [--dry-run]
-  starci journal-retire --journal-file <file> --store-root <root,..> [--delete true]
+  starci op-contract --workflow <id> --op <op> [--attempt N] [--dispatch <id>] [--json true]
+  starci workflow-export --id <id> --to <dir>
+  starci ledger-verify --repo <root> [--id <id>]
+  starci ledger-anchor --write --repo <root> [--id <id>]
+  starci ledger-migrate --repo <root> [--journal-file <old>] [--machine-file <file>] [--dry-run] [--archive true]
+  starci ledger-prune --repo <root> [--retire <id,..>] [--vacuum true] [--dry-run]
+  starci ledger-retire --repo <root> [--delete true]
+  starci journal-prune --journal-file <file>   renamed ledger-prune (--repo, not --journal-file); refused, exit 2
+  starci journal-retire --journal-file <file>   renamed ledger-retire (--repo, not --journal-file); refused, exit 2
   starci start-op --run <run> --workflow-task <task> --from <terminal> --worktree <path> --operation <op> --scope <scope> --spec-file <file>
   starci settle --dispatch <dispatch> [--terminal <terminal>] [--close true]
   starci sweep --worktree <path> --from <monitor terminal> [--keep <handle,handle>]

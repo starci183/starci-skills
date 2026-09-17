@@ -9,7 +9,7 @@ import {fileURLToPath} from 'node:url';
  */
 const LAUNCHER_COMMANDS=['workflow-goal','workflow-amend','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status',
   'workflow-tail','workflow-ops','workflow-list','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs',
-  'journal-prune','journal-retire',
+  'op-contract','workflow-export','ledger-verify','ledger-migrate','ledger-prune','ledger-retire','ledger-anchor','journal-prune','journal-retire',
   'start-op','settle','sweep','notify','report','wait','verify'];
 
 /**
@@ -38,8 +38,14 @@ workflow kernel (forwarded to the launcher; add --host <skill root> to reach a W
   workflow-lane-close  remove a merged workflow's worktree, keeping its branch
   workflow-supervise   start and restart the kernel of every approved, unfinished workflow
   workflow-inputs      serve the kernel-owned credential form in its workflow's Orca browser
-  journal-prune        --journal-file <file> [--store-root <root,..>] [--retire <id,..>] [--vacuum true] [--dry-run]: retire settled workflow rows
-  journal-retire       --journal-file <file> --store-root <root,..> [--delete true]: remove a journal nothing binds
+  op-contract          --workflow <id> --op <op> [--attempt N] [--dispatch <id>] [--json true]: print a stored operation contract
+  workflow-export      --id <id> --to <dir>: write today's human-readable file layout from the workflow's ledger rows
+  ledger-verify        --repo <root> [--id <id>]: walk the events hash chain and check it against the tracked anchor, exit non-zero on a break
+  ledger-anchor        --write --repo <root> [--id <id>]: regenerate .starciwork/ledger-anchor.json from a healthy ledger
+  ledger-migrate       --repo <root> [--journal-file <old>] [--machine-file <file>] [--dry-run] [--archive true]: fold _local + a retired journal into runtime.sqlite
+  ledger-prune         --repo <root> [--retire <id,..>] [--vacuum true] [--dry-run]: retire settled workflow rows from the ledger
+  ledger-retire        --repo <root> [--delete true]: remove the whole ledger file once nothing in it is live
+  journal-prune journal-retire   renamed ledger-prune / ledger-retire (--repo, not --journal-file); refused, exit 2
   start-op settle sweep notify report wait verify   the host calls an operation makes
 
 machine checks (read-only; they judge bytes, not claims):
@@ -60,7 +66,8 @@ if (LAUNCHER_COMMANDS.includes(command)) {
     // A text view prints as text; everything else is the record it always was.
     const output=await main(args);
     process.stdout.write(typeof output?.print==='string'?output.print.endsWith('\n')?output.print:`${output.print}\n`:`${JSON.stringify(output,null,2)}\n`);
-    if(output?.ok===false)process.exitCode=1;
+    if(Number.isInteger(output?.exitCode))process.exitCode=output.exitCode;
+    else if(output?.ok===false)process.exitCode=1;
   } catch(error) {
     process.stderr.write(`${JSON.stringify({ok:false,error:{message:error.message}},null,2)}\n`);
     process.exitCode=1;
