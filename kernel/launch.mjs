@@ -108,7 +108,7 @@ export function releaseStartup(ledger,id,owner){
 const LAUNCHING_PHASES=new Set(['launching','launching-child','launching-native']);
 
 // ---- the launch hand-off record (was launch.json; now the workflow's 'launch' signal) ----
-export function writeLaunch(ledger,id,value,{now=Date.now()}={}){
+export function writeLaunch(ledger,id,value,{now=Date.now}={}){
   need(plain(value),'writeLaunch needs a launch record');
   ledger.transaction(()=>setSignal(ledger.db,id,'launch',{value,at:now()}));
   return{ok:true};
@@ -128,7 +128,7 @@ export async function awaitLaunch(ledger,id,{wait=false,timeoutMs=15*60*1000,int
 }
 
 // ---- the single-supervisor signal (was supervisor.lock; one '*' row per ledger) ----
-export function claimSupervisor(ledger,{pid,round=null,ttl=3*60*1000,now=Date.now(),alive=pid=>{try{process.kill(pid,0);return true;}catch{return false;}}}={}){
+export function claimSupervisor(ledger,{pid,round=null,ttl=3*60*1000,now=Date.now,alive=pid=>{try{process.kill(pid,0);return true;}catch{return false;}}}={}){
   need(pid,'claimSupervisor needs a pid');
   return ledger.transaction(()=>{
     const at=now(),row=signalRow(ledger.db,'*','supervisor-lock');
@@ -151,7 +151,7 @@ export function readClosedCoordinatorTerminals(ledger,id){
   const row=signalRow(ledger.db,id,'coordinator-terminals');
   return Array.isArray(row?.value?.closed)?row.value.closed.filter(name=>typeof name==='string'&&name):[];
 }
-export function recordCoordinatorTerminal(ledger,id,handle,{now=Date.now()}={}){
+export function recordCoordinatorTerminal(ledger,id,handle,{now=Date.now}={}){
   const name=required(handle,'coordinator terminal name');
   return ledger.transaction(()=>{
     const open=readCoordinatorTerminals(ledger,id),closed=readClosedCoordinatorTerminals(ledger,id);
@@ -160,7 +160,7 @@ export function recordCoordinatorTerminal(ledger,id,handle,{now=Date.now()}={}){
     return{ok:true,opened:[...open,name]};
   });
 }
-export function closeStaleCoordinatorTerminals(ledger,id,{keep=[],close,known,now=Date.now()}={}){
+export function closeStaleCoordinatorTerminals(ledger,id,{keep=[],close,known,now=Date.now}={}){
   need(typeof close==='function','closeStaleCoordinatorTerminals needs a close callback');
   const keepSet=new Set([keep].flat().filter(Boolean)),listed=known?new Set(known):null;
   return ledger.transaction(()=>{
@@ -173,7 +173,7 @@ export function closeStaleCoordinatorTerminals(ledger,id,{keep=[],close,known,no
     return{ok:true,closed:closedNow,open:stillOpen};
   });
 }
-export function pruneClosedCoordinatorTerminals(ledger,id,listed,{now=Date.now()}={}){
+export function pruneClosedCoordinatorTerminals(ledger,id,listed,{now=Date.now}={}){
   const set=new Set([listed].flat().filter(Boolean));
   return ledger.transaction(()=>{
     const open=readCoordinatorTerminals(ledger,id),closed=readClosedCoordinatorTerminals(ledger,id);
@@ -185,15 +185,16 @@ export function pruneClosedCoordinatorTerminals(ledger,id,listed,{now=Date.now()
 }
 // Recovery for coordinators opened before the signal existed: the supervisor's own
 // log still names them (the log is an audit stream, not state).
-export function seedCoordinatorTerminals(ledger,id,{logFile,now=Date.now(),readFile=fs.readFileSync}={}){
+export function seedCoordinatorTerminals(ledger,id,{logFile,now=Date.now,readFile=fs.readFileSync}={}){
   if(!logFile||!fs.existsSync(logFile))return{ok:true,seeded:[]};
+  const known=new Set(readCoordinatorTerminals(ledger,id));
   const lines=String(readFile(logFile,'utf8')).split('\n'),seeded=[];
   for(const line of lines){
     let record;try{record=JSON.parse(line);}catch{continue;}
     if(record.event!=='kernel-started-in-coordinator'||record.id!==id||typeof record.terminal!=='string'||!record.terminal)continue;
-    if(seeded.includes(record.terminal))continue;
+    if(known.has(record.terminal))continue;
     recordCoordinatorTerminal(ledger,id,record.terminal,{now});
-    seeded.push(record.terminal);
+    known.add(record.terminal);seeded.push(record.terminal);
   }
   return{ok:true,seeded};
 }
