@@ -342,3 +342,49 @@ the small, tracked, human-readable counter-record.
   (`starci ledger-anchor --write`).
 - The sealed runtime pin records the anchor digest of each live workflow, so a pin and a checkout that
   disagree are caught at seal time rather than mid-run.
+
+## 13. The rest of `_local` — what becomes a row, and what was never a record
+
+§1 retired `_local/workflows`. A live root holds more than that, and the families are not alike. Measured on
+`nivo-backend/.starciwork/_local` (2.1 GB total):
+
+| family | size | verdict |
+|---|---|---|
+| `workflows/<id>/` | 47 MB | already rows (§4, §10) |
+| `plans/<id>/{PLAN.md,goal,approval,run,index.yaml}` | 183 KB | **new `plans` table** |
+| `history/` | 210 KB | **new `history` table** |
+| `runtime/orca-dispatch-ctx_*.md` | 80 KB | not a record: §9 puts it in `os.tmpdir()`. Deleted, never imported |
+| `drafts/` (html, png, `dist/`) | 62 MB | **not a record**: product artifacts. They belong in the repository |
+| `workflow-archive/`, `workflows-archive/`, `workflow-retirement/` | 2 GB | retired bodies and backup manifests: rows migrate, bytes do not |
+
+The rule this table applies, so the next family is decided the same way: **the ledger holds what a kernel
+continues from and what an audit must read.** Bytes that are neither do not become records by being moved into
+one. A 1.5 GB retirement backup inside `runtime.sqlite` would make every copy of the record carry a copy of
+its own backup, and `archive = copy one file` (§2) would stop being true.
+
+```sql
+-- Plan v2 state: today's `_local/plans/<id>/`, written by workflows/lifecycle.mjs. Append-only per revision,
+-- so an approval can always be read against the exact plan text it approved.
+CREATE TABLE plans(
+  plan_seq INTEGER PRIMARY KEY AUTOINCREMENT, plan_id TEXT NOT NULL, revision INTEGER NOT NULL,
+  workflow_id TEXT REFERENCES workflows(workflow_id),   -- null until a plan becomes a workflow
+  phase TEXT NOT NULL, markdown TEXT NOT NULL, index_json TEXT, goal_json TEXT, approval_json TEXT,
+  run_json TEXT, work_root TEXT, created_at INTEGER NOT NULL, UNIQUE(plan_id,revision));
+
+-- today's `_local/history/`: what a migration or a rename did, kept because an audit reads it
+CREATE TABLE history(
+  history_id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, subject TEXT, payload_json TEXT NOT NULL,
+  created_at INTEGER NOT NULL);
+CREATE INDEX history_subject ON history(kind,subject,history_id);
+```
+
+`ledger-migrate` imports `plans/` and `history/`, records every archive and retirement directory it found in
+`migrations` with its size and its verdict (`archived-bytes-not-imported`), refuses to swallow `drafts/`, and
+names each one in its result so the owner places them deliberately. Only once a root reports `ok:true` and
+`ledger-verify` passes is `_local` removed: `--archive true` moves it to `_local.migrated` first, and the
+owner deletes that when the anchor and the ledger agree.
+
+`workflows/storage.mjs`'s `stateRoot(workRoot)` and `workflows/lifecycle.mjs`'s plan writers are the last
+`_local` writers outside the migrator; they move onto `store.plans.*`. After that the grep bar of §11 covers
+`workflows/` too, and a Work root that still has a `_local` directory is a root that has not been migrated.
+
