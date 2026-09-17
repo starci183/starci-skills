@@ -79,4 +79,4 @@ function runModelWithHeartbeat(job,token,{journalFile,admission,spawnChild,event
 function stopOwnedTree(pid,spawnChild=spawn){return new Promise(resolve=>{if(!Number.isInteger(pid)||pid<=0)return resolve(false);if(process.platform==='win32'){const killer=spawnChild('taskkill',['/PID',String(pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});killer.on('error',()=>resolve(false));killer.on('close',status=>resolve(status===0));return;}try{process.kill(pid,'SIGTERM');}catch(error){return resolve(error?.code==='ESRCH');}setTimeout(()=>{try{process.kill(pid,0);resolve(false);}catch(error){resolve(error?.code==='ESRCH');}},250);});}
 
 const invoked=process.argv[1]&&pathToFileURL(path.resolve(process.argv[1])).href===import.meta.url;
-if(invoked){const [journalFile,jobId,leaseToken]=process.argv.slice(2);const result=await runDurableJob({journalFile,jobId,leaseToken});if(!result.ok)process.exitCode=1;}
+if(invoked){const [ledgerFile,jobId,leaseToken,machineFile]=process.argv.slice(2);const result=await runDurableJob({ledgerFile,jobId,leaseToken,machineFile:machineFile||null});if(!result.ok)process.exitCode=1;}

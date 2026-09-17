@@ -74,10 +74,10 @@ export function featureOf(item){
   return item?.module??(segments[0]||'(no feature)');
 }
 
-/** The last supervision round, from `_local/workflows/supervisor.log`, plus what that round decided for this workflow. */
+/** The last supervision round, from the repository's `.starciwork/supervisor.log`, plus what it decided here. */
 function readSupervisor(repoRoot,id,now,dir=null){
-  // The log beside the workflow (a named-ledger store) or the repository's own: whichever the supervisor wrote.
-  const files=[...new Set([path.join(workflowsRoot(repoRoot),'supervisor.log'),...(dir?[path.join(path.dirname(dir),'supervisor.log')]:[])])];
+  // The supervisor's log is an audit stream beside the ledger, never state: the record itself is the ledger.
+  const files=[...new Set([path.join(repoRoot,'.starciwork','supervisor.log'),...(dir?[path.join(path.dirname(dir),'supervisor.log')]:[])])];
   const rounds=files.flatMap(file=>readJsonLines(file)).filter(entry=>entry.event==='supervisor-round').sort((a,b)=>(a.at??0)-(b.at??0));
   const lastRound=rounds.at(-1)??null;
   const lastRoundAt=at(lastRound);

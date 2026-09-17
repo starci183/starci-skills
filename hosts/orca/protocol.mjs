@@ -1,7 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {getPath} from './calls.mjs';
-import {buildReport,readReports,reportBody,reportPath,reportsDirectory,validateReport} from '../../kernel/reports.mjs';
+import {buildReport,reportBody,repositoryRoot,validateReport} from '../../kernel/reports.mjs';
+import {createStore} from '../../kernel/store.mjs';
+
+/**
+ * §9: a worker gives and takes its data through the CLI against the workflow's own ledger rows. There is no
+ * reports directory any more, so both verbs need the workflow id the contract already told the worker to pass.
+ */
+const withStore=(cwd,workflow,fn)=>{const store=createStore({repoRoot:repositoryRoot(cwd),id:required(workflow,'workflow id')});try{return fn(store);}finally{store.close();}};
+const reportRef=(workflow,dispatch)=>`ledger://reports/${workflow}/${dispatch}`;
 import {notifyTerminal,settleDispatch,sweepWorktree} from './launch.mjs';
 import {DEFAULT_STALLED_AFTER_MS,observe} from './observe.mjs';
 
@@ -29,19 +37,22 @@ function readJson(file,fallback){try{return JSON.parse(fs.readFileSync(file,'utf
 function writeJson(file,value){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,`${JSON.stringify(value,null,2)}\n`);}
 
 /** One typed outcome: validate, write the file, send the matching Orca signal once, record the send. */
-export function reportOutcome(orca,{cwd,kind='op',run,from,task,dispatch,outcome,summary,files=[],checksFile=null,checks=[],open=[],question=null,blocker=null,credentialRequest=null,credentialRequestFile=null,branch=null,head=null,gates=[],observations=[],reportsDir=null,capability=null,fileKey=null,now=Date.now}){
-  const directory=reportsDirectory(cwd,required(run,'run id'),reportsDir);
-  const file=reportPath(directory,fileKey??required(dispatch,'dispatch id'));
-  const existing=readJson(file,null);
+export function reportOutcome(orca,{cwd,kind='op',run,from,task,dispatch,outcome,summary,files=[],checksFile=null,checks=[],open=[],question=null,blocker=null,credentialRequest=null,credentialRequestFile=null,branch=null,head=null,gates=[],observations=[],workflow=null,capability=null,fileKey=null,opId=null,attempt=null,generation=null,now=Date.now}){
+  const workflowId=required(workflow,'workflow id'),key=fileKey??required(dispatch,'dispatch id');
+  const store=createStore({repoRoot:repositoryRoot(cwd),id:workflowId});
+  try{
+  const file=reportRef(workflowId,key);
+  const existing=store.readReports().find(row=>row.dispatchId===key);
   if(existing?.sent)return {schema:REPORT_RESULT,ok:false,file,reason:'already-reported',existing:{outcome:existing.outcome,sent:existing.sent}};
   const loadedChecks=checksFile?readJson(path.resolve(cwd,checksFile),null):checks;
   need(Array.isArray(loadedChecks),`Checks file is not a JSON array: ${checksFile}`);
   const request=credentialRequestFile?readJson(path.resolve(cwd,credentialRequestFile),null):credentialRequest;
   need(!credentialRequestFile||request!==null,'Credential request file is missing or invalid JSON.');
   const report=buildReport({kind,outcome,run,task,dispatch,from,summary,files,checks:loadedChecks,open,question,blocker,credentialRequest:request,branch,head,gates,observations,reportedAt:now()});
-  writeJson(file,report);
+  const written={dispatchId:key,opId,attempt,generation,outcome:report.outcome,fromTerminal:from};
+  store.writeReport({...written,report});
   const {type,orcaOutcome}=report.signal;
-  const params={run,from,type,subject:`${report.outcome}: ${report.summary.slice(0,120)}`,body:reportBody(report,path.relative(cwd,file)),'task-id':task,'dispatch-id':dispatch,'report-path':path.relative(cwd,file).replaceAll('\\','/')};
+  const params={run,from,type,subject:`${report.outcome}: ${report.summary.slice(0,120)}`,body:reportBody(report,file),'task-id':task,'dispatch-id':dispatch,'report-path':file};
   if(orcaOutcome)params.outcome=orcaOutcome;
   if(report.files.length)params['files-modified']=report.files.join(',');
   if(capability)params['dispatch-capability']=capability;
@@ -49,10 +60,11 @@ export function reportOutcome(orca,{cwd,kind='op',run,from,task,dispatch,outcome
   const messageId=getPath(sent.receipt,'result.message.id')??getPath(sent.receipt,'result.messageId')??getPath(sent.receipt,'result.id')??null;
   report.sent=sent.outcome==='ok'?{messageId,sentAt:now(),type}:null;
   report.sendFailure=sent.outcome==='ok'?null:{outcome:sent.outcome,effectState:sent.effectState,reason:sent.reason};
-  writeJson(file,report);
+  store.writeReport({...written,report});
   return {schema:REPORT_RESULT,ok:sent.outcome==='ok',file,outcome:report.outcome,signal:report.signal,messageId,
     send:{outcome:sent.outcome,effectState:sent.effectState,reason:sent.reason},
-    reason:sent.outcome==='ok'?null:`report written but the ${type} signal was not accepted (${sent.reason??sent.outcome}); the receiver's wait tick still reads the file`};
+    reason:sent.outcome==='ok'?null:`report recorded but the ${type} signal was not accepted (${sent.reason??sent.outcome}); the receiver's wait tick still reads the row`};
+  }finally{store.close();}
 }
 
 const isLive=w=>['ready','running','starting'].includes(w.workerState)||(w.workerState==='unsupervised'&&['dispatched','pending','ready'].includes(w.dispatchStatus));
@@ -75,14 +87,14 @@ export const DEFAULT_TICK_MS=120000;
  * once per tick while the supervisor keeps waiting; the call returns at the first boundary (report, stalled,
  * dead) or after the whole timeout with `timeout`.
  */
-export function waitTick(orca,{cwd,run,from,timeoutMs=900000,tickMs=DEFAULT_TICK_MS,reportsDir=null,stalledAfterMs=DEFAULT_STALLED_AFTER_MS,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack=null,noAck=false,now=Date.now,wake=null,wait=sleepSync}){
+export function waitTick(orca,{cwd,run,from,timeoutMs=900000,tickMs=DEFAULT_TICK_MS,workflow=null,stalledAfterMs=DEFAULT_STALLED_AFTER_MS,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack=null,noAck=false,now=Date.now,wake=null,wait=sleepSync}){
   const started=now();
   const ticks=[];
   let ackOnce=ack,noAckOnce=noAck;
   for(;;){
     const remaining=timeoutMs-(now()-started);
     const slice=Math.max(1000,Math.min(tickMs,remaining));
-    const tick=singleTick(orca,{cwd,run,from,timeoutMs:slice,reportsDir,stalledAfterMs,heartbeatGraceMs,ack:ackOnce,noAck:noAckOnce,now,wait});
+    const tick=singleTick(orca,{cwd,run,from,timeoutMs:slice,workflow,stalledAfterMs,heartbeatGraceMs,ack:ackOnce,noAck:noAckOnce,now,wait});
     ackOnce=null;noAckOnce=false;
     ticks.push({at:now(),event:tick.event,liveness:tick.liveness.map(item=>`${item.dispatch}:${item.liveness}`)});
     if(tick.event!=='timeout'||now()-started>=timeoutMs)return {...tick,ticks:ticks.length,elapsedMs:now()-started};
@@ -92,8 +104,8 @@ export function waitTick(orca,{cwd,run,from,timeoutMs=900000,tickMs=DEFAULT_TICK
   }
 }
 
-function singleTick(orca,{cwd,run,from,timeoutMs,reportsDir,stalledAfterMs,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack,noAck,now,wait}){
-  const directory=reportsDirectory(cwd,required(run,'run id'),reportsDir);
+function singleTick(orca,{cwd,run,from,timeoutMs,workflow,stalledAfterMs,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack,noAck,now,wait}){
+  const recorded=withStore(cwd,workflow,store=>store.readReports());
   const stateFile=path.join(directory,'wait-state.json');
   const state=readJson(stateFile,{lastDeliveryId:null,seenReports:{}});
   const checkParams={run,terminal:required(from,'own terminal handle'),wait:true,'timeout-ms':String(timeoutMs),types:BOUNDARY_TYPES};
@@ -118,12 +130,12 @@ function singleTick(orca,{cwd,run,from,timeoutMs,reportsDir,stalledAfterMs,heart
   const pings=new Map();
   const peeked=orca.invoke('check',{run,terminal:from,peek:true,types:'heartbeat'},{cwd});
   for(const m of (getPath(peeked.receipt,'result.messages')??[])){let p={};try{p=JSON.parse(m.payload??'{}');}catch{}const at=Date.parse(m.created_at??m.createdAt??'')||0;if(p.dispatchId&&at>=(pings.get(p.dispatchId)??0))pings.set(p.dispatchId,at);}
-  const reports=readReports(directory).filter(report=>report?.dispatch&&!state.seenReports[report.dispatch]).map(report=>({...report,validation:validateReport(report)}));
+  const reports=recorded.filter(report=>report?.dispatch&&!state.seenReports[report.dispatch]).map(report=>({...report,validation:validateReport(report)}));
   const workers=(getPath(orca.invoke('worker-list',{run},{cwd}).receipt,'result.workers')??[]);
   const listed=getPath(orca.invoke('terminal-list',{},{cwd}).receipt,'result.terminals')??[];
   const tasks=getPath(orca.invoke('task-list',{run},{cwd}).receipt,'result.tasks')??[];
   const names=new Map(tasks.map(task=>[task.id,task.display_name]));
-  const reportedDispatches=new Set(readReports(directory).map(report=>report?.dispatch).filter(Boolean));
+  const reportedDispatches=new Set(recorded.map(report=>report?.dispatch).filter(Boolean));
   const liveness=[],renamed=[],approvals=[];
   for(const worker of workers.filter(isLive)){
     const handle=worker.agentTerminalHandle;
@@ -178,9 +190,9 @@ export function protocolMain(command,options,{orca,cwd}){
       blocker:options.blocker?{kind:options.blocker.split(':')[0],detail:options.blocker.split(':').slice(1).join(':').trim()}:null,
       credentialRequestFile:options['credential-request-file']??null,
       branch:options.branch??null,head:options.head??null,gates:options.gates?csv(options.gates).map(gate=>{const [name,status]=gate.split('=');return {name,status:status??'passed'};}):[],
-      observations:options.observations?[options.observations]:[],reportsDir:options['reports-dir']??null,capability:options.capability??null});
+      observations:options.observations?[options.observations]:[],workflow:required(options.workflow,'workflow id'),opId:options.op??null,attempt:options.attempt!==undefined?Number(options.attempt):null,capability:options.capability??null});
   }
-  if(command==='wait')return waitTick(orca,{cwd,run:required(options.run,'run id'),from:required(options.from,'own terminal handle'),timeoutMs:Number(options['timeout-ms']??900000),tickMs:Number(options['tick-ms']??DEFAULT_TICK_MS),reportsDir:options['reports-dir']??null,stalledAfterMs:Number(options['stalled-after-ms']??DEFAULT_STALLED_AFTER_MS),ack:options.ack??null,noAck:options['no-ack']==='true'});
+  if(command==='wait')return waitTick(orca,{cwd,run:required(options.run,'run id'),from:required(options.from,'own terminal handle'),timeoutMs:Number(options['timeout-ms']??900000),tickMs:Number(options['tick-ms']??DEFAULT_TICK_MS),workflow:required(options.workflow,'workflow id'),stalledAfterMs:Number(options['stalled-after-ms']??DEFAULT_STALLED_AFTER_MS),ack:options.ack??null,noAck:options['no-ack']==='true'});
   throw Error(`Unsupported protocol command: ${command}`);
 }
 

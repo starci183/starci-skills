@@ -157,7 +157,7 @@ function headOf(root,git=spawnSync){
 const row=cells=>`| ${cells.map(text).join(' | ')} |`;
 const bullets=items=>items.length?items.map(item=>`- ${text(item)}`).join('\n'):'- None';
 
-const storeRepoRoot=store=>path.dirname(path.dirname(path.dirname(path.dirname(store.dir))));
+const storeRepoRoot=store=>store.repoRoot;
 function assertContinuationTarget(root,target){
   const parts=path.relative(root,target).split(path.sep);let current=root;
   for(const [index,part] of parts.entries()){

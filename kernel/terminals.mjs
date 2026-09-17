@@ -5,8 +5,7 @@ import {dispatchLastWords,settleDispatch} from '../hosts/orca/launch.mjs';
 import {RESTART_LIMIT,firstLine,need,plain,sleepSync} from './common.mjs';
 import {buildReport} from './reports.mjs';
 import {redactSecrets} from './owner.mjs';
-import {closeStaleCoordinatorTerminals,pruneClosedCoordinatorTerminals,readClosedCoordinatorTerminals,seedCoordinatorTerminalsFromLog} from './coordinator-terminals.mjs';
-import {inspectStartup,startupRowHolds} from './startup-lock.mjs';
+import {closeStaleCoordinatorTerminals,inspectStartup,pruneClosedCoordinatorTerminals,readClosedCoordinatorTerminals,seedCoordinatorTerminals,startupRowHolds} from './launch.mjs';
 
 /**
  * Tabs and the Run they hang from. The rule is one sentence - a tab exists only while somebody reads it - and
@@ -128,14 +127,14 @@ export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Dat
   const listed=listTerminals(orca,cwd);
   // The coordinator terminals earlier kernels of this workflow ran in, by handle: Orca re-titles an exited kernel's
   // tab to its shell, so the title match below never sees them; the record beside the store does.
-  seedCoordinatorTerminalsFromLog(store.dir,state.id);
+  seedCoordinatorTerminals(store.ledger,state.id,{logFile:path.join(path.dirname(store.ledgerFile),'supervisor.log')});
   for(const handle of Object.keys(attempts))if(!listed.some(item=>item.handle===handle))delete attempts[handle];
-  const recorded=closeStaleCoordinatorTerminals(store.dir,{keep:state.from??null,known:listed.map(item=>item.handle),close:tryClose});
-  for(const item of recorded.closed)if(item.reason!=='coordinator terminal already gone')closed.push({terminal:item.terminal,reason:'stale kernel tab'});
+  const recorded=closeStaleCoordinatorTerminals(store.ledger,state.id,{keep:state.from?[state.from]:[],known:listed.map(item=>item.handle),close:tryClose});
+  for(const terminal of recorded.closed)closed.push({terminal,reason:'stale kernel tab'});
   // A tab whose close was answered earlier but which Orca still lists: asked again only after the window, reported once.
   const listedHandles=listed.map(item=>item.handle);
-  for(const handle of readClosedCoordinatorTerminals(store.dir))if(listedHandles.includes(handle)&&handle!==state.from&&tryClose(handle))closed.push({terminal:handle,reason:'stale kernel tab'});
-  pruneClosedCoordinatorTerminals(store.dir,listedHandles);
+  for(const handle of readClosedCoordinatorTerminals(store.ledger,state.id))if(listedHandles.includes(handle)&&handle!==state.from&&tryClose(handle))closed.push({terminal:handle,reason:'stale kernel tab'});
+  pruneClosedCoordinatorTerminals(store.ledger,state.id,listedHandles);
   const closedHandles=new Set(closed.map(item=>item.terminal));
   for(const item of listed){
     if(closedHandles.has(item.handle))continue;
@@ -161,16 +160,16 @@ export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Dat
 }
 /** Whether a sibling workflow of this store root is finished or has no live kernel: its `[Kernel]` tab is then nobody's. */
 export function siblingKernelGone(store,id,{terminal=null,now=Date.now,alive=pid=>{try{process.kill(pid,0);return true;}catch{return false;}}}={}){
-  const dir=path.join(path.dirname(store.dir),id);
   let sibling=null;
-  // A workflow this store root does not know is not this kernel's to judge: its tab is left alone.
-  try{sibling=JSON.parse(fs.readFileSync(path.join(dir,'state.json'),'utf8'));}catch{return false;}
+  // A workflow this ledger does not know is not this kernel's to judge: its tab is left alone.
+  try{const row=store.ledger.db.prepare("SELECT state_json FROM state_snapshots WHERE workflow_id=? AND state_json<>'' ORDER BY snapshot_id DESC LIMIT 1").get(id);
+    if(!row)return false;sibling=JSON.parse(row.state_json);}catch{return false;}
   if(sibling?.finished)return true;
-  try{const lock=JSON.parse(fs.readFileSync(path.join(dir,'kernel.lock'),'utf8'));if(alive(Number(lock.pid)))return false;}catch{}
   // A native supervisor first reserves startup while creating/reading/sending to the coordinator terminal, then
   // binds its exact handle. Closing either window can kill a kernel between command delivery and lock creation.
   // Age alone is not worker-stop proof; the supervisor owns reconciliation of an expired launch reservation.
-  try{const startup=inspectStartup(dir),standing=startupRowHolds(startup,{now,alive,kernelAlive:()=>false});
+  try{const startup=inspectStartup(store.ledger,id),standing=startupRowHolds(startup,{now,alive,kernelAlive:()=>false});
+    if(startup?.phase==='running'&&alive(Number(startup.pid))&&startup.terminal!==terminal)return false;
     if(startup?.phase==='launching'&&standing.holds)return false;
     if(startup?.phase==='launching-native'&&startup.terminal===terminal)return false;
     if(startup?.phase==='running'&&startup.terminal===terminal&&alive(Number(startup.pid)))return false;}catch{}
@@ -258,7 +257,7 @@ export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=slee
   const dead=[];
   if(terminals.outcome==='ok')for(const op of state.ops.filter(item=>item.status==='running'&&item.dispatch)){
     if(liveDispatches.has(op.dispatch)||(op.terminal&&handles.has(op.terminal)))continue;
-    if(fs.existsSync(path.join(store.paths.reports,`${op.dispatch}.json`)))continue;
+    if(store.readReports().some(report=>report.dispatchId===op.dispatch))continue;
     // What the Dispatch said last is read BEFORE it is called dead. A worker that finished its work and could
     // not reach the kernel's report command is not a lost agent, and it is never charged for that.
     const words=dispatchLastWords(orca,op.dispatch,{cwd});
