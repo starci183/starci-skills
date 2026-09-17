@@ -528,7 +528,7 @@ test('the goal phase writes goal.md and goal.json and stops: nothing is launched
     // A plan-mode backend.implement op without a Work node still gets the implement.ledger working order.
     assert.match(contract,/## Working order \(mandatory, in this order\)\nSequence `implement\.ledger`\./);
     assert.match(contract,/## Definition of done for this kind/);
-    assert.match(contract,/node L\.mjs report --run run_wf/);
+    assert.match(contract,new RegExp(`node L\\.mjs report --workflow ${state.id} --run run_wf`));
     assert.match(contract,/- `apps\/agentos-controlplane\/src\/sales\/intake\.ts`/);
     assert.doesNotMatch(contract,/<launcher>|<nested run>|<runtime dir>|<reports dir>/);
   }finally{harness.cleanup();}
@@ -1284,6 +1284,9 @@ test('a launched audit with a Work node leaves every canonical Work byte unchang
     const workRoot=path.join(harness.repo,'.starciwork'),snapshot=()=>{
       const rows=[];const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){
         if(dir===workRoot&&entry.name==='_local')continue;
+        // The §12 tracked anchor advances its own checkpoint on every save, including a pure audit's - that
+        // churn is the ledger's own bookkeeping, not a byte the audit's inspection touched.
+        if(dir===workRoot&&(entry.name==='ledger-anchor.json'||entry.name.startsWith('runtime.sqlite')))continue;
         const file=path.join(dir,entry.name);if(entry.isDirectory())walk(file);else rows.push([path.relative(workRoot,file).replaceAll('\\','/'),fs.readFileSync(file).toString('base64')]);}};
       walk(workRoot);return rows;
     };
@@ -2026,7 +2029,7 @@ test('untracked strays that alone make the tree invalid are quarantined beside t
     assert.ok(quarantined,'the stray was quarantined');
     assert.deepEqual(quarantined.strays.map(item=>item.from),['.starciwork/features/collab/']);
     assert.equal(fs.existsSync(stray),false,'the stray left the tree');
-    assert.ok(fs.existsSync(path.join(store.dir,'strays')),'and is kept beside the store');
+    assert.ok(fs.existsSync(path.join(repo,'.starciwork','_local','strays')),'and is kept in the excluded root the tree never scans');
     assert.ok(log.some(event=>event.event==='ledger-valid-again'));
     // The op the red tree had exhausted is not blocked any more (a kernel start re-admits validator-blocked ops; a mid-run recovery says `op-readmitted`).
     assert.notEqual(after.ops.find(item=>item.id===nodeId).status,'blocked');
@@ -2306,7 +2309,7 @@ test('kernel startup discovers existing credential waits before the first tick, 
     // inputScratchDir is keyed by workflow id, and setupWork's id is the same fixed string every call
     // (unlike store.dir, which used to be a fresh tmpdir per test); a stale session from an earlier run of
     // this same suite would otherwise read as `workflow-binding-changed` against this run's fresh repo.
-    fs.rmSync(inputScratchDir(state.id),{recursive:true,force:true});
+    fs.rmSync(inputScratchDir(state.id,store.repoRoot),{recursive:true,force:true});
     approve(store,state);state.run='run_wf';state.from='term_kernel';
     harness.run({maxIterations:0});
     const requester=state.ops.find(op=>op.nodeId==='demo.sales.implementation.backend.intake');
@@ -2316,7 +2319,7 @@ test('kernel startup discovers existing credential waits before the first tick, 
     requester.status='paused';requester.waitingFor=ask.id;requester.dependsOn.push(ask.id);state.ops.push(ask);
     const owner='demo.sales.architecture.sds.intake',file=harness.node(owner),record=parseYaml(fs.readFileSync(file,'utf8')),entry=preparedEntry();
     delete entry.preparation;record.extensions??={};record.extensions.work3??={};record.extensions.work3.integrations=[entry];fs.writeFileSync(file,stringifyYaml(record));
-    const files=inputFiles(inputScratchDir(state.id)),browserCalls=[];let launches=0;
+    const files=inputFiles(inputScratchDir(state.id,store.repoRoot)),browserCalls=[];let launches=0;
     const browser={verify:()=>({ok:true}),invoke:(name,params)=>{
       browserCalls.push({name,params});
       if(name==='tab-list')return {outcome:'ok',receipt:{result:{tabs:[]}}};
@@ -4000,17 +4003,17 @@ test('the preflight runs once at the start, its problems become needUser items, 
 
 test('a second workflow-run process is refused before run binding or terminal effects',async()=>{
   const repo=tmp(),host=path.resolve('.'),functions={assessGoal:()=>({ok:true,provider:'fake',value:salesPlan}),critiqueGoal:soundCritique,extractMaterial:()=>[]};
-  const fake=scriptedOrca({store:null,scripts:{}});let child;
+  const fake=scriptedOrca({store:null,scripts:{}});let child,store;
   try{
     const created=kernelMain('workflow-goal',{job:'Lock the sales slice',host},{orca:fake.orca,cwd:repo,functions});kernelMain('workflow-approve',{id:created.id},{orca:fake.orca,cwd:repo});
     child=spawn(process.execPath,['-e','setTimeout(()=>{},30000)'],{stdio:'ignore',windowsHide:true});
-    const store=createStore({repoRoot:repo,id:created.id});
+    store=createStore({repoRoot:repo,id:created.id});
     store.signal.set(store.id,'kernel-lock',{pid:child.pid,token:'sim-launch-token'});
     fake.terminals.set('term_live_worker',{handle:'term_live_worker',title:'[Op] live',status:'running',sent:true,worktreePath:repo});
     const before=fake.terminals.size;assert.throws(()=>kernelMain('workflow-run',{id:created.id,'max-iterations':'0'},{orca:fake.orca,cwd:repo,functions}),/another kernel or unresolved launch/);
     assert.equal(fake.terminals.size,before,'no coordinator terminal was created or native worker swept');assert.equal(fake.terminals.has('term_live_worker'),true);
     assert.equal(store.readEvents().some(event=>['run-bound','run-resumed'].includes(event.event)),false);
-  }finally{if(child)try{child.kill();}catch{}fs.rmSync(repo,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+  }finally{if(child)try{child.kill();}catch{}try{store?.close();}catch{}fs.rmSync(repo,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 });
 
 test('a kernel that already has its run records run-resumed; only a real bind records run-bound',()=>{
@@ -4041,7 +4044,7 @@ test('a kernel that already has its run records run-resumed; only a real bind re
     const boundEvents=eventsOf(boundGoal.id).map(event=>event.event);
     assert.ok(boundEvents.includes('run-bound'));
     assert.equal(boundEvents.includes('run-resumed'),false);
-  }finally{fs.rmSync(repo,{recursive:true,force:true});}
+  }finally{try{fs.rmSync(repo,{recursive:true,force:true,maxRetries:20,retryDelay:100});}catch(error){if(error?.code!=='EPERM'&&error?.code!=='EBUSY')throw error;}}
 });
 
 /**
@@ -4647,13 +4650,13 @@ test('the kernel holds its launch in the repository runtime ledger and clears th
   try{
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
-    const file=harness.store.ledgerFile;
-    const allocator=createAllocator({runtimes:runtimeProfile,now:()=>Date.UTC(2026,8,12,9),
+    const file=harness.store.ledgerFile,now=()=>Date.UTC(2026,8,12,9);
+    const allocator=createAllocator({runtimes:runtimeProfile,now,
       shared:{path:file,workflow:harness.store.id}});
     harness.run({allocator,maxIterations:1});
     const launched=events(harness.store).find(event=>event.event==='launched');
     assert.equal(launched.op,'op-intake');
-    const ledger=()=>readLoads({path:file,workflow:harness.store.id});
+    const ledger=()=>readLoads({path:file,workflow:harness.store.id,now});
     assert.equal(ledger().schema,'starci/runtime-loads@1');
     assert.deepEqual(ledger().runtimes[launched.runtime].live.map(item=>[item.workflow,item.op]),
       [[harness.store.id,'op-intake']]);
@@ -4922,6 +4925,10 @@ test('a critic no provider could answer is recorded as unavailable and the workf
  */
 function headlessFake({store,scripts}){
   const root=path.join(os.tmpdir(),'starci',store.id,'headless');
+  // The host's own dispatch/mailbox table lives on real disk at a path keyed only by the workflow id, which
+  // `setup()` fixes to the same literal every call (unlike `repo`, a fresh tmpdir per test): a prior run's
+  // stale dispatch records would otherwise carry into this one and confuse the mailbox-wait liveness check.
+  fs.rmSync(root,{recursive:true,force:true});
   const children=[];const alive=new Set();let pid=7000;
   const opOf=text=>(String(text).match(/op `([^`]+)`/)??[null,'unknown'])[1];
   const spawn=(executable,args,options)=>{const child={pid:++pid,executable,args,options,input:'',stdin:{write(text){child.input+=text;},end(){}},on(){},unref(){}};alive.add(child.pid);children.push(child);return child;};
@@ -4937,6 +4944,11 @@ function headlessFake({store,scripts}){
       const report=buildReport({...script,run,task,dispatch,from:terminal});
       report.sent={messageId:`msg_${dispatch}`,sentAt:Date.now(),type:report.signal.type};
       store.writeReport({dispatchId:dispatch,report,fromTerminal:terminal});
+      // The real launcher's `report` CLI both files the ledger row and notifies the host through its mailbox
+      // (hosts/orca/protocol.mjs, outside this stream); the fake child does the first itself and asks the real
+      // headless host to do the second, so `check`'s own wait sees the report the same way it would for real.
+      orca.invoke('send',{run,from:terminal,type:report.signal.type,subject:`report:${dispatch}`,
+        payload:JSON.stringify({dispatchId:dispatch,taskId:task,outcome:script.outcome})});
       alive.delete(child.pid);
     }
   };

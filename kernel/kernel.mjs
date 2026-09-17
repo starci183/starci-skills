@@ -1621,7 +1621,7 @@ export function releaseSettledOperationLeases(store,state,ctx,{settle=settleGene
 const withAnchorVerified=(boundary,store,state)=>{
   if(typeof ledgerDb.verifyAnchor!=='function')return boundary;
   let anchor;
-  try{anchor=ledgerDb.verifyAnchor(store.ledger,{workflowId:state.id});}
+  try{anchor=ledgerDb.verifyAnchor(store.ledger,store.repoRoot);}
   catch(error){anchor={ok:false,reason:error?.code??'ledger-anchor-unavailable',detail:String(error?.message??error)};}
   if(anchor?.ok!==false)return boundary;
   const code=['ledger-behind-anchor','ledger-missing','ledger-identity-mismatch'].includes(anchor.reason)?anchor.reason:'ledger-behind-anchor';

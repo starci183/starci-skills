@@ -477,7 +477,7 @@ test('public retry and pinned enrolled run preserve accepted history while settl
   for(const op of run.state.ops)op.references=(op.references??[]).map(reference=>{if(typeof reference!=='string')return reference;const normalized=slash(reference);
     if(!normalized.startsWith(`${currentPrefix}/knowledge/`))return reference;relocatedReferences+=1;return `${authoredPrefix}${normalized.slice(currentPrefix.length)}`;});
   assert.ok(relocatedReferences>0,'the pre-pin operation carries authored runtime provenance before sealing');
-  const pin=sealRuntime({sourceRoot:authoredRuntime,buildsRoot:path.join(run.root,'builds'),version:'1.0.0'}),pinFile=path.join(run.root,'accepted-runtime-pin.json'),journalFile=path.join(run.root,'runtime','journal.sqlite'),machineFile=path.join(run.root,'runtime','machine.sqlite');
+  const pin=sealRuntime({sourceRoot:authoredRuntime,buildsRoot:path.join(run.root,'builds'),version:'1.0.0'}),pinFile=path.join(run.root,'accepted-runtime-pin.json'),journalFile=run.store.ledgerFile,machineFile=path.join(run.root,'runtime','machine.sqlite');
   assert.equal(pin.sourceRoot,slash(fs.realpathSync(authoredRuntime)));fs.writeFileSync(pinFile,`${JSON.stringify(pin,null,2)}\n`);
   fs.renameSync(authoredRuntime,path.join(run.root,'relocated-authored-runtime'));
   assert.equal(fs.existsSync(authoredRuntime),false,'the original authored runtime is absent before public retry');
@@ -488,9 +488,14 @@ test('public retry and pinned enrolled run preserve accepted history while settl
   const stopped=kernelMain('workflow-stop',{id:run.state.id,host:run.host},{orca:{},cwd:run.code});assert.equal(stopped.id,run.state.id);
   const retried=kernelMain('workflow-retry',{id:run.state.id,host:run.host,'runtime-pin':pinFile},{orca:{},cwd:run.code});assert.equal(retried.ok,true);assert.equal(retried.generation,2);
   const afterRetry=run.store.loadState();assert.equal(afterRetry.ops.find(op=>op.id===accepted.id).status,'done');assert.deepEqual(afterRetry.decisions,run.state.decisions);
-  const retryReceiptJournal=openJournal({file:journalFile});try{const names=retryReceiptJournal.events({workflowId:run.state.id}).filter(event=>event.generation===2&&event.kind==='runtime-file-written').map(event=>event.payload?.relative);
-    for(const name of ['state.json','events.jsonl','stop.flag'])assert.ok(names.includes(name),`public retry receipts ${name}`);
+  // There is one ledger, not a per-generation journal to hand files into: "custody" of state, events and the
+  // paused signal under generation 2 is proven by the rows themselves, not by file-receipt events.
+  const retryReceiptJournal=openJournal({file:journalFile});try{
+    assert.ok(retryReceiptJournal.events({workflowId:run.state.id}).some(event=>event.generation===2&&event.kind==='workflow-retried'),
+      'public retry records its own generation-2 event in the shared ledger');
   }finally{retryReceiptJournal.close();}
+  assert.equal(afterRetry.engine.generation,2,'public retry durably advances the bound generation');
+  assert.equal(run.store.signal.get(run.state.id,'stop'),null,'public retry clears the paused signal in the same ledger');
 
   const nonce=`shared-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const pinnedKernel=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','kernel.mjs')).href}?${nonce}`),
