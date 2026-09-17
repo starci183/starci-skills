@@ -174,11 +174,13 @@ export function bindContinuationPath(store,state=null){
   if(typeof explicit==='string'&&explicit.trim()){
     const target=path.resolve(root,explicit),relative=path.relative(workflows,target);
     if(relative.startsWith('..')||path.isAbsolute(relative)||path.extname(target).toLowerCase()!=='.md')throw Error('Public continuation binding must be a Markdown file under workflows/');
-    assertContinuationTarget(root,target);store.paths.continuation=target;return target;
+    assertContinuationTarget(root,target);return target;
   }
+  // `store.continuation` is the same canonical path when the binding's own id matches the store's; recomputed
+  // here (rather than read from the store) so an explicit `state.id` override is still honoured.
   const canonical=path.join(workflows,`${id}.md`);
   assertContinuationTarget(root,canonical);
-  if(fs.existsSync(canonical)){store.paths.continuation=canonical;return canonical;}
+  if(fs.existsSync(canonical))return canonical;
   // Friendly briefs need an explicit identity declaration. A goal index can mention many workflow IDs and
   // must never become a workflow's checkpoint just because its prose (or an old generated section) names one.
   let matched=[];try{matched=fs.readdirSync(workflows,{withFileTypes:true}).filter(entry=>entry.isFile()&&entry.name.toLowerCase().endsWith('.md')).map(entry=>path.join(workflows,entry.name)).filter(file=>{
@@ -195,7 +197,7 @@ export function bindContinuationPath(store,state=null){
       return body.startsWith(`<!-- ${CONTINUATION_BRIEF} -->\n# Workflow continuation: ${id}\n`)||body.startsWith(`<!-- ${CONTINUATION_BRIEF} -->\r\n# Workflow continuation: ${id}\r\n`);
     }catch{return false;}
   });}catch{matched=[];}
-  store.paths.continuation=matched.length===1?matched[0]:canonical;assertContinuationTarget(root,store.paths.continuation);return store.paths.continuation;
+  const resolved=matched.length===1?matched[0]:canonical;assertContinuationTarget(root,resolved);return resolved;
 }
 export function continuationPath(store,state=null){return bindContinuationPath(store,state);}
 
@@ -209,9 +211,12 @@ export function buildContinuationBrief(store,state,{now=Date.now,git=spawnSync}=
   const blockers=[...list(current.needUser).map(item=>`${item.code??item.kind??'need-user'}: ${item.detail??item.question??json(item)}`),
     ...remaining.filter(op=>op.status==='blocked'||op.refusal).map(op=>`${op.id}: ${op.refusal??op.blocker?.detail??'blocked'}`)];
   const unknown=boundary.findings.length||remaining.some(op=>op.lease||op.dispatch);
+  // The final report is a ledger row now (signals: key 'final-report'), never a file; state.finished only
+  // marks that one exists (`{outcome,reason,report:true}`), so read it back for the text an operator sees.
+  const finalReport=current.finished?store.signal?.get?.(store.id,'final-report')?.value??null:null;
   const next=controller.alive?`Wait for controller PID ${controller.pid} to exit, then run workflow-status and inspect this brief again.`
     :boundary.findings.length?`Reconcile the exact identities in Boundary findings. Preserve every unknown effect and writer; do not clear a lease from process absence alone.`
-      :current.finished?`Inspect the final report at ${store.paths.final}; do not reopen accepted work without a new authorized retry boundary.`
+      :current.finished?`This workflow finished (${text(current.finished.outcome)}${current.finished.reason?`: ${text(current.finished.reason)}`:''}); inspect the final report in the ledger${finalReport?` (${json({schema:finalReport.schema,head:finalReport.head})})`:''}. Do not reopen accepted work without a new authorized retry boundary.`
         :`Resume with workflow-run --id ${current.id} through the same sealed runtime. The kernel lock admits one controller and exact live operation identities are reconciled before a new dispatch.`;
   const lines=[`<!-- ${CONTINUATION_BRIEF} -->`,`# Workflow continuation: ${current.id}`,'',
     `Generated: ${new Date(typeof now==='function'?now():now).toISOString()}`,'',
@@ -219,8 +224,8 @@ export function buildContinuationBrief(store,state,{now=Date.now,git=spawnSync}=
     row(['Field','Value']),row(['---','---']),
     row(['Workflow',current.id]),row(['Job',current.job]),row(['Phase',current.phase]),row(['Approved',String(Boolean(current.approved))]),
     row(['Workflow generation',current.engine?.generation??'not enrolled']),row(['Goal identity',stateGoalIdentity(current)]),
-    row(['State SHA-256',sha256(stateBytes)]),row(['Projected state',slash(store.paths.state)]),
-    row(['Durable checkpoint',ledgerView.snapshot?.checkpoint_id??'none']),row(['Durable ledger',ledgerView.file??'none']),
+    row(['State SHA-256',sha256(stateBytes)]),
+    row(['Durable checkpoint',ledgerView.snapshot?.checkpoint_id??'none']),row(['Durable ledger',ledgerView.file??store.ledgerFile??'none']),
     row(['Runtime pin digest',current.engine?.runtimePin?.digest??'none']),row(['Runtime pin root',slash(current.engine?.runtimePin?.root??'none')]),
     row(['Worktree',slash(current.worktree??current.repoRoot)]),row(['Branch',current.branch]),row(['Accepted workflow head',current.head??'none']),
     row(['Observed source HEAD',actualHead??'unavailable']),row(['Controller PID',controller.pid??'none']),

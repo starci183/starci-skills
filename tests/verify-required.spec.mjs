@@ -10,7 +10,13 @@ import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
 const fixture=t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-validator-required-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   fs.writeFileSync(path.join(dir,'a.js'),'changed');
-  const store={dir,appendEvent:event=>store.events.push(event),events:[]};
+  // §8: the validator's memory page and verdict log are `signals` rows now, not files under a store
+  // directory that no longer exists. The stub carries the same keyed surface the real store exposes.
+  const signals=new Map();
+  const store={id:'wf',dir,appendEvent:event=>store.events.push(event),events:[],
+    signal:{get:(scope,key)=>signals.get(`${scope}/${key}`)??null,
+      set:(scope,key,row)=>{signals.set(`${scope}/${key}`,{...row});return row;},
+      clear:(scope,key)=>signals.delete(`${scope}/${key}`)}};
   const state={id:'wf',job:'job',worktree:dir,head:'b'.repeat(40),needUser:[]};
   const op={id:'op',attempt:1,baseHead:'a'.repeat(40),nodeId:null,references:[],allowlist:['a.js'],checks:[]};
   const git=(command,args)=>args[0]==='diff'?{status:0,stdout:'diff --git a/a.js b/a.js\n-old\n+new\n'}:{status:0,stdout:''};

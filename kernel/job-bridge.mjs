@@ -43,7 +43,7 @@ export function createJobBridge({ledgerFile,machineFile=null,now=Date.now,spawnC
     journal.appendEvent({eventId:`${identity.jobId}:spawned`,workflowId,entityType:'job',entityId:identity.jobId,generation,kind:'job-spawned',payload:{pid:child.pid}});
     return {schema:JOB_PENDING,pending:true,identity,status:'running'};
   };
-  return {journal,admission,request,poll({jobId,workflowId,opId=null,attempt=1,generation=1}){const job=journal.getJob(jobId);if(!job||job.workflow_id!==workflowId||job.op_id!==opId||job.attempt!==attempt||job.generation!==generation)return null;return ['succeeded','failed','cancelled'].includes(job.status)?{pending:false,identity:{jobId,workflowId,opId,attempt,generation},status:job.status,result:job.result}:{schema:JOB_PENDING,pending:true,identity:{jobId,workflowId,opId,attempt,generation},status:job.status};},close(){journal.close();}};
+  return {journal,admission,request,poll({jobId,workflowId,opId=null,attempt=1,generation=1}){const job=journal.getJob(jobId);if(!job||job.workflow_id!==workflowId||job.op_id!==opId||job.attempt!==attempt||job.generation!==generation)return null;return ['succeeded','failed','cancelled'].includes(job.status)?{pending:false,identity:{jobId,workflowId,opId,attempt,generation},status:job.status,result:job.result}:{schema:JOB_PENDING,pending:true,identity:{jobId,workflowId,opId,attempt,generation},status:job.status};},close(){admission.close();journal.close();}};
 }
 
 export function replayModelFunction(bridge,functionName,args,identity,{admission=null,kind='model',role=functionName}={}){return bridge.request({...identity,kind,role,input:{handler:'model-function',functionName,args,...(admission?{admission}:{})}});}

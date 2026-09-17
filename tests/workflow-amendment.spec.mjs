@@ -9,13 +9,15 @@ import {amendmentContractLines,applyWorkflowAmendment,bindPlannedAmendmentEffect
 import {createWorkflowState} from '../kernel/kernel.mjs';
 import {openJournal} from '../kernel/journal.mjs';
 import {createStore,stateGoalIdentity} from '../kernel/store.mjs';
-import {acquireStartup,reserveStartup} from '../kernel/startup-lock.mjs';
+import {acquireStartup,reserveStartup} from '../kernel/launch.mjs';
 
 function fixture(t){
   const root=fs.mkdtempSync(path.join(process.cwd(),'.workflow-amendment-test-'));
-  t.after(()=>{assert.equal(path.dirname(root),process.cwd());assert.ok(path.basename(root).startsWith('.workflow-amendment-test-'));fs.rmSync(root,{recursive:true,force:true});});
   assert.equal(spawnSync('git',['init','-q'],{cwd:root,windowsHide:true}).status,0);
   const store=createStore({repoRoot:root,id:'wf-existing'});
+  // Runtime 1.0.4: the store holds a real ledger handle; it must close before the temp directory is
+  // removed, or Windows refuses to delete the file still open underneath it.
+  t.after(()=>{store.close();assert.equal(path.dirname(root),process.cwd());assert.ok(path.basename(root).startsWith('.workflow-amendment-test-'));fs.rmSync(root,{recursive:true,force:true});});
   const state=createWorkflowState({job:'Deliver the originally approved slice',worktree:root,branch:'main',store,scope:['features/existing']});
   state.phase='finished';state.approved=true;state.goalDigest='a'.repeat(64);state.definitionOfDone=['Original acceptance'];
   state.decisions=[{id:'decision-1',answer:'Keep historical decision'}];
@@ -24,7 +26,7 @@ function fixture(t){
     {id:'remaining-1',kind:'frontend.implement',status:'blocked',attempt:3,findings:['Historical blocker'],files:[],reports:[],
       lease:{workflowId:'wf-existing',opId:'remaining-1',attempt:3,generation:2,jobId:'job-unknown',leaseToken:'lease-token'}}
   ];
-  state.finished={outcome:'blocked',reason:'owner clarification required',report:store.paths.final};
+  state.finished={outcome:'blocked',reason:'owner clarification required',report:'signal:final-report'};
   const journalFile=path.join(root,'runtime','journal.sqlite'),journal=openJournal({file:journalFile});
   const now=Date.now();
   journal.db.prepare("INSERT INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,priority_json,lease_token,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,'effect_unknown',?,?,?,?)")
@@ -133,13 +135,13 @@ test('an owner maps each superseded unfinished check exactly and history stays i
 
 test('public amendment reclaims a dead running startup row but refuses a live one',t=>{
   const dead=fixture(t);publicCommand(dead,'workflow-stop','--id',dead.state.id);
-  const reserved=reserveStartup(dead.store.dir,{pid:999999,alive:()=>false}),running=acquireStartup(dead.store.dir,{launchToken:reserved.token,pid:999999});assert.equal(running.ok,true);
-  fs.writeFileSync(path.join(dead.store.dir,'kernel.lock'),JSON.stringify({pid:999999,startedAt:1,startupToken:running.token}));
+  // acquireStartup already sets the ledger's kernel-lock signal to 'running' with this pid; kernelAlive()
+  // reads that signal directly, so no separate file stands in for it under the ledger model.
+  const reserved=reserveStartup(dead.store.ledger,dead.state.id,{pid:999999,alive:()=>false}),running=acquireStartup(dead.store.ledger,dead.state.id,{launchToken:reserved.token,pid:999999});assert.equal(running.ok,true);
   assert.equal(publicCommand(dead,'workflow-amend','--id',dead.state.id,'--amendment',dead.amendmentFile).ok,true);
   assert.equal(dead.store.loadState().ops[1].lease.jobId,'job-unknown','startup recovery does not alter unresolved operation effects');
   const live=fixture(t);publicCommand(live,'workflow-stop','--id',live.state.id);
-  const liveReservation=reserveStartup(live.store.dir),liveRunning=acquireStartup(live.store.dir,{launchToken:liveReservation.token});
-  fs.writeFileSync(path.join(live.store.dir,'kernel.lock'),JSON.stringify({pid:process.pid,startedAt:Date.now(),startupToken:liveRunning.token}));
+  const liveReservation=reserveStartup(live.store.ledger,live.state.id),liveRunning=acquireStartup(live.store.ledger,live.state.id,{launchToken:liveReservation.token});
   assert.throws(()=>publicCommand(live,'workflow-amend','--id',live.state.id,'--amendment',live.amendmentFile),/still running/);
 });
 

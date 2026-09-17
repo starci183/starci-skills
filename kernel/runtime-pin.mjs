@@ -13,25 +13,40 @@ const filesUnder=(root,at=root)=>fs.readdirSync(at,{withFileTypes:true}).flatMap
   return [slash(path.relative(root,absolute))];
 });
 
+/**
+ * The tracked head of every workflow a ledger root carries (§12). It is recorded in the pin RECORD, never
+ * inside the payload: the payload is content-addressed and immutable, while an anchor moves with every
+ * checkpoint - sealing one into the payload would change the runtime's digest each time a workflow ticked.
+ * What this buys is the check §12 asks for: a pin and a checkout that disagree about which history is the
+ * agreed one are caught when the pin is verified, not halfway through a resumed run.
+ */
+export const anchorFor=repoRoot=>{
+  try{const anchor=JSON.parse(fs.readFileSync(path.join(repoRoot,'.starciwork','ledger-anchor.json'),'utf8'));
+    return {repoRoot:slash(path.resolve(repoRoot)),ledgerId:anchor?.ledgerId??null,
+      workflows:Object.fromEntries(Object.entries(anchor?.workflows??{}).map(([id,row])=>[id,{generation:row?.generation??null,eventsHead:row?.eventsHead??null,seq:row?.seq??null}]))};
+  }catch(error){return {repoRoot:slash(path.resolve(repoRoot)),ledgerId:null,workflows:{},reason:String(error?.message??error)};}
+};
+
 /** Seal an already-built payload. Building and testing are separate prerequisites, never implicit live effects. */
-export function sealRuntime({sourceRoot,buildsRoot,version}={}){
+export function sealRuntime({sourceRoot,buildsRoot,version,ledgerRoots=[]}={}){
   const root=fs.realpathSync(path.resolve(sourceRoot)),authoredSourceRoot=slash(root);
   const paths=[...filesUnder(path.join(root,'.dist')).map(file=>`.dist/${file}`),'bin/starci.mjs','bin/starci-skills.mjs',
     'scripts/config.mjs','config.json','core/runtime-root.mjs','core/yaml.mjs','init/AGENTS.md','init/CLAUDE.md','init/DEVIN.md',
     'package.json','SKILL.md','docs/supervision-templates/op.md'];
   const entries=paths.sort().map(file=>({path:file,sha256:hash(fs.readFileSync(path.join(root,file)))}));
   const digest=hash(JSON.stringify({version,sourceRoot:authoredSourceRoot,entries})),target=path.resolve(buildsRoot,digest);
-  if(fs.existsSync(target)){const pin={schema:RUNTIME_PIN,root:target,digest,version,sourceRoot:authoredSourceRoot};const checked=verifyRuntimePin(pin);if(!checked.ok)throw Error(checked.reason);return pin;}
+  const anchors=ledgerRoots.map(anchorFor);
+  if(fs.existsSync(target)){const pin={schema:RUNTIME_PIN,root:target,digest,version,sourceRoot:authoredSourceRoot,...(anchors.length?{anchors}:{})};const checked=verifyRuntimePin(pin);if(!checked.ok)throw Error(checked.reason);return pin;}
   fs.mkdirSync(path.dirname(target),{recursive:true});
   const stage=`${target}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`;
   fs.mkdirSync(stage);
   for(const entry of entries){const out=path.join(stage,entry.path);fs.mkdirSync(path.dirname(out),{recursive:true});fs.copyFileSync(path.join(root,entry.path),out);}
   fs.writeFileSync(path.join(stage,'runtime-pin.json'),JSON.stringify({schema:RUNTIME_PIN,version,digest,sourceRoot:authoredSourceRoot,entries}));
   fs.renameSync(stage,target);
-  return {schema:RUNTIME_PIN,root:target,digest,version,sourceRoot:authoredSourceRoot};
+  return {schema:RUNTIME_PIN,root:target,digest,version,sourceRoot:authoredSourceRoot,...(anchors.length?{anchors}:{})};
 }
 
-export function verifyRuntimePin(pin){
+export function verifyRuntimePin(pin,{anchors='ignore'}={}){
   try{
     if(pin?.schema!==RUNTIME_PIN||!pin.root||!/^[a-f0-9]{64}$/.test(pin.digest))throw Error('Invalid runtime pin identity');
     const root=fs.realpathSync(pin.root),manifest=JSON.parse(fs.readFileSync(path.join(root,'runtime-pin.json'),'utf8'));
@@ -51,6 +66,20 @@ export function verifyRuntimePin(pin){
     }
     const actual=filesUnder(root).filter(file=>file!=='runtime-pin.json');
     if(actual.some(file=>!seen.has(file))||actual.length!==seen.size)throw Error('Runtime pin contains unsealed files');
-    return {ok:true,launcher:path.join(root,'bin','starci.mjs'),sourceRoot};
+    // A recorded anchor is checked only when asked: an operator verifying the payload has no ledger in hand,
+    // while a kernel about to resume does, and for it a head that moved under the pin is a refusal.
+    if(anchors==='check'&&Array.isArray(pin.anchors)){
+      for(const recorded of pin.anchors){
+        const live=anchorFor(recorded.repoRoot);
+        if(recorded.ledgerId&&live.ledgerId&&recorded.ledgerId!==live.ledgerId)throw Error(`Runtime pin anchor identity mismatch: ${recorded.repoRoot}`);
+        for(const [id,row] of Object.entries(recorded.workflows??{})){
+          const now=live.workflows?.[id];
+          if(!now)throw Error(`Runtime pin anchor is missing a sealed workflow: ${id}`);
+          if(row.eventsHead&&now.eventsHead&&row.eventsHead!==now.eventsHead&&Number(now.generation??0)<Number(row.generation??0))
+            throw Error(`Runtime pin anchor moved backwards: ${id}`);
+        }
+      }
+    }
+    return {ok:true,launcher:path.join(root,'bin','starci.mjs'),sourceRoot,anchors:Array.isArray(pin.anchors)?pin.anchors.length:0};
   }catch(error){return {ok:false,reason:error.message};}
 }

@@ -15,13 +15,18 @@ const OK=result=>result?.outcome==='ok';
 const WAIT_MS=30000;
 /**
  * The detached input helper is a worker like any other: it never touches the ledger file directly, so its
- * session/launch/lock/server coordination lives in scratch, under `os.tmpdir()/starci/<id>/` - never in
+ * session/launch/lock/server coordination lives in scratch, under `os.tmpdir()/starci/<hash>/` - never in
  * `.starciwork`. `inputs.lock` itself is the one signal of the four the kernel also reads on its own tick,
  * so it lives in the ledger's `signals` table instead (scope the workflow id, key `inputs-lock`).
+ *
+ * A workflow id is unique only inside its own ledger (`(repoRoot,id)` together), so the scratch directory
+ * is keyed by both - keying by `id` alone let two workflows of the same id in different repositories share
+ * one scratch directory and read each other's session.
  */
-export const inputScratchDir=id=>path.join(os.tmpdir(),'starci',required(id,'workflow id'));
+export const inputScratchDir=(id,repoRoot)=>path.join(os.tmpdir(),'starci',
+  crypto.createHash('sha256').update(`${path.resolve(required(repoRoot,'repository root'))}:${required(id,'workflow id')}`).digest('hex').slice(0,32));
 function required(value,label){if(typeof value!=='string'||!value.trim())throw Error(`Missing ${label}`);return value.trim();}
-const bindingMatches=(a,b)=>a&&b&&['id','dir','workRoot','worktree','host'].every(key=>a[key]===b[key]);
+const bindingMatches=(a,b)=>a&&b&&['id','repoRoot','workRoot','worktree','host'].every(key=>a[key]===b[key]);
 // Approved goal references remain in state.inputs; the owner surface has its own lifecycle.
 const status=(state,phase,extra={})=>(state.ownerInputs={...state.ownerInputs,phase,...extra});
 const SURFACE_PHASES=['idle','starting','restarting','checking','unavailable','opening','ready','finished'];
@@ -80,10 +85,10 @@ export function reconcileWorkflowInputs(orca,store,state,{host=orca?.host,now=Da
   if(!waiting.length&&!state.ownerInputs)return {phase:'idle'};
   // The helper reads this snapshot independently while the kernel uses synchronous waits.
   store.saveState(state);
-  const scratch=inputScratchDir(state.id);
+  const scratch=inputScratchDir(state.id,store.repoRoot);
   fs.mkdirSync(scratch,{recursive:true});
   let binding;
-  try{binding=inputBinding(state,scratch);}catch{return status(state,'unavailable',{reason:'workflow-binding-unavailable'});}
+  try{binding=inputBinding(state,store);}catch{return status(state,'unavailable',{reason:'workflow-binding-unavailable'});}
   const files=inputFiles(scratch),at=now();
   let session=read(files.session),lock=store.signal.get(state.id,'inputs-lock'),launch=read(files.launch),server=read(files.server);
   if(session&&!bindingMatches(session.binding,binding))return status(state,'unavailable',{reason:'workflow-binding-changed'});
@@ -98,7 +103,7 @@ export function reconcileWorkflowInputs(orca,store,state,{host=orca?.host,now=Da
     if(launch?.phase==='starting'&&at-launch.at<WAIT_MS)return status(state,'starting');
     let language='vi';try{language=loadConfig(state.host).language;}catch{}
     session={schema:'starci/input-session@1',id:crypto.randomBytes(16).toString('hex'),token:crypto.randomBytes(32).toString('base64url'),
-      binding,repoRoot:state.repoRoot,language,createdAt:at,runtimeVersion:runtimeVersion()};
+      binding,language,createdAt:at,runtimeVersion:runtimeVersion()};
     privateJson(files.session,session);
     privateJson(files.launch,{session:session.id,phase:'starting',pid:null,at});
     try{
