@@ -6,7 +6,7 @@ import path from 'node:path';
 import {ENGINE_SCHEMA,isEnrolled,predatesEngineSchema,sealedRuntimeOf} from '../kernel/common.mjs';
 import {ENGINE_VERSION,relocateJournal} from '../kernel/engine.mjs';
 import {migrateEngineState} from '../kernel/kernel.mjs';
-import {openJournal} from '../kernel/journal.mjs';
+import {openLedger} from '../kernel/ledger-db.mjs';
 import {createAdmission} from '../kernel/admission.mjs';
 import {WORKFLOW_STATE,createStore} from '../kernel/store.mjs';
 import {CANDIDATE_RECORD,readCandidateBridge} from '../kernel/candidate-bridge.mjs';
@@ -17,6 +17,10 @@ import {CANDIDATE_RECORD,readCandidateBridge} from '../kernel/candidate-bridge.m
  * boundary, and only there. The number is read from the record, never known to this code.
  */
 const temporary=()=>fs.mkdtempSync(path.join(os.tmpdir(),'starci-engine-migration-'));
+// A sibling temp file, never nested inside a test's own `dir`: an unclosed admission machine handle on
+// Windows would otherwise block that dir's own cleanup, and the real default machine.sqlite is shared
+// (and mutated) by every other spec file's admission fixtures.
+const temporaryMachineFile=()=>path.join(fs.mkdtempSync(path.join(os.tmpdir(),'starci-engine-migration-machine-')),'machine.sqlite');
 const pkg=JSON.parse(fs.readFileSync(new URL('../package.json',import.meta.url),'utf8'));
 
 test('the engine version is the package version, and the engine identity is a schema',()=>{
@@ -68,10 +72,10 @@ test('a record already on the schema is untouched, whatever fields it carries',(
   assert.deepEqual(events,[]);assert.ok(state.ops[0].v9Lease);
 });
 
-test('relocating a workflow\'s journal binding refuses while the former journal holds anything live, and otherwise retires its rows and carries the probation ledgers over',t=>{
+test('relocating a workflow\'s ledger binding refuses while the former ledger holds anything live, and otherwise retires its rows and carries the probation ledgers over',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
-  const from=path.join(dir,'old','journal.sqlite'),to=path.join(dir,'new','journal.sqlite');
-  const journal=openJournal({file:from}),admission=createAdmission({journal});
+  const from=path.join(dir,'old','runtime.sqlite'),to=path.join(dir,'new','runtime.sqlite');
+  const journal=openLedger({file:from}),admission=createAdmission({journal,machineFile:temporaryMachineFile()});
   journal.enqueueJob({jobId:'live',workflowId:'wf',opId:'op',attempt:1,generation:1,kind:'operation',payload:{}});admission.setCapacity('ai/global',10);
   assert.equal(admission.reserve({jobId:'live',workflowId:'wf',opId:'op',attempt:1,generation:1,resources:[{key:'ai/global',units:1}],ttlMs:60000}).ok,true);
   journal.enqueueJob({jobId:'done',workflowId:'wf',generation:1,kind:'model',payload:{}});journal.db.prepare("UPDATE jobs SET status='succeeded' WHERE job_id='done'").run();
@@ -81,9 +85,9 @@ test('relocating a workflow\'s journal binding refuses while the former journal 
   assert.equal(refused.ok,false);assert.match(refused.reason,/1 lease\(s\) and 1 unsettled job\(s\)/);assert.equal(fs.existsSync(to),false);
   assert.equal(admission.release({jobId:'live',generation:1,leaseToken:journal.getJob('live').lease_token}).ok,true);journal.db.prepare("UPDATE jobs SET status='cancelled' WHERE job_id='live'").run();journal.close();
   const moved=relocateJournal({from,to,workflowId:'wf'});
-  assert.equal(moved.ok,true);assert.deepEqual(moved.retired,{snapshots:0,jobs:2,events:0,incidents:0});assert.deepEqual(moved.copied,['model-probations.json']);
+  assert.equal(moved.ok,true);assert.deepEqual(moved.retired,{snapshots:0,jobs:2,events:0,incidents:0,goals:0,reports:0,contracts:0,checks:0,inbox:0,inputs:0,signals:0,workflows:1});assert.deepEqual(moved.copied,['model-probations.json']);
   assert.equal(fs.readFileSync(path.join(dir,'new','model-probations.json'),'utf8'),'{"p":1}');
-  const old=openJournal({file:from});assert.deepEqual(old.workflows().map(item=>item.workflowId),['other'],'another workflow\'s rows are not this relocation\'s to touch');old.close();
+  const old=openLedger({file:from});assert.deepEqual(old.workflows().map(item=>item.workflowId),['other'],'another workflow\'s rows are not this relocation\'s to touch');old.close();
   assert.equal(relocateJournal({from:path.join(dir,'absent.sqlite'),to,workflowId:'wf'}).ok,true);
 });
 
