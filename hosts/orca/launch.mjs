@@ -15,8 +15,8 @@ import {roleOf as operationRoleOf} from '../../kernel/graph.mjs';
 import {supervisorMain} from '../../kernel/supervisor.mjs';
 import {serveWorkflowInputs} from '../../kernel/inputs-server.mjs';
 import {QUIET_EVENTS,WORKFLOW_LIST,WORKFLOW_OPS,buildList,buildOpsView,buildView,readWorkflowEvents,renderEventLine,renderEventTail,renderList,renderOpsView,renderView} from '../../kernel/view.mjs';
-import {repositoryRoot} from '../../kernel/store.mjs';
-import {journalMaintenanceMain} from '../../kernel/journal-maintenance.mjs';
+import {createStore,repositoryRoot} from '../../kernel/store.mjs';
+import {inspectLedger,ledgerFileFor,openLedger} from '../../kernel/ledger-db.mjs';
 import {DISK_HEADROOM_CODE} from '../../kernel/disk.mjs';
 
 /**
@@ -743,11 +743,27 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
     while workflow-stop is present and its controller has exited, bind a starci/workflow-amendment@1 owner grant
     to this exact frozen goal identity. The grant and the coordinator application decision are separate; accepted
     work, receipts, decisions, evidence and unknown effects are preserved. Added scope needs an explicit path ceiling.
-  node bin/starci.mjs journal-prune --journal-file <journal.sqlite> [--store-root <root[,root]>] [--retire <id[,id]>] [--vacuum true] [--dry-run]
-    retire the rows of every workflow the named stores prove settled (finished, bound to another journal, or named
-    with --retire); a workflow with live reservations is kept by the journal itself; unknown ids are reported only.
-  node bin/starci.mjs journal-retire --journal-file <journal.sqlite> --store-root <root[,root]> [--delete true]
-    a whole journal nothing binds: no state under the stores names it and no row is live; deleted only with --delete true.
+  node bin/starci.mjs op-contract --workflow <workflow-id> --op <op> [--attempt N] [--dispatch <id>] [--json true] [--worktree <relative-path>]
+    prints the contract markdown the kernel wrote for this operation attempt (--json prints {markdown,context}).
+    The dispatch prompt tells the worker to run exactly this to read its own contract.
+  node bin/starci.mjs workflow-export --id <workflow-id> --to <directory> [--worktree <relative-path>]
+    writes today's human-readable file layout (state.json, events.jsonl, goal.md/json, reports/, contracts/,
+    checks/) from the workflow's ledger rows, for a reader or a tool that still wants files on disk.
+  node bin/starci.mjs ledger-verify --repo <ledger-repository-root> [--id <workflow-id>]
+    walks the hash chain of one workflow's events, or every workflow the ledger holds when --id is omitted;
+    exits non-zero the moment a chain is broken (ledger-chain-broken), naming the seq it broke at.
+  node bin/starci.mjs ledger-migrate --repo <ledger-repository-root> [--journal-file <old-journal.sqlite>] [--machine-file <machine.sqlite>] [--dry-run] [--archive true]
+    forwards to scripts/ledger-migrate.mjs: folds .starciwork/_local/workflows/<id> plus the retired journal's
+    rows for it into .starciwork/runtime.sqlite, per workflow, refusing a workflow a live kernel lock or an
+    unreconciled generation still owns.
+  node bin/starci.mjs ledger-prune --repo <ledger-repository-root> [--retire <id[,id]>] [--vacuum true] [--dry-run]
+    retire the rows of every workflow the ledger itself proves settled (finished, or named with --retire); a
+    workflow with live leases or unsettled jobs is kept by the ledger itself.
+  node bin/starci.mjs ledger-retire --repo <ledger-repository-root> [--delete true]
+    the whole runtime.sqlite, only when nothing in it is live and nothing wrote to it inside the quiet window;
+    deleted only with --delete true.
+  node bin/starci.mjs journal-prune | journal-retire
+    renamed ledger-prune / ledger-retire (--repo <root>, not --journal-file): refused with a one-line pointer, exit 2.
   node bin/starci.mjs workflow-status --id <workflow-id> [--json true] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     prints one status view of the workflow, derived from its own files: kernel liveness, runtimes, running
     and blocked operations, the ledger by feature, reviews, the validator, what needs you, the rate and the
@@ -782,8 +798,59 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
 const KERNEL_COMMANDS=['workflow-goal','workflow-amend','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status','workflow-tail','workflow-ops','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs'];
 /** Read-only views of the workflow store: they open no kernel, call no Orca and never write. */
 const VIEW_COMMANDS=['workflow-list'];
-/** Operator maintenance of a local journal: no kernel, no Orca; the store roots named on the command line are the proof. */
-const JOURNAL_COMMANDS=['journal-prune','journal-retire'];
+/** Worker IPC and export against one workflow's own ledger rows: no kernel, no Orca. */
+const STORE_COMMANDS=['op-contract','workflow-export'];
+/** Operator maintenance/inspection of the repository ledger `.starciwork/runtime.sqlite`: no kernel, no Orca. */
+const LEDGER_COMMANDS=['ledger-verify','ledger-migrate','ledger-prune','ledger-retire'];
+/**
+ * 1.0.3 named these `journal-prune`/`journal-retire` against a shared `--journal-file`; 1.0.4 has one ledger
+ * per repository, so the operator names `--repo <root>` instead. The old names are refused with a pointer to
+ * the new one rather than silently reinterpreting `--journal-file` as `--repo`.
+ */
+const RENAMED_COMMANDS={'journal-prune':'ledger-prune','journal-retire':'ledger-retire'};
+/** A workflow the ledger still holds live rows for is not retired by age alone; `--repo`-scoped, same as journal-retire was. */
+const LEDGER_QUIET_MS=30*60*1000;
+
+/** `ledger-prune`: retire every workflow the ledger itself proves settled (finished, or named by --retire) and give the space back. */
+function pruneLedger({repoRoot,file,options}){
+  const dryRun=options['dry-run']===true;
+  const named=new Set(String(options.retire??'').split(',').map(item=>item.trim()).filter(Boolean));
+  const handle=dryRun?inspectLedger({file}):openLedger({file});
+  const decisions=[];
+  try{
+    for(const entry of handle.workflows()){
+      const row=handle.db.prepare('SELECT finished_json FROM workflows WHERE workflow_id=?').get(entry.workflowId);
+      const live=entry.leases.length||entry.jobs.length;
+      let decision,reason;
+      if(live){decision='kept';reason=`live rows: ${entry.leases.length} lease(s), ${entry.jobs.length} unsettled job(s)`;}
+      else if(named.has(entry.workflowId)){decision='retire';reason='named by --retire';}
+      else if(row?.finished_json){decision='retire';reason='its state is finished';}
+      else {decision='kept';reason='its state is unfinished';}
+      let removed=null;
+      if(decision==='retire'&&!dryRun){
+        const result=handle.retireWorkflow(entry.workflowId);
+        if(result.ok)removed=result.removed;else{decision='kept';reason=result.reason;}
+      }
+      decisions.push({workflowId:entry.workflowId,decision,reason,rows:entry.rows,...(removed?{removed}:{})});
+    }
+    if(options.vacuum==='true'&&!dryRun)handle.db.exec('VACUUM');
+  }finally{handle.close();}
+  return {schema:'starci/ledger-prune@1',command:'ledger-prune',ok:true,repo:repoRoot,file,dryRun,decisions};
+}
+/** `ledger-retire`: the whole ledger file, only when nothing in it is live and nothing wrote to it recently. */
+function retireLedger({repoRoot,file,options}){
+  const inspection=inspectLedger({file});
+  let live;
+  try{live=inspection.workflows().filter(entry=>entry.leases.length||entry.jobs.length).map(entry=>({workflowId:entry.workflowId,leases:entry.leases.length,jobs:entry.jobs.length}));}
+  finally{inspection.close();}
+  const quietFor=Date.now()-fs.statSync(file).mtimeMs,recentlyWritten=quietFor<LEDGER_QUIET_MS;
+  const retirable=!live.length&&!recentlyWritten,remove=options.delete==='true';
+  const deleted=[];
+  if(retirable&&remove)for(const suffix of ['','-journal','-wal','-shm']){const sibling=`${file}${suffix}`;if(fs.existsSync(sibling)){fs.rmSync(sibling,{force:true});deleted.push(sibling);}}
+  return {schema:'starci/ledger-retire@1',command:'ledger-retire',ok:retirable,repo:repoRoot,file,orphanedLiveRows:live,quietForMs:Math.round(quietFor),quietMs:LEDGER_QUIET_MS,retirable,deleted,
+    ...(retirable?{}:{reason:live.length?'the ledger still holds live reservations or unsettled jobs':`the ledger was written ${Math.round(quietFor/60000)} min ago, inside the ${Math.round(LEDGER_QUIET_MS/60000)} min quiet window`}),
+    ...(retirable&&!remove?{next:'run again with --delete true to remove the file'}:{})};
+}
 
 /**
  * A command may answer with text instead of a record: `print` is written verbatim by the CLI, so a status
@@ -793,8 +860,12 @@ const printed=(schema,command,print,rest={})=>({schema,command,...rest,print});
 
 export function main(argv=process.argv.slice(2),{orca,wait,env=process.env}={}){
   const {command,options}=parseArgs(argv);
-  need(['start-op','settle','sweep','verify','notify','report','wait',...KERNEL_COMMANDS,...VIEW_COMMANDS,...JOURNAL_COMMANDS].includes(command),usage());
-  if(JOURNAL_COMMANDS.includes(command))return journalMaintenanceMain(command,options);
+  if(Object.hasOwn(RENAMED_COMMANDS,command)){
+    const to=RENAMED_COMMANDS[command];
+    return {schema:'starci/command-renamed@1',command,ok:false,exitCode:2,renamedTo:to,
+      print:`starci: '${command}' is now '${to}' (it takes --repo <root>, the one ledger of that repository, not --journal-file). Run: starci ${to} --repo <root> ...\n`};
+  }
+  need(['start-op','settle','sweep','verify','notify','report','wait',...KERNEL_COMMANDS,...VIEW_COMMANDS,...STORE_COMMANDS,...LEDGER_COMMANDS].includes(command),usage());
   if(command==='workflow-inputs'){
     need(Object.keys(options).length===1&&typeof options.session==='string'&&options.session.trim(),
       'Use starci workflow-inputs --session <kernel-owned-session-file>. The kernel owns this helper.');
@@ -804,6 +875,58 @@ export function main(argv=process.argv.slice(2),{orca,wait,env=process.env}={}){
     // Reading a workflow needs no Orca runner at all, so a status page works where Orca is not even installed.
     const workflows=buildList({repoRoot:repositoryRoot(options.worktree?exactWorktree(options.worktree).path:process.cwd())});
     return options.json==='true'?{schema:WORKFLOW_LIST,command,workflows}:printed(WORKFLOW_LIST,command,renderList(workflows),{workflows:workflows.length});
+  }
+  if(STORE_COMMANDS.includes(command)){
+    // Worker IPC against one workflow's own ledger rows: no kernel, no Orca - a worker in a worktree with no
+    // multi-agent runner installed still reaches its contract.
+    const cwd=options.worktree?exactWorktree(options.worktree).path:process.cwd();
+    if(command==='op-contract'){
+      const attempt=options.attempt!==undefined?Number(options.attempt):null;
+      need(attempt===null||(Number.isInteger(attempt)&&attempt>0),'--attempt must be a positive integer');
+      const store=createStore({repoRoot:repositoryRoot(cwd),id:required(options.workflow,'workflow id')});
+      try{
+        const contract=store.readContract(required(options.op,'operation id'),attempt);
+        need(contract,`No contract recorded for ${options.op}${attempt?` attempt ${attempt}`:' (any attempt)'}`);
+        need(!options.dispatch||!contract.dispatchId||contract.dispatchId===options.dispatch,
+          `Contract for ${options.op} attempt ${contract.attempt} was written for dispatch ${contract.dispatchId}, not ${options.dispatch}`);
+        return options.json==='true'
+          ?{schema:'starci/op-contract@1',command,workflow:store.id,op:options.op,attempt:contract.attempt,markdown:contract.markdown,context:contract.context}
+          :printed('starci/op-contract@1',command,contract.markdown.endsWith('\n')?contract.markdown:`${contract.markdown}\n`,{workflow:store.id,op:options.op,attempt:contract.attempt});
+      }finally{store.close();}
+    }
+    // workflow-export
+    const store=createStore({repoRoot:repositoryRoot(cwd),id:required(options.id,'workflow id')});
+    try{
+      const result=store.exportTo(path.resolve(required(options.to,'export directory')));
+      return {schema:'starci/workflow-export@1',command,id:store.id,...result};
+    }finally{store.close();}
+  }
+  if(LEDGER_COMMANDS.includes(command)){
+    // Operator maintenance/inspection of the repository ledger: no kernel, no Orca.
+    if(command==='ledger-migrate'){
+      // Imported by path, per contract: if s7's script is not on this branch yet, the import error names it.
+      return (async()=>{
+        const {migrateLedger}=await import('../../scripts/ledger-migrate.mjs');
+        const summary=await migrateLedger({repoRoot:path.resolve(required(options.repo,'ledger repository root')),
+          ...(options['journal-file']?{journalFile:path.resolve(options['journal-file'])}:{}),
+          ...(options['machine-file']?{machineFile:path.resolve(options['machine-file'])}:{}),
+          dryRun:options['dry-run']===true,archive:options.archive==='true'});
+        return {schema:'starci/ledger-migrate@1',command,...summary};
+      })();
+    }
+    const repoRoot=path.resolve(required(options.repo,'ledger repository root'));
+    const file=ledgerFileFor(repoRoot);
+    need(fs.existsSync(file),`No ledger at ${file}`);
+    if(command==='ledger-verify'){
+      const inspection=inspectLedger({file});
+      try{
+        const ids=options.id?[options.id]:inspection.workflows().map(entry=>entry.workflowId);
+        need(ids.length,'ledger-verify found no workflow to check in this ledger; pass --id <id>');
+        const results=ids.map(workflowId=>({workflowId,...inspection.verifyChain({workflowId})}));
+        return {schema:'starci/ledger-verify@1',command,ok:results.every(result=>result.ok),repo:repoRoot,file,results};
+      }finally{inspection.close();}
+    }
+    return command==='ledger-prune'?pruneLedger({repoRoot,file,options}):retireLedger({repoRoot,file,options});
   }
   const adapter=hostAdapterOf(options,env);
   const runner=orca??createHostRunner({adapter,cwd:options.worktree?exactWorktree(options.worktree).path:process.cwd(),env,reportsDir:options['reports-dir']??null});
@@ -882,6 +1005,7 @@ if(direct){
     const output=await main();
     // A text view prints as text; everything else is the record it always was.
     process.stdout.write(typeof output?.print==='string'?output.print.endsWith('\n')?output.print:`${output.print}\n`:`${JSON.stringify(output,null,2)}\n`);
-    if(output?.ok===false)process.exitCode=1;
+    if(Number.isInteger(output?.exitCode))process.exitCode=output.exitCode;
+    else if(output?.ok===false)process.exitCode=1;
   }catch(error){process.stderr.write(`${JSON.stringify({ok:false,error:{code:error.code??null,message:error.message}},null,2)}\n`);process.exitCode=error?.code===DISK_HEADROOM_CODE?3:1;}
 }
