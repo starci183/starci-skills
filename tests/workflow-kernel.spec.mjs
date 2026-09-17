@@ -10,7 +10,7 @@ import {preparedEntry,inputAsk} from './helpers/input-fixture.mjs';
 import {encodePng,screen} from './helpers/png.mjs';
 import {brandColours} from '../checks/render.mjs';
 import {refreshCredentialPreparation,deferForIntegrationPreparation,normalizePreparationAuthority,reconcileStoppedNativeRetryLease,stageAnsweredDecisionLateReport,lateReportReplayMatches,restoreDeferredReportOperation,persistLaunchAttempts} from '../kernel/kernel.mjs';
-import {reconcileWorkflowInputs} from '../kernel/inputs.mjs';
+import {inputScratchDir,reconcileWorkflowInputs} from '../kernel/inputs.mjs';
 import {credentialFields} from '../kernel/inputs-model.mjs';
 import {inputFiles,privateJson} from '../kernel/inputs-server.mjs';
 import {canonicalTarget,resolveExecutionChain} from '../kernel/chains.mjs';
@@ -21,9 +21,9 @@ import {buildReport} from '../kernel/reports.mjs';
 import {spawn,spawnSync} from 'node:child_process';
 import {validateGoalPlan,validateOp} from '../models/functions.mjs';
 import {createStore} from '../kernel/store.mjs';
-import {openJournal} from '../kernel/journal.mjs';
+import {setSignal} from '../kernel/launch.mjs';
 import {createAllocator} from '../kernel/schedule.mjs';
-import {loadsFileFor} from '../kernel/loads.mjs';
+import {createLoadsLedger,readLoads} from '../kernel/loads.mjs';
 import {resolveLedgerRoot} from '../kernel/routing.mjs';
 import {RESTART_LIMIT,toOp} from '../kernel/common.mjs';
 import * as work from '../kernel/ledger.mjs';
@@ -302,7 +302,10 @@ function setup({job='Implement the sales slice',plan,scripts,dirty=[],exec,alloc
     validateOp:acceptAll,
     waitTimeoutMs:2000,tickMs:1000,maxIterations:12,...options});
   return {repo,store,state,goal,fake,git,run,runs,allocator,clock,
-    cleanup:()=>{store.close();fs.rmSync(repo,{recursive:true,force:true,maxRetries:5,retryDelay:50});}};
+    cleanup:()=>{store.close();
+      // A sqlite handle on Windows can outlive its own close() by a beat (node:sqlite is still experimental);
+      // the OS reclaims a leftover temp dir on its own, so a stubborn one here is not this test's failure.
+      try{fs.rmSync(repo,{recursive:true,force:true,maxRetries:20,retryDelay:100});}catch(error){if(error?.code!=='EPERM'&&error?.code!=='EBUSY')throw error;}}};
 }
 
 const salesPlan={
@@ -335,10 +338,12 @@ const stalenessReport=(findings=[{id:'finding-1',bindingId:'source:audit-scope',
 };
 
 test('typed stale findings settle a real report and durable journal as measurement without delivery or repair',()=>{
-  const harness=setup({plan:auditPlan(),scripts:{}});let journal=null;
+  const harness=setup({plan:auditPlan(),scripts:{}});
   try{
     approve(harness.store,harness.state);harness.state.run='run_wf';harness.state.from='term_kernel';
-    journal=openJournal({file:path.join(harness.repo,'runtime','audit.sqlite')});
+    // A durable binding must be the store's own ledger file now (bindJournal refuses any other file);
+    // the store's own handle stands in for what used to be a separate journal.sqlite.
+    const journal=harness.store.ledger;
     harness.store.bindJournal(journal,1,{state:harness.state});harness.store.saveState(harness.state);
     const op=running(harness.state,'audit-source','ctx_audit'),report=buildReport({outcome:'partial',run:'run_wf',task:'task_audit',
       dispatch:'ctx_audit',from:'term_ctx_audit',summary:'The exact scanner measured one current stale binding.',files:[],
@@ -362,7 +367,7 @@ test('typed stale findings settle a real report and durable journal as measureme
     const durable=JSON.parse(saved.state_json),durableOp=durable.ops.find(item=>item.id==='audit-source');
     assert.equal(durableOp.operation,'stales');assert.equal(durableOp.audit.outcome,'findings');
     assert.equal(durable.ledger[0].status,'planned');
-  }finally{journal?.close();harness.cleanup();}
+  }finally{harness.cleanup();}
 });
 
 test('a pending durable audit check remains replayable and its persisted findings settle on the next pass',()=>{
@@ -1263,7 +1268,8 @@ function setupWork({nodes=WORK_NODES,scope=[],reintake=[],migrate=[],scripts={},
     validateOp,
     ...(binding?{resolveLedger:bindingRoles(binding)}:{}),
     waitTimeoutMs:2000,tickMs:1000,maxIterations:12,...options});
-  return {...tree,api,store,state,goal,fake,git,run,commits,allocator,clock,cleanup:()=>{store.close();fs.rmSync(tree.repo,{recursive:true,force:true,maxRetries:5,retryDelay:50});}};
+  return {...tree,api,store,state,goal,fake,git,run,commits,allocator,clock,cleanup:()=>{store.close();
+    try{fs.rmSync(tree.repo,{recursive:true,force:true,maxRetries:20,retryDelay:100});}catch(error){if(error?.code!=='EPERM'&&error?.code!=='EBUSY')throw error;}}};
 }
 
 test('a launched audit with a Work node leaves every canonical Work byte unchanged through its finding report',()=>{
@@ -1964,9 +1970,11 @@ test('an accepted op closes its terminal, and the reconcile sweep closes stale k
     const asked={...harness.state.ops[0],id:'ask-7',kind:'decision.prepare',status:'done',terminal:'term_ask_open',dispatch:null,requesters:['x'],nodeId:null,
       reports:[{outcome:'done',summary:'decision: demo.sales.business.srs.decision.d-demo\nrecommended: 1\n1. keep\n2. drop',files:[],checks:[]}]};harness.state.ops.push(asked);
     harness.fake.terminals.set('term_ask_open',{handle:'term_ask_open',title:'[Op] decision.prepare - ask-7',status:'running',sent:true,worktreePath:cwd});
-    // A sibling workflow of this store root that finished, and its kernel tab left behind.
-    const siblingDir=path.join(path.dirname(harness.store.dir),'sibling-done');fs.mkdirSync(siblingDir,{recursive:true});
-    fs.writeFileSync(path.join(siblingDir,'state.json'),JSON.stringify({id:'sibling-done',finished:{outcome:'done'}}));
+    // A sibling workflow of this store root that finished, and its kernel tab left behind: one ledger,
+    // so the sibling is just another workflow row in the same file.
+    const siblingStore=createStore({repoRoot:harness.store.repoRoot,id:'sibling-done'});
+    siblingStore.saveState({...createWorkflowState({job:'sibling',worktree:cwd,branch:'main',store:siblingStore}),finished:{outcome:'done'}});
+    siblingStore.close();
     harness.fake.terminals.set('term_sibling',{handle:'term_sibling',title:'[Kernel] sibling-done',status:'running',sent:false,worktreePath:cwd});
     const state=harness.run({maxIterations:8});
     const op=state.ops.find(item=>item.id===nodeId);
@@ -2139,7 +2147,7 @@ test('a kernel paused by the stop flag releases its own tab, and the next start 
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';harness.state.kernelTerminalOwned=true;
     harness.fake.terminals.set('term_kernel',{handle:'term_kernel',title:`[Kernel] ${harness.state.id}`,status:'running',sent:false,worktreePath:cwd});
-    fs.writeFileSync(path.join(harness.store.dir,'stop.flag'),'');
+    harness.store.signal.set(harness.store.id,'stop',{value:{at:Date.now()}});
     const state=harness.run({maxIterations:3});
     assert.equal(state.from,null);assert.equal(state.kernelTerminalOwned,false);
     assert.equal(harness.fake.terminals.has('term_kernel'),false,'the paused kernel left no tab');
@@ -2295,6 +2303,10 @@ test('kernel startup discovers existing credential waits before the first tick, 
   const harness=setupWork({scope:['sales']});
   try{
     const {store,state}=harness;
+    // inputScratchDir is keyed by workflow id, and setupWork's id is the same fixed string every call
+    // (unlike store.dir, which used to be a fresh tmpdir per test); a stale session from an earlier run of
+    // this same suite would otherwise read as `workflow-binding-changed` against this run's fresh repo.
+    fs.rmSync(inputScratchDir(state.id),{recursive:true,force:true});
     approve(store,state);state.run='run_wf';state.from='term_kernel';
     harness.run({maxIterations:0});
     const requester=state.ops.find(op=>op.nodeId==='demo.sales.implementation.backend.intake');
@@ -2304,7 +2316,7 @@ test('kernel startup discovers existing credential waits before the first tick, 
     requester.status='paused';requester.waitingFor=ask.id;requester.dependsOn.push(ask.id);state.ops.push(ask);
     const owner='demo.sales.architecture.sds.intake',file=harness.node(owner),record=parseYaml(fs.readFileSync(file,'utf8')),entry=preparedEntry();
     delete entry.preparation;record.extensions??={};record.extensions.work3??={};record.extensions.work3.integrations=[entry];fs.writeFileSync(file,stringifyYaml(record));
-    const files=inputFiles(store.dir),browserCalls=[];let launches=0;
+    const files=inputFiles(inputScratchDir(state.id)),browserCalls=[];let launches=0;
     const browser={verify:()=>({ok:true}),invoke:(name,params)=>{
       browserCalls.push({name,params});
       if(name==='tab-list')return {outcome:'ok',receipt:{result:{tabs:[]}}};
@@ -2329,7 +2341,7 @@ test('kernel startup discovers existing credential waits before the first tick, 
     assert.equal(launches,1);assert.equal(state.ownerInputs.phase,'starting');
     const session=JSON.parse(fs.readFileSync(files.session,'utf8'));
     assert.equal(session.binding.workRoot,path.join(harness.repo,'.starciwork'));
-    privateJson(files.lock,{pid:101,session:session.id});privateJson(files.server,{pid:101,session:session.id,port:32123});
+    store.signal.set(state.id,'inputs-lock',{pid:101,value:{session:session.id}});privateJson(files.server,{pid:101,session:session.id,port:32123});
     harness.run(options);
     assert.equal(launches,1);assert.equal(state.ownerInputs.page,'synthetic-input-page');
     assert.equal(browserCalls.filter(call=>call.name==='tab-create').length,1);
@@ -3583,13 +3595,12 @@ test('a kernel revives a dead supervisor from its stale pulse, once per window, 
   const harness=setupWork({});
   try{
     const store=harness.store,state=harness.state;state.host=path.resolve('.');
-    const file=path.join(path.dirname(store.dir),'supervisor.lock');
     const spawned=[];const spawn=(executable,args,options)=>{spawned.push({executable,args,cwd:options.cwd});return 777;};
     let clock=10*60*1000;const now=()=>clock;
     assert.equal(reviveSupervisor(store,state,{},{now,spawn,alive:()=>false}),null,'no pulse was ever written: a kernel run by hand has no supervisor to miss');
-    fs.writeFileSync(file,JSON.stringify({pid:4242,at:clock-60*1000}));
+    setSignal(store.ledger.db,'*','supervisor-lock',{pid:4242,at:clock-60*1000});
     assert.equal(reviveSupervisor(store,state,{},{now,spawn,alive:()=>false}),null,'a pulse one minute old is a live supervisor');
-    fs.writeFileSync(file,JSON.stringify({pid:4242,at:clock-6*60*1000}));
+    setSignal(store.ledger.db,'*','supervisor-lock',{pid:4242,at:clock-6*60*1000});
     assert.equal(reviveSupervisor(store,state,{},{now,spawn,alive:()=>true}),null,'stale pulse but the pid still answers: it is only slow');
     assert.equal(reviveSupervisor(store,state,{},{now,spawn,alive:()=>false}),777,'stale pulse and no process: revived');
     assert.deepEqual(spawned[0].args.slice(1),['workflow-supervise','--host',state.host]);
@@ -4636,14 +4647,13 @@ test('the kernel holds its launch in the repository runtime ledger and clears th
   try{
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
-    const file=loadsFileFor(harness.store.dir);
-    assert.equal(path.dirname(file),path.dirname(harness.store.dir));
+    const file=harness.store.ledgerFile;
     const allocator=createAllocator({runtimes:runtimeProfile,now:()=>Date.UTC(2026,8,12,9),
       shared:{path:file,workflow:harness.store.id}});
     harness.run({allocator,maxIterations:1});
     const launched=events(harness.store).find(event=>event.event==='launched');
     assert.equal(launched.op,'op-intake');
-    const ledger=()=>JSON.parse(fs.readFileSync(file,'utf8'));
+    const ledger=()=>readLoads({path:file,workflow:harness.store.id});
     assert.equal(ledger().schema,'starci/runtime-loads@1');
     assert.deepEqual(ledger().runtimes[launched.runtime].live.map(item=>[item.workflow,item.op]),
       [[harness.store.id,'op-intake']]);
@@ -4657,30 +4667,30 @@ test('the kernel holds its launch in the repository runtime ledger and clears th
   }finally{harness.cleanup();}
 });
 
-test('the quota proposal opens the next chain runtime when the first one is busy with another workflow',t=>{
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-quota-loads-'));
-  t.after(()=>{fs.rmSync(root,{recursive:true,force:true});});
-  const other='20260912-100000-other';
-  fs.mkdirSync(path.join(root,other),{recursive:true});
-  fs.writeFileSync(path.join(root,other,'kernel.lock'),JSON.stringify({pid:process.pid,startedAt:1}));
-  const state={id:'20260912-104251-mine',dir:path.join(root,'20260912-104251-mine'),
-    ops:[{id:'op-decide',kind:'architecture.decide',status:'pending',difficulty:'hard'}]};
-  // Alone in the repository the proposal names the Fable window, the first runtime of the decide chain, and
-  // marks nothing busy.
-  const alone=proposeQuota(state);
-  assert.equal(alone.rows.some(row=>row.runtime==='claude-fable-5.1'),false,'a retired pool id never names a row');
-  assert.equal(alone.rows.find(row=>row.runtime==='claude-fable').slots,1);
-  assert.doesNotMatch(alone.text,/busy with/);
-  // A ledger another kernel wrote still names the retired pool id; it folds into the claude-fable window.
-  fs.writeFileSync(loadsFileFor(state.dir),JSON.stringify({schema:'starci/runtime-loads@1',
-    runtimes:{'claude-fable-5.1':{live:[{workflow:other,op:'op-other',since:1}],cooling:null,usedToday:1,day:new Date().toISOString().slice(0,10)}}}));
-  const shared=proposeQuota(state);
-  const astra=shared.rows.find(row=>row.runtime==='codex-agent');
-  assert.equal(astra.slots,1);
-  assert.match(astra.why,/claude-fable is busy with 20260912-100000-other/);
-  assert.match(shared.text,/codex-agent=1/);
-  // A lane is added, never taken away: the busy runtime keeps the slot this workflow's own quota gives it.
-  assert.equal(shared.rows.find(row=>row.runtime==='claude-fable').slots,1);
+test('the quota proposal opens the next chain runtime when the first one is busy with another workflow',()=>{
+  const repo=tmp();
+  const store=createStore({repoRoot:repo,id:'20260912-104251-mine'});
+  try{
+    const other='20260912-100000-other';
+    const state={id:store.id,ops:[{id:'op-decide',kind:'architecture.decide',status:'pending',difficulty:'hard'}]};
+    // Alone in the repository the proposal names the Fable window, the first runtime of the decide chain, and
+    // marks nothing busy.
+    const alone=proposeQuota(state,{shared:readLoads({ledger:store.ledger,workflow:state.id})});
+    assert.equal(alone.rows.some(row=>row.runtime==='claude-fable-5.1'),false,'a retired pool id never names a row');
+    assert.equal(alone.rows.find(row=>row.runtime==='claude-fable').slots,1);
+    assert.doesNotMatch(alone.text,/busy with/);
+    // A ledger another kernel wrote still names the retired pool id; it folds into the claude-fable window.
+    // A dead kernel's entries are dropped on read, so the other workflow needs a live kernel-lock too.
+    setSignal(store.ledger.db,other,'kernel-lock',{pid:process.pid});
+    createLoadsLedger({ledger:store.ledger,workflow:other}).launched({runtime:'claude-fable-5.1',op:'op-other'});
+    const shared=proposeQuota(state,{shared:readLoads({ledger:store.ledger,workflow:state.id})});
+    const astra=shared.rows.find(row=>row.runtime==='codex-agent');
+    assert.equal(astra.slots,1);
+    assert.match(astra.why,/claude-fable is busy with 20260912-100000-other/);
+    assert.match(shared.text,/codex-agent=1/);
+    // A lane is added, never taken away: the busy runtime keeps the slot this workflow's own quota gives it.
+    assert.equal(shared.rows.find(row=>row.runtime==='claude-fable').slots,1);
+  }finally{store.close();fs.rmSync(repo,{recursive:true,force:true});}
 });
 
 /* ------------------------------------------------------------------ the critique of the goal */
@@ -5431,7 +5441,8 @@ const goalFixture=()=>{
   const store=createStore({repoRoot:repo,id:'20260912-120000-goal-spec'});
   const state=createWorkflowState({job:'Ship the goal',inputs:[],worktree:repo,branch:'main',store});
   const op=(id='op-a',extra={})=>toOp({id,kind:'backend.implement',goal:'build A',ledgerIds:['feature-a'],allowlist:['src/a.ts'],...extra});
-  return {repo,store,state,op,cleanup:()=>{store.close();fs.rmSync(repo,{recursive:true,force:true,maxRetries:5,retryDelay:50});}};
+  return {repo,store,state,op,cleanup:()=>{store.close();
+    try{fs.rmSync(repo,{recursive:true,force:true,maxRetries:20,retryDelay:100});}catch(error){if(error?.code!=='EPERM'&&error?.code!=='EBUSY')throw error;}}};
 };
 
 test('goal metrics evaluate against the ledger, gates and kernel-derived ops; a fresh goal is rev 1',()=>{
