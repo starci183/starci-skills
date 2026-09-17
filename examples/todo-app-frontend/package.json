@@ -1,0 +1,9 @@
+{
+  "name": "todo-app-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:unit": "node --test src/**/*.test.mjs"
+  }
+}
+

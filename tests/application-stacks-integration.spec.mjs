@@ -23,8 +23,8 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
     'docs/application-stacks.md','docs/application-stacks-vps.md',
     ...['app/Dockerfile','app/server.mjs','gateway/nginx.conf','scripts/prepare.sh','scripts/prepare.ps1',
       '.gitignore','.stacks/application-stacks.yaml','.stacks/dev/compose.yaml','.stacks/vps/stack.yaml']
-      .map(name=>'examples/todo-app/'+name)])assert.ok(files.has(file),file);
-  assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app/')&&
+      .map(name=>'examples/todo-app-backend-backend/'+name)])assert.ok(files.has(file),file);
+  assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app-backend-backend/')&&
     (/\/(runtime|generated|\.runtime)\//.test(file)||/\.(enc|agekey)$/.test(file))),false);
 });
 
@@ -51,7 +51,7 @@ test('runtime packaging excludes accidental generated example plaintext and ciph
   for(const entry of ['config.example.yaml','cli','ops','workflows','model','kernel','hosts','models','checks','providers','approvals',
     'execution','knowledge','contracts','specifications','examples','scripts','core','schemas'])
     fs.cpSync(path.join(root,entry),path.join(directory,entry),{recursive:true});
-  const base='examples/todo-app/.starcistacks/dev/';
+  const base='examples/todo-app-backend-backend/.starcistacks/dev/';
   for(const suffix of ['secrets.yaml','secrets.yaml.enc','runtime/files/secret.yaml','generated/deployment-model.yaml']){
     const target=path.join(directory,base,suffix);fs.mkdirSync(path.dirname(target),{recursive:true});
     fs.writeFileSync(target,'synthetic-credential-must-not-ship');
