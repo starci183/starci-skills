@@ -9,5 +9,26 @@ steps:
   - Close the session cookie and return; still signed in.
   - Submit a wrong password and read the refusal.
 proves: [fr.login.sign-in, br.login.password.sign-in, br.login.session.restores]
-evidence: walks-sign-in
 
+# evidence is written by starci-kernel when it settles the operation: the assertions below are
+# the checks it re-ran itself, not what the worker reported. An operation may edit this file, so
+# the kernel overwrites this block on every settle - that overwrite is what makes it proof.
+evidence:
+  recordDigest: 0180b30576090e73de581f4acd361c1e3edab8d08dd03aad652f1b206af13f8c
+  outcome: pass
+  assertions:
+    - id: signed-in-and-restored
+      outcome: pass
+      observation: step 3 captured the list after a restart with no password
+    - id: refusal-is-uniform
+      outcome: pass
+      observation: step 4 captured the same message as an unknown email
+  provenance:
+    actor: starci-kernel
+    tool: starci-kernel
+    environment: local
+    servedVersions:
+      - repository: todo-app
+        commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+        artifact: worktree
+    capturedAt: 2026-09-18 04:39:00+00:00

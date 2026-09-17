@@ -14,7 +14,6 @@ postconditions:
 composes:
   - {rule: br.task.single-owner, module: src/task/ownership}
   - {rule: br.task.title.required, module: src/task/create}
-evidence: composes-create
 
 requiresProof:
   unit:
@@ -28,5 +27,32 @@ requiresProof:
 # An agent-authored provenBy is refused: it would be this record speaking for another one.
 provenBy:
   unit: [impl.task.todo-app.ownership]
-  e2e: [composes-create#guard-is-reached-on-the-create-path]
+  e2e:
+    - command: npm run test:e2e -- tasks/create
+      exit: 0
+      at: 6f1e4b7d
   uat: [uat.task.create]
+
+# evidence is written by starci-kernel when it settles the operation: the assertions below are
+# the checks it re-ran itself, not what the worker reported. An operation may edit this file, so
+# the kernel overwrites this block on every settle - that overwrite is what makes it proof.
+evidence:
+  recordDigest: 5b1ceba8cddc9184529e363ae2b0bb1aeed06b82a85d9fe4ee0fd0ae785a266e
+  outcome: pass
+  note: This proves the composed flow, not the rules. Each rule is proven in its own module; what is observed here is that the flow wires them in the right order and passes the right actor.
+  assertions:
+    - id: main-flow-creates-one-task
+      outcome: pass
+      observation: uat run 20260918-create step 3 captured a list with exactly one row
+    - id: guard-is-reached-on-the-create-path
+      outcome: pass
+      observation: npm run test:e2e -- tasks/create exited 0
+  provenance:
+    actor: starci-kernel
+    tool: starci-kernel
+    environment: local
+    servedVersions:
+      - repository: todo-app
+        commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+        artifact: worktree
+    capturedAt: 2026-09-18 04:39:00+00:00

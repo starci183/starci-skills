@@ -111,25 +111,26 @@ export function classifyChange(previous,current){
   return keptCriteria&&additive(normative(previous.meta),normative(current.meta))?'clarifying':'breaking';
 }
 
-/** Every YAML record and evidence manifest of one Work tree, read once, keyed by its stable id. */
+/**
+ * Every record of one Work tree, read once, keyed by its stable id. Evidence is the kernel-written
+ * `evidence` block inside the record it proves - one record, one proof, in the file it belongs to.
+ */
 export function readWorkTree(root){
   const resolved=path.resolve(root);
   if(!directory(resolved))throw new WorkChangeInputError(`Not a readable Work root: ${slash(root)}`);
-  const records=new Map(),evidence=new Map(),unreadable=[];
+  const records=new Map(),unreadable=[];
   const walk=dir=>{
     for(const entry of fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))){
       const target=path.join(dir,entry.name);
       if(entry.isDirectory()){if(!SKIP_DIRECTORY.test(entry.name)&&directory(target))walk(target);continue;}
-      if(entry.name!=='index.yaml'&&entry.name!=='manifest.yaml')continue;
+      if(entry.name!=='index.yaml')continue;
       if(!regular(target)){unreadable.push(slash(path.relative(resolved,target)));continue;}
       let meta=null;
       try{meta=parseYaml(fs.readFileSync(target,'utf8'));}catch{unreadable.push(slash(path.relative(resolved,target)));continue;}
       if(!object(meta))continue;
       const at=slash(path.relative(resolved,target));
       const id=text(meta.id)?meta.id.trim():`path:${at}`;
-      if(meta.schema==='work/evidence'){evidence.set(`${text(meta.record)?meta.record.trim():'?'}/${id}`,{id,path:at,meta});continue;}
-      if(entry.name==='manifest.yaml')continue;
-      records.set(id,{id,path:at,meta,criteria:new Map()});
+      records.set(id,{id,path:at,meta,criteria:new Map(),evidence:object(meta.evidence)?meta.evidence:null});
     }
   };
   walk(resolved);
@@ -138,10 +139,8 @@ export function readWorkTree(root){
       const rule=records.get(record.meta.rule.trim());
       if(rule)rule.criteria.set(record.id,normativeDigest(record.meta));
     }
-  return {root:resolved,records,evidence,unreadable};
+  return {root:resolved,records,unreadable};
 }
-
-const evidenceOf=(tree,recordId)=>[...tree.evidence.values()].filter(item=>text(item.meta.record)&&item.meta.record.trim()===recordId);
 
 /**
  * `--work` alone decides everything a single checkout can decide; `--against` a previous tree decides
@@ -209,50 +208,47 @@ export function checkWorkChange({workRoot,baselineRoot=null}={}){
         for(const clause of withdraws)if(!held.has(clause))
           add('WITHDRAWS_UNKNOWN_STATEMENT',record,'a withdrawal names a statement the previous revision did not carry',{observed:clause});
       }
-      for(const gone of evidenceOf(baseline,record.id))
-        if(!current.evidence.has(`${record.id}/${gone.id}`))
-          add('EVIDENCE_DELETED',record,'expired evidence is marked, never deleted; history is what lets somebody later ask whether this was ever proven',{observed:gone.id});
+      if(previous?.evidence&&!record.evidence)
+        add('EVIDENCE_DELETED',record,'expired evidence is marked, never deleted; history is what lets somebody later ask whether this was ever proven',{observed:previous.evidence.recordDigest??'the evidence block'});
     }
 
-    const bound=evidenceOf(current,record.id);
+    const proof=record.evidence;
     const changeAt=change?moment(change.at):null;
     // A break stales the evidence it expired; the clause words are what the reason must name.
     const clause=new Set([...withdraws.flatMap(item=>[...stems(item)]),
       ...(baseline&&previous?list(previous.meta.statements).filter(text).filter(item=>!statements.includes(item.trim())).flatMap(item=>[...stems(item)]):[])]);
     const broke=declared==='breaking'||computed==='breaking';
-    for(const proof of bound.sort((a,b)=>a.id.localeCompare(b.id))){
-      const capturedAt=moment(proof.meta.provenance?.capturedAt);
-      const before=baseline?baseline.evidence.get(`${record.id}/${proof.id}`)??null:null;
+    const stale=proof?.stale===true;
+    if(proof){
+      const capturedAt=moment(proof.provenance?.capturedAt);
+      const before=previous?.evidence??null;
       /**
-       * What the manifest says it was proved against. `recordDigest` is written by the capturing
-       * kernel, and this check does not recompute it - see the limitation below - so it is used the
-       * one way that needs no agreement about the function: a manifest carrying the same token it
-       * carried before a break was not re-captured against what replaced the broken content. Capture
-       * time is the fallback where there is no baseline to compare the token against.
+       * What the record says its proof was captured against. `recordDigest` is written by the
+       * capturing kernel, and this check does not recompute it - see the limitation below - so it is
+       * used the one way that needs no agreement about the function: a proof still carrying the token
+       * it carried before a break was not re-captured against what replaced the broken content.
+       * Capture time is the fallback where there is no baseline to compare the token against.
        */
-      const recaptured=before!==null&&text(proof.meta.recordDigest)&&proof.meta.recordDigest!==before.meta.recordDigest;
+      const recaptured=before!==null&&text(proof.recordDigest)&&proof.recordDigest!==before.recordDigest;
       const predates=before!==null?!recaptured:capturedAt===null||changeAt===null||capturedAt<changeAt;
-      const stale=proof.meta.stale===true;
-      if(!text(proof.meta.recordDigest))
-        add('EVIDENCE_DIGEST_MISSING',record,'a manifest that does not say what it was proved against cannot be judged expired later',{observed:proof.path});
+      if(!text(proof.recordDigest))
+        add('EVIDENCE_DIGEST_MISSING',record,'proof that does not say what it was captured against cannot be judged expired later',{observed:'evidence.recordDigest'});
       // Only a break expires evidence. A clarification adds a criterion the old proof never covered;
       // marking healthy proof expired for that makes people re-run what never broke.
       if(broke&&predates&&!stale)
-        add('EVIDENCE_STALE_UNMARKED',record,'a breaking change expires the evidence bound to the content it changed',{observed:proof.path,expected:'stale: true with a staleReason'});
-      if(stale&&!(namesRevision(proof.meta.staleReason)&&(clause.size===0||[...stems(proof.meta.staleReason)].filter(word=>clause.has(word)).length>=2)))
-        add('STALE_REASON_UNNAMED',record,'stale evidence names the revision that expired it and the clause that went',{observed:proof.path});
-      if(baseline){
-        if(before&&before.meta.stale!==true&&stale&&!broke)
-          add('EVIDENCE_STALED_WITHOUT_BREAK',record,'only a breaking change expires evidence; prose and clarifications leave existing proof standing',{observed:proof.path,computed:computed??declared});
-      }
+        add('EVIDENCE_STALE_UNMARKED',record,'a breaking change expires the evidence bound to the content it changed',{observed:proof.recordDigest??null,expected:'stale: true with a staleReason'});
+      if(stale&&!(namesRevision(proof.staleReason)&&(clause.size===0||[...stems(proof.staleReason)].filter(word=>clause.has(word)).length>=2)))
+        add('STALE_REASON_UNNAMED',record,'stale evidence names the revision that expired it and the clause that went',{observed:proof.staleReason??null});
+      if(before&&before.stale!==true&&stale&&!broke)
+        add('EVIDENCE_STALED_WITHOUT_BREAK',record,'only a breaking change expires evidence; prose and clarifications leave existing proof standing',{observed:proof.staleReason??null,computed:computed??declared});
     }
-    if(record.meta.state==='done'&&bound.length&&bound.every(proof=>proof.meta.stale===true))
-      add('STATE_RESTS_ON_STALE_EVIDENCE',record,'every evidence of this record is history; a rule whose proof expired returns to todo',{observed:'state: done'});
+    if(record.meta.state==='done'&&stale)
+      add('STATE_RESTS_ON_STALE_EVIDENCE',record,'the evidence of this record is history; a rule whose proof expired returns to todo',{observed:'state: done'});
 
     summaries.push({id:record.id,path:record.path,schema:text(record.meta.schema)?record.meta.schema:null,
       state:text(record.meta.state)?record.meta.state:null,rev:positiveInteger(rev)?rev:null,declaredKind:declared,computedKind:computed,
       normativeDigest:digest,withdraws,criteria:[...record.criteria.keys()].sort(),
-      evidence:bound.map(proof=>({id:proof.id,path:proof.path,stale:proof.meta.stale===true})).sort((a,b)=>a.id.localeCompare(b.id))});
+      evidence:proof?{recordDigest:text(proof.recordDigest)?proof.recordDigest:null,outcome:text(proof.outcome)?proof.outcome:null,stale}:null});
   }
 
   // A record the check cannot read is not a clean record: it is a record nothing was decided about.
@@ -263,13 +259,13 @@ export function checkWorkChange({workRoot,baselineRoot=null}={}){
   return {schema:RESULT,workRoot:slash(current.root),baseline:baseline?slash(baseline.root):null,
     clean:findings.length===0,
     coverage:{records:current.records.size,governed:summaries.filter(item=>item.declaredKind!==null).length,
-      evidence:current.evidence.size,compared:baseline?summaries.filter(item=>item.computedKind!==null).length:0,
+      proven:summaries.filter(item=>item.evidence).length,stale:summaries.filter(item=>item.evidence?.stale).length,compared:baseline?summaries.filter(item=>item.computedKind!==null).length:0,
       unreadable:unreadable.map(item=>item.path)},
     records:summaries,
     findings:findings.sort((a,b)=>a.code.localeCompare(b.code)||a.id.localeCompare(b.id)||String(a.observed??'').localeCompare(String(b.observed??''))),
     limitations:[baseline?'The transition is computed between two given trees; neither is independently authenticated as the revision it claims to be.':'No baseline was given, so no transition was computed: the declared kind was not verified against the edit, withdrawals were not matched to a previous revision, and an undeclared edit cannot be seen. Pass --against a previous Work tree for those.',
       'Prose and lifecycle keys are excluded from the normative digest by name, so a normative obligation written into a description travels nowhere.',
-      'Evidence staleness is judged from the manifest, its recordDigest and its capture time; no proof was re-run and no assertion was re-observed.',
+      'Evidence staleness is judged from the evidence block the record carries, its recordDigest and its capture time; no proof was re-run and no assertion was re-observed.',
       'A manifest\'s recordDigest is the capturing kernel\'s own token and is not recomputed here: this module owns what an edit is, not what a record hashes to. It is compared between revisions, never to a value this check derives.',
       'Which proof kinds a record still owes (requiresProof) is a different question from how far its edit travelled, and is not decided here.',
       'This check reports and never repairs: it writes nothing into the Work tree.']};
