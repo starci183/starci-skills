@@ -14,7 +14,7 @@ import {spawn,spawnSync} from 'node:child_process';
 import {skillRoot} from '../core/runtime-root.mjs';
 import {getPath} from '../hosts/orca/calls.mjs';
 import {waitTick} from '../hosts/orca/protocol.mjs';
-import {buildOperationLaunch,notifyTerminal,settleDispatch,startOperation,sweepWorktree} from '../hosts/orca/launch.mjs';
+import {buildOperationLaunch,completedWorkerResidue,notifyTerminal,settleDispatch,startOperation,sweepWorktree} from '../hosts/orca/launch.mjs';
 import {buildReport,validateReport} from './reports.mjs';
 import {TAB_READ_LIMIT,classifyTab} from './tab.mjs';
 import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot,workflowsRoot} from './store.mjs';
@@ -680,7 +680,13 @@ export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost
   // it is closed by the settlement below.
   const processExited=['failed','stopped','succeeded'].includes(worker?.state)&&observation?.exactWorker===true&&(observation?.status==='exited'||worker?.stage==='process_exited');
   const terminalGone=!terminal||(terminal.connected===false&&terminal.writable===false&&(terminal.paneRuntimeId===undefined||terminal.paneRuntimeId===null||terminal.paneRuntimeId===-1));
-  const stopped=processExited&&(terminalGone||worker?.stage==='process_exited');
+  // A completed, capability-revoked, settled worker whose tab survives only as recorded residue proves its own
+  // exit. Once the process incarnation is gone `observation.exactWorker` can never read true again, so demanding
+  // it here refuses the retry on every future pass: the writer fence stays held, the workflow can never resume,
+  // and the supervisor restarts a kernel that dies at this same boundary. The typed settlement below accepts
+  // exactly this shape, and a boundary stricter than the settlement it delegates to is the bug.
+  const residue=completedWorkerResidue(result,dispatchId);
+  const stopped=(processExited&&(terminalGone||worker?.stage==='process_exited'))||residue.retainedResidue;
   const terminalResource=result?.terminalResource,ownershipState=String(terminalResource?.ownershipState??'').toLowerCase(),
     userTakeover=preparedDecision&&dispatch?.status==='completed'&&Boolean(dispatch?.completed_at)&&Boolean(dispatch?.capability_revoked_at)&&
       worker?.state==='succeeded'&&worker?.stage==='settled'&&ownershipState==='user_owned'&&terminalResource?.originDispatchId===dispatchId&&
