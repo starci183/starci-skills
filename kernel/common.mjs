@@ -121,7 +121,7 @@ export const isWorkTreePath=entry=>/(^|\/)\.starciwork(\/|$)/.test(slash(entry))
  * A write scope that would reach the workflow record itself: `.starciwork/**`, the `.starciwork` root, or one
  * of the ledger database files. Asymmetric - a narrow `.starciwork/...` scope names a product path and is legal.
  */
-export const coversLedgerScope=entry=>{const root=allowRoot(entry);return ['.starciwork','.starciwork/runtime.sqlite','.starciwork/runtime.sqlite-journal','.starciwork/runtime.sqlite-wal'].some(target=>target===root||target.startsWith(`${root}/`));};
+export const coversLedgerScope=entry=>{const root=allowRoot(entry);return ['.starciwork','.starciwork/runtime.sqlite','.starciwork/runtime.sqlite-journal','.starciwork/runtime.sqlite-wal','.starciwork/runtime.sqlite-shm'].some(target=>target===root||target.startsWith(`${root}/`));};
 /**
  * A build or a repair scope composed from OTHER operations' allowlists: the code they touched, never the Work
  * tree. One tree is shared by a project's repositories, so a `.starciwork` entry inherited from a design op puts

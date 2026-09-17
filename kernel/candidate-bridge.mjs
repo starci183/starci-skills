@@ -127,7 +127,7 @@ const trackedFor=(git,root,scopes)=>{
 // may enter a candidate baseline, reference or oracle. The Work tree's product files stay readable.
 const DEFAULT_EXCLUDED=[/(^|\/)\.git(\/|$)/,/(^|\/)node_modules(\/|$)/,/(^|\/)(dist|build|coverage|\.cache)(\/|$)/,
   /(^|\/)\.env([^/]*)$/,/(^|\/)(secrets?|credentials?)(\.|\/|$)/,/\.(pem|p12|pfx|key|enc)$/i,/(^|\/)\.starciwork\/_local(\/|$)/,
-  /(^|\/)\.starciwork\/runtime\.sqlite(-journal|-wal)?$/,/(^|\/)\.starciwork\/_resources(\/|$)/];
+  /(^|\/)\.starciwork\/runtime\.sqlite(-journal|-wal|-shm)?$/,/(^|\/)\.starciwork\/_resources(\/|$)/];
 const safeTracked=file=>!DEFAULT_EXCLUDED.some(pattern=>pattern.test(clean(file)));
 export function candidateDependencyPlan(root,{declared=null,required=true}={}){
   if(typeof declared==='string'&&declared.trim())return {manager:'declared',command:declared.trim(),lifecycleScripts:'caller-declared'};
@@ -161,7 +161,7 @@ function externalDependencyLinks(candidateRoot){
 // The whole `.starciwork` subtree is runtime custody, never Git-stream drift: Work-tree writes reach the
 // candidate through the ledger inventory below, and the record file itself is never inventoried at all.
 const runtimeInternal=file=>/(^|\/)\.starciwork(\/|$)/.test(clean(file));
-const ledgerRecord=file=>/(^|\/)\.starciwork\/runtime\.sqlite(-journal|-wal)?$/.test(clean(file));
+const ledgerRecord=file=>/(^|\/)\.starciwork\/runtime\.sqlite(-journal|-wal|-shm)?$/.test(clean(file));
 // Runtime state is intentionally absent from candidate/model payloads, but it is still inventoried here.
 // This walk includes Git-ignored files and hashes only their state; it never copies their bytes into a snapshot.
 const runtimeLocalPaths=root=>{
@@ -546,7 +546,7 @@ const housekeepingIdentity=(bridge,value)=>{
 // The kernel's only `.starciwork` footprint under the ledger model is the record itself. The custody inventory
 // already keeps `runtime.sqlite*` out of `observed`, so these exempt paths are belt-and-braces for a caller that
 // ever inventories them; every other `.starciwork` change is custody evidence, never housekeeping.
-const housekeepingFiles=identity=>identity?['.starciwork/runtime.sqlite','.starciwork/runtime.sqlite-journal','.starciwork/runtime.sqlite-wal']:[];
+const housekeepingFiles=identity=>identity?['.starciwork/runtime.sqlite','.starciwork/runtime.sqlite-journal','.starciwork/runtime.sqlite-wal','.starciwork/runtime.sqlite-shm']:[];
 const aggregatePacketFile=packet=>({...packet,roots:(packet.roots??[]).map(({packet:ignored,...root})=>root)});
 
 /** Freeze every bound root under one immutable aggregate identity; old one-root callers retain the v1 packet. */

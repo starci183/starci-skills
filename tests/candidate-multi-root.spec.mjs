@@ -118,6 +118,7 @@ test('the kernel\'s .starciwork footprint is the ledger record alone; it is invi
   fs.mkdirSync(path.join(accepted.owner,'.starciwork'),{recursive:true});
   fs.writeFileSync(path.join(accepted.owner,'.starciwork','runtime.sqlite'),'live ledger bytes');
   fs.writeFileSync(path.join(accepted.owner,'.starciwork','runtime.sqlite-wal'),'wal bytes');
+  fs.writeFileSync(path.join(accepted.owner,'.starciwork','runtime.sqlite-shm'),'shm bytes');
   const sealed=freezeDetectionCandidate(accepted.bridge,{git,requireReported:true,reportedFiles:['src/app.js','.starciwork/evidence/capture.txt']});
   assert.equal(sealed.status,'sealed',JSON.stringify(sealed.reasons));
   assert.deepEqual(sealed.housekeepingObserved,[]);

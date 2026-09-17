@@ -69,7 +69,7 @@ test('a write under .starciwork quarantines as custody-path-touched, never as or
 test('an allowlist covering the ledger record is refused at candidate open, not observed later',t=>{
   const root=cloneTemplate(t,appBase,'starci-ledger-scope-'),parent=path.dirname(root);
   const identity={workflowId:'wf',opId:'op',attempt:1,generation:1,jobId:'job-ledger'};
-  for(const entry of ['.starciwork','.starciwork/**','.starciwork/runtime.sqlite','.starciwork/runtime.sqlite-wal'])
+  for(const entry of ['.starciwork','.starciwork/**','.starciwork/runtime.sqlite','.starciwork/runtime.sqlite-journal','.starciwork/runtime.sqlite-wal','.starciwork/runtime.sqlite-shm'])
     assert.throws(()=>beginDetectionCandidate({identity,repoRoot:root,workerRoot:path.join(parent,`${path.basename(root)}-candidate`),
       controlRoot:path.join(parent,`${path.basename(root)}-control`),allowlist:[entry],references:[],git,environmentDigest:'env'}),
       /scope-covers-ledger/,`allowlist entry ${entry} must be refused`);
