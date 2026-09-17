@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {parseYaml} from '../core/yaml.mjs';
 import {createOrcaCalls} from '../hosts/orca/calls.mjs';
 import {buildReport} from '../kernel/reports.mjs';
-import {openLedger,inspectLedger,ledgerFileFor} from '../kernel/ledger-db.mjs';
+import {openLedger,inspectLedger,openMachine,ledgerFileFor,machineFileFor,ledgerIdOf,anchorFileFor,readAnchor,reserveTwoPhase} from '../kernel/ledger-db.mjs';
 import {createStore} from '../kernel/store.mjs';
 import {createWorkflowState,runLoop} from '../kernel/kernel.mjs';
 import {goalPhase,approve} from '../kernel/goal.mjs';
@@ -172,6 +173,13 @@ test('§11 restart proof: kill mid-op, delete and recreate the worktree, resume 
       'the ledger owns the record: no _local/workflows/<id> was ever created');
     assert.equal(fs.existsSync(path.join(repoRoot,'.starciwork','_local')),false,'nothing under _local at all');
 
+    // §12: the anchor lives in repoRoot's .starciwork, never in the worktree lane, so deleting and
+    // recreating the lane cannot touch it - it is the tracked proof a re-clone of repoRoot would carry.
+    assert.equal(fs.existsSync(anchorFileFor(repoRoot)),true,'the anchor survives the worktree delete/recreate');
+    const survivedAnchor=readAnchor(repoRoot).workflows[id];
+    assert.ok(survivedAnchor,'the anchor holds an entry for this workflow after the kill');
+    assert.equal(survivedAnchor.generation,1,'anchored at the checkpoint generation bound at enrollment');
+
     // ---- phase 2: a new process: fresh store, fresh engine, state re-read from the ledger
     const store2=createStore({repoRoot,id});
     const resumed=store2.loadState();
@@ -209,4 +217,53 @@ test('§11 restart proof: kill mid-op, delete and recreate the worktree, resume 
     assert.equal(machine.db.prepare('SELECT count(*) AS n FROM leases').get().n,0,'the machine arbiter holds zero leases');
     assert.equal(fs.existsSync(path.join(repoRoot,'.starciwork','_local')),false,'resume still wrote nothing under _local');
   });
+});
+
+test('§5/§6 identity: a relocated ledger keeps its machine leases; a path rebuilt fresh does not inherit them',async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-ledger-identity-'));
+  const machineHome=path.join(root,'machine');fs.mkdirSync(machineHome,{recursive:true});
+  const machineFile=machineFileFor({LOCALAPPDATA:machineHome});
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
+
+  const machine=openMachine({file:machineFile});
+  machine.setCapacity('ai/test',10);
+  const job=(jobId,workflowId)=>({jobId,workflowId,kind:'model',generation:1});
+
+  // ---- a ledger moved to another path (close, rename the bytes, reopen+register at the new path) keeps
+  // its machine leases: `meta.ledger_id` travels with the bytes, so the machine sweep still recognizes them.
+  const pathA=path.join(root,'a','runtime.sqlite'),pathB=path.join(root,'b','runtime.sqlite');
+  let ledgerA=openLedger({file:pathA,machine});
+  const idA=ledgerIdOf(ledgerA);
+  const reservedA=reserveTwoPhase(ledgerA,machine,{job:job('job-a','wf-a'),machineNeeds:[{resourceKey:'ai/test',units:1}]});
+  assert.equal(reservedA.ok,true,reservedA.reason);
+  assert.equal(machine.db.prepare('SELECT count(*) AS n FROM leases').get().n,1,'the machine lease is taken');
+  ledgerA.close();
+  fs.mkdirSync(path.dirname(pathB),{recursive:true});
+  fs.renameSync(pathA,pathB);
+  const movedLedger=openLedger({file:pathB,machine});   // re-registers idA with the refreshed file=pathB
+  assert.equal(ledgerIdOf(movedLedger),idA,'the identity moved with the bytes, unchanged by the path');
+  assert.equal(machine.db.prepare('SELECT file FROM ledgers WHERE ledger_id=?').get(idA).file,fs.realpathSync(pathB));
+  let swept=machine.sweep({inspectLedger,at:reservedA.expiresAt-1});
+  assert.equal(swept.orphaned,0,'the relocated ledger still backs its lease, so nothing is orphaned');
+  assert.equal(machine.db.prepare('SELECT count(*) AS n FROM leases').get().n,1,'the lease is kept across the move');
+  movedLedger.close();
+
+  // ---- a path rebuilt with a fresh ledger does not inherit the old registration: pathA is re-created from
+  // nothing (new meta.ledger_id), but the OLD ledgers row for idA never learned about the move to pathB in
+  // this branch of the scenario - a second, independent lease is taken under idA still pointed at pathA,
+  // proving the fresh file at pathA is never mistaken for idA's backing store.
+  const secondLedgerA=openLedger({file:pathA,machine});   // idA "never moved" here; still registered at pathA
+  const secondReserve=reserveTwoPhase(secondLedgerA,machine,{job:job('job-a2','wf-a'),machineNeeds:[{resourceKey:'ai/test',units:1}]});
+  assert.equal(secondReserve.ok,true,secondReserve.reason);
+  secondLedgerA.close();
+  fs.rmSync(pathA);
+  const freshC=openLedger({file:pathA,machine});   // a brand new ledger rebuilt at the same path: fresh meta.ledger_id
+  const idC=ledgerIdOf(freshC);
+  assert.notEqual(idC,idA,'a rebuilt file at the same path is a different ledger, never the old one');
+  assert.equal(machine.db.prepare('SELECT count(*) AS n FROM leases WHERE ledger_id=?').get(idC).n,0,
+    'the fresh ledger inherits none of the old leases - it has never taken any of its own');
+  swept=machine.sweep({inspectLedger,at:secondReserve.expiresAt-1});
+  assert.equal(machine.db.prepare('SELECT count(*) AS n FROM leases WHERE ledger_id=?').get(idA).n,0,
+    'idA\'s lease is released: pathA now opens as idC, so idA is proven unbacked, not silently kept');
+  freshC.close();machine.close();
 });
