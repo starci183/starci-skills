@@ -12,7 +12,7 @@ import {createWorkflowState,runLoop} from '../kernel/kernel.mjs';
 import {goalPhase,approve} from '../kernel/goal.mjs';
 import {enrollEngine,createEngineRuntime} from '../kernel/engine.mjs';
 import {fakeAllocator} from './helpers/kernel-harness.mjs';
-import {withLedger,verifyChain} from './_ledger-fixture.mjs';
+import {withLedger} from './_ledger-fixture.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const json=(status,value)=>({status,stdout:JSON.stringify(value),stderr:''});
@@ -204,7 +204,7 @@ test('§11 restart proof: kill mid-op, delete and recreate the worktree, resume 
       assert.ok(jobs.some(job=>job.op_id==='op-2'&&job.status!=='queued'&&job.status!=='running'&&job.status!=='leased'),
         'the killed op-2 attempt is terminally settled in the ledger');
       assert.equal(ledger.db.prepare('SELECT count(*) AS n FROM leases WHERE workflow_id=?').get(id).n,0,'no live leases remain');
-      assert.equal(verifyChain(ledger,{workflowId:id}).ok,true,'the event hash chain verifies');
+      assert.equal(ledger.verifyChain({workflowId:id}).ok,true,'the event hash chain verifies');
     }finally{ledger.close();}
     assert.equal(machine.db.prepare('SELECT count(*) AS n FROM leases').get().n,0,'the machine arbiter holds zero leases');
     assert.equal(fs.existsSync(path.join(repoRoot,'.starciwork','_local')),false,'resume still wrote nothing under _local');

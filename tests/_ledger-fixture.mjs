@@ -93,21 +93,3 @@ export function seedWorkflow(ledger,{id,state=null,events=[],jobs=[],leases=[],g
   });
   return {id,generation:gen,goalIdentity:identity,events:events.length,jobs:jobs.length,leases:leases.length};
 }
-
-/**
- * The §4 event hash chain, checked row by row: `verifyChain(ledger[,workflowId])` →
- * `{ok:true,checked}` or `{ok:false,reason,workflowId,seq}`. Prefer `ledger.verifyChain()` when s0 ships it;
- * this stands in for it so specs do not guess the module's name.
- */
-export function verifyChain(ledger,{workflowId=null}={}){
-  const rows=(workflowId?ledger.db.prepare('SELECT * FROM events WHERE workflow_id=? ORDER BY seq').all(workflowId)
-    :ledger.db.prepare('SELECT * FROM events ORDER BY seq').all());
-  const head=new Map();
-  for(const row of rows){
-    const prev=head.get(row.workflow_id)??null;
-    if((row.prev_digest??null)!==prev)return {ok:false,reason:'prev_digest mismatch',workflowId:row.workflow_id,seq:row.seq};
-    if(eventDigest(prev,row)!==row.digest)return {ok:false,reason:'digest mismatch',workflowId:row.workflow_id,seq:row.seq};
-    head.set(row.workflow_id,row.digest);
-  }
-  return {ok:true,checked:rows.length};
-}
