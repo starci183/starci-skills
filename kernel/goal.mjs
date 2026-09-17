@@ -11,8 +11,8 @@ import {goalRevOf} from './ask.mjs';
 import {loadsFileFor,readLoads} from './loads.mjs';
 import {resolveExecutionChain} from './chains.mjs';
 import {GOAL_RECORD,WORK_LEDGER,addOp,allowlistsOverlap,byId,describeNode,dynamicBudget,firstLine,hostMissing,kindRole,
-  launchOperator,ledgerBinding,ledgerItem,liveStatus,locateSharedTreePaths,need,parseGate,parseQuota,parseRef,plain,readJson,required,slash,tail,toOp,
-  unique,workModule,workOpId,writeJson} from './common.mjs';
+  launchOperator,ledgerBinding,ledgerItem,liveStatus,locateSharedTreePaths,need,parseGate,parseQuota,parseRef,plain,required,slash,tail,toOp,
+  unique,workModule,workOpId} from './common.mjs';
 import {recordDigests} from './reconciliation.mjs';
 import {stateGoalIdentity} from './store.mjs';
 import {decisionKindFor} from './io.mjs';
@@ -55,14 +55,14 @@ export function laneHeaderLines(state){
     `owns that tree alone. Its branch is merged into \`${lane.base?.branch}\` in \`${slash(lane.base?.worktree??'')}\` when the workflow finishes done.`];
 }
 export function noteLaneInGoal(store,state){
-  let page='';
-  try{page=fs.readFileSync(store.paths.goal,'utf8');}catch{page='';}
+  const current=store.goal();
+  const page=current?.markdown??'';
   if(page.includes(`Lane \`${state.lane.name}\``))return;
   const lines=page.split('\n');
   const title=lines.findIndex(line=>line.startsWith('# '));
   const header=['',...laneHeaderLines(state)];
   lines.splice(title<0?0:title+1,0,...header);
-  fs.writeFileSync(store.paths.goal,lines.join('\n'));
+  store.setGoal({markdown:lines.join('\n'),json:current?.json??{schema:GOAL_RECORD,id:state.id},amendment:current?.amendment??null});
 }
 
 /* ------------------------------------------------------------------ the critique of the goal */
@@ -124,15 +124,18 @@ export function decidedRecords(api,at,loaded,{scope=[],max=40}={}){
 
 /**
  * The declared inputs, as the worktree can reach them. A `file:` input the owner named by an absolute path outside
- * the worktree is copied under the worktree's own `.starciwork/_local/inputs/<workflow>/` and the input refers to
- * that copy from now on - relative, digest-bound, frozen at goal time like everything else the owner approved.
- * Every op reference the plan derives from it then resolves inside the repository, where the candidate provenance
- * rule can read it; the first plan-ledger trial failed its first launch on an input that lived in another folder.
- * A relative input, a `branch:`/`history:` ref that is no path, a directory, a missing file: left as declared.
+ * the worktree is put into the ledger's own `inputs` table (`store.inputs.put`), never copied under the
+ * worktree's `.starciwork/_local/inputs/<workflow>/` - that copy died with the worktree (restart test
+ * 2026-09-17 lost two staged inputs this way), while the ledger bytes are the record and outlive it. The input's
+ * `ref` becomes `ledger://inputs/<workflow_id>/<key>#sha256=<hex>`; the candidate bridge and root binding
+ * resolve that scheme, materialising a digest-checked copy under `os.tmpdir()/starci/inputs/<wf>/<key>` only
+ * when a worker actually needs a file on disk. A relative input, a `branch:`/`history:` ref that is no path, a
+ * directory, a missing file: left as declared.
  */
 export function stageExternalInputs(store,state,{worktree}={}){
   const root=path.resolve(worktree??state.worktree);
   const staged=[];
+  const goalRevision=Number.isInteger(state.goalRev)&&state.goalRev>0?state.goalRev:1;
   state.inputs=(state.inputs??[]).map((input,index)=>{
     const ref=String(input?.ref??'');
     if(!ref||!path.isAbsolute(ref))return input;
@@ -140,13 +143,10 @@ export function stageExternalInputs(store,state,{worktree}={}){
     if(!stat.isFile())return input;
     const inside=path.relative(root,ref);
     if(inside&&!inside.startsWith('..')&&!path.isAbsolute(inside))return {...input,ref:slash(inside)};
-    const target=path.join(root,'.starciwork','_local','inputs',state.id,`${index+1}-${path.basename(ref)}`);
-    fs.mkdirSync(path.dirname(target),{recursive:true});
-    fs.copyFileSync(ref,target);
-    const sha256=crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex');
-    const relative=slash(path.relative(root,target));
-    staged.push({kind:input.kind,from:slash(ref),to:relative,sha256});
-    return {...input,ref:relative,sourceRef:slash(ref),sha256};
+    const key=`${index+1}-${path.basename(ref)}`;
+    const {ref:ledgerRef,sha256}=store.inputs.put({key,goalRevision,bytes:fs.readFileSync(ref),origin:slash(ref)});
+    staged.push({kind:input.kind,from:slash(ref),to:ledgerRef,sha256});
+    return {...input,ref:ledgerRef,sourceRef:slash(ref),sha256};
   });
   if(staged.length)store.appendEvent({event:'inputs-staged',inputs:staged});
   return staged;
@@ -169,7 +169,9 @@ export function critiqueRuntimes(host){
 function quotaSelectedProviders(store,state,role,providers,{budget=freshRuntimeBudget}={}){
   if(Array.isArray(providers))return providers;
   const configured=nonOperationModels(role,loadConfig(state.host??undefined));
-  const root=store?.dir?path.dirname(store.dir):null;
+  // The provider quota is a repo-wide file beside the ledger, never under `_local`: every kernel of the
+  // repository reads the same `.starciwork/runtime-budget.json`, workflow-store or not.
+  const root=store?.repoRoot?path.join(store.repoRoot,'.starciwork'):null;
   const fresh=root?budget(root):{ok:false,budget:null,reason:'this workflow store has no root to read the provider quota beside'};
   if(fresh.refreshed)store.appendEvent({event:'budget-refreshed',role,at:fresh.budget.at,
     providers:Object.fromEntries(Object.entries(fresh.budget.providers).map(([provider,entry])=>[provider,entry.status]))});
@@ -407,8 +409,8 @@ export function critiqueLines(state){
 }
 /** Write the section into goal.md above the definition of done, replacing the one that is already there. */
 export function noteCritiqueInGoal(store,state){
-  let page='';
-  try{page=fs.readFileSync(store.paths.goal,'utf8');}catch{page='';}
+  const current=store.goal();
+  const page=current?.markdown??'';
   const lines=page.split('\n');
   const section=critiqueLines(state);
   const at=lines.findIndex(line=>line.trim()===CRITIQUE_HEADING);
@@ -422,7 +424,7 @@ export function noteCritiqueInGoal(store,state){
     lines.splice(heading>=0?heading:title<0?lines.length:title+1,0,...section);
   }
   const text=lines.join('\n');
-  fs.writeFileSync(store.paths.goal,text.endsWith('\n')?text:`${text}\n`);
+  store.setGoal({markdown:text.endsWith('\n')?text:`${text}\n`,json:current?.json??{schema:GOAL_RECORD,id:state.id},amendment:current?.amendment??null});
 }
 
 /* ------------------------------------------------------------------ phase: goal on a plan ledger */
@@ -493,26 +495,26 @@ export function planGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   // from the assessment or from nowhere. The phase already refuses an assessment that failed; this is what the
   // approval gate reads when a model answered with an empty one.
   goalGrounds(state,{assessed,fallback:'none'});
-  writeJson(store.paths.goalJson,{schema:GOAL_RECORD,id:state.id,rev:goalRevOf(state),job:state.job,inputs:state.inputs,ledgerMode:state.ledgerMode,
+  const goalJson={schema:GOAL_RECORD,id:state.id,rev:goalRevOf(state),job:state.job,inputs:state.inputs,ledgerMode:state.ledgerMode,
     definitionOfDone:state.definitionOfDone,done:goalMetricsOf(state),risks:state.risks,questions:state.questions,critique:state.critique??null,
     ledger:state.ledger,ops:state.ops.map(op=>({id:op.id,kind:op.kind,goal:op.goal,
       ledgerIds:op.ledgerIds,allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn})),
     gates:state.gates,serializedOverlaps:overlaps,assessedBy:assessed.provider??null,provisions:state.provisions??[],
-    grounds:state.goalGrounds,approvable:!goalApprovalBlocks(state).length,approvalBlocks:goalApprovalBlocks(state)});
+    grounds:state.goalGrounds,approvable:!goalApprovalBlocks(state).length,approvalBlocks:goalApprovalBlocks(state)};
   const markdown=typeof renderGoalMarkdown==='function'?renderGoalMarkdown(plan,{job:state.job}):null;
-  fs.writeFileSync(store.paths.goal,markdown??fallbackGoalMarkdown(state));
+  const goalRow=store.setGoal({markdown:markdown??fallbackGoalMarkdown(state),json:goalJson});
   state.phase='awaiting-approval';
   const blocks=goalApprovalBlocks(state);
   store.appendEvent({event:'goal',ops:state.ops.length,ledger:state.ledger.length,gates:state.gates.length,overlaps,
     grounds:{assessment:state.goalGrounds.assessment,critique:state.goalGrounds.critique},approvable:!blocks.length});
   if(blocks.length)store.appendEvent({event:'goal-not-approvable',blocks});
   store.saveState(state);
-  return {ok:true,id:state.id,goal:store.paths.goal,goalJson:store.paths.goalJson,
+  return {ok:true,id:state.id,goalRevision:goalRow.revision,
     ops:state.ops.length,ledger:state.ledger.length,gates:state.gates.length,overlaps,
     grounds:state.goalGrounds,approvable:!blocks.length,...(blocks.length?{approvalBlocks:blocks}:{}),
     next:blocks.length
       ?`this goal cannot be approved as it stands: ${blocks[0]}`
-      :`review ${slash(store.paths.goal)} and approve with workflow-approve --id ${state.id}`};
+      :`review the goal with workflow-export --id ${state.id} and approve with workflow-approve --id ${state.id}`};
 }
 
 export function fallbackGoalMarkdown(state){
@@ -757,7 +759,7 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
   // repair settles it when an operation actually hits it.
   planCritiqueDecisions(store,state,{ctx:critiqueCtx});
   need(new Set(state.ops.map(op=>op.id)).size===state.ops.length,'Work operation ids are not unique');
-  writeJson(store.paths.goalJson,{schema:GOAL_RECORD,id:state.id,rev:goalRevOf(state),job:state.job,inputs:state.inputs,
+  const goalJson={schema:GOAL_RECORD,id:state.id,rev:goalRevOf(state),job:state.job,inputs:state.inputs,
     ledgerMode:state.ledgerMode,scope:state.scope,workRoot:slash(loaded.workRoot),ledgerValid:loaded.ok,
     ledgerSource:binding.source,ledgerShared:binding.sharedLedger,ledgerOwner:state.ledgerOwner,codeRepository:repository,codeSide:binding.side??null,
     definitionOfDone:state.definitionOfDone,done:goalMetricsOf(state),risks:state.risks,questions:state.questions,critique:state.critique??null,
@@ -766,8 +768,8 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
     ops:state.ops.map(op=>({id:op.id,nodeId:op.nodeId,kind:op.kind,goal:op.goal,ledgerIds:op.ledgerIds,
       allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn})),
     gates:state.gates,needUser:state.needUser,assessedBy:assessed?.provider??null,provisions:state.provisions??[],
-    grounds:state.goalGrounds,approvable:!goalApprovalBlocks(state).length,approvalBlocks:goalApprovalBlocks(state)});
-  fs.writeFileSync(store.paths.goal,workGoalMarkdown(state,loaded));
+    grounds:state.goalGrounds,approvable:!goalApprovalBlocks(state).length,approvalBlocks:goalApprovalBlocks(state)};
+  const goalRow=store.setGoal({markdown:workGoalMarkdown(state,loaded),json:goalJson});
   state.phase='awaiting-approval';
   const blocks=goalApprovalBlocks(state);
   store.appendEvent({event:'goal',ledgerMode:state.ledgerMode,scope:state.scope,ops:state.ops.length,
@@ -775,7 +777,7 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
     grounds:{assessment:state.goalGrounds.assessment,critique:state.goalGrounds.critique},approvable:!blocks.length});
   if(blocks.length)store.appendEvent({event:'goal-not-approvable',blocks});
   store.saveState(state);
-  return {ok:true,id:state.id,ledgerMode:state.ledgerMode,goal:store.paths.goal,goalJson:store.paths.goalJson,
+  return {ok:true,id:state.id,ledgerMode:state.ledgerMode,goalRevision:goalRow.revision,
     ops:state.ops.length,ledger:state.ledger.length,decisions:state.decisions.length,
     incomplete:incomplete.map(node=>node.id),needUser:state.needUser,gates:state.gates.length,
     grounds:state.goalGrounds,approvable:!blocks.length,...(blocks.length?{approvalBlocks:blocks}:{}),
@@ -783,7 +785,7 @@ export function workGoalPhase(store,state,{assessGoal=llm.assessGoal,critiqueGoa
     ledgerOwner:binding.sharedLedger?(binding.ownerRepository??slash(binding.ownerRepoRoot)):null,
     next:blocks.length
       ?`this goal cannot be approved as it stands: ${blocks[0]}`
-      :`review ${slash(store.paths.goal)} and approve with workflow-approve --id ${state.id}`};
+      :`review the goal with workflow-export --id ${state.id} and approve with workflow-approve --id ${state.id}`};
 }
 
 /**
@@ -1400,8 +1402,9 @@ export function reviseGoal(store,state,body,{ctx=null,source='owner',now=Date.no
     op.inputsHeld=held;
     (held?revalidated.held:revalidated.changed).push(op.id);
   }
-  const file=readJson(store.paths.goalJson)??{schema:GOAL_RECORD,id:state.id};
-  writeJson(store.paths.goalJson,{...file,rev:state.goalRev,revisedAt:new Date(at).toISOString(),
+  const current=store.goal();
+  const file=current?.json??{schema:GOAL_RECORD,id:state.id};
+  const goalJson={...file,rev:state.goalRev,revisedAt:new Date(at).toISOString(),
     ...(next.job!==undefined?{job:state.job}:{}),
     ...(next.scope!==undefined?{scope:state.scope}:{}),
     ...(next.definitionOfDone!==undefined?{definitionOfDone:state.definitionOfDone}:{}),
@@ -1413,7 +1416,10 @@ export function reviseGoal(store,state,body,{ctx=null,source='owner',now=Date.no
     ...(next.ledger!==undefined?{ledger:state.ledger}:{}),
     ...(next.decisions!==undefined?{decisions:state.decisions}:{}),
     ops:state.ops.map(op=>({id:op.id,nodeId:op.nodeId??null,kind:op.kind,goal:op.goal,ledgerIds:op.ledgerIds,
-      allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn,goalRev:op.goalRev}))});
+      allowlist:op.allowlist,references:op.references,checks:op.checks,acceptance:op.acceptance,dependsOn:op.dependsOn,goalRev:op.goalRev}))};
+  // `goal.revise`/`workflow-amend` never rewrites the human-readable markdown itself; the amendment body is
+  // its own record (`amendment_json`) beside the json the revision actually moved.
+  store.setGoal({markdown:current?.markdown??fallbackGoalMarkdown(state),json:goalJson,amendment:body});
   store.appendEvent({event:'goal-revised',rev:state.goalRev,fromRev:prior,source,changed,stale:invalidation.stale,revalidated});
   store.saveState(state);
   return {ok:true,rev:state.goalRev,fromRev:prior,changed,stale:invalidation.stale,revalidated};
