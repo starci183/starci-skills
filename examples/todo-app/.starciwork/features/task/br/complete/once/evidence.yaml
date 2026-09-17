@@ -1,0 +1,22 @@
+# Written by starci-kernel when it settles the operation: the assertions below are the checks it
+# re-ran itself, not what the worker reported. It is a file of its own so that the history of a
+# record is the history of the record, and every re-run does not rewrite what the record says.
+schema: work/evidence
+record: br.task.complete.once
+recordDigest: 0000000013b2847d653c57bd812f5ce1c2e06cd28f54cb5b7503096d3629ede3
+outcome: pass
+stale: true
+staleReason: Proven against rev 1, whose never-reopen clause rev 2 withdrew. Kept as history; ac.task.complete.once.is-reversible has no evidence yet.
+assertions:
+  - id: ac.task.complete.once.is-idempotent
+    outcome: pass
+    observation: npm run test:unit -- src/task/complete exited 0
+provenance:
+  actor: starci-kernel
+  tool: starci-kernel
+  environment: local
+  servedVersions:
+    - repository: todo-app
+      commit: 0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1b4e7d0a3
+      artifact: worktree
+  capturedAt: 2026-09-17T19:38:00.000Z

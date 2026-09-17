@@ -1,0 +1,20 @@
+# Written by starci-kernel when it settles the operation: the assertions below are the checks it
+# re-ran itself, not what the worker reported. It is a file of its own so that the history of a
+# record is the history of the record, and every re-run does not rewrite what the record says.
+schema: work/evidence
+record: nfr.task.list.latency
+recordDigest: cf540bcef9f757265bc7735d6ac6432fd19415459223adae2392f979627a238f
+outcome: pass
+assertions:
+  - id: p95-under-200ms
+    outcome: pass
+    observation: k6 reported p95=118ms over 60s, 50 VUs, 1000 seeded tasks
+provenance:
+  actor: starci-kernel
+  tool: starci-kernel
+  environment: local
+  servedVersions:
+    - repository: todo-app
+      commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+      artifact: worktree
+  capturedAt: 2026-09-18T04:41:00.000Z

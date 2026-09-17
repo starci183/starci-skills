@@ -12,26 +12,3 @@ acceptanceCriteria:
   - refusal-does-not-name-the-half
 module: src/auth/sign-in
 change: {rev: 1, kind: initial, at: 2026-09-18T01:00:00.000Z}
-
-# evidence is written by starci-kernel when it settles the operation: the assertions below are
-# the checks it re-ran itself, not what the worker reported. An operation may edit this file, so
-# the kernel overwrites this block on every settle - that overwrite is what makes it proof.
-evidence:
-  recordDigest: b76d94eb8bd9a9b9f9df7b87487bf3dc4b382eea4a62714b586c7439158a8ff1
-  outcome: pass
-  assertions:
-    - id: ac.login.password.sign-in.wrong-pair-is-refused
-      outcome: pass
-      observation: npm run test:unit -- src/auth/sign-in exited 0
-    - id: ac.login.password.sign-in.refusal-does-not-name-the-half
-      outcome: pass
-      observation: npm run test:unit -- src/auth/sign-in/timing exited 0
-  provenance:
-    actor: starci-kernel
-    tool: starci-kernel
-    environment: local
-    servedVersions:
-      - repository: todo-app
-        commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
-        artifact: worktree
-    capturedAt: 2026-09-18 04:38:00+00:00

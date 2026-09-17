@@ -31,30 +31,3 @@ requiresProof:
 provenBy:
   provider: [impl.login.todo-app.auth]
   consumer: [impl.task.todo-app.ownership]
-
-# evidence is written by starci-kernel when it settles the operation: the assertions below are the
-# checks it re-ran itself, not what the worker reported.
-
-evidence:
-  recordDigest: d7a5c3f8e1b6d4a9c2f5b8e1d4a7c0f3b6e9d2a5c8f1b4e7d0a3c6f9b24c1f0b
-  outcome: pass
-  assertions:
-    - id: actor-of-a-live-session-is-the-person
-      outcome: pass
-      observation: node --test app/src/auth/session.test.mjs exited 0
-    - id: actor-of-no-session-is-null-not-a-throw
-      outcome: pass
-      observation: node --test app/src/auth/session.test.mjs exited 0
-    - id: consumer-refuses-on-null-instead-of-inventing
-      outcome: pass
-      observation: node --test app/src/task/ownership.test.mjs exited 0
-  provenance:
-    actor: starci-kernel
-    tool: starci-kernel
-    environment: local
-    servedVersions:
-      - repository: todo-app
-        commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
-        artifact: worktree
-    capturedAt: 2026-09-18T04:45:00.000Z
-

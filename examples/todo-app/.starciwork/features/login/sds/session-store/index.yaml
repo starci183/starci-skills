@@ -64,36 +64,3 @@ requiresProof:
 provenBy:
   implementation: [impl.login.todo-app.auth]
   transitions: [t-begin, t-accept, t-refuse, t-expire, t-revoke]
-
-# evidence is written by starci-kernel when it settles the operation: the assertions below are the
-# checks it re-ran itself, not what the worker reported.
-
-evidence:
-  recordDigest: c4f1e0b9d2a5c8f1b4e7d0a3c6f9b24c1f0b9e2d7a5c3f8e1b6d4a9c2f5b8e1d
-  outcome: pass
-  assertions:
-    - id: t-accept
-      outcome: pass
-      observation: npm run test:unit -- src/auth/session/accept exited 0
-    - id: t-refuse
-      outcome: pass
-      observation: npm run test:unit -- src/auth/session/refuse exited 0
-    - id: t-expire
-      outcome: pass
-      observation: npm run test:unit -- src/auth/session/expiry exited 0
-    - id: t-revoke
-      outcome: pass
-      observation: npm run test:unit -- src/auth/session/revoke exited 0
-    - id: t-begin
-      outcome: pass
-      observation: npm run test:unit -- src/auth/session/begin exited 0
-  provenance:
-    actor: starci-kernel
-    tool: starci-kernel
-    environment: local
-    servedVersions:
-      - repository: todo-app
-        commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
-        artifact: worktree
-    capturedAt: 2026-09-18T04:40:00.000Z
-

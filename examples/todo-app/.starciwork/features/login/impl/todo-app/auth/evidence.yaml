@@ -1,0 +1,20 @@
+# Written by starci-kernel when it settles the operation: the assertions below are the checks it
+# re-ran itself, not what the worker reported. It is a file of its own so that the history of a
+# record is the history of the record, and every re-run does not rewrite what the record says.
+schema: work/evidence
+record: impl.login.todo-app.auth
+recordDigest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+outcome: pass
+assertions:
+  - id: unit-suite-green-at-the-recorded-revision
+    outcome: pass
+    observation: npm run test:unit -- src/auth exited 0
+provenance:
+  actor: starci-kernel
+  tool: starci-kernel
+  environment: local
+  servedVersions:
+    - repository: todo-app
+      commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+      artifact: worktree
+  capturedAt: 2026-09-18T04:38:00.000Z

@@ -1,0 +1,20 @@
+# Written by starci-kernel when it settles the operation: the assertions below are the checks it
+# re-ran itself, not what the worker reported. It is a file of its own so that the history of a
+# record is the history of the record, and every re-run does not rewrite what the record says.
+schema: work/evidence
+record: br.task.single-owner
+recordDigest: 566b5549a49b1799b9c7e7701cc7d8d26d062e55accf5c327eb148235477b304
+outcome: pass
+assertions:
+  - id: ac.task.single-owner.refuses-stranger
+    outcome: pass
+    observation: npm run test:unit -- src/task/ownership exited 0
+provenance:
+  actor: starci-kernel
+  tool: starci-kernel
+  environment: local
+  servedVersions:
+    - repository: todo-app
+      commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+      artifact: worktree
+  capturedAt: 2026-09-18T04:38:00.000Z

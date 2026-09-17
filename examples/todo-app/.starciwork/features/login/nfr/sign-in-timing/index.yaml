@@ -21,23 +21,3 @@ provenBy:
   measurement:
     - command: see the measurement block of this record
       exit: 0
-
-# evidence is written by starci-kernel when it settles the operation: the assertions below are
-# the checks it re-ran itself, not what the worker reported. An operation may edit this file, so
-# the kernel overwrites this block on every settle - that overwrite is what makes it proof.
-evidence:
-  recordDigest: 61479fc018139d55d11bbb8cbb461ab882639a895db596dda62f6520e6173f06
-  outcome: pass
-  assertions:
-    - id: p95-delta-under-10ms
-      outcome: pass
-      observation: measured p95 delta 3.1ms over 1000 attempts of each shape
-  provenance:
-    actor: starci-kernel
-    tool: starci-kernel
-    environment: local
-    servedVersions:
-      - repository: todo-app
-        commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
-        artifact: worktree
-    capturedAt: 2026-09-18 04:41:00+00:00
