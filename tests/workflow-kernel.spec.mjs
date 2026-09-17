@@ -2026,7 +2026,7 @@ test('untracked strays that alone make the tree invalid are quarantined beside t
     assert.ok(quarantined,'the stray was quarantined');
     assert.deepEqual(quarantined.strays.map(item=>item.from),['.starciwork/features/collab/']);
     assert.equal(fs.existsSync(stray),false,'the stray left the tree');
-    assert.ok(fs.existsSync(path.join(store.dir,'strays')),'and is kept beside the store');
+    assert.ok(fs.existsSync(path.join(store.repoRoot,'.starciwork','kernel-strays',store.id)),'and is kept beside the store');
     assert.ok(log.some(event=>event.event==='ledger-valid-again'));
     // The op the red tree had exhausted is not blocked any more (a kernel start re-admits validator-blocked ops; a mid-run recovery says `op-readmitted`).
     assert.notEqual(after.ops.find(item=>item.id===nodeId).status,'blocked');
@@ -2306,7 +2306,7 @@ test('kernel startup discovers existing credential waits before the first tick, 
     // inputScratchDir is keyed by workflow id, and setupWork's id is the same fixed string every call
     // (unlike store.dir, which used to be a fresh tmpdir per test); a stale session from an earlier run of
     // this same suite would otherwise read as `workflow-binding-changed` against this run's fresh repo.
-    fs.rmSync(inputScratchDir(state.id),{recursive:true,force:true});
+    fs.rmSync(inputScratchDir(state.id,store.repoRoot),{recursive:true,force:true});
     approve(store,state);state.run='run_wf';state.from='term_kernel';
     harness.run({maxIterations:0});
     const requester=state.ops.find(op=>op.nodeId==='demo.sales.implementation.backend.intake');
