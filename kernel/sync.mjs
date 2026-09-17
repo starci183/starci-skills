@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import {parseYaml} from '../core/yaml.mjs';
 import {settleDispatch} from '../hosts/orca/launch.mjs';
 import * as graph from './graph.mjs';
-import {AUTHOR_KIND,PLAN_KIND,authorsRecord,BRAND_DECIDE,KERNEL_CHECK,RECORD_OWNED,WORK_LEDGER,WORK_OPERATION,allowRoot,describeNode,firstLine,
+import {AUTHOR_KIND,PLAN_KIND,authorsRecord,BRAND_DECIDE,KERNEL_CHECK,RECORD_OWNED,WORK_LEDGER,WORK_OPERATION,allowRoot,covers,describeNode,firstLine,
   gateDynamicOp,grammarReferences,inside,kernelGuards,kindRole,ledgerItem,liveStatus,locateSharedTreePaths,normalize,pathsIn,plain,
   slash,tail,toOp,unique,UI_KIND,validateCommandAt,workModule,workOpId,workValidateCommand,byId,ledgerAccess,workRootOf} from './common.mjs';
 import {kindsReadingBrand} from './io.mjs';
@@ -261,7 +261,11 @@ export function deriveWorkOp(api,repoRoot,node,{id,opOfNode=new Map(),index=0,la
  * user added, or one whose dependencies just became done) becomes an operation of this workflow.
  */
 export function syncLedgerOps(store,state,ctx){
-  if(!ctx.work)return [];
+  // The cut gate for ops, not only nodes: a minted implement op past the bounds - a standalone refactor, a
+  // repair, a shared change - is cut into disjoint children here, before its first launch and whatever ledger
+  // mode the workflow runs. Cut parents are settled against their children in the same pass.
+  settleOpCuts(store,state);
+  if(!ctx.work){cutOversizedOps(store,state,ctx);return [];}
   let loaded;
   try{loaded=ctx.work.api.loadLedger({...ctx.work.at,validate:ctx.work.validate});}
   catch(error){store.appendEvent({event:'ledger-sync-failed',reason:error.message});return [];}
@@ -408,6 +412,9 @@ export function syncLedgerOps(store,state,ctx){
       reason:laneOps.length?`lane step ${entry.done.length+1} of ${laneWalked(entry).length} (${laneText(laneWalked(entry))})`:'newly schedulable Work node'});
     gateDynamicOp(store,state,op);
   }
+  // And the ops this pass minted pass the same gate before the scheduler can reach them: a lane step whose
+  // scope is past the bounds is still cut before its first launch, never launched whole and split later.
+  cutOversizedOps(store,state,ctx);
   return added;
 }
 
@@ -715,22 +722,182 @@ export function settleCut(store,state,op,ctx){
  * alone - nothing of its group beside it. Returns the reason to defer, or null when the op may launch.
  */
 export function fanOutDeferral(state,op,busy=[],ctx=null){
-  const groupOf=item=>cutParentOf(state,item?.nodeId??(item?.ledgerIds??[])[0]??'');
+  // Two kinds of group share this rule: a Work node's children (the member's node id is inside the parent's
+  // cut group) and a cut op's children (the member's `cutChildOf` names the parent op directly - its own
+  // nodeId stays null, because a slice of an operation is not a ledger node).
+  const groupOf=item=>item?.cutChildOf??cutParentOf(state,item?.nodeId??(item?.ledgerIds??[])[0]??'');
+  const keyOf=item=>item?.cutChildOf?item.id:item?.nodeId;
   const parent=groupOf(op);
   if(!parent)return null;
   const policy=plain(ctx?.allocator?.fanOut)?ctx.allocator.fanOut:FAN_OUT;
   const max=Number.isFinite(policy.maxPerGroup)?policy.maxPerGroup:FAN_OUT.maxPerGroup;
-  const seam=cutGroup(state,parent)?.seam??null;
+  const seam=(op.cutChildOf?opCutGroup(state,parent):cutGroup(state,parent))?.seam??null;
   const siblings=busy.filter(other=>other.id!==op.id&&groupOf(other)===parent);
   if(policy.seamFirst!==false&&seam){
-    if(op.nodeId===seam&&siblings.length)
+    if(keyOf(op)===seam&&siblings.length)
       return {reason:`the seam of ${parent} runs alone`,parent,running:siblings.map(other=>other.id)};
-    if(op.nodeId!==seam&&siblings.some(other=>other.nodeId===seam))
+    if(keyOf(op)!==seam&&siblings.some(other=>keyOf(other)===seam))
       return {reason:`the seam ${seam} of ${parent} runs alone`,parent,running:[seam]};
   }
   if(siblings.length>=max)
     return {reason:`${max} children of ${parent} already run (allocation.fanOut.maxPerGroup)`,parent,running:siblings.map(other=>other.id)};
   return null;
+}
+
+/* ------------------------------------------- an op too big is cut before its first launch */
+
+/** The op-level cut groups of this workflow: `state.opCuts[parentOpId] = {children, seam, assertions}`. */
+const opCutsOf=state=>{state.opCuts=plain(state?.opCuts)?state.opCuts:{};return state.opCuts;};
+export const opCutGroup=(state,parent)=>opCutsOf(state)[String(parent??'')]??null;
+
+/**
+ * Why one operation is too big to launch as it is, or null - the same three measures `cutReason` reads off a
+ * Work node, taken on the op's own declared scope: the files its allowlist names, the assertions it must prove
+ * and the design components it carries. Only an implement-role op is measured: a plan, a decision, a walk or a
+ * proof is one answer by construction, whatever its allowlist names.
+ */
+export function opCutReason(op){
+  if((kindRole(op?.kind)??op?.role)!=='implement')return null;
+  const files=(op?.allowlist??[]).length;
+  const assertions=(Array.isArray(op?.assertions)?op.assertions:Array.isArray(op?.acceptance)?op.acceptance:[]).length;
+  const components=(Array.isArray(op?.components)?op.components:Array.isArray(op?.sdsComponents)?op.sdsComponents:[]).length;
+  if(files>CUT_FILES)return `its declared write scope names ${files} files, past the ${CUT_FILES} one operation may hold`;
+  if(assertions>CUT_ASSERTIONS)return `it states ${assertions} assertions, past the ${CUT_ASSERTIONS} one operation may prove`;
+  if(components>=CUT_COMPONENTS)return `the design it references names ${components} components, which is more than one operation builds`;
+  return null;
+}
+
+/**
+ * The disjoint pieces of one write scope. Allowlist entries that cover each other (`src/**` and `src/x.ts`)
+ * name the same files and stay in one class, so no file can land in two children; the classes then pack into
+ * child scopes of at most CUT_FILES entries, in allowlist order. A single class past the bound stays one
+ * child's whole scope - one file in two children is a silent write conflict, an oversized child is only big.
+ */
+function scopeChunks(allowlist){
+  const classes=[];
+  for(const entry of allowlist??[]){
+    const hits=classes.filter(cls=>cls.some(other=>covers(other,entry)));
+    if(!hits.length){classes.push([entry]);continue;}
+    hits[0].push(entry);
+    for(const cls of hits.slice(1)){for(const item of cls)if(!hits[0].includes(item))hits[0].push(item);classes.splice(classes.indexOf(cls),1);}
+  }
+  const chunks=[];
+  for(const cls of classes){
+    const last=chunks.at(-1);
+    if(last&&last.length+cls.length<=CUT_FILES)last.push(...cls);else chunks.push([...cls]);
+  }
+  return chunks;
+}
+
+/** The path shapes that carry what every sibling would otherwise share - wiring, contracts, types, migrations. */
+const SEAM_PATH=/(^|\/)(index|mod|main|types?|contracts?|registry|registrations?|wiring|container|di|migrations?|schemas?|config|manifest|barrel|bootstrap|setup|package\.json|tsconfig[^/]*)/i;
+const seamScore=chunk=>chunk.reduce((score,entry)=>score+(SEAM_PATH.test(String(entry))?1:0),0);
+/** `items` over `count` children: shared whole while inside the bound, contiguous slices past it. */
+const spread=(items,count,bound)=>items.length<=bound?Array.from({length:count},()=>[...items])
+  :Array.from({length:count},(_,index)=>items.slice(Math.ceil(index*items.length/count),Math.ceil((index+1)*items.length/count)));
+
+/**
+ * An op whose own declared scope is past the cut bounds is not launched as one long build: it is cut here -
+ * before its first launch and in either ledger mode - into disjoint child ops named `<op>.1`, `<op>.2`, ...,
+ * the same treatment a too-big Work node gets before its lane, applied to ops that never pass through a node
+ * (standalone and refactor work, repairs, shared changes) or whose scope grew past the bound after minting.
+ * The seam child - the one holding what every sibling would otherwise touch - is named, runs first and alone
+ * (its siblings depend on it), and the parent op waits as the group's derived parent: it owns no slot, proves
+ * nothing itself, and is settled by `settleOpCuts` when every child is.
+ */
+export function cutOversizedOps(store,state,ctx){
+  const taken=new Set(state.ops.map(op=>op.id));
+  const minted=[];
+  for(const op of [...state.ops]){
+    if(!['pending','ready'].includes(op.status))continue;
+    // Only a first launch is cut: an op that already ran is answered by retries and repairs, never recut,
+    // and an op marked for replan is measured after its scope is rewritten, not before.
+    if(op.dispatch||op.terminal||op.lease||op.fill||op.ownerRequest||op.waitingFor||op.needsReplan||(op.attempt??1)>1||(op.reports??[]).length)continue;
+    if(plain(op.cut)||op.intake||op.cutChildOf||op.cutChildren||op.refusal==='superseded'||isAuditOperation(op))continue;
+    if(opCutsOf(state)[op.id])continue;
+    const reason=opCutReason(op);
+    if(!reason)continue;
+    const chunks=scopeChunks(op.allowlist);
+    // One covering class over the whole scope is still one operation - the honest `cut: none` answer.
+    if(chunks.length<2)continue;
+    const seam=chunks.reduce((best,chunk,index)=>seamScore(chunk)>seamScore(chunks[best])?index:best,0);
+    const assertions=Array.isArray(op.assertions)?op.assertions:(op.acceptance??[]);
+    const components=Array.isArray(op.components)?op.components:(op.sdsComponents??[]);
+    const assertShare=spread(assertions,chunks.length,CUT_ASSERTIONS),componentShare=spread(components,chunks.length,CUT_COMPONENTS-1);
+    const ids=chunks.map((_,index)=>workOpId(`${op.id}.${index+1}`,taken));
+    chunks.forEach((chunk,index)=>{
+      // A child is a slice of the operation, not a node: no nodeId. The group link is `cutChildOf`, and the
+      // parent's ledger ids keep the child inside the same proof group, the same avoids and the same lane.
+      const child=toOp({id:ids[index],kind:op.kind,
+        goal:`${firstLine(op.goal)} - part ${index+1} of ${chunks.length} of ${op.id}${index===seam?' (the seam: what every sibling would otherwise touch)':''}: ${chunk.join(', ')}`,
+        ledgerIds:[...(op.ledgerIds??[])],allowlist:chunk,references:[...(op.references??[])],
+        checks:(op.checks??[]).map(check=>({...check})),acceptance:[...(assertShare[index].length?assertShare[index]:(op.acceptance??[]))],
+        dependsOn:unique([...(op.dependsOn??[]).filter(dep=>dep!==op.id),...(index===seam?[]:[ids[seam]])]),
+        // The kernel derives the children by its own rule: a cut is not new dynamic work - the parent's scope
+        // already covered every file a child names - so they do not spend the owner's dynamic-op budget. The
+        // `cutChildOf` link carries the provenance the origin would have.
+        resources:[...(op.resources??[])],avoidRuntimes:[...(op.avoidRuntimes??[])],timeoutMs:op.timeoutMs??null,origin:'gate'},state.ops.length+index);
+      child.cutChildOf=op.id;
+      // What the parent declared travels with the slice that will actually run it: the fenced roots it may
+      // write, the effect grants the amendment ceiling measured, and any pinned runtime list.
+      for(const key of ['restrictTo','candidateRootBindings','externalEffects','amendmentEffects','independentReview','provisional'])
+        if(op[key]!==undefined&&op[key]!==null)child[key]=structuredClone(op[key]);
+      // The scope that forced the cut is the child's declared floor: a slice of a hard op is hard work too.
+      child.difficulty=effectiveDifficulty(op);
+      child.createdIteration=state.iterations;
+      const componentField=Array.isArray(op.components)?'components':'sdsComponents';
+      if(componentShare[index].length)child[componentField]=[...componentShare[index]];
+      locateSharedTreePaths(child,ctx);
+      state.ops.push(child);
+      store.appendEvent({event:'op-added',op:child.id,kind:child.kind,reason:`cut child of ${op.id}: ${reason}`});
+      gateDynamicOp(store,state,child);
+    });
+    opCutsOf(state)[op.id]={children:ids,seam:ids[seam],assertions:[...assertions]};
+    op.cutChildren=ids;
+    op.cutReason=reason;
+    op.status='paused';
+    store.appendEvent({event:'op-cut',op:op.id,kind:op.kind,reason,children:ids,seam:ids[seam],
+      files:(op.allowlist??[]).length,assertions:assertions.length,components:components.length});
+    minted.push(op.id);
+  }
+  return minted;
+}
+
+/**
+ * A cut op is the derived parent of its group: it owns no runtime slot and proves nothing itself - it waits
+ * on its children. When every child is done the parent is done with the group's last head; a child that dies
+ * for good blocks the parent with the reason, so the op's dependents read the same answer it would have given.
+ */
+export function settleOpCuts(store,state){
+  const settled=[];
+  for(const [parentId,group] of Object.entries(opCutsOf(state))){
+    const parent=byId(state,parentId);
+    if(!parent||!Array.isArray(parent.cutChildren)||parent.status!=='paused')continue;
+    const children=group.children.map(id=>byId(state,id));
+    if(children.some(child=>!child))continue;
+    // Dead the way the kernel's `deadOp` reads it: failed outright, or blocked by a refusal time will not lift.
+    const dead=children.find(child=>child.status==='failed'||(child.status==='blocked'&&child.refusal&&!['launch-cooling','rate-limited'].includes(child.refusal)));
+    if(dead){
+      parent.status='blocked';parent.refusal='cut-child-failed';
+      // The group is dead with its child: the siblings that never launched are cancelled, not left to depend
+      // on a seam that can never land.
+      for(const child of children)if(['pending','ready'].includes(child.status))child.status='cancelled';
+      if(!state.needUser.some(item=>item.op===parent.id&&item.kind==='authority'))state.needUser.push({op:parent.id,kind:'authority',
+        detail:`${parent.id} was cut into ${group.children.join(', ')} before its first launch; ${dead.id} is ${dead.status}${dead.refusal?` (${dead.refusal})`:''}`});
+      store.appendEvent({event:'cut-parent-blocked',op:parent.id,child:dead.id,status:dead.status,refusal:dead.refusal??null});
+      continue;
+    }
+    if(!children.every(child=>child.status==='done'))continue;
+    parent.status='done';parent.verdict='cut';
+    parent.head=children.map(child=>child.head).filter(Boolean).at(-1)??parent.head;
+    parent.files=unique(children.flatMap(child=>child.files??[]));
+    // The lane step the parent stood for was walked by its children: the group's delivery counts once, as its.
+    const entry=parent.nodeId?state.lanes?.[parent.nodeId]:null;
+    if(entry?.lane?.length)entry.done=unique([...(entry.done??[]),parent.kind]);
+    store.appendEvent({event:'cut-parent-settled',op:parent.id,children:group.children});
+    settled.push(parent.id);
+  }
+  return settled;
 }
 
 /** The child of a cut group whose build step holds this file, or null when no child's write scope names it. */
