@@ -87,9 +87,9 @@ targets:
   # implement-role model of the pool's models map for compatibility with consumers that read one model.
   codex-agent:
     runtime: codex
-    requestedModel: gpt-5.6-sol
+    requestedModel: gpt-5.6-luna
     profiles:
-      working: gpt-5.6-sol
+      working: gpt-5.6-luna
       reasoning: gpt-6-astra
     orcaLaunch:
       kind: managed-agent
