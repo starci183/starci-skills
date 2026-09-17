@@ -511,7 +511,9 @@ export function resetReviewEpoch(store,state,priorGeneration=state.engine?.gener
   return superseded;
 }
 export function settleSkippedGenerationLeases(state,{settle=settleGenerationLeases,journalFile=state.engine?.journalFile}={}){
-  const skipped=state.ops.filter(op=>op.lease&&!retryableOperation(op));
+  // A blocked op still carrying its pending marker is deliberately fenced, not skipped: the reconcile passes
+  // left its reservation held on purpose and reported it (`unreconciled-pending`), so it is never settled here.
+  const skipped=state.ops.filter(op=>op.lease&&!retryableOperation(op)&&!(op.status==='blocked'&&op.pending));
   // A confirmed native stop proves a skipped worker finished; so does acceptance. An operation that is done or
   // cancelled with no live dispatch or terminal was verified and committed by this kernel, and the reservation it
   // still carries fences nothing - it is settled with the rest instead of refusing the owner's retry.
@@ -2872,7 +2874,12 @@ export function acceptReports(orca,store,state,ctx){
       restoreDeferredReportOperation(op,before,error);
       store.saveState(state);continue;
     }
-    if(late&&(action!=='owner-ask-settled'||op.status!=='done')){
+    // The marker is re-read, not the snapshot: `applyOpReport` can end the retained-report shape itself -
+    // a lost candidate custody deletes `lateReportRecovery` and retries the attempt - and only a marker
+    // still on the operation binds the replay guards. Re-quarantining on the stale snapshot would restore
+    // the pre-acceptance record and park the op forever.
+    const lateAfter=op.lateReportRecovery;
+    if(lateAfter&&(action!=='owner-ask-settled'||op.status!=='done')){
       for(const key of Object.keys(op))delete op[key];Object.assign(op,before);
       quarantineCandidate(store,state,op,{kind:'answered-decision-late-report',reasons:[`ordinary acceptance did not accept the exact late decision report (${action})`]});
       continue;
@@ -2882,13 +2889,13 @@ export function acceptReports(orca,store,state,ctx){
       continue;
     }
     delete op.pending;
-    if(late){
-      const preserved=questionDigestMatches(op.question,late.questionDigest)&&op.ownerAnswer?.receiptId===late.ownerReceipt&&
-        op.ownerContinuationReceipt===late.ownerReceipt&&op.ownerRequestStatus==='answered';
+    if(lateAfter){
+      const preserved=questionDigestMatches(op.question,lateAfter.questionDigest)&&op.ownerAnswer?.receiptId===lateAfter.ownerReceipt&&
+        op.ownerContinuationReceipt===lateAfter.ownerReceipt&&op.ownerRequestStatus==='answered';
       if(!preserved){for(const key of Object.keys(op))delete op[key];Object.assign(op,before);quarantineCandidate(store,state,op,{kind:'answered-decision-late-report',reasons:['ordinary acceptance changed the prepared question or immutable owner receipt']});continue;}
       delete op.lateReportRecovery;
-      store.appendEvent({event:'prepared-decision-late-report-accepted',op:op.id,dispatch,candidateDigest:late.candidateDigest,
-        reportSha256:late.reportSha256,ownerReceipt:late.ownerReceipt,proof:'ordinary report, machine, candidate, integration and acceptance gates passed; owner terminal retained'});
+      store.appendEvent({event:'prepared-decision-late-report-accepted',op:op.id,dispatch,candidateDigest:lateAfter.candidateDigest,
+        reportSha256:lateAfter.reportSha256,ownerReceipt:lateAfter.ownerReceipt,proof:'ordinary report, machine, candidate, integration and acceptance gates passed; owner terminal retained'});
     }
     actions.push({op:op.id,action});
     state.stalls=0;
@@ -4692,11 +4699,57 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       const reconciled=reconcileStoppedNativeRetryLease(state,op,{orca,store});
       need(reconciled.ok,`Stopped native lease ${op.lease?.jobId??op.id} cannot be reconciled for retry: ${reconciled.reason}`);
     }
+    // A blocked operation still holding its durable lease shares one proof at this boundary: the typed host
+    // settlement must show the exact Dispatch has no live process, then the stopped-attempt machinery freezes
+    // the candidate delta under the retained writer fence and completes the job. Nothing less releases it.
+    const proveHeldDispatchStopped=op=>{
+      let settled=null;
+      try{settled=settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:'retry reconciles a stopped native attempt',terminalHandle:op.terminal,closeTerminal:true,wait});}
+      catch(error){return {ok:false,effectState:'unknown',reason:String(error?.message??error)};}
+      if(settled?.effectState!=='none')return {ok:false,effectState:settled?.effectState??'unknown',reason:'typed host settlement did not prove the exact native worker stopped'};
+      const runtime=createEngineRuntime({store,state,eligibility:()=>({eligible:false,reasons:['retry reconciliation only']}),git:spawnSync});
+      if(!runtime)return {ok:false,effectState:'unknown',reason:'the durable engine is not enrolled'};
+      try{return runtime.settleStoppedOperation(op,{dispatch:op.dispatch,settlement:settled,reason:'public retry reconciles a quarantined native stop'})??{ok:false,reason:'native attempt could not be reconciled'};}
+      finally{store.unbindJournal?.(runtime.journal);runtime.close();}
+    };
+    const reportedHeldLease=new Set();
+    // A `native-stop-reconciliation` quarantine still carries its Dispatch on the record: the stop could not be
+    // proved when the kernel fenced it, so the canonical-writer reservation stayed held and starves every
+    // sibling writer. The retry boundary may prove it now - but only proof releases the fence. An unproved
+    // stop keeps the operation blocked and fenced; the retry itself still proceeds.
+    for(const op of state.ops.filter(item=>item.lease&&item.status==='blocked'&&item.pending?.kind==='native-stop-reconciliation'&&item.dispatch)){
+      const lease=op.lease,dispatch=op.dispatch,reconciled=proveHeldDispatchStopped(op);
+      if(reconciled?.ok){
+        // `settleStoppedOperation` preserved the candidate delta on `retryReconciled`/`ownedBaselinePaths` and
+        // completed the durable job; the ordinary retry pass below adopts that baseline for the next attempt.
+        delete op.lease;delete op.pending;delete op.refusal;op.status='ready';
+        store.appendEvent({event:'native-stop-reconciled',op:op.id,jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,dispatch,
+          candidateDigest:reconciled.candidateDigest??null,observedFiles:reconciled.observedFiles??[],
+          proof:'the retry boundary proved the exact native worker stopped; the sealed candidate delta is the next attempt baseline and the writer reservation completed'});
+        store.saveState(state);
+      }else{store.appendEvent({event:'native-stop-unreconciled',op:op.id,jobId:lease.jobId,dispatch,effectState:reconciled?.effectState??'unknown',
+        reason:reconciled?.reason??'the exact native worker stop is not proved; the writer reservation stays held'});
+        reportedHeldLease.add(op.id);}
+    }
     for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&!settledOperation(item)&&item.launch?.task&&!item.dispatch&&!item.terminal)){
       const reconciled=reconcileFailedLaunchLease(state,op,{orca,store});need(reconciled.ok,`Failed launch lease ${op.lease?.jobId??op.id} cannot be proved stopped: ${reconciled.reason}`);
     }
     for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&!settledOperation(item)&&item.launch?.stopReason===LEGACY_COORDINATOR_ERROR)){
       const reconciled=reconcileLegacyCoordinatorLease(state,op,{orca,store});need(reconciled.ok,`Legacy coordinator lease ${op.lease?.jobId??op.id} cannot be proved no-effect: ${reconciled.reason}`);
+    }
+    // Every other pending marker still holding a lease is a silent deadlock unless the retry names it: the
+    // kinds above each have a dedicated reconcile path and anything left over is reported here, every pass.
+    // Only a provably terminal stop - the exact Dispatch settled with `effectState:'none'` and no sealed
+    // candidate left in custody - releases the fence through the same stopped-attempt machinery; anything
+    // short of that stays blocked and loud.
+    for(const op of state.ops.filter(item=>item.lease&&item.status==='blocked'&&item.pending&&!reportedHeldLease.has(item.id))){
+      const job=op.lease?.jobId?reconciliationJournal?.getJob?.(op.lease.jobId):null,
+        leaseAgeMs=Number.isFinite(job?.created_at)?Math.max(0,Date.now()-job.created_at):null,
+        terminal=op.dispatch&&op.candidate?.status!=='sealed'?proveHeldDispatchStopped(op):null,
+        resolved=terminal?.ok===true;
+      store.appendEvent({event:'unreconciled-pending',op:op.id,kind:op.pending?.kind??null,leaseAgeMs,
+        disposition:resolved?'settled':'blocked',...(resolved?{candidateDigest:terminal.candidateDigest??null,observedFiles:terminal.observedFiles??[]}:{effectState:terminal?.effectState??null,reason:terminal?.reason??'the pending kind has no dedicated reconcile path and no provably terminal stop'})});
+      if(resolved){delete op.lease;delete op.pending;delete op.refusal;op.status='ready';store.saveState(state);}
     }
     }finally{store.unbindJournal?.(reconciliationJournal);reconciliationJournal?.close();}
     // A settled operation was proved by its own acceptance: none of the stop-receipt reconciliations above apply to
@@ -4706,6 +4759,10 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const retry=[];
     for(const op of state.ops){
       if(!retryableOperation(op))continue;
+      // A blocked op still holding both its lease and a pending marker was deliberately left fenced by the
+      // reconcile passes above: it is not retried and its writer reservation is not released - the next
+      // retry boundary tries the proof again.
+      if(op.lease&&op.status==='blocked'&&op.pending)continue;
       if(op.dispatch){
         const settled=settleDispatch(orca,op.dispatch,{cwd:state.worktree,reason:'owner requested a fresh workflow retry',terminalHandle:op.terminal,closeTerminal:true,wait});
         need(settled.effectState==='none',`Dispatch ${op.dispatch} must be reconciled before retry; its effect state is ${settled.effectState}`);
