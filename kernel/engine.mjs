@@ -492,22 +492,27 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       catch(error){return {ok:false,effectState:'unknown',reason:`candidate freeze failed after native stop: ${String(error?.message??error)}`};}
       // `canonical-head-drift` alone is the ordinary residue of a stopped parallel attempt: a sibling commit
       // moved the canonical head, so this candidate's bytes can never be promoted - but the freeze already
-      // proved every observed path is in-scope and attributable. Preserve the in-scope delta as the next
-      // attempt's owned baseline, complete the durable job and release the writer fence. Any violation reason
-      // (outside-allowlist, baseline-touched, kernel-owned drift, binding drift) keeps the fence: those paths
-      // are never laundered into the retry baseline.
-      const sealReasons=[...(frozen.reasons??[])],
-        unpromotableOnly=sealReasons.length>0&&sealReasons.every(reason=>/(^|:)canonical-head-drift$/.test(String(reason)));
+      // proved every observed path is in-scope and attributable. A `pre-existing-user-work-modified` reason is
+      // equally admissible when the freeze reports that file clean now: the uncommitted user bytes died with a
+      // wiped worktree and the file equals HEAD again, so nothing attributable remains to launder. Preserve
+      // the in-scope delta minus those user files as the next attempt's owned baseline, complete the durable
+      // job and release the writer fence. Any violation reason (outside-allowlist, still-dirty baseline,
+      // kernel-owned drift, binding drift) keeps the fence: those paths are never laundered into the retry
+      // baseline.
+      const sealReasons=[...(frozen.reasons??[])],cleanNow=new Set(frozen.cleanNow??[]),baselineTouched=new Set(frozen.baselineTouched??[]),
+        unpromotableOnly=sealReasons.length>0&&sealReasons.every(reason=>{const text=String(reason);
+          if(/(^|:)canonical-head-drift$/.test(text))return true;
+          const match=text.match(/(^|:)pre-existing-user-work-modified:(.+)$/);return match!==null&&cleanNow.has(match[2]);});
       if(frozen.status!=='sealed'&&(!unpromotableOnly||acceptedPreparedDecision))
         return {ok:false,effectState:'unknown',reason:'candidate effects could not be sealed',pending:frozen};
       if(frozen.status!=='sealed'){
-        const observed=[...new Set(frozen.observedFiles??[])].sort(),owned=observed.filter(file=>scopeMatches(file,op.allowlist??[]));
+        const observed=[...new Set(frozen.observedFiles??[])].sort(),owned=observed.filter(file=>scopeMatches(file,op.allowlist??[])&&!baselineTouched.has(file));
         op.ownedBaselinePaths=owned;
         op.retryReconciled={schema:'starci/native-retry-reconciliation@1',jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,
           dispatch,observedFiles:owned,abandonedFiles:observed,abandonedReasons:sealReasons,candidateDigest:op.candidateDigest??null};
         journal.appendEvent({eventId:`${lease.jobId}:stopped-effects-abandoned`,workflowId:lease.workflowId,entityType:'job',entityId:lease.jobId,
           generation:lease.generation,kind:'operation-stopped-effects-abandoned',payload:{dispatch,reason,observedFiles:observed,ownedBaseline:owned,
-            unsealableReasons:sealReasons,candidateDigest:op.candidateDigest??null,historicalEffectState:observed.length?'partial':'none-observed'}});
+            cleanedUserWork:[...cleanNow].sort(),unsealableReasons:sealReasons,candidateDigest:op.candidateDigest??null,historicalEffectState:observed.length?'partial':'none-observed'}});
         store.saveState(state);
         const completed=this.settled(op,{status:'failed',reason:`${reason}; worker stopped and its candidate is unpromotable (${sealReasons.join('; ')}); ${owned.length} in-scope path(s) preserved for a fresh attempt`});
         if(completed.ok)store.saveState(state);
@@ -566,7 +571,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
         housekeeping:{workflowId:state.id,opId:op.id,dispatch:op.dispatch??op.launch?.dispatch??null},now});
       const {packet}=frozen;
       op.candidate={...op.candidate,status:frozen.status,observedFiles:[...(frozen.observedFiles??[])],assurance:frozen.assurance,
-        concurrentWriterDrift:[...(frozen.concurrentWriterDrift??[])],
+        concurrentWriterDrift:[...(frozen.concurrentWriterDrift??[])],baselineTouched:[...(frozen.baselineTouched??[])],cleanNow:[...(frozen.cleanNow??[])],
         reportDiagnostics:{unmatched:[...(frozen.reportDiagnostics?.unmatched??[])]},housekeepingObserved:[...(frozen.housekeepingObserved??[])],
         runtimeAcknowledgements:(frozen.runtimeAcknowledgements??[]).map(record=>({...record,paths:(record.paths??[]).map(item=>typeof item==='object'?{...item}:item)})),
         ...(frozen.observedByRoot?{observedByRoot:frozen.observedByRoot.map(item=>({...item}))}:{}),

@@ -320,6 +320,25 @@ test('a stopped native attempt unpromotable only by head drift preserves in-scop
   assert.equal(runtime.journal.events({workflowId:'wf'}).some(event=>event.kind==='operation-stopped-effects-abandoned'&&event.payload.dispatch==='ctx-drifted'),true);bridge.close();
 });
 
+test('a stopped native attempt whose only drift is now-clean user work abandons without laundering it',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'wiped-user-work',kind:'backend.implement',attempt:1,status:'running',allowlist:['src/**'],dispatch:'ctx-wiped'};f.state.ops=[op];
+  const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-wiped',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
+  runtime.freezeCandidate=()=>({status:'quarantined',observedFiles:['src/a.ts','f1.ts','f2.ts'],reasons:['source:pre-existing-user-work-modified:f1.ts','source:pre-existing-user-work-modified:f2.ts'],baselineTouched:['f1.ts','f2.ts'],cleanNow:['f1.ts','f2.ts']});
+  const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-wiped',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-wiped',effectState:'none'},reason:'retry proved exit'});
+  assert.equal(result.ok,true);assert.equal(result.abandoned,true);assert.deepEqual(result.observedFiles,['src/a.ts'],'cleaned user work never enters the retry baseline');
+  assert.deepEqual(op.ownedBaselinePaths,['src/a.ts']);assert.equal(op.lease,undefined);assert.deepEqual(op.retryReconciled.abandonedReasons,['source:pre-existing-user-work-modified:f1.ts','source:pre-existing-user-work-modified:f2.ts']);
+  const event=runtime.journal.events({workflowId:'wf'}).find(item=>item.kind==='operation-stopped-effects-abandoned');assert.deepEqual(event?.payload?.cleanedUserWork,['f1.ts','f2.ts']);bridge.close();
+});
+
+test('a stopped native attempt with a still-dirty pre-existing file retains its writer',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'dirty-user-work',kind:'backend.implement',attempt:1,status:'running',allowlist:['src/**'],dispatch:'ctx-dirty'};f.state.ops=[op];
+  const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-dirty',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
+  runtime.freezeCandidate=()=>({status:'quarantined',observedFiles:['src/a.ts','f1.ts'],reasons:['source:pre-existing-user-work-modified:f1.ts'],baselineTouched:['f1.ts'],cleanNow:[]});
+  const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-dirty',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-dirty',effectState:'none'}});
+  assert.equal(result.ok,false);assert.equal(op.ownedBaselinePaths,undefined);assert.ok(op.lease,'still-dirty user work keeps the writer fence attached');
+  assert.equal(runtime.journal.events({workflowId:'wf'}).some(item=>item.kind==='operation-stopped-effects-abandoned'),false);bridge.close();
+});
+
 test('a stopped native attempt with head drift plus a real violation still retains its writer',t=>{
   const f=fixture(t),bridge=createJobBridge({ledgerFile:f.state.engine.ledgerFile,machineFile:f.state.engine.machineFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'drift-violation',kind:'backend.implement',attempt:1,status:'running',allowlist:['src/**'],dispatch:'ctx-drifted-violation'};f.state.ops=[op];
   const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-drifted-violation',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
