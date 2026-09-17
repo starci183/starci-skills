@@ -6,7 +6,9 @@ import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {parseQuota} from '../kernel/common.mjs';
 import {ADAPTIVE_CAPACITY,ALLOCATION,withProviderPreference,DEFAULT_COOLDOWN_MS,LEAST_LOADED,PREFER_THEN_OVERFLOW,applyQuota,budgetBand,classifyFailure,createAllocator,sequentialRuntimes} from '../kernel/schedule.mjs';
-import {RUNTIME_LOADS,loadsFile,loadsFileFor,readLoads} from '../kernel/loads.mjs';
+import {RUNTIME_LOADS,readLoads} from '../kernel/loads.mjs';
+import {ledgerFileFor,openLedger} from '../kernel/ledger-db.mjs';
+import {setSignal} from '../kernel/launch.mjs';
 
 const profile=parseYaml(fs.readFileSync(new URL('../model/runtimes.yaml',import.meta.url),'utf8'));
 const clock=start=>{const box={at:start};return {now:()=>box.at,advance:ms=>{box.at+=ms;}};};
@@ -46,21 +48,35 @@ test('the headless host never exposes the Orca-only Devin target even when the o
   assert.throws(()=>allocator.candidateFor('backend.implement','devin-agent'),/not launchable.*headless/);
 });
 /**
- * A throwaway workflows root: the shared runtime ledger beside the workflow directories, each of which may hold
- * a `kernel.lock` - the one thing that says whether the workflow that wrote an entry is still alive.
+ * A throwaway repository root: the shared runtime ledger (`.starciwork/runtime.sqlite`, docs §4
+ * `runtime_loads`), whose `kernel-lock` signal per workflow is the one thing that says whether the workflow
+ * that wrote an entry is still alive (§4 `signals`). Each op opens and closes its own short-lived handle, so
+ * nothing here holds the file open across a test - the "unreadable ledger" case later overwrites it in place.
  */
 function sharedRoot(t){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-runtime-loads-'));
-  t.after(()=>{fs.rmSync(root,{recursive:true,force:true});});
+  // SQLite on Windows can hold a file mapping open a moment past `close()`; a cleanup that still can't remove
+  // the directory after retrying is a leaked temp dir, not a correctness assertion, so it is never let fail the test.
+  t.after(()=>{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,150);try{fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:150});}catch{}});
+  const file=ledgerFileFor(root);
+  const withLedger=fn=>{const ledger=openLedger({file});try{return fn(ledger);}finally{ledger.close();}};
   return {
-    root,file:loadsFile(root),
+    root,file,
     /** A workflow whose kernel is this very process is alive; one with a dead pid or no lock at all is not. */
     kernel:(workflow,pid=process.pid)=>{
-      fs.mkdirSync(path.join(root,workflow),{recursive:true});
-      if(pid!==null)fs.writeFileSync(path.join(root,workflow,'kernel.lock'),JSON.stringify({pid,startedAt:1}));
+      if(pid===null)return;
+      withLedger(ledger=>setSignal(ledger.db,workflow,'kernel-lock',{pid,value:{phase:'running'},at:1}));
     },
-    write:runtimes=>fs.writeFileSync(loadsFile(root),JSON.stringify({schema:RUNTIME_LOADS,runtimes})),
-    read:()=>JSON.parse(fs.readFileSync(loadsFile(root),'utf8'))
+    write:runtimes=>withLedger(ledger=>{
+      ledger.db.prepare('DELETE FROM runtime_loads').run();
+      const insert=ledger.db.prepare('INSERT INTO runtime_loads(runtime,loads_json,at) VALUES(?,?,?)');
+      for(const [id,entry] of Object.entries(runtimes))insert.run(id,JSON.stringify(entry),ledger.now());
+    }),
+    read:()=>withLedger(ledger=>{
+      const runtimes={};
+      for(const row of ledger.db.prepare('SELECT runtime,loads_json FROM runtime_loads').all())runtimes[row.runtime]=JSON.parse(row.loads_json);
+      return {schema:RUNTIME_LOADS,runtimes};
+    })
   };
 }
 const liveOn=(workflow,op,since=1)=>({live:[{workflow,op,since}],cooling:null,usedToday:1,day:'2026-09-12'});
@@ -346,7 +362,6 @@ test('a runtime another kernel is already on is not the first choice: the next c
   const shared=sharedRoot(t),other='20260912-100000-other',mine='20260912-104251-mine';
   shared.kernel(other);
   shared.write({'claude-fable':liveOn(other,'op-decide')});
-  assert.equal(loadsFileFor(path.join(shared.root,other)),shared.file);
   const allocator=createAllocator({runtimes:profile,now:()=>Date.UTC(2026,8,12,9),shared:{path:shared.file,workflow:mine}});
   // Left to itself this kernel would take fable first: the role's preference is [fable, codex, claude], and
   // every one of them carries the decide role now - the Codex and Claude pools are Fable's downgrade.
@@ -414,7 +429,7 @@ test('entries of a dead kernel are ignored and dropped, and an unreadable ledger
   const local=createAllocator({runtimes:profile,now:()=>Date.UTC(2026,8,12,9),shared:{path:shared.file,workflow:mine}});
   assert.equal(local.sharedView().ok,false);
   assert.equal(local.allocate('architecture.decide').runtime,'claude-fable');
-  assert.deepEqual(local.allocate('backend.implement').preferredOver,[]);
+  assert.equal(local.allocate('backend.implement').preferredOver,undefined,'no shared ledger at all: the shared-only fields are absent, not empty');
 });
 
 test('the probed provider budget blocks an exhausted window until its reset and ranks clearly-more-headroom first, in bands, without touching the shared key',()=>{
@@ -512,8 +527,8 @@ test('two kernels write the one ledger under a lock and both their launches surv
   assert.deepEqual(entry.live.map(item=>[item.workflow,item.op]),[[first,'op-first'],[second,'op-second']]);
   assert.equal(entry.usedToday,0,'admitted/live reservations are not reported as completed service');
   assert.equal(shared.read().schema,RUNTIME_LOADS);
-  // Each writer released the lock, and each kernel counts only the other one's operation as shared load.
-  assert.equal(fs.existsSync(`${shared.file}.lock`),false);
+  // Each kernel counts only the other one's operation as shared load; the ledger's own transaction serializes
+  // the two writers, so both survive without an external lock file.
   assert.deepEqual(one.sharedView().loads,{'claude-fable':1});
   assert.deepEqual(two.sharedView().ops['claude-fable'].map(item=>item.op),['op-first']);
   // Both slots of fable are taken across the two kernels, so the next operation of either goes on to the Codex pool.

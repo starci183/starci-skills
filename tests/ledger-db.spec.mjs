@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
+import {createRequire} from 'node:module';
 import {ANCHOR_SCHEMA,LEDGER_SCHEMA,LEDGER_VERSION,MACHINE_SCHEMA,checkpointLedger,compactSnapshots,ensureWorkflow,eventsHead,inspectLedger,ledgerFileFor,ledgerIdOf,ledgerWorkflows,liveRows,machineFileFor,openLedger,openMachine,pruneRetiredGenerations,readAnchor,releaseTwoPhase,reserveTwoPhase,retireWorkflow,verifyAnchor,verifyChain,writeAnchor} from '../kernel/ledger-db.mjs';
 
 /**
@@ -11,7 +13,85 @@ import {ANCHOR_SCHEMA,LEDGER_SCHEMA,LEDGER_VERSION,MACHINE_SCHEMA,checkpointLedg
  * reservation against the machine arbiter, sweep of orphaned machine rows (guarded by meta.ledger_id, not a
  * path), the retention semantics ported from journal.mjs, and the §12 tracked anchor.
  */
+const require=createRequire(import.meta.url);
 const temporary=()=>fs.mkdtempSync(path.join(os.tmpdir(),'starci-ledger-db-'));
+/**
+ * A v1 ledger exactly as it looked before the identity/anchor addendum: every §4 table except `meta`, and
+ * `events.digest` with no default and no chain trigger — the shape a ledger built by an earlier 1.0.4 agent
+ * (or any file that reached user_version=1 before this module carried `meta`) is stuck in.
+ */
+function legacyLedgerFile(){
+  const dir=temporary(),file=path.join(dir,'runtime.sqlite');
+  const {DatabaseSync}=require('node:sqlite');
+  const db=new DatabaseSync(file);
+  db.exec(`
+    CREATE TABLE workflows(workflow_id TEXT PRIMARY KEY, title TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+      ledger_mode TEXT, source_roots_json TEXT, generation INTEGER NOT NULL DEFAULT 0,
+      goal_identity TEXT, phase TEXT, finished_json TEXT, pin_digest TEXT, archived_at INTEGER);
+    CREATE TABLE goals(goal_seq INTEGER PRIMARY KEY AUTOINCREMENT, workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id),
+      revision INTEGER NOT NULL, goal_identity TEXT NOT NULL, markdown TEXT NOT NULL, json TEXT NOT NULL,
+      amendment_json TEXT, created_at INTEGER NOT NULL, UNIQUE(workflow_id,revision));
+    CREATE TABLE state_snapshots(snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT, checkpoint_id TEXT NOT NULL UNIQUE,
+      workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), generation INTEGER NOT NULL,
+      goal_identity TEXT NOT NULL, state_json TEXT NOT NULL, events_head TEXT, created_at INTEGER NOT NULL);
+    CREATE INDEX state_snapshots_lookup ON state_snapshots(workflow_id,generation,goal_identity,snapshot_id);
+    CREATE TABLE events(seq INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT NOT NULL UNIQUE,
+      workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), generation INTEGER NOT NULL,
+      entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, kind TEXT NOT NULL, payload_json TEXT,
+      prev_digest TEXT, digest TEXT NOT NULL, created_at INTEGER NOT NULL);
+    CREATE INDEX events_entity ON events(workflow_id,entity_type,entity_id,seq);
+    CREATE INDEX events_kind ON events(workflow_id,kind,seq);
+    CREATE TABLE jobs(job_id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), op_id TEXT,
+      attempt INTEGER NOT NULL, generation INTEGER NOT NULL, kind TEXT NOT NULL, role TEXT, payload_json TEXT,
+      status TEXT NOT NULL, priority_json TEXT, lease_token TEXT, worker_id TEXT, deadline INTEGER,
+      result_json TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+    CREATE INDEX jobs_queue ON jobs(status,kind,created_at,job_id);
+    CREATE INDEX jobs_op ON jobs(workflow_id,op_id,attempt);
+    CREATE TABLE resources(resource_key TEXT PRIMARY KEY, capacity INTEGER NOT NULL CHECK(capacity>=0));
+    CREATE TABLE leases(resource_key TEXT NOT NULL, job_id TEXT NOT NULL REFERENCES jobs(job_id) ON DELETE CASCADE,
+      workflow_id TEXT NOT NULL, op_id TEXT, attempt INTEGER NOT NULL, generation INTEGER NOT NULL,
+      token TEXT NOT NULL, units INTEGER NOT NULL CHECK(units>0), acquired_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL, machine_ref TEXT, PRIMARY KEY(resource_key,job_id));
+    CREATE INDEX leases_expiry ON leases(expires_at);
+    CREATE TRIGGER leases_match_job BEFORE INSERT ON leases BEGIN
+      SELECT RAISE(ABORT,'lease-identity-drift') WHERE NOT EXISTS(
+        SELECT 1 FROM jobs j WHERE j.job_id=NEW.job_id AND j.workflow_id=NEW.workflow_id
+          AND j.op_id IS NEW.op_id AND j.attempt=NEW.attempt AND j.generation=NEW.generation AND j.lease_token=NEW.token);
+    END;
+    CREATE TABLE budgets(scope_key TEXT PRIMARY KEY, limit_value INTEGER NOT NULL CHECK(limit_value>=0),
+      used_value INTEGER NOT NULL DEFAULT 0 CHECK(used_value>=0), reserved_value INTEGER NOT NULL DEFAULT 0 CHECK(reserved_value>=0));
+    CREATE TABLE budget_reservations(scope_key TEXT NOT NULL REFERENCES budgets(scope_key), job_id TEXT NOT NULL REFERENCES jobs(job_id) ON DELETE CASCADE,
+      units INTEGER NOT NULL CHECK(units>0), PRIMARY KEY(scope_key,job_id));
+    CREATE TABLE incidents(incident_id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, op_id TEXT, attempts INTEGER NOT NULL DEFAULT 0,
+      model_calls INTEGER NOT NULL DEFAULT 0, tokens INTEGER NOT NULL DEFAULT 0, elapsed_ms INTEGER NOT NULL DEFAULT 0,
+      last_progress TEXT, status TEXT NOT NULL, updated_at INTEGER NOT NULL);
+    CREATE TABLE reports(report_id INTEGER PRIMARY KEY AUTOINCREMENT, workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id),
+      dispatch_id TEXT NOT NULL, op_id TEXT, attempt INTEGER, generation INTEGER, outcome TEXT NOT NULL,
+      report_json TEXT NOT NULL, from_terminal TEXT, consumed_at INTEGER, created_at INTEGER NOT NULL, UNIQUE(workflow_id,dispatch_id));
+    CREATE TABLE contracts(workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), op_id TEXT NOT NULL, attempt INTEGER NOT NULL,
+      dispatch_id TEXT, markdown TEXT NOT NULL, context_json TEXT, created_at INTEGER NOT NULL, PRIMARY KEY(workflow_id,op_id,attempt));
+    CREATE TABLE checks(workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), op_id TEXT NOT NULL, attempt INTEGER NOT NULL,
+      checks_json TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(workflow_id,op_id,attempt));
+    CREATE TABLE inbox(inbox_id INTEGER PRIMARY KEY AUTOINCREMENT, workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id),
+      kind TEXT NOT NULL, key TEXT, payload_json TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+      disposition_json TEXT, created_at INTEGER NOT NULL, applied_at INTEGER);
+    CREATE TABLE signals(scope TEXT NOT NULL, key TEXT NOT NULL, holder_pid INTEGER, token TEXT, value_json TEXT,
+      at INTEGER NOT NULL, expires_at INTEGER, PRIMARY KEY(scope,key));
+    CREATE TABLE runtime_loads(runtime TEXT PRIMARY KEY, loads_json TEXT NOT NULL, at INTEGER NOT NULL);
+    CREATE TABLE inputs(workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), key TEXT NOT NULL,
+      goal_revision INTEGER NOT NULL, sha256 TEXT NOT NULL, size INTEGER NOT NULL, media_type TEXT,
+      origin TEXT NOT NULL, bytes BLOB NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(workflow_id,key));
+    CREATE TABLE migrations(source TEXT PRIMARY KEY, kind TEXT NOT NULL, rows_json TEXT NOT NULL, at INTEGER NOT NULL);
+    PRAGMA user_version=1;
+  `);
+  const digest=text=>crypto.createHash('sha256').update(text).digest('hex');
+  db.prepare('INSERT INTO workflows(workflow_id,title,created_at,updated_at,generation,goal_identity) VALUES(?,?,?,?,?,?)').run('wf','pre-addendum',1000,1000,1,'goal-1');
+  const d1=digest('e1kdone{"x":1}1000');
+  db.prepare('INSERT INTO events(event_id,workflow_id,generation,entity_type,entity_id,kind,payload_json,prev_digest,digest,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .run('e1','wf',1,'workflow','wf','kdone','{"x":1}',null,d1,1000);
+  db.close();
+  return {dir,file,firstDigest:d1};
+}
 const snapshot=(ledger,{workflowId='wf',generation,checkpoint,body='{"x":1}'})=>{ensureWorkflow(ledger.db,{workflowId,at:1});ledger.db.prepare('INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at) VALUES(?,?,?,?,?,?)').run(checkpoint,workflowId,generation,'goal',body,1);};
 const job=(ledger,{jobId,workflowId='wf',generation,status='succeeded',kind='model'})=>{ledger.enqueueJob({jobId,workflowId,opId:'op',attempt:1,generation,kind,payload:{}});ledger.db.prepare('UPDATE jobs SET status=? WHERE job_id=?').run(status,jobId);ledger.appendEvent({eventId:`${jobId}:event`,workflowId,entityType:'job',entityId:jobId,generation,kind:'job-succeeded'});};
 const lease=(ledger,{jobId,workflowId='wf',generation=1,resource='lane:x',token='tok'})=>{ledger.db.prepare("UPDATE jobs SET status='leased',lease_token=?,deadline=? WHERE job_id=?").run(token,Number.MAX_SAFE_INTEGER,jobId);ledger.db.prepare('INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run(resource,jobId,workflowId,'op',1,generation,token,1,1,Number.MAX_SAFE_INTEGER);};
@@ -363,4 +443,54 @@ test('verifyAnchor: no tracked anchor is a legitimate first boot, and the three 
   ledger.db.prepare('UPDATE events SET digest=? WHERE workflow_id=?').run('tampered','wf');
   assert.deepEqual(verifyAnchor(ledger,dir),{ok:false,reason:'ledger-behind-anchor',workflowId:'wf'},'the anchored event digest is no longer there');
   ledger.close();
+});
+
+test('openLedger migrates a v1 file that predates meta, preserving every row and retrofitting the digest trigger',t=>{
+  const {dir,file,firstDigest}=legacyLedgerFile();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const {DatabaseSync}=require('node:sqlite'),precheck=new DatabaseSync(file,{readOnly:true});
+  assert.equal(precheck.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get(),undefined,'confirms the fixture predates meta');
+  precheck.close();
+  const ledger=openLedger({file});
+  assert.match(ledger.ledgerId,/^[0-9a-f-]{36}$/i,'a fresh identity was minted for the file that never had one');
+  assert.equal(ledger.db.prepare("SELECT value FROM meta WHERE key='schema'").get().value,LEDGER_SCHEMA);
+  assert.equal(ledger.db.prepare("SELECT value FROM meta WHERE key='journal_mode'").get().value,ledger.journalMode.toLowerCase());
+  assert.deepEqual({...ledger.db.prepare('SELECT workflow_id,title FROM workflows').get()},{workflow_id:'wf',title:'pre-addendum'},'the pre-existing workflow row is untouched');
+  assert.deepEqual({...ledger.db.prepare('SELECT event_id,digest FROM events').get()},{event_id:'e1',digest:firstDigest},'the pre-existing event row is untouched');
+  assert.ok(ledger.db.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='events_digest_chain'").get(),'the digest-chain trigger was retrofitted onto the old file');
+  // reopening a second time (version already 1, meta already present) is a no-op, not a re-seed
+  const ledgerId=ledger.ledgerId;ledger.close();
+  const reopened=openLedger({file});
+  assert.equal(reopened.ledgerId,ledgerId,'meta is seeded once; a second open never mints a new identity');
+  reopened.close();
+});
+
+test('the events table computes its own hash chain even when an insert omits prev_digest and digest entirely',t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
+  ensureWorkflow(ledger.db,{workflowId:'wf',at:1});
+  // the exact shape of kernel/jobs.mjs's own INSERT: no prev_digest, no digest column at all
+  ledger.db.prepare('INSERT INTO events(event_id,workflow_id,entity_type,entity_id,generation,kind,payload_json,created_at) VALUES(?,?,?,?,?,?,?,?)')
+    .run('e1','wf','job','j1',1,'job-succeeded',JSON.stringify({opId:'op',attempt:1,result:null}),1000);
+  ledger.db.prepare('INSERT INTO events(event_id,workflow_id,entity_type,entity_id,generation,kind,payload_json,created_at) VALUES(?,?,?,?,?,?,?,?)')
+    .run('e2','wf','job','j1',1,'job-failed',null,2000);
+  const rows=ledger.events({workflowId:'wf'});
+  assert.equal(rows.length,2);
+  assert.notEqual(rows[0].digest,'');assert.equal(rows[0].prev_digest,null);
+  assert.notEqual(rows[1].digest,'');assert.equal(rows[1].prev_digest,rows[0].digest);
+  assert.deepEqual(verifyChain(ledger.db,{workflowId:'wf'}),{ok:true,checked:2,brokenAt:null},'the chain the trigger computed verifies like any other');
+  ledger.close();
+});
+
+test('inspectLedger exposes the same job and event read surface as openLedger',t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
+  ledger.enqueueJob({jobId:'j1',workflowId:'wf',kind:'model',generation:1});
+  ledger.appendEvent({workflowId:'wf',entityType:'workflow',entityId:'wf',generation:1,kind:'started'});
+  ledger.close();
+  const inspect=inspectLedger({file:path.join(dir,'runtime.sqlite')});
+  assert.equal(typeof inspect.listJobs,'function');assert.equal(typeof inspect.getJob,'function');assert.equal(typeof inspect.events,'function');
+  assert.deepEqual(inspect.listJobs().map(item=>item.job_id),['j1']);
+  assert.equal(inspect.getJob('j1').job_id,'j1');assert.equal(inspect.getJob('missing'),null);
+  assert.equal(inspect.events({workflowId:'wf'}).length,1);
+  inspect.close();
 });

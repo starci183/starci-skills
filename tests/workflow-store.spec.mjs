@@ -20,8 +20,9 @@ test('a workflow id is sortable by time and safe as a directory name',()=>{
 
 test('opening a store creates the single workflow directory and nothing outside it',()=>{
   const repo=tmp();
+  let store;
   try{
-    const store=createStore({repoRoot:repo,id:'20260912-104251-demo'});
+    store=createStore({repoRoot:repo,id:'20260912-104251-demo'});
     assert.equal(store.dir,path.join(workflowsRoot(repo),'20260912-104251-demo'));
     for(const key of ['reports','contracts','checks','inbox'])assert.ok(fs.statSync(store.paths[key]).isDirectory(),key);
     assert.equal(store.paths.state,path.join(store.dir,'state.json'));
@@ -32,16 +33,17 @@ test('opening a store creates the single workflow directory and nothing outside 
     assert.deepEqual(fs.readdirSync(path.join(repo,'.starciwork','_local')),['workflows']);
     assert.throws(()=>createStore({repoRoot:repo,id:'a/b'}),/one directory segment/);
     assert.throws(()=>createStore({repoRoot:repo,id:' '}),/Missing workflow id/);
-  }finally{fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
+  }finally{store?.close();fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
 });
 
 test('the event log is append only and its seq keeps counting after the store is re-opened',()=>{
   const repo=tmp();
+  let first,reopened,third;
   try{
-    const first=createStore({repoRoot:repo,id:'20260912-104251-demo'});
+    first=createStore({repoRoot:repo,id:'20260912-104251-demo'});
     assert.equal(first.appendEvent({kind:'workflow.start'}).seq,1);
     assert.equal(first.appendEvent({kind:'op.dispatch',op:'backend.implement'}).seq,2);
-    const reopened=createStore({repoRoot:repo,id:'20260912-104251-demo'});
+    reopened=createStore({repoRoot:repo,id:'20260912-104251-demo'});
     assert.equal(reopened.appendEvent({kind:'op.report',outcome:'done'}).seq,3);
     const all=reopened.readEvents();
     assert.deepEqual(all.map(event=>event.seq),[1,2,3]);
@@ -53,14 +55,16 @@ test('the event log is append only and its seq keeps counting after the store is
     assert.throws(()=>first.appendEvent('nope'),/must be an object/);
     fs.appendFileSync(first.paths.events,'{ not json\n\n');
     assert.deepEqual(first.readEvents().map(event=>event.seq),[1,2,3]);
-    assert.equal(createStore({repoRoot:repo,id:'20260912-104251-demo'}).appendEvent({kind:'x'}).seq,4);
-  }finally{fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
+    third=createStore({repoRoot:repo,id:'20260912-104251-demo'});
+    assert.equal(third.appendEvent({kind:'x'}).seq,4);
+  }finally{first?.close();reopened?.close();third?.close();fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
 });
 
 test('state is written atomically through a tmp file that never survives the write',()=>{
   const repo=tmp();
+  let store;
   try{
-    const store=createStore({repoRoot:repo,id:'20260912-104251-demo'});
+    store=createStore({repoRoot:repo,id:'20260912-104251-demo'});
     assert.equal(store.loadState(),null);
     store.saveState(state({goal:'Ship the board'}));
     assert.deepEqual(store.loadState(),{schema:WORKFLOW_STATE,phase:'plan',goal:'Ship the board'});
@@ -71,13 +75,14 @@ test('state is written atomically through a tmp file that never survives the wri
     assert.throws(()=>store.saveState({phase:'execute'}),/schema starci\/workflow-state@1/);
     fs.writeFileSync(store.paths.state,'{ truncated');
     assert.equal(store.loadState(),null);
-  }finally{fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
+  }finally{store?.close();fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
 });
 
 test('reading reports skips the wait state, non-JSON names and unreadable files',()=>{
   const repo=tmp();
+  let store;
   try{
-    const store=createStore({repoRoot:repo,id:'20260912-104251-demo'});
+    store=createStore({repoRoot:repo,id:'20260912-104251-demo'});
     assert.deepEqual(store.readReports(),[]);
     fs.writeFileSync(store.reportPath('ctx_a'),JSON.stringify({dispatch:'ctx_a',outcome:'done'}));
     fs.writeFileSync(store.reportPath('ctx_b'),JSON.stringify({dispatch:'ctx_b',outcome:'partial'}));
@@ -85,7 +90,7 @@ test('reading reports skips the wait state, non-JSON names and unreadable files'
     fs.writeFileSync(path.join(store.paths.reports,'broken.json'),'{ half written');
     fs.writeFileSync(path.join(store.paths.reports,'notes.md'),'not a report');
     assert.deepEqual(store.readReports().map(report=>report.dispatch),['ctx_a','ctx_b']);
-  }finally{fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
+  }finally{store?.close();fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
 });
 
 test('transient Windows replacement denial preserves the old complete snapshot until atomic promotion',t=>{
@@ -121,11 +126,12 @@ test('snapshot replacement does not retry unrelated errors or non-Windows failur
 
 test('listWorkflows returns every workflow of the repository newest first with its state',()=>{
   const repo=tmp();
+  let older,newest,middle;
   try{
     assert.deepEqual(listWorkflows(repo),[]);
-    createStore({repoRoot:repo,id:'20260910-090000-older'});
-    createStore({repoRoot:repo,id:'20260912-104251-newest'}).saveState(state({phase:'review'}));
-    createStore({repoRoot:repo,id:'20260912-080000-middle'});
+    older=createStore({repoRoot:repo,id:'20260910-090000-older'});
+    newest=createStore({repoRoot:repo,id:'20260912-104251-newest'});newest.saveState(state({phase:'review'}));
+    middle=createStore({repoRoot:repo,id:'20260912-080000-middle'});
     fs.writeFileSync(path.join(workflowsRoot(repo),'stray.json'),'{}');
     const listed=listWorkflows(repo);
     assert.deepEqual(listed.map(item=>item.id),['20260912-104251-newest','20260912-080000-middle','20260910-090000-older']);
@@ -133,7 +139,7 @@ test('listWorkflows returns every workflow of the repository newest first with i
     assert.equal(listed[1].state,null);
     assert.equal(listed[0].dir,path.join(workflowsRoot(repo),'20260912-104251-newest'));
     assert.ok(listed.every(item=>item.updatedAt>0));
-  }finally{fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
+  }finally{older?.close();newest?.close();middle?.close();fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
 });
 
 test('a linked worktree resolves to the main repository, so one product has one workflows root',()=>{

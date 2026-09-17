@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {recordForQuestion} from './ask.mjs';
@@ -108,19 +107,7 @@ export function repositoryRoot(cwd){
   const resolved=path.resolve(cwd,common);
   return path.basename(resolved)==='.git'?path.dirname(resolved):cwd;
 }
-export function reportsDirectory(cwd,run,explicit=null){
-  return explicit?path.resolve(cwd,explicit):path.join(repositoryRoot(cwd),'.starciwork','_local','runtime','reports',run);
-}
-export function reportPath(directory,dispatch){return path.join(directory,`${dispatch}.json`);}
-
-export function readReports(directory){
-  if(!fs.existsSync(directory))return [];
-  return fs.readdirSync(directory).filter(name=>name.endsWith('.json')&&name!=='wait-state.json').sort().map(name=>{
-    try{return JSON.parse(fs.readFileSync(path.join(directory,name),'utf8'));}catch{return {schema:null,file:name,error:'unreadable report file'};}
-  });
-}
-
-/** Compose the short Orca message body: the receiver reads the file for everything else. */
+/** Compose the short Orca message body: the receiver reads the row for everything else. */
 export function reportBody(report,file){
   const lines=[`outcome: ${report.outcome}`,`report: ${normalize(file)}`,`summary: ${report.summary}`];
   if(report.files.length)lines.push(`files: ${report.files.slice(0,20).join(', ')}${report.files.length>20?` (+${report.files.length-20})`:''}`);

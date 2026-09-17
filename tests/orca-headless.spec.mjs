@@ -104,7 +104,7 @@ test('a managed-agent launch is one detached headless process: worker-start spaw
     const empty=host.invoke('check',{run,terminal:'term_kernel',types:'worker_done,question,escalation'}).receipt.result;
     assert.deepEqual(empty,{deliveryId:null,messages:[]});
     // The child reports through the launcher's own `report`, on a host built from nothing but its environment.
-    const reported=reportOutcome(childHost(child,cwd),{cwd,run,from:handle,task:taskId,dispatch,outcome:'done',summary:'Done.',files:[],checks:[{name:'unit',command:'npx vitest run a',exitCode:0,evidence:'ok'}],reportsDir:path.join(store,'reports')});
+    const reported=reportOutcome(childHost(child,cwd),{cwd,run,from:handle,task:taskId,dispatch,outcome:'done',summary:'Done.',files:[],checks:[{name:'unit',command:'npx vitest run a',exitCode:0,evidence:'ok'}],workflow:'w1'});
     assert.equal(reported.ok,true,reported.reason);
     assert.match(reported.messageId,/^msg_h/);
     const mailbox=readLines(path.join(root,'mailbox.jsonl'));
@@ -124,7 +124,7 @@ test('a managed-agent launch is one detached headless process: worker-start spaw
     const acked=host.invoke('check',{run,terminal:'term_kernel',ack:again.deliveryId,types:'worker_done,question,escalation'}).receipt.result;
     assert.deepEqual(acked.messages,[]);
     // The protocol's own tick reads the same host: the report file is a report, and the exited process reads as dead.
-    const tick=waitTick(host,{cwd,run,from:'term_kernel',timeoutMs:1000,tickMs:1000,reportsDir:path.join(store,'reports'),wait:()=>{}});
+    const tick=waitTick(host,{cwd,run,from:'term_kernel',timeoutMs:1000,tickMs:1000,workflow:'w1',wait:()=>{}});
     assert.equal(tick.event,'report');
     assert.equal(tick.reports.length,1);
     assert.equal(tick.reports[0].dispatch,dispatch);

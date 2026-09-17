@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {createRequire} from 'node:module';
@@ -12,6 +13,11 @@ const require=createRequire(import.meta.url);
  */
 export const JOURNAL_SCHEMA='starci/operational-journal@1';
 export const JOURNAL_VERSION=2;
+// Same root as engine.mjs's runtimeRootFor (and ledger-db.mjs's own copy), kept local so a module that reads
+// nothing but the retired journal never has to import the live engine. `enrollEngine`'s `journalFileFor`
+// default was removed with the journal it once resolved; the migrator is the last caller, so it stays here.
+const runtimeRootFor=(env=process.env)=>path.join(env.LOCALAPPDATA||path.join(os.homedir(),'.local','state'),'StarCi','runtime');
+export const journalFileFor=(env=process.env)=>path.join(runtimeRootFor(env),'journal.sqlite');
 const need=(ok,message)=>{if(!ok)throw Error(message);};
 const json=value=>JSON.stringify(value??null);
 const value=row=>row?{...row,payload:row.payload_json===null?null:JSON.parse(row.payload_json),result:row.result_json===null?null:JSON.parse(row.result_json)}:null;

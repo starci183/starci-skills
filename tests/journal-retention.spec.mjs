@@ -106,7 +106,10 @@ test('a journal created by this build gives freed pages back on its own',t=>{
   journal.close();
 });
 
-const stateAt=(repoRoot,id,extra)=>{const store=createStore({repoRoot,id});store.saveState({schema:WORKFLOW_STATE,id,ops:[],...extra});return store;};
+// `createStore` holds its ledger handle open (§8: a store is a session, closed by its caller); every call here
+// is fire-and-forget, so it closes immediately - an open WAL handle on `repo/.starciwork/runtime.sqlite`
+// otherwise survives the test and blocks the temp directory's own removal on Windows (EPERM, not ENOENT).
+const stateAt=(repoRoot,id,extra)=>{const store=createStore({repoRoot,id});store.saveState({schema:WORKFLOW_STATE,id,ops:[],...extra});store.close();};
 
 test('journal-prune retires what the store roots prove settled, keeps the unfinished and the live, and reports the unknown',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));

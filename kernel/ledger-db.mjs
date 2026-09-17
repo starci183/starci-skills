@@ -23,6 +23,18 @@ const value=row=>row?{...row,payload:row.payload_json===null?null:JSON.parse(row
 const sha256=text=>crypto.createHash('sha256').update(text).digest('hex');
 const realpathOf=file=>{try{return fs.realpathSync(file);}catch{return path.resolve(file);}};
 const digestOf=(prevDigest,row)=>sha256(`${prevDigest??''}${row.event_id}${row.kind}${row.payload_json??''}${row.created_at}`);
+// A caller (inside this module or outside it - kernel/jobs.mjs writes `events` rows directly, and always
+// will) can omit or get the hash chain wrong. Rather than chase every such INSERT, the chain is enforced by
+// the table itself: `digest` defaults to '' so an omitted column never trips NOT NULL, and this AFTER INSERT
+// trigger recomputes prev_digest/digest from the workflow's own history regardless of what was supplied,
+// via a registered SQL function mirroring `digestOf` exactly (registerDigestFunction, below).
+const EVENTS_DIGEST_TRIGGER=`CREATE TRIGGER IF NOT EXISTS events_digest_chain AFTER INSERT ON events BEGIN
+    UPDATE events SET
+      prev_digest=(SELECT digest FROM events WHERE workflow_id=NEW.workflow_id AND seq<NEW.seq ORDER BY seq DESC LIMIT 1),
+      digest=starci_sha256(COALESCE((SELECT digest FROM events WHERE workflow_id=NEW.workflow_id AND seq<NEW.seq ORDER BY seq DESC LIMIT 1),'')||NEW.event_id||NEW.kind||COALESCE(NEW.payload_json,'')||NEW.created_at)
+    WHERE seq=NEW.seq;
+  END;`;
+const registerDigestFunction=db=>db.function('starci_sha256',{deterministic:true},text=>sha256(String(text)));
 /** The ledger's own identity, from its `meta` row. Never derived from a path (§5). */
 export function ledgerIdOf(handle){
   need(handle?.db,'ledgerIdOf needs a handle');
@@ -185,11 +197,14 @@ export function verifyAnchor(ledger,repoRoot){
   return {ok:true,checked};
 }
 
+// Its own constant (not inlined in LEDGER_DDL) so the schema-catalog test's `CREATE TABLE (\w+)` source scan
+// - and the meta-backfill path below, which runs this exact statement standalone - each see it exactly once.
+const META_TABLE_DDL='CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL)';
 const LEDGER_DDL=`
   -- the ledger's own identity and open-mode facts. Seeded once, on create, and never rewritten (§4):
   -- ledger_id (randomUUID at create, THE identity — moves with the bytes, never derived from the path),
   -- schema, created_at (epoch ms), journal_mode ('wal' | 'delete', kept in step with what an open achieves).
-  CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+  ${META_TABLE_DDL};
   CREATE TABLE workflows(
     workflow_id TEXT PRIMARY KEY, title TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
     ledger_mode TEXT, source_roots_json TEXT, generation INTEGER NOT NULL DEFAULT 0,
@@ -207,9 +222,10 @@ const LEDGER_DDL=`
     seq INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT NOT NULL UNIQUE,
     workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), generation INTEGER NOT NULL,
     entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, kind TEXT NOT NULL, payload_json TEXT,
-    prev_digest TEXT, digest TEXT NOT NULL, created_at INTEGER NOT NULL);
+    prev_digest TEXT, digest TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);
   CREATE INDEX events_entity ON events(workflow_id,entity_type,entity_id,seq);
   CREATE INDEX events_kind ON events(workflow_id,kind,seq);
+  ${EVENTS_DIGEST_TRIGGER}
   CREATE TABLE jobs(
     job_id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), op_id TEXT,
     attempt INTEGER NOT NULL, generation INTEGER NOT NULL, kind TEXT NOT NULL, role TEXT, payload_json TEXT,
@@ -288,16 +304,31 @@ const MACHINE_DDL=`
   CREATE TABLE budgets(scope_key TEXT PRIMARY KEY, limit_value INTEGER NOT NULL, used_value INTEGER NOT NULL DEFAULT 0, reserved_value INTEGER NOT NULL DEFAULT 0);
   CREATE TABLE budget_reservations(scope_key TEXT NOT NULL, ledger_id TEXT NOT NULL, job_id TEXT NOT NULL, units INTEGER NOT NULL, PRIMARY KEY(scope_key,ledger_id,job_id));`;
 
+const seedMeta=(db,now)=>{
+  // Seeded once, on create, and never rewritten: this identity moves with the bytes (§4/§5).
+  const seed=db.prepare('INSERT OR IGNORE INTO meta(key,value) VALUES(?,?)');
+  seed.run('ledger_id',crypto.randomUUID());seed.run('schema',LEDGER_SCHEMA);seed.run('created_at',String(now()));
+};
 function migrateLedger(db,{now}){
   const version=Number(db.prepare('PRAGMA user_version').get().user_version);
   need(version<=LEDGER_VERSION,`Ledger version ${version} is newer than supported ${LEDGER_VERSION}`);
-  if(version!==0)return;
-  db.exec(`BEGIN IMMEDIATE;${LEDGER_DDL}
-    PRAGMA user_version=${LEDGER_VERSION};
-    COMMIT;`);
-  // Seeded once, on create, and never rewritten: this identity moves with the bytes (§4/§5).
-  const seed=db.prepare('INSERT INTO meta(key,value) VALUES(?,?)');
-  seed.run('ledger_id',crypto.randomUUID());seed.run('schema',LEDGER_SCHEMA);seed.run('created_at',String(now()));
+  if(version===0){
+    db.exec(`BEGIN IMMEDIATE;${LEDGER_DDL}
+      PRAGMA user_version=${LEDGER_VERSION};
+      COMMIT;`);
+    seedMeta(db,now);
+    return;
+  }
+  // A ledger already at LEDGER_VERSION can still predate the `meta` table and the digest-chain trigger: both
+  // were added to LEDGER_DDL without a version bump, so user_version alone cannot tell a fresh v1 file from
+  // one built before either landed. Check the schema itself and bring it up without touching any other row.
+  if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='meta'").get()){
+    db.exec('BEGIN IMMEDIATE');
+    try{db.exec(META_TABLE_DDL);db.exec('COMMIT');}
+    catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}
+    seedMeta(db,now);
+  }
+  if(!db.prepare("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='events_digest_chain'").get())db.exec(EVENTS_DIGEST_TRIGGER);
 }
 function migrateMachine(db){
   const version=Number(db.prepare('PRAGMA user_version').get().user_version);
@@ -340,19 +371,28 @@ const makeTransaction=(db,label)=>{let inside=false;return fn=>{if(inside)throw 
  * A ledger opened to be read and nothing else: no migration, no compaction, no reclaim. What an operator's
  * inspection, the candidate bridge and machine.sweep use on a file a kernel may hold.
  */
+// The read surface both handles share: an inspection is a full read of the ledger, not a lesser one, so
+// anything openLedger's handle can query (jobs, events, workflows, chain) inspectLedger's must too.
+const readAccessors=db=>({
+  liveRows(workflowId){return liveRows(db,workflowId);},workflows(){return ledgerWorkflows(db);},
+  eventsHead(workflowId){return eventsHead(db,workflowId);},verifyChain(options={}){return verifyChain(db,options);},
+  getJob(jobId){return value(db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId));},
+  listJobs({status=null,kind=null}={}){let sql='SELECT * FROM jobs WHERE 1=1';const args=[];if(status){sql+=' AND status=?';args.push(status);}if(kind){sql+=' AND kind=?';args.push(kind);}sql+=' ORDER BY created_at,job_id';return db.prepare(sql).all(...args).map(value);},
+  events({workflowId=null,since=null}={}){let sql='SELECT * FROM events WHERE 1=1';const args=[];if(workflowId){sql+=' AND workflow_id=?';args.push(workflowId);}if(since!==null){sql+=' AND seq>?';args.push(since);}sql+=' ORDER BY seq';return db.prepare(sql).all(...args).map(row=>({...row,payload:JSON.parse(row.payload_json)}));},
+});
 export function inspectLedger({file}={}){
   const {DatabaseSync}=require('node:sqlite');
   need(typeof file==='string'&&fs.existsSync(file),'inspectLedger needs an existing file');
   const db=new DatabaseSync(file,{readOnly:true,timeout:5000});
   return {schema:LEDGER_SCHEMA,file,path:path.resolve(file),db,readOnly:true,ledgerId:ledgerIdOf({db}),
     version:Number(db.prepare('PRAGMA user_version').get().user_version),
-    liveRows(workflowId){return liveRows(db,workflowId);},workflows(){return ledgerWorkflows(db);},
-    eventsHead(workflowId){return eventsHead(db,workflowId);},verifyChain(options={}){return verifyChain(db,options);},
+    ...readAccessors(db),
     close(){db.close();}};
 }
 
 export function openLedger({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL',machine=null}={}){
   const {db,sqliteVersion,journalMode:actual}=openDb({file,busyTimeoutMs,journalMode,autoVacuum:true,label:'openLedger'});
+  registerDigestFunction(db);
   migrateLedger(db,{now});
   // Kept in step with the mode this open actually achieved, WAL or its DELETE fallback (§3).
   db.prepare("INSERT INTO meta(key,value) VALUES('journal_mode',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(actual.toLowerCase());
@@ -381,17 +421,11 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=15000,journalMode='W
       db.prepare("INSERT OR IGNORE INTO jobs(job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,priority_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?, 'queued',?,?,?)").run(jobId,workflowId,opId,attempt,generation,kind,role,json(payload),json(priority),createdAt,createdAt);
       return value(db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId));
     },
-    getJob(jobId){return value(db.prepare('SELECT * FROM jobs WHERE job_id=?').get(jobId));},
-    listJobs({status=null,kind=null}={}){let sql='SELECT * FROM jobs WHERE 1=1';const args=[];if(status){sql+=' AND status=?';args.push(status);}if(kind){sql+=' AND kind=?';args.push(kind);}sql+=' ORDER BY created_at,job_id';return db.prepare(sql).all(...args).map(value);},
-    events({workflowId=null,since=null}={}){let sql='SELECT * FROM events WHERE 1=1';const args=[];if(workflowId){sql+=' AND workflow_id=?';args.push(workflowId);}if(since!==null){sql+=' AND seq>?';args.push(since);}sql+=' ORDER BY seq';return db.prepare(sql).all(...args).map(row=>({...row,payload:JSON.parse(row.payload_json)}));},
+    ...readAccessors(db),
     /** The rows of a workflow that are only history now: retired generations go, then freed pages are given back. */
     retireGenerations({workflowId,generation}){const pruned=transaction(inner=>pruneRetiredGenerations(inner,{workflowId,generation}));reclaimSpace(db);return pruned;},
     /** Everything of a workflow, when nothing of it is live. */
     retireWorkflow(workflowId,options={}){const result=transaction(inner=>retireWorkflow(inner,workflowId,options));if(result.ok)reclaimSpace(db);return result;},
-    liveRows(workflowId){return liveRows(db,workflowId);},
-    workflows(){return ledgerWorkflows(db);},
-    eventsHead(workflowId){return eventsHead(db,workflowId);},
-    verifyChain(options={}){return verifyChain(db,options);},
     inputs:{
       put({workflowId,key,goalRevision,bytes,origin,mediaType=null}={}){
         need(workflowId&&key&&Number.isInteger(goalRevision)&&bytes&&origin,'inputs.put needs a workflow, key, goal revision, bytes and origin');

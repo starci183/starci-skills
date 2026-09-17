@@ -90,6 +90,7 @@ kernel/engine.mjs
 kernel/runtime-pin.mjs
 kernel/candidates.mjs
 kernel/candidate-bridge.mjs
+kernel/dependency-store.mjs
 kernel/candidate-roots.mjs
 kernel/model-policy.mjs
 kernel/owner-requests.mjs
@@ -99,7 +100,6 @@ models/validator-transport.mjs
 kernel/lanes.mjs
 kernel/launch.mjs
 kernel/terminals.mjs
-kernel/coordinator-terminals.mjs
 kernel/tab.mjs
 kernel/verify.mjs
 kernel/contract.mjs
@@ -128,6 +128,7 @@ providers/validate.mjs
 scripts/config.mjs
 scripts/check-scoped-lint.mjs
 scripts/check-stales.mjs
+scripts/ledger-migrate.mjs
 scripts/plan.mjs
 scripts/present-goal.mjs
 

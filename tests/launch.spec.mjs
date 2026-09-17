@@ -53,7 +53,7 @@ test('a coordinator terminal is recorded once even if opened twice; a stale one 
     assert.deepEqual(readCoordinatorTerminals(ledger,'wf'),['term_a','term_b']);
     const closed=[];
     const result=closeStaleCoordinatorTerminals(ledger,'wf',{keep:'term_b',known:['term_a','term_b'],close:handle=>{closed.push(handle);return true;}});
-    assert.deepEqual(result.closed,['term_a']);
+    assert.deepEqual(result.closed,[{terminal:'term_a',reason:'coordinator terminal of a kernel that is not running'}]);
     assert.deepEqual(closed,['term_a']);
     assert.deepEqual(readCoordinatorTerminals(ledger,'wf'),['term_b']);
     assert.deepEqual(readClosedCoordinatorTerminals(ledger,'wf'),['term_a']);
