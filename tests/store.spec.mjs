@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {WORKFLOW_STATE,createStore,eventDigest,eventsHead,listWorkflows,newWorkflowId,replaceStateSnapshot,repositoryRoot,workflowsRoot} from '../kernel/store.mjs';
-import {ledgerFileFor,openLedger} from '../kernel/ledger-db.mjs';
+import {anchorFileFor,ledgerFileFor,openLedger,readAnchor,verifyAnchor} from '../kernel/ledger-db.mjs';
 
 const tmp=()=>{const dir=path.join(os.tmpdir(),'starci-store-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);fs.mkdirSync(dir,{recursive:true});return dir;};
 const state=extra=>({schema:WORKFLOW_STATE,phase:'plan',...extra});
@@ -136,6 +137,26 @@ test('transition persists exactly once; replay returns the latest state without 
   assert.equal(store.ledger.verifyChain({workflowId:ID}).ok,true);
 });
 
+test('§12: the tracked anchor follows every checkpoint saveState/bindJournal/transition commits',t=>{
+  const fx=fixture(t),repo=fx.repo(),store=fx.track(createStore({repoRoot:repo,id:ID})),ledger=fx.track(openLedger({file:ledgerFileFor(repo)}));
+  assert.equal(readAnchor(repo),null,'nothing anchored before the first checkpoint');
+  store.saveState(state({goal:'g'}));
+  assert.ok(fs.existsSync(anchorFileFor(repo)));
+  let anchor=readAnchor(repo);
+  assert.equal(anchor.ledgerId,store.ledger.ledgerId);
+  assert.equal(anchor.workflows[ID].generation,0);
+  assert.equal(anchor.workflows[ID].checkpointId,store.ledger.db.prepare("SELECT checkpoint_id FROM state_snapshots WHERE workflow_id=? AND checkpoint_id LIKE 'save:%'").get(ID).checkpoint_id);
+  store.bindJournal(ledger,1,{state:state({goal:'g'})});
+  anchor=readAnchor(repo);
+  assert.equal(anchor.workflows[ID].generation,1,'binding refreshes the anchor to the bound generation head');
+  const next=store.transition(state({goal:'g'}),{transitionId:'t1',apply:draft=>{draft.ops=[{id:'op-1'}];}});
+  assert.deepEqual(next.ops,[{id:'op-1'}]);
+  anchor=readAnchor(repo);
+  assert.equal(anchor.workflows[ID].checkpointId,`transition:${ID}:1:t1`);
+  assert.equal(anchor.workflows[ID].eventsHead,eventsHead(store.ledger.db,ID));
+  assert.equal(verifyAnchor(store.ledger,repo).ok,true,'the ledger is never behind the anchor it just wrote');
+});
+
 test('reports, contracts and checks round-trip through their tables',t=>{
   const fx=fixture(t),repo=fx.repo(),store=fx.track(createStore({repoRoot:repo,id:ID}));
   assert.deepEqual(store.readReports(),[]);
@@ -193,6 +214,32 @@ test('signals carry locks and payloads, workflow-scoped or ledger-wide',t=>{
   assert.equal(store.signal.get(ID,'stop'),null);
   assert.equal(store.signal.clear(ID,'stop'),false);
   assert.equal(store.signal.get(ID,'kernel-lock').token,'tok','clearing one key leaves the others');
+});
+
+test('inputs are frozen bytes bound by sha256, materialised digest-checked for a worker',t=>{
+  const fx=fixture(t),repo=fx.repo(),store=fx.track(createStore({repoRoot:repo,id:ID}));
+  assert.equal(store.inputs.get('1-brief.md'),null);
+  assert.deepEqual(store.inputs.list(),[]);
+  const bytes=Buffer.from('# Brief\ncontents');
+  const put=store.inputs.put({key:'1-brief.md',goalRevision:1,bytes,origin:'C:/owner/brief.md',mediaType:'text/markdown'});
+  assert.equal(put.sha256,crypto.createHash('sha256').update(bytes).digest('hex'));
+  assert.match(put.ref,new RegExp(`^ledger://inputs/${ID}/1-brief\\.md#sha256=${put.sha256}$`));
+  const got=store.inputs.get('1-brief.md');
+  assert.deepEqual(Buffer.from(got.bytes),bytes);
+  assert.equal(got.sha256,put.sha256);
+  assert.equal(got.mediaType,'text/markdown');
+  assert.equal(got.goalRevision,1);
+  assert.equal(got.origin,'C:/owner/brief.md');
+  assert.deepEqual(store.inputs.list().map(row=>row.key),['1-brief.md']);
+  assert.equal(store.inputs.list()[0].ref,put.ref);
+  const dir=fx.repo(),materialised=store.inputs.materialise('1-brief.md',dir);
+  assert.equal(materialised.sha256,put.sha256);
+  assert.equal(fs.readFileSync(materialised.file,'utf8'),bytes.toString());
+  assert.throws(()=>store.inputs.materialise('missing.md',dir),/inputs\.materialise needs a known input/);
+  assert.throws(()=>store.inputs.put({key:'x',goalRevision:0,bytes,origin:'o'}),/positive goal revision/);
+  const replaced=store.inputs.put({key:'1-brief.md',goalRevision:2,bytes:Buffer.from('v2'),origin:'C:/owner/brief.md'});
+  assert.notEqual(replaced.sha256,put.sha256,'same key overwrites in place, keyed by (workflow,key)');
+  assert.equal(store.inputs.get('1-brief.md').goalRevision,2);
 });
 
 test('goal revisions append and workflows.goal_identity follows the latest',t=>{
