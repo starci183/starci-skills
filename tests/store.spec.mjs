@@ -32,9 +32,16 @@ test('opening a store uses the ledger and creates nothing under _local',t=>{
   assert.ok(fs.existsSync(store.ledgerFile));
   assert.equal(fs.existsSync(path.join(repo,'.starciwork','_local')),false,'no _local subtree is created');
   assert.equal(store.continuation,path.join(repo,'workflows',`${ID}.md`));
-  for(const name of ['state','events','goal','goalJson','reports','contracts','checks','inbox','final','launch','continuation'])
+  for(const name of ['state','events','goal','goalJson','reports','contracts','checks','inbox','launch'])
     assert.throws(()=>store.paths[name],new RegExp(`store-paths-removed:${name}`),name);
   assert.throws(()=>{store.paths.state='x';},/store-paths-removed:state/);
+  // `paths.continuation`/`paths.final` are the two keys with no dedicated method (§8): a real, working
+  // surface, not a guard — real callers (kernel/continuation.mjs) get/set them directly.
+  assert.equal(store.paths.continuation,store.continuation,'defaults to the canonical projection path');
+  assert.equal(store.paths.final,`ledger://final-report/${ID}`);
+  const override=path.join(repo,'workflows','override.md');
+  assert.equal(store.paths.continuation=override,override);
+  assert.equal(store.paths.continuation,path.resolve(override),'the bound override sticks until rebound');
   for(const method of ['reportPath','contractPath','checksPath'])
     assert.throws(()=>store[method]('op-1'),new RegExp(`store-paths-removed:${method}`),method);
   assert.throws(()=>createStore({repoRoot:repo,id:'a/b'}),/one directory segment/);
