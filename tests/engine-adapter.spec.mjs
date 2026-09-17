@@ -186,7 +186,7 @@ test('cross-root admission acquires both writers atomically and retains both thr
   const first={id:'first',kind:'frontend.implement',attempt:1,status:'running',allowlist:['src/**'],candidateRootBindings:{bindings:[binding('source',f.dir),binding('work',owner)]}};
   const second={id:'second',kind:'frontend.implement',attempt:1,status:'ready',allowlist:['src/**'],candidateRootBindings:{bindings:[binding('source',other),binding('work',owner)]}};f.state.ops=[first,second];
   const bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),
-    runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})}),allocation={role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'};
+    runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true}),runtimeProfile:{...loadRuntimes(),allocation:{...(loadRuntimes().allocation??{}),maxConcurrentWriters:1}}}),allocation={role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'};
   const held=runtime.reserveOperation(first,allocation);assert.equal(held.ok,true);runtime.settled(first,{workerOnly:true});
   const rows=runtime.journal.db.prepare('SELECT resource_key FROM leases WHERE job_id=? ORDER BY resource_key').all(held.jobId).map(row=>row.resource_key);
   assert.equal(rows.filter(key=>key.startsWith('canonical-writer:')).length,2,'both actual repositories remain fenced');

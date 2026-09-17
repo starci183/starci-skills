@@ -14,6 +14,7 @@ worktrees/
 
 # Preserve this ignore after retirement: never accidentally track old personal settings.
 resources/settings.json
+settings.local.json
 
 # Dependencies and process-local generated state
 node_modules/

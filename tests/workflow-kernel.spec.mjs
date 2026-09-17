@@ -40,9 +40,11 @@ const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',imp
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
 const runtimeProfile=parseYaml(fs.readFileSync(new URL('../model/runtimes.yaml',import.meta.url),'utf8'));
 // A repo-relative fixture path would leak `.starciwork/_local/runtime/orca-dispatch-ctx_*.md` launch
-// artifacts into the real `fixtures/` tree; the worktree lives under a per-file temp root instead.
-const worktreeRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-wk-spec-'));
-const worktree=path.join(worktreeRoot,'agentos-r14-sales');
+// artifacts into the real `fixtures/` tree; the worktree lives under a per-file temp root instead. The root
+// must stay inside this checkout: `buildOperationLaunch` hands Orca a path RELATIVE to the process cwd, and
+// a different-drive temp resolves to an absolute path the launcher refuses.
+const worktreeRoot=fs.mkdtempSync(path.resolve('.starci-wk-spec-'));
+const worktree=path.join(path.relative(process.cwd(),worktreeRoot),'agentos-r14-sales');
 const cwd=path.resolve(worktree);
 after(()=>fs.rmSync(worktreeRoot,{recursive:true,force:true}));
 const json=(status,value)=>({status,stdout:JSON.stringify(value),stderr:''});

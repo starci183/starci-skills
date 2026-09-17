@@ -584,6 +584,15 @@ const questionDigestMatches=(question,digest)=>decisionQuestionDigest(question)=
   (plain(question)&&'goalRev' in question&&decisionQuestionDigest(Object.fromEntries(Object.entries(question).filter(([key])=>key!=='goalRev')))===digest);
 const fileDigest=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 /**
+ * Allowlists of every OTHER op that may hold a canonical-writer lease — running/answering ops plus blocked
+ * ops that retained their reservation. Concurrent disjoint writers legitimately share the canonical worktree;
+ * a freeze must classify a sibling's in-flight writes inside ITS OWN allowlist as `concurrent-writer-drift`
+ * (retryable) instead of this op's `outside-allowlist` violation.
+ */
+const foreignAllowlistsOf=(state,op)=>state.ops
+  .filter(other=>other.id!==op.id&&(other.lease||['running','answering'].includes(other.status)))
+  .flatMap(other=>other.allowlist??[]);
+/**
  * A completed redundant decision worker may have reported after the owner's answer was durably accepted.  Its
  * bytes are not the owner's answer, so they still pass through ordinary candidate acceptance.  This marker
  * carries only enough immutable identity to let the stopped kernel replay that exact report on its next run.
@@ -686,7 +695,7 @@ export function reconcileStoppedNativeRetryLease(state,op,{orca,store,settleHost
   if(settlement?.effectState!=='none')return {ok:false,reason:`exact native process settlement remains ${settlement?.effectState??'unknown'}`};
   const runtime=createRuntime({store,state,eligibility:()=>({eligible:false,reasons:['retry reconciliation only']}),git});
   try{
-    const reconciled=runtime.settleStoppedOperation(op,{dispatch:dispatchId,settlement,reason:'public workflow retry proved the exact native worker exited',acceptedPreparedDecision:preparedDecision});
+    const reconciled=runtime.settleStoppedOperation(op,{dispatch:dispatchId,settlement,reason:'public workflow retry proved the exact native worker exited',acceptedPreparedDecision:preparedDecision,foreignAllowlists:foreignAllowlistsOf(state,op)});
     if(!reconciled.ok){
       if(preparedDecision&&reconciled.effectState==='partial'){
         const staged=stageAnsweredDecisionLateReport(state,op,{store,runtime,dispatchId,taskId});
@@ -782,7 +791,7 @@ function launchOp(orca,store,state,op,allocated,ctx){
       dependencyDigests:op.dependencyDigests??{},environmentDigest:typeof op.environmentDigest==='string'&&op.environmentDigest.trim()?op.environmentDigest:
         (typeof state.engine?.runtimePin?.digest==='string'&&state.engine.runtimePin.digest.trim()?state.engine.runtimePin.digest:
           (typeof state.engine?.runtimePinDigest==='string'&&state.engine.runtimePinDigest.trim()?state.engine.runtimePinDigest:'runtime-unpinned')),
-      dependencyInstall:op.dependencyInstall??null,dependencyRequired:candidateChecksNeedDependencies(op.checks)});
+      dependencyInstall:op.dependencyInstall??null,dependencyRequired:candidateChecksNeedDependencies(op.checks),foreignAllowlists:foreignAllowlistsOf(state,op)});
       const dropped=begun.schema==='starci/candidate-root-bridge@1'?begun.roots.flatMap(root=>(root.bridge.droppedOwnedPaths??[]).map(file=>root.id==='source'?file:path.join(root.repoRoot,file))):begun.droppedOwnedPaths??[];
       if(dropped.length){op.ownedBaselinePaths=(op.ownedBaselinePaths??[]).filter(file=>!dropped.includes(file));store.appendEvent({event:'owned-baseline-dropped',op:op.id,attempt:op.attempt,paths:dropped,reason:'clean since the prior attempt (committed or reverted): no longer owned'});}}
     if(ctx.engine)ctx.engine.beginLaunchIntent(op);
@@ -2056,7 +2065,7 @@ export function coordinateManagedWorkflow(store,state,ctx){
   }
   if(manager.progressDigest!==progressDigest){manager.progressDigest=progressDigest;manager.noProgressRound=0;manager.incident=null;}
   const busy=state.ops.filter(op=>['running','answering'].includes(op.status)&&!op.fill&&!op.ownerRequest);
-  const capacity={operationLimit:ctx.allocator?.maxParallelOps??null,nativeWriterLimit:ctx.engine?1:null,activeOperations:busy.length,globalAIJobLimit:10};
+  const capacity={operationLimit:ctx.allocator?.maxParallelOps??null,nativeWriterLimit:ctx.engine?.writerCapacity??null,activeOperations:busy.length,globalAIJobLimit:10};
   const makeSnapshot=()=>buildManagerSnapshot({state,actions,blockers,capacity,noProgress:{round:manager.noProgressRound??0,budget:2}});
   let snapshot=makeSnapshot();
   if(!actions.length&&!manager.pendingSnapshot)return {pending:false,waiting:true,dispatch:[]};
@@ -2383,7 +2392,7 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       return retryOp(store,state,op,['the sealed candidate control root is gone from disk; the attempt must be rebuilt'],ctx,'candidate-custody-lost');
     }
     if(ctx.engine&&op.candidate?.status!=='sealed'){
-      const frozen=ctx.engine.freezeCandidate(op,{reportedFiles:report.files??[],requireReported:true});
+      const frozen=ctx.engine.freezeCandidate(op,{reportedFiles:report.files??[],requireReported:true,foreignAllowlists:foreignAllowlistsOf(state,op)});
       if(frozen.status!=='sealed'){
         op.pending={kind:'candidate-quarantine',reasons:frozen.reasons??['candidate could not be sealed']};
         store.appendEvent({event:'candidate-quarantined',op:op.id,reasons:op.pending.reasons,observedFiles:frozen.observedFiles??[]});
@@ -2850,7 +2859,7 @@ export function acceptReports(orca,store,state,ctx){
       ctx.engine.settled(op,{reason:'native worker settled before acceptance',workerOnly:true});
     }
     if(ctx.engine&&report.outcome==='done'&&op.workerSettled&&op.candidate?.status!=='sealed'){
-      const frozen=ctx.engine.freezeCandidate(op,{reportedFiles:report.files??[],requireReported:true});
+      const frozen=ctx.engine.freezeCandidate(op,{reportedFiles:report.files??[],requireReported:true,foreignAllowlists:foreignAllowlistsOf(state,op)});
       if(frozen.status!=='sealed'){
         quarantineCandidate(store,state,op,{kind:'candidate-quarantine',reasons:frozen.reasons??['candidate could not be sealed'],observedFiles:frozen.observedFiles??[]});continue;
       }
@@ -3227,7 +3236,7 @@ function settleFromTab(orca,store,state,op,ctx,observed){
  */
 function reconcileStoppedNativeAttempt(store,state,op,ctx,settlement,reason){
   if(!ctx.engine)return true;
-  const reconciled=ctx.engine.settleStoppedOperation(op,{dispatch:op.dispatch,settlement,reason});
+  const reconciled=ctx.engine.settleStoppedOperation(op,{dispatch:op.dispatch,settlement,reason,foreignAllowlists:foreignAllowlistsOf(state,op)});
   if(!reconciled.ok){quarantineCandidate(store,state,op,{kind:'native-stop-reconciliation',effectState:reconciled.effectState??'unknown',reasons:[reconciled.reason??'native attempt could not be reconciled',...(Array.isArray(reconciled.pending?.reasons)?reconciled.pending.reasons.map(String):[])]});return false;}
   const prior={attempt:op.attempt,dispatch:op.dispatch,candidateDigest:reconciled.candidateDigest??null,observedFiles:[...(reconciled.observedFiles??[])]};
   op.priorStoppedAttempt=prior;op.attempt=(op.attempt??1)+1;
@@ -4709,7 +4718,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       if(settled?.effectState!=='none')return {ok:false,effectState:settled?.effectState??'unknown',reason:'typed host settlement did not prove the exact native worker stopped'};
       const runtime=createEngineRuntime({store,state,eligibility:()=>({eligible:false,reasons:['retry reconciliation only']}),git:spawnSync});
       if(!runtime)return {ok:false,effectState:'unknown',reason:'the durable engine is not enrolled'};
-      try{return runtime.settleStoppedOperation(op,{dispatch:op.dispatch,settlement:settled,reason:'public retry reconciles a quarantined native stop'})??{ok:false,reason:'native attempt could not be reconciled'};}
+      try{return runtime.settleStoppedOperation(op,{dispatch:op.dispatch,settlement:settled,reason:'public retry reconciles a quarantined native stop',foreignAllowlists:foreignAllowlistsOf(state,op)})??{ok:false,reason:'native attempt could not be reconciled'};}
       finally{store.unbindJournal?.(runtime.journal);runtime.close();}
     };
     const reportedHeldLease=new Set();
