@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {RETENTION,SETTLED_JOB_STATUSES,compactSnapshots,inspectJournal,journalWorkflows,liveRows,openJournal,pruneRetiredGenerations,retireWorkflow} from '../kernel/journal.mjs';
+import {ledgerFileFor,ledgerWorkflows,liveRows as ledgerLiveRows,openLedger,pruneRetiredGenerations as ledgerPruneRetiredGenerations,retireWorkflow as ledgerRetireWorkflow} from '../kernel/ledger-db.mjs';
 import {createAdmission} from '../kernel/admission.mjs';
 import {pruneJournal,retireJournal,statesUnderRoots} from '../kernel/journal-maintenance.mjs';
 import {WORKFLOW_STATE,createStore} from '../kernel/store.mjs';
@@ -13,7 +14,9 @@ import {WORKFLOW_STATE,createStore} from '../kernel/store.mjs';
  * needs to continue stays, what it has settled goes, and nothing live is ever touched.
  */
 const temporary=()=>fs.mkdtempSync(path.join(os.tmpdir(),'starci-journal-retention-'));
-const snapshot=(journal,{workflowId='wf',generation,checkpoint,body='{"x":1}'})=>journal.db.prepare('INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at) VALUES(?,?,?,?,?,?)').run(checkpoint,workflowId,generation,'goal',body,1);
+// A ledger's state_snapshots.workflow_id is FK'd to workflows (journal.mjs has no such table); ensureWorkflow
+// only exists on a ledger handle, so this stays a no-op for the journal.mjs-backed fixtures below.
+const snapshot=(journal,{workflowId='wf',generation,checkpoint,body='{"x":1}'})=>{journal.ensureWorkflow?.({workflowId});journal.db.prepare('INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at) VALUES(?,?,?,?,?,?)').run(checkpoint,workflowId,generation,'goal',body,1);};
 const job=(journal,{jobId,workflowId='wf',generation,status='succeeded',kind='model'})=>{journal.enqueueJob({jobId,workflowId,opId:'op',attempt:1,generation,kind,payload:{}});journal.db.prepare('UPDATE jobs SET status=? WHERE job_id=?').run(status,jobId);journal.appendEvent({eventId:`${jobId}:event`,workflowId,entityType:'job',entityId:jobId,generation,kind:'job-succeeded'});};
 
 test('the policy is one record: one body for the bound generation, no rows for a retired one',()=>{
@@ -49,9 +52,11 @@ test('unbound compaction takes each workflow\'s newest generation as bound and l
   journal.close();
 });
 
+// reserveTwoPhase keys the machine side by meta.ledger_id (docs §5/§6), which a kernel/journal.mjs handle
+// has no table for: this fixture drives 1.0.4 admission through it, so it opens a ledger, not a journal.
 test('retired generations lose their settled jobs and events; a leased or unsettled job keeps its rows whatever its generation',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
-  const journal=openJournal({file:path.join(dir,'journal.sqlite')}),admission=createAdmission({journal});
+  const journal=openLedger({file:path.join(dir,'runtime.sqlite')}),admission=createAdmission({journal,machineFile:path.join(fs.mkdtempSync(path.join(os.tmpdir(),'starci-journal-retention-machine-')),'machine.sqlite')});
   job(journal,{jobId:'old-done',generation:1});job(journal,{jobId:'old-failed',generation:1,status:'failed'});job(journal,{jobId:'old-running',generation:1,status:'running'});
   job(journal,{jobId:'old-leased',generation:1,status:'queued'});admission.setCapacity('ai/global',10);
   const reserved=admission.reserve({jobId:'old-leased',workflowId:'wf',opId:'op',attempt:1,generation:1,resources:[{key:'ai/global',units:1}],ttlMs:60000});assert.equal(reserved.ok,true);
@@ -62,23 +67,24 @@ test('retired generations lose their settled jobs and events; a leased or unsett
   assert.deepEqual(pruned,{jobs:2,events:3},'two settled jobs of generation 1 and their events, plus the workflow event of generation 1');
   assert.deepEqual(journal.listJobs().map(item=>item.job_id).sort(),['current-done','old-leased','old-running','other-old']);
   assert.deepEqual(journal.events({workflowId:'wf'}).map(event=>event.entity_id).sort(),['current-done','old-leased','old-running']);
-  assert.deepEqual(liveRows(journal.db,'wf'),{leases:[{jobId:'old-leased',resource:'ai/global'}],jobs:[{jobId:'old-running',status:'running',generation:1}]});
-  assert.equal(pruneRetiredGenerations(journal.db,{workflowId:'wf',generation:2}).jobs,0,'idempotent');
+  assert.deepEqual(ledgerLiveRows(journal.db,'wf'),{leases:[{jobId:'old-leased',resource:'ai/global'}],jobs:[{jobId:'old-running',status:'running',generation:1}]});
+  assert.equal(ledgerPruneRetiredGenerations(journal.db,{workflowId:'wf',generation:2}).jobs,0,'idempotent');
   journal.close();
 });
 
+// Same as above: drives admission.reserve, so this fixture needs a real ledger, not a journal.
 test('a workflow is retired whole only when nothing of it is live; a finished workflow with a live lease is refused on the record',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
-  const journal=openJournal({file:path.join(dir,'journal.sqlite')}),admission=createAdmission({journal});
+  const journal=openLedger({file:path.join(dir,'runtime.sqlite')}),admission=createAdmission({journal,machineFile:path.join(fs.mkdtempSync(path.join(os.tmpdir(),'starci-journal-retention-machine-')),'machine.sqlite')});
   snapshot(journal,{generation:1,checkpoint:'save:wf:1:1'});job(journal,{jobId:'j1',generation:1});job(journal,{jobId:'j2',generation:1,status:'queued'});
   admission.setCapacity('ai/global',10);assert.equal(admission.reserve({jobId:'j2',workflowId:'wf',opId:'op',attempt:1,generation:1,resources:[{key:'ai/global',units:1}],ttlMs:60000}).ok,true);
   const refused=journal.retireWorkflow('wf');
   assert.equal(refused.ok,false);assert.equal(refused.live.leases.length,1);assert.equal(journal.db.prepare('SELECT count(*) n FROM jobs').get().n,2,'nothing removed');
   assert.equal(admission.release({jobId:'j2',generation:1,leaseToken:journal.getJob('j2').lease_token}).ok,true);journal.db.prepare("UPDATE jobs SET status='cancelled' WHERE job_id='j2'").run();
   const retired=journal.retireWorkflow('wf');
-  assert.deepEqual(retired,{ok:true,workflowId:'wf',removed:{snapshots:1,jobs:2,events:2,incidents:0}});
-  assert.deepEqual(journalWorkflows(journal.db),[]);
-  assert.equal(retireWorkflow(journal.db,'wf').ok,true,'retiring an absent workflow removes nothing and is not an error');
+  assert.deepEqual(retired,{ok:true,workflowId:'wf',removed:{snapshots:1,jobs:2,events:2,incidents:0,goals:0,reports:0,contracts:0,checks:0,inbox:0,inputs:0,signals:0,workflows:1}});
+  assert.deepEqual(ledgerWorkflows(journal.db),[]);
+  assert.equal(ledgerRetireWorkflow(journal.db,'wf').ok,true,'retiring an absent workflow removes nothing and is not an error');
   journal.close();
 });
 
@@ -116,8 +122,12 @@ test('journal-prune retires what the store roots prove settled, keeps the unfini
   const file=path.join(dir,'journal.sqlite'),repo=path.join(dir,'repo');fs.mkdirSync(repo,{recursive:true});
   const journal=openJournal({file});
   for(const id of ['finished','moved','unfinished','unknown','named','live'])job(journal,{jobId:`${id}-job`,workflowId:id,generation:1});
-  const admission=createAdmission({journal});admission.setCapacity('ai/global',10);journal.db.prepare("UPDATE jobs SET status='queued' WHERE job_id='live-job'").run();
-  assert.equal(admission.reserve({jobId:'live-job',workflowId:'live',opId:'op',attempt:1,generation:1,resources:[{key:'ai/global',units:1}],ttlMs:60000}).ok,true);
+  // journal.mjs has no meta table for reserveTwoPhase to key the machine side by (docs §5/§6), and this
+  // fixture's own subject is journal-maintenance.mjs, which is journal.mjs-only - so "live" is built with a
+  // raw lease row (exactly the shape admission.reserve leaves) rather than going through admission.mjs.
+  const at=Date.now();
+  journal.db.prepare("UPDATE jobs SET status='leased',lease_token='tok',deadline=?,updated_at=? WHERE job_id='live-job'").run(at+60000,at);
+  journal.db.prepare('INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run('ai/global','live-job','live','op',1,1,'tok',1,at,at+60000);
   journal.close();
   stateAt(repo,'finished',{finished:{outcome:'done'},engine:{journalFile:file}});
   stateAt(repo,'moved',{engine:{journalFile:path.join(dir,'elsewhere.sqlite')}});
