@@ -6,7 +6,9 @@ import {inspectJournal} from '../kernel/journal.mjs';
 import {journalFileFor} from '../kernel/engine.mjs';
 import {pidAlive} from '../kernel/loads.mjs';
 import {stateGoalIdentity,workflowsRoot} from '../kernel/store.mjs';
-import {openLedger,openMachine,inspectLedger,ledgerFileFor,machineFileFor} from '../kernel/ledger-db.mjs';
+import {openLedger,openMachine,inspectLedger,ledgerFileFor,machineFileFor,LEDGER_SCHEMA} from '../kernel/ledger-db.mjs';
+
+const ANCHOR_SCHEMA='starci/ledger-anchor@1';
 
 export {verifyChain} from '../kernel/ledger-db.mjs';
 
@@ -25,8 +27,35 @@ const eventDigest=(prev,row)=>sha256(`${prev??''}${row.event_id}${row.kind}${row
 
 const journalRows=(journal,sql,args=[])=>{try{return journal.db.prepare(sql).all(...[].concat(args));}catch{return [];}};
 
+/**
+ * Owner-named inputs staged under `_local/inputs/<id>/` (goal.mjs's `stageExternalInputs`). A declared ref the
+ * directory no longer holds is a loss, not a refusal: the workflow still imports, missing bytes are reported.
+ */
+function collectInputs({id,inputsDir,declared,now}){
+  const present=(()=>{try{return new Set(fs.readdirSync(inputsDir));}catch{return null;}})();
+  const items=[],lost=[],seen=new Set();
+  for(const input of declared){
+    const ref=String(input?.ref??'');
+    if(!ref.startsWith(`.starciwork/_local/inputs/${id}/`))continue;
+    const key=path.basename(ref);
+    if(seen.has(key))continue;   // state.json and goal.json both carry `inputs`; the same key is not a second input.
+    seen.add(key);
+    const file=path.join(inputsDir,key);
+    const bytes=present?.has(key)?(()=>{try{return fs.readFileSync(file);}catch{return null;}})():null;
+    if(!bytes){lost.push({key,reason:'input-file-missing'});continue;}
+    items.push({key,bytes,origin:input.sourceRef??ref,created_at:mtime(file)??now()});
+  }
+  for(const key of present??[]){
+    if(seen.has(key))continue;
+    const file=path.join(inputsDir,key);
+    const bytes=(()=>{try{return fs.readFileSync(file);}catch{return null;}})();
+    if(bytes)items.push({key,bytes,origin:file,created_at:mtime(file)??now()});
+  }
+  return {items,lost};
+}
+
 /** Read everything one `_local/workflows/<id>` directory plus the journal hold for it. Pure: touches no target. */
-function collectWorkflow({dir,id,state,stateGen,journal,ledgerFile,machineFile,now}){
+function collectWorkflow({dir,id,state,stateGen,journal,ledgerFile,machineFile,inputsDir,now}){
   const goalMd=readText(path.join(dir,'goal.md')),goalJsonText=readText(path.join(dir,'goal.json')),goalJson=(()=>{try{return goalJsonText?JSON.parse(goalJsonText):null;}catch{return null;}})();
   const goalIdentity=state?stateGoalIdentity(state):sha256(JSON.stringify({job:goalJson?.job??null,inputs:goalJson?.inputs??null,scope:goalJson?.scope??null,definitionOfDone:goalJson?.definitionOfDone??null,ledgerMode:goalJson?.ledgerMode??null}));
   const events=[];
@@ -79,9 +108,11 @@ function collectWorkflow({dir,id,state,stateGen,journal,ledgerFile,machineFile,n
     generation:stateGen,goal_identity:goalIdentity,phase:state?.phase??null,finished_json:plain(state?.finished)?JSON.stringify(state.finished):null,
     pin_digest:state?.engine?.runtimePin?.digest??state?.engine?.runtimePinDigest??null};
   const goal={revision:Number.isInteger(goalJson?.rev)?goalJson.rev:1,goal_identity:goalIdentity,markdown:goalMd??'',json:goalJsonText??'null',created_at:mtime(path.join(dir,'goal.json'))??mtime(path.join(dir,'goal.md'))??now()};
+  const declaredInputs=[...(Array.isArray(state?.inputs)?state.inputs:[]),...(Array.isArray(goalJson?.inputs)?goalJson.inputs:[])];
+  const inputs=collectInputs({id,inputsDir,declared:declaredInputs,now});
   const counts={events:events.length+jevents.length,snapshots:snapshots.length+(importedState?1:0),jobs:jobs.length,leases:leases.length,
-    reports:reports.length,contracts:contracts.length,checks:checks.length,inbox:inbox.length,goals:(goalMd!==null||goalJson!==null)?1:0};
-  return {id,dir,workflow,goal:counts.goals?goal:null,events:[...events,...jevents],snapshots,importedState,jobs,leases,incidents,reservations,reports,contracts,checks,inbox,counts};
+    reports:reports.length,contracts:contracts.length,checks:checks.length,inbox:inbox.length,goals:(goalMd!==null||goalJson!==null)?1:0,inputs:inputs.items.length};
+  return {id,dir,inputsDir,workflow,goal:counts.goals?goal:null,events:[...events,...jevents],snapshots,importedState,jobs,leases,incidents,reservations,reports,contracts,checks,inbox,inputs,counts};
 }
 
 /** Journal-global rows (resources, budgets) have no workflow scope: they import once, under their own migration key. */
@@ -100,14 +131,14 @@ function machineApply(machine,{file,plan,shared,at}){
   for(const row of plan.reservations.filter(row=>machineScoped(row.scope_key)))machine.db.prepare('INSERT OR IGNORE INTO budget_reservations(scope_key,ledger_id,job_id,units) VALUES(?,?,?,?)').run(row.scope_key,ledgerId,row.job_id,row.units);
 }
 
-function ledgerApply(db,{plan,shared,recordShared,journalFile,at}){
+function ledgerApply(db,{plan,shared,recordShared,journalFile,at,ledger}){
   const row=plan.workflow;
   db.prepare('INSERT INTO workflows(workflow_id,title,created_at,updated_at,ledger_mode,source_roots_json,generation,goal_identity,phase,finished_json,pin_digest) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
     .run(row.workflow_id,row.title,row.created_at,row.updated_at,row.ledger_mode,row.source_roots_json,row.generation,row.goal_identity,row.phase,row.finished_json,row.pin_digest);
   if(plan.goal)db.prepare('INSERT INTO goals(workflow_id,revision,goal_identity,markdown,json,created_at) VALUES(?,?,?,?,?,?)').run(plan.id,plan.goal.revision,plan.goal.goal_identity,plan.goal.markdown,plan.goal.json,plan.goal.created_at);
-  let head=null;
+  let head=null,lastSeq=null;
   const insertEvent=db.prepare('INSERT INTO events(event_id,workflow_id,generation,entity_type,entity_id,kind,payload_json,prev_digest,digest,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)');
-  for(const event of plan.events){const digest=eventDigest(head,event);insertEvent.run(event.event_id,plan.id,event.generation,event.entity_type,event.entity_id,event.kind,event.payload_json,head,digest,event.created_at);head=digest;}
+  for(const event of plan.events){const digest=eventDigest(head,event);const result=insertEvent.run(event.event_id,plan.id,event.generation,event.entity_type,event.entity_id,event.kind,event.payload_json,head,digest,event.created_at);head=digest;lastSeq=Number(result.lastInsertRowid);}
   const insertSnapshot=db.prepare('INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,events_head,created_at) VALUES(?,?,?,?,?,?,?)');
   for(const snapshot of plan.snapshots)insertSnapshot.run(snapshot.checkpoint_id,plan.id,snapshot.generation,snapshot.goal_identity,snapshot.state_json,null,snapshot.created_at);
   if(plan.importedState)insertSnapshot.run(`import:${plan.id}:${plan.workflow.generation}`,plan.id,plan.workflow.generation,plan.workflow.goal_identity,JSON.stringify(plan.importedState),head,at);
@@ -130,15 +161,56 @@ function ledgerApply(db,{plan,shared,recordShared,journalFile,at}){
   for(const check of plan.checks)insertCheck.run(plan.id,check.op_id,check.attempt,check.checks_json,check.created_at);
   const insertInbox=db.prepare('INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,?,?)');
   for(const item of plan.inbox)insertInbox.run(plan.id,item.kind,item.key,item.payload_json,'pending',item.created_at);
+  for(const item of plan.inputs.items)ledger.inputs.put({workflowId:plan.id,key:item.key,goalRevision:plan.goal?.revision??1,bytes:item.bytes,origin:item.origin});
+  // `inputs.put` bumps `workflows.updated_at` to its own clock (via `ensureWorkflow`); restore the imported value.
+  if(plan.inputs.items.length)db.prepare('UPDATE workflows SET updated_at=? WHERE workflow_id=?').run(row.updated_at,plan.id);
+  if(plan.inputs.items.length||plan.inputs.lost.length)db.prepare('INSERT INTO migrations(source,kind,rows_json,at) VALUES(?,?,?,?)').run(plan.inputsDir,'workflow-inputs',JSON.stringify({imported:plan.inputs.items.length,lost:plan.inputs.lost}),at);
   db.prepare('INSERT INTO migrations(source,kind,rows_json,at) VALUES(?,?,?,?)').run(plan.dir,'workflow-dir',JSON.stringify(plan.counts),at);
   db.prepare('INSERT INTO migrations(source,kind,rows_json,at) VALUES(?,?,?,?)').run(`${journalFile}#${plan.id}`,'journal-workflow',JSON.stringify({events:plan.counts.events,jobs:plan.jobs.length,leases:plan.leases.length,snapshots:plan.snapshots.length,incidents:plan.incidents.length}),at);
   if(recordShared)db.prepare('INSERT INTO migrations(source,kind,rows_json,at) VALUES(?,?,?,?)').run(`${journalFile}#shared`,'journal-shared',JSON.stringify({resources:shared.resources.length,budgets:shared.budgets.length}),at);
+  return {eventsHead:head,lastSeq};
 }
 
 const readMigrations=file=>{
   const inspection=inspectLedger({file});
   try{return new Set(inspection.db.prepare('SELECT source FROM migrations').all().map(row=>row.source));}catch{return new Set();}finally{inspection.close();}
 };
+
+/**
+ * §4/§12: `meta` is seeded once, at ledger creation, and never rewritten. `kernel/ledger-db.mjs` does not yet
+ * create the table itself (docs addendum ahead of the module), so the migrator — the process that actually
+ * creates `runtime.sqlite` on a first run — owns bootstrapping it here. `CREATE TABLE IF NOT EXISTS` plus the
+ * `ledger_id` existence check make this safe to keep calling even once the module seeds its own copy.
+ */
+function seedMeta(db,{now}){
+  db.exec('CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+  if(db.prepare('SELECT 1 FROM meta WHERE key=?').get('ledger_id'))return null;
+  const ledgerId=crypto.randomUUID();
+  const journalMode=String(db.prepare('PRAGMA journal_mode').get().journal_mode).toLowerCase();
+  const insert=db.prepare('INSERT INTO meta(key,value) VALUES(?,?)');
+  insert.run('ledger_id',ledgerId);insert.run('schema',LEDGER_SCHEMA);insert.run('created_at',String(now()));insert.run('journal_mode',journalMode);
+  return ledgerId;
+}
+
+const anchorFileFor=repoRoot=>path.join(repoRoot,'.starciwork','ledger-anchor.json');
+const readAnchorFile=file=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}};
+/** §12: replace the anchor atomically (write temp + rename), after the ledger transaction it describes has committed. */
+function writeAnchorEntry({repoRoot,ledgerId,workflowId,entry,now}){
+  const file=anchorFileFor(repoRoot);
+  const prior=readAnchorFile(file);
+  const anchor={schema:ANCHOR_SCHEMA,ledgerId,updatedAt:now,workflows:{...(prior?.workflows??{}),[workflowId]:entry}};
+  const tmp=path.join(path.dirname(file),`.ledger-anchor.${process.pid}.${crypto.randomUUID()}.tmp`);
+  fs.mkdirSync(path.dirname(file),{recursive:true});
+  fs.writeFileSync(tmp,JSON.stringify(anchor));
+  fs.renameSync(tmp,file);
+  return anchor;
+}
+/** The checkpoint the anchor should point at for one imported workflow: the file state if imported, else the newest old-journal snapshot. */
+function anchorCheckpoint(plan){
+  if(plan.importedState)return {checkpointId:`import:${plan.id}:${plan.workflow.generation}`,generation:plan.workflow.generation};
+  const newest=plan.snapshots.at(-1);
+  return newest?{checkpointId:newest.checkpoint_id,generation:newest.generation}:{checkpointId:null,generation:plan.workflow.generation};
+}
 
 function archiveDir(root,id){
   const target=path.join(path.dirname(root),'workflows-archive');
@@ -155,19 +227,30 @@ function archiveDir(root,id){
  */
 export async function migrateLedger({repoRoot,journalFile=journalFileFor(),machineFile=machineFileFor(),dryRun=false,archive=false,now=Date.now,pidAliveFn=pidAlive}={}){
   need(typeof repoRoot==='string'&&repoRoot.trim(),'migrateLedger needs a repository root');
-  const root=workflowsRoot(path.resolve(repoRoot)),ledgerFile=ledgerFileFor(path.resolve(repoRoot));
+  const resolvedRoot=path.resolve(repoRoot),root=workflowsRoot(resolvedRoot),ledgerFile=ledgerFileFor(resolvedRoot);
   const summary={ok:true,workflows:[],skipped:[],refused:[]};
   if(!fs.existsSync(root))return summary;
   const journal=journalFile&&fs.existsSync(journalFile)?inspectJournal({file:journalFile}):null;
-  let ledger=null,machine=null,prior=new Set();
+  let ledger=null,machine=null,prior=new Set(),ledgerId=null;
   const closeAll=()=>{try{ledger?.close();}catch{}try{machine?.close();}catch{}try{journal?.close();}catch{}};
   try{
     if(dryRun){if(fs.existsSync(ledgerFile))prior=readMigrations(ledgerFile);}
     else{
       ledger=openLedger({file:ledgerFile,now});
       try{prior=new Set(ledger.db.prepare('SELECT source FROM migrations').all().map(row=>row.source));}catch{prior=new Set();}
+      // §4/§12: seed `meta` the first time this ledger is created; every run reads back its `ledger_id` for the anchor.
+      const metaSource=`${ledgerFile}#meta`;
+      ledgerId=ledger.transaction(db=>{
+        if(!prior.has(metaSource)){
+          const seeded=seedMeta(db,{now});
+          if(seeded)db.prepare('INSERT INTO migrations(source,kind,rows_json,at) VALUES(?,?,?,?)').run(metaSource,'ledger-meta',JSON.stringify({ledgerId:seeded}),now());
+        }
+        return db.prepare("SELECT value FROM meta WHERE key='ledger_id'").get()?.value??null;
+      });
+      prior.add(metaSource);
     }
     const ids=fs.readdirSync(root,{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name).sort();
+    const inputsRoot=path.join(path.dirname(root),'inputs');
     const shared=collectShared(journal),sharedSource=`${journalFile}#shared`;
     let sharedDone=prior.has(sharedSource);
     for(const id of ids){
@@ -178,15 +261,20 @@ export async function migrateLedger({repoRoot,journalFile=journalFileFor(),machi
       const state=readJson(path.join(dir,'state.json')),stateGen=Number.isInteger(state?.engine?.generation)?state.engine.generation:0;
       const behind=journal?journalRows(journal,`SELECT job_id FROM jobs WHERE workflow_id=? AND generation<? AND status NOT IN (${SETTLED.map(()=>'?').join(',')})`,[id,stateGen,...SETTLED]).length:0;
       if(behind){summary.refused.push({id,reason:'kernel-reconcile-required'});continue;}
-      const plan=collectWorkflow({dir,id,state,stateGen,journal,ledgerFile,machineFile,now});
-      if(dryRun){summary.workflows.push({id,imported:plan.counts});continue;}
+      const plan=collectWorkflow({dir,id,state,stateGen,journal,ledgerFile,machineFile,inputsDir:path.join(inputsRoot,id),now});
+      if(dryRun){summary.workflows.push({id,imported:plan.counts,...(plan.inputs.lost.length?{inputsLost:plan.inputs.lost}:{})});continue;}
       try{
         const needsMachine=plan.leases.some(lease=>machineScoped(lease.resource_key))||plan.reservations.some(row=>machineScoped(row.scope_key))||(!sharedDone&&(shared.resources.some(row=>machineScoped(row.resource_key))||shared.budgets.some(row=>machineScoped(row.scope_key))));
         if(needsMachine){machine??=openMachine({file:machineFile,now});machine.transaction(()=>machineApply(machine,{file:ledgerFile,plan,shared:sharedDone?{resources:[],budgets:[]}:shared,at:now()}));}
-        ledger.transaction(db=>ledgerApply(db,{plan,shared:sharedDone?{resources:[],budgets:[]}:shared,recordShared:!sharedDone,journalFile,at:now()}));
+        const applied=ledger.transaction(db=>ledgerApply(db,{plan,shared:sharedDone?{resources:[],budgets:[]}:shared,recordShared:!sharedDone,journalFile,at:now(),ledger}));
         sharedDone=true;
+        // §12: the anchor is written only after the ledger transaction it describes has committed.
+        const checkpoint=anchorCheckpoint(plan),anchorSource=`${plan.dir}#anchor`;
+        writeAnchorEntry({repoRoot:resolvedRoot,ledgerId,workflowId:id,
+          entry:{generation:checkpoint.generation,checkpointId:checkpoint.checkpointId,eventsHead:applied.eventsHead,seq:applied.lastSeq,at:now()},now:now()});
+        ledger.transaction(db=>db.prepare('INSERT INTO migrations(source,kind,rows_json,at) VALUES(?,?,?,?)').run(anchorSource,'workflow-anchor',JSON.stringify({workflowId:id,checkpointId:checkpoint.checkpointId}),now()));
         if(archive)archiveDir(root,id);
-        summary.workflows.push({id,imported:plan.counts});
+        summary.workflows.push({id,imported:plan.counts,...(plan.inputs.lost.length?{inputsLost:plan.inputs.lost}:{})});
       }catch(error){summary.refused.push({id,reason:`import-failed:${String(error?.message??error).slice(0,160)}`});}
     }
     summary.ok=summary.refused.length===0;
