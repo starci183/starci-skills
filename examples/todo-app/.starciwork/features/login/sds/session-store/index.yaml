@@ -7,8 +7,5 @@ responsibility: Holds one row per live session with its person, its device and i
 interfaces:
   - The auth module is the only writer; every other reader goes through it.
 refs: [br.login.session.restores]
-proven:
-  by: [impl.login.todo-app.auth]
-  evidence: proves-session-store
-  at: 2026-09-18T04:40:00.000Z
+evidence: proves-session-store
 

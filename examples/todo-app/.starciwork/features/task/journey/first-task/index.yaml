@@ -8,8 +8,5 @@ steps:
   - {actor: person, does: Types a title and submits, expects: The task appears immediately, owned by them.}
   - {actor: person, does: Returns the next day, expects: The task is still there.}
 requirements: [fr.login.sign-in, fr.task.create]
-proven:
-  by: [uat.task.create, uat.login.sign-in]
-  evidence: walks-first-task
-  at: 2026-09-18T04:39:00.000Z
+evidence: walks-first-task
 

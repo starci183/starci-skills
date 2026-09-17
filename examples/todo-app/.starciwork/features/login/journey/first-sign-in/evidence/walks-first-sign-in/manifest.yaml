@@ -1,6 +1,7 @@
 schema: work/evidence
 id: walks-first-sign-in
 record: journey.login.first-sign-in
+recordDigest: 055afe19000823d18507849ca9416aa870b7db7aa2b64507e193b4788f68a6ba
 outcome: pass
 assertions:
   - id: empty-state-explains-itself

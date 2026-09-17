@@ -1,6 +1,7 @@
 schema: work/evidence
 id: proves-sign-in
 record: br.login.password.sign-in
+recordDigest: b76d94eb8bd9a9b9f9df7b87487bf3dc4b382eea4a62714b586c7439158a8ff1
 outcome: pass
 assertions:
   - id: ac.login.password.sign-in.wrong-pair-is-refused

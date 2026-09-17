@@ -10,8 +10,5 @@ measurement:
   threshold: p95 < 200ms
   environment: dev
 appliesTo: [br.task.list.owned]
-proven:
-  by: [impl.task.todo-app.list]
-  evidence: measures-latency
-  at: 2026-09-18T04:41:00.000Z
+evidence: measures-latency
 

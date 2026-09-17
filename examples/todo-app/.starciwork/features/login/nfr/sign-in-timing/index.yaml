@@ -10,8 +10,5 @@ measurement:
   threshold: p95 delta < 10ms
   environment: dev
 appliesTo: [br.login.password.sign-in]
-proven:
-  by: [impl.login.todo-app.auth]
-  evidence: measures-timing
-  at: 2026-09-18T04:41:00.000Z
+evidence: measures-timing
 

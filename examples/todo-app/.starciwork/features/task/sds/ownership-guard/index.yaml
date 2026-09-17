@@ -6,8 +6,5 @@ responsibility: Every mutation names the actor and compares it with the row's ow
 interfaces:
   - No write path reaches the repository without passing this guard.
 refs: [br.task.single-owner]
-proven:
-  by: [impl.task.todo-app.ownership]
-  evidence: proves-guard
-  at: 2026-09-18T04:40:00.000Z
+evidence: proves-guard
 

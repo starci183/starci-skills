@@ -1,6 +1,7 @@
 schema: work/evidence
 id: proves-session
 record: br.login.session.restores
+recordDigest: 99f9bc3ab4c704e7f3a000ed53f6661716e0561664f761e0b0a3279ccca53ed8
 outcome: pass
 assertions:
   - id: ac.login.session.restores.returning-within-the-window-stays-signed-in

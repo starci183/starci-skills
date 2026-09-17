@@ -16,8 +16,5 @@ composes:
     module: src/auth/sign-in
   - rule: br.login.session.restores
     module: src/auth/session
-proven:
-  by: [uat.login.sign-in]
-  evidence: composes-sign-in
-  at: 2026-09-18T04:39:00.000Z
+evidence: composes-sign-in
 
