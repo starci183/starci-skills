@@ -197,13 +197,13 @@ export function createStore({repoRoot,id}){
       const dispatch=required(dispatchId,'dispatch id'),resolved=outcome??(plain(report)?report.outcome:null);
       need(resolved,'writeReport needs an outcome');
       bound().prepare(`INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,created_at) VALUES(?,?,?,?,?,?,?,?,?)
-        ON CONFLICT(workflow_id,dispatch_id) DO UPDATE SET op_id=excluded.op_id,attempt=excluded.attempt,generation=excluded.generation,outcome=excluded.outcome,report_json=excluded.report_json,from_terminal=excluded.from_terminal,created_at=excluded.created_at`)
+        ON CONFLICT(workflow_id,dispatch_id) DO UPDATE SET op_id=COALESCE(excluded.op_id,reports.op_id),attempt=COALESCE(excluded.attempt,reports.attempt),generation=COALESCE(excluded.generation,reports.generation),outcome=excluded.outcome,report_json=excluded.report_json,from_terminal=COALESCE(excluded.from_terminal,reports.from_terminal),created_at=excluded.created_at`)
         .run(workflowId,dispatch,opId,attempt,generation,resolved,json(report),fromTerminal,now());
       return {dispatchId:dispatch,outcome:resolved};
     },
     readReports(){
       return bound().prepare('SELECT * FROM reports WHERE workflow_id=? ORDER BY dispatch_id').all(workflowId)
-        .map(row=>{const report=JSON.parse(row.report_json);return {...(plain(report)?report:{report}),reportId:row.report_id,dispatchId:row.dispatch_id,consumedAt:row.consumed_at,fromTerminal:row.from_terminal,createdAt:row.created_at};});
+        .map(row=>{const report=JSON.parse(row.report_json);return {...(plain(report)?report:{report}),reportId:row.report_id,dispatchId:row.dispatch_id,opId:row.op_id,attempt:row.attempt,generation:row.generation,consumedAt:row.consumed_at,fromTerminal:row.from_terminal,createdAt:row.created_at};});
     },
     writeContract({opId,attempt=1,dispatchId=null,markdown,context=null}={}){
       const op=required(opId,'operation id');need(Number.isInteger(attempt)&&attempt>0,'writeContract needs a positive attempt');need(typeof markdown==='string','writeContract needs contract markdown');
