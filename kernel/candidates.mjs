@@ -115,7 +115,15 @@ export const walkFiles=(root,current=root,out=[])=>{
 /** Seal exact candidate bytes. The bridge checks `reportedFiles` as an untrusted completeness acknowledgement; this packet retains it for diagnosis. */
 export function sealCandidate(snapshot,{candidatePaths,allowedWrites=[],reportedFiles=[],now=Date.now}={}){
   if(snapshot?.schema!==CANDIDATE_SNAPSHOT)throw new TypeError('a candidate snapshot is required');
+  const packetFile=path.join(snapshot.controlRoot,'candidate.json');
   const allowed=new Set(allowedWrites.map(cleanRelative));
+  // An immutable packet that already exists judged this attempt's writes when it was sealed, and the worker root
+  // still holds exactly those bytes. A replay recomputes `allowedWrites` from what the canonical tree shows now -
+  // which, once that tree went back to clean, is nothing at all - so judging the seal against it would refuse the
+  // attempt its own sealed delta and leave the writer fence held for good. The sealed change set is the authority
+  // for its own replay; bytes that drifted from it are still caught by the binding comparison below.
+  let sealed=null;try{sealed=JSON.parse(fs.readFileSync(packetFile,'utf8'));}catch{sealed=null;}
+  for(const change of Array.isArray(sealed?.changes)?sealed.changes:[])allowed.add(cleanRelative(change.path));
   const discovered=walkFiles(snapshot.workerRoot);
   if(candidatePaths){
     const declared=new Set(candidatePaths.map(cleanRelative));
@@ -134,7 +142,6 @@ export function sealCandidate(snapshot,{candidatePaths,allowedWrites=[],reported
     candidateDigest:digestEntries(files),oracleDigest:snapshot.oracle.digest,environmentDigest:snapshot.environmentDigest,
     dependencyDigests:snapshot.dependencyDigests,files,changes:changes.map(item=>({path:item.path,beforeSha256:source.get(item.path)?.sha256??null,afterSha256:item.sha256})),
     assurance:snapshot.assurance,reportedFiles:[...reportedFiles],sealedAt:new Date(now()).toISOString()};
-  const packetFile=path.join(snapshot.controlRoot,'candidate.json');
   try{writeJson(packetFile,packet);}
   catch(error){
     if(error?.code!=='EEXIST')throw error;
