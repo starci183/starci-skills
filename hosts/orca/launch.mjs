@@ -16,7 +16,7 @@ import {supervisorMain} from '../../kernel/supervisor.mjs';
 import {serveWorkflowInputs} from '../../kernel/inputs-server.mjs';
 import {QUIET_EVENTS,WORKFLOW_LIST,WORKFLOW_OPS,buildList,buildOpsView,buildView,readWorkflowEvents,renderEventLine,renderEventTail,renderList,renderOpsView,renderView} from '../../kernel/view.mjs';
 import {createStore,repositoryRoot} from '../../kernel/store.mjs';
-import {inspectLedger,ledgerFileFor,openLedger} from '../../kernel/ledger-db.mjs';
+import {inspectLedger,ledgerFileFor,ledgerIdFor,openLedger} from '../../kernel/ledger-db.mjs';
 import {DISK_HEADROOM_CODE} from '../../kernel/disk.mjs';
 
 /**
@@ -66,7 +66,7 @@ function parseArgs(argv){
     need(flag.startsWith('--'),`Unexpected argument: ${flag}`);
     const key=flag.slice(2);
     need(!Object.hasOwn(options,key),`Duplicate option: --${key}`);
-    if(key==='dry-run'){options[key]=true;continue;}
+    if(key==='dry-run'||key==='write'){options[key]=true;continue;}
     // `--lane` is the one flag whose value is optional: alone it names the lane after the workflow id.
     if(key==='lane'&&(index+1>=rest.length||rest[index+1].startsWith('--'))){options[key]=true;continue;}
     need(index+1<rest.length&&!rest[index+1].startsWith('--'),`Missing value for --${key}`);
@@ -752,8 +752,13 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
     writes today's human-readable file layout (state.json, events.jsonl, goal.md/json, reports/, contracts/,
     checks/) from the workflow's ledger rows, for a reader or a tool that still wants files on disk.
   node bin/starci.mjs ledger-verify --repo <ledger-repository-root> [--id <workflow-id>]
-    walks the hash chain of one workflow's events, or every workflow the ledger holds when --id is omitted;
-    exits non-zero the moment a chain is broken (ledger-chain-broken), naming the seq it broke at.
+    walks the hash chain of one workflow's events, or every workflow the ledger holds when --id is omitted,
+    and checks each against the tracked .starciwork/ledger-anchor.json head (§12); ok:false the moment a
+    chain is broken or an anchored head is not reached (ledger-behind-anchor, ledger-identity-mismatch), or
+    the ledger file itself is gone while the anchor is still tracked (ledger-missing).
+  node bin/starci.mjs ledger-anchor --write --repo <ledger-repository-root> [--id <workflow-id>]
+    regenerate .starciwork/ledger-anchor.json from a healthy ledger: one workflow with --id, every workflow
+    otherwise. A workflow whose chain does not verify is refused, never anchored.
   node bin/starci.mjs ledger-migrate --repo <ledger-repository-root> [--journal-file <old-journal.sqlite>] [--machine-file <machine.sqlite>] [--dry-run] [--archive true]
     forwards to scripts/ledger-migrate.mjs: folds .starciwork/_local/workflows/<id> plus the retired journal's
     rows for it into .starciwork/runtime.sqlite, per workflow, refusing a workflow a live kernel lock or an
@@ -803,7 +808,63 @@ const VIEW_COMMANDS=['workflow-list'];
 /** Worker IPC and export against one workflow's own ledger rows: no kernel, no Orca. */
 const STORE_COMMANDS=['op-contract','workflow-export'];
 /** Operator maintenance/inspection of the repository ledger `.starciwork/runtime.sqlite`: no kernel, no Orca. */
-const LEDGER_COMMANDS=['ledger-verify','ledger-migrate','ledger-prune','ledger-retire'];
+const LEDGER_COMMANDS=['ledger-verify','ledger-migrate','ledger-prune','ledger-retire','ledger-anchor'];
+/** §12: the small, tracked, human-readable counter-record the self-consistent hash chain cannot be. */
+const ANCHOR_SCHEMA='starci/ledger-anchor@1';
+const anchorFileFor=repoRoot=>path.join(repoRoot,'.starciwork','ledger-anchor.json');
+function readAnchor(repoRoot){
+  try{const parsed=JSON.parse(fs.readFileSync(anchorFileFor(repoRoot),'utf8'));return plain(parsed)&&parsed.schema===ANCHOR_SCHEMA?parsed:null;}catch{return null;}
+}
+/** Write temp + rename: a reader never sees a half-written anchor. */
+function writeAnchorAtomic(repoRoot,anchor){
+  const file=anchorFileFor(repoRoot);
+  fs.mkdirSync(path.dirname(file),{recursive:true});
+  const tmp=`${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp,`${JSON.stringify(anchor,null,2)}\n`);
+  fs.renameSync(tmp,file);
+  return file;
+}
+/** One workflow's current head, straight from the ledger's own rows: null when nothing is recorded yet. */
+function workflowHead(db,workflowId){
+  const event=db.prepare('SELECT seq,digest FROM events WHERE workflow_id=? ORDER BY seq DESC LIMIT 1').get(workflowId);
+  if(!event)return null;
+  const snapshot=db.prepare('SELECT checkpoint_id,generation FROM state_snapshots WHERE workflow_id=? ORDER BY snapshot_id DESC LIMIT 1').get(workflowId);
+  return {generation:snapshot?.generation??0,checkpointId:snapshot?.checkpoint_id??null,eventsHead:event.digest,seq:event.seq,at:Date.now()};
+}
+/**
+ * §12's per-workflow check: the ledger being ahead of (or never having reached) its anchor is normal and never
+ * refuses; the ledger lacking the anchored head, or belonging to a different ledger identity, does.
+ */
+function anchorStatus({db,workflowId,anchor,ledgerId}){
+  const anchored=anchor?.workflows?.[workflowId]??null;
+  if(!anchored)return {ok:true,checked:false,reason:null};
+  if(anchor.ledgerId&&anchor.ledgerId!==ledgerId)return {ok:false,checked:true,reason:'ledger-identity-mismatch'};
+  const head=db.prepare('SELECT digest FROM events WHERE workflow_id=? AND seq=?').get(workflowId,anchored.seq);
+  const settled=db.prepare('SELECT 1 FROM state_snapshots WHERE workflow_id=? AND generation>=? LIMIT 1').get(workflowId,anchored.generation);
+  return head&&head.digest===anchored.eventsHead&&settled?{ok:true,checked:true,reason:null}:{ok:false,checked:true,reason:'ledger-behind-anchor'};
+}
+/** `ledger-anchor --write`: regenerate the anchor from a healthy ledger. A broken chain is never anchored. */
+function writeAnchor({repoRoot,file,options}){
+  const inspection=inspectLedger({file}),ledgerId=ledgerIdFor(file);
+  try{
+    const existing=readAnchor(repoRoot);
+    const ids=options.id?[options.id]:inspection.workflows().map(entry=>entry.workflowId);
+    // A whole-ledger rewrite starts from a clean map (stale entries of a retired workflow do not linger);
+    // a scoped `--id` rewrite keeps every other entry the existing anchor already carried, from this same ledger.
+    const workflows=options.id&&existing?.ledgerId===ledgerId?{...existing.workflows}:{};
+    const written=[],refused=[];
+    for(const workflowId of ids){
+      const chain=inspection.verifyChain({workflowId});
+      if(!chain.ok){refused.push({workflowId,reason:'ledger-chain-broken',brokenAt:chain.brokenAt});continue;}
+      const head=workflowHead(inspection.db,workflowId);
+      if(!head){refused.push({workflowId,reason:'no recorded event to anchor'});continue;}
+      workflows[workflowId]=head;written.push(workflowId);
+    }
+    const anchor={schema:ANCHOR_SCHEMA,ledgerId,updatedAt:Date.now(),workflows};
+    const anchorFile=writeAnchorAtomic(repoRoot,anchor);
+    return {schema:ANCHOR_SCHEMA,command:'ledger-anchor',ok:refused.length===0,repo:repoRoot,file:anchorFile,ledgerId,written,refused};
+  }finally{inspection.close();}
+}
 /**
  * 1.0.3 named these `journal-prune`/`journal-retire` against a shared `--journal-file`; 1.0.4 has one ledger
  * per repository, so the operator names `--repo <root>` instead. The old names are refused with a pointer to
@@ -899,6 +960,9 @@ export function main(argv=process.argv.slice(2),{orca,wait,env=process.env}={}){
     // workflow-export
     const store=createStore({repoRoot:repositoryRoot(cwd),id:required(options.id,'workflow id')});
     try{
+      // §3: every copy checkpoints (TRUNCATE) first, so a WAL-mode ledger's -wal/-shm are folded back before
+      // anything reads it as a snapshot. A DELETE-mode handle answers the pragma as a harmless no-op.
+      store.ledger.db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
       const result=store.exportTo(path.resolve(required(options.to,'export directory')));
       return {schema:'starci/workflow-export@1',command,id:store.id,...result};
     }finally{store.close();}
@@ -918,16 +982,28 @@ export function main(argv=process.argv.slice(2),{orca,wait,env=process.env}={}){
     }
     const repoRoot=path.resolve(required(options.repo,'ledger repository root'));
     const file=ledgerFileFor(repoRoot);
-    need(fs.existsSync(file),`No ledger at ${file}`);
     if(command==='ledger-verify'){
-      const inspection=inspectLedger({file});
+      const anchor=readAnchor(repoRoot);
+      // §12: a tracked anchor with no ledger file at all is a re-clone (the ledger is untracked, the anchor
+      // is not) — the named recovery is restoring a backup or ledger-migrate, never a silent fresh start.
+      if(!fs.existsSync(file)){
+        if(anchor)return {schema:'starci/ledger-verify@1',command,ok:false,repo:repoRoot,file,reason:'ledger-missing',results:Object.keys(anchor.workflows??{}).map(workflowId=>({workflowId,ok:false,anchor:{ok:false,checked:true,reason:'ledger-missing'}}))};
+        need(false,`No ledger at ${file}`);
+      }
+      const inspection=inspectLedger({file}),ledgerId=ledgerIdFor(file);
       try{
         const ids=options.id?[options.id]:inspection.workflows().map(entry=>entry.workflowId);
         need(ids.length,'ledger-verify found no workflow to check in this ledger; pass --id <id>');
-        const results=ids.map(workflowId=>({workflowId,...inspection.verifyChain({workflowId})}));
-        return {schema:'starci/ledger-verify@1',command,ok:results.every(result=>result.ok),repo:repoRoot,file,results};
+        const results=ids.map(workflowId=>{
+          const chain=inspection.verifyChain({workflowId});
+          const anchorCheck=anchorStatus({db:inspection.db,workflowId,anchor,ledgerId});
+          return {workflowId,...chain,anchor:anchorCheck};
+        });
+        return {schema:'starci/ledger-verify@1',command,ok:results.every(result=>result.ok&&result.anchor.ok),repo:repoRoot,file,results};
       }finally{inspection.close();}
     }
+    need(fs.existsSync(file),`No ledger at ${file}`);
+    if(command==='ledger-anchor')return writeAnchor({repoRoot,file,options});
     return command==='ledger-prune'?pruneLedger({repoRoot,file,options}):retireLedger({repoRoot,file,options});
   }
   const adapter=hostAdapterOf(options,env);

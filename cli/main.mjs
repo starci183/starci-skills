@@ -30,6 +30,7 @@ Usage:
   starci op-contract --workflow <id> --op <op> [--attempt N] [--dispatch <id>] [--json true]
   starci workflow-export --id <id> --to <dir>
   starci ledger-verify --repo <root> [--id <id>]
+  starci ledger-anchor --write --repo <root> [--id <id>]
   starci ledger-migrate --repo <root> [--journal-file <old>] [--machine-file <file>] [--dry-run] [--archive true]
   starci ledger-prune --repo <root> [--retire <id,..>] [--vacuum true] [--dry-run]
   starci ledger-retire --repo <root> [--delete true]

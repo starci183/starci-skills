@@ -5,7 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import {main} from '../hosts/orca/launch.mjs';
 import {createStore} from '../kernel/store.mjs';
-import {ledgerFileFor} from '../kernel/ledger-db.mjs';
+import {ledgerFileFor,ledgerIdFor} from '../kernel/ledger-db.mjs';
+
+const anchorFileFor=repo=>path.join(repo,'.starciwork','ledger-anchor.json');
 
 /**
  * runtime 1.0.4 §9/§11: the worker-IPC and operator verbs that read and write a workflow's own ledger rows
@@ -119,6 +121,89 @@ test('ledger-prune retires a finished workflow and keeps a live one; ledger-reti
   const stillLive=main(['ledger-retire','--repo',repo]);
   assert.equal(stillLive.ok,false);
   assert.throws(()=>main(['ledger-retire','--repo',path.join(repo,'nowhere')]),/No ledger at/);
+});
+
+test('ledger-anchor --write regenerates the tracked head, and ledger-verify checks the ledger against it (§12)',t=>{
+  const fx=fixture(t),repo=fx.repo();
+  const store=fx.track(createStore({repoRoot:repo,id:ID}));
+  store.appendEvent({event:'workflow.start'});
+  store.appendEvent({event:'op.dispatch'});
+  store.saveState({schema:'starci/workflow-state@1',phase:'run'});
+  const written=main(['ledger-anchor','--write','--repo',repo]);
+  assert.equal(written.ok,true);
+  assert.deepEqual(written.written,[ID]);
+  assert.deepEqual(written.refused,[]);
+  assert.equal(written.file,anchorFileFor(repo));
+  const onDisk=JSON.parse(fs.readFileSync(anchorFileFor(repo),'utf8'));
+  assert.equal(onDisk.schema,'starci/ledger-anchor@1');
+  assert.equal(onDisk.ledgerId,ledgerIdFor(ledgerFileFor(repo)));
+  const lastSeq=store.ledger.db.prepare('SELECT max(seq) seq FROM events WHERE workflow_id=?').get(ID).seq;
+  assert.equal(onDisk.workflows[ID].seq,lastSeq);
+  // A tracked anchor with no entry yet for a workflow is fine (never having reached it is not "behind").
+  const other=`${ID}-fresh`;
+  fx.track(createStore({repoRoot:repo,id:other}));
+  const freshOk=main(['ledger-verify','--repo',repo,'--id',other]);
+  assert.deepEqual(freshOk.results[0].anchor,{ok:true,checked:false,reason:null});
+  const healthy=main(['ledger-verify','--repo',repo,'--id',ID]);
+  assert.equal(healthy.ok,true);
+  assert.deepEqual(healthy.results[0].anchor,{ok:true,checked:true,reason:null});
+  // The ledger running ahead of its anchor (a new event after the anchor was written) is normal, never a refusal.
+  store.appendEvent({event:'op.report'});
+  const ahead=main(['ledger-verify','--repo',repo,'--id',ID]);
+  assert.equal(ahead.ok,true);
+  assert.equal(ahead.results[0].anchor.ok,true);
+  // A ledger genuinely missing the anchored head - restored from an earlier backup - refuses closed.
+  store.ledger.db.prepare('DELETE FROM events WHERE workflow_id=? AND seq>=?').run(ID,lastSeq);
+  const behind=main(['ledger-verify','--repo',repo,'--id',ID]);
+  assert.equal(behind.ok,false);
+  assert.equal(behind.results[0].ok,true,'the remaining, shorter chain is still internally self-consistent');
+  assert.deepEqual(behind.results[0].anchor,{ok:false,checked:true,reason:'ledger-behind-anchor'});
+});
+
+test('ledger-verify reports ledger-missing for a tracked anchor whose ledger file is gone (a re-clone)',t=>{
+  const fx=fixture(t),repo=fx.repo();
+  // Closed explicitly (not tracked) before its file is deleted below - Windows denies deleting an open handle.
+  const store=createStore({repoRoot:repo,id:ID});
+  store.appendEvent({event:'workflow.start'});
+  main(['ledger-anchor','--write','--repo',repo]);
+  store.close();
+  for(const suffix of ['','-journal','-wal','-shm']){const file=`${ledgerFileFor(repo)}${suffix}`;if(fs.existsSync(file))fs.rmSync(file);}
+  const result=main(['ledger-verify','--repo',repo]);
+  assert.equal(result.ok,false);
+  assert.equal(result.reason,'ledger-missing');
+  assert.deepEqual(result.results.map(r=>r.workflowId),[ID]);
+  assert.equal(result.results[0].anchor.reason,'ledger-missing');
+  // No anchor at all and no ledger is the ordinary "nothing here yet" case, not a refusal by name.
+  fs.rmSync(anchorFileFor(repo));
+  assert.throws(()=>main(['ledger-verify','--repo',repo]),/No ledger at/);
+});
+
+test('ledger-verify reports ledger-identity-mismatch when the anchor names a different ledger',t=>{
+  const fx=fixture(t),repo=fx.repo();
+  const store=fx.track(createStore({repoRoot:repo,id:ID}));
+  store.appendEvent({event:'workflow.start'});
+  const lastSeq=store.ledger.db.prepare('SELECT max(seq) seq FROM events WHERE workflow_id=?').get(ID).seq;
+  const digest=store.ledger.db.prepare('SELECT digest FROM events WHERE workflow_id=? AND seq=?').get(ID,lastSeq).digest;
+  fs.mkdirSync(path.dirname(anchorFileFor(repo)),{recursive:true});
+  fs.writeFileSync(anchorFileFor(repo),JSON.stringify({schema:'starci/ledger-anchor@1',ledgerId:'not-this-ledger',updatedAt:0,
+    workflows:{[ID]:{generation:0,checkpointId:null,eventsHead:digest,seq:lastSeq,at:0}}}));
+  const result=main(['ledger-verify','--repo',repo]);
+  assert.equal(result.ok,false);
+  assert.deepEqual(result.results[0].anchor,{ok:false,checked:true,reason:'ledger-identity-mismatch'});
+});
+
+test('ledger-anchor --write refuses to anchor a workflow whose chain does not verify',t=>{
+  const fx=fixture(t),repo=fx.repo();
+  const store=fx.track(createStore({repoRoot:repo,id:ID}));
+  store.appendEvent({event:'workflow.start'});
+  const row=store.ledger.db.prepare('SELECT seq FROM events WHERE workflow_id=? ORDER BY seq LIMIT 1').get(ID);
+  store.ledger.db.prepare('UPDATE events SET payload_json=? WHERE seq=?').run('{"tampered":true}',row.seq);
+  const result=main(['ledger-anchor','--write','--repo',repo]);
+  assert.equal(result.ok,false);
+  assert.deepEqual(result.written,[]);
+  assert.equal(result.refused[0].workflowId,ID);
+  assert.equal(result.refused[0].reason,'ledger-chain-broken');
+  assert.deepEqual(JSON.parse(fs.readFileSync(anchorFileFor(repo),'utf8')).workflows,{});
 });
 
 test('journal-prune and journal-retire are redirected to their renamed verb and exit 2',async t=>{

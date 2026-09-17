@@ -9,7 +9,7 @@ import {fileURLToPath} from 'node:url';
  */
 const LAUNCHER_COMMANDS=['workflow-goal','workflow-amend','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status',
   'workflow-tail','workflow-ops','workflow-list','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs',
-  'op-contract','workflow-export','ledger-verify','ledger-migrate','ledger-prune','ledger-retire','journal-prune','journal-retire',
+  'op-contract','workflow-export','ledger-verify','ledger-migrate','ledger-prune','ledger-retire','ledger-anchor','journal-prune','journal-retire',
   'start-op','settle','sweep','notify','report','wait','verify'];
 
 /**
@@ -40,7 +40,8 @@ workflow kernel (forwarded to the launcher; add --host <skill root> to reach a W
   workflow-inputs      serve the kernel-owned credential form in its workflow's Orca browser
   op-contract          --workflow <id> --op <op> [--attempt N] [--dispatch <id>] [--json true]: print a stored operation contract
   workflow-export      --id <id> --to <dir>: write today's human-readable file layout from the workflow's ledger rows
-  ledger-verify        --repo <root> [--id <id>]: walk the events hash chain, exit non-zero on a break
+  ledger-verify        --repo <root> [--id <id>]: walk the events hash chain and check it against the tracked anchor, exit non-zero on a break
+  ledger-anchor        --write --repo <root> [--id <id>]: regenerate .starciwork/ledger-anchor.json from a healthy ledger
   ledger-migrate       --repo <root> [--journal-file <old>] [--machine-file <file>] [--dry-run] [--archive true]: fold _local + a retired journal into runtime.sqlite
   ledger-prune         --repo <root> [--retire <id,..>] [--vacuum true] [--dry-run]: retire settled workflow rows from the ledger
   ledger-retire        --repo <root> [--delete true]: remove the whole ledger file once nothing in it is live

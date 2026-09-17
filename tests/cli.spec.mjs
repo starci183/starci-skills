@@ -139,7 +139,7 @@ test('--help names every command of the one entry, the forwarded kernel commands
   // only half of it teaches the wrong entry. One line each, so a reader can copy the one they need.
   const forwarded = ['workflow-goal', 'workflow-amend', 'workflow-approve', 'workflow-answer', 'workflow-run', 'workflow-retry', 'workflow-status',
     'workflow-tail', 'workflow-ops', 'workflow-list', 'workflow-stop', 'workflow-lane-close', 'workflow-supervise', 'workflow-inputs',
-    'op-contract', 'workflow-export', 'ledger-verify', 'ledger-migrate', 'ledger-prune', 'ledger-retire', 'journal-prune', 'journal-retire',
+    'op-contract', 'workflow-export', 'ledger-verify', 'ledger-anchor', 'ledger-migrate', 'ledger-prune', 'ledger-retire', 'journal-prune', 'journal-retire',
     'start-op', 'settle', 'sweep', 'notify', 'report', 'wait', 'verify'];
   const lines = help.stdout.split('\n').map(line => line.trim());
   for (const command of forwarded) assert.ok(lines.some(line => line.startsWith(`starci ${command} `) || line === `starci ${command}`), command);
