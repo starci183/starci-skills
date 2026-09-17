@@ -95,7 +95,7 @@ test('operation request carries the whole chain with its launch kinds and owns t
   assert.equal(planned.candidates[0].terminalParams.worktree,`path:${worktreePath}`);
   assert.deepEqual(planned.candidates[0].dispatchParams,{task:'$operationTaskId',to:'$terminalHandle',from:'term_monitor_sales',run:'run_sales','return-preamble':true});
   assert.equal(planned.candidates[1].workerParams.model,'claude-opus-5');
-  assert.equal(planned.candidates[2].workerParams.model,'gpt-5.6-sol');
+  assert.equal(planned.candidates[2].workerParams.model,'gpt-5.6-luna');
   assert.equal(planned.candidates[1].workerParams['timeout-ms'],45*60*1000,'the native worker receives the operation execution deadline');
   assert.deepEqual(planned.runAttestationParams,{id:'run_sales'});
   assert.equal(planned.taskParams['display-name'],opName);
@@ -112,7 +112,7 @@ test('operation request carries the whole chain with its launch kinds and owns t
 });
 
 test('a supervisor chain resolves from the registry with its model and effort, never from a hardcoded provider',()=>{
-  assert.deepEqual(resolveSupervisorChain('workflowMonitor').map(candidate=>[candidate.target,candidate.model,candidate.effort]),[['claude-agent','claude-opus-5','high'],['codex-agent','gpt-5.6-sol','high']]);
+  assert.deepEqual(resolveSupervisorChain('workflowMonitor').map(candidate=>[candidate.target,candidate.model,candidate.effort]),[['claude-agent','claude-opus-5','high'],['codex-agent','gpt-5.6-luna','high']]);
   assert.throws(()=>resolveSupervisorChain('nobody'),/Supervisor chain is missing/);
 });
 
