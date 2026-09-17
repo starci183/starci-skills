@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import {CANDIDATE_PACKET,CANDIDATE_SNAPSHOT,bindRuntimeInputs,createCandidateSnapshot,sealCandidate,verifyCandidateIdentity} from './candidates.mjs';
+import {CANDIDATE_PACKET,CANDIDATE_SNAPSHOT,bindRuntimeInputs,createCandidateSnapshot,sealCandidate,verifyCandidateIdentity,walkFiles} from './candidates.mjs';
 import {parseRef} from './common.mjs';
 import {candidateDisplayPath,candidateRootBindingDigest,pathInCandidateRoots} from './candidate-roots.mjs';
 import {inspectJournal} from './journal.mjs';
@@ -463,7 +463,7 @@ function freezeSingleDetectionCandidate(bridge,{git,reportedFiles=[],housekeepin
   const reasons=[...baselineTouched.map(file=>`pre-existing-user-work-modified:${file}`),...runtimeDrift.map(file=>`kernel-owned-write-drift:${file}`),...[...foreignDriftPaths].map(file=>`concurrent-writer-drift:${file}`),...outside.map(file=>`outside-allowlist:${file}`)];
   const currentHead=bridge.nonGit?contentHead(repoRoot,snapshot.source.entries.map(item=>item.path)):headOf(git,repoRoot);
   if(currentHead!==bridge.acceptedHead)reasons.push('canonical-head-drift');
-  if(reasons.length)return {schema:DETECTION_BRIDGE,status:'quarantine',reasons,concurrentWriterDrift:[...foreignDriftPaths],observedFiles:observable,housekeepingObserved,runtimeAcknowledgements:runtimeAcknowledgement.records,assurance:bridge.writer};
+  if(reasons.length)return {schema:DETECTION_BRIDGE,status:'quarantine',reasons,concurrentWriterDrift:[...foreignDriftPaths],observedFiles:observable,baselineTouched:[...baselineTouched],cleanNow:baselineTouched.filter(file=>!postDirty.includes(file)),housekeepingObserved,runtimeAcknowledgements:runtimeAcknowledgement.records,assurance:bridge.writer};
   const alreadySealed=fs.existsSync(path.join(snapshot.controlRoot,CANDIDATE_FILES.packet));
   // Runtime-managed-only bytes are rebound into both verifier views before the first seal. This is the same
   // narrow mechanism as other kernel-owned writes, but selected only after proving the surrounding human bytes
@@ -477,6 +477,17 @@ function freezeSingleDetectionCandidate(bridge,{git,reportedFiles=[],housekeepin
     if(after.get(file)?.state!=='file')return {schema:DETECTION_BRIDGE,status:'quarantine',reasons:[`unsupported-observed-path:${file}`],observedFiles:observable,housekeepingObserved,runtimeAcknowledgements:runtimeAcknowledgement.records,assurance:bridge.writer};
     fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(source,target);
   }
+  // A path an earlier quarantined freeze copied into the worker root that is no longer observed (its bytes went
+  // back to the baseline, or the worktree was wiped) is residue of that attempt, not a write of this one: the
+  // worker root follows the canonical bytes again so the seal judges only what is observed now.
+  if(!alreadySealed&&fs.existsSync(snapshot.workerRoot)){const observedSet=new Set(candidateObserved),baselineSha=new Map(snapshot.source.entries.map(item=>[item.path,item.sha256]));
+    for(const file of walkFiles(snapshot.workerRoot)){
+      if(observedSet.has(file)||managedOnly.has(file))continue;
+      const target=path.join(snapshot.workerRoot,...file.split('/'));
+      if(baselineSha.get(file)===sha256(fs.readFileSync(target)))continue;
+      const source=path.join(repoRoot,...file.split('/'));
+      if(fs.existsSync(source)&&fs.statSync(source).isFile())fs.copyFileSync(source,target);else fs.rmSync(target,{force:true});
+    }}
   const packet=sealCandidate(snapshot,{allowedWrites:candidateObserved,reportedFiles,now});
   const frozen=verifyCandidateIdentity(snapshot,packet,{canonicalRoot:repoRoot,
     expectedCanonicalEntries:packet.files.filter(item=>!managedByPath.has(item.path))});
@@ -541,7 +552,7 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],requireRep
   for(const file of trustedHousekeeping){const routed=pathInCandidateRoots(file,bridge.rootBindings);housekeepingByRoot.get(routed.rootId)?.push(routed.relative);}
   const foreignByRoot=new Map(bridge.roots.map(root=>[root.id,[]]));
   for(const scope of foreignScopes){try{const routed=pathInCandidateRoots(scope,bridge.rootBindings);foreignByRoot.get(routed.rootId)?.push(routed.relative);}catch{}}
-  const roots=[],observed=[],housekeepingObserved=[],runtimeAcknowledgements=[],concurrentDrift=[];let quarantined=false;
+  const roots=[],observed=[],housekeepingObserved=[],runtimeAcknowledgements=[],concurrentDrift=[],baselineTouched=[],cleanNow=[];let quarantined=false;
   for(const root of bridge.roots){
     const frozen=freezeSingleDetectionCandidate(root.bridge,{git,reportedFiles:[],housekeepingPaths:housekeepingByRoot.get(root.id)??[],foreignAllowlists:foreignByRoot.get(root.id)??[],now});
     if(frozen.status!=='sealed')quarantined=true;
@@ -549,6 +560,9 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],requireRep
     housekeepingObserved.push(...(frozen.housekeepingObserved??[]).map(file=>({rootId:root.id,path:file,displayPath:candidateDisplayPath(root,file)})));
     runtimeAcknowledgements.push(...(frozen.runtimeAcknowledgements??[]).map(record=>({rootId:root.id,...record})));
     concurrentDrift.push(...(frozen.concurrentWriterDrift??[]).map(file=>({rootId:root.id,path:file,displayPath:candidateDisplayPath(root,file)})));
+    // Reasons name the root-relative path; observed files carry the display path. Both spellings are kept so the
+    // engine can match a `pre-existing-user-work-modified:<file>` reason and exclude that file from the observed set.
+    baselineTouched.push(...(frozen.baselineTouched??[]).map(file=>candidateDisplayPath(root,file)));cleanNow.push(...(frozen.cleanNow??[]));
     roots.push({id:root.id,role:root.role,repoRoot:root.repoRoot,controlRoot:root.controlRoot,runtimePin:root.runtimePin?{...root.runtimePin}:null,workerWritable:Boolean(root.workerWritable),
       runtimeWritable:Boolean(root.runtimeWritable),readOnly:Boolean(root.readOnly),status:frozen.status,reasons:[...(frozen.reasons??[])],observedFiles:changed,
       concurrentWriterDrift:[...(frozen.concurrentWriterDrift??[])],
@@ -556,7 +570,7 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],requireRep
       ...(frozen.status==='sealed'?{acceptedHead:frozen.packet.acceptedHead,snapshotDigest:frozen.packet.snapshotDigest,candidateDigest:frozen.packet.candidateDigest,
         oracleDigest:frozen.packet.oracleDigest,environmentDigest:frozen.packet.environmentDigest,files:frozen.packet.files,changes:frozen.packet.changes}:{}),packet:frozen.packet});
   }
-  if(quarantined)return {schema:ROOT_DETECTION_BRIDGE,status:'quarantine',reasons:roots.flatMap(root=>root.reasons.map(reason=>`${root.id}:${reason}`)),concurrentWriterDrift:concurrentDrift.map(item=>item.displayPath),observedFiles:observed.map(item=>item.displayPath),housekeepingObserved:housekeepingObserved.map(item=>item.displayPath),runtimeAcknowledgements,roots,assurance:bridge.writer};
+  if(quarantined)return {schema:ROOT_DETECTION_BRIDGE,status:'quarantine',reasons:roots.flatMap(root=>root.reasons.map(reason=>`${root.id}:${reason}`)),concurrentWriterDrift:concurrentDrift.map(item=>item.displayPath),observedFiles:observed.map(item=>item.displayPath),baselineTouched,cleanNow,housekeepingObserved:housekeepingObserved.map(item=>item.displayPath),runtimeAcknowledgements,roots,assurance:bridge.writer};
   const mismatch=requireReported?reportMismatch(bridge.rootBindings,observed,reportedFiles):{missing:[],extra:[]};
   const reportDiagnostics={unmatched:mismatch.extra};
   if(mismatch.missing.length)return {schema:ROOT_DETECTION_BRIDGE,status:'quarantine',reasons:mismatch.missing.map(file=>`unreported-changed-file:${file}`),reportDiagnostics,
