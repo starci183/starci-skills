@@ -3,7 +3,7 @@ import path from 'node:path';
 import {repositoryRoot} from './reports.mjs';
 import crypto from 'node:crypto';
 import {configuredProgressDebug,configuredProgressLanguage,createProgressReporter} from './progress.mjs';
-import {compactSnapshots,eventsHead,inspectLedger,ledgerFileFor,newToken,openLedger} from './ledger-db.mjs';
+import {checkpointLedger,compactSnapshots,eventsHead,inspectLedger,ledgerFileFor,newToken,openLedger,writeAnchor} from './ledger-db.mjs';
 
 /**
  * Runtime state of a 5.0 workflow. Everything a workflow needs to continue lives in one ledger —
@@ -91,6 +91,11 @@ export function createStore({repoRoot,id}){
   const insertSnapshot=(inner,{checkpoint,generation,goalIdentity,state,ignore=true})=>
     inner.prepare(`INSERT ${ignore?'OR IGNORE ':''}INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,events_head,created_at) VALUES(?,?,?,?,?,?,?)`)
       .run(checkpoint,workflowId,generation,goalIdentity,JSON.stringify(state),eventsHead(inner,workflowId),now());
+  /** §12: after a checkpoint's transaction commits, the tracked anchor follows it — non-transactional by design (ledger ahead of anchor is safe). */
+  const anchorCheckpoint=(handle,{generation,checkpointId})=>{
+    const head=handle.db.prepare('SELECT seq,digest FROM events WHERE workflow_id=? ORDER BY seq DESC LIMIT 1').get(workflowId);
+    writeAnchor(boundRepoRoot,{ledgerId:handle.ledgerId,workflowId,generation,checkpointId,eventsHead:head?.digest??null,seq:head?.seq??null,at:now()});
+  };
   const touch=(inner,state)=>inner.prepare('UPDATE workflows SET updated_at=?,phase=COALESCE(?,phase),goal_identity=COALESCE(?,goal_identity),finished_json=COALESCE(?,finished_json) WHERE workflow_id=?')
     .run(now(),state?.phase??null,state?stateGoalIdentity(state):null,state?.finished?json(state.finished):null,workflowId);
   const latestBody=(inner,{generation=null,goalIdentity=null}={})=>
@@ -137,12 +142,13 @@ export function createStore({repoRoot,id}){
       need(plain(state)&&state.schema===WORKFLOW_STATE,`State must carry schema ${WORKFLOW_STATE}`);
       assertNoRawSecrets(state);const goal=stateGoalIdentity(state);
       if(durable)need(goal===durable.goalIdentity,'Workflow goal identity changed across the durable binding');
-      const generation=durable?.generation??0,handle=durable?.ledger??ledger;
+      const generation=durable?.generation??0,handle=durable?.ledger??ledger,checkpoint=`save:${workflowId}:${generation}:${digest(state)}`;
       handle.transaction(inner=>{
-        insertSnapshot(inner,{checkpoint:`save:${workflowId}:${generation}:${digest(state)}`,generation,goalIdentity:goal,state});
+        insertSnapshot(inner,{checkpoint,generation,goalIdentity:goal,state});
         compactSnapshots(inner,{workflowId,generation,goalIdentity:goal});
         touch(inner,state);
       });
+      anchorCheckpoint(handle,{generation,checkpointId:checkpoint});
       return state;
     },
     loadState(){
@@ -164,6 +170,8 @@ export function createStore({repoRoot,id}){
       // The generations this binding retires keep one body each; the bound one keeps its latest few.
       handle.transaction(inner=>{compactSnapshots(inner,{workflowId,generation,goalIdentity:durable.goalIdentity});
         inner.prepare('UPDATE workflows SET generation=?,goal_identity=?,updated_at=? WHERE workflow_id=?').run(generation,durable.goalIdentity,now(),workflowId);});
+      const head=handle.db.prepare('SELECT checkpoint_id FROM state_snapshots WHERE workflow_id=? AND generation=? AND goal_identity=? ORDER BY snapshot_id DESC LIMIT 1').get(workflowId,generation,durable.goalIdentity);
+      if(head)anchorCheckpoint(handle,{generation,checkpointId:head.checkpoint_id});
       return api;
     },
     unbindJournal(handle=null){if(!handle||durable?.ledger===handle)durable=null;return api;},
@@ -188,6 +196,7 @@ export function createStore({repoRoot,id}){
         compactSnapshots(inner,{workflowId,generation:durable.generation,goalIdentity:durable.goalIdentity});
         touch(inner,next);
       });
+      anchorCheckpoint(durable.ledger,{generation:durable.generation,checkpointId:checkpoint});
       return next;
     },
     reportPath(){removed('reportPath');},
@@ -295,7 +304,7 @@ export function createStore({repoRoot,id}){
       const target=path.resolve(required(dir,'export directory'));
       fs.mkdirSync(target,{recursive:true});
       // WAL makes the ledger three files; truncate it into runtime.sqlite before reading so an archive of this export stays one file (§3).
-      bound().exec('PRAGMA wal_checkpoint(TRUNCATE)');
+      checkpointLedger(durable?.ledger??ledger);
       const files=[],write=(name,content)=>{const file=path.join(target,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,content);files.push(slash(name));};
       const pretty=value=>`${JSON.stringify(value,null,2)}\n`;
       const latest=api.loadState();

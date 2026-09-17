@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {WORKFLOW_STATE,createStore,eventDigest,eventsHead,listWorkflows,newWorkflowId,replaceStateSnapshot,repositoryRoot,workflowsRoot} from '../kernel/store.mjs';
-import {ledgerFileFor,openLedger} from '../kernel/ledger-db.mjs';
+import {anchorFileFor,ledgerFileFor,openLedger,readAnchor,verifyAnchor} from '../kernel/ledger-db.mjs';
 
 const tmp=()=>{const dir=path.join(os.tmpdir(),'starci-store-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);fs.mkdirSync(dir,{recursive:true});return dir;};
 const state=extra=>({schema:WORKFLOW_STATE,phase:'plan',...extra});
@@ -135,6 +135,26 @@ test('transition persists exactly once; replay returns the latest state without 
   assert.equal(transitionEvent?.kind,'op-created');
   assert.throws(()=>store.transition(seed,{transitionId:'drift',apply:draft=>{draft.goal='moved';draft.inputs=['x'];}}),/goal identity/);
   assert.equal(store.ledger.verifyChain({workflowId:ID}).ok,true);
+});
+
+test('§12: the tracked anchor follows every checkpoint saveState/bindJournal/transition commits',t=>{
+  const fx=fixture(t),repo=fx.repo(),store=fx.track(createStore({repoRoot:repo,id:ID})),ledger=fx.track(openLedger({file:ledgerFileFor(repo)}));
+  assert.equal(readAnchor(repo),null,'nothing anchored before the first checkpoint');
+  store.saveState(state({goal:'g'}));
+  assert.ok(fs.existsSync(anchorFileFor(repo)));
+  let anchor=readAnchor(repo);
+  assert.equal(anchor.ledgerId,store.ledger.ledgerId);
+  assert.equal(anchor.workflows[ID].generation,0);
+  assert.equal(anchor.workflows[ID].checkpointId,store.ledger.db.prepare("SELECT checkpoint_id FROM state_snapshots WHERE workflow_id=? AND checkpoint_id LIKE 'save:%'").get(ID).checkpoint_id);
+  store.bindJournal(ledger,1,{state:state({goal:'g'})});
+  anchor=readAnchor(repo);
+  assert.equal(anchor.workflows[ID].generation,1,'binding refreshes the anchor to the bound generation head');
+  const next=store.transition(state({goal:'g'}),{transitionId:'t1',apply:draft=>{draft.ops=[{id:'op-1'}];}});
+  assert.deepEqual(next.ops,[{id:'op-1'}]);
+  anchor=readAnchor(repo);
+  assert.equal(anchor.workflows[ID].checkpointId,`transition:${ID}:1:t1`);
+  assert.equal(anchor.workflows[ID].eventsHead,eventsHead(store.ledger.db,ID));
+  assert.equal(verifyAnchor(store.ledger,repo).ok,true,'the ledger is never behind the anchor it just wrote');
 });
 
 test('reports, contracts and checks round-trip through their tables',t=>{
