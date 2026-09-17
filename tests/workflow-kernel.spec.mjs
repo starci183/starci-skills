@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -39,8 +39,12 @@ import {GOAL_SPIN_LIMIT,adoptReportRev,applyInbox,evaluateGoalMetrics,goalMetric
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
 const runtimeProfile=parseYaml(fs.readFileSync(new URL('../model/runtimes.yaml',import.meta.url),'utf8'));
-const worktree='fixtures/orca/agentos-r14-sales';
+// A repo-relative fixture path would leak `.starciwork/_local/runtime/orca-dispatch-ctx_*.md` launch
+// artifacts into the real `fixtures/` tree; the worktree lives under a per-file temp root instead.
+const worktreeRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-wk-spec-'));
+const worktree=path.join(worktreeRoot,'agentos-r14-sales');
 const cwd=path.resolve(worktree);
+after(()=>fs.rmSync(worktreeRoot,{recursive:true,force:true}));
 const json=(status,value)=>({status,stdout:JSON.stringify(value),stderr:''});
 const noWait=()=>{};
 /**
