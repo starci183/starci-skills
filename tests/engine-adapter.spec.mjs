@@ -330,6 +330,27 @@ test('a stopped native attempt whose only drift is now-clean user work abandons 
   const event=runtime.journal.events({workflowId:'wf'}).find(item=>item.kind==='operation-stopped-effects-abandoned');assert.deepEqual(event?.payload?.cleanedUserWork,['f1.ts','f2.ts']);bridge.close();
 });
 
+test('a stopped native attempt whose sealed delta is gone from canonical abandons and releases its writer',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'delta-gone',kind:'backend.implement',attempt:1,status:'running',allowlist:['src/**'],dispatch:'ctx-gone'};f.state.ops=[op];
+  const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-gone',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
+  // The attempt sealed a packet, then the worktree was wiped back to the accepted bytes: every sealed path reads
+  // missing and the byte comparison reads drift, while the freeze observes no canonical delta of its own.
+  runtime.freezeCandidate=()=>({status:'quarantined',observedFiles:[],reasons:['source:canonical-drift','source:canonical-delta-missing:src/a.ts','source:canonical-delta-missing:src/b.ts']});
+  const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-gone',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-gone',effectState:'none'},reason:'retry proved exit'});
+  assert.equal(result.ok,true);assert.equal(result.abandoned,true);assert.deepEqual(result.observedFiles,[],'a vanished delta leaves nothing to preserve');
+  assert.deepEqual(op.ownedBaselinePaths,[]);assert.equal(op.lease,undefined,'the writer fence is released for a fresh attempt');
+  const job=runtime.journal.listJobs().find(item=>item.op_id==='delta-gone');assert.equal(job.status,'failed');
+  assert.equal(runtime.journal.db.prepare('SELECT count(*) AS n FROM leases WHERE job_id=?').get(job.job_id).n,0);bridge.close();
+});
+
+test('a canonical delta that is still standing is judged by the ordinary rules, not the vanished-delta one',t=>{
+  const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'delta-standing',kind:'backend.implement',attempt:1,status:'running',allowlist:['src/**'],dispatch:'ctx-standing'};f.state.ops=[op];
+  const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-standing',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);
+  runtime.freezeCandidate=()=>({status:'quarantined',observedFiles:['src/a.ts'],reasons:['source:canonical-drift','source:canonical-delta-missing:src/b.ts']});
+  const result=runtime.settleStoppedOperation(op,{dispatch:'ctx-standing',settlement:{schema:'starci/orca-supervised-settlement@1',dispatchId:'ctx-standing',effectState:'none'}});
+  assert.equal(result.ok,false);assert.ok(op.lease,'an observed canonical change keeps the writer fence attached');bridge.close();
+});
+
 test('a stopped native attempt with a still-dirty pre-existing file retains its writer',t=>{
   const f=fixture(t),bridge=createJobBridge({journalFile:f.state.engine.journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})}),op={id:'dirty-user-work',kind:'backend.implement',attempt:1,status:'running',allowlist:['src/**'],dispatch:'ctx-dirty'};f.state.ops=[op];
   const runtime=createEngineRuntime({...f,bridge,eligibility:()=>({eligible:true})});runtime.reserveOperation(op,{role:'implement',runtime:'gpt-5.6-sol',target:'gpt-5.6-sol'});runtime.beginLaunchIntent(op);op.launch={task:'task-dirty',dispatch:op.dispatch};runtime.recordLaunchObservation(op);runtime.launched(op);

@@ -4712,7 +4712,10 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     }
     for(const op of state.ops.filter(item=>item.lease&&!retryableOperation(item)&&!settledOperation(item)&&item.launch?.task&&stoppedRetryDispatchId(item)&&!item.dispatch&&!item.terminal&&item.candidate?.identity)){
       const reconciled=reconcileStoppedNativeRetryLease(state,op,{orca,store});
-      need(reconciled.ok,`Stopped native lease ${op.lease?.jobId??op.id} cannot be reconciled for retry: ${reconciled.reason}`);
+      // A refusal the freeze explained names the paths it refused. Without them the operator is told only that
+      // the effects "could not be sealed" and has to read the candidate control root to find out why.
+      const explained=[...new Set(reconciled.pending?.reasons??[])];
+      need(reconciled.ok,`Stopped native lease ${op.lease?.jobId??op.id} cannot be reconciled for retry: ${reconciled.reason}${explained.length?`: ${explained.join('; ')}`:''}`);
     }
     // A blocked operation still holding its durable lease shares one proof at this boundary: the typed host
     // settlement must show the exact Dispatch has no live process, then the stopped-attempt machinery freezes
