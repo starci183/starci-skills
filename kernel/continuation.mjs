@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectJournal} from './journal.mjs';
+import {inspectLedger,verifyAnchor,verifyChain} from './ledger-db.mjs';
 import {replaceStateSnapshot,stateGoalIdentity} from './store.mjs';
 
 export const CONTINUATION_BRIEF='starci/workflow-continuation@1';
@@ -17,43 +17,88 @@ const text=value=>String(value??'').replaceAll('|','\\|').replace(/[\r\n]+/g,' '
 const json=value=>text(JSON.stringify(value??null));
 const list=value=>Array.isArray(value)?value:[];
 
-function readController(store){
+const livePid=pid=>{try{process.kill(pid,0);return true;}catch(error){return error?.code==='EPERM';}};
+function readController(store,state){
   try{
-    const lock=JSON.parse(fs.readFileSync(path.join(store.dir,'kernel.lock'),'utf8'));
-    const pid=Number(lock?.pid),alive=Number.isInteger(pid)&&pid>0&&(()=>{try{process.kill(pid,0);return true;}catch(error){return error?.code==='EPERM';}})();
-    return {pid:Number.isInteger(pid)&&pid>0?pid:null,startedAt:Number(lock?.startedAt)||null,
-      startupTokenDigest:typeof lock?.startupToken==='string'?sha256(lock.startupToken):null,alive};
+    const file=state?.engine?.ledgerFile;
+    if(typeof file!=='string'||!fs.existsSync(file))return {pid:null,startedAt:null,startupTokenDigest:null,alive:false};
+    let ledger,lock=null;
+    try{ledger=inspectLedger({file});
+      lock=ledger.db.prepare("SELECT holder_pid,token,value_json,at,expires_at FROM signals WHERE scope=? AND key='kernel-lock'").get(state.id)??null;
+    }finally{ledger?.close();}
+    let value=null;try{value=JSON.parse(lock?.value_json??'null');}catch{}
+    const pid=Number(lock?.holder_pid??value?.pid),
+      alive=Number.isInteger(pid)&&pid>0&&(!lock?.expires_at||lock.expires_at>Date.now())&&livePid(pid),
+      token=typeof lock?.token==='string'?lock.token:(typeof value?.startupToken==='string'?value.startupToken:null);
+    return {pid:Number.isInteger(pid)&&pid>0?pid:null,startedAt:Number(lock?.at??value?.startedAt)||null,
+      startupTokenDigest:token?sha256(token):null,alive};
   }catch{return {pid:null,startedAt:null,startupTokenDigest:null,alive:false};}
 }
 
-function readJournal(state){
-  const file=state?.engine?.journalFile;
-  if(typeof file!=='string'||!fs.existsSync(file))return {file:file??null,jobs:[],leases:[],snapshot:null,error:null};
-  let journal;
+// The repo that owns `.starciwork` and, with it, the tracked anchor (`.starciwork/ledger-anchor.json`):
+// ledgerFileFor(repoRoot) joins the same two segments, so this is the exact inverse.
+const anchorRepoRoot=file=>path.dirname(path.dirname(file));
+
+function readLedger(state){
+  const file=state?.engine?.ledgerFile;
+  if(typeof file!=='string')return {file:null,jobs:[],leases:[],snapshot:null,snapshotHead:null,eventsHead:null,kernelLock:null,chain:null,anchor:null,error:null};
+  if(!fs.existsSync(file)){
+    let anchor=null;try{anchor=verifyAnchor(null,anchorRepoRoot(file));}catch(error){anchor={ok:false,reason:String(error?.message??error)};}
+    return {file,jobs:[],leases:[],snapshot:null,snapshotHead:null,eventsHead:null,kernelLock:null,chain:null,anchor,error:null};
+  }
+  let ledger;
   try{
-    journal=inspectJournal({file});
-    const jobs=journal.db.prepare('SELECT job_id,workflow_id,op_id,attempt,generation,kind,status,worker_id,deadline,lease_token FROM jobs WHERE workflow_id=? ORDER BY created_at,job_id').all(state.id);
-    const leases=journal.db.prepare('SELECT resource_key,job_id,workflow_id,op_id,attempt,generation,token,expires_at FROM leases WHERE workflow_id=? ORDER BY job_id,resource_key').all(state.id);
-    const row=journal.db.prepare('SELECT checkpoint_id,generation,goal_identity,state_json,created_at FROM state_snapshots WHERE workflow_id=? ORDER BY snapshot_id DESC LIMIT 1').get(state.id);
+    ledger=inspectLedger({file});
+    const jobs=ledger.db.prepare('SELECT job_id,workflow_id,op_id,attempt,generation,kind,status,worker_id,deadline,lease_token FROM jobs WHERE workflow_id=? ORDER BY created_at,job_id').all(state.id);
+    const leases=ledger.db.prepare('SELECT resource_key,job_id,workflow_id,op_id,attempt,generation,token,expires_at FROM leases WHERE workflow_id=? ORDER BY job_id,resource_key').all(state.id);
+    const row=ledger.db.prepare('SELECT checkpoint_id,generation,goal_identity,state_json,events_head,created_at FROM state_snapshots WHERE workflow_id=? ORDER BY snapshot_id DESC LIMIT 1').get(state.id);
+    const eventsHead=ledger.db.prepare('SELECT seq,digest FROM events WHERE workflow_id=? ORDER BY seq DESC LIMIT 1').get(state.id)??null;
+    const kernelLock=ledger.db.prepare("SELECT holder_pid,token,value_json,at,expires_at FROM signals WHERE scope=? AND key='kernel-lock'").get(state.id)??null;
     let snapshot=null;
     if(row?.state_json){try{snapshot={...row,state:JSON.parse(row.state_json)};}catch{snapshot={...row,state:null,error:'latest durable state body is unreadable'};}}
-    return {file:path.resolve(file),version:journal.version,jobs,leases,snapshot,error:null};
-  }catch(error){return {file:path.resolve(file),jobs:[],leases:[],snapshot:null,error:String(error?.message??error)};}
-  finally{journal?.close();}
+    let chain=null;
+    try{chain=verifyChain(ledger.db,{workflowId:state.id});}catch(error){chain={ok:false,reason:String(error?.message??error)};}
+    let anchor=null;
+    try{anchor=verifyAnchor(ledger,anchorRepoRoot(file));}catch(error){anchor={ok:false,reason:String(error?.message??error)};}
+    return {file:path.resolve(file),version:ledger.version,jobs,leases,snapshot,snapshotHead:row?.events_head??null,eventsHead,kernelLock,chain,anchor,error:null};
+  }catch(error){return {file:path.resolve(file),jobs:[],leases:[],snapshot:null,snapshotHead:null,eventsHead:null,kernelLock:null,chain:null,anchor:null,error:String(error?.message??error)};}
+  finally{ledger?.close();}
 }
 
+/** The kernel-lock signal proves a newer-than-snapshot event head belongs to a live kernel, not a rewound record. */
+const kernelLockHeld=(lock,controller)=>{
+  const holder=Number(lock?.holder_pid);
+  if(Number.isInteger(holder)&&holder>0&&(!lock.expires_at||lock.expires_at>Date.now())&&livePid(holder))return true;
+  const own=Number(controller?.pid);
+  return Boolean(controller?.alive)&&Number.isInteger(own)&&own>0&&livePid(own);
+};
+
 /** Prefer the latest durable body when it matches this workflow and generation; state.json is only a projection. */
-export function durableContinuationState(state,journalView){
-  const durable=journalView?.snapshot?.state;
+export function durableContinuationState(state,ledgerView){
+  const durable=ledgerView?.snapshot?.state;
   return plain(durable)&&durable.id===state?.id&&durable.engine?.generation===state?.engine?.generation?durable:state;
 }
 
 /** Read-only invariants at stop/resume boundaries. Unknown effects remain resumable only under their exact fence. */
-export function continuationBoundary(state,{journalView=readJournal(state),controller={alive:false}}={}){
+export function continuationBoundary(state,{ledgerView=readLedger(state),controller={alive:false}}={}){
+  if(typeof state?.engine?.journalFile==='string'&&typeof state?.engine?.ledgerFile!=='string')
+    return {ok:false,reason:'ledger-unmigrated',findings:[{code:'ledger-unmigrated',detail:'the workflow record still names journalFile without a ledgerFile; ledger-migrate must run before any continuation'}],ledgerView};
+  // The anchor is the tracked counter-record (§12): a file the hash chain alone cannot prove, because anyone
+  // able to write the untracked ledger can recompute a self-consistent chain for it. A restored, rolled-back
+  // or never-cloned ledger fails here before its chain is even read as authoritative.
+  if(ledgerView.anchor&&ledgerView.anchor.ok===false)
+    return {ok:false,reason:ledgerView.anchor.reason,findings:[{code:ledgerView.anchor.reason,detail:`the tracked ledger anchor does not verify against this ledger file${ledgerView.anchor.workflowId?` for workflow ${ledgerView.anchor.workflowId}`:''}`,...(ledgerView.anchor.workflowId?{anchorWorkflowId:ledgerView.anchor.workflowId}:{})}],ledgerView};
+  if(ledgerView.chain&&ledgerView.chain.ok===false)
+    return {ok:false,reason:'ledger-chain-broken',findings:[{code:'ledger-chain-broken',detail:`the workflow event hash chain does not verify${Number.isInteger(ledgerView.chain.brokenAt)?` at seq ${ledgerView.chain.brokenAt}`:''}${ledgerView.chain.reason?`: ${ledgerView.chain.reason}`:''}`}],ledgerView};
+  // One transaction commits snapshot+events+jobs+leases, so a live head newer than the snapshot's events_head is
+  // legal only while a kernel holds the lock: a crash mid-tick commits neither; a rewound file leaves orphans.
+  const headDigest=ledgerView.eventsHead?.digest??null;
+  if(headDigest!==(ledgerView.snapshotHead??null)&&!kernelLockHeld(ledgerView.kernelLock,controller))
+    return {ok:false,reason:'ledger-head-mismatch',findings:[{code:'ledger-head-mismatch',detail:'events exist past the latest durable snapshot while no live pid holds the kernel lock'}],ledgerView};
   const findings=[];
-  const jobs=new Map(journalView.jobs.map(job=>[job.job_id,job]));
+  const jobs=new Map(ledgerView.jobs.map(job=>[job.job_id,job]));
   const leasesByJob=new Map();
-  for(const lease of journalView.leases){const rows=leasesByJob.get(lease.job_id)??[];rows.push(lease);leasesByJob.set(lease.job_id,rows);}
+  for(const lease of ledgerView.leases){const rows=leasesByJob.get(lease.job_id)??[];rows.push(lease);leasesByJob.set(lease.job_id,rows);}
   const claimed=new Set();
   const issue=(code,detail,identity={})=>findings.push({code,detail,...identity});
   for(const op of list(state?.ops)){
@@ -74,7 +119,7 @@ export function continuationBoundary(state,{journalView=readJournal(state),contr
     if(!job){issue('lease-job-unproven','state carries an operation lease whose durable job is absent',identity);continue;}
     // The lease generation binds the durable job, not the current enrollment: a writer reservation retained
     // across a retry deliberately predates `state.engine.generation` (the reconcile passes re-prove it), so
-    // the exact identity here is job <-> lease <-> lease rows, all still fenced in the same journal.
+    // the exact identity here is job <-> lease <-> lease rows, all still fenced in the same ledger.
     const exact=job.workflow_id===state.id&&job.op_id===op.id&&job.attempt===op.lease.attempt&&
       job.generation===op.lease.generation&&job.kind==='operation'&&op.lease.workflowId===state.id&&
       op.lease.opId===op.id&&op.lease.attempt===op.attempt;
@@ -86,7 +131,7 @@ export function continuationBoundary(state,{journalView=readJournal(state),contr
     if(DONE.has(op.status)&&(!SETTLED.has(job.status)||held.length))
       issue('settled-operation-retains-writer','a settled operation still owns an unsettled job or durable writer reservation',identity);
   }
-  for(const lease of journalView.leases)if(!claimed.has(lease.job_id)){
+  for(const lease of ledgerView.leases)if(!claimed.has(lease.job_id)){
     const job=jobs.get(lease.job_id),identity={jobId:lease.job_id,opId:lease.op_id,attempt:lease.attempt,generation:lease.generation,kind:job?.kind??null};
     if(!job){issue('orphan-writer-reservation',`resource ${lease.resource_key} has no durable job identity`,identity);continue;}
     // Model, judge and command-check jobs own admission identities of their own. They are not operation writers
@@ -101,8 +146,8 @@ export function continuationBoundary(state,{journalView=readJournal(state),contr
     issue('orphan-writer-reservation',`operation resource ${lease.resource_key} is not represented by an exact operation lease in state`,identity);
   }
   if(controller.alive&&(!controller.pid||!controller.startupTokenDigest))issue('controller-identity-unproven','the live controller lacks an exact PID/startup-token identity',{pid:controller.pid??null});
-  if(journalView.error)issue('journal-unreadable',journalView.error,{journalFile:journalView.file});
-  return {ok:findings.length===0,findings,journalView};
+  if(ledgerView.error)issue('ledger-unreadable',ledgerView.error,{ledgerFile:ledgerView.file});
+  return {ok:findings.length===0,findings,ledgerView};
 }
 
 function headOf(root,git=spawnSync){
@@ -155,8 +200,8 @@ export function bindContinuationPath(store,state=null){
 export function continuationPath(store,state=null){return bindContinuationPath(store,state);}
 
 export function buildContinuationBrief(store,state,{now=Date.now,git=spawnSync}={}){
-  const journalView=readJournal(state),current=durableContinuationState(state,journalView),controller=readController(store);
-  const boundary=continuationBoundary(current,{journalView,controller});
+  const ledgerView=readLedger(state),current=durableContinuationState(state,ledgerView),controller=readController(store,state);
+  const boundary=continuationBoundary(current,{ledgerView,controller});
   const stateBytes=JSON.stringify(current);
   const actualHead=headOf(current.worktree??current.repoRoot??process.cwd(),git);
   const complete=list(current.ops).filter(op=>DONE.has(op.status));
@@ -175,7 +220,7 @@ export function buildContinuationBrief(store,state,{now=Date.now,git=spawnSync}=
     row(['Workflow',current.id]),row(['Job',current.job]),row(['Phase',current.phase]),row(['Approved',String(Boolean(current.approved))]),
     row(['Workflow generation',current.engine?.generation??'not enrolled']),row(['Goal identity',stateGoalIdentity(current)]),
     row(['State SHA-256',sha256(stateBytes)]),row(['Projected state',slash(store.paths.state)]),
-    row(['Durable checkpoint',journalView.snapshot?.checkpoint_id??'none']),row(['Durable journal',journalView.file??'none']),
+    row(['Durable checkpoint',ledgerView.snapshot?.checkpoint_id??'none']),row(['Durable ledger',ledgerView.file??'none']),
     row(['Runtime pin digest',current.engine?.runtimePin?.digest??'none']),row(['Runtime pin root',slash(current.engine?.runtimePin?.root??'none')]),
     row(['Worktree',slash(current.worktree??current.repoRoot)]),row(['Branch',current.branch]),row(['Accepted workflow head',current.head??'none']),
     row(['Observed source HEAD',actualHead??'unavailable']),row(['Controller PID',controller.pid??'none']),
@@ -202,7 +247,7 @@ export function buildContinuationBrief(store,state,{now=Date.now,git=spawnSync}=
     '', '## Blockers','',bullets(blockers),
     '', '## Boundary findings','',boundary.findings.length?boundary.findings.map(item=>`- **${text(item.code)}** — ${text(item.detail)} (${json(Object.fromEntries(Object.entries(item).filter(([key])=>!['code','detail'].includes(key))))})`).join('\n'):'- None; the saved identities are internally consistent.',
     '', '## Next safe action','',next,'',
-    unknown?'Unknown or live effects are intentionally preserved. This Markdown is a human-readable continuation brief; journal, state, runtime pin, candidate packets, reports and source commits remain authoritative.':'This Markdown is a human-readable continuation brief; journal, state, runtime pin, candidate packets, reports and source commits remain authoritative.',''];
+    unknown?'Unknown or live effects are intentionally preserved. This Markdown is a human-readable continuation brief; the ledger record, runtime pin, candidate packets, reports and source commits remain authoritative.':'This Markdown is a human-readable continuation brief; the ledger record, runtime pin, candidate packets, reports and source commits remain authoritative.',''];
   return {schema:CONTINUATION_BRIEF,state:current,stateDigest:sha256(stateBytes),boundary,controller,head:actualHead,markdown:lines.join('\n')};
 }
 
@@ -221,7 +266,7 @@ function mergeManagedSection(existing,markdown,file){
   return `${existing.slice(0,start)}${managedSection(markdown)}${existing.slice(after).replace(/^\r?\n/,'')}`;
 }
 
-/** Atomically update one managed section of the public continuation without replacing journal/state or human notes. */
+/** Atomically update one managed section of the public continuation without replacing the ledger record or human notes. */
 export function exportContinuationBrief(store,state,options={}){
   const file=continuationPath(store,state),built=buildContinuationBrief(store,state,options);
   fs.mkdirSync(path.dirname(file),{recursive:true});

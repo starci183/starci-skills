@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,10 +8,52 @@ import {spawnSync} from 'node:child_process';
 import {beginDetectionCandidate,freezeDetectionCandidate,readCandidateBridge,readCandidatePacket} from '../kernel/candidate-bridge.mjs';
 import {prepareCandidateIntegration} from '../kernel/candidates.mjs';
 import {candidateRootBindingDigest,candidateRootBindings,resolveCandidateReferences} from '../kernel/candidate-roots.mjs';
-import {openJournal} from '../kernel/journal.mjs';
-import {readmitCandidateRootBindingRetry,retireFinishedWorkflowRows,retryableOperation} from '../kernel/kernel.mjs';
+import {ledgerFileFor,openLedger} from '../kernel/ledger-db.mjs';
+import {readmitCandidateRootBindingRetry,retryableOperation} from '../kernel/kernel.mjs';
 import {sealRuntime,verifyRuntimePin} from '../kernel/runtime-pin.mjs';
-import {createStore,WORKFLOW_STATE} from '../kernel/store.mjs';
+import {RUNTIME_FILE_WRITE,WORKFLOW_STATE} from '../kernel/store.mjs';
+
+/**
+ * A co-resident foreign kernel now shares this repo's one ledger file (`ledgerFileFor(owner)`) instead of a
+ * per-workflow journal. It still writes its legacy `_local/workflows/<id>` artifact bytes to disk (candidate
+ * custody receipts diff real file bytes), but the state snapshot, events and kernel-lock signal that
+ * `runtimeWriters`/`acknowledgedForeignRuntime` read now live in that shared ledger.
+ */
+function foreignLedgerWorkflow({owner,worktree,workflowId='other-workflow',generation=4,pin=null}){
+  const ledgerFile=ledgerFileFor(owner),ledger=openLedger({file:ledgerFile}),dir=path.join(owner,'.starciwork','_local','workflows',workflowId);
+  let state={schema:WORKFLOW_STATE,id:workflowId,approved:true,finished:false,worktree,goalDigest:'a'.repeat(64),
+    ops:[{id:'foreign-op',dispatch:'ctx-foreign',launch:{dispatch:'ctx-foreign'},reports:[]}],
+    engine:{schema:'starci/engine@1',generation,ledgerFile,...(pin?{runtimePin:pin}:{})}};
+  ledger.ensureWorkflow({workflowId});
+  const write=(relative,bytes)=>{
+    const file=path.join(dir,...relative.split('/'));fs.mkdirSync(path.dirname(file),{recursive:true});
+    if(bytes===null)fs.rmSync(file,{force:true});else fs.writeFileSync(file,bytes);
+    const read=bytes===null?null:fs.readFileSync(file),fileStateValue=read!==null?'file':'absent',
+      sha256=read!==null?crypto.createHash('sha256').update(read).digest('hex'):null,size=read?.length??0;
+    ledger.appendEvent({workflowId,entityType:'runtime-file',entityId:relative,generation:state.engine.generation,kind:'runtime-file-written',
+      payload:{schema:RUNTIME_FILE_WRITE,file,relative,mode:bytes===null?'delete':'replace',state:fileStateValue,sha256,size}});
+    return file;
+  };
+  const saveSnapshot=(prefix='save')=>{
+    const checkpointId=`${prefix}:${workflowId}:${state.engine.generation}:${crypto.randomBytes(4).toString('hex')}`;
+    ledger.db.prepare('INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,events_head,created_at) VALUES(?,?,?,?,?,?,?)')
+      .run(checkpointId,workflowId,state.engine.generation,state.goalDigest,JSON.stringify(state),ledger.eventsHead(workflowId),Date.now());
+  };
+  const setLock=({holderPid=process.pid,token='foreign-runtime-token',at=1700000000000,expiresAt=null}={})=>
+    ledger.db.prepare(`INSERT INTO signals(scope,key,holder_pid,token,value_json,at,expires_at) VALUES(?,?,?,?,?,?,?)
+      ON CONFLICT(scope,key) DO UPDATE SET holder_pid=excluded.holder_pid,token=excluded.token,at=excluded.at,expires_at=excluded.expires_at`)
+      .run(workflowId,'kernel-lock',holderPid,token,null,at,expiresAt);
+  const clearLock=()=>ledger.db.prepare('DELETE FROM signals WHERE scope=? AND key=?').run(workflowId,'kernel-lock');
+  write('state.json',`${JSON.stringify(state,null,2)}\n`);
+  ledger.appendEvent({workflowId,entityType:'workflow',entityId:workflowId,generation,kind:'foreign-kernel-ready'});
+  write('events.jsonl','own events\n');
+  write('kernel.lock',JSON.stringify({pid:process.pid,startedAt:1700000000000,startupToken:'foreign-runtime-token'}));
+  saveSnapshot('bind');setLock();
+  return {dir,ledger,ledgerFile,write,saveSnapshot,setLock,clearLock,
+    get state(){return state;},
+    setState(next){state=next;write('state.json',`${JSON.stringify(state,null,2)}\n`);saveSnapshot('save');},
+    advanceGeneration(generation,nextLedgerFile=ledgerFile){state={...state,engine:{...state.engine,generation,ledgerFile:nextLedgerFile}};}};
+}
 
 const git=(command,args,options)=>spawnSync(command,args,options);
 const run=(cwd,...args)=>{const result=git('git',args,{cwd,encoding:'utf8',windowsHide:true});assert.equal(result.status,0,result.stderr);return result.stdout.trim();};
@@ -30,13 +73,9 @@ function fixture(t,{managed=false,local=false,foreignRuntime=false,foreignPin=fa
   }
   let foreign=null;
   if(foreignRuntime){
-    const worktree=path.join(temp,'backend-branch');run(owner,'worktree','add','--quiet','-b','foreign-runtime',worktree);const journalFile=path.join(temp,'runtime','foreign-journal.sqlite'),
-      store=createStore({repoRoot:owner,id:'other-workflow'}),journal=openJournal({file:journalFile}),state={schema:WORKFLOW_STATE,id:'other-workflow',approved:true,finished:false,
-        worktree,ledgerRoot:path.join(worktree,'.starciwork'),goalDigest:'a'.repeat(64),ops:[{id:'foreign-op',dispatch:'ctx-foreign',launch:{dispatch:'ctx-foreign'},reports:[]}],
-        engine:{schema:'starci/engine@1',generation:4,journalFile,...(foreignPin?{runtimePin:sealRuntime({sourceRoot:process.cwd(),buildsRoot:path.join(temp,'foreign-builds'),version:'1.0.0'})}:{})}};
-    store.bindJournal(journal,4,{state});store.saveState(state);store.appendEvent({event:'foreign-kernel-ready'});
-    fs.writeFileSync(path.join(store.dir,'kernel.lock'),JSON.stringify({pid:process.pid,startedAt:1700000000000,startupToken:'foreign-runtime-token'}));
-    foreign={worktree,store,journal,state};
+    const worktree=path.join(temp,'backend-branch');run(owner,'worktree','add','--quiet','-b','foreign-runtime',worktree);
+    const pin=foreignPin?sealRuntime({sourceRoot:process.cwd(),buildsRoot:path.join(temp,'foreign-builds'),version:'1.0.0'}):null;
+    foreign=foreignLedgerWorkflow({owner,worktree,pin});
   }
   const roots=[{id:'source',role:'source',repoRoot:source,primary:true,allowlist:['src/**'],references:[{kind:'file',ref:'source-rule.md',sourceRef:'source-rule.md',rootId:'source',rootRole:'source',path:'source-rule.md'}],
     inputPaths:[{kind:'file',ref:'source-rule.md',sourceRef:'source-rule.md',rootId:'source',rootRole:'source',path:'source-rule.md'}],oraclePaths:[],ownedDirtyPaths:[],runtimePaths:[],runtimeManagedFiles:[],workerWritable:true,runtimeWritable:false,readOnly:false},
@@ -45,7 +84,7 @@ function fixture(t,{managed=false,local=false,foreignRuntime=false,foreignPin=fa
     runtimeManagedFiles:managed?[{path:'.starciwork/workflows/wf.md',start:'<!-- starci:continuation:start -->',end:'<!-- starci:continuation:end -->'}]:[],workerWritable:true,runtimeWritable:managed,readOnly:false}];
   const control=path.join(temp,'control'),worker=path.join(temp,'worker'),bridge=beginDetectionCandidate({identity:{workflowId:'wf',opId:'frontend',attempt:1,generation:2,jobId:'job-roots'},
     workerRoot:worker,controlRoot:control,roots,bindingDigest:candidateRootBindingDigest(roots),git,environmentDigest:'env'});
-  t.after(()=>{foreign?.journal.close();fs.rmSync(temp,{recursive:true,force:true});});return {temp,source,owner,roots,bridge,control,foreign};
+  t.after(()=>{foreign?.ledger.close();fs.rmSync(temp,{recursive:true,force:true});});return {temp,source,owner,roots,bridge,control,foreign};
 }
 
 test('two real repositories accept both routed Work report spellings while unchanged extras stay diagnostic',t=>{
@@ -70,10 +109,24 @@ test('aggregate sealing rejects unreported per-root changes and protected-input 
   assert.ok(unreported.reasons.some(reason=>reason.includes('unreported-changed-file:')&&reason.includes('capture.txt')));
   const drift=fixture(t);fs.writeFileSync(path.join(drift.owner,'.starciwork/rule.md'),'tampered protected input\n');
   const refused=freezeDetectionCandidate(drift.bridge,{git,requireReported:true,reportedFiles:[path.join(drift.owner,'.starciwork/rule.md')]});assert.equal(refused.status,'quarantine');
-  assert.ok(refused.reasons.some(reason=>reason==='work:outside-allowlist:.starciwork/rule.md'));
+  assert.ok(refused.reasons.some(reason=>reason==='work:custody-path-touched:.starciwork/rule.md'));
+});
+
+test('the kernel\'s .starciwork footprint is the ledger record alone; it is invisible without any housekeeping identity',t=>{
+  const accepted=fixture(t,{local:true}),workFile=path.join(accepted.owner,'.starciwork/evidence/capture.txt');
+  fs.writeFileSync(path.join(accepted.source,'src/app.js'),'new source\n');fs.writeFileSync(workFile,'new evidence\n');
+  fs.mkdirSync(path.join(accepted.owner,'.starciwork'),{recursive:true});
+  fs.writeFileSync(path.join(accepted.owner,'.starciwork','runtime.sqlite'),'live ledger bytes');
+  fs.writeFileSync(path.join(accepted.owner,'.starciwork','runtime.sqlite-wal'),'wal bytes');
+  fs.writeFileSync(path.join(accepted.owner,'.starciwork','runtime.sqlite-shm'),'shm bytes');
+  const sealed=freezeDetectionCandidate(accepted.bridge,{git,requireReported:true,reportedFiles:['src/app.js','.starciwork/evidence/capture.txt']});
+  assert.equal(sealed.status,'sealed',JSON.stringify(sealed.reasons));
+  assert.deepEqual(sealed.housekeepingObserved,[]);
 });
 
 test('exact current-workflow housekeeping is exempt without entering the candidate payload',t=>{
+  // store.mjs has not migrated off `_local` yet - its own dispatch's projection stays exempt by trusted
+  // identity, named exactly, while every other `.starciwork` path is still custody evidence.
   const accepted=fixture(t,{local:true}),workFile=path.join(accepted.owner,'.starciwork/evidence/capture.txt'),dispatch='ctx-owned';
   fs.writeFileSync(path.join(accepted.source,'src/app.js'),'new source\n');fs.writeFileSync(workFile,'new evidence\n');
   write(accepted.owner,'.starciwork/_local/workflows/wf/state.json','kernel state after launch\n');
@@ -93,29 +146,23 @@ test('exact current-workflow housekeeping is exempt without entering the candida
   ].sort());
 });
 
-test('the same quarantined candidate can seal after exact supervisor diagnostics are recognized, while arbitrary logs remain fenced',t=>{
-  const recovered=fixture(t),report=path.join(recovered.source,'src/app.js');
-  fs.writeFileSync(report,'new source\n');write(recovered.owner,'.starciwork/_local/workflows/supervisor.log','{"event":"round"}\n');
-  const first=freezeDetectionCandidate(recovered.bridge,{git,requireReported:true,reportedFiles:['src/app.js']});
-  assert.equal(first.status,'quarantine');assert.ok(first.reasons.includes('work:outside-allowlist:.starciwork/_local/workflows/supervisor.log'));
-  assert.equal(fs.existsSync(path.join(recovered.bridge.snapshot.controlRoot,'candidate.json')),false,'quarantine precedes aggregate sealing');
-  const sealed=freezeDetectionCandidate(recovered.bridge,{git,requireReported:true,reportedFiles:['src/app.js'],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
-  assert.equal(sealed.status,'sealed',JSON.stringify(sealed.reasons));assert.ok(sealed.housekeepingObserved.some(file=>file.endsWith('/.starciwork/_local/workflows/supervisor.log')));
-
-  const refused=fixture(t);fs.writeFileSync(path.join(refused.source,'src/app.js'),'new source\n');write(refused.owner,'.starciwork/_local/workflows/audit.log','arbitrary\n');
-  const arbitrary=freezeDetectionCandidate(refused.bridge,{git,requireReported:true,reportedFiles:['src/app.js'],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
-  assert.equal(arbitrary.status,'quarantine');assert.ok(arbitrary.reasons.includes('work:outside-allowlist:.starciwork/_local/workflows/audit.log'));
+test('a stray write elsewhere under .starciwork stays fenced even with a housekeeping identity supplied',t=>{
+  const refused=fixture(t);fs.writeFileSync(path.join(refused.source,'src/app.js'),'new source\n');
+  write(refused.owner,'.starciwork/_local/workflows/audit.log','arbitrary\n');
+  const quarantined=freezeDetectionCandidate(refused.bridge,{git,requireReported:true,reportedFiles:['src/app.js'],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
+  assert.equal(quarantined.status,'quarantine');
+  assert.ok(quarantined.reasons.includes('work:custody-path-touched:.starciwork/_local/workflows/audit.log'),JSON.stringify(quarantined.reasons));
 });
 
-test('a journal-backed live kernel may update another workflow in the shared Work store, but an unacknowledged projection cannot',t=>{
-  const accepted=fixture(t,{foreignRuntime:true}),next={...accepted.foreign.state,phase:'done',iteration:2,finished:{outcome:'done'}};
-  accepted.foreign.store.saveState(next);accepted.foreign.store.appendEvent({event:'foreign-kernel-progress',iteration:2});
-  fs.writeFileSync(accepted.foreign.store.contractPath('foreign-op'),'foreign contract\n');accepted.foreign.store.acknowledgeRuntimeFile(accepted.foreign.store.contractPath('foreign-op'),'contracts/foreign-op.md','replace');
-  fs.writeFileSync(accepted.foreign.store.checksPath('foreign-op'),'{}\n');accepted.foreign.store.acknowledgeRuntimeFile(accepted.foreign.store.checksPath('foreign-op'),'checks/foreign-op.json','replace');
-  fs.writeFileSync(accepted.foreign.store.checksPath('foreign-op-kernel'),'{}\n');accepted.foreign.store.acknowledgeRuntimeFile(accepted.foreign.store.checksPath('foreign-op-kernel'),'checks/foreign-op-kernel.json','replace');
-  fs.writeFileSync(accepted.foreign.store.reportPath('ctx-foreign'),'{}\n');accepted.foreign.store.acknowledgeRuntimeFile(accepted.foreign.store.reportPath('ctx-foreign'),'reports/ctx-foreign.json','replace');
-  const finishedLock=path.join(accepted.foreign.store.dir,'kernel.lock');fs.rmSync(finishedLock);accepted.foreign.store.acknowledgeRuntimeFile(finishedLock,'kernel.lock','delete');
-  const retired=retireFinishedWorkflowRows(accepted.foreign.store,next);assert.equal(retired.ok,true);assert.equal(retired.retained.snapshots,1);assert.ok(retired.retained.runtimeFileReceipts>=7);
+test('a ledger-backed live kernel may update another workflow in the shared Work store, but an unacknowledged projection cannot',t=>{
+  const accepted=fixture(t,{foreignRuntime:true}),foreign=accepted.foreign;
+  foreign.setState({...foreign.state,phase:'done',iteration:2,finished:{outcome:'done'}});
+  foreign.write('events.jsonl','own events\nforeign-kernel-progress\n');
+  foreign.write('contracts/foreign-op.md','foreign contract\n');
+  foreign.write('checks/foreign-op.json','{}\n');
+  foreign.write('checks/foreign-op-kernel.json','{}\n');
+  foreign.write('reports/ctx-foreign.json','{}\n');
+  foreign.write('kernel.lock',null);foreign.clearLock();
   const sealed=freezeDetectionCandidate(accepted.bridge,{git,reportedFiles:[],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
   assert.equal(sealed.status,'sealed',JSON.stringify(sealed.reasons));
   assert.deepEqual(sealed.runtimeAcknowledgements.map(item=>[item.rootId,item.workflowId,item.paths.map(path=>path.path).sort()]),[[
@@ -125,56 +172,54 @@ test('a journal-backed live kernel may update another workflow in the shared Wor
       '.starciwork/_local/workflows/other-workflow/state.json'].sort()]]);
   assert.ok(sealed.packet.runtimeHousekeepingWriters.some(item=>item.rootId==='work'&&item.workflowId==='other-workflow'&&item.generation===4));
 
-  const tampered=fixture(t,{foreignRuntime:true}),stateFile=tampered.foreign.store.paths.state,forged={...tampered.foreign.state,phase:'worker-forged'};
-  fs.writeFileSync(stateFile,`${JSON.stringify(forged,null,2)}\n`);
+  const tampered=fixture(t,{foreignRuntime:true});
+  fs.writeFileSync(path.join(tampered.foreign.dir,'state.json'),`${JSON.stringify({...tampered.foreign.state,phase:'worker-forged'},null,2)}\n`);
   const refused=freezeDetectionCandidate(tampered.bridge,{git,reportedFiles:[],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
   assert.equal(refused.status,'quarantine');
-  assert.ok(refused.reasons.includes('work:outside-allowlist:.starciwork/_local/workflows/other-workflow/state.json'),JSON.stringify(refused.reasons));
+  assert.ok(refused.reasons.includes('work:custody-path-touched:.starciwork/_local/workflows/other-workflow/state.json'),JSON.stringify(refused.reasons));
 
-  const forgedEvent=fixture(t,{foreignRuntime:true}),eventsFile=forgedEvent.foreign.store.paths.events;
-  fs.appendFileSync(eventsFile,`${JSON.stringify({at:Date.now(),seq:2,event:'forged-valid-tail'})}\n`);
+  const forgedEvent=fixture(t,{foreignRuntime:true});
+  fs.appendFileSync(path.join(forgedEvent.foreign.dir,'events.jsonl'),`${JSON.stringify({at:Date.now(),seq:2,event:'forged-valid-tail'})}\n`);
   const eventRefused=freezeDetectionCandidate(forgedEvent.bridge,{git,reportedFiles:[],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
   assert.equal(eventRefused.status,'quarantine');
-  assert.ok(eventRefused.reasons.includes('work:outside-allowlist:.starciwork/_local/workflows/other-workflow/events.jsonl'),JSON.stringify(eventRefused.reasons));
+  assert.ok(eventRefused.reasons.includes('work:custody-path-touched:.starciwork/_local/workflows/other-workflow/events.jsonl'),JSON.stringify(eventRefused.reasons));
 
-  const rolledBack=fixture(t,{foreignRuntime:true}),rollbackEvents=rolledBack.foreign.store.paths.events;
-  rolledBack.foreign.store.appendEvent({event:'legitimate-first'});const staleBytes=fs.readFileSync(rollbackEvents);
-  rolledBack.foreign.store.appendEvent({event:'legitimate-latest'});fs.writeFileSync(rollbackEvents,staleBytes);
+  const rolledBack=fixture(t,{foreignRuntime:true});
+  rolledBack.foreign.write('events.jsonl','legitimate-first\n');
+  const staleBytes=fs.readFileSync(path.join(rolledBack.foreign.dir,'events.jsonl'));
+  rolledBack.foreign.write('events.jsonl','legitimate-first\nlegitimate-latest\n');
+  fs.writeFileSync(path.join(rolledBack.foreign.dir,'events.jsonl'),staleBytes);
   const rollbackRefused=freezeDetectionCandidate(rolledBack.bridge,{git,reportedFiles:[],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
   assert.equal(rollbackRefused.status,'quarantine');
-  assert.ok(rollbackRefused.reasons.includes('work:outside-allowlist:.starciwork/_local/workflows/other-workflow/events.jsonl'),JSON.stringify(rollbackRefused.reasons));
+  assert.ok(rollbackRefused.reasons.includes('work:custody-path-touched:.starciwork/_local/workflows/other-workflow/events.jsonl'),JSON.stringify(rollbackRefused.reasons));
 
-  const forgedArtifacts=fixture(t,{foreignRuntime:true});fs.writeFileSync(forgedArtifacts.foreign.store.checksPath('foreign-op'),'forged checks\n');
-  fs.writeFileSync(forgedArtifacts.foreign.store.reportPath('ctx-foreign'),'forged report\n');
+  const forgedArtifacts=fixture(t,{foreignRuntime:true});
+  fs.mkdirSync(path.join(forgedArtifacts.foreign.dir,'checks'),{recursive:true});fs.writeFileSync(path.join(forgedArtifacts.foreign.dir,'checks','foreign-op.json'),'forged checks\n');
+  fs.mkdirSync(path.join(forgedArtifacts.foreign.dir,'reports'),{recursive:true});fs.writeFileSync(path.join(forgedArtifacts.foreign.dir,'reports','ctx-foreign.json'),'forged report\n');
   const forgedArtifactsRefused=freezeDetectionCandidate(forgedArtifacts.bridge,{git,reportedFiles:[],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
   assert.equal(forgedArtifactsRefused.status,'quarantine');
-  assert.ok(forgedArtifactsRefused.reasons.includes('work:outside-allowlist:.starciwork/_local/workflows/other-workflow/checks/foreign-op.json'));
-  assert.ok(forgedArtifactsRefused.reasons.includes('work:outside-allowlist:.starciwork/_local/workflows/other-workflow/reports/ctx-foreign.json'));
+  assert.ok(forgedArtifactsRefused.reasons.includes('work:custody-path-touched:.starciwork/_local/workflows/other-workflow/checks/foreign-op.json'));
+  assert.ok(forgedArtifactsRefused.reasons.includes('work:custody-path-touched:.starciwork/_local/workflows/other-workflow/reports/ctx-foreign.json'));
 
-  const changedAfterReceipt=fixture(t,{foreignRuntime:true});fs.writeFileSync(changedAfterReceipt.foreign.store.reportPath('ctx-foreign'),'trusted report\n');
-  changedAfterReceipt.foreign.store.acknowledgeRuntimeFile(changedAfterReceipt.foreign.store.reportPath('ctx-foreign'),'reports/ctx-foreign.json','replace');
-  fs.writeFileSync(changedAfterReceipt.foreign.store.reportPath('ctx-foreign'),'tampered after receipt\n');
+  const changedAfterReceipt=fixture(t,{foreignRuntime:true});
+  changedAfterReceipt.foreign.write('reports/ctx-foreign.json','trusted report\n');
+  fs.writeFileSync(path.join(changedAfterReceipt.foreign.dir,'reports','ctx-foreign.json'),'tampered after receipt\n');
   const changedAfterReceiptRefused=freezeDetectionCandidate(changedAfterReceipt.bridge,{git,reportedFiles:[],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
   assert.equal(changedAfterReceiptRefused.status,'quarantine');
-  assert.ok(changedAfterReceiptRefused.reasons.includes('work:outside-allowlist:.starciwork/_local/workflows/other-workflow/reports/ctx-foreign.json'));
+  assert.ok(changedAfterReceiptRefused.reasons.includes('work:custody-path-touched:.starciwork/_local/workflows/other-workflow/reports/ctx-foreign.json'));
 });
 
 test('a verified foreign runtime may advance generation while exact new-generation bytes and native artifacts remain attributable',t=>{
-  const f=fixture(t,{foreignRuntime:true,foreignPin:true}),nextJournal=path.join(f.temp,'runtime','foreign-journal-g5.sqlite'),next={...f.foreign.state,phase:'retried',
-    engine:{...f.foreign.state.engine,generation:5,journalFile:nextJournal}};
-  const journal=openJournal({file:nextJournal});
-  try{
-    f.foreign.store.unbindJournal(f.foreign.journal).bindJournal(journal,5,{state:next});
-    f.foreign.store.saveState(next);f.foreign.store.appendEvent({event:'workflow-retried',generation:5});
-    fs.writeFileSync(f.foreign.store.reportPath('ctx-foreign'),'new generation report\n');f.foreign.store.acknowledgeRuntimeFile(f.foreign.store.reportPath('ctx-foreign'),'reports/ctx-foreign.json','replace');
-    const lock=path.join(f.foreign.store.dir,'kernel.lock');fs.rmSync(lock);f.foreign.store.acknowledgeRuntimeFile(lock,'kernel.lock','delete');
-    const sealed=freezeDetectionCandidate(f.bridge,{git,reportedFiles:[],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
-    assert.equal(sealed.status,'sealed',JSON.stringify(sealed.reasons));
-    const acknowledged=sealed.runtimeAcknowledgements.find(item=>item.workflowId==='other-workflow');
-    assert.equal(acknowledged.previousGeneration,4);assert.equal(acknowledged.generation,5);assert.equal(acknowledged.previousJournalFile,f.foreign.state.engine.journalFile.replaceAll('\\','/'));
-    assert.ok(acknowledged.paths.some(item=>item.path.endsWith('/state.json')&&item.journalSeq>0));
-    assert.ok(acknowledged.paths.some(item=>item.path.endsWith('/reports/ctx-foreign.json')&&item.journalSeq>0));
-  }finally{f.foreign.store.unbindJournal(journal);journal.close();}
+  const f=fixture(t,{foreignRuntime:true,foreignPin:true}),foreign=f.foreign,previousLedgerFile=foreign.ledgerFile.replaceAll('\\','/');
+  foreign.advanceGeneration(5);foreign.setState({...foreign.state,phase:'retried'});
+  foreign.write('reports/ctx-foreign.json','new generation report\n');
+  foreign.write('kernel.lock',null);foreign.clearLock();
+  const sealed=freezeDetectionCandidate(f.bridge,{git,reportedFiles:[],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
+  assert.equal(sealed.status,'sealed',JSON.stringify(sealed.reasons));
+  const acknowledged=sealed.runtimeAcknowledgements.find(item=>item.workflowId==='other-workflow');
+  assert.equal(acknowledged.previousGeneration,4);assert.equal(acknowledged.generation,5);assert.equal(acknowledged.previousLedgerFile,previousLedgerFile);
+  assert.ok(acknowledged.paths.some(item=>item.path.endsWith('/state.json')&&item.ledgerSeq>0));
+  assert.ok(acknowledged.paths.some(item=>item.path.endsWith('/reports/ctx-foreign.json')&&item.ledgerSeq>0));
 });
 
 test('ignored unrelated local mutations and deletion are caught on source and Work roots',t=>{
@@ -184,9 +229,9 @@ test('ignored unrelated local mutations and deletion are caught on source and Wo
   write(refused.owner,'.starciwork/_local/evidence-staging/new/unrelated.txt','worker created unrelated local evidence\n');
   const contaminated=freezeDetectionCandidate(refused.bridge,{git,reportedFiles:[],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
   assert.equal(contaminated.status,'quarantine');
-  assert.ok(contaminated.reasons.includes('source:outside-allowlist:.starciwork/_local/workflows/other/state.json'),JSON.stringify(contaminated.reasons));
-  assert.ok(contaminated.reasons.includes('source:outside-allowlist:.starciwork/_local/inputs/unrelated.txt'),JSON.stringify(contaminated.reasons));
-  assert.ok(contaminated.reasons.includes('work:outside-allowlist:.starciwork/_local/evidence-staging/new/unrelated.txt'),JSON.stringify(contaminated.reasons));
+  assert.ok(contaminated.reasons.includes('source:custody-path-touched:.starciwork/_local/workflows/other/state.json'),JSON.stringify(contaminated.reasons));
+  assert.ok(contaminated.reasons.includes('source:custody-path-touched:.starciwork/_local/inputs/unrelated.txt'),JSON.stringify(contaminated.reasons));
+  assert.ok(contaminated.reasons.includes('work:custody-path-touched:.starciwork/_local/evidence-staging/new/unrelated.txt'),JSON.stringify(contaminated.reasons));
 });
 
 test('aggregate replay preserves a partially sealed root and catches deletion and source identity drift',t=>{
@@ -211,7 +256,7 @@ test('backend-owned continuation ignores only its managed section and remains bo
   const other=fixture(t,{managed:true}),otherBrief=path.join(other.owner,'.starciwork/workflows/wf.md');
   fs.writeFileSync(otherBrief,'Changed human note\n<!-- starci:continuation:start -->\nnew\n<!-- starci:continuation:end -->\n');
   const refused=freezeDetectionCandidate(other.bridge,{git,requireReported:true,reportedFiles:[]});assert.equal(refused.status,'quarantine');
-  assert.ok(refused.reasons.some(reason=>reason.includes('pre-existing-user-work-modified:.starciwork/workflows/wf.md')||reason.includes('outside-allowlist:.starciwork/workflows/wf.md')));
+  assert.ok(refused.reasons.some(reason=>reason.includes('pre-existing-user-work-modified:.starciwork/workflows/wf.md')||reason.includes('custody-path-touched:.starciwork/workflows/wf.md')));
 });
 
 test('runtime-managed continuation follows the attested workflow store when the source and loaded Work roots are worktrees',t=>{

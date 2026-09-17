@@ -56,6 +56,25 @@ test('modifying pre-existing user work or writing outside allowlist quarantines 
   assert.ok(result.reasons.some(reason=>reason.startsWith('pre-existing-user-work-modified:keep.txt')));assert.ok(result.reasons.includes('outside-allowlist:escape.txt'));
   assert.equal(fs.readFileSync(path.join(f.root,'keep.txt'),'utf8'),'worker collision\n');});
 
+test('a write under .starciwork quarantines as custody-path-touched, never as ordinary scope drift',t=>{
+  // The ledger record itself is never inventoried (see runtimeLocalPaths' ledgerRecord skip) - its custody
+  // comes from the allowlist compiler refusing the scope up front. Any other `.starciwork` path is still
+  // walked and hashed, so a stray write there is what this classification exists to catch.
+  const f=fixture(t);fs.mkdirSync(path.join(f.root,'.starciwork','_local'),{recursive:true});fs.writeFileSync(path.join(f.root,'.starciwork','_local','rogue.json'),'tampered bytes');
+  const result=freezeDetectionCandidate(f.bridge,{git});assert.equal(result.status,'quarantine');
+  assert.ok(result.reasons.includes('custody-path-touched:.starciwork/_local/rogue.json'),JSON.stringify(result.reasons));
+  assert.equal(result.reasons.some(reason=>reason.startsWith('outside-allowlist:')),false,'a custody-path write is never reported as ordinary scope drift');
+});
+
+test('an allowlist covering the ledger record is refused at candidate open, not observed later',t=>{
+  const root=cloneTemplate(t,appBase,'starci-ledger-scope-'),parent=path.dirname(root);
+  const identity={workflowId:'wf',opId:'op',attempt:1,generation:1,jobId:'job-ledger'};
+  for(const entry of ['.starciwork','.starciwork/**','.starciwork/runtime.sqlite','.starciwork/runtime.sqlite-journal','.starciwork/runtime.sqlite-wal','.starciwork/runtime.sqlite-shm'])
+    assert.throws(()=>beginDetectionCandidate({identity,repoRoot:root,workerRoot:path.join(parent,`${path.basename(root)}-candidate`),
+      controlRoot:path.join(parent,`${path.basename(root)}-control`),allowlist:[entry],references:[],git,environmentDigest:'env'}),
+      /scope-covers-ledger/,`allowlist entry ${entry} must be refused`);
+});
+
 test('only the owned continuation managed section is excluded; changing adjacent human notes is still a full-delta collision',t=>{
   const root=cloneTemplate(t,appBase,'starci-managed-'),start='<!-- managed:start -->',end='<!-- managed:end -->';fs.mkdirSync(path.join(root,'workflows'));
   fs.writeFileSync(path.join(root,'workflows','wf.md'),`# Human handoff\nkeep me\n\n${start}\nold runtime projection\n${end}\n`);run(root,'add','-A');run(root,'commit','--quiet','-m','continuation');
@@ -220,15 +239,16 @@ test('runtime acknowledgement rebaselines an allowlisted path but protects an ac
   assert.equal(refused.status,'quarantine');assert.ok(refused.reasons.includes(`kernel-owned-write-drift:${protectedPath}`),JSON.stringify(refused.reasons));
 });
 
-test('goal-staged _local inputs are readable references while live workflow state stays excluded',t=>{
+test('the whole .starciwork subtree is excluded from candidate references, staged inputs included',t=>{
   const root=cloneTemplate(t,appBase,'starci-inputs-'),parent=path.dirname(root);
   const input=path.join(root,'.starciwork','_local','inputs','wf','1-handoff.md');fs.mkdirSync(path.dirname(input),{recursive:true});fs.writeFileSync(input,'owner staged bytes\n');
   const live=path.join(root,'.starciwork','_local','workflows','wf','state.json');fs.mkdirSync(path.dirname(live),{recursive:true});fs.writeFileSync(live,'{}\n');
   const identity={workflowId:'wf',opId:'op',attempt:1,generation:1,jobId:'job-in'};
-  const bridge=beginDetectionCandidate({identity,repoRoot:root,workerRoot:path.join(parent,'in-candidate'),controlRoot:path.join(parent,'in-control'),
-    allowlist:['src/**'],references:['.starciwork/_local/inputs/wf/1-handoff.md'],git,environmentDigest:'env'});
-  t.after(()=>{fs.rmSync(bridge.snapshot.workerRoot,{recursive:true,force:true});fs.rmSync(bridge.snapshot.controlRoot,{recursive:true,force:true});});
-  assert.ok(bridge.snapshot.source.entries.some(item=>item.path==='.starciwork/_local/inputs/wf/1-handoff.md'),'the frozen owner input is attested in the snapshot');
+  // Goal-staged owner inputs are ledger rows now (`inputs.materialise`), never a `.starciwork` path a candidate
+  // can reference directly: the retired `_local/inputs` exception is gone along with everything else under it.
+  assert.throws(()=>beginDetectionCandidate({identity,repoRoot:root,workerRoot:path.join(parent,'in-candidate'),controlRoot:path.join(parent,'in-control'),
+    allowlist:['src/**'],references:['.starciwork/_local/inputs/wf/1-handoff.md'],git,environmentDigest:'env'}),
+    /not a readable, permitted source file/,'a staged _local input is no longer a candidate reference');
   assert.throws(()=>beginDetectionCandidate({identity:{...identity,jobId:'job-live'},repoRoot:root,
     workerRoot:path.join(parent,'live-candidate'),controlRoot:path.join(parent,'live-control'),
     allowlist:['src/**'],references:['.starciwork/_local/workflows/wf/state.json'],git,environmentDigest:'env'}),

@@ -2,9 +2,9 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {CANDIDATE_PACKET,CANDIDATE_SNAPSHOT,bindRuntimeInputs,createCandidateSnapshot,sealCandidate,verifyCandidateIdentity,walkFiles} from './candidates.mjs';
-import {parseRef} from './common.mjs';
+import {coversLedgerScope,parseRef} from './common.mjs';
 import {candidateDisplayPath,candidateRootBindingDigest,pathInCandidateRoots} from './candidate-roots.mjs';
-import {inspectJournal} from './journal.mjs';
+import {inspectLedger,ledgerFileFor} from './ledger-db.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
 import {RUNTIME_FILE_WRITE} from './store.mjs';
 
@@ -123,10 +123,11 @@ const trackedFor=(git,root,scopes)=>{
   if(!scopes.length)return [];
   return execGit(git,root,['ls-files','-z','--',...scopes]).split('\0').map(clean).filter(Boolean);
 };
-// `.starciwork/_local/inputs/` is the one permitted `_local` subtree: goal staging copies owner-named external
-// files there, digest-bound, precisely so the candidate provenance rule can read them (see stageExternalInputs).
+// `.starciwork/_local/` is retired kernel authority and `runtime.sqlite*` is the workflow record itself: neither
+// may enter a candidate baseline, reference or oracle. The Work tree's product files stay readable.
 const DEFAULT_EXCLUDED=[/(^|\/)\.git(\/|$)/,/(^|\/)node_modules(\/|$)/,/(^|\/)(dist|build|coverage|\.cache)(\/|$)/,
-  /(^|\/)\.env([^/]*)$/,/(^|\/)(secrets?|credentials?)(\.|\/|$)/,/\.(pem|p12|pfx|key|enc)$/i,/(^|\/)\.starciwork\/_local\/(?!inputs(?:\/|$))/,/(^|\/)\.starciwork\/_resources(\/|$)/];
+  /(^|\/)\.env([^/]*)$/,/(^|\/)(secrets?|credentials?)(\.|\/|$)/,/\.(pem|p12|pfx|key|enc)$/i,/(^|\/)\.starciwork\/_local(\/|$)/,
+  /(^|\/)\.starciwork\/runtime\.sqlite(-journal|-wal|-shm)?$/,/(^|\/)\.starciwork\/_resources(\/|$)/];
 const safeTracked=file=>!DEFAULT_EXCLUDED.some(pattern=>pattern.test(clean(file)));
 export function candidateDependencyPlan(root,{declared=null,required=true}={}){
   if(typeof declared==='string'&&declared.trim())return {manager:'declared',command:declared.trim(),lifecycleScripts:'caller-declared'};
@@ -157,13 +158,17 @@ function externalDependencyLinks(candidateRoot){
       const item=fs.lstatSync(target);if(item.isDirectory()&&!item.isSymbolicLink())inspectTree(target);}};
   inspectTree(base);return [...new Set(outside)].sort();
 }
-const runtimeInternal=file=>/(^|\/)\.starciwork\/_local(\/|$)/.test(clean(file));
-// Local workflow state is intentionally absent from candidate/model payloads, but it is still inventoried here.
+// The whole `.starciwork` subtree is runtime custody, never Git-stream drift: Work-tree writes reach the
+// candidate through the ledger inventory below, and the record file itself is never inventoried at all.
+const runtimeInternal=file=>/(^|\/)\.starciwork(\/|$)/.test(clean(file));
+const ledgerRecord=file=>/(^|\/)\.starciwork\/runtime\.sqlite(-journal|-wal|-shm)?$/.test(clean(file));
+// Runtime state is intentionally absent from candidate/model payloads, but it is still inventoried here.
 // This walk includes Git-ignored files and hashes only their state; it never copies their bytes into a snapshot.
 const runtimeLocalPaths=root=>{
-  const base=path.join(path.resolve(root),'.starciwork','_local'),found=[];
+  const base=path.join(path.resolve(root),'.starciwork'),found=[];
   const walk=at=>{let entries=[];try{entries=fs.readdirSync(at,{withFileTypes:true});}catch{return;}
     for(const item of entries){const absolute=path.join(at,item.name),relative=clean(path.relative(root,absolute));
+      if(ledgerRecord(relative))continue;
       if(item.isDirectory()&&!item.isSymbolicLink())walk(absolute);else found.push(relative);}};
   walk(base);return found.sort();
 };
@@ -171,50 +176,60 @@ const readJson=file=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch
 const stable=value=>Array.isArray(value)?value.map(stable):value&&typeof value==='object'
   ?Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])])):value;
 const jsonDigest=value=>sha256(JSON.stringify(stable(value)));
-const durableProjection=(workflowId,generation,journalFile)=>{let journal;try{
-    journal=inspectJournal({file:journalFile});
-    const row=journal.db.prepare('SELECT goal_identity,state_json FROM state_snapshots WHERE workflow_id=? AND generation=? AND state_json<>\'\' ORDER BY snapshot_id DESC LIMIT 1').get(workflowId,generation);
+const durableProjection=(workflowId,generation,ledgerFile)=>{let ledger;try{
+    ledger=inspectLedger({file:ledgerFile});
+    const row=ledger.db.prepare('SELECT goal_identity,state_json FROM state_snapshots WHERE workflow_id=? AND generation=? AND state_json<>\'\' ORDER BY snapshot_id DESC LIMIT 1').get(workflowId,generation);
     if(!row?.state_json)return null;const state=JSON.parse(row.state_json);return {state,goalIdentity:row.goal_identity};
-  }catch{return null;}finally{journal?.close();}};
+  }catch{return null;}finally{ledger?.close();}};
+// The newest snapshot body a workflow carries in the ledger, whatever generation it enrolled under.
+const latestProjection=(workflowId,ledgerFile)=>{let ledger;try{
+    ledger=inspectLedger({file:ledgerFile});
+    const row=ledger.db.prepare('SELECT generation,goal_identity,state_json FROM state_snapshots WHERE workflow_id=? AND state_json<>\'\' ORDER BY snapshot_id DESC LIMIT 1').get(workflowId);
+    if(!row?.state_json)return null;const state=JSON.parse(row.state_json);return {state,goalIdentity:row.goal_identity,generation:row.generation};
+  }catch{return null;}finally{ledger?.close();}};
 const samePath=(a,b)=>{try{return slash(fs.realpathSync(path.resolve(a))).toLowerCase()===slash(fs.realpathSync(path.resolve(b))).toLowerCase();}catch{return false;}};
 const commonStoreOwner=(git,worktree)=>{try{const result=git('git',['rev-parse','--git-common-dir'],{cwd:worktree,encoding:'utf8',windowsHide:true});if(result?.status!==0)return null;
     const common=path.resolve(worktree,String(result.stdout??'').trim());return path.basename(common).toLowerCase()==='.git'?path.dirname(common):null;}catch{return null;}};
-const lastCustodySeq=(workflowId,generation,journalFile)=>{let journal;try{journal=inspectJournal({file:journalFile});
-    return Number(journal.db.prepare("SELECT COALESCE(max(seq),0) AS seq FROM events WHERE workflow_id=? AND generation=? AND entity_type='runtime-file' AND kind='runtime-file-written'").get(workflowId,generation)?.seq??0);
-  }catch{return null;}finally{journal?.close();}};
+const lastCustodySeq=(workflowId,generation,ledgerFile)=>{let ledger;try{ledger=inspectLedger({file:ledgerFile});
+    return Number(ledger.db.prepare("SELECT COALESCE(max(seq),0) AS seq FROM events WHERE workflow_id=? AND generation=? AND entity_type='runtime-file' AND kind='runtime-file-written'").get(workflowId,generation)?.seq??0);
+  }catch{return null;}finally{ledger?.close();}};
 const safeSegment=value=>typeof value==='string'&&value.length>0&&!value.includes('/')&&!value.includes('\\')?value:null;
 const runtimePinDigest=state=>/^[a-f0-9]{64}$/.test(String(state?.engine?.runtimePin?.digest??''))?state.engine.runtimePin.digest:null;
-// A foreign workflow may legitimately project state into a shared Git common-dir store while its source and
-// authored Work stay in a branch checkout. The journal and common-dir routing are captured before launch; later
-// exceptions require an exact post-baseline byte receipt written by the store, never a live pid or event shape.
+// Foreign workflows sharing this repository's ledger are enumerated from the ledger itself: every snapshot body
+// whose declared ledger file is this repo's `runtime.sqlite` and whose worktree shares the Git common dir is a
+// foreign runtime writer. Custody exceptions still require the exact post-baseline byte receipt the store wrote.
 const runtimeWriters=(root,ownWorkflow,git)=>{
-  const workflows=path.join(path.resolve(root),'.starciwork','_local','workflows'),records=[];let entries=[];
-  try{entries=fs.readdirSync(workflows,{withFileTypes:true});}catch{return records;}
-  for(const entry of entries){if(!entry.isDirectory()||entry.isSymbolicLink()||entry.name===String(ownWorkflow))continue;
-    const prefix=`.starciwork/_local/workflows/${entry.name}`,statePath=`${prefix}/state.json`,eventsPath=`${prefix}/events.jsonl`,lockPath=`${prefix}/kernel.lock`,
-      state=readJson(path.join(root,...statePath.split('/'))),generation=Number(state?.engine?.generation),journalGiven=state?.engine?.journalFile;
-    if(state?.schema!=='starci/workflow-state@1'||state.id!==entry.name||!Number.isInteger(generation)||generation<1||typeof journalGiven!=='string'||!journalGiven||
+  const file=ledgerFileFor(root);let ledger,rows=[];const records=[];
+  try{ledger=inspectLedger({file});
+    rows=ledger.db.prepare(`SELECT s.workflow_id,s.goal_identity,s.state_json FROM state_snapshots s
+      WHERE s.state_json<>'' AND s.snapshot_id=(SELECT max(snapshot_id) FROM state_snapshots WHERE workflow_id=s.workflow_id)`).all();
+  }catch{return records;}finally{ledger?.close();}
+  for(const row of rows){if(row.workflow_id===String(ownWorkflow))continue;
+    let state=null;try{state=JSON.parse(row.state_json);}catch{continue;}
+    const generation=Number(state?.engine?.generation),ledgerGiven=state?.engine?.ledgerFile;
+    if(state?.schema!=='starci/workflow-state@1'||state.id!==row.workflow_id||!Number.isInteger(generation)||generation<1||typeof ledgerGiven!=='string'||!ledgerGiven||
       typeof state.worktree!=='string'||!samePath(commonStoreOwner(git,state.worktree),root))continue;
-    let journalFile;try{journalFile=fs.realpathSync(path.resolve(journalGiven));}catch{continue;}
-    const durable=durableProjection(entry.name,generation,journalFile);if(!durable||jsonDigest(durable.state)!==jsonDigest(state))continue;
-    const custodySeq=lastCustodySeq(entry.name,generation,journalFile);if(custodySeq===null)continue;
-    records.push({workflowId:entry.name,generation,goalIdentity:durable.goalIdentity,journalFile:slash(journalFile),storeRoot:slash(fs.realpathSync(root)),
-      sourceRoot:slash(fs.realpathSync(state.worktree)),runtimePinDigest:runtimePinDigest(state),prefix,statePath,eventsPath,lockPath,custodyAfterSeq:custodySeq});
+    let ledgerFile;try{ledgerFile=fs.realpathSync(path.resolve(ledgerGiven));}catch{continue;}
+    if(!samePath(ledgerFile,file))continue;
+    const custodySeq=lastCustodySeq(row.workflow_id,generation,ledgerFile);if(custodySeq===null)continue;
+    records.push({workflowId:row.workflow_id,generation,goalIdentity:row.goal_identity,ledgerFile:slash(ledgerFile),storeRoot:slash(fs.realpathSync(root)),
+      sourceRoot:slash(fs.realpathSync(state.worktree)),runtimePinDigest:runtimePinDigest(state),
+      prefix:`.starciwork/_local/workflows/${row.workflow_id}`,custodyAfterSeq:custodySeq});
   }
   return records.sort((a,b)=>a.workflowId.localeCompare(b.workflowId));
 };
 const currentRuntimeWriter=(bridge,writer,git)=>{
-  const state=readJson(path.join(bridge.repoRoot,...writer.statePath.split('/'))),generation=Number(state?.engine?.generation),journalGiven=state?.engine?.journalFile;
-  if(state?.schema!=='starci/workflow-state@1'||state.id!==writer.workflowId||!Number.isInteger(generation)||generation<writer.generation||
+  const latest=latestProjection(writer.workflowId,writer.ledgerFile),state=latest?.state;
+  const generation=Number(state?.engine?.generation),ledgerGiven=state?.engine?.ledgerFile;
+  if(!state||state.schema!=='starci/workflow-state@1'||state.id!==writer.workflowId||!Number.isInteger(generation)||generation<writer.generation||
     typeof state.worktree!=='string'||!samePath(state.worktree,writer.sourceRoot)||!samePath(commonStoreOwner(git,state.worktree),bridge.repoRoot))return null;
-  let journalFile;try{journalFile=slash(fs.realpathSync(path.resolve(journalGiven??'')));}catch{return null;}
-  const transition=generation!==writer.generation||journalFile!==writer.journalFile,pinDigest=runtimePinDigest(state);
-  if(!transition&&journalFile!==writer.journalFile)return null;
+  let ledgerFile;try{ledgerFile=slash(fs.realpathSync(path.resolve(ledgerGiven??'')));}catch{return null;}
+  const transition=generation!==writer.generation||ledgerFile!==writer.ledgerFile,pinDigest=runtimePinDigest(state);
   if(transition&&!verifyRuntimePin(state?.engine?.runtimePin).ok)return null;
   if(!transition&&writer.runtimePinDigest&&pinDigest!==writer.runtimePinDigest)return null;
-  const durable=durableProjection(writer.workflowId,generation,journalFile);
+  const durable=durableProjection(writer.workflowId,generation,ledgerFile);
   if(!durable||durable.goalIdentity!==writer.goalIdentity||jsonDigest(durable.state)!==jsonDigest(state))return null;
-  return {...writer,state,generation,journalFile,pinDigest,transition,custodyAfterSeq:transition?0:writer.custodyAfterSeq};
+  return {...writer,state,generation,ledgerFile,pinDigest,transition,custodyAfterSeq:transition?0:writer.custodyAfterSeq};
 };
 const operationArtifacts=(writer,state)=>{
   const names=new Map(),add=(name,authority)=>{if(name)names.set(`${writer.prefix}/${name}`,{name,authority});};
@@ -231,15 +246,15 @@ const runtimeAuthority=(writer,artifacts,relative)=>{
   if(['state.json','events.jsonl','kernel.lock','stop.flag'].includes(name)||/^events\.g\d+\.jsonl$/.test(name))return {name,authority:'receipt'};
   return artifacts.get(relative)??null;
 };
-const custodyReceipt=(bridge,writer,relative,name)=>{const current=fileState(bridge.repoRoot,relative);if(!['file','absent'].includes(current.state))return null;let journal;
-  try{journal=inspectJournal({file:writer.journalFile});const rows=journal.db.prepare("SELECT seq,event_id,payload_json FROM events WHERE workflow_id=? AND generation=? AND entity_type='runtime-file' AND kind='runtime-file-written' AND seq>? ORDER BY seq DESC").all(writer.workflowId,writer.generation,writer.custodyAfterSeq),target=path.join(bridge.repoRoot,...relative.split('/'));
+const custodyReceipt=(bridge,writer,relative,name)=>{const current=fileState(bridge.repoRoot,relative);if(!['file','absent'].includes(current.state))return null;let ledger;
+  try{ledger=inspectLedger({file:writer.ledgerFile});const rows=ledger.db.prepare("SELECT seq,event_id,payload_json FROM events WHERE workflow_id=? AND generation=? AND entity_type='runtime-file' AND kind='runtime-file-written' AND seq>? ORDER BY seq DESC").all(writer.workflowId,writer.generation,writer.custodyAfterSeq),target=path.join(bridge.repoRoot,...relative.split('/'));
     for(const row of rows){let payload;try{payload=JSON.parse(row.payload_json);}catch{continue;}
       const pathMatches=current.state==='absent'?slash(path.resolve(payload?.file??'')).toLowerCase()===slash(path.resolve(target)).toLowerCase():samePath(payload?.file,target);
       if(payload?.schema!==RUNTIME_FILE_WRITE||payload.relative!==name||!pathMatches)continue;
       if(payload.state!==current.state||payload.sha256!==(current.sha256??null)||payload.size!==(current.size??0))return null;
-      return {journalSeq:row.seq,eventId:row.event_id,state:current.state,sha256:current.sha256??null,size:current.size??0};
+      return {ledgerSeq:row.seq,eventId:row.event_id,state:current.state,sha256:current.sha256??null,size:current.size??0};
     }
-  }catch{return null;}finally{journal?.close();}return null;};
+  }catch{return null;}finally{ledger?.close();}return null;};
 const acknowledgedForeignRuntime=(bridge,observed,{git}={})=>{
   const changed=new Set(observed),paths=[],records=[];
   for(const baseline of bridge.runtimeWriters??[]){const writer=currentRuntimeWriter(bridge,baseline,git);if(!writer)continue;
@@ -247,8 +262,8 @@ const acknowledgedForeignRuntime=(bridge,observed,{git}={})=>{
     if(!relevant.length)continue;
     const receipts=relevant.map(item=>({...item,receipt:custodyReceipt(bridge,writer,item.relative,item.rule.name)}));
     if(receipts.some(item=>!item.receipt))continue;
-    paths.push(...relevant.map(item=>item.relative));records.push({workflowId:writer.workflowId,generation:writer.generation,journalFile:writer.journalFile,
-      previousGeneration:writer.transition?baseline.generation:null,previousJournalFile:writer.transition?baseline.journalFile:null,
+    paths.push(...relevant.map(item=>item.relative));records.push({workflowId:writer.workflowId,generation:writer.generation,ledgerFile:writer.ledgerFile,
+      previousGeneration:writer.transition?baseline.generation:null,previousLedgerFile:writer.transition?baseline.ledgerFile:null,
       runtimePinDigest:writer.pinDigest,custodyAfterSeq:writer.custodyAfterSeq,paths:receipts.map(item=>({path:item.relative,...item.receipt}))});
   }
   return {paths:[...new Set(paths)],records};
@@ -300,6 +315,8 @@ function beginSingleDetectionCandidate({identity,repoRoot,workerRoot,controlRoot
   dependencyDigests={},environmentDigest='runtime-unpinned',ownedDirtyPaths=[],runtimeManagedFiles=[],dependencyInstall=null,dependencyRequired=false,nonGit=false,runtimePin=null,
   foreignAllowlists=[],concurrentScopes=[],maxWriters=1,now=Date.now}={}){
   if(runtimePin){const checked=verifyRuntimePin({...runtimePin,root:repoRoot});if(!checked.ok)throw new Error(`candidate runtime pin is invalid before snapshot: ${checked.reason}`);}
+  const ledgerScope=allowlist.filter(coversLedgerScope);
+  if(ledgerScope.length)throw new Error(`scope-covers-ledger: candidate allowlist cannot cover the workflow record: ${ledgerScope.join(', ')}`);
   const dirty=nonGit?[]:statusPaths(git,repoRoot).filter(file=>!runtimeInternal(file)),local=nonGit?[]:runtimeLocalPaths(repoRoot),allTracked=nonGit?[]:trackedFor(git,repoRoot,['.']);
   if(typeof environmentDigest!=='string'||!environmentDigest.trim())throw new TypeError('candidate environmentDigest must be a nonempty string');
   const resolveOnDisk=value=>{const reference=resolveCandidateReference(value),target=path.join(repoRoot,...reference.path.split('/'));
@@ -459,8 +476,11 @@ function freezeSingleDetectionCandidate(bridge,{git,reportedFiles=[],housekeepin
   // packet. Files outside every declared scope - including foreign scopes that went quiet - fail closed below.
   const foreignDriftPaths=new Set(candidateObserved.filter(file=>!matches(file,bridge.allowlist)&&matches(file,foreignScopes)));
   const baselineTouched=observable.filter(file=>dirtyAtStart.has(file)&&!owned.has(file)&&!managedOnly.has(file)&&!foreignDriftPaths.has(file));
-  const outside=candidateObserved.filter(file=>!matches(file,bridge.allowlist)&&!foreignDriftPaths.has(file));
-  const reasons=[...baselineTouched.map(file=>`pre-existing-user-work-modified:${file}`),...runtimeDrift.map(file=>`kernel-owned-write-drift:${file}`),...[...foreignDriftPaths].map(file=>`concurrent-writer-drift:${file}`),...outside.map(file=>`outside-allowlist:${file}`)];
+  // Any `.starciwork` change outside the operation's allowlist touches the workflow record's custody boundary:
+  // it is never ordinary scope drift and it never seals into a packet.
+  const custody=candidateObserved.filter(file=>runtimeInternal(file)&&!matches(file,bridge.allowlist)&&!foreignDriftPaths.has(file));
+  const outside=candidateObserved.filter(file=>!matches(file,bridge.allowlist)&&!foreignDriftPaths.has(file)&&!runtimeInternal(file));
+  const reasons=[...baselineTouched.map(file=>`pre-existing-user-work-modified:${file}`),...runtimeDrift.map(file=>`kernel-owned-write-drift:${file}`),...[...foreignDriftPaths].map(file=>`concurrent-writer-drift:${file}`),...custody.map(file=>`custody-path-touched:${file}`),...outside.map(file=>`outside-allowlist:${file}`)];
   const currentHead=bridge.nonGit?contentHead(repoRoot,snapshot.source.entries.map(item=>item.path)):headOf(git,repoRoot);
   if(currentHead!==bridge.acceptedHead)reasons.push('canonical-head-drift');
   if(reasons.length)return {schema:DETECTION_BRIDGE,status:'quarantine',reasons,concurrentWriterDrift:[...foreignDriftPaths],observedFiles:observable,baselineTouched:[...baselineTouched],cleanNow:baselineTouched.filter(file=>!postDirty.includes(file)),housekeepingObserved,runtimeAcknowledgements:runtimeAcknowledgement.records,assurance:bridge.writer};
@@ -523,13 +543,21 @@ const housekeepingIdentity=(bridge,value)=>{
     throw new Error('candidate housekeeping identity does not match the trusted candidate identity');
   return {workflowId,opId,dispatch:dispatch||null};
 };
-const housekeepingFiles=identity=>{if(!identity)return [];const root=`.starciwork/_local/workflows/${identity.workflowId}`,files=[`${root}/state.json`,`${root}/events.jsonl`,`${root}/kernel.lock`,`${root}/stop.flag`,
-    `${root}/checks/${identity.opId}.json`,`${root}/checks/${identity.opId}.credential-request.json`,`${root}/reports/wait-state.json`,'.starciwork/_local/workflows/supervisor.lock',
-    '.starciwork/_local/workflows/runtime-loads.json','.starciwork/_local/workflows/runtime-budget.json',
-    // The supervisor appends repository-wide launch diagnostics while operations run. It is neither product output
-    // nor workflow authority; only this exact file is excluded (other logs, state and evidence remain observed).
+// The ledger record itself is always exempt (the custody inventory already keeps it out of `observed`; this
+// is belt-and-braces for a caller that ever inventories it). Until every writer of `.starciwork/_local` has
+// migrated off it (store.mjs still projects there today), this exact operation's own dispatch artifacts stay
+// exempt too, named by the caller's trusted identity - every other `.starciwork` change is custody evidence.
+const LEDGER_HOUSEKEEPING_FILES=['.starciwork/runtime.sqlite','.starciwork/runtime.sqlite-journal','.starciwork/runtime.sqlite-wal','.starciwork/runtime.sqlite-shm'];
+const housekeepingFiles=identity=>{
+  if(!identity)return LEDGER_HOUSEKEEPING_FILES;
+  const root=`.starciwork/_local/workflows/${identity.workflowId}`,files=[...LEDGER_HOUSEKEEPING_FILES,
+    `${root}/state.json`,`${root}/events.jsonl`,`${root}/kernel.lock`,`${root}/stop.flag`,
+    `${root}/checks/${identity.opId}.json`,`${root}/checks/${identity.opId}.credential-request.json`,`${root}/reports/wait-state.json`,
+    '.starciwork/_local/workflows/supervisor.lock','.starciwork/_local/workflows/runtime-loads.json','.starciwork/_local/workflows/runtime-budget.json',
     '.starciwork/_local/workflows/supervisor.log'];
-  if(identity.dispatch)files.push(`${root}/reports/${identity.dispatch}.json`);return files;};
+  if(identity.dispatch)files.push(`${root}/reports/${identity.dispatch}.json`);
+  return files;
+};
 const aggregatePacketFile=packet=>({...packet,roots:(packet.roots??[]).map(({packet:ignored,...root})=>root)});
 
 /** Freeze every bound root under one immutable aggregate identity; old one-root callers retain the v1 packet. */
@@ -581,8 +609,8 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],requireRep
     oracleDigest:sha256(JSON.stringify(roots.map(root=>({id:root.id,digest:root.oracleDigest})))),environmentDigest:primary.environmentDigest,
     dependencyDigests:primary.packet.dependencyDigests,reportedFiles:[...reportedFiles],reportDiagnostics,housekeeping:housekeepingRecord,
     runtimeHousekeepingWriters:bridge.roots.flatMap(root=>(root.bridge.runtimeWriters??[]).map(writer=>({rootId:root.id,workflowId:writer.workflowId,
-      generation:writer.generation,goalIdentity:writer.goalIdentity,journalFile:writer.journalFile,storeRoot:writer.storeRoot,sourceRoot:writer.sourceRoot,
-      runtimePinDigest:writer.runtimePinDigest,prefix:writer.prefix,custodyAfterSeq:writer.custodyAfterSeq,statePath:writer.statePath,eventsPath:writer.eventsPath,lockPath:writer.lockPath}))),runtimeAcknowledgements,
+      generation:writer.generation,goalIdentity:writer.goalIdentity,ledgerFile:writer.ledgerFile,storeRoot:writer.storeRoot,sourceRoot:writer.sourceRoot,
+      runtimePinDigest:writer.runtimePinDigest,prefix:writer.prefix,custodyAfterSeq:writer.custodyAfterSeq}))),runtimeAcknowledgements,
     roots:roots.map(root=>{const {packet:ignored,runtimeAcknowledgements:diagnostic,...record}=root;return record;}),
     files:roots.flatMap(root=>root.files.map(file=>({...file,rootId:root.id,rootRole:root.role,displayPath:candidateDisplayPath(root,file.path)}))),
     changes:roots.flatMap(root=>root.changes.map(change=>({...change,rootId:root.id,rootRole:root.role,displayPath:candidateDisplayPath(root,change.path)}))),
