@@ -78,7 +78,9 @@ function setup({nodes=TREE,scope=[],reintake=[],ledgerMode='work',job='Design th
     ...(assessGoal!==undefined?{assessGoal}:{}),...(critiqueGoal!==undefined?{critiqueGoal}:{}),
     ...(providers!==undefined?{providers}:{}),...(runHeadless?{runHeadless}:{}),...(budget?{budget}:{}),...goalOptions});}
   catch(caught){error=caught;}
-  return {...tree,store,state,goal,error};
+  // A leaked ledger sqlite handle holds its file open, which EPERMs `cleanup`'s rmSync on Windows - close
+  // the store before removing the tree it lives in, whatever path setup() took to get here.
+  return {...tree,store,state,goal,error,cleanup:()=>{try{store.close();}catch{}tree.cleanup();}};
 }
 
 const modelAssessed=({ledger=[]}={})=>({ok:true,provider:'fake-planner',attempts:[{provider:'fake-planner',attempt:0,errors:[]}],
@@ -269,8 +271,9 @@ test('a goal nobody assessed and nobody was asked to critique cannot be approved
 
 test('a plan-ledger goal whose model answered an empty definition of done is not approvable',()=>{
   const tree=workRepo([]);
+  let store;
   try{
-    const store=createStore({repoRoot:tree.repo,id:'20260915-plan-empty'});
+    store=createStore({repoRoot:tree.repo,id:'20260915-plan-empty'});
     const state=createWorkflowState({job:'Reinstall the stack',worktree:tree.repo,branch:'starci183/stacks',gates:[],store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'plan',scope:[],reintake:[],migrate:[],repoRoot:tree.repo});
     const goal=goalPhase(store,state,{cwd:tree.repo,extractMaterial:()=>[],renderGoalMarkdown:null,
       assessGoal:()=>({ok:true,provider:'fake',value:{definitionOfDone:[],risks:[],questions:[],
@@ -280,13 +283,14 @@ test('a plan-ledger goal whose model answered an empty definition of done is not
     assert.equal(goal.ok,true);
     assert.equal(goal.approvable,false);
     assert.throws(()=>approve(store,state),/no definition of done/);
-  }finally{tree.cleanup();}
+  }finally{store?.close();tree.cleanup();}
 });
 
 test('a plan-ledger goal whose model invented an operation kind is refused before the page is written',()=>{
   const tree=workRepo([]);
+  let store;
   try{
-    const store=createStore({repoRoot:tree.repo,id:'20260915-plan-kind'});
+    store=createStore({repoRoot:tree.repo,id:'20260915-plan-kind'});
     const state=createWorkflowState({job:'Reinstall the stack',worktree:tree.repo,branch:'starci183/stacks',gates:[],store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'plan',scope:[],reintake:[],migrate:[],repoRoot:tree.repo});
     const plan={definitionOfDone:['the stack is inventoried'],risks:[],questions:[],ledger:[{id:'g1',title:'inventory',status:'planned'}],
       ops:[{id:'op1',kind:'inventory',goal:'inventory the stack',ledgerIds:['g1'],allowlist:['.stacks/**'],references:[],checks:[{name:'c',command:'true'}],acceptance:['done'],dependsOn:[]}]};
@@ -294,16 +298,17 @@ test('a plan-ledger goal whose model invented an operation kind is refused befor
       /Operation op1 has the kind inventory, which no operator launches/);
     assert.equal(state.approved,false);
     assert.equal(fs.existsSync(store.paths.goalJson),false,'no goal record is written for a plan the kernel cannot launch');
-  }finally{tree.cleanup();}
+  }finally{store?.close();tree.cleanup();}
 });
 
 test('a file input outside the worktree is staged under its own _local inputs and referred to by the copy',()=>{
   const tree=workRepo([]);
   const outside=tmp();
+  let store;
   try{
     const file=path.join(outside,'review.md');fs.writeFileSync(file,'# review\n');
     const insideFile=path.join(tree.repo,'notes.md');fs.writeFileSync(insideFile,'notes');
-    const store=createStore({repoRoot:tree.repo,id:'20260915-inputs'});
+    store=createStore({repoRoot:tree.repo,id:'20260915-inputs'});
     const state=createWorkflowState({job:'Reinstall the stack',inputs:[`file:${file.replaceAll('\\\\','/')}`,`file:${insideFile.replaceAll('\\\\','/')}`,'file:branch:starci183/x','file:history:D:/nowhere'],
       worktree:tree.repo,branch:'starci183/stacks',gates:[],store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'plan',scope:[],reintake:[],migrate:[],repoRoot:tree.repo});
     const staged=stageExternalInputs(store,state,{worktree:tree.repo});
@@ -315,13 +320,14 @@ test('a file input outside the worktree is staged under its own _local inputs an
     assert.equal(state.inputs[2].ref,'branch:starci183/x','a ref that is no path is left as declared');
     assert.equal(state.inputs[3].ref,'history:D:/nowhere');
     assert.ok(events(store).some(event=>event.event==='inputs-staged'&&event.inputs[0].to===state.inputs[0].ref));
-  }finally{tree.cleanup();fs.rmSync(outside,{recursive:true,force:true});}
+  }finally{store?.close();tree.cleanup();fs.rmSync(outside,{recursive:true,force:true});}
 });
 
 test('on a plan ledger a decisive hidden decision is the owner\'s question on the page, never a decision.prepare op the Work gate refuses',()=>{
   const tree=workRepo([]);
+  let store;
   try{
-    const store=createStore({repoRoot:tree.repo,id:'20260915-plan-decision'});
+    store=createStore({repoRoot:tree.repo,id:'20260915-plan-decision'});
     const state=createWorkflowState({job:'Reinstall the stack',worktree:tree.repo,branch:'starci183/stacks',gates:[],store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'plan',scope:[],reintake:[],migrate:[],repoRoot:tree.repo});
     const plan={definitionOfDone:['the stack is reinstalled'],risks:[],questions:['which services are in scope?'],ledger:[{id:'g1',title:'inventory',status:'planned'}],
       ops:[{id:'op1',kind:'runtime.operate',goal:'inventory the stack',ledgerIds:['g1'],allowlist:['.stacks/**'],references:[],checks:[{name:'c',command:'true'}],acceptance:['done'],dependsOn:[]}]};
@@ -335,19 +341,20 @@ test('on a plan ledger a decisive hidden decision is the owner\'s question on th
     assert.match(unplanned.reason,/plan ledger binds no canonical Work/);
     assert.match(fs.readFileSync(store.paths.goal,'utf8'),/nivo-backup-store is removed as Nivo-owned/);
     assert.equal(goal.approvable,true);
-  }finally{tree.cleanup();}
+  }finally{store?.close();tree.cleanup();}
 });
 
 test('a plan-ledger goal that plans a Work-record kind is refused, and the Work gate holds only where a canonical tree is bound',()=>{
   const tree=workRepo([]);
+  let store;
   try{
-    const store=createStore({repoRoot:tree.repo,id:'20260915-plan-record-kind'});
+    store=createStore({repoRoot:tree.repo,id:'20260915-plan-record-kind'});
     const state=createWorkflowState({job:'Reinstall the stack',worktree:tree.repo,branch:'starci183/stacks',gates:[],store,host:path.resolve('.'),launcher:'L.mjs',ledgerMode:'plan',scope:[],reintake:[],migrate:[],repoRoot:tree.repo});
     const plan={definitionOfDone:['the owner decided'],risks:[],questions:[],ledger:[{id:'g1',title:'decide',status:'planned'}],
       ops:[{id:'op1',kind:'decision.prepare',goal:'ask the owner',ledgerIds:['g1'],allowlist:['.starciwork/decisions/**'],references:[],checks:[{name:'c',command:'true'}],acceptance:['done'],dependsOn:[]}]};
     assert.throws(()=>goalPhase(store,state,{cwd:tree.repo,extractMaterial:()=>[],renderGoalMarkdown:null,assessGoal:()=>({ok:true,provider:'fake',value:plan}),critiqueGoal:soundCritique}),
       /Operation op1 has the kind decision\.prepare, which no operator launches on a plan ledger/);
-  }finally{tree.cleanup();}
+  }finally{store?.close();tree.cleanup();}
   const engine={};
   assert.equal(needsWorkGate({kind:'runtime.operate'},{engine,work:null}),false,'a plan ledger has no tree to gate');
   assert.equal(needsWorkGate({kind:'runtime.operate'},{engine,work:{ledger:{repoRoot:'r',workRoot:'w'}}}),true);
