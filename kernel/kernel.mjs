@@ -8,6 +8,7 @@ import {verifyRuntimePin} from './runtime-pin.mjs';
 import {freshRuntimeBudget,probeRuntimeBudget} from './budget.mjs';
 import {createWorkflowModelEligibility} from './model-policy.mjs';
 import {openJournal} from './journal.mjs';
+import * as ledgerDb from './ledger-db.mjs';
 import {DISK_HEADROOM_CODE,headroomError,isDiskFull,measureHeadroom} from './disk.mjs';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
@@ -21,7 +22,7 @@ import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot,workflowsRoot} f
 import {grammarRepository,resolveLedgerRoot,sharedLedgerStatus} from './routing.mjs';
 import {createAllocator,loadRuntimes,withProviderPreference} from './schedule.mjs';
 import {resolveExecutionChain} from './chains.mjs';
-import {loadsFileFor} from './loads.mjs';
+import {loadsFile} from './loads.mjs';
 import {planProtectedProof,proofApplies,proofFinding,proofPlan,protectedProofFinding,runAtBase,runProtectedProof} from '../checks/proof.mjs';
 import {evaluateAcceptance,kernelVerificationReceipt,resolveEvidencePacket} from '../checks/acceptance.mjs';
 import {candidateChecksNeedDependencies,persistInlineCandidate,protectedOracleManifest} from './candidate-bridge.mjs';
@@ -139,7 +140,9 @@ export function createWorkflowState({job,inputs=[],worktree,branch,gates=[],stor
   codeRole=null,codeSide=null,lane=null}){
   need(plain(store)&&typeof store.id==='string','A workflow store is required');
   need(LEDGER_MODES.includes(ledgerMode),`Unsupported ledger mode ${ledgerMode}; use ${LEDGER_MODES.join(' or ')}`);
-  return {schema:WORKFLOW_STATE,kernel:WORKFLOW_KERNEL,id:store.id,dir:store.dir,
+  // `dir` is no longer a real directory (no `_local` workflow dir is created): it stays the stand-in shared
+  // loads/budget root a few other modules (goal.mjs's `loadsFileFor`) still key off of, one path segment up.
+  return {schema:WORKFLOW_STATE,kernel:WORKFLOW_KERNEL,id:store.id,dir:path.join(sharedRuntimeRootFor(store.repoRoot),store.id),
     job:required(job,'job'),inputs:inputs.map(parseRef),worktree:path.resolve(required(worktree,'worktree')),
     branch:required(branch,'branch'),gates:gates.map(parseGate),host,launcher,
     // The worktree above is this workflow's lane when it owns one: the tree it runs in, and the branch that is
@@ -1618,8 +1621,23 @@ export function releaseSettledOperationLeases(store,state,ctx,{settle=settleGene
  * identities, expires admission deadlines transactionally, performs the pure-model reconciliation rules, and
  * releases only already accepted operation residue. No planner, model, check or native operation is admitted.
  */
+/**
+ * The anchor (docs/ledger-db.md §12) is the tracked, human-readable counter-record of the ledger's own head:
+ * the ledger file itself is untracked and self-consistent, so a restored/rolled-back/foreign file is only
+ * caught here, before resume ever trusts its checkpoint. `ledgerDb.verifyAnchor` is called defensively - it
+ * lands on `kernel/ledger-db.mjs` (s0); until then this is a no-op, never a silent pass disguised as a check.
+ */
+const withAnchorVerified=(boundary,store,state)=>{
+  if(typeof ledgerDb.verifyAnchor!=='function')return boundary;
+  let anchor;
+  try{anchor=ledgerDb.verifyAnchor(store.ledger,{workflowId:state.id});}
+  catch(error){anchor={ok:false,reason:error?.code??'ledger-anchor-unavailable',detail:String(error?.message??error)};}
+  if(anchor?.ok!==false)return boundary;
+  const code=['ledger-behind-anchor','ledger-missing','ledger-identity-mismatch'].includes(anchor.reason)?anchor.reason:'ledger-behind-anchor';
+  return {...boundary,ok:false,findings:[...boundary.findings,{code,detail:anchor.detail??`the ledger anchor refused resume (${code})`}]};
+};
 export function reconcileContinuationPreflight(store,state,{now=Date.now}={}){
-  if(!isEnrolled(state))return {recovered:false,boundary:continuationBoundary(state,{controller:{alive:true,pid:process.pid,startupTokenDigest:'held-by-this-process'}})};
+  if(!isEnrolled(state))return {recovered:false,boundary:withAnchorVerified(continuationBoundary(state,{controller:{alive:true,pid:process.pid,startupTokenDigest:'held-by-this-process'}}),store,state)};
   const runtime=createEngineRuntime({store,state,now});
   try{
     store.bindJournal?.(runtime.journal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
@@ -1630,7 +1648,7 @@ export function reconcileContinuationPreflight(store,state,{now=Date.now}={}){
     runtime.pulse();
     const released=releaseSettledOperationLeases(store,state,{engine:runtime});
     store.saveState(state);
-    const boundary=continuationBoundary(state,{controller:{alive:true,pid:process.pid,startupTokenDigest:'held-by-this-process'}});
+    const boundary=withAnchorVerified(continuationBoundary(state,{controller:{alive:true,pid:process.pid,startupTokenDigest:'held-by-this-process'}}),store,state);
     return {recovered:true,released:released?.released??[],boundary};
   }finally{store.unbindJournal?.(runtime.journal);runtime.close();}
 }
@@ -2540,7 +2558,10 @@ export function applyOpReport(orca,store,state,op,report,ctx){
       const acceptanceCriteria=(op.acceptance??[]).map(value=>String(value).trim()).filter(Boolean);
       if(!acceptanceCriteria.length){op.pending={kind:'required-acceptance',blocking:['operation has no explicit acceptance criteria to bind evidence']};return 'acceptance-pending';}
       const candidateIdentity=Object.fromEntries(['workflowId','opId','attempt','generation','jobId'].map(field=>[field,candidate[field]]));
-      const receiptRelative=`evidence/${candidate.jobId}-validation.json`,receiptFile=path.join(store.dir,receiptRelative);
+      // Kernel-only immutable evidence, never a worker's to see: a non-`_local` corner of `.starciwork`
+      // beside the ledger, outside every op's allowlist (the kernel never puts it in scope).
+      const kernelEvidenceRoot=path.join(store.repoRoot,'.starciwork','kernel-evidence',store.id);
+      const receiptRelative=`evidence/${candidate.jobId}-validation.json`,receiptFile=path.join(kernelEvidenceRoot,receiptRelative);
       const receipt={schema:'starci/validation-receipt@1',identity:candidateIdentity,candidateDigest:candidate.candidateDigest,
         checks:verified.checks,validation,acceptanceCriteria,createdAt:candidate.sealedAt};
       fs.mkdirSync(path.dirname(receiptFile),{recursive:true});
@@ -2555,9 +2576,9 @@ export function applyOpReport(orca,store,state,op,report,ctx){
             criterion,outcome:validation.verdict==='accept'?'pass':'fail',evidenceRefs:['validator']})),
           artifacts:[{id:'validator',path:receiptRelative,sha256:crypto.createHash('sha256').update(fs.readFileSync(receiptFile)).digest('hex')} ]};
       const acceptance=evaluateAcceptance({requirements:[{id:'independent-review',required:true,independent:true}],evidence:[ownerEvidence],
-        candidate,identity:candidateIdentity,evidenceRoots:{'independent-review':store.dir}});
+        candidate,identity:candidateIdentity,evidenceRoots:{'independent-review':kernelEvidenceRoot}});
       if(!acceptance.admitIntegration){op.pending={kind:'required-acceptance',blocking:acceptance.blocking};return 'acceptance-pending';}
-      const resolved=resolveEvidencePacket(ownerEvidence,{evidenceRoot:store.dir,requireIndependent:true});
+      const resolved=resolveEvidencePacket(ownerEvidence,{evidenceRoot:kernelEvidenceRoot,requireIndependent:true});
       if(!resolved.ok){op.pending={kind:'required-acceptance',blocking:resolved.errors};return 'acceptance-pending';}
       acceptedOwnerEvidence=resolved.packet;acceptedOwnerAcceptance=acceptance;
       const bridge=ctx.engine.candidateBridge(op),multi=Array.isArray(bridge.rootBindings);
@@ -4465,7 +4486,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const workflowId=required(id,'workflow id');
     const store=createStore({repoRoot:storeRootFor(workflowId),id:workflowId});
     const state=store.loadState();
-    need(plain(state)&&state.kernel===WORKFLOW_KERNEL,`No workflow kernel state in ${slash(store.dir)}`);
+    need(plain(state)&&state.kernel===WORKFLOW_KERNEL,`No workflow kernel state for ${store.id} in ${slash(store.ledgerFile)}`);
     // A state written before the ledger mode existed resumes as a plan-ledger workflow.
     state.ledgerMode=LEDGER_MODES.includes(state.ledgerMode)?state.ledgerMode:'plan';
     state.scope=Array.isArray(state.scope)?state.scope:[];
@@ -4514,14 +4535,14 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     // The provider quota the goal phase selects on is refreshed through the host's typed probe when it has one;
     // a host that cannot read it answers a reason, and the selector then chooses nothing rather than guessing.
     const budget=root=>freshRuntimeBudget(root,{probe:typeof orca?.probeBudget==='function'?()=>orca.probeBudget():probeRuntimeBudget});
-    return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,
+    return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.ledgerFile,
       ...goalPhase(store,state,{cwd:code,ledgerRoot:options['ledger-root']??null,budget,...functions})};
   }
   if(command==='workflow-lane-close'){
     const {store,state}=open(options.id);
     need(plain(state.lane),`Workflow ${state.id} has no lane: there is no worktree of its own to close`);
     need(!kernelAlive(store),`The kernel of ${state.id} is still running; run workflow-stop --id ${state.id} first`);
-    if(plain(state.lane.closed))return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,lane:laneView(state),closed:true,
+    if(plain(state.lane.closed))return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.ledgerFile,lane:laneView(state),closed:true,
       next:'the lane was already closed; its branch is preserved'};
     need(plain(state.lane.merged),`The lane ${state.lane.name} of ${state.id} is not merged into ${state.lane.base?.branch} yet; a lane is closed only after it went home`);
     need(plain(orca)&&typeof orca.invoke==='function','workflow-lane-close needs an Orca runner: the lane is an Orca worktree');
@@ -4532,7 +4553,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     store.appendEvent({event:'lane-closed',name:state.lane.name,worktree:slash(state.lane.worktree),
       branch:state.lane.branch,preservedBranch:state.lane.closed.preservedBranch});
     store.saveState(state);
-    return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,lane:laneView(state),closed:true,
+    return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.ledgerFile,lane:laneView(state),closed:true,
       next:`the worktree is gone and branch ${state.lane.closed.preservedBranch} is preserved`};
   }
   if(command==='workflow-stop'){
@@ -4545,7 +4566,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       store.appendEvent({event:'continuation-exported',file:slash(continuation.file),stateDigest:continuation.stateDigest,
         boundaryFindings:continuation.boundary.findings.map(item=>item.code)});
     }finally{store.unbindJournal?.(stopJournal);stopJournal?.close();}
-    return {schema:WORKFLOW_KERNEL,command,id:options.id,dir:store.dir,stopRequested:true,
+    return {schema:WORKFLOW_KERNEL,command,id:options.id,dir:store.ledgerFile,stopRequested:true,
       continuation:continuation.file,boundary:continuation.boundary.findings,
       next:'the running kernel exits at its next iteration (at most one wait tick); workflow-run resumes from the same journal/state checkpoint and exact live identities'};
   }
@@ -4582,7 +4603,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       :state.finished?.outcome==='blocked'
         ?`run workflow-approve --id ${state.id} to re-admit the existing blocked continuation, then workflow-run on the same workflow id`
         :`run workflow-run --id ${state.id} on the same workflow id and frozen goal identity`;
-    return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,ok:true,replayed:applied.replayed,
+    return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.ledgerFile,ok:true,replayed:applied.replayed,
       amendment:{digest:applied.amendment.digest,baseGoalIdentity:applied.amendment.baseGoalIdentity,
         ownerGrant:applied.amendment.authority.source,coordinatorDecision:applied.amendment.coordinator.source},
       continuation:continuation.file,boundary:continuation.boundary.findings,next};
@@ -4596,11 +4617,11 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     // A running kernel owns the state: the revision is queued in its inbox and applied at its next tick.
     if(kernelAlive(store)){
       const inbox=queueInbox(store,{kind:'goal-revise',goal:body,source:options.source??'owner'});
-      return {schema:WORKFLOW_KERNEL,command,dir:store.dir,id:state.id,queued:true,inbox,
+      return {schema:WORKFLOW_KERNEL,command,dir:store.ledgerFile,id:state.id,queued:true,inbox,
         next:'the running kernel applies the revision at its next tick (events goal-revised or inbox-rejected)'};
     }
     const revised=reviseGoal(store,state,body,{source:options.source??'owner'});
-    return {schema:WORKFLOW_KERNEL,command,dir:store.dir,id:state.id,...revised,
+    return {schema:WORKFLOW_KERNEL,command,dir:store.ledgerFile,id:state.id,...revised,
       next:`run workflow-approve --id ${state.id} to resume under rev ${revised.rev}, then workflow-run`};
   }
   if(command==='workflow-approve'){
@@ -4609,10 +4630,10 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     if(state.approved&&kernelAlive(store)){
       const file=queueInbox(store,{kind:'approve',allocation:options.allocation??null,allowDynamic:options['allow-dynamic']??null,
         acceptCritique:options['accept-critique']??null});
-      return {schema:WORKFLOW_KERNEL,command,dir:store.dir,id:state.id,queued:true,inbox:file,
+      return {schema:WORKFLOW_KERNEL,command,dir:store.ledgerFile,id:state.id,queued:true,inbox:file,
         next:'the running kernel applies this at its next iteration (event inbox-applied); a new allocation restarts the kernel through the supervisor'};
     }
-    return {schema:WORKFLOW_KERNEL,command,dir:store.dir,
+    return {schema:WORKFLOW_KERNEL,command,dir:store.ledgerFile,
       ...approve(store,state,{allocation:options.allocation??null,allowDynamic:options['allow-dynamic']??null,
         acceptCritique:options['accept-critique']??null,host:hostDescriptorOf(orca)})};
   }
@@ -4833,15 +4854,15 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const envelope=answerEnvelopeArg(options);
     if(state.approved&&kernelAlive(store)){
       const file=queueInbox(store,{kind:'answer',op:options.op,choice:options.choice??null,note:options.note??null,...(envelope?{envelope}:{})});
-      return {schema:WORKFLOW_KERNEL,command,dir:store.dir,id:state.id,queued:true,inbox:file,next:'the running kernel delivers the answer at its next tick (event owner-answered)'};
+      return {schema:WORKFLOW_KERNEL,command,dir:store.ledgerFile,id:state.id,queued:true,inbox:file,next:'the running kernel delivers the answer at its next tick (event owner-answered)'};
     }
     const answered=answerOwnerQuestion(store,state,{op:options.op,choice:options.choice??null,note:options.note??null,envelope});
     store.saveState(state);
-    return {schema:WORKFLOW_KERNEL,command,dir:store.dir,id:state.id,...answered,next:'approve or start the workflow again: the paused operation carries the answer in its next contract'};
+    return {schema:WORKFLOW_KERNEL,command,dir:store.ledgerFile,id:state.id,...answered,next:'approve or start the workflow again: the paused operation carries the answer in its next contract'};
   }
   if(command==='workflow-status'){
     const {store,state}=open(options.id);
-    return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,phase:state.phase,approved:state.approved,
+    return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.ledgerFile,phase:state.phase,approved:state.approved,
       engine:state.engine?{schema:state.engine.schema??null,version:state.engine.version,generation:state.engine.generation,
         assurance:state.engine.assurance,runtimeDigest:state.engine.runtimePin?.digest??null}:null,
       iterations:state.iterations,head:state.head,ledgerMode:state.ledgerMode,scope:state.scope,hostAdapter:state.hostAdapter??null,
@@ -4932,7 +4953,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       // Every kernel of this repository shares one runtime ledger beside the workflow directories, so an
       // expensive runtime another workflow is on is load here too and a provider cooldown is seen by all.
       // A sequential host (headless) caps the allocator at one operation whatever the approved quota says.
-      allocator:createAllocator({runtimes:runtimeProfile,state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:loadsFileFor(sharedRuntimeRootFor(store.repoRoot)),workflow:state.id},budget:{path:sharedRuntimeRootFor(store.repoRoot)},sequential:host.sequential,executionHost:host.name,eligibility}),template:templateOf(isEnrolled(state)?state.engine.runtimePin.root:state.host),host,
+      allocator:createAllocator({runtimes:runtimeProfile,state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:loadsFile(sharedRuntimeRootFor(store.repoRoot)),workflow:state.id},budget:{path:sharedRuntimeRootFor(store.repoRoot)},sequential:host.sequential,executionHost:host.name,eligibility}),template:templateOf(isEnrolled(state)?state.engine.runtimePin.root:state.host),host,
       modelEligibility:eligibility,modelPolicy,runtimeBinding,
       ledgerRoot:options['ledger-root']??null,
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});
@@ -4946,7 +4967,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     // Dispatch). A finished workflow closes it: nobody reads it any more.
     if(finished.finished&&state.kernelTerminalOwned&&state.from){try{orca.invoke('terminal-close',{terminal:state.from},{cwd:worktree});}catch{}store.appendEvent({event:'kernel-terminal-closed',terminal:state.from});state.from=null;state.kernelTerminalOwned=false;store.saveState(state);}
     if(finished.finished&&isEnrolled(state)){releaseKernel();retireFinishedWorkflowRows(store,state);}
-    return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.dir,phase:finished.phase,ledgerMode:finished.ledgerMode,
+    return {schema:WORKFLOW_KERNEL,command,id:state.id,dir:store.ledgerFile,phase:finished.phase,ledgerMode:finished.ledgerMode,
       finished:finished.finished,lane:laneView(finished),ledger:finished.ledger.map(item=>`${item.id}=${item.status}`),
       ledgerSummary:finished.ledgerSummary,needUser:finished.needUser,head:finished.head,iterations:finished.iterations,
       ledgerRoot:finished.ledgerRoot?slash(finished.ledgerRoot):null,ledgerShared:Boolean(finished.ledgerShared),
