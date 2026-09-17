@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import {CANDIDATE_PACKET,CANDIDATE_SNAPSHOT,bindRuntimeInputs,createCandidateSnapshot,sealCandidate,verifyCandidateIdentity} from './candidates.mjs';
+import {CANDIDATE_PACKET,CANDIDATE_SNAPSHOT,bindRuntimeInputs,createCandidateSnapshot,sealCandidate,verifyCandidateIdentity,walkFiles} from './candidates.mjs';
 import {parseRef} from './common.mjs';
 import {candidateDisplayPath,candidateRootBindingDigest,pathInCandidateRoots} from './candidate-roots.mjs';
 import {inspectJournal} from './journal.mjs';
@@ -477,6 +477,17 @@ function freezeSingleDetectionCandidate(bridge,{git,reportedFiles=[],housekeepin
     if(after.get(file)?.state!=='file')return {schema:DETECTION_BRIDGE,status:'quarantine',reasons:[`unsupported-observed-path:${file}`],observedFiles:observable,housekeepingObserved,runtimeAcknowledgements:runtimeAcknowledgement.records,assurance:bridge.writer};
     fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(source,target);
   }
+  // A path an earlier quarantined freeze copied into the worker root that is no longer observed (its bytes went
+  // back to the baseline, or the worktree was wiped) is residue of that attempt, not a write of this one: the
+  // worker root follows the canonical bytes again so the seal judges only what is observed now.
+  if(!alreadySealed&&fs.existsSync(snapshot.workerRoot)){const observedSet=new Set(candidateObserved),baselineSha=new Map(snapshot.source.entries.map(item=>[item.path,item.sha256]));
+    for(const file of walkFiles(snapshot.workerRoot)){
+      if(observedSet.has(file)||managedOnly.has(file))continue;
+      const target=path.join(snapshot.workerRoot,...file.split('/'));
+      if(baselineSha.get(file)===sha256(fs.readFileSync(target)))continue;
+      const source=path.join(repoRoot,...file.split('/'));
+      if(fs.existsSync(source)&&fs.statSync(source).isFile())fs.copyFileSync(source,target);else fs.rmSync(target,{force:true});
+    }}
   const packet=sealCandidate(snapshot,{allowedWrites:candidateObserved,reportedFiles,now});
   const frozen=verifyCandidateIdentity(snapshot,packet,{canonicalRoot:repoRoot,
     expectedCanonicalEntries:packet.files.filter(item=>!managedByPath.has(item.path))});
