@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import {main} from '../hosts/orca/launch.mjs';
 import {createStore} from '../kernel/store.mjs';
@@ -17,11 +16,21 @@ const anchorFileFor=repo=>path.join(repo,'.starciwork','ledger-anchor.json');
 const ID='20260912-104251-demo';
 /** `--worktree` refuses an absolute path (it is a filesystem-relative selector), so a temp repo is passed relative to cwd. */
 const rel=dir=>path.relative(process.cwd(),dir);
+/**
+ * A relative selector only exists between two paths on one drive, and os.tmpdir() is on another drive here,
+ * so path.relative() handed the launcher an absolute path back. The fixture lives on the current drive's
+ * root instead: relative from this checkout, and outside the runtime tree (tests/runtime-tree-hygiene).
+ */
+const SUITE_TEMP=path.join(path.parse(process.cwd()).root,'starci-tmp');
 const fixture=t=>{
   const closers=[],dirs=[];
-  t.after(()=>{for(const close of [...closers].reverse())close();for(const dir of dirs)fs.rmSync(dir,{recursive:true,force:true});});
+  // Cleanup never depends on the code under test succeeding: a throwing close() must not strand a fixture.
+  t.after(()=>{
+    for(const close of [...closers].reverse())try{close();}catch{}
+    for(const dir of dirs)fs.rmSync(dir,{recursive:true,force:true,maxRetries:20,retryDelay:25});
+  });
   return {
-    repo(){const dir=path.join(os.tmpdir(),'starci-cli-ledger-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);fs.mkdirSync(dir,{recursive:true});dirs.push(dir);return dir;},
+    repo(){const dir=path.join(SUITE_TEMP,'cli-ledger-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);fs.mkdirSync(dir,{recursive:true});dirs.push(dir);return dir;},
     track(handle){closers.push(()=>handle.close());return handle;}
   };
 };
