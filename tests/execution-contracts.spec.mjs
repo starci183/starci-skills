@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
-
+import path from 'node:path';
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml} from '../core/yaml.mjs';
 import {PLAN_OP_KINDS} from '../models/functions.mjs';

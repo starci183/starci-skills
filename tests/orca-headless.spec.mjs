@@ -291,9 +291,12 @@ test('providerFor maps the launcher\'s agent and model, or a terminal command li
 test('the real launcher drives a managed launch through the host end to end and attests the process it started',()=>{
   const base=tmp();
   // The launcher requires a filesystem-relative worktree; a repo-relative fixture path would leak
-  // `orca-dispatch-ctx_*.md` artifacts into the real `fixtures/` tree, so the fixture itself lives
-  // in the OS temp directory (never the runtime tree) and `worktree` is its path relative to cwd.
-  const wtRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-orca-headless-wt-'));
+  // `orca-dispatch-ctx_*.md` artifacts into the real `fixtures/` tree, so the fixture lives outside the
+  // runtime tree and `worktree` is its path relative to cwd. A relative path only exists between two paths
+  // on one drive and os.tmpdir() is on another drive here, so the fixture goes to this drive's root.
+  const suiteTemp=path.join(path.parse(process.cwd()).root,'starci-tmp');
+  fs.mkdirSync(suiteTemp,{recursive:true});
+  const wtRoot=fs.mkdtempSync(path.join(suiteTemp,'orca-headless-wt-'));
   try{
     const worktree=path.join(path.relative(process.cwd(),wtRoot),'agentos-r14-sales'),cwd=path.resolve(worktree);
     const {host,processes}=hostIn({root:path.join(base,'h'),cwd});

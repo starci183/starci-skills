@@ -650,17 +650,16 @@ export function buildList({repoRoot,now=Date.now()}){
   return listWorkflows(repoRoot).map(entry=>{
     const state=entry.state;
     const ops=Array.isArray(state?.ops)?state.ops:[];
-    const lastEvent=readLines(path.join(entry.dir,'events.jsonl')).at(-1);
-    const parsed=(()=>{try{return JSON.parse(lastEvent??'');}catch{return null;}})();
-    const lastEventAt=at(parsed);
-    const lock=readJson(path.join(entry.dir,'kernel.lock'));
+    // §8: the last event, the kernel lock and the stop request are ledger rows the lister already read;
+    // there is no workflow directory left to stat for them.
+    const lastEventAt=at(entry.lastEvent);
     const lane=readLane(state);
     return {id:entry.id,phase:state?.finished?'finished':state?.phase??'unknown',
       approved:Boolean(state?.approved),finished:state?.finished?.outcome??null,
       lane:lane?{name:lane.name,branch:lane.branch,base:lane.base.branch,merged:lane.merged?.commit??null,closed:lane.closed}:null,
       opsDone:ops.filter(op=>op.status==='done').length,opsTotal:ops.length,
-      kernelAlive:processAlive(lock?.pid),pid:lock?.pid??null,
-      stopRequested:fs.existsSync(path.join(entry.dir,'stop.flag')),
+      kernelAlive:processAlive(entry.kernelPid),pid:entry.kernelPid??null,
+      stopRequested:entry.stopRequested===true,
       lastEventAt,lastEventAgeMs:lastEventAt===null?null:stamp-lastEventAt};
   });
 }

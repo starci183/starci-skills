@@ -344,15 +344,31 @@ export function createStore({repoRoot,id}){
   return api;
 }
 
-/** Every workflow of a repository, newest first: the id carries the timestamp, so the order is the name order. */
+/**
+ * Every workflow of a repository, newest first: the id carries the timestamp, so the order is the name order.
+ *
+ * Runtime 1.0.4 (§8): a workflow has no directory any more, so a lister that returned only `{id,dir,state}`
+ * left its one caller - the `workflow-list` row builder - reading `events.jsonl`, `kernel.lock` and
+ * `stop.flag` under a `dir` that is now `null`. The three facts that row needs are ledger rows, so they are
+ * read here, inside the one handle this function already opens, rather than from a directory that is gone.
+ */
 export function listWorkflows(repoRoot){
   const root=path.resolve(required(repoRoot,'repository root')),file=ledgerFileFor(root);
   if(!fs.existsSync(file))return [];
   const ledger=inspectLedger({file});
   try{
+    const lastEventOf=ledger.db.prepare("SELECT seq,payload_json,created_at FROM events WHERE workflow_id=? AND entity_type='workflow' AND entity_id=? ORDER BY seq DESC LIMIT 1");
+    const signalOf=ledger.db.prepare('SELECT holder_pid,value_json,at FROM signals WHERE scope=? AND key=?');
     return ledger.db.prepare(`SELECT w.workflow_id id,w.updated_at,
         (SELECT s.state_json FROM state_snapshots s WHERE s.workflow_id=w.workflow_id AND s.state_json<>'' ORDER BY s.snapshot_id DESC LIMIT 1) state_json
       FROM workflows w ORDER BY w.workflow_id DESC`).all()
-      .map(row=>({id:row.id,dir:null,state:row.state_json?JSON.parse(row.state_json):null,updatedAt:row.updated_at}));
+      .map(row=>{
+        const event=lastEventOf.get(row.id,row.id)??null,lock=signalOf.get(row.id,'kernel-lock')??null;
+        return {id:row.id,dir:null,state:row.state_json?JSON.parse(row.state_json):null,updatedAt:row.updated_at,
+          // The stored payload carries the event's own `at`; `created_at` is the row's, and is the fallback.
+          lastEvent:event?{seq:event.seq,at:event.created_at,...JSON.parse(event.payload_json)}:null,
+          kernelPid:lock?.holder_pid??null,
+          stopRequested:Boolean(signalOf.get(row.id,'stop'))};
+      });
   }finally{ledger.close();}
 }
