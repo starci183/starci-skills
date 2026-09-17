@@ -22,8 +22,18 @@ const json=value=>JSON.stringify(value??null);
 const value=row=>row?{...row,payload:row.payload_json===null?null:JSON.parse(row.payload_json),result:row.result_json===null?null:JSON.parse(row.result_json)}:null;
 const sha256=text=>crypto.createHash('sha256').update(text).digest('hex');
 const realpathOf=file=>{try{return fs.realpathSync(file);}catch{return path.resolve(file);}};
-export const ledgerIdFor=file=>sha256(realpathOf(file)).slice(0,16);
 const digestOf=(prevDigest,row)=>sha256(`${prevDigest??''}${row.event_id}${row.kind}${row.payload_json??''}${row.created_at}`);
+/** The ledger's own identity, from its `meta` row. Never derived from a path (§5). */
+export function ledgerIdOf(handle){
+  need(handle?.db,'ledgerIdOf needs a handle');
+  return handle.db.prepare("SELECT value FROM meta WHERE key='ledger_id'").get()?.value??null;
+}
+const runCheckpoint=db=>{
+  const row=db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').get();
+  return {ok:!row.busy,busy:Boolean(row.busy),logFrames:Number(row.log),checkpointedFrames:Number(row.checkpointed)};
+};
+/** Truncate the WAL into the main file. Every copy path (archive, workflow-export, backup, supervisor snapshot) calls this on its handle before copying `runtime.sqlite` alone (§3). */
+export function checkpointLedger(handle){need(handle?.db,'checkpointLedger needs a ledger handle');return runCheckpoint(handle.db);}
 
 /**
  * Retention of the ledger, ported whole from journal.mjs: the bound generation keeps one state body, its
@@ -128,7 +138,58 @@ export function verifyChain(db,{workflowId}={}){
   return {ok:true,checked,brokenAt:null};
 }
 
+// §12 anchor: the small, tracked, human-readable counter-record `.starciwork/ledger-anchor.json`.
+export const ANCHOR_SCHEMA='starci/ledger-anchor@1';
+export const anchorFileFor=repoRoot=>path.join(repoRoot,'.starciwork','ledger-anchor.json');
+/** The tracked anchor, or null when nothing has ever been anchored (legitimate first boot). */
+export function readAnchor(repoRoot){
+  need(repoRoot,'readAnchor needs a repo root');
+  const file=anchorFileFor(repoRoot);
+  if(!fs.existsSync(file))return null;
+  return JSON.parse(fs.readFileSync(file,'utf8'));
+}
+/** Replace the anchor atomically (write temp + rename) with one workflow's head updated. */
+export function writeAnchor(repoRoot,{ledgerId,workflowId,generation,checkpointId,eventsHead=null,seq=null,at=Date.now()}={}){
+  need(repoRoot&&ledgerId&&workflowId&&Number.isInteger(generation)&&checkpointId,'writeAnchor needs a repo root, ledger id, workflow id, generation and checkpoint id');
+  const current=readAnchor(repoRoot);
+  need(!current||current.ledgerId===ledgerId,'ledger-identity-mismatch');
+  const anchor={schema:ANCHOR_SCHEMA,ledgerId,updatedAt:at,workflows:{...current?.workflows,[workflowId]:{generation,checkpointId,eventsHead,seq,at}}};
+  const dir=path.dirname(anchorFileFor(repoRoot));
+  fs.mkdirSync(dir,{recursive:true});
+  const tmp=path.join(dir,`.ledger-anchor.${process.pid}-${Math.random().toString(36).slice(2)}.tmp`);
+  fs.writeFileSync(tmp,JSON.stringify(anchor));
+  fs.renameSync(tmp,anchorFileFor(repoRoot));
+  return anchor;
+}
+/**
+ * Per §12: a tracked anchor with no ledger at all is `ledger-missing`; a ledgerId that does not match the
+ * ledger's own `meta` row is `ledger-identity-mismatch`; a ledger that lacks an anchored workflow's head
+ * (event digest at its seq, or a snapshot at or after its generation) is `ledger-behind-anchor`. No tracked
+ * anchor, or one with no workflow heads yet, is the legitimate first boot.
+ */
+export function verifyAnchor(ledger,repoRoot){
+  const anchor=readAnchor(repoRoot);
+  if(!anchor)return {ok:true,checked:0};
+  if(!ledger?.db)return {ok:false,reason:'ledger-missing'};
+  const ledgerId=ledger.ledgerId??ledgerIdOf(ledger);
+  if(anchor.ledgerId!==ledgerId)return {ok:false,reason:'ledger-identity-mismatch'};
+  const db=ledger.db;
+  let checked=0;
+  for(const [workflowId,head] of Object.entries(anchor.workflows??{})){
+    checked+=1;
+    if(head.eventsHead!==null&&!db.prepare('SELECT 1 FROM events WHERE workflow_id=? AND seq=? AND digest=?').get(workflowId,head.seq,head.eventsHead))
+      return {ok:false,reason:'ledger-behind-anchor',workflowId};
+    if(!db.prepare('SELECT 1 FROM state_snapshots WHERE workflow_id=? AND generation>=? LIMIT 1').get(workflowId,head.generation))
+      return {ok:false,reason:'ledger-behind-anchor',workflowId};
+  }
+  return {ok:true,checked};
+}
+
 const LEDGER_DDL=`
+  -- the ledger's own identity and open-mode facts. Seeded once, on create, and never rewritten (§4):
+  -- ledger_id (randomUUID at create, THE identity — moves with the bytes, never derived from the path),
+  -- schema, created_at (epoch ms), journal_mode ('wal' | 'delete', kept in step with what an open achieves).
+  CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
   CREATE TABLE workflows(
     workflow_id TEXT PRIMARY KEY, title TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
     ledger_mode TEXT, source_roots_json TEXT, generation INTEGER NOT NULL DEFAULT 0,
@@ -215,6 +276,8 @@ const LEDGER_DDL=`
   CREATE TABLE migrations(source TEXT PRIMARY KEY, kind TEXT NOT NULL, rows_json TEXT NOT NULL, at INTEGER NOT NULL);`;
 
 const MACHINE_DDL=`
+  -- ledger_id is the ledger's own meta.ledger_id (§5); file is only the last known path, refreshed on every
+  -- register, and used to reopen the ledger read-only for the sweep. A moved ledger keeps its rows.
   CREATE TABLE ledgers(ledger_id TEXT PRIMARY KEY, file TEXT NOT NULL, registered_at INTEGER NOT NULL, seen_at INTEGER NOT NULL);
   CREATE TABLE resources(resource_key TEXT PRIMARY KEY, capacity INTEGER NOT NULL CHECK(capacity>=0));
   CREATE TABLE leases(
@@ -225,14 +288,16 @@ const MACHINE_DDL=`
   CREATE TABLE budgets(scope_key TEXT PRIMARY KEY, limit_value INTEGER NOT NULL, used_value INTEGER NOT NULL DEFAULT 0, reserved_value INTEGER NOT NULL DEFAULT 0);
   CREATE TABLE budget_reservations(scope_key TEXT NOT NULL, ledger_id TEXT NOT NULL, job_id TEXT NOT NULL, units INTEGER NOT NULL, PRIMARY KEY(scope_key,ledger_id,job_id));`;
 
-function migrateLedger(db){
+function migrateLedger(db,{now}){
   const version=Number(db.prepare('PRAGMA user_version').get().user_version);
   need(version<=LEDGER_VERSION,`Ledger version ${version} is newer than supported ${LEDGER_VERSION}`);
   if(version!==0)return;
-  db.exec('PRAGMA auto_vacuum=INCREMENTAL');
   db.exec(`BEGIN IMMEDIATE;${LEDGER_DDL}
     PRAGMA user_version=${LEDGER_VERSION};
     COMMIT;`);
+  // Seeded once, on create, and never rewritten: this identity moves with the bytes (§4/§5).
+  const seed=db.prepare('INSERT INTO meta(key,value) VALUES(?,?)');
+  seed.run('ledger_id',crypto.randomUUID());seed.run('schema',LEDGER_SCHEMA);seed.run('created_at',String(now()));
 }
 function migrateMachine(db){
   const version=Number(db.prepare('PRAGMA user_version').get().user_version);
@@ -243,19 +308,29 @@ function migrateMachine(db){
     COMMIT;`);
 }
 
-function openDb({file,busyTimeoutMs,journalMode,allowWal,label}){
+// WAL is the default (§3): under DELETE every reader blocks the writer for the length of its read, and ten
+// workers read their contracts through the ledger while the kernel writes. WAL cannot be set on some network
+// and UNC paths; when the PRAGMA does not actually report `wal`, the handle falls back to DELETE rather than
+// fail closed on an open — the fallback is recorded in `meta.journal_mode` by the caller.
+const setJournalMode=(db,{journalMode})=>{
+  const requested=String(journalMode).toUpperCase();
+  need(['DELETE','WAL'].includes(requested),`Unsupported journal mode ${requested}`);
+  const actual=String(db.prepare(`PRAGMA journal_mode=${requested}`).get().journal_mode).toUpperCase();
+  if(requested==='WAL'&&actual!=='WAL')return String(db.prepare('PRAGMA journal_mode=DELETE').get().journal_mode).toUpperCase();
+  need(actual===requested,`SQLite selected journal mode ${actual}, expected ${requested}`);
+  return actual;
+};
+function openDb({file,busyTimeoutMs,journalMode,autoVacuum=false,label}){
   const {DatabaseSync}=require('node:sqlite');
   need(typeof file==='string'&&file.trim(),`${label} needs a file`);
   fs.mkdirSync(path.dirname(path.resolve(file)),{recursive:true});
   const db=new DatabaseSync(file,{timeout:busyTimeoutMs});
   try{
+    // auto_vacuum only takes on a database SQLite still considers empty; switching to WAL first defeats it.
+    if(autoVacuum)db.exec('PRAGMA auto_vacuum=INCREMENTAL');
     db.exec('PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;');
     const sqliteVersion=db.prepare('select sqlite_version() AS version').get().version;
-    const requested=String(journalMode).toUpperCase();
-    if(requested==='WAL')need(allowWal&&sqliteAtLeast(sqliteVersion,'3.51.3'),`WAL requires explicit allowWal and SQLite >=3.51.3; found ${sqliteVersion}`);
-    need(['DELETE','WAL'].includes(requested),`Unsupported journal mode ${requested}`);
-    const actual=String(db.prepare(`PRAGMA journal_mode=${requested}`).get().journal_mode).toUpperCase();
-    need(actual===requested,`SQLite selected journal mode ${actual}, expected ${requested}`);
+    const actual=setJournalMode(db,{journalMode});
     return {db,sqliteVersion,journalMode:actual};
   }catch(error){try{db.close();}catch{}throw error;}
 }
@@ -269,25 +344,28 @@ export function inspectLedger({file}={}){
   const {DatabaseSync}=require('node:sqlite');
   need(typeof file==='string'&&fs.existsSync(file),'inspectLedger needs an existing file');
   const db=new DatabaseSync(file,{readOnly:true,timeout:5000});
-  return {schema:LEDGER_SCHEMA,file,path:path.resolve(file),db,readOnly:true,ledgerId:ledgerIdFor(file),
+  return {schema:LEDGER_SCHEMA,file,path:path.resolve(file),db,readOnly:true,ledgerId:ledgerIdOf({db}),
     version:Number(db.prepare('PRAGMA user_version').get().user_version),
     liveRows(workflowId){return liveRows(db,workflowId);},workflows(){return ledgerWorkflows(db);},
     eventsHead(workflowId){return eventsHead(db,workflowId);},verifyChain(options={}){return verifyChain(db,options);},
     close(){db.close();}};
 }
 
-export function openLedger({file,now=Date.now,busyTimeoutMs=5000,journalMode='DELETE',allowWal=false,machine=null}={}){
-  const {db,sqliteVersion,journalMode:actual}=openDb({file,busyTimeoutMs,journalMode,allowWal,label:'openLedger'});
-  migrateLedger(db);
+export function openLedger({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL',machine=null}={}){
+  const {db,sqliteVersion,journalMode:actual}=openDb({file,busyTimeoutMs,journalMode,autoVacuum:true,label:'openLedger'});
+  migrateLedger(db,{now});
+  // Kept in step with the mode this open actually achieved, WAL or its DELETE fallback (§3).
+  db.prepare("INSERT INTO meta(key,value) VALUES('journal_mode',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(actual.toLowerCase());
   const autoVacuum=Number(db.prepare('PRAGMA auto_vacuum').get().auto_vacuum);
   // Opening compacts what an older runtime left behind, for every workflow the file holds.
   db.exec('BEGIN IMMEDIATE');try{compactSnapshots(db);db.exec('COMMIT');}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}
   reclaimSpace(db);
   const transaction=makeTransaction(db,'ledger');
-  const resolved=path.resolve(file),ledgerId=ledgerIdFor(resolved);
+  const resolved=path.resolve(file),ledgerId=ledgerIdOf({db});
   if(machine?.registerLedger)machine.registerLedger({ledgerId,file:resolved});
   const handle={
     schema:LEDGER_SCHEMA,file,path:resolved,sqliteVersion,journalMode:actual,autoVacuum,db,now,transaction,ledgerId,
+    checkpoint(){return runCheckpoint(db);},
     ensureWorkflow({workflowId,title=null,ledgerMode=null,sourceRoots=null}={}){return ensureWorkflow(db,{workflowId,title,ledgerMode,sourceRoots,at:now()});},
     appendEvent({eventId=newToken(),workflowId,entityType,entityId,generation=0,kind,payload=null,createdAt=now()}){
       need(workflowId&&entityType&&entityId&&kind,'Event identity and kind are required');
@@ -333,16 +411,19 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=5000,journalMode='DE
   return handle;
 }
 
-export function openMachine({file,now=Date.now,busyTimeoutMs=5000,journalMode='DELETE',allowWal=false}={}){
-  const {db,sqliteVersion,journalMode:actual}=openDb({file,busyTimeoutMs,journalMode,allowWal,label:'openMachine'});
+export function openMachine({file,now=Date.now,busyTimeoutMs=15000,journalMode='WAL'}={}){
+  const {db,sqliteVersion,journalMode:actual}=openDb({file,busyTimeoutMs,journalMode,label:'openMachine'});
   migrateMachine(db);
   const transaction=makeTransaction(db,'machine');
   return {
     schema:MACHINE_SCHEMA,file,path:path.resolve(file),sqliteVersion,journalMode:actual,db,now,transaction,
-    registerLedger({file:ledgerFile,ledgerId=null}={}){
-      const id=ledgerId??ledgerIdFor(ledgerFile),at=now();
-      db.prepare('INSERT INTO ledgers(ledger_id,file,registered_at,seen_at) VALUES(?,?,?,?) ON CONFLICT(ledger_id) DO UPDATE SET file=excluded.file,seen_at=excluded.seen_at').run(id,realpathOf(ledgerFile),at,at);
-      return {ledgerId:id};
+    checkpoint(){return runCheckpoint(db);},
+    // ledger_id is always the ledger's own `meta.ledger_id` (§5) — never derived here from the path.
+    registerLedger({file:ledgerFile,ledgerId}={}){
+      need(ledgerId,'registerLedger needs the ledger meta.ledger_id');
+      const at=now();
+      db.prepare('INSERT INTO ledgers(ledger_id,file,registered_at,seen_at) VALUES(?,?,?,?) ON CONFLICT(ledger_id) DO UPDATE SET file=excluded.file,seen_at=excluded.seen_at').run(ledgerId,realpathOf(ledgerFile),at,at);
+      return {ledgerId};
     },
     setCapacity(resourceKey,capacity){db.prepare('INSERT INTO resources(resource_key,capacity) VALUES(?,?) ON CONFLICT(resource_key) DO UPDATE SET capacity=excluded.capacity').run(resourceKey,capacity);},
     /** Reserve cross-ledger units (ai/* quota, machine budgets). One tiny transaction of its own. */
@@ -365,7 +446,12 @@ export function openMachine({file,now=Date.now,busyTimeoutMs=5000,journalMode='D
       let released=0;for(const token of list)released+=db.prepare('DELETE FROM leases WHERE token=?').run(token).changes;
       return {ok:true,released};
     },
-    /** Delete expired machine rows and rows whose (ledger_id,job_id) no longer holds the paired ledger lease. */
+    /**
+     * Delete expired machine rows and rows whose (ledger_id,job_id) no longer holds the paired ledger lease.
+     * A registered ledger is only trusted to prove its leases gone when its own `meta.ledger_id` still
+     * matches the group's key (§5/§6): a path now holding a different ledger proves the old one moved, never
+     * that its leases are live, so that group is skipped, same as an inspection that fails to open at all.
+     */
     sweep({inspectLedger:inspect=inspectLedger,at=now()}={}){
       let expired=0,orphaned=0;
       transaction(inner=>{
@@ -374,10 +460,11 @@ export function openMachine({file,now=Date.now,busyTimeoutMs=5000,journalMode='D
         for(const row of inner.prepare('SELECT l.resource_key,l.token,l.ledger_id,l.job_id,g.file FROM leases l JOIN ledgers g ON g.ledger_id=l.ledger_id').all()){
           const list=byLedger.get(row.ledger_id)??[];list.push(row);byLedger.set(row.ledger_id,list);
         }
-        for(const rows of byLedger.values()){
+        for(const [ledgerId,rows] of byLedger){
           let inspection=null;try{inspection=inspect({file:rows[0].file});}catch{inspection=null;}
           if(!inspection)continue;   // cannot prove the lease is gone; its TTL still owns it
           try{
+            if(inspection.ledgerId!==ledgerId)continue;   // this path now holds a different ledger
             for(const row of rows){
               const held=inspection.db.prepare('SELECT 1 FROM leases WHERE job_id=? AND machine_ref=? LIMIT 1').get(row.job_id,row.token);
               if(!held)orphaned+=inner.prepare('DELETE FROM leases WHERE resource_key=? AND token=?').run(row.resource_key,row.token).changes;
@@ -401,7 +488,7 @@ export function reserveTwoPhase(ledger,machine,{job,leases=[],machineNeeds=[],tt
   need(machine?.reserve&&machine?.release,'reserveTwoPhase needs a machine handle');
   need(job?.jobId&&job?.workflowId&&job?.kind&&Number.isInteger(job?.generation),'Job identity, kind and generation are required');
   const opId=job.opId??null,attempt=job.attempt??1;
-  const {ledgerId}=machine.registerLedger({file:ledger.path});
+  const {ledgerId}=machine.registerLedger({file:ledger.path,ledgerId:ledger.ledgerId??ledgerIdOf(ledger)});
   const merge=list=>{const byKey=new Map();for(const item of list){need(item?.resourceKey&&Number.isInteger(item.units)&&item.units>0,'Invalid resource request');const prev=byKey.get(item.resourceKey);byKey.set(item.resourceKey,{resourceKey:item.resourceKey,units:(prev?.units??0)+item.units,ttlMs:item.ttlMs??prev?.ttlMs??null});}return [...byKey.values()];};
   const repoNeeds=merge(leases),machNeeds=merge(machineNeeds),tokens=[];
   try{
