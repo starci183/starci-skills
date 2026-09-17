@@ -985,7 +985,11 @@ export function quarantineStrays(store,state,ctx,loaded){
   const stamp=new Date().toISOString().replace(/[:.]/g,'-');
   const moved=[];
   for(const stray of culprits){
-    const from=path.join(root,stray),to=path.join(store.dir,'strays',stamp,stray);
+    // A quarantined stray is a real file taken out of the tree, so it keeps a real home - beside the ledger,
+    // in the kernel's own corner of `.starciwork`, never under `_local` and never in the ledger itself.
+    // `store.dir` was that home until §8 made it null, at which point every quarantine threw and the tree
+    // stayed invalid with the stray still in it.
+    const from=path.join(root,stray),to=path.join(store.repoRoot,'.starciwork','kernel-strays',store.id,stamp,stray);
     try{
       fs.mkdirSync(path.dirname(to),{recursive:true});
       // The store may live on another drive than the worktree (an Orca worktree on C:, the repository on D:):
