@@ -90,3 +90,71 @@ không có runtime nào mang role `write`.
 3. BE: đợi `instance_chatbot05` xong rồi `workflow-stop` + `workflow-retry`
    lên pin `fd458453` để gỡ 2 op `native-stop-reconciliation` — không cắt ngang
    khi đang có worker chạy.
+
+## 2026-09-17 ~20:45 — báo cáo #2
+
+### business-design: đã chạy thật
+
+`login-intake` launched attempt 7 trên `claude-agent (claude-opus-5)`, dispatch
+`ctx_8ed72b41f8bc`. Kernel alive, gen 31, pin `fd458453`. Lần đầu tiên workflow
+này sinh việc sau nhiều giờ. `ask-3` vẫn chờ `canonical-writer` do ask-1/ask-2 giữ.
+
+### be-refactor: đang chạy, chưa can thiệp
+
+`instance_chatbot05` chạy trên luna. Không stall — theo MISSION rule 1 nên để yên.
+Chờ op này xong mới `workflow-stop` + `workflow-retry` lên pin `fd458453`; hai op
+`instance_sales04`/`module_runtime06` đang blocked `native-stop-reconciliation
+(candidate effects could not be sealed)` — **đúng lớp lỗi đã vá ở d5c5bf70**, nên
+retry lên pin mới nhiều khả năng gỡ được.
+
+### fe-refactor: hai blocker, cả hai cần quyết định của lead
+
+**1. `shared-1` — `protected-proof` inconclusive. Không phải lỗi của op.**
+
+Đã truy tới tận gốc. `source:oracle-189` = `scripts/check-fe-architecture.spec.mjs`,
+command khớp theo basename là:
+
+```
+node node_modules/vitest/vitest.mjs run --changed a01a7bd7... && node --test scripts/check-fe-architecture.spec.mjs
+```
+
+`runProtectedProof` chạy đúng command đó ở **cả** base root lẫn candidate root.
+Nhưng `prepareCandidateDependencies` (kernel/candidate-bridge.mjs:598) chỉ cài
+dependency vào **candidate root**, và `checkEnv` chỉ trỏ `NODE_PATH`/`PATH` vào
+`<candidateRoot>/node_modules`. Base root không hề có `node_modules`. Chạy tay để
+xác nhận:
+
+```
+Error: Cannot find module '...\control\roots\source\base\node_modules\vitest\vitest.mjs'
+```
+
+Nên base "fail" — nhưng là fail vì không chạy được, không phải vì hành vi. Vì
+`op.expectedBaseFailures` **không có chỗ nào trong code sinh ra** (chỉ xuất hiện ở
+một fixture test, `tests/engine-kernel-flow.spec.mjs:33`), `classifyBase` rơi
+thẳng vào `inconclusive`. Hệ quả: **bất kỳ oracle command nào tham chiếu
+`node_modules` theo đường dẫn tương đối đều không bao giờ pass được proof**, và op
+giữ `canonical-writer` vĩnh viễn — đây chính là writer mà `fe-public-landing` đang chờ.
+
+Đổi sang policy `equivalence` cũng không cứu được: equivalence đòi base chạy sạch
+(exit 0), mà base còn không chạy nổi.
+
+Đây là khoảng trống thiết kế của cơ chế proof, không phải data của workflow, và
+sửa nó là một quyết định có giá: hoặc cài dependency cho cả base root (thêm một
+lần install mỗi op), hoặc cho base mượn `node_modules` của candidate, hoặc khai
+báo `expectedBaseFailure`/`equivalence` ở tầng plan. **Em không tự chọn — cần lead
+chốt**, vì nó đụng mọi workflow chứ không riêng FE.
+
+**2. `draw-1` — `interface.draw` không có runtime nào mang role `write`.**
+
+`codex-agent`/`claude-fable`/`qwen-agent`/`devin-agent` đều "no write role";
+`claude-agent` thì "not launchable for this operation". Đáng chú ý: goal của FE
+ghi rõ *"no new draw, no browser/API UAT"* — tức op này mâu thuẫn với chính goal
+đã duyệt. Nghi là lỗi lúc plan. Gỡ bằng `workflow-amend` (bỏ op khỏi scope) hay
+cấp runtime cho `interface.draw` đều là thay đổi phạm vi → **cần owner quyết**.
+
+### Việc kế tiếp
+
+1. Theo dõi `login-intake` (business-design) tới khi settle.
+2. `instance_chatbot05` (be-refactor) xong → stop + retry lên pin `fd458453`.
+3. FE đứng yên chờ lead chốt 2 điểm trên; chưa re-admit vì re-admit mà không gỡ
+   `shared-1` thì writer vẫn kẹt và workflow sẽ blocked lại y hệt.
