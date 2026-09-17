@@ -151,20 +151,23 @@ export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEA
   // Every ledger root this supervisor covers: the repository's own and, when it runs from a worktree, that
   // worktree's (a shared ledger puts a workflow beside the tree it was named with).
   const stores=[...new Set((roots??[repoRoot]).map(root=>path.resolve(root)))];
-  // The machine db's share of the tick: expired and orphaned cross-ledger leases go before any local act.
+  // The machine db's share of the tick: expired and orphaned cross-ledger leases go before any local act. Kept
+  // open through the round below, so every ledger opened this tick registers/refreshes itself on it (§5/§6) -
+  // closed only at the very end, and only when this call opened it itself.
   let machineHandle=machine??null;
   try{
     if(!machineHandle)machineHandle=openMachine({file:machineFile??machineFileFor(),now});
     const swept=machineHandle.sweep({inspectLedger:inspectLedgerFn,at:now()});
     if(swept&&(swept.expired||swept.orphaned))log({event:'machine-leases-swept',expired:swept.expired,orphaned:swept.orphaned});
   }catch(error){log({event:'machine-sweep-failed',reason:String(error?.message??error).slice(0,200)});}
-  finally{if(!machine&&machineHandle)try{machineHandle.close();}catch{}}
   const ledgers=new Map(),opened=[];
   const ledgerOf=root=>{
     if(ledgers.has(root))return ledgers.get(root);
     let handle=ledgerFor?.(root)??null;
     if(!handle&&fs.existsSync(ledgerFileFor(root))){
-      try{handle=openLedger({file:ledgerFileFor(root),now});opened.push(handle);}
+      // Registers/refreshes this ledger's (ledger_id,file,seen_at) on the machine every round, so a ledger
+      // moved since the last tick is found at its new path and `machine.sweep` never reopens a stale one (§5/§6).
+      try{handle=openLedger({file:ledgerFileFor(root),now,machine:machineHandle});opened.push(handle);}
       catch(error){log({event:'ledger-open-failed',root,file:ledgerFileFor(root),reason:String(error?.message??error).slice(0,200)});handle=null;}
     }
     ledgers.set(root,handle);return handle;
@@ -210,7 +213,7 @@ export function superviseOnce({repoRoot,roots=null,launcher,healthMs=DEFAULT_HEA
         rounds.push({id:info.id,...decision,approved:info.approved,finished:info.finished,stopRequested:info.stopRequested,alive:info.alive,silentMs:info.silentMs,outcome});
       }
     }
-  }finally{for(const handle of opened)try{handle.close();}catch{}}
+  }finally{for(const handle of opened)try{handle.close();}catch{}if(!machine&&machineHandle)try{machineHandle.close();}catch{}}
   return {schema:SUPERVISOR,at:now(),rounds};
 }
 

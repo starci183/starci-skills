@@ -128,7 +128,7 @@ test('the machine sweep every tick removes a lease no ledger row holds any more,
     const machineFile=path.join(machineDir,'machine.sqlite');
     const machine=openMachine({file:machineFile,now:()=>1});
     const ledgerFile=ledger.path;
-    const {ledgerId}=machine.registerLedger({file:ledgerFile});
+    const {ledgerId}=machine.registerLedger({file:ledgerFile,ledgerId:ledger.ledgerId});
     machine.setCapacity('ai/test',5);
     // Orphan: a machine reservation with no paired ledger lease naming its token - the crash-between-the-two case §6 describes.
     const orphan=machine.reserve({resourceKey:'ai/test',ledgerId,workflowId:'wf',jobId:'job-orphan',units:1,ttlMs:600_000});
