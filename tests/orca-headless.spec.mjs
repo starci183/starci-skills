@@ -291,11 +291,11 @@ test('providerFor maps the launcher\'s agent and model, or a terminal command li
 test('the real launcher drives a managed launch through the host end to end and attests the process it started',()=>{
   const base=tmp();
   // The launcher requires a filesystem-relative worktree; a repo-relative fixture path would leak
-  // `orca-dispatch-ctx_*.md` artifacts into the real `fixtures/` tree, so it lives under a temp root
-  // inside the process cwd and is removed with the test.
-  const wtRoot=fs.mkdtempSync(path.join(process.cwd(),'.orca-headless-wt-'));
+  // `orca-dispatch-ctx_*.md` artifacts into the real `fixtures/` tree, so the fixture itself lives
+  // in the OS temp directory (never the runtime tree) and `worktree` is its path relative to cwd.
+  const wtRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-orca-headless-wt-'));
   try{
-    const worktree=path.join(path.basename(wtRoot),'agentos-r14-sales'),cwd=path.resolve(worktree);
+    const worktree=path.join(path.relative(process.cwd(),wtRoot),'agentos-r14-sales'),cwd=path.resolve(worktree);
     const {host,processes}=hostIn({root:path.join(base,'h'),cwd});
     const run=host.invoke('run-create',{objective:'w',from:'term_kernel'}).receipt.result.run.id;
     const candidate=resolveExecutionChain({skill:'starci',op:'architecture.decide'}).candidates[0];
@@ -383,17 +383,18 @@ test('the root follows the store, then the environment the kernel gave the child
 test('the supervisor starts the next kernel of a headless workflow on the headless host',()=>{
   const base=tmp();
   try{
-    const dir=path.join(base,'.starciwork','_local','workflows','w1');fs.mkdirSync(dir,{recursive:true});
-    fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id:'w1',approved:true,finished:null,worktree:base,host:'H',hostAdapter:'headless'}));
-    fs.writeFileSync(path.join(dir,'events.jsonl'),`${JSON.stringify({at:1,seq:1,event:'tick'})}\n`);
-    const info=inspectWorkflow({id:'w1',dir},{now:()=>2});
+    // inspectWorkflow no longer reads a workflow directory off disk (there is none, under the ledger) - the
+    // caller loads the state the way the real supervisor loop does, via listWorkflows(repoRoot) -> {id, dir:
+    // null, state, updatedAt}, and hands it the loaded state directly instead of a dir to read state.json from.
+    const state={schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id:'w1',approved:true,finished:null,worktree:base,host:'H',hostAdapter:'headless'};
+    const info=inspectWorkflow({id:'w1',dir:null,state},{now:()=>2});
     assert.equal(info.hostAdapter,'headless');
     const spawned=[];
     startKernel(info,{launcher:'L.mjs',spawnFn:(exe,args)=>{spawned.push(args);return {pid:1,unref(){}};}});
     assert.deepEqual(spawned[0].slice(-2),['--host-adapter','headless']);
     // A workflow that never recorded a host is started as before: on Orca, with no flag.
-    fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id:'w1',approved:true,finished:null,worktree:base,host:'H'}));
-    const plain=inspectWorkflow({id:'w1',dir},{now:()=>2});
+    const {hostAdapter:_omit,...withoutHostAdapter}=state;
+    const plain=inspectWorkflow({id:'w1',dir:null,state:withoutHostAdapter},{now:()=>2});
     assert.equal(plain.hostAdapter,null);
     startKernel(plain,{launcher:'L.mjs',spawnFn:(exe,args)=>{spawned.push(args);return {pid:1,unref(){}};}});
     assert.equal(spawned[1].includes('--host-adapter'),false);
