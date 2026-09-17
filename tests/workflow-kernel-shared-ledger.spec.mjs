@@ -12,7 +12,7 @@ import {fakeAllocator,passing,scriptedOrca} from './helpers/kernel-harness.mjs';
 import {encodePng,screen} from './helpers/png.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {buildReport} from '../kernel/reports.mjs';
-import {openLedger as openJournal} from '../kernel/ledger-db.mjs';
+import {ledgerFileFor,openLedger as openJournal} from '../kernel/ledger-db.mjs';
 import {sealRuntime} from '../kernel/runtime-pin.mjs';
 
 /**
@@ -393,7 +393,14 @@ test('the accepted slice is recorded and committed in the owner, names the front
   assert.match(git(run.owner,'log','-1','--format=%B'),new RegExp(`^work\\(${RECEIPT.replaceAll('.','\\.')}\\): record ${last.id.replaceAll('.','\.')} in the Work ledger`));
   assert.match(git(run.owner,'log','-1','--format=%B'),new RegExp(`Work: ${RECEIPT.replaceAll('.','\\.')}`));
   assert.equal(git(run.owner,'status','--porcelain','--','.starciwork/features'),'','the write is committed, not left dirty in somebody else'+"'"+'s repository');
-  assert.equal(git(run.owner,'status','--porcelain','--','.starciwork'),'?? .starciwork/_local/','only the kernel\'s own runtime directory stays untracked');
+  // 1.0.4 moved the runtime record out of `.starciwork/_local/` and into the Work root itself: the ledger
+  // `runtime.sqlite` with its WAL siblings, and the anchor beside it (docs/ledger-db.md §3, §12). Those are the
+  // runtime's own custody; nothing of the Work the kernel wrote may be left behind uncommitted next to them.
+  const untracked=git(run.owner,'status','--porcelain','--','.starciwork').split('\n').filter(Boolean).map(line=>line.slice(3));
+  const ledgerCustody=['.starciwork/ledger-anchor.json','.starciwork/runtime.sqlite','.starciwork/runtime.sqlite-journal','.starciwork/runtime.sqlite-wal','.starciwork/runtime.sqlite-shm'];
+  assert.deepEqual(untracked.filter(file=>!ledgerCustody.includes(file)),[],'only the kernel\'s own ledger record stays untracked');
+  assert.ok(untracked.includes('.starciwork/runtime.sqlite'),'the ledger itself is the untracked record');
+  assert.ok(untracked.includes('.starciwork/ledger-anchor.json'),'its anchor sits beside it in the owner');
   assert.equal(state.head,built.head,'the workflow head stays the head of the code it produced');
   assert.notEqual(state.head,ledgerCommit);
   assert.equal(last.ledgerCommit,ledgerCommit);
@@ -477,7 +484,12 @@ test('public retry and pinned enrolled run preserve accepted history while settl
   for(const op of run.state.ops)op.references=(op.references??[]).map(reference=>{if(typeof reference!=='string')return reference;const normalized=slash(reference);
     if(!normalized.startsWith(`${currentPrefix}/knowledge/`))return reference;relocatedReferences+=1;return `${authoredPrefix}${normalized.slice(currentPrefix.length)}`;});
   assert.ok(relocatedReferences>0,'the pre-pin operation carries authored runtime provenance before sealing');
-  const pin=sealRuntime({sourceRoot:authoredRuntime,buildsRoot:path.join(run.root,'builds'),version:'1.0.0'}),pinFile=path.join(run.root,'accepted-runtime-pin.json'),journalFile=path.join(run.root,'runtime','journal.sqlite'),machineFile=path.join(run.root,'runtime','machine.sqlite');
+  const pin=sealRuntime({sourceRoot:authoredRuntime,buildsRoot:path.join(run.root,'builds'),version:'1.0.0'}),pinFile=path.join(run.root,'accepted-runtime-pin.json'),machineFile=path.join(run.root,'runtime','machine.sqlite');
+  // One shared ledger per Work root (docs/ledger-db.md §3/§8): the engine's ledger is the owner's own
+  // `.starciwork/runtime.sqlite`, the same file this workflow's store holds. A second, repo-external
+  // `journal.sqlite` is the retired 1.0.3 two-file shape, and `store.bindJournal` refuses it outright as
+  // `ledger-binding-mismatch`.
+  const journalFile=ledgerFileFor(run.owner);
   assert.equal(pin.sourceRoot,slash(fs.realpathSync(authoredRuntime)));fs.writeFileSync(pinFile,`${JSON.stringify(pin,null,2)}\n`);
   fs.renameSync(authoredRuntime,path.join(run.root,'relocated-authored-runtime'));
   assert.equal(fs.existsSync(authoredRuntime),false,'the original authored runtime is absent before public retry');
@@ -488,9 +500,19 @@ test('public retry and pinned enrolled run preserve accepted history while settl
   const stopped=kernelMain('workflow-stop',{id:run.state.id,host:run.host},{orca:{},cwd:run.code});assert.equal(stopped.id,run.state.id);
   const retried=kernelMain('workflow-retry',{id:run.state.id,host:run.host,'runtime-pin':pinFile},{orca:{},cwd:run.code});assert.equal(retried.ok,true);assert.equal(retried.generation,2);
   const afterRetry=run.store.loadState();assert.equal(afterRetry.ops.find(op=>op.id===accepted.id).status,'done');assert.deepEqual(afterRetry.decisions,run.state.decisions);
-  const retryReceiptJournal=openJournal({file:journalFile});try{const names=retryReceiptJournal.events({workflowId:run.state.id}).filter(event=>event.generation===2&&event.kind==='runtime-file-written').map(event=>event.payload?.relative);
-    for(const name of ['state.json','events.jsonl','stop.flag'])assert.ok(names.includes(name),`public retry receipts ${name}`);
+  // `state.json`, `events.jsonl` and `stop.flag` are rows since 1.0.4, so a public retry writes no file and
+  // leaves no `runtime-file-written` receipt for them. Its receipt is the log itself, in the one shared ledger:
+  // the retired generation is closed, the next one is enrolled and retried, and the stop that paused it is gone.
+  const retryReceiptJournal=openJournal({file:journalFile});
+  try{
+    const logged=retryReceiptJournal.events({workflowId:run.state.id});
+    assert.ok(logged.some(event=>event.kind==='events-generation-closed'&&event.payload?.generation===1),'public retry closes the retired generation');
+    for(const kind of ['engine-enrolled','workflow-retried'])
+      assert.ok(logged.some(event=>event.generation===2&&event.kind===kind),`public retry records ${kind} in the new generation`);
+    assert.deepEqual(logged.filter(event=>event.kind==='runtime-file-written').map(event=>event.payload?.relative),[],
+      'the retry writes no runtime file at all: every part of it is a row');
   }finally{retryReceiptJournal.close();}
+  assert.equal(run.store.signal.get(run.state.id,'stop'),null,'the retry clears the stop signal that paused the workflow');
 
   const nonce=`shared-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const pinnedKernel=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','kernel.mjs')).href}?${nonce}`),
@@ -512,11 +534,20 @@ test('public retry and pinned enrolled run preserve accepted history while settl
     digest:snapshot.digest,decisionId:snapshot.decisionId,basisDigest:snapshot.basisDigest,orderedActionIds:snapshot.actions.map(action=>action.id),rationale:'continue accepted remaining shared-root work'});
   runtime.check=(command,options={})=>({status:0,stdout:`${command} passed`,stderr:'',...options.result});
   runtime.candidateCheck=(command,options={},op)=>runtime.check(command,{...options,cwd:runtime.candidateCwd(op)});
-  const candidateRoots=new Map(),writerRows=new Map(),observedReceiptNames=new Set(),settle=runtime.settled.bind(runtime);let activeOp=null,activeJob=null;
+  const candidateRoots=new Map(),writerRows=new Map(),observedCustody=new Set(),settle=runtime.settled.bind(runtime);let activeOp=null,activeJob=null;
   const begin=runtime.beginCandidate.bind(runtime);runtime.beginCandidate=(op,options)=>{if(op.kind==='uat.verify'&&!op.checks?.length)op.checks=[{name:'unit-tests-pass',command:'npx vitest run receipt'}];
     activeOp=op;activeJob=op.lease.jobId;const bridge=begin(op,options);
     candidateRoots.set(op.id,bridge.rootBindings.map(root=>root.id));return bridge;};
-  runtime.settled=(op,options={})=>{const result=settle(op,options);for(const event of runtime.journal.events({workflowId:run.state.id}).filter(event=>event.generation===2&&event.kind==='runtime-file-written'))observedReceiptNames.add(event.payload?.relative);
+  // A contract, its checks and its report are rows in the one shared ledger since 1.0.4, not files under
+  // `_local` with a `runtime-file-written` receipt. They are read here, as each operation settles - exactly
+  // where the file receipts used to be observed - because the normal finish retires them with the rest of the
+  // run's operational history.
+  const custody=()=>{
+    for(const row of runtime.journal.db.prepare('SELECT op_id FROM contracts WHERE workflow_id=?').all(run.state.id))observedCustody.add(`contracts/${row.op_id}`);
+    for(const row of runtime.journal.db.prepare('SELECT op_id FROM checks WHERE workflow_id=?').all(run.state.id))observedCustody.add(`checks/${row.op_id}`);
+    for(const row of runtime.journal.db.prepare('SELECT dispatch_id FROM reports WHERE workflow_id=?').all(run.state.id))observedCustody.add(`reports/${row.dispatch_id}`);
+  };
+  runtime.settled=(op,options={})=>{const result=settle(op,options);custody();
     if(result.ok&&activeJob){const count=runtime.journal.db.prepare("SELECT count(*) AS n FROM leases WHERE job_id=? AND resource_key LIKE 'canonical-writer:%'").get(activeJob).n;
       writerRows.set(`${op.id}:${options.workerOnly===true?'worker':'final'}`,count);}return result;};
   const allocator={maxParallelOps:1,allocate:()=>({ok:true,runtime:'gpt-5.6-sol',target:'gpt-5.6-sol',role:'implement',candidate:{selection:{target:'gpt-5.6-sol',orcaLaunch:{agent:'codex',model:'gpt-5.6-sol'}}}}),
@@ -561,13 +592,15 @@ test('public retry and pinned enrolled run preserve accepted history while settl
     'the frontend operation derived by the pinned kernel retains compiled canon');
   assert.equal(writerRows.get(`${implemented.id}:worker`),2);assert.equal(writerRows.get(`${implemented.id}:final`),0);
   for(const op of final.ops.filter(item=>item.status==='done'&&item.id!==accepted.id)){
-    assert.ok(observedReceiptNames.has(`contracts/${op.id}.md`),`contract receipt for ${op.id}; found ${JSON.stringify([...observedReceiptNames])}`);
-    assert.ok(observedReceiptNames.has(`checks/${op.id}.json`),`worker checks receipt for ${op.id}`);
-    assert.ok(observedReceiptNames.has(`checks/${op.id}-kernel.json`),`kernel checks receipt for ${op.id}`);
-    assert.ok(observedReceiptNames.has(`reports/${op.launch.dispatch}.json`),`report receipt for ${op.id}`);
+    assert.ok(observedCustody.has(`contracts/${op.id}`),`contract custody for ${op.id}; found ${JSON.stringify([...observedCustody])}`);
+    assert.ok(observedCustody.has(`checks/${op.id}`),`worker checks custody for ${op.id}`);
+    assert.ok(observedCustody.has(`checks/${op.id}-kernel`),`kernel checks custody for ${op.id}`);
+    assert.ok(observedCustody.has(`reports/${op.launch.dispatch}`),`report custody for ${op.id}`);
   }
-  const retainedReceiptNames=new Set(runtime.journal.events({workflowId:run.state.id}).filter(event=>event.kind==='runtime-file-written').map(event=>event.payload?.relative));
-  for(const name of observedReceiptNames)assert.ok(retainedReceiptNames.has(name),`normal finish retained latest custody for ${name}`);
+  // What the finish keeps is the final state projection and the latest receipt per runtime file; the
+  // operational custody the run held goes with the rest of its history.
+  for(const table of ['contracts','checks','reports'])
+    assert.equal(runtime.journal.db.prepare(`SELECT count(*) n FROM ${table} WHERE workflow_id=?`).get(run.state.id).n,0,`normal finish retires the ${table} of the run`);
   assert.equal(runtime.journal.db.prepare('SELECT count(*) n FROM state_snapshots WHERE workflow_id=?').get(run.state.id).n,1,'normal finish retains one final state projection');
   assert.equal(runtime.journal.db.prepare('SELECT count(*) n FROM jobs WHERE workflow_id=?').get(run.state.id).n,0,'normal finish drops completed operational jobs');
   assert.equal(runtime.journal.db.prepare("SELECT count(*) n FROM events WHERE workflow_id=? AND kind<>'runtime-file-written'").get(run.state.id).n,0,'normal finish drops non-custody journal history');

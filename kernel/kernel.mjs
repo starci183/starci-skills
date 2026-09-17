@@ -1615,13 +1615,13 @@ export function releaseSettledOperationLeases(store,state,ctx,{settle=settleGene
 /**
  * The anchor (docs/ledger-db.md §12) is the tracked, human-readable counter-record of the ledger's own head:
  * the ledger file itself is untracked and self-consistent, so a restored/rolled-back/foreign file is only
- * caught here, before resume ever trusts its checkpoint. `ledgerDb.verifyAnchor` is called defensively - it
- * lands on `kernel/ledger-db.mjs` (s0); until then this is a no-op, never a silent pass disguised as a check.
+ * caught here, before resume ever trusts its checkpoint. The check is scoped to this workflow: one ledger
+ * holds every workflow of its Work root, and a sibling being behind its own anchor is not this one's refusal.
  */
 const withAnchorVerified=(boundary,store,state)=>{
   if(typeof ledgerDb.verifyAnchor!=='function')return boundary;
   let anchor;
-  try{anchor=ledgerDb.verifyAnchor(store.ledger,{workflowId:state.id});}
+  try{anchor=ledgerDb.verifyAnchor(store.ledger,store.repoRoot,{workflowId:state.id});}
   catch(error){anchor={ok:false,reason:error?.code??'ledger-anchor-unavailable',detail:String(error?.message??error)};}
   if(anchor?.ok!==false)return boundary;
   const code=['ledger-behind-anchor','ledger-missing','ledger-identity-mismatch'].includes(anchor.reason)?anchor.reason:'ledger-behind-anchor';

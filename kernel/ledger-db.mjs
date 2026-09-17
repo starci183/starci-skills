@@ -193,8 +193,12 @@ export function writeAnchor(repoRoot,{ledgerId,workflowId,generation,checkpointI
  * ledger's own `meta` row is `ledger-identity-mismatch`; a ledger that lacks an anchored workflow's head
  * (event digest at its seq, or a snapshot at or after its generation) is `ledger-behind-anchor`. No tracked
  * anchor, or one with no workflow heads yet, is the legitimate first boot.
+ *
+ * `workflowId` scopes the check to one workflow's head, which is what §12's per-workflow continuation boundary
+ * verifies: one ledger holds every workflow of its Work root, and another workflow being behind its anchor is
+ * not this one's refusal. Omitted, every anchored head is checked - what `ledger-verify` does.
  */
-export function verifyAnchor(ledger,repoRoot){
+export function verifyAnchor(ledger,repoRoot,{workflowId=null}={}){
   const anchor=readAnchor(repoRoot);
   if(!anchor)return {ok:true,checked:0};
   if(!ledger?.db)return {ok:false,reason:'ledger-missing'};
@@ -202,12 +206,13 @@ export function verifyAnchor(ledger,repoRoot){
   if(anchor.ledgerId!==ledgerId)return {ok:false,reason:'ledger-identity-mismatch'};
   const db=ledger.db;
   let checked=0;
-  for(const [workflowId,head] of Object.entries(anchor.workflows??{})){
+  for(const [anchored,head] of Object.entries(anchor.workflows??{})){
+    if(workflowId!==null&&anchored!==workflowId)continue;
     checked+=1;
-    if(head.eventsHead!==null&&!db.prepare('SELECT 1 FROM events WHERE workflow_id=? AND seq=? AND digest=?').get(workflowId,head.seq,head.eventsHead))
-      return {ok:false,reason:'ledger-behind-anchor',workflowId};
-    if(!db.prepare('SELECT 1 FROM state_snapshots WHERE workflow_id=? AND generation>=? LIMIT 1').get(workflowId,head.generation))
-      return {ok:false,reason:'ledger-behind-anchor',workflowId};
+    if(head.eventsHead!==null&&!db.prepare('SELECT 1 FROM events WHERE workflow_id=? AND seq=? AND digest=?').get(anchored,head.seq,head.eventsHead))
+      return {ok:false,reason:'ledger-behind-anchor',workflowId:anchored};
+    if(!db.prepare('SELECT 1 FROM state_snapshots WHERE workflow_id=? AND generation>=? LIMIT 1').get(anchored,head.generation))
+      return {ok:false,reason:'ledger-behind-anchor',workflowId:anchored};
   }
   return {ok:true,checked};
 }
