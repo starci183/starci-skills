@@ -543,10 +543,21 @@ const housekeepingIdentity=(bridge,value)=>{
     throw new Error('candidate housekeeping identity does not match the trusted candidate identity');
   return {workflowId,opId,dispatch:dispatch||null};
 };
-// The kernel's only `.starciwork` footprint under the ledger model is the record itself. The custody inventory
-// already keeps `runtime.sqlite*` out of `observed`, so these exempt paths are belt-and-braces for a caller that
-// ever inventories them; every other `.starciwork` change is custody evidence, never housekeeping.
-const housekeepingFiles=identity=>identity?['.starciwork/runtime.sqlite','.starciwork/runtime.sqlite-journal','.starciwork/runtime.sqlite-wal','.starciwork/runtime.sqlite-shm']:[];
+// The ledger record itself is always exempt (the custody inventory already keeps it out of `observed`; this
+// is belt-and-braces for a caller that ever inventories it). Until every writer of `.starciwork/_local` has
+// migrated off it (store.mjs still projects there today), this exact operation's own dispatch artifacts stay
+// exempt too, named by the caller's trusted identity - every other `.starciwork` change is custody evidence.
+const LEDGER_HOUSEKEEPING_FILES=['.starciwork/runtime.sqlite','.starciwork/runtime.sqlite-journal','.starciwork/runtime.sqlite-wal','.starciwork/runtime.sqlite-shm'];
+const housekeepingFiles=identity=>{
+  if(!identity)return LEDGER_HOUSEKEEPING_FILES;
+  const root=`.starciwork/_local/workflows/${identity.workflowId}`,files=[...LEDGER_HOUSEKEEPING_FILES,
+    `${root}/state.json`,`${root}/events.jsonl`,`${root}/kernel.lock`,`${root}/stop.flag`,
+    `${root}/checks/${identity.opId}.json`,`${root}/checks/${identity.opId}.credential-request.json`,`${root}/reports/wait-state.json`,
+    '.starciwork/_local/workflows/supervisor.lock','.starciwork/_local/workflows/runtime-loads.json','.starciwork/_local/workflows/runtime-budget.json',
+    '.starciwork/_local/workflows/supervisor.log'];
+  if(identity.dispatch)files.push(`${root}/reports/${identity.dispatch}.json`);
+  return files;
+};
 const aggregatePacketFile=packet=>({...packet,roots:(packet.roots??[]).map(({packet:ignored,...root})=>root)});
 
 /** Freeze every bound root under one immutable aggregate identity; old one-root callers retain the v1 packet. */

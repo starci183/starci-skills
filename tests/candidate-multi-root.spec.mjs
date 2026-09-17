@@ -124,12 +124,34 @@ test('the kernel\'s .starciwork footprint is the ledger record alone; it is invi
   assert.deepEqual(sealed.housekeepingObserved,[]);
 });
 
+test('exact current-workflow housekeeping is exempt without entering the candidate payload',t=>{
+  // store.mjs has not migrated off `_local` yet - its own dispatch's projection stays exempt by trusted
+  // identity, named exactly, while every other `.starciwork` path is still custody evidence.
+  const accepted=fixture(t,{local:true}),workFile=path.join(accepted.owner,'.starciwork/evidence/capture.txt'),dispatch='ctx-owned';
+  fs.writeFileSync(path.join(accepted.source,'src/app.js'),'new source\n');fs.writeFileSync(workFile,'new evidence\n');
+  write(accepted.owner,'.starciwork/_local/workflows/wf/state.json','kernel state after launch\n');
+  write(accepted.owner,'.starciwork/_local/workflows/wf/events.jsonl','kernel events after launch\n');
+  write(accepted.owner,`.starciwork/_local/workflows/wf/reports/${dispatch}.json`,'{"schema":"starci/op-report@1"}\n');
+  write(accepted.owner,'.starciwork/_local/workflows/wf/checks/frontend.json','[]\n');
+  write(accepted.owner,'.starciwork/_local/workflows/supervisor.log','{"event":"kernel-started"}\n');
+  const sealed=freezeDetectionCandidate(accepted.bridge,{git,requireReported:true,reportedFiles:['src/app.js','.starciwork/evidence/capture.txt'],
+    housekeeping:{workflowId:'wf',opId:'frontend',dispatch}});
+  assert.equal(sealed.status,'sealed',JSON.stringify(sealed.reasons));
+  const owner=accepted.owner.replaceAll('\\','/');assert.deepEqual(sealed.housekeepingObserved.sort(),[
+    `${owner}/.starciwork/_local/workflows/wf/checks/frontend.json`,
+    `${owner}/.starciwork/_local/workflows/wf/events.jsonl`,
+    `${owner}/.starciwork/_local/workflows/wf/reports/${dispatch}.json`,
+    `${owner}/.starciwork/_local/workflows/wf/state.json`,
+    `${owner}/.starciwork/_local/workflows/supervisor.log`
+  ].sort());
+});
+
 test('a stray write elsewhere under .starciwork stays fenced even with a housekeeping identity supplied',t=>{
   const refused=fixture(t);fs.writeFileSync(path.join(refused.source,'src/app.js'),'new source\n');
-  write(refused.owner,'.starciwork/_local/workflows/supervisor.log','{"event":"round"}\n');
+  write(refused.owner,'.starciwork/_local/workflows/audit.log','arbitrary\n');
   const quarantined=freezeDetectionCandidate(refused.bridge,{git,requireReported:true,reportedFiles:['src/app.js'],housekeeping:{workflowId:'wf',opId:'frontend',dispatch:'ctx-owned'}});
   assert.equal(quarantined.status,'quarantine');
-  assert.ok(quarantined.reasons.includes('work:custody-path-touched:.starciwork/_local/workflows/supervisor.log'),JSON.stringify(quarantined.reasons));
+  assert.ok(quarantined.reasons.includes('work:custody-path-touched:.starciwork/_local/workflows/audit.log'),JSON.stringify(quarantined.reasons));
 });
 
 test('a ledger-backed live kernel may update another workflow in the shared Work store, but an unacknowledged projection cannot',t=>{
