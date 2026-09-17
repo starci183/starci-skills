@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {WORKFLOW_STATE,createStore,listWorkflows,newWorkflowId,replaceStateSnapshot,repositoryRoot,workflowsRoot} from '../kernel/store.mjs';
+import {trackHandles} from './_ledger-fixture.mjs';
 
 const tmp=()=>{const dir=path.join(os.tmpdir(),'starci-workflow-store-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);fs.mkdirSync(dir,{recursive:true});return dir;};
 const state=extra=>({schema:WORKFLOW_STATE,phase:'plan',...extra});
@@ -18,79 +19,69 @@ test('a workflow id is sortable by time and safe as a directory name',()=>{
   assert.equal(newWorkflowId('***',()=>0),'19700101-000000-workflow');
 });
 
-test('opening a store creates the single workflow directory and nothing outside it',()=>{
-  const repo=tmp();
-  let store;
-  try{
-    store=createStore({repoRoot:repo,id:'20260912-104251-demo'});
-    assert.equal(store.dir,path.join(workflowsRoot(repo),'20260912-104251-demo'));
-    for(const key of ['reports','contracts','checks','inbox'])assert.ok(fs.statSync(store.paths[key]).isDirectory(),key);
-    assert.equal(store.paths.state,path.join(store.dir,'state.json'));
-    assert.equal(store.paths.events,path.join(store.dir,'events.jsonl'));
-    assert.equal(store.reportPath('ctx_op'),path.join(store.dir,'reports','ctx_op.json'));
-    assert.equal(store.contractPath('op-1'),path.join(store.dir,'contracts','op-1.md'));
-    assert.equal(store.checksPath('op-1'),path.join(store.dir,'checks','op-1.json'));
-    assert.deepEqual(fs.readdirSync(path.join(repo,'.starciwork','_local')),['workflows']);
-    assert.throws(()=>createStore({repoRoot:repo,id:'a/b'}),/one directory segment/);
-    assert.throws(()=>createStore({repoRoot:repo,id:' '}),/Missing workflow id/);
-  }finally{store?.close();fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
+test('opening a store uses the ledger and creates nothing under _local',t=>{
+  const track=trackHandles(t),repo=tmp();
+  t.after(()=>fs.rmSync(path.dirname(repo),{recursive:true,force:true}));
+  const store=track(createStore({repoRoot:repo,id:'20260912-104251-demo'}));
+  assert.equal(store.dir,null,'no per-workflow directory exists any more - everything is a row');
+  assert.equal(store.ledgerFile,path.join(repo,'.starciwork','runtime.sqlite'));
+  assert.ok(fs.existsSync(store.ledgerFile));
+  assert.equal(fs.existsSync(path.join(repo,'.starciwork','_local')),false,'no _local subtree is created');
+  for(const name of ['state','events','goal','reports','contracts','checks','inbox'])
+    assert.throws(()=>store.paths[name],new RegExp(`store-paths-removed:${name}`),name);
+  for(const method of ['reportPath','contractPath','checksPath'])
+    assert.throws(()=>store[method]('op-1'),new RegExp(`store-paths-removed:${method}`),method);
+  assert.throws(()=>createStore({repoRoot:repo,id:'a/b'}),/one directory segment/);
+  assert.throws(()=>createStore({repoRoot:repo,id:' '}),/Missing workflow id/);
 });
 
-test('the event log is append only and its seq keeps counting after the store is re-opened',()=>{
-  const repo=tmp();
-  let first,reopened,third;
-  try{
-    first=createStore({repoRoot:repo,id:'20260912-104251-demo'});
-    assert.equal(first.appendEvent({kind:'workflow.start'}).seq,1);
-    assert.equal(first.appendEvent({kind:'op.dispatch',op:'backend.implement'}).seq,2);
-    reopened=createStore({repoRoot:repo,id:'20260912-104251-demo'});
-    assert.equal(reopened.appendEvent({kind:'op.report',outcome:'done'}).seq,3);
-    const all=reopened.readEvents();
-    assert.deepEqual(all.map(event=>event.seq),[1,2,3]);
-    assert.deepEqual(all.map(event=>event.kind),['workflow.start','op.dispatch','op.report']);
-    assert.ok(all.every(event=>Number.isInteger(event.at)));
-    assert.deepEqual(reopened.readEvents({since:2}).map(event=>event.kind),['op.report']);
-    assert.equal(first.readEvents().length,3);
-    assert.throws(()=>first.appendEvent({seq:9}),/assigned by the log/);
-    assert.throws(()=>first.appendEvent('nope'),/must be an object/);
-    fs.appendFileSync(first.paths.events,'{ not json\n\n');
-    assert.deepEqual(first.readEvents().map(event=>event.seq),[1,2,3]);
-    third=createStore({repoRoot:repo,id:'20260912-104251-demo'});
-    assert.equal(third.appendEvent({kind:'x'}).seq,4);
-  }finally{first?.close();reopened?.close();third?.close();fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
+test('the event log is append only and its seq keeps counting after the store is re-opened',t=>{
+  const track=trackHandles(t),repo=tmp();
+  t.after(()=>fs.rmSync(path.dirname(repo),{recursive:true,force:true}));
+  const first=track(createStore({repoRoot:repo,id:'20260912-104251-demo'}));
+  assert.equal(first.appendEvent({event:'workflow.start'}).seq,1);
+  assert.equal(first.appendEvent({event:'op.dispatch',op:'backend.implement'}).seq,2);
+  const reopened=track(createStore({repoRoot:repo,id:'20260912-104251-demo'}));
+  assert.equal(reopened.appendEvent({event:'op.report',outcome:'done'}).seq,3);
+  const all=reopened.readEvents();
+  assert.deepEqual(all.map(event=>event.seq),[1,2,3]);
+  assert.deepEqual(all.map(event=>event.event),['workflow.start','op.dispatch','op.report']);
+  assert.ok(all.every(event=>Number.isInteger(event.at)));
+  assert.deepEqual(reopened.readEvents({since:2}).map(event=>event.event),['op.report']);
+  assert.equal(first.readEvents().length,3,'a second handle on the same row is still the same append-only log');
+  assert.throws(()=>first.appendEvent({seq:9}),/assigned by the log/);
+  assert.throws(()=>first.appendEvent('nope'),/must be an object/);
+  const third=track(createStore({repoRoot:repo,id:'20260912-104251-demo'}));
+  assert.equal(third.appendEvent({event:'x'}).seq,4,'the seq keeps counting across every re-open, there is no file to go stale');
 });
 
-test('state is written atomically through a tmp file that never survives the write',()=>{
-  const repo=tmp();
-  let store;
-  try{
-    store=createStore({repoRoot:repo,id:'20260912-104251-demo'});
-    assert.equal(store.loadState(),null);
-    store.saveState(state({goal:'Ship the board'}));
-    assert.deepEqual(store.loadState(),{schema:WORKFLOW_STATE,phase:'plan',goal:'Ship the board'});
-    store.saveState(state({phase:'execute',ops:[{id:'op-1',status:'dispatched'}]}));
-    assert.equal(store.loadState().phase,'execute');
-    assert.deepEqual(fs.readdirSync(store.dir).filter(name=>name.includes('tmp')),[]);
-    assert.deepEqual(fs.readdirSync(store.dir).sort(),['checks','contracts','inbox','reports','state.json']);
-    assert.throws(()=>store.saveState({phase:'execute'}),/schema starci\/workflow-state@1/);
-    fs.writeFileSync(store.paths.state,'{ truncated');
-    assert.equal(store.loadState(),null);
-  }finally{store?.close();fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
+test('state round-trips through the ledger, survives a re-open, and refuses the wrong schema',t=>{
+  const track=trackHandles(t),repo=tmp();
+  t.after(()=>fs.rmSync(path.dirname(repo),{recursive:true,force:true}));
+  const store=track(createStore({repoRoot:repo,id:'20260912-104251-demo'}));
+  assert.equal(store.loadState(),null);
+  store.saveState(state({goal:'Ship the board'}));
+  assert.deepEqual(store.loadState(),{schema:WORKFLOW_STATE,phase:'plan',goal:'Ship the board'});
+  store.saveState(state({phase:'execute',ops:[{id:'op-1',status:'dispatched'}]}));
+  assert.equal(store.loadState().phase,'execute');
+  assert.throws(()=>store.saveState({phase:'execute'}),/schema starci\/workflow-state@1/);
+  // A fresh handle on the same repo reads the same ledger row - there is no per-process file cache to miss.
+  const reopened=track(createStore({repoRoot:repo,id:'20260912-104251-demo'}));
+  assert.equal(reopened.loadState().phase,'execute');
 });
 
-test('reading reports skips the wait state, non-JSON names and unreadable files',()=>{
-  const repo=tmp();
-  let store;
-  try{
-    store=createStore({repoRoot:repo,id:'20260912-104251-demo'});
-    assert.deepEqual(store.readReports(),[]);
-    fs.writeFileSync(store.reportPath('ctx_a'),JSON.stringify({dispatch:'ctx_a',outcome:'done'}));
-    fs.writeFileSync(store.reportPath('ctx_b'),JSON.stringify({dispatch:'ctx_b',outcome:'partial'}));
-    fs.writeFileSync(path.join(store.paths.reports,'wait-state.json'),JSON.stringify({deliveryId:'delivery_2'}));
-    fs.writeFileSync(path.join(store.paths.reports,'broken.json'),'{ half written');
-    fs.writeFileSync(path.join(store.paths.reports,'notes.md'),'not a report');
-    assert.deepEqual(store.readReports().map(report=>report.dispatch),['ctx_a','ctx_b']);
-  }finally{store?.close();fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
+test('reports are written and read back by dispatch id, and a second write for the same dispatch upserts rather than duplicates',t=>{
+  const track=trackHandles(t),repo=tmp();
+  t.after(()=>fs.rmSync(path.dirname(repo),{recursive:true,force:true}));
+  const store=track(createStore({repoRoot:repo,id:'20260912-104251-demo'}));
+  assert.deepEqual(store.readReports(),[]);
+  store.writeReport({dispatchId:'ctx_a',opId:'op-1',attempt:1,outcome:'done'});
+  store.writeReport({dispatchId:'ctx_b',opId:'op-2',attempt:1,outcome:'partial'});
+  assert.deepEqual(store.readReports().map(report=>report.dispatchId),['ctx_a','ctx_b']);
+  store.writeReport({dispatchId:'ctx_a',opId:'op-1',attempt:2,outcome:'done'});
+  const reports=store.readReports();
+  assert.equal(reports.length,2,'the same dispatch id upserts in place, it never accumulates a second row');
+  assert.equal(reports.find(report=>report.dispatchId==='ctx_a').attempt,2);
 });
 
 test('transient Windows replacement denial preserves the old complete snapshot until atomic promotion',t=>{
@@ -124,22 +115,19 @@ test('snapshot replacement does not retry unrelated errors or non-Windows failur
   }
 });
 
-test('listWorkflows returns every workflow of the repository newest first with its state',()=>{
-  const repo=tmp();
-  let older,newest,middle;
-  try{
-    assert.deepEqual(listWorkflows(repo),[]);
-    older=createStore({repoRoot:repo,id:'20260910-090000-older'});
-    newest=createStore({repoRoot:repo,id:'20260912-104251-newest'});newest.saveState(state({phase:'review'}));
-    middle=createStore({repoRoot:repo,id:'20260912-080000-middle'});
-    fs.writeFileSync(path.join(workflowsRoot(repo),'stray.json'),'{}');
-    const listed=listWorkflows(repo);
-    assert.deepEqual(listed.map(item=>item.id),['20260912-104251-newest','20260912-080000-middle','20260910-090000-older']);
-    assert.equal(listed[0].state.phase,'review');
-    assert.equal(listed[1].state,null);
-    assert.equal(listed[0].dir,path.join(workflowsRoot(repo),'20260912-104251-newest'));
-    assert.ok(listed.every(item=>item.updatedAt>0));
-  }finally{older?.close();newest?.close();middle?.close();fs.rmSync(path.dirname(repo),{recursive:true,force:true});}
+test('listWorkflows returns every workflow of the repository newest first with its state',t=>{
+  const track=trackHandles(t),repo=tmp();
+  t.after(()=>fs.rmSync(path.dirname(repo),{recursive:true,force:true}));
+  assert.deepEqual(listWorkflows(repo),[]);
+  track(createStore({repoRoot:repo,id:'20260910-090000-older'}));
+  track(createStore({repoRoot:repo,id:'20260912-104251-newest'})).saveState(state({phase:'review'}));
+  track(createStore({repoRoot:repo,id:'20260912-080000-middle'}));
+  const listed=listWorkflows(repo);
+  assert.deepEqual(listed.map(item=>item.id),['20260912-104251-newest','20260912-080000-middle','20260910-090000-older']);
+  assert.equal(listed[0].state.phase,'review');
+  assert.equal(listed[1].state,null);
+  assert.equal(listed[0].dir,null,'there is no per-workflow directory to report any more');
+  assert.ok(listed.every(item=>item.updatedAt>0));
 });
 
 test('a linked worktree resolves to the main repository, so one product has one workflows root',()=>{

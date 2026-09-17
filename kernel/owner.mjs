@@ -218,8 +218,10 @@ export function openOwnerAsk(store,state,op,question,ctx,report=null){
     origin:'ask',requesters:[op.id]},`question of ${op.id} for the owner`);
   if(!same&&ctx?.work)locateSharedTreePaths(ask,ctx);
   if(same)same.requesters=unique([...(same.requesters??[]),op.id]);
-  const file=op.dispatch?store.reportPath(op.dispatch):null;
-  if(file&&fs.existsSync(file))fs.renameSync(file,`${file}.asked-${op.reports.length}`);
+  // The op's own report must not be read as its answer once the op became an ask. It used to be renamed
+  // aside on disk; the row is marked consumed instead, which is the same statement in the ledger's terms.
+  if(op.dispatch)store.ledger.db.prepare('UPDATE reports SET consumed_at=? WHERE workflow_id=? AND dispatch_id=? AND consumed_at IS NULL')
+    .run(store.ledger.now(),store.id,op.dispatch);
   op.dispatch=null;op.terminal=null;op.nudged=false;
   if(stop||ownerRequired){op.status='paused';op.waitingFor=ask.id;}
   // No stop reason: the op is not paused. It depends on the ask op - so nothing schedules it before the

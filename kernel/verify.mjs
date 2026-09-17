@@ -232,12 +232,12 @@ export function treeVerdictFor(ctx,op){
  * verdicts stay consistent across ops. The verdict is data: it decides accept, retry or stop-at-the-user and
  * changes nothing else.
  */
-const validatorPaths=store=>{const dir=path.join(store.dir,'validator');return {dir,memory:path.join(dir,'memory.md'),verdicts:path.join(dir,'verdicts.jsonl')};};
-export function readValidatorMemory(store){try{return fs.readFileSync(validatorPaths(store).memory,'utf8');}catch{return '';}}
-function readVerdicts(store){
-  let text='';try{text=fs.readFileSync(validatorPaths(store).verdicts,'utf8');}catch{return [];}
-  return text.split('\n').map(line=>line.trim()).filter(Boolean).map(line=>{try{return JSON.parse(line);}catch{return null;}}).filter(Boolean);
-}
+// `<store>/validator/{memory.md,verdicts.jsonl}` had no filesystem home once `store.dir` went null (§8): the
+// rendered memory page and the append-only verdict log are two `signals` rows instead, scoped to the
+// workflow - the same table kernel.lock/stop.flag use for a small keyed operational record.
+const VALIDATOR_MEMORY_KEY='validator-memory',VALIDATOR_VERDICTS_KEY='validator-verdicts';
+export function readValidatorMemory(store){return store.signal.get(store.id,VALIDATOR_MEMORY_KEY)?.value??'';}
+function readVerdicts(store){const value=store.signal.get(store.id,VALIDATOR_VERDICTS_KEY)?.value;return Array.isArray(value)?value:[];}
 /** The memory page: job rulings first (binding), then the latest verdict lines, oldest dropped until the page fits. */
 export function renderValidatorMemory(store,state){
   const lines=readVerdicts(store).slice(-VALIDATOR_MEMORY_LINES).map(item=>{
@@ -253,10 +253,9 @@ export function renderValidatorMemory(store,state){
   return text;
 }
 export function recordVerdict(store,state,op,record){
-  const paths=validatorPaths(store);
-  fs.mkdirSync(paths.dir,{recursive:true});
-  fs.appendFileSync(paths.verdicts,`${JSON.stringify({at:Date.now(),op:op.id,node:op.nodeId,attempt:op.attempt,...record})}\n`);
-  fs.writeFileSync(paths.memory,renderValidatorMemory(store,state));
+  const verdicts=[...readVerdicts(store),{at:Date.now(),op:op.id,node:op.nodeId,attempt:op.attempt,...record}];
+  store.signal.set(store.id,VALIDATOR_VERDICTS_KEY,{value:verdicts});
+  store.signal.set(store.id,VALIDATOR_MEMORY_KEY,{value:renderValidatorMemory(store,state)});
 }
 
 /** The unified diff of the op's changed files against the head it started from; an untracked file is rendered as an added one. */

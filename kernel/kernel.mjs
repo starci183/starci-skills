@@ -4184,7 +4184,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     if(running.length){
       if(ctx.engine&&state.ops.some(op=>op.pending)){store.saveState(state);wait(Math.min(pollMs,1000));continue;}
       const inputWait=fillWaitingAsks(state).length>0;
-      const tick=waitTick(orca,{cwd:state.worktree,run:state.run,from:state.from,
+      const tick=waitTick(orca,{cwd:state.worktree,run:state.run,from:state.from,store,workflow:state.id,
         timeoutMs:inputWait?Math.min(waitTimeoutMs,5000):waitTimeoutMs,tickMs:inputWait?Math.min(tickMs,5000):tickMs,
         now,wait,wake:()=>inboxPending(store)||stopRequested(store)});
       if(tick.event==='check-failed'){noteAnomaly(store,state,`check-failed:${tick.check?.reason??'unknown'}`,{reason:tick.check?.reason??null});triageAnomaly(store,state,`check-failed:${tick.check?.reason??'unknown'}`,{...ctx,orca});}

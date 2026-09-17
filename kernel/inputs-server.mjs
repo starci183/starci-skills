@@ -8,8 +8,10 @@ import {createStore} from './store.mjs';
 
 export const INPUT_BODY_LIMIT=128*1024;
 const read=file=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}};
+// `inputs.lock` is a ledger signal now (`inputs-lock`, scope the workflow id), never a file - these three
+// remain the scratch IPC files under `os.tmpdir()/starci/<hash>/` (see kernel/inputs.mjs).
 export const inputFiles=dir=>({session:path.join(dir,'inputs-session.json'),launch:path.join(dir,'inputs-launch.json'),
-  lock:path.join(dir,'inputs.lock'),server:path.join(dir,'inputs-server.json')});
+  server:path.join(dir,'inputs-server.json')});
 export function privateJson(file,value){
   const temporary=`${file}.${process.pid}.tmp`;
   fs.writeFileSync(temporary,JSON.stringify(value),{mode:0o600});fs.renameSync(temporary,file);
@@ -65,11 +67,13 @@ export async function startInputServer({token,model,language='vi',port=0,session
  */
 export async function serveWorkflowInputs(sessionFile,{now=Date.now,alive=processAlive,graceMs=120000,intervalMs=2000}={}){
   const session=read(sessionFile);
-  if(session?.schema!=='starci/input-session@1'||!session?.binding?.dir||!session.id||!session.repoRoot)throw Error('Invalid workflow input session.');
-  const files=inputFiles(session.binding.dir);
+  if(session?.schema!=='starci/input-session@1'||!session?.binding?.repoRoot||!session.id)throw Error('Invalid workflow input session.');
+  // The session file's own directory IS the scratch root the kernel created it under (os.tmpdir()/starci/<id>/);
+  // the binding itself carries no directory any more, only the ledger's repoRoot.
+  const files=inputFiles(path.dirname(path.resolve(sessionFile)));
   if(path.resolve(sessionFile)!==files.session||!readInputState(session.binding))throw Error('Workflow input binding is unavailable.');
   let store;
-  try{store=createStore({repoRoot:session.repoRoot,id:session.binding.id});}
+  try{store=createStore({repoRoot:session.binding.repoRoot,id:session.binding.id});}
   catch{throw Error('Workflow input binding is unavailable.');}
   // `signal.set` replaces unconditionally, so exclusivity is a read-then-write in application code: a live
   // holder refuses the second spawn, and a dead one's row is simply overwritten by the one that wins the race.

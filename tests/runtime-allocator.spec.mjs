@@ -96,9 +96,9 @@ test('prefer-then-overflow fills the preferred runtime before it offers the next
   assert.equal(allocator.policy,PREFER_THEN_OVERFLOW);
   assert.equal(profile.allocation.policy,PREFER_THEN_OVERFLOW);
   assert.deepEqual(profile.allocation.preference.implement,['codex-agent','claude-agent','qwen-agent','devin-agent']);
-  assert.equal(profile.runtimes['codex-agent'].maxParallel,8);
+  assert.equal(profile.runtimes['codex-agent'].maxParallel,10);
   const picked=[];
-  for(let index=0;index<9;index+=1){
+  for(let index=0;index<11;index+=1){
     const result=allocator.allocate('backend.implement');
     assert.equal(result.ok,true,result.reason);
     assert.equal(result.role,'implement');
@@ -106,23 +106,26 @@ test('prefer-then-overflow fills the preferred runtime before it offers the next
     assert.equal(result.policy,PREFER_THEN_OVERFLOW);
     picked.push(result.runtime);
   }
-  // Eight slots of the preferred pool first, and only the ninth operation overflows to the next one.
-  assert.deepEqual(picked,['codex-agent','codex-agent','codex-agent','codex-agent','codex-agent','codex-agent','codex-agent','codex-agent','claude-agent']);
-  assert.deepEqual(tally(picked),{'codex-agent':8,'claude-agent':1});
+  // Ten slots of the preferred pool first, and only the eleventh operation overflows to the next one.
+  assert.deepEqual(picked,['codex-agent','codex-agent','codex-agent','codex-agent','codex-agent','codex-agent','codex-agent','codex-agent','codex-agent','codex-agent','claude-agent']);
+  assert.deepEqual(tally(picked),{'codex-agent':10,'claude-agent':1});
   // A freed preferred slot takes the next operation straight back from the overflow runtime.
   allocator.release('codex-agent');
   assert.equal(allocator.allocate('backend.implement').runtime,'codex-agent');
   const snapshot=allocator.snapshot();
   assert.equal(snapshot.policy,PREFER_THEN_OVERFLOW);
   assert.deepEqual(snapshot.preference.verify,['codex-agent','claude-fable','claude-agent','qwen-agent','devin-agent']);
-  assert.equal(snapshot.inFlight,9);
+  assert.equal(snapshot.inFlight,11);
   // No pool declares a daily budget any more - the probed provider window is the only one - so nothing is left to count.
   assert.equal(profile.runtimes['claude-agent'].budget,undefined);
   assert.equal(snapshot.runtimes['claude-agent'].remaining.ops,null);
   assert.equal(snapshot.runtimes['qwen-agent'].remaining.tokens,null);
   assert.deepEqual(snapshot.cooling,[]);
-  for(let index=0;index<9;index+=1)assert.equal(allocator.allocate('backend.implement').ok,true);
-  // The implement pools are full; the decide pools carry the last two operations to the repository-wide cap.
+  // The remaining implement-capable capacity (claude-agent 6, qwen-agent 4) absorbs the rest, up to the
+  // repository-wide cap of 20 minus the two decide operations below.
+  for(let index=0;index<7;index+=1)assert.equal(allocator.allocate('backend.implement').ok,true);
+  // codex-agent and claude-agent (the decide preference's first two implement-capable pools) are full now;
+  // the untouched claude-fable pool carries the last two operations to the repository-wide cap.
   assert.equal(allocator.allocate('decision.prepare').ok,true);
   assert.equal(allocator.allocate('decision.prepare').ok,true);
   assert.equal(allocator.snapshot().inFlight,20);
@@ -377,13 +380,13 @@ test('a runtime another kernel is already on is not the first choice: the next c
   const implemented=allocator.allocate('backend.implement');
   assert.equal(implemented.runtime,'codex-agent');
   assert.deepEqual(implemented.preferredOver,[]);
-  // maxParallel is the runtime's cap across the repository: the Codex pool has eight slots and another kernel
+  // maxParallel is the runtime's cap across the repository: the Codex pool has ten slots and another kernel
   // holds all of them.
-  shared.write({'codex-agent':{live:Array.from({length:8},(_,index)=>({workflow:other,op:`op-other-${index}`,since:1})),cooling:null,usedToday:8,day:'2026-09-12'}});
+  shared.write({'codex-agent':{live:Array.from({length:10},(_,index)=>({workflow:other,op:`op-other-${index}`,since:1})),cooling:null,usedToday:10,day:'2026-09-12'}});
   const full=createAllocator({runtimes:profile,now:()=>Date.UTC(2026,8,12,9),shared:{path:shared.file,workflow:mine}});
   const back=full.allocate('architecture.decide');
   assert.equal(back.runtime,'claude-fable');
-  assert.deepEqual(back.blocked.find(item=>item.runtime==='codex-agent'),{runtime:'codex-agent',reason:'no free slot',sharedLoad:8});
+  assert.deepEqual(back.blocked.find(item=>item.runtime==='codex-agent'),{runtime:'codex-agent',reason:'no free slot',sharedLoad:10});
 });
 
 test('a cooldown one kernel ran into parks the runtime for every kernel of the repository, and is learned once',t=>{
@@ -477,7 +480,7 @@ test('a decide operation downgrades to the Codex and Claude pools when the reaso
   assert.equal(allocator.allocate('decision.prepare').runtime,'claude-fable');
   assert.equal(allocator.allocate('decision.prepare').runtime,'claude-fable');
   // Fable's two slots are full now, so the operation goes down one tier, to the Codex pool's reasoning model.
-  for(let index=0;index<8;index+=1)assert.equal(allocator.allocate('decision.prepare').runtime,'codex-agent');
+  for(let index=0;index<10;index+=1)assert.equal(allocator.allocate('decision.prepare').runtime,'codex-agent');
   const downgraded=allocator.allocate('decision.prepare');
   assert.equal(downgraded.runtime,'claude-agent');
   assert.equal(downgraded.overflowed,true);
@@ -772,9 +775,9 @@ test('a pool may pin a model per role: allocate exposes it and the role gate sta
   assert.ok(seen.some(([kind,model])=>kind==='x.implement'&&model==='swe-2-max'),'eligibility sees the resolved model');
 });
 
-test('a hard implement operation prefers the heavy pools - Sol is the last resort, never the first answer',()=>{
+test('a hard implement operation prefers the heavy pools - Luna is the last resort, never the first answer',()=>{
   // Devin open with two slots (an explicit-capacity grant, not a share target): a hard refactor fills
-  // Claude's six, then Devin's two, and only then may the work land on Sol.
+  // Claude's six, then Devin's two, and only then may the work land on Luna.
   const open=structuredClone(profile);open.runtimes['devin-agent'].maxParallel=2;open.runtimes['devin-agent'].explicitCapacity=true;
   const allocator=createAllocator({runtimes:open,now:()=>0});
   for(let index=0;index<6;index+=1)
@@ -783,14 +786,14 @@ test('a hard implement operation prefers the heavy pools - Sol is the last resor
     assert.equal(allocator.allocate('backend.implement',{difficulty:'hard',job:{opId:`hard-d${index}`}}).runtime,'devin-agent');
   const last=allocator.allocate('backend.implement',{difficulty:'hard',job:{opId:'hard-9'}});
   assert.equal(last.runtime,'codex-agent');
-  assert.equal(last.model,'gpt-5.6-sol','Sol answers a hard task only when the heavy pools are full');
+  assert.equal(last.model,'gpt-5.6-luna','Luna answers a hard task only when the heavy pools are full');
   const review=allocator.review('backend.implement',{difficulty:'hard'});
   assert.equal(review.blocked.find(item=>item.runtime==='qwen-agent')?.reason,'outside the hard tier','hard work never lands on the cheap pool');
 });
 
-test('a medium implement operation keeps Sol first - the alignment is the tier, not a ban',()=>{
+test('a medium implement operation keeps Luna first - the alignment is the tier, not a ban',()=>{
   const allocator=createAllocator({runtimes:profile,now:()=>0});
   const first=allocator.allocate('backend.implement',{difficulty:'medium',job:{opId:'medium-1'}});
   assert.equal(first.runtime,'codex-agent');
-  assert.equal(first.model,'gpt-5.6-sol');
+  assert.equal(first.model,'gpt-5.6-luna');
 });

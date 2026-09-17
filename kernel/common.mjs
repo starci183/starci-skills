@@ -466,11 +466,21 @@ export function grammarReferences(root=skillRoot){
   return unique(found).sort();
 }
 
-/** Job-wide rulings the user gave at approval time (`<store>/rulings.md`) travel inside every contract and in the validator memory. */
+/**
+ * Job-wide rulings the user gave at approval time (`<store>/rulings.md`) travel inside every contract and in
+ * the validator memory. `store.dir` is `null` for a ledger-backed store (§8: no filesystem workflow directory
+ * exists any more) — there is not yet a ledger home for this owner-authored file, so there is nothing to read.
+ */
+export const RULINGS_KEY='rulings';
 export function rulingsText(store){
-  const file=path.join(store.dir,'rulings.md');
-  if(!fs.existsSync(file))return '';
-  return fs.readFileSync(file,'utf8').trim();
+  // §8: the owner's rulings page had no home once `store.dir` went null. It is a `signals` row now, the same
+  // keyed operational record the locks and the validator memory use - returning '' for a missing store.dir
+  // would have dropped a binding instruction silently, which is the one thing a ruling must never do.
+  const value=store?.signal?.get?.(store.id,RULINGS_KEY)?.value;
+  return typeof value==='string'?value.trim():'';
+}
+export function setRulingsText(store,text){
+  return store.signal.set(store.id,RULINGS_KEY,{value:String(text??'').trim()});
 }
 export function jobRulings(store){
   const body=rulingsText(store);

@@ -22,6 +22,17 @@ import {GOAL_POOLS,POOL_OF_MODEL,GOAL_POOL_CAPS,GOAL_MAX_PARALLEL_OPS,poolOf,idO
 // goal.md acceptance suite: executable invariants where the code supports them today, marked
 // test.skip where the feature is not merged yet. A skipped check here is the acceptance test
 // the merge must turn green; an unsipped check is a contract the runtime already owes.
+/**
+ * `enrollEngine` opens its own ledger handle and hands it to `store.bindJournal`, which the store keeps
+ * as its durable binding; `store.close()` only closes the handle it opened itself, and nothing ever closes
+ * the one `enrollEngine` opened (kernel/engine.mjs and kernel/store.mjs, not owned by this stream - see
+ * notes/w2-s9.md, "kernel/engine.mjs leaks the durable ledger handle enrollEngine opens"). Windows refuses
+ * to delete a directory with any file still open under it, and no amount of retrying closes a handle
+ * nothing ever releases, so cleanup after such a test tolerates that specific, external, known leak rather
+ * than asserting a defect this stream does not own.
+ */
+const rmSyncTolerant=target=>{try{fs.rmSync(target,{recursive:true,force:true});}
+  catch(error){if(process.platform!=='win32'||error?.code!=='EPERM')throw error;}};
 const profile=loadRuntimeProfile();
 const kinds=parseYaml(fs.readFileSync(new URL('../model/kinds.yaml',import.meta.url),'utf8'));
 const opsDirs=fs.readdirSync(new URL('../ops',import.meta.url),{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name);
@@ -82,13 +93,15 @@ test('the full goal §2 chain is in the catalog: intake, refactor, test.author, 
     assert.ok(KINDS.includes(kind),`goal §2 chain kind ${kind} is missing from the catalog`);
 });
 
-test('interface.draw and interface.asset allow only the image route: one candidate, Sol-pinned',{skip:false},()=>{
+test('interface.draw and interface.asset allow only the image route: one candidate, its pool\'s write model',{skip:false},()=>{
   for(const op of ['interface.draw','interface.asset']){
     const chain=resolveExecutionChain({skill:'starci',op});
     assert.equal(chain.candidates.length,1,`${op} must have exactly one launch candidate`);
     const candidate=chain.candidates[0];
     assert.equal(poolOf(candidate.target),'codex-agent',`${op} must resolve inside the codex pool`);
-    assert.equal(candidate.model,'gpt-5.6-sol',`${op} is pinned to the gpt-5.6-sol model inside its pool`);
+    // model/registry.yaml: the ImageGen tool call names the operation agent, not an image-model version, so
+    // the resolved model is whatever model/runtimes.yaml pins codex-agent's `write` role to.
+    assert.equal(candidate.model,profile.runtimes[SOL].models.write,`${op} is pinned to the codex pool's write model`);
     assert.equal(idOf(profile.runtimes,candidate.target),SOL);
   }
 });
@@ -147,8 +160,8 @@ test('runtime pools are keyed by provider window with goal §3 caps',()=>{
 
 test('a goal without a checkable done block cannot be approved or enrolled',t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-goal-contract-'));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const store=createStore({repoRoot:root,id:'wf-goal'});
+  t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});
   const state=createWorkflowState({job:'x',inputs:[],worktree:root,branch:'main',store,host:path.resolve(import.meta.dirname,'..'),launcher:'L.mjs'});
   const blocks=goalApprovalBlocks(state);
   assert.ok(blocks.length>0&&blocks.every(text=>/definition of done|assessed by nobody|never critiqued/.test(text)),'empty goals must name their blocks');
@@ -186,8 +199,8 @@ test('typed I/O: a candidate reference resolves to a concrete file inside a dige
 test('typed I/O: a record reference that resolves to nothing blocks dispatch with a named reason',t=>{
   const repo=fs.mkdtempSync(path.join(os.tmpdir(),'starci-goal-block-'));
   let runtime=null;
-  t.after(()=>{runtime?.close();fs.rmSync(repo,{recursive:true,force:true});});
   const store=createStore({repoRoot:repo,id:'wf-io-block'});
+  t.after(()=>{runtime?.close();store.close();rmSyncTolerant(repo);});
   const events=[];
   const append=store.appendEvent.bind(store);
   store.appendEvent=event=>{events.push(event);return append(event);};
@@ -201,7 +214,7 @@ test('typed I/O: a record reference that resolves to nothing blocks dispatch wit
   enrollEngine(store,state,{journalFile:path.join(repo,'journal.sqlite')});
   runtime=createEngineRuntime({store,state,eligibility:()=>({eligible:true,mode:'qualified'}),spawnChild:()=>({pid:1,once(){},unref(){}})});
   runtime.manageWorkflow=snapshot=>({schema:MANAGER_DECISION,workflowId:snapshot.workflowId,decisionId:snapshot.decisionId,generation:snapshot.generation,version:snapshot.version,digest:snapshot.digest,basisDigest:snapshot.basisDigest,orderedActionIds:(snapshot.actions??[]).map(action=>action.id),rationale:'test'});
-  const orca=scriptedOrca({reportsDir:store.paths.reports,scripts:{},worktree:repo});
+  const orca=scriptedOrca({store,scripts:{},worktree:repo});
   let at=0;const clock={now:()=>at,wait:ms=>{at+=ms;}};
   runLoop(orca.orca,store,state,{cwd:repo,engineRuntime:runtime,allocator:createAllocator({runtimes:profile,now:clock.now}),
     wait:clock.wait,now:clock.now,template:'t',maxIterations:3,waitTimeoutMs:1000,tickMs:50,
@@ -221,8 +234,8 @@ test('typed I/O: a record reference that resolves to nothing blocks dispatch wit
 // the rev it was derived from, and goal.revise produces v(n+1) invalidating derived work.
 test('approval freezes the goal with goalRev and every derived artifact binds it',t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-goal-rev-'));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const store=createStore({repoRoot:root,id:'wf-goal-rev'});
+  t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});
   const state=createWorkflowState({job:'x',inputs:[],worktree:root,branch:'main',store,host:path.resolve(import.meta.dirname,'..'),launcher:'L.mjs'});
   state.definitionOfDone=['`op-0` settles'];
   state.doneMetrics=[{kind:'operation',ref:'op-0'}];
@@ -238,8 +251,8 @@ test('approval freezes the goal with goalRev and every derived artifact binds it
 // `store.setGoal`; no goal.md/goal.json file, revision increments, goal_identity is recomputed.
 test('goal.revise persists a new goals row via store.setGoal: revision increments, the amendment body is recorded',t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-goal-revise-rows-'));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const store=createStore({repoRoot:root,id:'wf-goal-revise-rows'});
+  t.after(()=>{store.close();fs.rmSync(root,{recursive:true,force:true});});
   const state=createWorkflowState({job:'x',inputs:[],worktree:root,branch:'main',store,host:path.resolve(import.meta.dirname,'..'),launcher:'L.mjs'});
   state.definitionOfDone=['`op-0` settles'];
   state.doneMetrics=[{kind:'operation',ref:'op-0'}];
