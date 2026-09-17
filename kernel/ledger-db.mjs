@@ -229,14 +229,16 @@ function openDb({file,busyTimeoutMs,journalMode,allowWal,label}){
   need(typeof file==='string'&&file.trim(),`${label} needs a file`);
   fs.mkdirSync(path.dirname(path.resolve(file)),{recursive:true});
   const db=new DatabaseSync(file,{timeout:busyTimeoutMs});
-  db.exec('PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;');
-  const sqliteVersion=db.prepare('select sqlite_version() AS version').get().version;
-  const requested=String(journalMode).toUpperCase();
-  if(requested==='WAL')need(allowWal&&sqliteAtLeast(sqliteVersion,'3.51.3'),`WAL requires explicit allowWal and SQLite >=3.51.3; found ${sqliteVersion}`);
-  need(['DELETE','WAL'].includes(requested),`Unsupported journal mode ${requested}`);
-  const actual=String(db.prepare(`PRAGMA journal_mode=${requested}`).get().journal_mode).toUpperCase();
-  need(actual===requested,`SQLite selected journal mode ${actual}, expected ${requested}`);
-  return {db,sqliteVersion,journalMode:actual};
+  try{
+    db.exec('PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;');
+    const sqliteVersion=db.prepare('select sqlite_version() AS version').get().version;
+    const requested=String(journalMode).toUpperCase();
+    if(requested==='WAL')need(allowWal&&sqliteAtLeast(sqliteVersion,'3.51.3'),`WAL requires explicit allowWal and SQLite >=3.51.3; found ${sqliteVersion}`);
+    need(['DELETE','WAL'].includes(requested),`Unsupported journal mode ${requested}`);
+    const actual=String(db.prepare(`PRAGMA journal_mode=${requested}`).get().journal_mode).toUpperCase();
+    need(actual===requested,`SQLite selected journal mode ${actual}, expected ${requested}`);
+    return {db,sqliteVersion,journalMode:actual};
+  }catch(error){try{db.close();}catch{}throw error;}
 }
 const makeTransaction=(db,label)=>{let inside=false;return fn=>{if(inside)throw Error(`${label}-nested-transaction`);inside=true;db.exec('BEGIN IMMEDIATE');try{const result=fn(db);db.exec('COMMIT');return result;}catch(error){try{db.exec('ROLLBACK');}catch{}throw error;}finally{inside=false;}};};
 
