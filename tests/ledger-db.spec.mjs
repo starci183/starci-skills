@@ -24,7 +24,7 @@ test('the ledger schema carries every contract table, the drift trigger, and ver
   assert.equal(Number(ledger.db.prepare('PRAGMA foreign_keys').get().foreign_keys),1);
   assert.equal(Number(ledger.db.prepare('PRAGMA synchronous').get().synchronous),2,'synchronous=FULL');
   const names=ledger.db.prepare("SELECT name FROM sqlite_master WHERE type IN ('table','trigger','index')").all().map(row=>row.name);
-  for(const table of ['workflows','goals','state_snapshots','events','jobs','resources','leases','budgets','budget_reservations','incidents','reports','contracts','checks','inbox','signals','runtime_loads','migrations'])
+  for(const table of ['workflows','goals','state_snapshots','events','jobs','resources','leases','budgets','budget_reservations','incidents','reports','contracts','checks','inbox','signals','runtime_loads','inputs','migrations'])
     assert.ok(names.includes(table),`missing table ${table}`);
   assert.ok(names.includes('leases_match_job')&&names.includes('leases_match_job_update'),'the drift trigger covers INSERT and UPDATE');
   for(const index of ['state_snapshots_lookup','events_entity','events_kind','jobs_queue','jobs_op','leases_expiry'])assert.ok(names.includes(index),`missing index ${index}`);
@@ -190,10 +190,29 @@ test('retired generations lose their settled jobs and events; a leased or unsett
   ledger.close();
 });
 
+test('inputs bind bytes by sha256: put returns a ledger:// ref, and a tampered row refuses to read',t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
+  const put=ledger.inputs.put({workflowId:'wf',key:'1-brief.md',goalRevision:1,bytes:Buffer.from('hello'),origin:'C:/owner/brief.md',mediaType:'text/markdown'});
+  assert.match(put.ref,/^ledger:\/\/inputs\/wf\/1-brief\.md#sha256=[a-f0-9]{64}$/);
+  const got=ledger.inputs.get({workflowId:'wf',key:'1-brief.md'});
+  assert.equal(Buffer.from(got.bytes).toString(),'hello');assert.equal(got.sha256,put.sha256);assert.equal(got.size,5);
+  assert.equal(ledger.inputs.get({workflowId:'wf',key:'missing.md'}),null);
+  assert.deepEqual(ledger.inputs.list({workflowId:'wf'}).map(row=>row.key),['1-brief.md']);
+  const out=path.join(dir,'worker-inputs');
+  const materialised=ledger.inputs.materialise({workflowId:'wf',key:'1-brief.md',dir:out});
+  assert.equal(fs.readFileSync(materialised.file,'utf8'),'hello');
+  ledger.db.prepare('UPDATE inputs SET bytes=? WHERE workflow_id=? AND key=?').run(Buffer.from('tampered'),'wf','1-brief.md');
+  assert.throws(()=>ledger.inputs.get({workflowId:'wf',key:'1-brief.md'}),/input-digest-mismatch/,'a row whose bytes no longer hash to its sha256 refuses to read');
+  assert.throws(()=>ledger.inputs.materialise({workflowId:'wf',key:'1-brief.md',dir:out}),/input-digest-mismatch/,'materialise is the same read path');
+  ledger.close();
+});
+
 test('a workflow is retired whole only when nothing of it is live, and its workflows row goes with it',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
   snapshot(ledger,{generation:1,checkpoint:'save:wf:1:1'});job(ledger,{jobId:'j1',generation:1});job(ledger,{jobId:'j2',generation:1,status:'queued'});
+  ledger.inputs.put({workflowId:'wf',key:'1-brief.md',goalRevision:1,bytes:Buffer.from('hello'),origin:'C:/owner/brief.md'});
   lease(ledger,{jobId:'j2'});
   const refused=ledger.retireWorkflow('wf');
   assert.equal(refused.ok,false);assert.equal(refused.live.leases.length,1);assert.equal(ledger.db.prepare('SELECT count(*) n FROM jobs').get().n,2,'nothing removed');
@@ -201,6 +220,7 @@ test('a workflow is retired whole only when nothing of it is live, and its workf
   ledger.db.prepare("UPDATE jobs SET status='cancelled',lease_token=NULL,deadline=NULL WHERE job_id='j2'").run();
   const retired=ledger.retireWorkflow('wf');
   assert.equal(retired.ok,true);assert.equal(retired.removed.workflows,1,'the registration row goes too');
+  assert.equal(retired.removed.inputs,1,'input rows go with the workflow');
   assert.equal(retired.removed.snapshots,1);assert.equal(retired.removed.jobs,2);assert.equal(retired.removed.events,2);
   assert.deepEqual(ledgerWorkflows(ledger.db),[]);
   assert.equal(retireWorkflow(ledger.db,'wf').ok,true,'retiring an absent workflow removes nothing and is not an error');

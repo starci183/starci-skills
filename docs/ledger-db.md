@@ -30,8 +30,12 @@ the ledger DB by `ledger-migrate`; after import the file is left in place, read-
   detectable: `leases.job_id` → `jobs`, `jobs.generation` must equal the snapshot generation it was written
   with (trigger), and the continuation boundary becomes a read of one consistent file.
 - Archive = copy one file. Inspect = `SELECT`. `workflow-ops`, `workflow-tail`, `workflow-status` are views.
-- Worktree deletion, repo re-clone and process crash all keep the record: the record is the ledger DB, and
-  the ledger DB is in the Work-owning repository, outside every worker allowlist (see §7).
+- Worktree deletion and process crash keep the record: the record is the ledger DB, it lives in the
+  Work-owning repository and it is outside every worker allowlist (see §7). A **repo re-clone does not**:
+  `.starciwork/runtime.sqlite` is untracked, so a clone starts with no ledger. What survives a clone is the
+  tracked anchor of §12, which turns that loss into a refusal (`ledger-missing` / `ledger-behind-anchor`)
+  instead of a silent restart at generation 0. Carrying the bytes across machines is `workflow-export` plus a
+  backup, never an assumption.
 - Cross-ledger resources still need one arbiter. Only `ai/*` quota and machine budgets are cross-ledger,
   so only they stay machine-scoped, in a table small enough to be reconciled by TTL.
 
@@ -45,22 +49,39 @@ export const LEDGER_VERSION=1;
 export const ledgerFileFor=repoRoot=>path.join(repoRoot,'.starciwork','runtime.sqlite');
 export const machineFileFor=(env=process.env)=>path.join(runtimeRootFor(env),'machine.sqlite');
 
-/** Read-write. Migrates schema, enables FK, synchronous=FULL, journal_mode=DELETE (WAL is opt-in as today). */
-export function openLedger({file,now=Date.now,busyTimeoutMs=5000});
+/** Read-write. Migrates schema, enables FK, synchronous=FULL, journal_mode=WAL. */
+export function openLedger({file,now=Date.now,busyTimeoutMs=15000,machine});
 /** Read-only, no migration, what an operator inspection and the candidate bridge use. */
 export function inspectLedger({file});
 /** Read-write machine arbiter. Same options. */
-export function openMachine({file,now=Date.now,busyTimeoutMs=5000});
+export function openMachine({file,now=Date.now,busyTimeoutMs=15000});
+/** The ledger's own identity, from its `meta` row. Never derived from a path. */
+export function ledgerIdOf(handle);
 ```
 
 Both handles expose `{db, transaction(fn), now, file, path, close()}` exactly as `openJournal` does today, so
 callers of `journal.transaction`/`journal.db` port by renaming. `transaction` is `BEGIN IMMEDIATE … COMMIT`
 with rollback on throw; nested calls are refused (throw), never silently flattened.
 
+`journal_mode=WAL` is the default for both handles: the kernel writes while ten workers read their contracts
+through `starci op-contract`, and under DELETE every reader blocks the writer for the length of its read.
+`busy_timeout` is 15s to survive a checkpoint under that load. WAL cannot be set on some network and UNC
+paths; when `PRAGMA journal_mode=WAL` does not report `wal`, the handle falls back to DELETE, records
+`meta.journal_mode`, and `inspectLedger` reports it. WAL makes the ledger three files (`-wal`, `-shm`), so
+every copy — archive, `workflow-export`, backup, the supervisor's snapshot — runs
+`PRAGMA wal_checkpoint(TRUNCATE)` inside the same handle first and copies `runtime.sqlite` alone. §7's scope
+refusal already covers `runtime.sqlite*`, which is why it is written with the glob.
+
 ## 4. Schema — ledger DB
 
 ```sql
 PRAGMA user_version=1; PRAGMA auto_vacuum=INCREMENTAL;
+
+-- the ledger's own identity and open-mode facts. Seeded once, on create, and never rewritten.
+CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+--   ledger_id     randomUUID() at create. THE identity: it moves with the bytes, so renaming the repo,
+--                 a junction, a case change or a UNC path cannot re-key a ledger (a realpath digest can).
+--   schema        'starci/ledger-db@1'   created_at  epoch ms   journal_mode  'wal' | 'delete'
 
 -- one row per workflow the ledger owns
 CREATE TABLE workflows(
@@ -148,6 +169,18 @@ CREATE TABLE signals(
   PRIMARY KEY(scope,key));
 -- today's runtime-loads.json / runtimes.json (supervisor's provider load view)
 CREATE TABLE runtime_loads(runtime TEXT PRIMARY KEY, loads_json TEXT NOT NULL, at INTEGER NOT NULL);
+-- owner-named external inputs, frozen at goal time (today: copies under the WORKTREE's `.starciwork/_local/inputs/<wf>/`,
+-- which die with the worktree — restart test 2026-09-17 lost `1-be-architecture-business-handoff.md` and
+-- `1-architecture-partition.md` this way). The bytes are the record; an op binds them by `sha256`, never by path.
+CREATE TABLE inputs(
+  workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), key TEXT NOT NULL,      -- '<index>-<basename>' as today
+  goal_revision INTEGER NOT NULL, sha256 TEXT NOT NULL, size INTEGER NOT NULL, media_type TEXT,
+  origin TEXT NOT NULL,           -- the owner's original absolute path or URL, for provenance only
+  bytes BLOB NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(workflow_id,key));
+-- input ref inside goal/state/contracts: `ledger://inputs/<workflow_id>/<key>#sha256=<hex>`. The candidate bridge
+-- and root binding resolve that scheme from the ledger (materialising to `os.tmpdir()/starci/inputs/<wf>/<key>` when a
+-- worker needs a file, digest-checked on read); a `.starciwork/_local/inputs/...` ref in a 1.0.4 state is
+-- `ledger-unmigrated`. The migrator imports the directory when it still exists and otherwise records the loss.
 -- what the ledger imported, so a second migrate is a no-op and an audit can see provenance
 CREATE TABLE migrations(source TEXT PRIMARY KEY, kind TEXT NOT NULL, rows_json TEXT NOT NULL, at INTEGER NOT NULL);
 ```
@@ -157,6 +190,8 @@ CREATE TABLE migrations(source TEXT PRIMARY KEY, kind TEXT NOT NULL, rows_json T
 ```sql
 PRAGMA user_version=1;
 CREATE TABLE ledgers(ledger_id TEXT PRIMARY KEY, file TEXT NOT NULL, registered_at INTEGER NOT NULL, seen_at INTEGER NOT NULL);
+--   ledger_id is the ledger's `meta.ledger_id`; `file` is only the last known path, refreshed on every
+--   register, and used to reopen the ledger read-only for the sweep. A moved ledger keeps its rows.
 CREATE TABLE resources(resource_key TEXT PRIMARY KEY, capacity INTEGER NOT NULL CHECK(capacity>=0));   -- ai/<provider>[/<tier>]
 CREATE TABLE leases(
   resource_key TEXT NOT NULL, token TEXT NOT NULL, ledger_id TEXT NOT NULL REFERENCES ledgers(ledger_id),
@@ -167,7 +202,12 @@ CREATE TABLE budgets(scope_key TEXT PRIMARY KEY, limit_value INTEGER NOT NULL, u
 CREATE TABLE budget_reservations(scope_key TEXT NOT NULL, ledger_id TEXT NOT NULL, job_id TEXT NOT NULL, units INTEGER NOT NULL, PRIMARY KEY(scope_key,ledger_id,job_id));
 ```
 
-`ledger_id` = sha256 of the realpath of the ledger file, 16 hex. A ledger registers itself on `openLedger`.
+`ledger_id` is the ledger's `meta.ledger_id` (a UUID minted at create, stored **inside** the ledger). It is
+never derived from a path: a path-derived id re-keys the same ledger whenever the checkout is renamed, reached
+through a junction, spelled with different case or opened over UNC — and every machine lease taken under the
+old key becomes an orphan that only TTL clears. `openLedger({file,machine})` registers `{ledger_id,file}` and
+refreshes `file` and `seen_at`; when a registered `file` no longer opens, or opens with a different
+`meta.ledger_id`, the sweep treats every lease of that `ledger_id` as unbacked and releases it.
 
 ## 6. Two-phase reservation (admission)
 
@@ -187,7 +227,12 @@ ledger.transaction(db => {
 Release is the mirror: ledger tx deletes lease rows and settles the job, then `machine.release(machine_ref)`
 for each. A crash between the two leaves a machine row with no ledger row: `machine.sweep()` (supervisor
 tick) deletes machine leases whose `expires_at` passed OR whose `(ledger_id, job_id)` no longer holds a lease
-in the registered ledger file (opened read-only via `inspectLedger`). TTL default = today's lease TTL.
+in the registered ledger (reopened read-only via `inspectLedger` at `ledgers.file`, and accepted only when its
+`meta.ledger_id` matches — a path that now holds a different ledger proves the old one moved, never that its
+leases are live). TTL default = today's lease TTL. This seam is the one place where 1.0.4 detects drift rather
+than making it unrepresentable: two files cannot share one transaction. It is bounded deliberately — only
+`ai/*` and machine budgets cross it, both TTL'd, both swept every supervisor tick, and a stale machine row
+costs a delayed admission, never a wrong one.
 
 Capacity for `ai/*` is read from the machine DB; capacity for repo fences from the ledger DB. `maxConcurrentWriters`
 (w2) is a ledger `resources` row.
@@ -216,6 +261,7 @@ the continuation boundary (`ledger-verify` runs there, fails closed with `ledger
 | `checksPath(op)` | file path | `writeChecks({opId,attempt,checks})` / `readChecks(opId,attempt)`. |
 | `paths.inbox` | dir | `inbox.push({kind,key,payload})` / `inbox.pending()` / `inbox.settle(id,status,disposition)` |
 | `paths.state/events/goal…` | files | **removed**. Anything that needs the goal reads `goal()` → `{markdown,json,revision,identity}`. |
+| new | | `inputs.put({key,goalRevision,bytes,origin,mediaType})` → `{ref,sha256}` / `inputs.get(key)` → `{bytes,sha256,…}` / `inputs.list()` / `inputs.materialise(key,dir)` (digest-checked file copy for a worker) |
 | new | | `signal.set(scope,key,{pid,token,value,ttl})` / `signal.get` / `signal.clear` (kernel.lock, stop.flag, …) |
 | new | | `exportTo(dir)` — writes today's file layout for humans (`workflow-export`). |
 
@@ -261,4 +307,38 @@ reconcile job for the kernel, not the migrator).
   worktree → resume: done ops stay done, in-flight op reconciles via `settleStoppedOperation`, no `_local`
   writes happened (assert the directory is absent).
 - `grep -rn "_local" kernel/ cli/ bin/ hosts/` returns only `ledger-migrate`, `workflow-export`, docs.
+- `tests/ledger-anchor.spec.mjs`: the anchor is written at every checkpoint; a ledger restored behind its
+  anchor refuses with `ledger-behind-anchor`; a missing ledger with a tracked anchor refuses with
+  `ledger-missing`; an anchor with no ledger row and no events is the legitimate first boot.
+- Identity and mode: a ledger moved to another path keeps its `meta.ledger_id` and its machine leases; a
+  path rebuilt with a fresh ledger does not inherit them; a handle that cannot take WAL falls back to DELETE,
+  records it in `meta`, and still passes the suite.
 - Pin sealed as `1.0.4`; the three live workflows migrated and resumed at their checkpoints.
+
+## 12. Anchor — the tracked head (`.starciwork/ledger-anchor.json`)
+
+The ledger file is untracked and the hash chain is self-consistent: anyone able to write the file can
+recompute the whole chain, so the chain proves nothing about *which* history is the agreed one. The anchor is
+the small, tracked, human-readable counter-record.
+
+```json
+{"schema":"starci/ledger-anchor@1","ledgerId":"<uuid>","updatedAt":0,
+ "workflows":{"<workflow_id>":{"generation":7,"checkpointId":"…","eventsHead":"<digest>","seq":412,"at":0}}}
+```
+
+- Written inside the same store call that commits a checkpoint (§8 `saveState`): ledger transaction commits,
+  then the anchor file is replaced atomically (write temp + rename). A crash between the two leaves the anchor
+  one checkpoint behind, which is the safe direction — the ledger being **ahead** of its anchor is normal and
+  never refuses.
+- Verified at the continuation boundary and by `ledger-verify`, per workflow: the anchor's `eventsHead` must
+  exist in `events` with that `seq`, and `state_snapshots` must hold a checkpoint at or after the anchor's
+  `generation`. A ledger that lacks the anchored head is a restored, rolled-back or rewritten file → fail
+  closed `ledger-behind-anchor`. A tracked anchor with no ledger file at all → `ledger-missing`, whose named
+  recovery is restoring a backup or `ledger-migrate`, never a fresh start.
+- `ledgerId` mismatch between anchor and `meta` → `ledger-identity-mismatch`: a different ledger was dropped
+  into a checkout that already carried a history.
+- The anchor is committed with the Work it describes, so a re-clone carries it. It is deliberately not the
+  record: it holds heads, never state, and it can be regenerated from a healthy ledger
+  (`starci ledger-anchor --write`).
+- The sealed runtime pin records the anchor digest of each live workflow, so a pin and a checkout that
+  disagree are caught at seal time rather than mid-run.
