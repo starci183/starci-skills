@@ -26,7 +26,7 @@ Chạy tay `workflow-run` để bắt output, lộ ra chuỗi 3 lỗi kernel n�
    `sealCandidate` xử mọi replay bằng `allowedWrites` tính lại từ canonical tree
    tại thời điểm đó; cây đã sạch trở lại nên list rỗng, và seal từ chối chính
    delta nó đã seal. Nay packet bất biến cho phép đúng các path nó ghi.
-4. `f8c1b5d2` — **sealed candidate mất delta canonical thì bị abandon, không fence mãi**.
+4. `d5c5bf70` — **sealed candidate mất delta canonical thì bị abandon, không fence mãi**.
    Attempt seal xong rồi worktree bị wipe về bytes đã accept → `canonical-drift`
    + `canonical-delta-missing` mỗi path; không luật nào nhận nên writer fence giữ
    mãi. Cùng verdict với 2 luật bên cạnh, chỉ khác là tới từ packet đã seal.
