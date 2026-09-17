@@ -1,14 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
 import {inspectJournal} from '../kernel/journal.mjs';
-import {journalFileFor,runtimeRootFor} from '../kernel/engine.mjs';
+import {journalFileFor} from '../kernel/engine.mjs';
 import {pidAlive} from '../kernel/loads.mjs';
 import {stateGoalIdentity,workflowsRoot} from '../kernel/store.mjs';
+import {openLedger,openMachine,inspectLedger,ledgerFileFor,machineFileFor} from '../kernel/ledger-db.mjs';
 
-const require=createRequire(import.meta.url);
+export {verifyChain} from '../kernel/ledger-db.mjs';
+
 const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const readJson=file=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}};
@@ -19,23 +20,8 @@ const SETTLED=['succeeded','failed','cancelled'];
 const SEGMENT=/^events\.g(\d+)\.jsonl$/;
 /** The journal's machine-arbiter resources; repo fences (canonical-writer:*, source-root:*, lane:*) stay ledger-side. */
 const machineScoped=key=>key.startsWith('ai/')||key.startsWith('machine:');
-
-export const ledgerFileFor=repoRoot=>path.join(repoRoot,'.starciwork','runtime.sqlite');
-export const machineFileFor=(env=process.env)=>path.join(runtimeRootFor(env),'machine.sqlite');
-/** §4: digest chains a workflow's event rows; the stored text columns are hashed verbatim. */
-const eventDigest=(prev,row)=>sha256(`${prev??''}${row.event_id}${row.kind}${String(row.payload_json)}${row.created_at}`);
-
-/** Recompute a workflow's event chain; the migrator's own proof until ledger-db exports the canonical verifier. */
-export function verifyChain(db,workflowId){
-  const rows=workflowId?db.prepare('SELECT * FROM events WHERE workflow_id=? ORDER BY seq').all(workflowId):db.prepare('SELECT * FROM events ORDER BY workflow_id,seq').all();
-  const heads=new Map(),broken=[];
-  for(const row of rows){
-    const prev=heads.get(row.workflow_id)??null;
-    if((row.prev_digest??null)!==prev||eventDigest(prev,row)!==row.digest)broken.push(row.event_id);
-    heads.set(row.workflow_id,row.digest);
-  }
-  return {ok:broken.length===0,broken};
-}
+/** §4 chain digest — byte-identical to ledger-db.mjs's digestOf (it is not exported, so it is mirrored here). */
+const eventDigest=(prev,row)=>sha256(`${prev??''}${row.event_id}${row.kind}${row.payload_json??''}${row.created_at}`);
 
 const journalRows=(journal,sql,args=[])=>{try{return journal.db.prepare(sql).all(...[].concat(args));}catch{return [];}};
 
@@ -106,14 +92,12 @@ function collectShared(journal){
     budgets:has('budgets')?journal.db.prepare('SELECT * FROM budgets ORDER BY scope_key').all():[]};
 }
 
-const ledgerId=file=>sha256(fs.realpathSync(file)).slice(0,16);
-
-function machineApply(machine,{ledgerKey,file,plan,shared,at}){
-  machine.db.prepare('INSERT OR IGNORE INTO ledgers(ledger_id,file,registered_at,seen_at) VALUES(?,?,?,?)').run(ledgerKey,file,at,at);
+function machineApply(machine,{file,plan,shared,at}){
+  const {ledgerId}=machine.registerLedger({file});
   for(const row of shared.resources.filter(row=>machineScoped(row.resource_key)))machine.db.prepare('INSERT OR IGNORE INTO resources(resource_key,capacity) VALUES(?,?)').run(row.resource_key,row.capacity);
   for(const row of shared.budgets.filter(row=>machineScoped(row.scope_key)))machine.db.prepare('INSERT OR IGNORE INTO budgets(scope_key,limit_value,used_value,reserved_value) VALUES(?,?,?,?)').run(row.scope_key,row.limit_value,row.used_value,row.reserved_value);
-  for(const lease of plan.leases.filter(row=>machineScoped(row.resource_key)))machine.db.prepare('INSERT OR IGNORE INTO leases(resource_key,token,ledger_id,workflow_id,job_id,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,?)').run(lease.resource_key,lease.token,ledgerKey,plan.id,lease.job_id,lease.units,lease.acquired_at,lease.expires_at);
-  for(const row of plan.reservations.filter(row=>machineScoped(row.scope_key)))machine.db.prepare('INSERT OR IGNORE INTO budget_reservations(scope_key,ledger_id,job_id,units) VALUES(?,?,?,?)').run(row.scope_key,ledgerKey,row.job_id,row.units);
+  for(const lease of plan.leases.filter(row=>machineScoped(row.resource_key)))machine.db.prepare('INSERT OR IGNORE INTO leases(resource_key,token,ledger_id,workflow_id,job_id,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,?)').run(lease.resource_key,lease.token,ledgerId,plan.id,lease.job_id,lease.units,lease.acquired_at,lease.expires_at);
+  for(const row of plan.reservations.filter(row=>machineScoped(row.scope_key)))machine.db.prepare('INSERT OR IGNORE INTO budget_reservations(scope_key,ledger_id,job_id,units) VALUES(?,?,?,?)').run(row.scope_key,ledgerId,row.job_id,row.units);
 }
 
 function ledgerApply(db,{plan,shared,recordShared,journalFile,at}){
@@ -152,9 +136,8 @@ function ledgerApply(db,{plan,shared,recordShared,journalFile,at}){
 }
 
 const readMigrations=file=>{
-  const {DatabaseSync}=require('node:sqlite');
-  const db=new DatabaseSync(file,{readOnly:true,timeout:5000});
-  try{return new Set(db.prepare('SELECT source FROM migrations').all().map(row=>row.source));}catch{return new Set();}finally{db.close();}
+  const inspection=inspectLedger({file});
+  try{return new Set(inspection.db.prepare('SELECT source FROM migrations').all().map(row=>row.source));}catch{return new Set();}finally{inspection.close();}
 };
 
 function archiveDir(root,id){
@@ -168,24 +151,20 @@ function archiveDir(root,id){
 
 /**
  * §10: fold `.starciwork/_local/workflows/<id>` plus the retired journal's rows for it into
- * `.starciwork/runtime.sqlite`, per workflow and atomically. `deps` injects the ledger openers
- * (`kernel/ledger-db.mjs`, s0) so the spec can stand the schema up before that branch lands.
+ * `.starciwork/runtime.sqlite`, per workflow and atomically.
  */
-export async function migrateLedger({repoRoot,journalFile=journalFileFor(),machineFile=machineFileFor(),dryRun=false,archive=false,now=Date.now,pidAliveFn=pidAlive,deps=null}={}){
+export async function migrateLedger({repoRoot,journalFile=journalFileFor(),machineFile=machineFileFor(),dryRun=false,archive=false,now=Date.now,pidAliveFn=pidAlive}={}){
   need(typeof repoRoot==='string'&&repoRoot.trim(),'migrateLedger needs a repository root');
-  const root=workflowsRoot(path.resolve(repoRoot)),ledgerFile=deps?.ledgerFileFor?.(repoRoot)??ledgerFileFor(path.resolve(repoRoot));
+  const root=workflowsRoot(path.resolve(repoRoot)),ledgerFile=ledgerFileFor(path.resolve(repoRoot));
   const summary={ok:true,workflows:[],skipped:[],refused:[]};
   if(!fs.existsSync(root))return summary;
   const journal=journalFile&&fs.existsSync(journalFile)?inspectJournal({file:journalFile}):null;
-  let ledger=null,machine=null,openMachine=null,prior=new Set();
+  let ledger=null,machine=null,prior=new Set();
   const closeAll=()=>{try{ledger?.close();}catch{}try{machine?.close();}catch{}try{journal?.close();}catch{}};
   try{
     if(dryRun){if(fs.existsSync(ledgerFile))prior=readMigrations(ledgerFile);}
     else{
-      const openers=deps??await import('../kernel/ledger-db.mjs');
-      need(typeof openers.openLedger==='function','kernel/ledger-db.mjs (s0) is required for a real migration');
-      ledger=openers.openLedger({file:ledgerFile,now});
-      openMachine=openers.openMachine;
+      ledger=openLedger({file:ledgerFile,now});
       try{prior=new Set(ledger.db.prepare('SELECT source FROM migrations').all().map(row=>row.source));}catch{prior=new Set();}
     }
     const ids=fs.readdirSync(root,{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name).sort();
@@ -203,7 +182,7 @@ export async function migrateLedger({repoRoot,journalFile=journalFileFor(),machi
       if(dryRun){summary.workflows.push({id,imported:plan.counts});continue;}
       try{
         const needsMachine=plan.leases.some(lease=>machineScoped(lease.resource_key))||plan.reservations.some(row=>machineScoped(row.scope_key))||(!sharedDone&&(shared.resources.some(row=>machineScoped(row.resource_key))||shared.budgets.some(row=>machineScoped(row.scope_key))));
-        if(needsMachine){need(typeof openMachine==='function','openMachine is required to import machine-scoped journal rows');machine??=openMachine({file:machineFile,now});machine.transaction(()=>machineApply(machine,{ledgerKey:ledgerId(ledgerFile),file:ledgerFile,plan,shared:sharedDone?{resources:[],budgets:[]}:shared,at:now()}));}
+        if(needsMachine){machine??=openMachine({file:machineFile,now});machine.transaction(()=>machineApply(machine,{file:ledgerFile,plan,shared:sharedDone?{resources:[],budgets:[]}:shared,at:now()}));}
         ledger.transaction(db=>ledgerApply(db,{plan,shared:sharedDone?{resources:[],budgets:[]}:shared,recordShared:!sharedDone,journalFile,at:now()}));
         sharedDone=true;
         if(archive)archiveDir(root,id);
