@@ -113,15 +113,18 @@ export function applyQuota(runtimes,quota){
   // so every quota key is resolved through the registry aliases before it is matched against a runtime.
   const order=[...new Set((Array.isArray(quota.order)?quota.order:[]).map(id=>canonicalTarget(id)).filter(id=>copy.runtimes?.[id]))];
   const granted={};
+  // Several quota keys can name the same pool through aliases (`gpt-5.6-luna`, `gpt-5.6-sol` and `gpt-6-astra`
+  // are all `codex-agent`): the pool's capacity is the largest grant, never the last key's overwrite - a zero
+  // on an unused alias must not close the slots another alias was given.
   for(const [key,n] of Object.entries(plain(quota.slots)?quota.slots:{})){
     const id=canonicalTarget(key);
-    if(copy.runtimes?.[id]&&Number.isFinite(Number(n))){
-      copy.runtimes[id].maxParallel=Math.max(0,Number(n));
-      granted[id]=Math.max(0,Number(n));
-      // Some external CLIs expose launch/auth status but no account headroom API. Naming a positive slot is the
-      // owner's explicit capacity decision for this workflow; absence or zero keeps that runtime closed.
-      if(copy.runtimes[id].capacityAuthority==='explicit-workflow-quota')copy.runtimes[id].explicitCapacity=Number(n)>0;
-    }
+    if(copy.runtimes?.[id]&&Number.isFinite(Number(n)))granted[id]=Math.max(granted[id]??0,Math.max(0,Number(n)));
+  }
+  for(const [id,n] of Object.entries(granted)){
+    copy.runtimes[id].maxParallel=n;
+    // Some external CLIs expose launch/auth status but no account headroom API. Naming a positive slot is the
+    // owner's explicit capacity decision for this workflow; absence or zero keeps that runtime closed.
+    if(copy.runtimes[id].capacityAuthority==='explicit-workflow-quota')copy.runtimes[id].explicitCapacity=n>0;
   }
   // A granted slot count is also the owner's target share for that runtime (goal §4): record it on the quota
   // itself and mirror it into the profile so the weights survive the hand to createAllocator either way.

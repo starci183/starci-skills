@@ -62,6 +62,22 @@ test('the required validator resolves typed anchors to full contained bytes and 
   assert.equal(Buffer.from(reference.bytes).toString(),'changed');
 });
 
+test('a no-diff implement result is judged on the current bytes of its declared write scope, never skipped',t=>{
+  const f=fixture(t);let request;
+  const workerRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-scope-snapshot-'));t.after(()=>fs.rmSync(workerRoot,{recursive:true,force:true}));
+  fs.writeFileSync(path.join(workerRoot,'a.js'),'// the goal already holds here');
+  f.ctx.candidate={workerRoot,baseRoot:workerRoot,packet:{acceptedHead:'head1',candidateDigest:'digest',changes:[],files:[]}};
+  f.input={files:[],produced:[],verified:{checks:[]}};
+  f.ctx.validateOp=value=>{request=value;return {verdict:'accept',complete:true,independentFromAttempt:true,freshContext:true,reviewerAttemptId:'review-2'};};
+  assert.equal(validateAccepted(f.store,f.state,f.op,f.ctx,f.input).verdict,'accept');
+  assert.match(request.diff.text,/the goal already holds here/,'the validator sees the bytes as found');
+  assert.match(request.diff.text,/unchanged by this attempt/,'the snapshot is labelled, never mistaken for a change');
+  assert.ok(f.store.events.some(event=>event.event==='validator-scope-snapshot'));
+  // A scope with no bytes on disk stays an honest inconclusive: there is nothing to judge.
+  f.op.allowlist=['absent.js'];f.ctx.validateOp=()=>({verdict:'accept'});
+  assert.equal(validateAccepted(f.store,f.state,f.op,f.ctx,f.input).verdict,'inconclusive');
+});
+
 test('the required validator can judge a no-diff verification receipt only after complete reproduced checks',t=>{
   const f=fixture(t);f.op.kind='e2e.verify';f.op.checks=[{name:'public-api',command:'node e2e.mjs'}];f.input={files:[],produced:[],verified:{checks:[{name:'public-api',command:'node e2e.mjs',exitCode:0,evidence:'receipt sha256 abc'}]}};
   f.ctx.validateOp=()=>({verdict:'accept',complete:true,independentFromAttempt:true,freshContext:true,reviewerAttemptId:'review-2'});

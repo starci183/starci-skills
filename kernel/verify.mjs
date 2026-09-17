@@ -331,10 +331,19 @@ export function validateAccepted(store,state,op,ctx,{files,verified,produced=nul
   const reproducedNoDiffEvidence=strict&&verificationKind&&(op.checks??[]).length>0&&verified.checks.length>=(op.checks??[]).length&&
     verified.checks.every(check=>check.exitCode===0&&typeof check.command==='string'&&check.command.trim()&&typeof check.evidence==='string'&&check.evidence.trim());
   // A review or a no-op slice changed nothing: there is no diff to judge, and a call on nothing could only misjudge.
-  if(!judged.length&&!reproducedNoDiffEvidence){store.appendEvent({event:'validator-skipped',op:op.id,reason:'the operation changed nothing inside its allowlist, so there is no diff to judge'});return strict
-    ?{verdict:'inconclusive',reason:'required validation has no observed candidate files'}:{verdict:'skipped'};}
+  // The strict path still asks once more when the op claims the state itself is the work - a done report with no
+  // candidate diff means "the allowlist already satisfies the goal", and that claim is judged on the current
+  // bytes of the op's declared write scope inside the frozen candidate (`unchangedScopeDiff`), never skipped.
+  let scopeSnapshot=null;
+  if(!judged.length&&!reproducedNoDiffEvidence){
+    scopeSnapshot=strict?unchangedScopeDiff(ctx.candidate,op):null;
+    if(!scopeSnapshot){store.appendEvent({event:'validator-skipped',op:op.id,reason:'the operation changed nothing inside its allowlist, so there is no diff to judge'});return strict
+      ?{verdict:'inconclusive',reason:'required validation has no observed candidate files'}:{verdict:'skipped'};}
+    store.appendEvent({event:'validator-scope-snapshot',op:op.id,files:scopeSnapshot.files.slice(0,12),
+      reason:'the attempt reported done with no candidate diff; the declared write scope is judged as found'});
+  }
   const providers=ctx.validator??llm.DEFAULT_VALIDATOR_RUNTIMES;
-  const diff=strict&&ctx.candidate?.packet?frozenCandidateDiff(ctx.candidate,judged,{git:ctx.git}):opDiff(state,op,judged,ctx);
+  const diff=scopeSnapshot??(strict&&ctx.candidate?.packet?frozenCandidateDiff(ctx.candidate,judged,{git:ctx.git}):opDiff(state,op,judged,ctx));
   if(strict&&diff.truncated){
     store.appendEvent({event:'validator-inconclusive',op:op.id,reason:'the complete candidate diff exceeds the validator transport bound',diffFiles:files});
     return {verdict:'inconclusive',reason:'required validator did not receive the complete candidate diff'};
@@ -434,6 +443,61 @@ export function frozenCandidateDiff(candidate,files,{git=null}={}){
   let text=chunks.join('\n');
   const truncated=Buffer.byteLength(text)>VALIDATOR_DIFF_BYTES;
   return {files,base:packet.acceptedHead,...(packet.roots?{roots:packet.roots.map(root=>({id:root.id,role:root.role,acceptedHead:root.acceptedHead}))}:{}),text,truncated};
+}
+
+/** How many unchanged scope files a snapshot may carry before the transport bound matters more than coverage. */
+const UNCHANGED_SCOPE_FILES=24;
+/**
+ * The regular files under `root` that an allowlist entry names: itself when it is a file, its walk when it is
+ * a directory or a `/**` prefix. Entries that name nothing on disk yield nothing.
+ */
+const scopeFiles=(root,entries)=>{
+  const out=[];
+  const walk=dir=>{let list=[];try{list=fs.readdirSync(dir,{withFileTypes:true});}catch{return [];}
+    return list.flatMap(item=>item.isDirectory()?walk(path.join(dir,item.name)):item.isFile()?[path.join(dir,item.name)]:[]);};
+  for(const raw of entries??[]){
+    const rel=normalize(raw).replace(/\/$/,'');
+    if(!rel||rel.split('/').includes('..'))continue;
+    const prefix=rel.endsWith('/**')?rel.slice(0,-3):rel;
+    const abs=path.join(root,...prefix.split('/'));
+    try{const stat=fs.lstatSync(abs);
+      if(stat.isDirectory())for(const file of walk(abs))out.push(`${prefix}/${slash(path.relative(abs,file))}`);
+      else if(stat.isFile())out.push(prefix);
+    }catch{/* an allowlisted path that does not exist in the candidate simply has no bytes to judge */}
+  }
+  return unique(out);
+};
+/**
+ * The validator's view when an implement operation reports done with no candidate diff: "nothing changed" is
+ * the operation's claim, and the claim is judged on the current bytes of the operation's own declared write
+ * scope inside the frozen candidate, not on an empty diff. Every rendered file is labelled unchanged so the
+ * reader cannot mistake the snapshot for a change, and the same transport bound holds. Returns null when the
+ * scope has no bytes on disk - that case stays an honest inconclusive.
+ */
+export function unchangedScopeDiff(candidate,op){
+  const packet=candidate?.packet;
+  if(!packet)return null;
+  const roots=candidate?.roots??{source:{id:'source',role:'source',workerRoot:candidate.workerRoot,baseRoot:candidate.baseRoot}};
+  const bindings=Array.isArray(op?.candidateRootBindings?.bindings)?op.candidateRootBindings.bindings
+    :[{id:'source',role:'source',allowlist:op?.allowlist??[]}];
+  const changed=new Set((packet.changes??[]).map(change=>slash(change.displayPath??change.path)));
+  const files=[],chunks=[];let bytes=0,truncated=false;
+  for(const binding of bindings){
+    const view=roots[binding.id];
+    if(!view?.workerRoot)continue;
+    for(const rel of scopeFiles(view.workerRoot,binding.allowlist)){
+      if(changed.has(rel)||files.length>=UNCHANGED_SCOPE_FILES)continue;
+      let body;try{body=fs.readFileSync(path.join(view.workerRoot,...rel.split('/')));}catch{continue;}
+      const header=`diff --starci a/${rel} b/${rel}\nroot ${binding.id} (${binding.role??'source'})\nunchanged by this attempt; the current bytes are the claim being judged`;
+      const chunk=looksBinary(body)?`${header}\nBinary file, ${body.length} bytes; its content is not rendered.`:`${header}\n${body.toString('utf8')}`;
+      bytes+=Buffer.byteLength(chunk);
+      if(bytes>VALIDATOR_DIFF_BYTES){truncated=true;break;}
+      files.push(rel);chunks.push(chunk);
+    }
+    if(truncated)break;
+  }
+  if(!files.length)return null;
+  return {files,base:packet.acceptedHead,text:chunks.join('\n'),truncated};
 }
 export function resolveValidatorReferences(state,op,candidate=null){
   const errors=[],entries=[],views=candidate?.roots??{},defaultView=candidate?.workerRoot?candidate:{workerRoot:state.worktree};

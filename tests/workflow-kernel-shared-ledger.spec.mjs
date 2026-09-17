@@ -29,7 +29,7 @@ const PAGE='app/receipt/page.tsx';
 const slash=value=>String(value).replaceAll('\\','/');
 const stageSealableRuntime=(sourceRoot,target)=>{
   const required=['.dist','bin/starci.mjs','bin/starci-skills.mjs','scripts/config.mjs','config.json','core/runtime-root.mjs','core/yaml.mjs',
-    'init/AGENTS.md','init/CLAUDE.md','package.json','SKILL.md','docs/supervision-templates/op.md','knowledge/grammars'];
+    'init/AGENTS.md','init/CLAUDE.md','init/DEVIN.md','package.json','SKILL.md','docs/supervision-templates/op.md','knowledge/grammars'];
   for(const relative of required){const source=path.join(sourceRoot,...relative.split('/')),destination=path.join(target,...relative.split('/'));
     fs.mkdirSync(path.dirname(destination),{recursive:true});fs.cpSync(source,destination,{recursive:true});}
   return target;

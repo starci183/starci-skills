@@ -123,12 +123,16 @@ export function createStore({repoRoot,id}){
     /** Retire the live log as the segment of the generation that just ended; the next event opens a new live log. */
     rotateEvents(generation){
       need(Number.isInteger(generation)&&generation>0,'rotateEvents needs the retired generation');
-      const target=path.join(dir,`events.g${generation}.jsonl`);
       if(!fs.existsSync(paths.events)||!readText(paths.events).trim())return {rotated:null};
-      need(!fs.existsSync(target),`event segment already exists: ${target}`);
+      // A retry that rotated but died before enrollment left <generation> taken while the same generation's
+      // live log kept filling: the leftover events retire under the next free segment number, never a
+      // collision and never a second writer into an existing archive.
+      let segment=generation,existing=new Set(eventSegments(dir).map(entry=>entry.generation));
+      while(existing.has(segment))segment+=1;
+      const target=path.join(dir,`events.g${segment}.jsonl`);
       if(seq===null)seq=lastSeq(paths.events,dir);
       fs.renameSync(paths.events,target);
-      acknowledgeFile(target,`events.g${generation}.jsonl`,'rename');
+      acknowledgeFile(target,`events.g${segment}.jsonl`,'rename');
       acknowledgeFile(paths.events,'events.jsonl','delete');
       return {rotated:target};
     },

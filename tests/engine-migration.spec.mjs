@@ -99,5 +99,6 @@ test('the event log rotates by generation and history stays readable, with the s
   assert.deepEqual(store.readEvents({since:2}).map(event=>event.event),['c']);
   const fresh=createStore({repoRoot:dir,id:'wf'});fresh.rotateEvents(2);fresh.appendEvent({event:'d'});
   assert.deepEqual(fresh.readEvents().map(event=>event.seq),[1,2,3,4],'a new process continues after the newest segment');
-  assert.throws(()=>fresh.rotateEvents(1),/already exists/);
+  const freed=fresh.rotateEvents(1);assert.equal(path.basename(freed.rotated),'events.g3.jsonl','a taken generation segment retires under the next free number instead of colliding');
+  assert.deepEqual(fresh.readEvents().map(event=>event.event),['a','b','c','d']);
 });

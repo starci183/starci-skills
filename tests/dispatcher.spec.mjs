@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {cutSizeReason,opScopes,planDispatch,writerKeys} from '../kernel/dispatcher.mjs';
-import {CUT_ASSERTIONS,CUT_FILES} from '../kernel/sync.mjs';
+import {CUT_ASSERTIONS,CUT_FILES,effectiveDifficulty,measuredDifficulty} from '../kernel/sync.mjs';
 
 /**
  * The dispatch planner's contract (goal §5): parallel where scopes are disjoint, sequential where a file, a
@@ -214,4 +214,25 @@ test('ops that cannot be launched anyway wait with their own reason',()=>{
   assert.deepEqual(plan.wait.map(item=>item.op),['leased','filling']);
   assert.match(plan.wait[0].reason,/durable reservation/);
   assert.match(plan.wait[1].reason,/credential custody/);
+});
+
+/* ------------------------------------------------------------------ task difficulty */
+
+test('the declared scope itself measures the difficulty an ordinary op carries',()=>{
+  assert.equal(measuredDifficulty(op('m',{allowlist:['src/a.ts','src/b.ts']})),'easy');
+  assert.equal(measuredDifficulty(op('m',{allowlist:['src/a.ts','src/b.ts','src/c.ts']})),'medium');
+  assert.equal(measuredDifficulty(op('m',{allowlist:['src/a.ts','src/b.ts','src/c.ts','src/d.ts','src/e.ts','src/f.ts']})),'hard');
+  assert.equal(measuredDifficulty(op('m',{acceptance:['one','two','three','four']})),'hard','assertions count like files');
+  assert.equal(measuredDifficulty(op('m',{candidateRootBindings:{bindings:[{id:'source',allowlist:['a','b','c','d','e','f']}]}})),'hard',
+    'the per-root binding file lists are part of the declared scope');
+});
+
+test('the effective difficulty is the heavier of the declaration and the measured scope',()=>{
+  assert.equal(effectiveDifficulty(op('x',{allowlist:['a']})),'easy');
+  assert.equal(effectiveDifficulty(op('x',{allowlist:['a','b','c']})),'medium','an undeclared op keeps the medium default');
+  assert.equal(effectiveDifficulty({...op('x',{allowlist:['a']}),difficulty:'hard'}),'hard','a declared hard is never downgraded');
+  assert.equal(effectiveDifficulty({...op('x',{allowlist:['a','b','c','d','e','f']}),difficulty:'easy'}),'hard',
+    'a declared easy cannot hide a heavy write scope from the allocator');
+  assert.equal(effectiveDifficulty(op('x',{allowlist:['a','b','c','d','e','f']})),'hard',
+    'a refactor-scale scope lands on the hard tier even when nothing declared it');
 });

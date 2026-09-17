@@ -20,6 +20,7 @@ Usage:
   starci workflow-run --id <id> [--host-adapter orca|headless] [--max-iterations N]
   starci workflow-retry --id <id> --runtime-pin <file>
   starci workflow-status --id <id> [--json true]
+  starci workflow-tail --id <id> [--lines 40] [--follow true] [--color true|false]
   starci workflow-list [--json true]
   starci workflow-stop --id <id>  # exports backend-owned workflows/<id>.md
   starci workflow-lane-close --id <id>

@@ -14,7 +14,7 @@ import {kernelMain,OP_DEADLINE_MS} from '../../kernel/kernel.mjs';
 import {roleOf as operationRoleOf} from '../../kernel/graph.mjs';
 import {supervisorMain} from '../../kernel/supervisor.mjs';
 import {serveWorkflowInputs} from '../../kernel/inputs-server.mjs';
-import {WORKFLOW_LIST,buildList,buildView,renderList,renderView} from '../../kernel/view.mjs';
+import {QUIET_EVENTS,WORKFLOW_LIST,buildList,buildView,readWorkflowEvents,renderEventLine,renderEventTail,renderList,renderView} from '../../kernel/view.mjs';
 import {repositoryRoot} from '../../kernel/store.mjs';
 import {journalMaintenanceMain} from '../../kernel/journal-maintenance.mjs';
 import {DISK_HEADROOM_CODE} from '../../kernel/disk.mjs';
@@ -317,12 +317,20 @@ function completedWorkerProof(orca,dispatchId,{cwd}={}){
   if(shown?.outcome!=='ok')return {proven:false,reason:`worker-show failed: ${shown?.reason??shown?.outcome??'unknown'}`};
   const result=resultOf(shown.receipt),dispatch=result?.dispatch,worker=result?.worker,observation=result?.observation,terminal=result?.terminal,
     terminalResource=result?.terminalResource,ownershipState=String(terminalResource?.ownershipState??'').toLowerCase();
-  const exact=dispatch?.id===dispatchId&&worker?.dispatch_id===dispatchId&&observation?.exactWorker===true;
   const completed=dispatch?.status==='completed'&&Boolean(dispatch?.completed_at)&&Boolean(dispatch?.capability_revoked_at)&&worker?.state==='succeeded'&&worker?.stage==='settled';
+  // After an Orca restart the terminal handle is stale: observation reads `missing` and the resource is
+  // retained as `identity_unproven`. The completed, capability-revoked, settled worker is still the proof
+  // that nothing runs; the unclosable tab is recorded residue, not a live effect. A user-owned retained
+  // tab of a completed dispatch is the same class: the human owns the leftover surface, not the work.
+  const retainedResidue=completed&&terminalResource?.releaseState==='retained'
+    &&terminalResource?.originDispatchId===dispatchId&&terminalResource?.ownerDispatchId===dispatchId
+    &&(observation?.status==='missing'||ownershipState==='user_owned');
+  const exact=dispatch?.id===dispatchId&&worker?.dispatch_id===dispatchId&&(observation?.exactWorker===true||retainedResidue);
   const terminalAbsent=!terminal,terminalDisconnected=terminal?.connected===false&&terminal?.writable===false;
-  if(ownershipState==='user_owned')return {proven:false,userOwned:true,ownershipState,reason:'the completed worker terminal is user-owned'};
-  if(!exact||!completed||observation?.status!=='exited'||(!terminalAbsent&&!terminalDisconnected))return {proven:false,ownershipState,reason:'the exact completed worker is not proved exited with an absent or disconnected terminal'};
+  if(ownershipState==='user_owned'&&!retainedResidue)return {proven:false,userOwned:true,ownershipState,reason:'the completed worker terminal is user-owned'};
+  if(!exact||!completed||(observation?.status!=='exited'&&!retainedResidue)||(!terminalAbsent&&!terminalDisconnected&&!retainedResidue))return {proven:false,ownershipState,reason:'the exact completed worker is not proved exited with an absent or disconnected terminal'};
   const cleanup=terminalAbsent?{complete:true,proof:'exact-terminal-absent'}:
+    retainedResidue?{complete:false,proof:'retained-terminal',reason:`the completed worker terminal is retained (${terminalResource?.retainedReason??'residual'})`,residualTerminal:true}:
     {complete:false,proof:null,reason:'the exited worker terminal remains recorded as disconnected',residualTerminal:true};
   return {proven:true,dispatchStatus:dispatch.status,workerState:worker.state,workerStage:worker.stage,capabilityRevoked:true,
     ownershipState:ownershipState||null,terminal:terminal?{handle:terminal.handle??null,connected:false,writable:false}:null,cleanup};
@@ -746,6 +754,11 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
     last events. --json true prints the machine shape (the kernel's own status fields plus view).
   node bin/starci.mjs workflow-list [--json true] [--worktree <relative-path>]
     one line per workflow of this repository: phase, operations done, kernel liveness, last event age
+  node bin/starci.mjs workflow-tail --id <workflow-id> [--lines 40] [--all true] [--follow true] [--poll-ms 1500] [--color true|false] [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
+    the workflow's event log as it happens, one line per event: launches and allocations cyan, accepted and
+    proven work green, waits and deferrals yellow, blocks and failures red, owner and manager events magenta.
+    --follow keeps the tail open; heartbeat noise is hidden unless --all asks for it; colour follows the
+    terminal unless --color or NO_COLOR says otherwise. --json true prints the raw events instead.
   node bin/starci.mjs workflow-stop --id <workflow-id> [--ledger-root <path>] [--host <path-to-.claude>] [--worktree <relative-path>]
     approve, status and stop find the workflow directory where the goal put it, so a job whose ledger is
     owned by another repository is reached with the same --host (or --ledger-root) the goal was given.
@@ -762,7 +775,7 @@ function usage(){return `Usage (the one command line; <skill root> is the instal
   capability the headless host lacks (interface.asset needs design-tool, which model/hosts.yaml declares only
   for the Orca host) is refused as host-unsupported.`;}
 
-const KERNEL_COMMANDS=['workflow-goal','workflow-amend','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs'];
+const KERNEL_COMMANDS=['workflow-goal','workflow-amend','workflow-approve','workflow-answer','workflow-run','workflow-retry','workflow-status','workflow-tail','workflow-stop','workflow-lane-close','workflow-supervise','workflow-inputs'];
 /** Read-only views of the workflow store: they open no kernel, call no Orca and never write. */
 const VIEW_COMMANDS=['workflow-list'];
 /** Operator maintenance of a local journal: no kernel, no Orca; the store roots named on the command line are the proof. */
@@ -799,6 +812,31 @@ export function main(argv=process.argv.slice(2),{orca,wait,env=process.env}={}){
       // The view reads the directory the kernel resolved (a named ledger keeps its store beside the tree), not a guess from cwd.
       const view=buildView({repoRoot:repositoryRoot(cwd),id:required(options.id,'workflow id'),dir:status.dir??null});
       return options.json==='true'?{...status,view}:printed(view.schema,command,renderView(view),{id:view.id,dir:view.dir});
+    }
+    if(command==='workflow-tail'){
+      // The same directory resolution as status, then the event log itself - a tail opens no kernel.
+      const status=kernelMain('workflow-status',options,{orca:runner,cwd,wait});
+      const dir=status.dir??null;
+      need(dir,'No workflow directory resolved');
+      const all=options.all==='true';
+      const lines=Math.max(0,Number.isFinite(Number(options.lines))?Number(options.lines):40);
+      const color=options.color!=='false'&&!env.NO_COLOR&&(options.color==='true'||Boolean(process.stdout.isTTY));
+      const events=()=>readWorkflowEvents(dir);
+      if(options.json==='true')return {schema:'starci/workflow-events@1',command,id:required(options.id,'workflow id'),dir,events:events().slice(-lines)};
+      if(options.follow!=='true')return printed('starci/workflow-events@1',command,renderEventTail(events(),{color,all,lines}),{id:required(options.id,'workflow id'),dir});
+      // Follow mode streams: the returned promise never settles, the interval keeps the process alive, and
+      // SIGINT ends the tail the way every terminal tail ends. The first paint is the last `lines` events;
+      // after that only lines the file gained since the last poll print.
+      const pollMs=Math.max(200,Number.isFinite(Number(options['poll-ms']))?Number(options['poll-ms']):1500);
+      const shown=()=>{const list=events();return all?list:list.filter(event=>!QUIET_EVENTS.has(event?.event));};
+      let seen=shown().length;
+      const head=shown().slice(-lines);
+      if(head.length)process.stdout.write(`${head.map(event=>renderEventLine(event,{color})).join('\n')}\n`);
+      const pump=()=>{
+        const list=shown(),fresh=list.slice(seen>list.length?0:seen);seen=list.length;
+        if(fresh.length)process.stdout.write(`${fresh.map(event=>renderEventLine(event,{color})).join('\n')}\n`);
+      };
+      return new Promise(()=>{setInterval(pump,pollMs);});
     }
     return kernelMain(command,options,{orca:runner,cwd,wait});
   }

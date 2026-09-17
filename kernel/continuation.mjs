@@ -61,7 +61,12 @@ export function continuationBoundary(state,{journalView=readJournal(state),contr
       jobId:op.lease?.jobId??null,taskId:op.task??op.launch?.task??null,dispatchId:op.dispatch??op.launch?.dispatch??null,terminal:op.terminal??null};
     if(op.dispatch&&op.launch?.dispatch&&op.dispatch!==op.launch.dispatch)issue('dispatch-identity-drift','operation dispatch differs from its launch receipt',identity);
     if(op.task&&op.launch?.task&&op.task!==op.launch.task)issue('task-identity-drift','operation task differs from its launch receipt',identity);
-    if(op.status==='running'&&(!identity.jobId||!identity.taskId||!identity.dispatchId||!identity.terminal))
+    // A running op with a retained late report carries its custody in the report record, not a lease: the
+    // retry path proved the lease stale and cleared it on the record, and the replay re-derives custody from
+    // the retained dispatch/task identity. Its dispatch, task and terminal must still be exact.
+    const lateReportCustody=op.lateReportRecovery?.schema==='starci/answered-decision-late-report@1'
+      &&op.lateReportRecovery.dispatch===identity.dispatchId&&op.lateReportRecovery.task===identity.taskId;
+    if(op.status==='running'&&(!identity.taskId||!identity.dispatchId||!identity.terminal||(!identity.jobId&&!lateReportCustody)))
       issue('running-identity-incomplete','a running operation lacks its exact job/task/dispatch/terminal identity',identity);
     if(!op.lease)continue;
     claimed.add(op.lease.jobId);

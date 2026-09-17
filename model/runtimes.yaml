@@ -22,7 +22,14 @@ allocation:
   # cheap pool.
   tiers:
     hard:
-      default: [codex-agent, claude-agent, devin-agent]
+      # Heavy implementation and refactor work (the scope measure names it hard even when the record does not):
+      # Opus first, the SWE agent when its slots were explicitly assigned, Sol only as the last heavy fallback -
+      # never the first answer for a six-file rewrite. Reasoning roles keep Fable first; hard verification goes
+      # to the independent verifier model before it shares the implement pool.
+      default: [claude-agent, devin-agent, codex-agent]
+      implement: [claude-agent, devin-agent, codex-agent]
+      write: [claude-agent, devin-agent, codex-agent]
+      verify: [claude-fable, claude-agent, codex-agent, devin-agent]
       decide: [claude-fable, codex-agent, claude-agent]
       plan: [claude-fable, codex-agent, claude-agent]
     medium:

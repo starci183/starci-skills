@@ -398,7 +398,7 @@ export function syncLedgerOps(store,state,ctx){
     const op=deriveWorkOp(ctx.work.api,ctx.work.at,node,{id,opOfNode,index:state.ops.length,lane:entry.lane,done:entry.done,loaded,goal:laneGoal(state)});
     bindPlannedAmendmentEffects(state,op,node);
     locateSharedTreePaths(op,ctx);
-    op.difficulty=op.difficulty??'medium';
+    op.difficulty=effectiveDifficulty(op);
     op.createdIteration=state.iterations;
     state.ops.push(op);
     if(!ledgerItem(state,node.id))
@@ -515,6 +515,35 @@ export const CUT_ASSERTIONS=8;
 export const CUT_COMPONENTS=3;
 /** Default fan-out policy, for a runtimes profile that declares no `allocation.fanOut`. */
 export const FAN_OUT={seamFirst:true,maxPerGroup:9};
+
+const DIFFICULTY_RANK={easy:0,medium:1,hard:2};
+/**
+ * The difficulty an operation's declared scope itself implies, measured on the same axes the cut gate uses,
+ * at half the cut bound: the write scope's file count (the op's allowlist and write paths plus every
+ * candidate root binding's file list), its assertions, and its named design components. An op approaching
+ * the cut bound touches too much of the tree for the cheap tiers to be the answer, even when nothing in
+ * the record said `hard`.
+ */
+export function measuredDifficulty(op){
+  const bindings=Array.isArray(op?.candidateRootBindings?.bindings)?op.candidateRootBindings.bindings:[];
+  const files=(op?.allowlist??[]).length+(op?.writePaths??[]).length
+    +bindings.reduce((total,binding)=>total+(Array.isArray(binding?.allowlist)?binding.allowlist.length:0),0);
+  const assertions=(Array.isArray(op?.assertions)?op.assertions:Array.isArray(op?.acceptance)?op.acceptance:[]).length;
+  const components=(Array.isArray(op?.components)?op.components:Array.isArray(op?.sdsComponents)?op.sdsComponents:[]).length;
+  if(files>=Math.ceil(CUT_FILES/2)||assertions>=Math.ceil(CUT_ASSERTIONS/2)||components>=CUT_COMPONENTS-1)return 'hard';
+  if(files<=2&&assertions<=2&&components===0)return 'easy';
+  return 'medium';
+}
+/**
+ * The difficulty the allocator sees: the heavier of what the record declared and what its scope measures.
+ * A declared `easy` cannot hide a six-file write scope, and a declared `hard` is never downgraded because
+ * its allowlist happens to be short.
+ */
+export function effectiveDifficulty(op){
+  const declared=typeof op?.difficulty==='string'&&op.difficulty in DIFFICULTY_RANK?op.difficulty:null;
+  const measured=measuredDifficulty(op);
+  return declared===null?measured:DIFFICULTY_RANK[measured]>DIFFICULTY_RANK[declared]?measured:declared;
+}
 
 const SDS_PATH=/(^|\/)architecture\/(sds|overview)(\/|$)/;
 /**

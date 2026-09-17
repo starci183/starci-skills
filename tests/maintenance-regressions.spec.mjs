@@ -39,7 +39,7 @@ test('root local state cannot be a link and nested canonical evidence is not a s
 
 test('current host entry with stale task INDEX.md is a context refresh, not missing runtime',t=>{
  const f=fixture(t);fs.mkdirSync(path.join(f.dir,'.claude'));fs.writeFileSync(path.join(f.dir,'.claude/SKILL.md'),'Synthetic skill');
- for(const name of ['AGENTS.md','CLAUDE.md'])fs.writeFileSync(path.join(f.dir,name),'Read .claude/SKILL.md');
+ for(const name of ['AGENTS.md','CLAUDE.md','DEVIN.md'])fs.writeFileSync(path.join(f.dir,name),'Read .claude/SKILL.md');
  const result=checkEntry(f.dir,{claimedEntry:'.claude/INDEX.md'});
  assert.equal(result.status,'context-refresh-required');assert.equal(result.runtimeWriteRequired,false);
  assert.equal(fs.existsSync(path.join(f.dir,'.claude/INDEX.md')),false);

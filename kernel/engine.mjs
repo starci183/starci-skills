@@ -17,7 +17,7 @@ import {resourceLocks} from './guards.mjs';
 import {ENGINE_SCHEMA,isEnrolled,kindRole,predatesEngineSchema,sealedRuntimeOf} from './common.mjs';
 import {nonOperationModels} from '../scripts/config.mjs';
 import {budgetVerdict,readRuntimeBudget} from './budget.mjs';
-import {loadsFileFor,readLoads} from './loads.mjs';
+import {loadsFileFor,pidAlive,readLoads} from './loads.mjs';
 import {readDistJson} from '../core/runtime-root.mjs';
 
 /** The engine version is the package version: one build, one name. */
@@ -127,11 +127,37 @@ export function unsettledGenerationJobs({journalFile,workflowId,generation}={}){
   finally{journal.close();}
 }
 /** Cancel only never-launched queued pure jobs, then report every job whose effect still needs settlement. */
-export function prepareGenerationRetry({journalFile,workflowId,generation,now=Date.now}={}){
+export function prepareGenerationRetry({journalFile,workflowId,generation,now=Date.now,pidAliveFn=pidAlive}={}){
   if(!journalFile||!fs.existsSync(journalFile))return {cancelled:[],unsettled:[]};
   const neverStarted=settleNeverStartedModelJobs({journalFile,workflowId,generation,now});
   const journal=openJournal({file:journalFile,now});
   try{
+    // A spawned model/judge/check job whose recorded processes are all gone cannot produce another byte: the
+    // kernel that owned it died. The retiring generation settles it as cancelled with the dead-pid set as proof;
+    // the row stays durable and replayable. A job that left a staged result is skipped - that evidence deserves
+    // the replay path, not a quiet cancel.
+    const pidsOf=new Map();
+    for(const event of journal.events({workflowId})){
+      const pid=event.kind==='job-spawned'?event.payload?.pid:event.kind==='job-wrapper-bound'?event.payload?.workerPid:event.kind==='job-nested-started'?event.payload?.nestedPid:null;
+      if(Number.isInteger(pid)){const list=pidsOf.get(event.entity_id)??[];list.push(pid);pidsOf.set(event.entity_id,list);}
+    }
+    const deadSettled=[];
+    const admission=createAdmission({journal,now});
+    for(const job of journal.listJobs().filter(job=>job.workflow_id===workflowId&&job.generation===generation&&['model','judge','check'].includes(job.kind)&&!['succeeded','failed','cancelled'].includes(job.status))){
+      const pids=pidsOf.get(job.job_id)??[];
+      if(!pids.length||pids.some(pid=>pidAliveFn(pid))||hasReplayableStagedResult(journal.path,job))continue;
+      if(job.lease_token){
+        if(job.status!=='effect_unknown')journal.db.prepare("UPDATE jobs SET status='effect_unknown',deadline=NULL,updated_at=? WHERE job_id=? AND lease_token=?").run(now(),job.job_id,job.lease_token);
+        const settled=admission.settleUnknown({jobId:job.job_id,generation:job.generation,leaseToken:job.lease_token,status:'cancelled',
+          result:{reason:'the workflow retry proved every recorded process of this durable job is gone; the retiring generation cancels it'},
+          event:{eventId:`${job.job_id}:${generation}:retry-dead-process`,workflowId,entityType:'job',entityId:job.job_id,generation,kind:'job-retry-dead-process',payload:{pids,jobKind:job.kind}}});
+        if(settled.ok)deadSettled.push(job.job_id);
+      }else{
+        journal.db.prepare("UPDATE jobs SET status='cancelled',result_json=?,updated_at=? WHERE job_id=?").run(JSON.stringify({reason:'the workflow retry proved every recorded process of this durable job is gone; the retiring generation cancels it'}),now(),job.job_id);
+        journal.appendEvent({eventId:`${job.job_id}:${generation}:retry-dead-process`,workflowId,entityType:'job',entityId:job.job_id,generation,kind:'job-retry-dead-process',payload:{pids,jobKind:job.kind}});
+        deadSettled.push(job.job_id);
+      }
+    }
     const cancelled=journal.transaction(db=>{
             // Every generation up to this one: a queued job of a retired generation that never launched (no lease, no
       // receipt of any kind) would otherwise bind the workflow to its old journal for good and refuse the relocation.
@@ -141,7 +167,7 @@ export function prepareGenerationRetry({journalFile,workflowId,generation,now=Da
       return rows.map(row=>row.job_id);
     });
     const unsettled=journal.listJobs().filter(job=>job.workflow_id===workflowId&&job.generation===generation&&['model','judge','check'].includes(job.kind)&&!['succeeded','failed','cancelled'].includes(job.status)).map(job=>job.job_id);
-    return {cancelled,unsettled,neverStarted};
+    return {cancelled,unsettled,neverStarted,deadSettled};
   }finally{journal.close();}
 }
 const modelRole=name=>['critiqueGoal','validateOp','classifyScreen'].includes(name)?'verify':['assessGoal','planOp','presentOwnerQuestion'].includes(name)?'plan':'decide';
@@ -308,11 +334,15 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
           providerResource:expected.map(item=>item.key).find(key=>key.startsWith('ai/provider:'))??null,probationRuntime:existing.payload.runtime,probationRole:existing.role};
         return {ok:true,...bound,leaseToken:existing.lease_token,runtime:existing.payload.runtime,target:existing.payload.target,reattached:true};
       }
-      const decision=eligibility?.(job,{id:allocated.runtime,...pool,model:pool.target??allocated.target});
+      // The model identity eligibility sees is the role's pinned model (what `allocate` selected), never the
+      // pool's launch target - a pool alias like `codex-agent` is not a model and never matches probation or
+      // qualification evidence, which the review pass keyed on the real role model.
+      const admittedModel=allocated.model??pool.models?.[effectiveRole]??pool.target??allocated.target;
+      const decision=eligibility?.(job,{id:allocated.runtime,...pool,model:admittedModel});
       if(!decision?.eligible)return {ok:false,reasons:decision?.reasons??['model eligibility unavailable']};
       journal.enqueueJob({...bound,kind:'operation',role:effectiveRole,payload:{runtime:allocated.runtime,target:allocated.target,kind:op.kind,reservationProtocol:'intent-v1',expectedResources:resources.map(item=>({key:item.key,units:item.units})).sort((a,b)=>a.key.localeCompare(b.key))}});
       const result=admission.reserve({...bound,resources,ttlMs:10*60*1000});
-      if(result.ok&&decision.mode==='probation'){const consumed=modelPolicy?.consumeProbation?.(probationJob,{id:allocated.runtime,...pool,model:pool.target??allocated.target});if(!consumed?.ok){admission.release({...bound,leaseToken:result.leaseToken});journal.db.prepare("UPDATE jobs SET status='cancelled',result_json=?,updated_at=? WHERE job_id=?").run(JSON.stringify({reason:consumed?.code??'probation-unavailable'}),now(),bound.jobId);return {ok:false,reasons:[consumed?.code??'probation-unavailable'],...bound};}}
+      if(result.ok&&decision.mode==='probation'){const consumed=modelPolicy?.consumeProbation?.(probationJob,{id:allocated.runtime,...pool,model:admittedModel});if(!consumed?.ok){admission.release({...bound,leaseToken:result.leaseToken});journal.db.prepare("UPDATE jobs SET status='cancelled',result_json=?,updated_at=? WHERE job_id=?").run(JSON.stringify({reason:consumed?.code??'probation-unavailable'}),now(),bound.jobId);return {ok:false,reasons:[consumed?.code??'probation-unavailable'],...bound};}}
       if(result.ok)op.lease={...bound,leaseToken:result.leaseToken,machineResources:machineResources.map(item=>item.key),providerResource:provider?providerResource(provider):null,probationRuntime:allocated.runtime,probationRole:effectiveRole};
       return {...result,...bound};
     },

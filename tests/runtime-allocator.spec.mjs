@@ -325,7 +325,7 @@ test('difficulty routes inside the quota: hard work to the strongest tier, easy 
   
   const allocator=createAllocator({runtimes:profile,now:()=>0});
   assert.equal(allocator.allocate('backend.implement',{difficulty:'easy'}).runtime,'qwen-agent');
-  assert.equal(allocator.allocate('backend.implement',{difficulty:'hard'}).runtime,'codex-agent');
+  assert.equal(allocator.allocate('backend.implement',{difficulty:'hard'}).runtime,'claude-agent');
   const quota=applyQuota(profile,{order:['claude-agent','qwen-agent','codex-agent'],slots:{'claude-agent':2,'qwen-agent':1,'codex-agent':1}});
   assert.equal(quota.runtimes['claude-agent'].maxParallel,2);
   assert.deepEqual(quota.allocation.preference.implement,['claude-agent','qwen-agent','codex-agent','devin-agent']);
@@ -495,8 +495,9 @@ test('a decide operation whose reasoning windows are exhausted downgrades on the
   assert.deepEqual(hard.review('decision.prepare',{difficulty:'hard'}).preference,['claude-fable','codex-agent','claude-agent']);
   assert.equal(hard.review('decision.prepare',{difficulty:'hard'}).blocked.some(item=>/outside the hard tier/.test(item.reason)),false);
   assert.equal(hard.allocate('decision.prepare',{difficulty:'hard'}).runtime,'claude-fable');
-  // The coding roles keep the order they always had inside that same tier.
-  assert.deepEqual(hard.review('backend.implement',{difficulty:'hard'}).preference,['codex-agent','claude-agent','devin-agent']);
+  // The coding roles prefer the heavy pools inside that same tier: Opus first, the explicitly-allocated SWE
+  // agent next, Sol last - a refactor-scale operation never leads with the light model.
+  assert.deepEqual(hard.review('backend.implement',{difficulty:'hard'}).preference,['claude-agent','devin-agent','codex-agent']);
   assert.equal(hard.allocate('backend.implement',{difficulty:'easy'}).runtime,'qwen-agent');
 });
 
@@ -754,4 +755,27 @@ test('a pool may pin a model per role: allocate exposes it and the role gate sta
   assert.equal(allocator.review('x.write').ready.find(item=>item.runtime==='writer').model,'writer-9','models.default covers every role of the pool');
   assert.equal(write.blocked.find(item=>item.runtime==='multi').reason,'no write role','a models map never widens the role gate');
   assert.ok(seen.some(([kind,model])=>kind==='x.implement'&&model==='swe-2-max'),'eligibility sees the resolved model');
+});
+
+test('a hard implement operation prefers the heavy pools - Sol is the last resort, never the first answer',()=>{
+  // Devin open with two slots (an explicit-capacity grant, not a share target): a hard refactor fills
+  // Claude's six, then Devin's two, and only then may the work land on Sol.
+  const open=structuredClone(profile);open.runtimes['devin-agent'].maxParallel=2;open.runtimes['devin-agent'].explicitCapacity=true;
+  const allocator=createAllocator({runtimes:open,now:()=>0});
+  for(let index=0;index<6;index+=1)
+    assert.equal(allocator.allocate('backend.implement',{difficulty:'hard',job:{opId:`hard-c${index}`}}).runtime,'claude-agent');
+  for(let index=0;index<2;index+=1)
+    assert.equal(allocator.allocate('backend.implement',{difficulty:'hard',job:{opId:`hard-d${index}`}}).runtime,'devin-agent');
+  const last=allocator.allocate('backend.implement',{difficulty:'hard',job:{opId:'hard-9'}});
+  assert.equal(last.runtime,'codex-agent');
+  assert.equal(last.model,'gpt-5.6-sol','Sol answers a hard task only when the heavy pools are full');
+  const review=allocator.review('backend.implement',{difficulty:'hard'});
+  assert.equal(review.blocked.find(item=>item.runtime==='qwen-agent')?.reason,'outside the hard tier','hard work never lands on the cheap pool');
+});
+
+test('a medium implement operation keeps Sol first - the alignment is the tier, not a ban',()=>{
+  const allocator=createAllocator({runtimes:profile,now:()=>0});
+  const first=allocator.allocate('backend.implement',{difficulty:'medium',job:{opId:'medium-1'}});
+  assert.equal(first.runtime,'codex-agent');
+  assert.equal(first.model,'gpt-5.6-sol');
 });

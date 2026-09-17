@@ -68,7 +68,7 @@ import {BRAND_PAYLOAD,attributedFiles,brandAware,brandFields,brandOf,brandPayloa
 import {KERNEL_PLANNED_KINDS,LANE_LAYOUTS,advanceLanes,authorRecordOp,commitLedgerWrite,cutParentOf,deriveWorkOp,designGate,
   designNodeOf,designRecord,fanOutDeferral,groupIncomplete,groupVerifyKind,guardKernelPaths,guardRecordBlocks,kernelOwnedPaths,
   laneGoal,laneNext,laneOf,lanePredicates,
-  laneProgress,laneSkip,laneText,laneWalked,ledgerWrite,markLedger,nodeLayout,protectedFingerprint,pruneAnsweredQuestions,
+  effectiveDifficulty,laneProgress,laneSkip,laneText,laneWalked,ledgerWrite,markLedger,nodeLayout,protectedFingerprint,pruneAnsweredQuestions,
   CUT_OWNED,quarantineStrays,recordBlocks,recordDone,recordPath,repairKernelRecords,repairTarget,retemplateLanes,settleCut,
   sweepTreeStrays,syncLedgerOps} from './sync.mjs';
 import {intakeOp,retemplateIntakeOps,scopeNames,settleIntake} from './intake.mjs';
@@ -575,6 +575,11 @@ function stoppedRetryDispatchId(op){
   return typeof persisted==='string'&&persisted?persisted:null;
 }
 const decisionQuestionDigest=question=>crypto.createHash('sha256').update(JSON.stringify(question??null)).digest('hex');
+// `question.goalRev` is a lazy backfill stamp (`??=`) applied by goal-revision migrations, not question
+// content: a report retained before the stamp must still bind the same asked question. Match the retained
+// digest either way rather than orphaning the accepted answer.
+const questionDigestMatches=(question,digest)=>decisionQuestionDigest(question)===digest||
+  (plain(question)&&'goalRev' in question&&decisionQuestionDigest(Object.fromEntries(Object.entries(question).filter(([key])=>key!=='goalRev')))===digest);
 const fileDigest=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 /**
  * A completed redundant decision worker may have reported after the owner's answer was durably accepted.  Its
@@ -616,7 +621,7 @@ export function lateReportReplayMatches(state,op,report,{store}={}){
   const late=op?.lateReportRecovery,reportFile=store?.reportPath?.(op?.dispatch),receipt=op?.ownerAnswer?.receiptId;
   return Boolean(late?.schema==='starci/answered-decision-late-report@1'&&late.dispatch===op.dispatch&&late.task===report?.task&&late.run===report?.run&&
     report.run===state.run&&report.task===op.launch?.task&&report.from===op.terminal&&reportFile&&fs.existsSync(reportFile)&&fileDigest(reportFile)===late.reportSha256&&
-    op.candidateDigest===late.candidateDigest&&decisionQuestionDigest(op.question)===late.questionDigest&&receipt===late.ownerReceipt&&
+    op.candidateDigest===late.candidateDigest&&questionDigestMatches(op.question,late.questionDigest)&&receipt===late.ownerReceipt&&
     op.ownerContinuationReceipt===receipt&&op.ownerRequestStatus==='answered'&&(report.question===null||report.question===undefined));
 }
 
@@ -627,7 +632,12 @@ export function readmitCompletedReportRetry(state,op,{orca,store,settleHost=sett
     candidate.generation===lease.generation&&candidate.jobId===lease.jobId;
   const valid=report&&validateReport(report,{allowlist:op.allowlist}).ok&&report.outcome==='done'&&report.run===state.run&&report.task===op.launch?.task&&
     report.dispatch===op.dispatch&&report.from===op.terminal;
-  if(op?.status!=='blocked'||op.refusal!=='runtime-reconciliation'||op.pending?.kind!=='dispatch-reconciliation'||!exactLease||!valid)
+  // The same custody shape without the reconciliation refusal: the worker settled, its immutable report is
+  // still retained, and the op was parked at `required-validation` - by a validator mechanism that could not
+  // judge its evidence, not by anything the worker did wrong.
+  const reconciliation=op?.pending?.kind==='dispatch-reconciliation'&&op.refusal==='runtime-reconciliation';
+  const validationPending=op?.pending?.kind==='required-validation'&&!op?.refusal&&op?.workerSettled===true;
+  if(op?.status!=='blocked'||(!reconciliation&&!validationPending)||!exactLease||!valid)
     return {ok:false,reason:'blocked report, candidate writer, or exact Run/Task/Dispatch identity does not match'};
   const settlement=settleHost(orca,op.dispatch,{cwd:state.worktree,reason:'public retry re-admits the exact completed report',terminalHandle:op.terminal,closeTerminal:true});
   if(settlement?.effectState!=='none')return {ok:false,reason:`exact completed worker settlement remains ${settlement?.effectState??'unknown'}`};
@@ -636,6 +646,8 @@ export function readmitCompletedReportRetry(state,op,{orca,store,settleHost=sett
   finally{store.unbindJournal?.(runtime.journal);runtime.close();}
   if(!durable?.ok)return {ok:false,reason:`retained candidate writer could not be fenced: ${durable?.reason??'unknown durable settlement failure'}`};
   op.workerSettled=true;op.status='running';delete op.pending;delete op.refusal;
+  // A verdict count accumulated on a mechanism that could not judge the report is not the report's record.
+  delete op.incidentSignature;op.reviewRound=0;
   store.appendEvent({event:'completed-report-readmitted',op:op.id,dispatch:op.dispatch,jobId:lease.jobId,attempt:lease.attempt,generation:lease.generation,
     proof:'public retry proved the exact completed worker exited and re-admitted its immutable report under the retained candidate writer'});
   store.saveState(state);
@@ -1193,7 +1205,7 @@ function scheduleOps(orca,store,state,ctx,{orderedOpIds=null}={}){
     const allocationJob={...op,opId:op.id,role:kindRole(op.kind),independentReview:ctx.engine?{required:true,freshContext:true}:op.independentReview,checks:op.checks};
     const reservation=ctx.engine?.reservationPhase?.(op);
     const allocated=reservation?.phase==='reserved'?{ok:true,runtime:reservation.runtime,target:reservation.target,role:reservation.role,continuedReservation:true}:
-      ctx.allocator.allocate(op.kind,{avoid,restrictTo:launchableFor(ctx.allocator,launchOperator(op.kind)),difficulty:op.difficulty??null,job:allocationJob});
+      ctx.allocator.allocate(op.kind,{avoid,restrictTo:launchableFor(ctx.allocator,launchOperator(op.kind)),difficulty:effectiveDifficulty(op),job:allocationJob});
     if(!allocated?.ok){
       // Every runtime that could carry the op is on its own avoid list: the list has served its purpose (one restart
       // per runtime) and now only starves the op. It is cleared and the op gets one more round on any runtime;
@@ -2360,6 +2372,14 @@ export function applyOpReport(orca,store,state,op,report,ctx){
         if(late)return late;return retryOp(store,state,op,findings,ctx,'integration-preparation-invalid');
       }
     }
+    if(ctx.engine&&op.candidate&&typeof op.candidate.controlRoot==='string'&&!fs.existsSync(op.candidate.controlRoot)){
+      // The sealed candidate's bytes are gone from disk: nothing remains to verify, integrate, or replay a
+      // retained late report against. The standing rule applies - the next attempt begins a new candidate -
+      // and the report this attempt left is carried as a finding, not accepted blind.
+      store.appendEvent({event:'candidate-custody-lost',op:op.id,controlRoot:op.candidate.controlRoot});
+      delete op.lateReportRecovery;delete op.candidate;
+      return retryOp(store,state,op,['the sealed candidate control root is gone from disk; the attempt must be rebuilt'],ctx,'candidate-custody-lost');
+    }
     if(ctx.engine&&op.candidate?.status!=='sealed'){
       const frozen=ctx.engine.freezeCandidate(op,{reportedFiles:report.files??[],requireReported:true});
       if(frozen.status!=='sealed'){
@@ -2863,7 +2883,7 @@ export function acceptReports(orca,store,state,ctx){
     }
     delete op.pending;
     if(late){
-      const preserved=decisionQuestionDigest(op.question)===late.questionDigest&&op.ownerAnswer?.receiptId===late.ownerReceipt&&
+      const preserved=questionDigestMatches(op.question,late.questionDigest)&&op.ownerAnswer?.receiptId===late.ownerReceipt&&
         op.ownerContinuationReceipt===late.ownerReceipt&&op.ownerRequestStatus==='answered';
       if(!preserved){for(const key of Object.keys(op))delete op[key];Object.assign(op,before);quarantineCandidate(store,state,op,{kind:'answered-decision-late-report',reasons:['ordinary acceptance changed the prepared question or immutable owner receipt']});continue;}
       delete op.lateReportRecovery;
@@ -4605,6 +4625,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     }
     const retryJobs=isEnrolled(state)?prepareGenerationRetry({journalFile:state.engine.journalFile,workflowId:state.id,generation:state.engine.generation}):{cancelled:[],unsettled:[]};
     if(retryJobs.cancelled.length)store.appendEvent({event:'retry-queued-jobs-cancelled',generation:state.engine.generation,jobs:retryJobs.cancelled,proof:'queued, unleased, and no job-spawned receipt'});
+    if(retryJobs.deadSettled?.length)store.appendEvent({event:'retry-dead-process-jobs-settled',generation:state.engine.generation,jobs:retryJobs.deadSettled,proof:'every recorded process pid of each durable job is gone'});
     need(!retryJobs.unsettled.length,`Current-generation durable model/check jobs must settle before retry: ${retryJobs.unsettled.join(', ')}`);
     let reconciliationJournal=null;
     if(isEnrolled(state)){
@@ -4628,12 +4649,24 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       need(recovered.ok,`Completed report ${op.id} cannot be re-admitted for retry: ${recovered.reason}`);
       lateReportRecovery={...recovered,retainedCompletedReport:true};
     }
-    for(const op of state.ops.filter(item=>item.lease&&item.status==='blocked'&&item.lateReportRecovery?.schema==='starci/answered-decision-late-report@1')){
+    // A report that reached verification and stalled at `required-validation` is re-admitted the same way:
+    // the kernel already holds the worker's answer, so the report replays through ordinary acceptance rather
+    // than buying a relaunch of a worker whose answer changed nothing.
+    for(const op of state.ops.filter(item=>item.lease&&item.status==='blocked'&&!item.refusal&&item.pending?.kind==='required-validation'&&item.workerSettled===true)){
+      const recovered=readmitCompletedReportRetry(state,op,{orca,store});
+      need(recovered.ok,`Validation-pending report ${op.id} cannot be re-admitted for retry: ${recovered.reason}`);
+      lateReportRecovery={...recovered,retainedCompletedReport:true};
+    }
+    // A retained late report rides on a running op too: the report arrived after the last acceptance pass,
+    // the workflow finished before replaying it, and the writer reservation stays held either way. The lease
+    // may already have been proved stale and cleared above; the dispatch on the record is what names the
+    // retained report, so it is the matching key, not the lease.
+    for(const op of state.ops.filter(item=>(item.lease||item.dispatch)&&['blocked','running'].includes(item.status)&&item.lateReportRecovery?.schema==='starci/answered-decision-late-report@1')){
       const report=store.readReports().find(item=>item.dispatch===op.dispatch);
       need(report&&lateReportReplayMatches(state,op,report,{store}),`Late decision report ${op.id} no longer matches its retained question, receipt, candidate, or report bytes`);
       op.status='running';delete op.pending;delete op.refusal;
       lateReportRecovery={op:op.id,dispatch:op.dispatch,report:store.reportPath(op.dispatch),observedFiles:[...(op.candidate?.observedFiles??[])]};
-      store.appendEvent({event:'prepared-decision-late-report-readmitted',op:op.id,dispatch:op.dispatch,jobId:op.lease.jobId,
+      store.appendEvent({event:'prepared-decision-late-report-readmitted',op:op.id,dispatch:op.dispatch,jobId:op.lease?.jobId??null,
         proof:'public retry re-admitted the same immutable report and retained writer after a prior acceptance gate did not pass'});
     }
     for(const op of state.ops.filter(item=>item.lease&&preparedOwnerDecision(item)&&item.status==='done'&&item.launch?.task&&stoppedRetryDispatchId(item)&&item.candidate?.identity)){
@@ -4644,6 +4677,9 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     if(lateReportRecovery){
       const priorPin=state.engine.runtimePin;
       state.engine.runtimePin=pin;state.launcher=checked.launcher;
+      // A retained report means the workflow is not finished: without the withdraw the supervisor leaves it
+      // (supervisorAction: finished => leave) and the replay path at report acceptance never runs.
+      if(state.finished){store.appendEvent({event:'finish-withdrawn',outcome:state.finished.outcome,reason:state.finished.reason,because:'a retained report still waits for replay under the adopted runtime'});state.finished=null;state.phase='run';}
       store.appendEvent({event:'recovery-runtime-adopted',generation:state.engine.generation,op:lateReportRecovery.op,
         fromDigest:priorPin?.digest??null,toDigest:pin.digest,jobId:state.ops.find(item=>item.id===lateReportRecovery.op)?.lease?.jobId??null,
         proof:lateReportRecovery.retainedCompletedReport?'the verified retry pin is adopted without changing the retained candidate writer; only its exact completed report is eligible':'the owner-selected verified retry pin is adopted without changing the retained job generation; only its exact late report is eligible'});

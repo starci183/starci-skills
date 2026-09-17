@@ -340,6 +340,45 @@ function oneLine(event){
   return `${time} #${event.seq??'-'} ${event.event??'?'}${fields.length?` ${fields.join(' ')}`:''}`;
 }
 
+/* ------------------------------------------------------------------ event tail */
+
+const ANSI={off:'\x1b[0m',dim:'\x1b[2m',bold:'\x1b[1m',red:'\x1b[31m',green:'\x1b[32m',yellow:'\x1b[33m',magenta:'\x1b[35m',cyan:'\x1b[36m'};
+/** Heartbeat noise a tail hides by default; `--all` asks for it back. */
+export const QUIET_EVENTS=new Set(['tick','owner-list','dependency-alive','wait','stalled-heartbeat','supervisor-round']);
+/**
+ * The colour of an event is the role it plays in the run, read off its name and in this order: red for a
+ * block or failure, magenta for a manager/owner/decision event, yellow for a wait or deferral, green for
+ * accepted and proven work, cyan for a launch, allocation or dispatch. Anything else stays uncoloured.
+ */
+const EVENT_TONE=[
+  [ANSI.red,/blocked|failed|reject|quarantine|error|refus|conflict|drift|exhausted|contradict|missing|inconclusive|dropped/i],
+  [ANSI.magenta,/manager|owner|question|asked|decision|answer|triage|provision|critique|amend/i],
+  [ANSI.yellow,/defer|held|stall|cool|pending|skipped|park|quota|wait|throttle|budget|unavail|reconciliation-required|nudge/i],
+  [ANSI.green,/done|accept|validat|commit|verif|finish|succeed|proved|readmit|adopted|settled|integrat|merged|attest|reconciled|approved|applied/i],
+  [ANSI.cyan,/launch|spawn|op-added|dispatch|start|resum|rebound|admission|allocation|model|task|lease/i]];
+const toneOf=event=>{const name=String(event?.event??'');for(const [tone,re] of EVENT_TONE)if(re.test(name))return tone;return '';};
+/**
+ * One event as one coloured line: the timestamp dimmed, the event name bold in its tone, its fields plain.
+ * `color:false` - or a non-terminal stdout - yields exactly the plain line the status page prints.
+ */
+export function renderEventLine(event,{color=true}={}){
+  const time=Number.isFinite(event.at)?new Date(event.at).toISOString().slice(11,19):'--:--:--';
+  const fields=LINE_FIELDS.filter(key=>event[key]!==undefined&&event[key]!==null).map(key=>`${key}=${short(event[key])}`);
+  const name=String(event.event??'?'),tone=color?toneOf(event):'';
+  const prefix=`${time} #${event.seq??'-'}`;
+  return `${color?ANSI.dim:''}${prefix}${color?ANSI.off:''} ${tone?`${tone}${ANSI.bold}${name}${ANSI.off}`:name}${fields.length?` ${fields.join(' ')}`:''}`;
+}
+/** The workflow's own event log, in order, as parsed objects. */
+export function readWorkflowEvents(dir){return readJsonLines(path.join(dir,'events.jsonl'));}
+/**
+ * The tail: the last `lines` events of the log, heartbeat noise filtered unless `all` asks for it. The colours
+ * make a scan answer "what just happened" at a glance - spawn is cyan, success green, a wait yellow, a block red.
+ */
+export function renderEventTail(events,{color=true,all=false,lines=40}={}){
+  const shown=(all?events:events.filter(event=>!QUIET_EVENTS.has(event?.event))).slice(-lines);
+  return `${shown.map(event=>renderEventLine(event,{color})).join('\n')}\n`;
+}
+
 /** The terminal page. Plain text with markdown tables: no colour codes, no cursor control, safe in a log. */
 export function renderView(view){
   const lines=[];

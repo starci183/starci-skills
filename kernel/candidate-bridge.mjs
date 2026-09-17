@@ -300,7 +300,10 @@ function beginSingleDetectionCandidate({identity,repoRoot,workerRoot,controlRoot
   }
   if(!oraclePaths.length)oraclePaths=[...allTracked,...dirty].filter(file=>file.startsWith('.starciwork/')||
     /(^|\/)(tests?|__tests__)(\/|$)|\.(spec|test|e2e-spec|container-spec)\.[cm]?[jt]sx?$/.test(file));
-  oraclePaths=oraclePaths.filter(safeTracked);
+  // A dirty path can be a deletion or the source of a staged rename: tracked, listed, and absent on disk.
+  // `inventory` lstats every oracle byte-for-byte, so an absent path must be dropped exactly as `sourcePaths`
+  // drops it - its absence is already on the record through `dirtyBaseline`.
+  oraclePaths=oraclePaths.filter(safeTracked).filter(file=>fileState(repoRoot,file).state==='file');
   const sourcePaths=[...new Set([...allTracked,...resolvedReferences.map(item=>item.path),...resolvedInputs.map(item=>item.path),...dirty])].filter(safeTracked)
     .filter(file=>fileState(repoRoot,file).state==='file').sort();
   const acceptedHead=nonGit?contentHead(repoRoot,sourcePaths):headOf(git,repoRoot);

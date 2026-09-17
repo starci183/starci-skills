@@ -179,7 +179,7 @@ const findStacks=dir=>{
   for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
     const at=path.join(dir,entry.name);
     if(entry.name==='.stacks'&&entry.isDirectory()){stackDirs.push(at);continue;}
-    if(entry.isDirectory()&&!['.git','node_modules','.dist','_local'].includes(entry.name))findStacks(at);
+    if(entry.isDirectory()&&!['.git','node_modules','.dist','_local','worktrees'].includes(entry.name))findStacks(at);
   }
 };
 findStacks(root);
