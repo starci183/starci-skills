@@ -40,8 +40,8 @@ Usage:
   starci settle --dispatch <dispatch> [--terminal <terminal>] [--close true]
   starci sweep --worktree <path> --from <monitor terminal> [--keep <handle,handle>]
   starci notify --terminal <monitor terminal> (--file <message-file> | --text <text>)
-  starci report --run <run> --from <own terminal> --task <task> --dispatch <dispatch> --outcome <outcome> --summary <text> [--credential-request-file <safe JSON>]
-  starci wait --run <run> --from <own terminal> [--timeout-ms 900000] [--tick-ms 120000]
+  starci report --run <run> --from <own terminal> --workflow <workflow-id> --task <task> --dispatch <dispatch> --outcome <outcome> --summary <text> [--op <op>] [--attempt N] [--credential-request-file <safe JSON>]
+  starci wait --run <run> --from <own terminal> --workflow <workflow-id> [--timeout-ms 900000] [--tick-ms 120000]
   starci verify
   starci workspace init <work-root> --id <workspace-id>
   starci storage <backend-root>

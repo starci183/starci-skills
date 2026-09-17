@@ -8,7 +8,6 @@ import {createStore} from '../../kernel/store.mjs';
  * §9: a worker gives and takes its data through the CLI against the workflow's own ledger rows. There is no
  * reports directory any more, so both verbs need the workflow id the contract already told the worker to pass.
  */
-const withStore=(cwd,workflow,fn)=>{const store=createStore({repoRoot:repositoryRoot(cwd),id:required(workflow,'workflow id')});try{return fn(store);}finally{store.close();}};
 const reportRef=(workflow,dispatch)=>`ledger://reports/${workflow}/${dispatch}`;
 import {notifyTerminal,settleDispatch,sweepWorktree} from './launch.mjs';
 import {DEFAULT_STALLED_AFTER_MS,observe} from './observe.mjs';
@@ -34,7 +33,6 @@ const sleepSync=ms=>{if(ms>0)Atomics.wait(new Int32Array(new SharedArrayBuffer(4
 const FENCED_DELIVERY_REASON='This mailbox Delivery belongs to a fenced consumer generation.';
 
 function readJson(file,fallback){try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return fallback;}}
-function writeJson(file,value){fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,`${JSON.stringify(value,null,2)}\n`);}
 
 /** One typed outcome: validate, write the file, send the matching Orca signal once, record the send. */
 export function reportOutcome(orca,{cwd,kind='op',run,from,task,dispatch,outcome,summary,files=[],checksFile=null,checks=[],open=[],question=null,blocker=null,credentialRequest=null,credentialRequestFile=null,branch=null,head=null,gates=[],observations=[],workflow=null,capability=null,fileKey=null,opId=null,attempt=null,generation=null,now=Date.now}){
@@ -104,10 +102,20 @@ export function waitTick(orca,{cwd,run,from,timeoutMs=900000,tickMs=DEFAULT_TICK
   }
 }
 
+/**
+ * The delivery cursor and seen-report set used to live in `<reports>/wait-state.json`; §8 has no reports
+ * directory any more, so it is a `signals` row scoped to the workflow, keyed by run (a workflow's own kernel
+ * lock and stop flag use the same table under their own fixed keys - this is one more small keyed record, not
+ * workflow state, so it belongs beside them rather than forcing a schema change for one more JSON blob).
+ */
+const waitStateKeyFor=run=>`wait-state:${required(run,'run id')}`;
 function singleTick(orca,{cwd,run,from,timeoutMs,workflow,stalledAfterMs,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack,noAck,now,wait}){
-  const recorded=withStore(cwd,workflow,store=>store.readReports());
-  const stateFile=path.join(directory,'wait-state.json');
-  const state=readJson(stateFile,{lastDeliveryId:null,seenReports:{}});
+  const workflowId=required(workflow,'workflow id'),waitStateKey=waitStateKeyFor(run);
+  const store=createStore({repoRoot:repositoryRoot(cwd),id:workflowId});
+  try{
+  const recorded=store.readReports();
+  const saved=store.signal.get(workflowId,waitStateKey)?.value;
+  const state=plain(saved)?saved:{lastDeliveryId:null,seenReports:{}};
   const checkParams={run,terminal:required(from,'own terminal handle'),wait:true,'timeout-ms':String(timeoutMs),types:BOUNDARY_TYPES};
   // New cursors are scoped to the consumer that obtained them. Legacy state did not carry that binding;
   // try it once for compatibility and let Orca's generation fence prove whether it is still usable.
@@ -173,12 +181,13 @@ function singleTick(orca,{cwd,run,from,timeoutMs,workflow,stalledAfterMs,heartbe
   state.run=run;state.from=from;
   if(!savedAckBelongsHere||recoveredFencedDelivery)state.lastDeliveryId=null;
   if(deliveryId)state.lastDeliveryId=deliveryId;
-  writeJson(stateFile,state);
+  store.signal.set(workflowId,waitStateKey,{value:state});
   // A rate-limited provider is a boundary too: the runtime must be parked now, not when the whole timeout ends.
   const stalled=liveness.filter(item=>item.liveness.startsWith('stalled')||['dead','rate-limited'].includes(item.liveness));
   const event=messages.length||reports.length?'report':stalled.length?stalled[0].liveness:checked.outcome==='ok'?'timeout':'check-failed';
   return {schema:WAIT_TICK,run,event,deliveryId,check:{outcome:checked.outcome,reason:checked.reason??null},messages,reports,liveness,renamed,approvals,sweep:{closed:sweep.closed,kept:sweep.kept.length},
     next:event==='timeout'?'call wait again; a timeout is not a boundary':event==='report'?'process every message and report, then call wait again':event==='rate-limited'?'the provider refused with a quota signal: park that runtime (allocator.failed with the reason) and re-dispatch the op elsewhere, then call wait again':event==='stalled-prompt'?'the agent is inside a confirmation dialog and cannot read a notify: settle it (--close true) and start-op again, then call wait again':'act on the stalled or dead worker (notify to report, or settle and retry), then call wait again'};
+  }finally{store.close();}
 }
 
 

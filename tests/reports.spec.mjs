@@ -5,12 +5,14 @@ import os from 'node:os';
 import path from 'node:path';
 import {parseYaml} from '../core/yaml.mjs';
 import {createOrcaCalls} from '../hosts/orca/calls.mjs';
-import {BLOCKER_KINDS,OUTCOMES,buildReport,reportBody,reportsDirectory,repositoryRoot,validateReport} from '../kernel/reports.mjs';
+import {BLOCKER_KINDS,OUTCOMES,buildReport,reportBody,repositoryRoot,validateReport} from '../kernel/reports.mjs';
 import {classifyWorker,reportOutcome,waitTick} from '../hosts/orca/protocol.mjs';
+import {createStore} from '../kernel/store.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 const base={run:'run_sales',task:'task_op',dispatch:'ctx_op',from:'term_op',summary:'Implemented the slice and ran the focused suite.'};
 const check={name:'unit',command:'npx vitest run x.spec.ts',exitCode:0,evidence:'12 passed'};
+const WORKFLOW='wf-reports-spec';
 const json=(status,value)=>({status,stdout:JSON.stringify(value),stderr:''});
 function fakeOrca(handlers){
   const spawned=[];const counts={};
@@ -18,7 +20,11 @@ function fakeOrca(handlers){
   return {orca:createOrcaCalls({executable:'orca-fake',calls,spawn,now:()=>0}),spawned};
 }
 const has=(args,flag,value)=>{const index=args.indexOf(flag);return index>=0&&(value===undefined||args[index+1]===value);};
+/** §8: a repo root, not a reports directory - `reportOutcome`/`waitTick` open the workflow's own ledger under it. */
 const tmp=()=>{const dir=path.join(os.tmpdir(),'starci-reports-spec',`${Date.now()}-${Math.random().toString(16).slice(2)}`);fs.mkdirSync(dir,{recursive:true});return dir;};
+/** Seed a signal row the way `singleTick` itself would have left it, so a test can start mid-sequence. */
+const seedWaitState=(repo,run,value)=>{const store=createStore({repoRoot:repo,id:WORKFLOW});try{store.signal.set(WORKFLOW,`wait-state:${run}`,{value});}finally{store.close();}};
+const readWaitState=(repo,run)=>{const store=createStore({repoRoot:repo,id:WORKFLOW});try{return store.signal.get(WORKFLOW,`wait-state:${run}`)?.value??null;}finally{store.close();}};
 
 test('every outcome maps to exactly one Orca signal and done is earned, not claimed',()=>{
   assert.deepEqual(OUTCOMES,['done','partial','failed','ask','blocked']);
@@ -49,23 +55,27 @@ test('every outcome maps to exactly one Orca signal and done is earned, not clai
   assert.match(reportBody(done,'reports/run_sales/ctx_op.json'),/^outcome: done\nreport: reports\/run_sales\/ctx_op.json/);
 });
 
-test('report writes the file first, sends the matching signal once, and refuses a second report',()=>{
-  const dir=tmp();
+test('report writes the row first, sends the matching signal once, and refuses a second report',()=>{
+  const repo=tmp();
   try{
     const sent=[];
     const fake=fakeOrca({send:(args)=>{sent.push(args);return json(0,{ok:true,result:{message:{id:'msg_1'}}});}});
-    const first=reportOutcome(fake.orca,{cwd:path.resolve('fixtures/orca/agentos-r14-sales'),...base,outcome:'done',files:['apps/sales/a.ts'],checks:[check],reportsDir:dir,now:()=>42});
+    const first=reportOutcome(fake.orca,{cwd:repo,...base,outcome:'done',files:['apps/sales/a.ts'],checks:[check],workflow:WORKFLOW,now:()=>42});
     assert.equal(first.ok,true);assert.equal(first.messageId,'msg_1');
     assert.ok(has(sent[0],'--type','worker_done')&&has(sent[0],'--outcome','succeeded')&&has(sent[0],'--task-id','task_op')&&has(sent[0],'--dispatch-id','ctx_op')&&has(sent[0],'--files-modified','apps/sales/a.ts'));
-    const stored=JSON.parse(fs.readFileSync(path.join(dir,'ctx_op.json'),'utf8'));
+    const store=createStore({repoRoot:repo,id:WORKFLOW});
+    const stored=store.readReports().find(row=>row.dispatchId==='ctx_op');
     assert.equal(stored.sent.messageId,'msg_1');assert.equal(stored.outcome,'done');
-    const again=reportOutcome(fake.orca,{cwd:path.resolve('fixtures/orca/agentos-r14-sales'),...base,outcome:'failed',reportsDir:dir});
+    store.close();
+    const again=reportOutcome(fake.orca,{cwd:repo,...base,outcome:'failed',workflow:WORKFLOW});
     assert.equal(again.ok,false);assert.equal(again.reason,'already-reported');assert.equal(sent.length,1);
     const refused=fakeOrca({send:()=>json(1,{ok:false,error:{code:'sender_not_assignee',message:'No active Dispatch belongs to this message sender.'}})});
-    const lost=reportOutcome(refused.orca,{cwd:path.resolve('fixtures/orca/agentos-r14-sales'),...base,dispatch:'ctx_other',outcome:'blocked',blocker:{kind:'sds-gap',detail:'ledger key'},reportsDir:dir});
-    assert.equal(lost.ok,false);assert.match(lost.reason,/still reads the file/);
-    assert.equal(JSON.parse(fs.readFileSync(path.join(dir,'ctx_other.json'),'utf8')).sent,null);
-  }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
+    const lost=reportOutcome(refused.orca,{cwd:repo,...base,dispatch:'ctx_other',outcome:'blocked',blocker:{kind:'sds-gap',detail:'ledger key'},workflow:WORKFLOW});
+    assert.equal(lost.ok,false);assert.match(lost.reason,/still reads the row/);
+    const store2=createStore({repoRoot:repo,id:WORKFLOW});
+    assert.equal(store2.readReports().find(row=>row.dispatchId==='ctx_other').sent,null);
+    store2.close();
+  }finally{fs.rmSync(repo,{recursive:true,force:true});}
 });
 
 test('a live worker is classified from its screen, never from a fresh heartbeat',()=>{
@@ -88,10 +98,13 @@ test('a live worker is classified from its screen, never from a fresh heartbeat'
   assert.equal(classifyWorker({screen:'API Error: 429 rate_limit_error',terminal:term,now:2000}).liveness,'rate-limited');
 });
 
-test('wait tick acknowledges the previous batch, reads report files, classifies workers, sweeps and re-canonicalizes titles',()=>{
-  const dir=tmp();const cwd=path.resolve('fixtures/orca/agentos-r14-sales');
+test('wait tick acknowledges the previous batch, reads report rows, classifies workers, sweeps and re-canonicalizes titles',()=>{
+  const repo=tmp();const cwd=repo;
   try{
-    fs.writeFileSync(path.join(dir,'ctx_done.json'),JSON.stringify(buildReport({...base,dispatch:'ctx_done',outcome:'done',files:['apps/sales/a.ts'],checks:[check]})));
+    const done=buildReport({...base,dispatch:'ctx_done',outcome:'done',files:['apps/sales/a.ts'],checks:[check]});
+    const seed=createStore({repoRoot:repo,id:WORKFLOW});
+    seed.writeReport({dispatchId:'ctx_done',outcome:done.outcome,report:done});
+    seed.close();
     const renames=[],checks=[];
     const fake=fakeOrca({
       check:(args)=>{if(args.includes('--peek'))return json(0,{ok:true,result:{messages:[{id:'hb',type:'heartbeat',created_at:'1970-01-01T00:00:04Z',payload:'{"dispatchId":"ctx_done"}'}]}});checks.push(args);return json(0,{ok:true,result:{deliveryId:'delivery_2',messages:[{id:'msg_q',type:'question',subject:'Which order?',body:'a or b',payload:'{"taskId":"task_q","dispatchId":"ctx_q"}'}]}});},
@@ -109,7 +122,7 @@ test('wait tick acknowledges the previous batch, reads report files, classifies 
       'terminal-rename':(args)=>{renames.push(args);return json(0,{ok:true,result:{}});},
       'terminal-close':()=>json(0,{ok:true,result:{}})
     });
-    const first=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_me',reportsDir:dir,now:()=>5000,wait:()=>{}});
+    const first=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_me',workflow:WORKFLOW,now:()=>5000,wait:()=>{}});
     assert.equal(first.event,'report');
     assert.ok(!has(checks[0],'--ack'));assert.ok(has(checks[0],'--types','worker_done,question,escalation')&&has(checks[0],'--wait'));
     assert.equal(first.messages[0].payload.dispatchId,'ctx_q');
@@ -117,16 +130,16 @@ test('wait tick acknowledges the previous batch, reads report files, classifies 
     assert.deepEqual(first.liveness.map(item=>[item.dispatch,item.liveness]),[['ctx_done','reported'],['ctx_idle','stalled-idle']]);
     assert.deepEqual(renames.map(args=>args[args.indexOf('--title')+1]),['[Op] review.verify - Sales']);
     assert.deepEqual(first.sweep.closed.map(item=>item.handle),['term_old']);
-    const second=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_me',reportsDir:dir,now:()=>6000,wait:()=>{}});
+    const second=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_me',workflow:WORKFLOW,now:()=>6000,wait:()=>{}});
     assert.ok(has(checks[1],'--ack','delivery_2'));
     assert.equal(second.reports.length,0);
-  }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
+  }finally{fs.rmSync(repo,{recursive:true,force:true});}
 });
 
 test('wait tick replaces only a fenced Delivery and returns the redelivered mail to the kernel',()=>{
-  const dir=tmp();const cwd=path.resolve('fixtures/orca/agentos-r14-sales');
+  const repo=tmp();const cwd=repo;
   try{
-    fs.writeFileSync(path.join(dir,'wait-state.json'),JSON.stringify({lastDeliveryId:'delivery_old',seenReports:{}}));
+    seedWaitState(repo,'run_sales',{lastDeliveryId:'delivery_old',seenReports:{}});
     const checks=[];
     const fake=fakeOrca({
       check:(args)=>{
@@ -139,21 +152,21 @@ test('wait tick replaces only a fenced Delivery and returns the redelivered mail
       'terminal-list':()=>json(0,{ok:true,result:{terminals:[]}}),
       'task-list':()=>json(0,{ok:true,result:{tasks:[]}})
     });
-    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_new_monitor',reportsDir:dir,timeoutMs:1000,tickMs:1000,now:()=>5000,wait:()=>{}});
+    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_new_monitor',workflow:WORKFLOW,timeoutMs:1000,tickMs:1000,now:()=>5000,wait:()=>{}});
     assert.equal(result.event,'report');
     assert.equal(result.messages[0].id,'msg_new','redelivered mail is returned, not consumed unseen');
     assert.equal(checks.length,2);
     assert.ok(has(checks[0],'--ack','delivery_old'));
     assert.ok(!has(checks[1],'--ack'));
-    const state=JSON.parse(fs.readFileSync(path.join(dir,'wait-state.json'),'utf8'));
+    const state=readWaitState(repo,'run_sales');
     assert.deepEqual({lastDeliveryId:state.lastDeliveryId,run:state.run,from:state.from},{lastDeliveryId:'delivery_new',run:'run_sales',from:'term_new_monitor'});
-  }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
+  }finally{fs.rmSync(repo,{recursive:true,force:true});}
 });
 
 test('wait tick does not retry or discard a Delivery for an unrelated check failure',()=>{
-  const dir=tmp();const cwd=path.resolve('fixtures/orca/agentos-r14-sales');
+  const repo=tmp();const cwd=repo;
   try{
-    fs.writeFileSync(path.join(dir,'wait-state.json'),JSON.stringify({lastDeliveryId:'delivery_keep',run:'run_sales',from:'term_me',seenReports:{}}));
+    seedWaitState(repo,'run_sales',{lastDeliveryId:'delivery_keep',run:'run_sales',from:'term_me',seenReports:{}});
     let boundaryChecks=0;
     const fake=fakeOrca({
       check:(args)=>args.includes('--peek')?json(0,{ok:true,result:{messages:[]}}):(boundaryChecks++,json(1,{ok:false,error:{code:'mailbox_unavailable',message:'Mailbox unavailable.'}})),
@@ -161,16 +174,16 @@ test('wait tick does not retry or discard a Delivery for an unrelated check fail
       'terminal-list':()=>json(0,{ok:true,result:{terminals:[]}}),
       'task-list':()=>json(0,{ok:true,result:{tasks:[]}})
     });
-    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_me',reportsDir:dir,timeoutMs:1000,tickMs:1000,now:()=>5000,wait:()=>{}});
+    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_me',workflow:WORKFLOW,timeoutMs:1000,tickMs:1000,now:()=>5000,wait:()=>{}});
     assert.equal(result.event,'check-failed');assert.equal(boundaryChecks,1);
-    assert.equal(JSON.parse(fs.readFileSync(path.join(dir,'wait-state.json'),'utf8')).lastDeliveryId,'delivery_keep');
-  }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
+    assert.equal(readWaitState(repo,'run_sales').lastDeliveryId,'delivery_keep');
+  }finally{fs.rmSync(repo,{recursive:true,force:true});}
 });
 
 test('wait tick never sends a cursor explicitly bound to another monitor',()=>{
-  const dir=tmp();const cwd=path.resolve('fixtures/orca/agentos-r14-sales');
+  const repo=tmp();const cwd=repo;
   try{
-    fs.writeFileSync(path.join(dir,'wait-state.json'),JSON.stringify({lastDeliveryId:'delivery_other',run:'run_sales',from:'term_old_monitor',seenReports:{}}));
+    seedWaitState(repo,'run_sales',{lastDeliveryId:'delivery_other',run:'run_sales',from:'term_old_monitor',seenReports:{}});
     const checks=[];let clock=0;
     const fake=fakeOrca({
       check:(args)=>{if(args.includes('--peek'))return json(0,{ok:true,result:{messages:[]}});checks.push(args);clock+=1000;return json(0,{ok:true,result:{deliveryId:null,messages:[]}});},
@@ -178,22 +191,20 @@ test('wait tick never sends a cursor explicitly bound to another monitor',()=>{
       'terminal-list':()=>json(0,{ok:true,result:{terminals:[]}}),
       'task-list':()=>json(0,{ok:true,result:{tasks:[]}})
     });
-    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_new_monitor',reportsDir:dir,timeoutMs:1000,tickMs:1000,now:()=>clock,wait:()=>{}});
+    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_new_monitor',workflow:WORKFLOW,timeoutMs:1000,tickMs:1000,now:()=>clock,wait:()=>{}});
     assert.equal(result.event,'timeout');assert.ok(!has(checks[0],'--ack'));
-    const state=JSON.parse(fs.readFileSync(path.join(dir,'wait-state.json'),'utf8'));
+    const state=readWaitState(repo,'run_sales');
     assert.deepEqual({lastDeliveryId:state.lastDeliveryId,run:state.run,from:state.from},{lastDeliveryId:null,run:'run_sales',from:'term_new_monitor'});
-  }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
+  }finally{fs.rmSync(repo,{recursive:true,force:true});}
 });
 
-test('report files of a linked worktree live in the main repository so op and kernel scan the same directory',()=>{
+test('repositoryRoot resolves the main checkout, so a linked worktree opens the same ledger as its owner',()=>{
   const root=repositoryRoot(process.cwd());
-  assert.ok(fs.existsSync(path.join(root,'.git')));
-  assert.equal(reportsDirectory(process.cwd(),'run_x'),path.join(root,'.starciwork','_local','runtime','reports','run_x'));
-  assert.equal(reportsDirectory(process.cwd(),'run_x','C:/explicit'),path.resolve('C:/explicit'));
+  assert.ok(fs.existsSync(path.join(root,'.git')),'the resolved root is a real git checkout, not a guess');
 });
 
 test('wait pings every live worker each tick instead of sleeping through the whole timeout',()=>{
-  const dir=tmp();const cwd=path.resolve('fixtures/orca/agentos-r14-sales');
+  const repo=tmp();const cwd=repo;
   try{
     let clock=0,checks=0;const reads=[];
     const fake=fakeOrca({
@@ -205,7 +216,7 @@ test('wait pings every live worker each tick instead of sleeping through the who
       'terminal-send':(args)=>{answers.push(args);return json(0,{ok:true,result:{}});}
     });
     const answers=[];
-    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_me',reportsDir:dir,timeoutMs:900000,tickMs:120000,now:()=>clock,wait:()=>{}});
+    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_me',workflow:WORKFLOW,timeoutMs:900000,tickMs:120000,now:()=>clock,wait:()=>{}});
     // tick 3: the prompt is answered once and clears (working); tick 4: a prompt survives the answer -> stalled-prompt.
     assert.equal(result.event,'stalled-prompt');
     assert.equal(checks,4);
@@ -216,11 +227,11 @@ test('wait pings every live worker each tick instead of sleeping through the who
     assert.equal(answers.length,2);
     assert.match(result.next,/settle/);
     assert.deepEqual(reads.slice(0,3),[120000,240000,360000]);
-  }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
+  }finally{fs.rmSync(repo,{recursive:true,force:true});}
 });
 
 test('a worker that neither pings nor prints inside the grace window is reported silent',()=>{
-  const dir=tmp();const cwd=path.resolve('fixtures/orca/agentos-r14-sales');
+  const repo=tmp();const cwd=repo;
   try{
     const fake=fakeOrca({
       check:(args)=>args.includes('--peek')?json(0,{ok:true,result:{messages:[{id:'hb',type:'heartbeat',created_at:'1970-01-01T00:00:00Z',payload:'{"dispatchId":"ctx_s"}'}]}}):json(0,{ok:true,result:{deliveryId:null,messages:[]}}),
@@ -229,10 +240,10 @@ test('a worker that neither pings nor prints inside the grace window is reported
       'task-list':()=>json(0,{ok:true,result:{tasks:[{id:'task_s',display_name:'[Op] backend.implement - Sales'}]}}),
       'terminal-read':()=>json(0,{ok:true,result:{terminal:{handle:'term_s',tail:['Compiling...']}}})
     });
-    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_me',reportsDir:dir,timeoutMs:1000,tickMs:1000,now:()=>11*60*1000,stalledAfterMs:20*60*1000,wait:()=>{}});
+    const result=waitTick(fake.orca,{cwd,run:'run_sales',from:'term_me',workflow:WORKFLOW,timeoutMs:1000,tickMs:1000,now:()=>11*60*1000,stalledAfterMs:20*60*1000,wait:()=>{}});
     assert.equal(result.event,'stalled-silent');
     assert.equal(result.liveness[0].pingAgeMs,11*60*1000);
-  }finally{fs.rmSync(path.dirname(dir),{recursive:true,force:true});}
+  }finally{fs.rmSync(repo,{recursive:true,force:true});}
 });
 
 test('the wait between ticks ends when the caller has something to handle: a queued command reaches the kernel within one tick',()=>{
@@ -243,12 +254,12 @@ test('the wait between ticks ends when the caller has something to handle: a que
     let clock=0;const wait=ms=>{clock+=ms;};
     const orca={invoke:()=>{clock+=500;return empty;}};
     let queued=0;
-    const woken=waitTick(orca,{cwd:dir,run:'run_x',from:'term_k',timeoutMs:600000,tickMs:1000,reportsDir:dir,now:()=>clock,wait,wake:()=>++queued>=2});
+    const woken=waitTick(orca,{cwd:dir,run:'run_x',from:'term_k',timeoutMs:600000,tickMs:1000,workflow:WORKFLOW,now:()=>clock,wait,wake:()=>++queued>=2});
     assert.equal(woken.event,'woken');
     assert.equal(woken.ticks,2,'the second slice saw the command');
     assert.ok(woken.elapsedMs<600000,'the wait did not run to its timeout');
     // Without anything to wake for the wait runs to its timeout as before.
-    const timed=waitTick(orca,{cwd:dir,run:'run_x',from:'term_k',timeoutMs:3000,tickMs:1000,reportsDir:dir,now:()=>clock,wait,wake:()=>false});
+    const timed=waitTick(orca,{cwd:dir,run:'run_x',from:'term_k',timeoutMs:3000,tickMs:1000,workflow:WORKFLOW,now:()=>clock,wait,wake:()=>false});
     assert.equal(timed.event,'timeout');
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
