@@ -13,7 +13,7 @@ import {dispatchLastWords,parseLastFailure,workerLastWords} from '../hosts/orca/
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
 // Fake launch writes must not race installers copying the packaged fixtures.
 // Keep this relative-path fixture on the current drive, outside every payload root.
-const suiteRoot=fs.mkdtempSync(path.join(process.cwd(),'.orca-launch-test-'));
+const suiteRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-orca-launch-'));
 const worktree=path.relative(process.cwd(),suiteRoot);
 const worktreePath=fs.realpathSync(suiteRoot);
 after(()=>{
