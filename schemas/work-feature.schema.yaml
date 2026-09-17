@@ -1,0 +1,43 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:work:feature:1
+type: object
+additionalProperties: false
+description: "A feature's own record at features/<feature>/index.yaml. It names the feature and says what it
+  is about; every rule, requirement, design, screen, implementation and flow of that feature lives under its
+  directory. Like the catalog it is a parent, so it carries no state - a feature is not a unit of work, it is
+  a place work is kept, and its progress is derived from the leaves beneath it. A `state` key here is refused
+  on purpose: the moment a parent can claim done, a tree can report done while its leaves say otherwise."
+required:
+  - schema
+  - id
+  - title
+  - description
+properties:
+  schema:
+    const: work/feature
+    description: Record family discriminator. Every record names its own family so a file can be validated
+      without inferring its meaning from the directory it happens to sit in.
+  id:
+    $ref: "#/$defs/slug"
+    description: The feature's stable identifier, matching the entry the catalog carries for it. It is the
+      second segment of every record id inside this feature, which is what makes an id readable as an
+      address.
+  title:
+    $ref: "#/$defs/prose"
+    description: What the feature is, written as a statement rather than a label. A title that reads as a
+      sentence forces the author to say what the feature does instead of naming a folder.
+  description:
+    $ref: "#/$defs/prose"
+    description: What the feature covers and, where it helps, what it deliberately does not. It is the
+      orientation a reader needs before opening any leaf.
+$defs:
+  prose:
+    type: string
+    minLength: 1
+    description: A nonempty sentence a person reads. An empty string is an unwritten field pretending to be
+      a written one, so it is refused at the type.
+  slug:
+    type: string
+    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that an id
+      written twice by two authors is the same string.

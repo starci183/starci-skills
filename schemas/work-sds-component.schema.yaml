@@ -1,0 +1,225 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:work:sds-component:1
+type: object
+additionalProperties: false
+description: "One piece of the intended technical design - what it is responsible for and what other code may
+  assume about it. It is a target, not a description of what the code currently does: the component record is
+  written before or against the implementation, and where the two differ it is the implementation that is
+  wrong until somebody argues otherwise and changes this record on purpose. That is why it names the business
+  rules it serves and carries no repository path - paths belong to the implementation record, which can be
+  refactored without touching the design it is meant to realise."
+required:
+  - schema
+  - id
+  - title
+  - state
+  - responsibility
+  - refs
+properties:
+  schema:
+    const: work/sds-component
+    description: Record family discriminator. Every record names its own family so a file can be validated
+      without inferring its meaning from the directory it happens to sit in.
+  id:
+    type: string
+    pattern: ^sds(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}$
+    description: "The component's stable id, a lowercase dot-path under the sds family:
+      sds.<feature>.<name>; example sds.task.ownership-guard. The prefix is enforced so a reference to sds.x
+      is unambiguously a design target rather than a shipped module."
+  title:
+    $ref: "#/$defs/prose"
+    description: What the component is, written so a reader learns its purpose from the line alone. It names
+      the thing in design terms, not by the file that happens to contain it today.
+  state:
+    $ref: "#/$defs/state"
+  responsibility:
+    $ref: "#/$defs/prose"
+    description: "What this component is answerable for, and where relevant how - expiry enforced on read
+      rather than by a sweep, for instance. One responsibility per component: if this field needs the word
+      `and` twice, the record is describing two components that should be separable."
+  interfaces:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/prose"
+    description: What the rest of the system may assume about reaching this component - who may write, who
+      must go through whom. These are the assumptions a refactor breaks silently, so they are written down
+      as promises rather than left implicit in the current call graph.
+  refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/recordId"
+    description: The records this design exists to serve, by id - usually the business rules it enforces. It
+      is required because a component that serves no stated rule is design with no mandate, and nobody can
+      then say whether it is still needed.
+  evidence:
+    $ref: "#/$defs/slug"
+    description: The single evidence directory under this record's evidence/ folder that carries what was
+      observed of this record directly. It is one pointer and nothing more - it does not repeat when the
+      capture was taken, because that is in the manifest, and it does not list what else demonstrated this
+      record, because that is `provenBy`, which the kernel computes rather than an author copying it. A
+      second copy of either fact here would be a second source of truth, and two copies that disagree leave
+      no answer to which is right. At most one directory is allowed, because a record has one current answer
+      to what was last observed of it; a superseded manifest stays where it is, marked stale.
+  requiresProof:
+    $ref: "#/$defs/requiresProof"
+  provenBy:
+    $ref: "#/$defs/provenBy"
+  blockedBy:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/prose"
+    description: What is standing in the way, in sentences that name the record responsible. It is prose
+      rather than lifecycle state because an impediment is a fact about the world, not a status - the
+      component is still todo, and the blocker explains why the design has not settled.
+$defs:
+  prose:
+    type: string
+    minLength: 1
+    description: A nonempty sentence a person reads. An empty string is an unwritten field pretending to be
+      a written one, so it is refused at the type.
+  slug:
+    type: string
+    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that an id
+      written twice by two authors is the same string.
+  recordId:
+    type: string
+    pattern: ^(?:br|fr|nfr|data|decision|journey|sds|impl|ui|uat)(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}$
+    description: The id of any record in the tree, family prefix included. Requiring a known prefix means a
+      dangling reference is caught as a malformed id rather than surviving as a plausible-looking string.
+  state:
+    enum:
+      - todo
+      - done
+    description: "Whether this leaf is outstanding or finished, and nothing else. There is deliberately no
+      third authored value: `stale` is derived by the checker when an input a done record was proved against
+      has moved, and authoring it would let a record claim a status the checker is supposed to compute -
+      which is how a tree starts reporting its own opinion of its freshness instead of a measured one."
+  requiresProof:
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    description: "What this record needs before anybody may call it proven, broken down by kind. It is
+      authored on the record, because a record stating what would convince a reader of itself is a statement
+      about itself and it is entitled to make it. It exists because a derived list of proofs tells you what
+      happens to exist and never what was required: a requirement covered by one manifest and a requirement
+      covered by unit tests of every rule it composes, an end-to-end run and a walked flow read identically
+      once you only count what turned up. The kinds are a closed set so that a weaker bar cannot be invented
+      by choosing a new word for it."
+    properties:
+      unit:
+        $ref: "#/$defs/proofDemand"
+        description: Focused tests over the code that implements this record. It is its own kind because it
+          is the only proof that isolates one rule from the flow around it, and a flow-level run can pass
+          while a rule it composes is wrong in a case that flow never reaches.
+      e2e:
+        $ref: "#/$defs/proofDemand"
+        description: An automated run across the assembled product. It is its own kind because composition
+          is where separately correct parts stop working together, and no isolated test can see that.
+      uat:
+        $ref: "#/$defs/proofDemand"
+        description: A walk somebody performs against the running product the way a person would. It is its
+          own kind because every automated proof observes the product through an interface the product
+          itself defines, and a product can satisfy all of them and still be unusable.
+      perf:
+        $ref: "#/$defs/proofDemand"
+        description: A measured run under load or against a clock. It is its own kind because correctness
+          and speed fail independently, and a green correctness suite reports nothing whatever about speed.
+      implementation:
+        $ref: "#/$defs/proofDemand"
+        description: A named implementation record built to this one. It is the demand a design component
+          makes, because a design is proven by something being built to it and never by a test of its prose.
+      measurement:
+        $ref: "#/$defs/proofDemand"
+        description: "This record's own measurement, carried out. It is the entire proof contract of a
+          non-functional requirement, which is why such a record names this kind and stops there: the
+          threshold is already authored once, in `measurement`, and restating it here would be a second copy
+          to drift."
+      requirements:
+        $ref: "#/$defs/proofDemand"
+        description: The records this one travels through, each proven in its own right. It is the demand a
+          journey makes, because a journey holds when the route was walked and when every requirement on the
+          route holds - neither one alone.
+  proofDemand:
+    type: object
+    additionalProperties: false
+    minProperties: 1
+    description: What satisfying one kind means here, stated concretely enough that a checker can decide it
+      rather than a reader judging it. An empty demand would be a kind named and nothing asked of it, so at
+      least one of the four ways of asking is required.
+    not:
+      properties:
+        required:
+          const: true
+        optional:
+          const: true
+      required:
+        - required
+        - optional
+    properties:
+      required:
+        const: true
+        description: This kind must be satisfied. It is only ever true, because the absence of the key
+          already says the kind is not demanded, and a field that can also be false would give a record two
+          ways to say the same thing and a reader two places to look.
+      optional:
+        const: true
+        description: This kind counts when it is present but does not hold the record back. It is only ever
+          true, for the same reason, and it may not appear beside `required` - a demand that is both is a
+          demand that has not been decided.
+      command:
+        $ref: "#/$defs/prose"
+        description: The exact command that satisfies this kind, runnable as written. Naming it on the
+          record is what stops the demand being satisfiable by whatever run happens to be convenient later.
+      forEach:
+        type: string
+        pattern: ^[a-z][A-Za-z0-9]*$
+        description: "The name of a field on this same record whose every entry must be satisfied
+          separately; example forEach: composes. It is what turns a single tick into a count that grows with
+          the record - add a rule to `composes` and the bar rises by itself, instead of a proof recorded
+          against the old, shorter list continuing to read as complete."
+  provenBy:
+    type: object
+    additionalProperties: false
+    description: "What actually satisfied each demanded kind. It is written by the kernel from
+      `requiresProof` and the provers' own `proves` edges, and an agent-authored one is refused: a record
+      filling this in is speaking for other records, and it goes quietly false the moment one of them stops
+      covering the path without this copy changing. That refusal is enforced where the field is written,
+      because no schema can see who typed a value; what the schema fixes is the shape, so a hand-written one
+      is at least recognisable as a claim about the same closed set of kinds."
+    properties:
+      unit:
+        $ref: "#/$defs/proofRefs"
+      e2e:
+        $ref: "#/$defs/proofRefs"
+      uat:
+        $ref: "#/$defs/proofRefs"
+      perf:
+        $ref: "#/$defs/proofRefs"
+      implementation:
+        $ref: "#/$defs/proofRefs"
+      measurement:
+        $ref: "#/$defs/proofRefs"
+      requirements:
+        $ref: "#/$defs/proofRefs"
+  proofRefs:
+    type: array
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/proofRef"
+    description: Everything that satisfied one kind. It may be empty, and an empty list is information - it
+      says the kind was demanded or offered and nothing has yet answered it, which is a different fact from
+      the kind not being asked for at all.
+  proofRef:
+    type: string
+    pattern: ^[a-z0-9]+(?:[-.][a-z0-9]+)*(?:#[a-z0-9]+(?:[-.][a-z0-9]+)*)?$
+    description: "One thing that satisfied a demand: the id of the record that proved it, the name of an
+      evidence directory, or an evidence directory and one assertion inside it written as name#assertion.
+      The assertion form exists because a manifest can carry several observations and only one of them may
+      be the one that answered this kind, and a pointer at the whole manifest would claim the rest as well."

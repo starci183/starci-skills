@@ -1,0 +1,66 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:work:workspace:1
+type: object
+additionalProperties: false
+description: The tree's own identity - which project this .starciwork belongs to and which repositories
+  serve it. It exists so that the project name lives in a record rather than in a wrapper directory, which is
+  what allows one canonical tree to describe a product served by a backend and a frontend without either
+  repository creating a second workspace of its own.
+required:
+  - schema
+  - id
+  - project
+  - description
+  - repositories
+properties:
+  schema:
+    const: work/workspace
+    description: Record family discriminator. Every record names its own family so a file can be validated
+      without inferring its meaning from the directory it happens to sit in.
+  id:
+    $ref: "#/$defs/slug"
+    description: The workspace's stable identifier. It names this tree, and it is what a runtime resolving a
+      project binding matches against.
+  project:
+    $ref: "#/$defs/slug"
+    description: The project this tree belongs to. It is a separate field from the id because a project can
+      outlive or precede the tree that describes it, and conflating the two makes a rename look like a new
+      workspace.
+  description:
+    $ref: "#/$defs/prose"
+    description: What the product is, in one sentence. It is the first thing a reader of the tree sees, and
+      it is here rather than in the catalog because it describes the product, not its feature list.
+  repositories:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    description: Every repository that serves this product, one entry each. It is the list an implementation
+      record's `repository` field and an evidence manifest's `servedVersions` are checked against, so a
+      module in an undeclared repository is caught rather than accepted.
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - role
+        - name
+      properties:
+        role:
+          $ref: "#/$defs/slug"
+          description: What the repository is for - be, fe, and whatever else a product genuinely needs. The
+            role is recorded so that a reader can tell which side of the product a proof came from without
+            recognising repository names.
+        name:
+          $ref: "#/$defs/slug"
+          description: The repository's name, as every other record refers to it. Names rather than paths,
+            because a path is a fact about one machine and this record must be true on all of them.
+$defs:
+  prose:
+    type: string
+    minLength: 1
+    description: A nonempty sentence a person reads. An empty string is an unwritten field pretending to be
+      a written one, so it is refused at the type.
+  slug:
+    type: string
+    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that an id
+      written twice by two authors is the same string.
