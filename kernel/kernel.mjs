@@ -1,14 +1,14 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import crypto from 'node:crypto';
-import {ENGINE_SCHEMA,ENGINE_VERSION,createEngineRuntime,enrollEngine,isEnrolled,isJobPending,journalFileFor,predatesEngineSchema,relocateJournal,settleGenerationLeases,prepareGenerationRetry,staleLeaseProof,validateCandidateRoot} from './engine.mjs';
+import {ENGINE_SCHEMA,ENGINE_VERSION,candidateBaseFor,createEngineRuntime,enrollEngine,isEnrolled,isJobPending,predatesEngineSchema,relocateJournal,settleGenerationLeases,prepareGenerationRetry,staleLeaseProof,validateCandidateRoot} from './engine.mjs';
 import {applyOwnerInbox} from './owner-inbox.mjs';
 import {verifyAcceptedIntegrationOwnerRequests} from './owner-requests.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
 import {freshRuntimeBudget,probeRuntimeBudget} from './budget.mjs';
 import {createWorkflowModelEligibility} from './model-policy.mjs';
-import {openJournal} from './journal.mjs';
 import * as ledgerDb from './ledger-db.mjs';
+const {ledgerFileFor,openLedger:openJournal}=ledgerDb;
 import {DISK_HEADROOM_CODE,headroomError,isDiskFull,measureHeadroom} from './disk.mjs';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
@@ -18,7 +18,7 @@ import {waitTick} from '../hosts/orca/protocol.mjs';
 import {buildOperationLaunch,notifyTerminal,settleDispatch,startOperation,sweepWorktree} from '../hosts/orca/launch.mjs';
 import {buildReport,validateReport} from './reports.mjs';
 import {TAB_READ_LIMIT,classifyTab} from './tab.mjs';
-import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot,workflowsRoot} from './store.mjs';
+import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot} from './store.mjs';
 import {grammarRepository,resolveLedgerRoot,sharedLedgerStatus} from './routing.mjs';
 import {createAllocator,loadRuntimes,withProviderPreference} from './schedule.mjs';
 import {resolveExecutionChain} from './chains.mjs';
@@ -520,7 +520,7 @@ export function resetReviewEpoch(store,state,priorGeneration=state.engine?.gener
   store.appendEvent({event:'review-epoch-reset',generation:priorGeneration,proof:'review counters and findings are generation-local; accepted operations and owner answers are preserved'});
   return superseded;
 }
-export function settleSkippedGenerationLeases(state,{settle=settleGenerationLeases,journalFile=state.engine?.journalFile}={}){
+export function settleSkippedGenerationLeases(state,{settle=settleGenerationLeases,ledgerFile=state.engine?.ledgerFile,machineFile=state.engine?.machineFile}={}){
   // A blocked op still carrying its pending marker is deliberately fenced, not skipped: the reconcile passes
   // left its reservation held on purpose and reported it (`unreconciled-pending`), so it is never settled here.
   const skipped=state.ops.filter(op=>op.lease&&!retryableOperation(op)&&!(op.status==='blocked'&&op.pending));
@@ -529,7 +529,7 @@ export function settleSkippedGenerationLeases(state,{settle=settleGenerationLeas
   // still carries fences nothing - it is settled with the rest instead of refusing the owner's retry.
   for(const op of skipped)need(op.workerSettled===true||settledOperation(op),`Skipped operation ${op.id} retains an unsettled durable lease`);
   if(!skipped.length)return [];
-  const results=settle({journalFile,leases:skipped.map(op=>op.lease),reason:'generation retry after confirmed stop of skipped operation'});
+  const results=settle({ledgerFile,machineFile,leases:skipped.map(op=>op.lease),reason:'generation retry after confirmed stop of skipped operation'});
   for(let index=0;index<skipped.length;index++){need(results[index]?.ok,`Durable lease ${skipped[index].lease.jobId} could not be settled before retry: ${results[index]?.reason??'unknown'}`);delete skipped[index].lease;}
   return skipped.map(op=>op.id);
 }
@@ -548,7 +548,7 @@ export function reconcileLegacyCoordinatorLease(state,op,{orca,store,verifyPin=v
   if(observedRun?.id!==state.run)return {ok:false,reason:'run attestation does not match the recorded Run'};
   if(!coordinator)return {ok:false,reason:'run coordinator is missing or ambiguous'};
   if(coordinator===state.from)return {ok:false,reason:'recorded monitor still matches the Run coordinator'};
-  const released=settle({journalFile:state.engine.journalFile,leases:[op.lease],reason:'legacy pinned coordinator attestation rejected before task creation'})[0];
+  const released=settle({ledgerFile:state.engine.ledgerFile,machineFile:state.engine.machineFile,leases:[op.lease],reason:'legacy pinned coordinator attestation rejected before task creation'})[0];
   if(!released?.ok)return {ok:false,reason:`durable lease settlement failed: ${released?.reason??'unknown'}`};
   const lease=op.lease;op.workerSettled=true;op.refusal='runtime-reconciliation';
   store.appendEvent({event:'legacy-coordinator-no-effect-proved',op:op.id,jobId:lease.jobId,generation:lease.generation,pin:state.engine.runtimePin.digest,recordedFrom:state.from,observedCoordinator:coordinator,
@@ -556,7 +556,7 @@ export function reconcileLegacyCoordinatorLease(state,op,{orca,store,verifyPin=v
   return {ok:true,jobId:lease.jobId,coordinator};
 }
 /** Re-read an exact failed launch and release its lease only when Orca proves the worker and resource are stopped. */
-function durableLaunchObservation(state,op){let journal;try{journal=openJournal({file:state.engine.journalFile});return journal.events({workflowId:state.id}).find(event=>event.entity_id===op.lease.jobId&&event.generation===op.lease.generation&&event.kind==='operation-launch-observed'&&event.payload?.task===op.launch.task&&event.payload?.dispatch===op.launch.dispatch)??null;}finally{journal?.close();}}
+function durableLaunchObservation(state,op){let journal;try{journal=openJournal({file:state.engine.ledgerFile});return journal.events({workflowId:state.id}).find(event=>event.entity_id===op.lease.jobId&&event.generation===op.lease.generation&&event.kind==='operation-launch-observed'&&event.payload?.task===op.launch.task&&event.payload?.dispatch===op.launch.dispatch)??null;}finally{journal?.close();}}
 export function reconcileFailedLaunchLease(state,op,{orca,store,settle=settleGenerationLeases,observeLaunch=durableLaunchObservation}={}){
   const taskId=op?.launch?.task;if(!op?.lease||!taskId||op.dispatch||op.terminal)return {ok:false,reason:'failed launch identity is incomplete or already active'};
   const launchReceipt=observeLaunch(state,op);
@@ -571,7 +571,7 @@ export function reconcileFailedLaunchLease(state,op,{orca,store,settle=settleGen
     &&observation?.exactWorker===true&&observation?.status==='exited'&&terminal?.handle===dispatch.assignee_handle&&terminal?.connected===false
     &&resource?.originDispatchId===dispatch.id&&resource?.ownerDispatchId===dispatch.id&&resource?.ownershipState==='released'&&resource?.releaseState==='released';
   if(!exact)return {ok:false,reason:`worker ${dispatch.id} is not proven exited with its exact terminal resource released`};
-  const released=settle({journalFile:state.engine.journalFile,leases:[op.lease],reason:'Orca proved failed dispatch-input worker exited and released its terminal resource'})[0];
+  const released=settle({ledgerFile:state.engine.ledgerFile,machineFile:state.engine.machineFile,leases:[op.lease],reason:'Orca proved failed dispatch-input worker exited and released its terminal resource'})[0];
   if(!released?.ok)return {ok:false,reason:`durable lease settlement failed: ${released?.reason??'unknown'}`};
   const lease=op.lease;op.workerSettled=true;op.refusal='runtime-reconciliation';op.launch.dispatch=dispatch.id;
   store.appendEvent({event:'failed-launch-stopped-proved',op:op.id,jobId:lease.jobId,generation:lease.generation,run:state.run,task:taskId,dispatch:dispatch.id,terminal:terminal.handle,
@@ -1588,7 +1588,7 @@ function publishAuthoredDecision(store,state,op,report,reason){
  */
 const RELEASABLE_JOB_STATUS=['effect_unknown','succeeded','failed','cancelled'];
 export function releaseSettledOperationLeases(store,state,ctx,{settle=settleGenerationLeases}={}){
-  if(!isEnrolled(state)||!state.engine?.journalFile)return null;
+  if(!isEnrolled(state)||!state.engine?.ledgerFile)return null;
   const released=[];
   for(const op of state.ops){
     if(!plain(op.lease)||!op.lease.jobId||op.dispatch||op.terminal)continue;
@@ -1597,7 +1597,7 @@ export function releaseSettledOperationLeases(store,state,ctx,{settle=settleGene
     try{status=ctx?.engine?.journal?.getJob?.(op.lease.jobId)?.status??null;}catch{status=null;}
     if(status!==null&&!RELEASABLE_JOB_STATUS.includes(status))continue;
     let settled;
-    try{settled=settle({journalFile:state.engine.journalFile,leases:[op.lease],
+    try{settled=settle({ledgerFile:state.engine.ledgerFile,machineFile:state.engine.machineFile,leases:[op.lease],
       reason:`operation ${op.id} was accepted and committed; its effects are the accepted effects`})[0];}
     catch(error){settled={ok:false,reason:String(error?.message??error)};}
     if(!settled?.ok){
@@ -1664,7 +1664,7 @@ export function reconcileContinuationPreflight(store,state,{now=Date.now}={}){
 export const CANDIDATE_SWEEP_LIMIT=64;
 export function sweepSettledCandidates(store,state,ctx,{limit=CANDIDATE_SWEEP_LIMIT,remove=directory=>fs.rmSync(directory,{recursive:true,force:true})}={}){
   if(!ctx?.engine?.journal||!isEnrolled(state))return [];
-  const base=path.join(path.dirname(state.engine.journalFile),'candidates',state.id);
+  const base=candidateBaseFor(state);
   let entries;
   try{entries=fs.readdirSync(base,{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name);}catch{return [];}
   if(!entries.length)return [];
@@ -4454,7 +4454,7 @@ export function migrateEngineState(store,state){
  * kernel records one event and stops with its own code; it does not save state on a disk that has no room for it.
  */
 export function assertHeadroom(store,state,{measure=measureHeadroom}={}){
-  const found=measure([store.ledgerFile,state.worktree,...(isEnrolled(state)?[state.engine.journalFile]:[])]);
+  const found=measure([store.ledgerFile,state.worktree,...(isEnrolled(state)?[state.engine.machineFile]:[])]);
   if(found.ok)return found;
   try{store.appendEvent({event:'disk-headroom-exhausted',thresholdBytes:found.thresholdBytes,volumes:found.exhausted.map(item=>({path:item.path,freeBytes:item.freeBytes}))});}catch{}
   throw headroomError(found);
@@ -4463,28 +4463,44 @@ export function assertHeadroom(store,state,{measure=measureHeadroom}={}){
  * just long enough for already-open candidates in the shared store to verify the bytes they observed. */
 export function retireFinishedWorkflowRows(store,state){
   let journal;
-  try{store.unbindJournal?.();journal=openJournal({file:state.engine.journalFile});store.bindJournal?.(journal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
+  try{store.unbindJournal?.();journal=openJournal({file:state.engine.ledgerFile});store.bindJournal?.(journal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
     const live=journal.liveRows(state.id);if(live.leases.length||live.jobs.length){store.appendEvent({event:'journal-workflow-retained',reason:'the workflow still holds live reservations or unsettled jobs',live});return {ok:false,workflowId:state.id,live,reason:'the workflow still holds live reservations or unsettled jobs'};}
     store.appendEvent({event:'journal-workflow-custody-retained',policy:'final state plus latest exact runtime-file receipt per path; operational jobs and history retired'});
     return journal.retireWorkflow(state.id,{preserveRuntimeCustody:true});}
   catch(error){store.appendEvent({event:'journal-workflow-retained',reason:String(error?.message??error).slice(0,240)});return {ok:false,reason:String(error?.message??error)};}
   finally{store.unbindJournal?.(journal);journal?.close();}
 }
-export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleepSync,functions={}}={}){
+/** Every CLI command is one self-contained unit of work against the ledger: whatever store(s) it opened
+ * along the way are closed before it returns, so a caller inside one long-lived process (a test, a daemon)
+ * never accumulates open sqlite handles across commands. */
+export function kernelMain(command,options={},ctx={}){
+  const openedStores=[];
+  try{return kernelMainDispatch(command,options,ctx,openedStores);}
+  finally{for(const opened of openedStores)try{opened.close();}catch{}}
+}
+function kernelMainDispatch(command,options={},{orca,cwd=process.cwd(),wait=sleepSync,functions={}}={},openedStores){
   const worktree=path.resolve(cwd);
   const repoRoot=repositoryRoot(worktree);
   // The ledger a job works decides where its own runtime state lives too: a repository that shares another
   // repository's Work tree keeps no `.starciwork` of its own, so the workflow directory belongs to the owner.
   const routedLedger=()=>{try{return resolveLedgerRoot({repoRoot:worktree,host:hostOf(options,repoRoot),options});}catch{return null;}};
+  const workflowKnownAt=(root,id)=>{
+    const file=ledgerFileFor(root);
+    if(!fs.existsSync(file))return false;
+    let ledger;try{ledger=ledgerDb.inspectLedger({file});}catch{return false;}
+    try{return Boolean(ledger.db.prepare('SELECT 1 FROM workflows WHERE workflow_id=?').get(id));}
+    finally{ledger.close();}
+  };
   const storeRootFor=id=>{
-    if(fs.existsSync(path.join(workflowsRoot(repoRoot),id,'state.json')))return repoRoot;
+    if(workflowKnownAt(repoRoot,id))return repoRoot;
     const resolved=routedLedger();
-    return resolved?.sharedLedger&&fs.existsSync(path.join(workflowsRoot(resolved.ownerRepoRoot),id,'state.json'))
+    return resolved?.sharedLedger&&workflowKnownAt(resolved.ownerRepoRoot,id)
       ?resolved.ownerRepoRoot:repoRoot;
   };
   const open=id=>{
     const workflowId=required(id,'workflow id');
     const store=createStore({repoRoot:storeRootFor(workflowId),id:workflowId});
+    openedStores.push(store);
     const state=store.loadState();
     need(plain(state)&&state.kernel===WORKFLOW_KERNEL,`No workflow kernel state for ${store.id} in ${slash(store.ledgerFile)}`);
     // A state written before the ledger mode existed resumes as a plan-ledger workflow.
@@ -4516,6 +4532,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     // Resolved before the store exists, because a shared ledger moves the workflow directory into its owner.
     const ledger=resolveLedgerRoot({repoRoot:code,host,options});
     const store=createStore({repoRoot:ledger.sharedLedger?ledger.ownerRepoRoot:repoRoot,id});
+    openedStores.push(store);
     const ledgerMode=detectLedgerMode(code,options.ledger??null,ledger.exists?ledger.ledgerRoot:null);
     const state=createWorkflowState({job,inputs:csv(options.inputs),worktree:code,branch:lane?lane.branch:currentBranch(code),
       gates:csv(options.gates),store,host,launcher:launcherOf(host),ledgerMode,scope:csv(options.scope),reintake:csv(options.reintake),migrate:csv(options.migrate),repoRoot:code,lane,
@@ -4560,7 +4577,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const {store,state}=open(options.id);
     let stopJournal=null,continuation;
     try{
-      if(isEnrolled(state)){stopJournal=openJournal({file:state.engine.journalFile});store.bindJournal(stopJournal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});}
+      if(isEnrolled(state)){stopJournal=openJournal({file:state.engine.ledgerFile});store.bindJournal(stopJournal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});}
       store.signal.set(store.id,'stop',{value:{at:Date.now()}});
       continuation=exportContinuationBrief(store,state);
       store.appendEvent({event:'continuation-exported',file:slash(continuation.file),stateDigest:continuation.stateDigest,
@@ -4584,7 +4601,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       need(store.signal.get(store.id,'stop'),`Workflow ${state.id} ceased to be paused before its amendment lock was acquired`);
       const enrolled=isEnrolled(state);
       if(enrolled){
-        amendmentJournal=openJournal({file:state.engine.journalFile});
+        amendmentJournal=openJournal({file:state.engine.ledgerFile});
         store.bindJournal(amendmentJournal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
       }
       const durable=store.loadState();
@@ -4646,18 +4663,18 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const checked=verifyRuntimePin(pin);need(checked.ok,`A verified runtime pin is required: ${checked.reason??''}`);
     const candidateRoot=options['candidate-root']?validateCandidateRoot(options['candidate-root']):state.engine?.candidateRoot??null;
     if(isEnrolled(state)&&store.readEvents().some(event=>event.event==='legacy-coordinator-no-effect-proved')){
-      const runtimeRoot=path.dirname(state.engine.journalFile),runtimeProfile=workflowRuntimeProfile(state),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
+      const runtimeRoot=path.dirname(state.engine.machineFile),runtimeProfile=workflowRuntimeProfile(state),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
         policyFile:path.join(skillRoot,'.dist','model','capabilities.json'),qualificationsFile:path.join(runtimeRoot,'model-qualifications.json'),probationsFile:path.join(runtimeRoot,'model-probations.json'),root:runtimeRoot});
       const refundRuntime=createEngineRuntime({store,state,modelPolicy:policy,eligibility:()=>({eligible:false,reasons:['refund-only runtime']} )});
       try{refundLegacyCoordinatorProbations(store,state,refundRuntime);}finally{refundRuntime.close();}
     }
-    const retryJobs=isEnrolled(state)?prepareGenerationRetry({journalFile:state.engine.journalFile,workflowId:state.id,generation:state.engine.generation}):{cancelled:[],unsettled:[]};
+    const retryJobs=isEnrolled(state)?prepareGenerationRetry({ledgerFile:state.engine.ledgerFile,machineFile:state.engine.machineFile,workflowId:state.id,generation:state.engine.generation}):{cancelled:[],unsettled:[]};
     if(retryJobs.cancelled.length)store.appendEvent({event:'retry-queued-jobs-cancelled',generation:state.engine.generation,jobs:retryJobs.cancelled,proof:'queued, unleased, and no job-spawned receipt'});
     if(retryJobs.deadSettled?.length)store.appendEvent({event:'retry-dead-process-jobs-settled',generation:state.engine.generation,jobs:retryJobs.deadSettled,proof:'every recorded process pid of each durable job is gone'});
     need(!retryJobs.unsettled.length,`Current-generation durable model/check jobs must settle before retry: ${retryJobs.unsettled.join(', ')}`);
     let reconciliationJournal=null;
     if(isEnrolled(state)){
-      reconciliationJournal=openJournal({file:state.engine.journalFile});
+      reconciliationJournal=openJournal({file:state.engine.ledgerFile});
       store.bindJournal(reconciliationJournal,state.engine.generation,{state,goalIdentity:state.goalDigest??undefined});
     }
     try{
@@ -4665,7 +4682,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     // A lease field the journal no longer backs is a stale field, not a reservation: it is cleared on the record
     // with the journal's own proof, and the operation is retried like any other unfinished one.
     for(const op of state.ops.filter(item=>item.lease)){
-      const stale=staleLeaseProof({journalFile:state.engine?.journalFile,lease:op.lease});
+      const stale=staleLeaseProof({ledgerFile:state.engine?.ledgerFile,lease:op.lease});
       if(!stale)continue;
       store.appendEvent({event:'stale-lease-cleared',op:op.id,jobId:op.lease.jobId,attempt:op.lease.attempt,generation:op.lease.generation,proof:stale});
       for(const key of ['lease','pending','workerSettled','retryReconciled'])delete op[key];
@@ -4791,7 +4808,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
       }
       if(op.lease){
         need(Boolean(op.dispatch)||op.workerSettled===true,`Operation ${op.id} has a durable lease but no confirmed native stop receipt`);
-        const released=settleGenerationLeases({journalFile:state.engine.journalFile,leases:[op.lease],reason:'workflow retry after confirmed native dispatch stop'})[0];
+        const released=settleGenerationLeases({ledgerFile:state.engine.ledgerFile,machineFile:state.engine.machineFile,leases:[op.lease],reason:'workflow retry after confirmed native dispatch stop'})[0];
         need(released?.ok,`Durable lease ${op.lease.jobId} could not be settled before retry: ${released?.reason??'unknown'}`);
       }
       const reconciledNative=op.retryReconciled;
@@ -4815,8 +4832,8 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     resetReviewEpoch(store,state,priorGeneration);
     // A migrated record moves to this build's journal unless the operator names one; a retry of a current record
     // stays where it is. Either way the former journal must hold nothing live of this workflow before it is left.
-    const previousJournal=state.engine?.journalFile??null;
-    const targetJournal=retryJournalTarget({option:options['journal-file']??null,previous:previousJournal,chosen:state.engine?.journalChosen===true,fallback:journalFileFor()});
+    const previousJournal=state.engine?.ledgerFile??null;
+    const targetJournal=retryJournalTarget({option:options['journal-file']??null,previous:previousJournal,chosen:state.engine?.journalChosen===true,fallback:ledgerFileFor(store.repoRoot)});
     const relocation=previousJournal&&path.resolve(previousJournal)!==targetJournal?relocateJournal({from:previousJournal,to:targetJournal,workflowId:state.id}):null;
     need(!relocation||relocation.ok,`The journal ${previousJournal} still binds ${state.id}: ${relocation?.reason??''}`);
     // The retired generation's log closes here: everything the retry settled above is its story; the enrollment opens the next.
@@ -4825,7 +4842,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     if(rotated?.rotated)store.appendEvent({event:'events-rotated',generation:priorGeneration,segment:path.basename(rotated.rotated)});
     const journalChosen=Boolean(options['journal-file'])||state.engine?.journalChosen===true;
     const previousCandidateRoot=state.engine?.candidateRoot??null;
-    const engine=enrollEngine(store,state,{runtimePin:pin,journalFile:targetJournal,candidateRoot});state.launcher=checked.launcher;
+    const engine=enrollEngine(store,state,{runtimePin:pin,ledgerFile:targetJournal,candidateRoot});state.launcher=checked.launcher;
     const retryJournal=openJournal({file:targetJournal});
     try{
       store.bindJournal(retryJournal,engine.generation,{state,goalIdentity:state.goalDigest??undefined});
@@ -4835,7 +4852,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
         scope:'new candidate attempts only; existing candidate records retain their exact stored paths'});
       // The generations this retry retires give back the probation their unfinished attempts consumed.
       if(state.modelEligibility?.probationScopes){
-        const runtimeRoot=path.dirname(state.engine.journalFile),runtimeProfile=workflowRuntimeProfile(state),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
+        const runtimeRoot=path.dirname(state.engine.machineFile),runtimeProfile=workflowRuntimeProfile(state),policy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,
           policyFile:path.join(skillRoot,'.dist','model','capabilities.json'),qualificationsFile:path.join(runtimeRoot,'model-qualifications.json'),probationsFile:path.join(runtimeRoot,'model-probations.json'),root:runtimeRoot});
         const refundRuntime=createEngineRuntime({store,state,modelPolicy:policy,eligibility:()=>({eligible:false,reasons:['refund-only runtime']})});
         try{refundRetiredGenerationProbations(store,state,refundRuntime,{generation:engine.generation});}finally{refundRuntime.close();}
@@ -4934,7 +4951,7 @@ export function kernelMain(command,options={},{orca,cwd=process.cwd(),wait=sleep
     const runtimeProfile=withSupervisorPreference(workflowRuntimeProfile(state),supervisorRuntimes(workflowModelConfigRoot(state)));
     let modelPolicy=null;
     if(isEnrolled(state)){
-      const root=path.dirname(state.engine.journalFile);fs.mkdirSync(root,{recursive:true});
+      const root=path.dirname(state.engine.machineFile);fs.mkdirSync(root,{recursive:true});
       modelPolicy=createWorkflowModelEligibility({runtimes:runtimeProfile,state,policyFile:path.join(skillRoot,'.dist','model','capabilities.json'),
         qualificationsFile:path.join(root,'model-qualifications.json'),probationsFile:path.join(root,'model-probations.json'),root});
     }
