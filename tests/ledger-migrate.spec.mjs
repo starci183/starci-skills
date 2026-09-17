@@ -207,7 +207,7 @@ test('a second run of an inputs import is a no-op',async t=>{
   try{assert.equal(db.prepare('SELECT count(*) n FROM inputs WHERE workflow_id=?').get(ID).n,1);}finally{db.close();}
 });
 
-test('the migrator seeds `meta` on the ledger it creates and writes the initial `ledger-anchor.json` for every workflow it imports',async t=>{
+test('the migrator reads the `meta` that `openLedger` seeds and writes the initial `ledger-anchor.json` for every workflow it imports',async t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
   makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
@@ -220,9 +220,8 @@ test('the migrator seeds `meta` on the ledger it creates and writes the initial 
     ledgerId=rows.ledger_id;
     assert.match(ledgerId,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,'ledger_id is a randomUUID');
     assert.equal(rows.schema,'starci/ledger-db@1');
-    assert.equal(rows.journal_mode,'delete');
+    assert.equal(rows.journal_mode,'wal','§3 defaults to WAL; the migrator does not seed meta itself so this is openLedger`s own value');
     assert.ok(Number.isFinite(Number(rows.created_at)));
-    assert.equal(db.prepare("SELECT count(*) n FROM migrations WHERE source=?").get(path.join(repo,'.starciwork','runtime.sqlite')+'#meta').n,1);
     assert.equal(db.prepare("SELECT count(*) n FROM migrations WHERE source=?").get(path.join(workflowsRoot(repo),ID)+'#anchor').n,1);
   }finally{db.close();}
   const anchorPath=path.join(repo,'.starciwork','ledger-anchor.json');
