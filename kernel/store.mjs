@@ -78,7 +78,7 @@ export function createStore({repoRoot,id}){
     need(migrated||!fs.existsSync(path.join(workflowsRoot(boundRepoRoot),workflowId)),`ledger-unmigrated:${workflowId}`);
     ledger.ensureWorkflow({workflowId});
   }catch(error){ledger.close();throw error;}
-  let durable=null;
+  let durable=null,continuationOverride=null;
   // The tab speaks the host's configured language; the events it renders stay as recorded.
   const reportProgress=createProgressReporter({language:configuredProgressLanguage(),debug:configuredProgressDebug()});
   const bound=()=>durable?.ledger.db??db;
@@ -111,7 +111,24 @@ export function createStore({repoRoot,id}){
       payload:{schema:RUNTIME_FILE_WRITE,file,relative:name,mode,state,sha256:sum,size}});
     return {seq,file,relative:name,mode,state,sha256:sum,size};
   };
-  const paths=new Proxy({},{get:(target,name)=>typeof name==='symbol'?undefined:removed(String(name)),set:(target,name)=>removed(String(name))});
+  // `paths.*` is removed except the two keys with no equivalent dedicated method: the continuation projection
+  // (§8/docstring — the one file that legitimately stays on disk, but real callers resolve/override its exact
+  // target dynamically, not just the canonical `<id>.md`) and the final-report reference (backed by the
+  // `signal` 'final-report' key, never a file). Every other key still fails loudly with its name.
+  const paths=new Proxy({},{
+    get:(target,name)=>{
+      if(typeof name==='symbol')return undefined;
+      const key=String(name);
+      if(key==='continuation')return continuationOverride??api.continuation;
+      if(key==='final')return `ledger://final-report/${workflowId}`;
+      return removed(key);
+    },
+    set:(target,name,value)=>{
+      const key=String(name);
+      if(key==='continuation'){continuationOverride=path.resolve(String(value));return true;}
+      return removed(key);
+    }
+  });
   const api={
     schema:WORKFLOW_STATE,id:workflowId,repoRoot:boundRepoRoot,dir:null,ledger,ledgerFile:path.resolve(file),paths,
     /** Canonical continuation projection — the one workflow file that stays on disk, in the repo not `_local`. */
