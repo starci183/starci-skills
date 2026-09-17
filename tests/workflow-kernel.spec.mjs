@@ -25,7 +25,7 @@ import {setSignal} from '../kernel/launch.mjs';
 import {createAllocator} from '../kernel/schedule.mjs';
 import {createLoadsLedger,readLoads} from '../kernel/loads.mjs';
 import {resolveLedgerRoot} from '../kernel/routing.mjs';
-import {RESTART_LIMIT,toOp} from '../kernel/common.mjs';
+import {RESTART_LIMIT,setRulingsText,toOp} from '../kernel/common.mjs';
 import * as work from '../kernel/ledger.mjs';
 import {describeLane,laneFor,nextKind,roleOf as graphRoleOf,routeFor,validateGraph} from '../kernel/graph.mjs';
 import {machineVerify} from '../kernel/kernel.mjs';
@@ -4488,7 +4488,7 @@ test('the validator accepts a result the kernel reproduced: the commit follows, 
   const harness=setup({plan:twoOpPlan,dirty:[intakeFile,receiptFile],
     scripts:{'op-intake':[doneReport(intakeFile,'intake')],'op-receipt':[doneReport(receiptFile,'receipt')],'verify-1':[reviewPassed]}});
   try{
-    fs.writeFileSync(path.join(harness.store.dir,'rulings.md'),'Never accept a spec without an assertion.\n');
+    setRulingsText(harness.store,'Never accept a spec without an assertion.');
     approve(harness.store,harness.state);
     harness.state.run='run_wf';harness.state.from='term_kernel';
     const state=harness.run({validateOp:validator,git:diffGit(harness.git.git),validator:['gpt-5.6-sol','claude-opus']});
@@ -4516,7 +4516,7 @@ test('the validator accepts a result the kernel reproduced: the commit follows, 
     assert.equal(intake.status,'done');
     assert.deepEqual([intake.validation.verdict,intake.validation.provider,intake.validation.summary],['accept','gpt-5.6-sol','op-intake satisfies its acceptance']);
     // Memory and verdict log live under the store, kernel-written.
-    const verdicts=fs.readFileSync(path.join(harness.store.dir,'validator','verdicts.jsonl'),'utf8').trim().split('\n').map(line=>JSON.parse(line));
+    const verdicts=harness.store.signal.get(harness.store.id,'validator-verdicts')?.value??[];
     assert.deepEqual(verdicts.map(item=>[item.op,item.verdict,item.provider,item.usage.total,item.head]),[['op-intake','accept','gpt-5.6-sol',940,'abc1234'],['op-receipt','accept','gpt-5.6-sol',940,'abc1234']]);
     const memory=readValidatorMemory(harness.store);
     assert.match(memory,/^# Validator memory - workflow 20260912-104251-kernel-spec/);
@@ -4618,7 +4618,7 @@ test('an unavailable validator never blocks a commit, is counted, and three in a
     assert.equal(asked.length,1,'the outage is one item, not one per op');
     assert.match(asked[0].detail,new RegExp(`the validator answered nothing usable for 3 op results in a row \\(${critiqueRuntimes(harness.state.host).join(', ')}\\)`),'the named pair is the configured validator pool, whichever pool the host config selects');
     assert.equal(state.finished.outcome,'blocked');
-    const verdicts=fs.readFileSync(path.join(harness.store.dir,'validator','verdicts.jsonl'),'utf8').trim().split('\n').map(line=>JSON.parse(line));
+    const verdicts=harness.store.signal.get(harness.store.id,'validator-verdicts')?.value??[];
     assert.deepEqual(verdicts.map(item=>item.verdict),['unavailable','unavailable','unavailable']);
     assert.match(readValidatorMemory(harness.store),/- op-pricing \| unavailable \| no provider produced a valid verdict/);
   }finally{harness.cleanup();}
@@ -4635,7 +4635,7 @@ test('with validateOp:null the step is skipped once on the record, and the kerne
     assert.equal(skipped.length,1);
     assert.match(skipped[0].reason,/no validator function/);
     assert.equal(state.ops[0].validation,null);
-    assert.ok(!fs.existsSync(path.join(harness.store.dir,'validator')));
+    assert.equal(harness.store.signal.get(harness.store.id,'validator-verdicts'),null,'no verdict record is written when there is no validator at all');
   }finally{harness.cleanup();}
 });
 
