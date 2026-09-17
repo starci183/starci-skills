@@ -106,8 +106,11 @@ export function providerFor({agent=null,model=null,command=null}={},providers=HE
   if(!executable)return null;
   const wanted=model??modelOf(words);
   const entries=Object.entries(providers).filter(([,spec])=>spec?.command?.[0]===executable);
+  // An exact target id match wins over an incidental command-model match: a pool's own primary target (e.g.
+  // `codex-agent`) can carry the very model a differently-named target (`gpt-5.6-luna`) was registered under,
+  // and Object.entries order alone must never be what decides which one attests the launch.
   const hit=wanted
-    ?entries.find(([id,spec])=>id===wanted||modelOf(spec.command)===wanted)??entries.find(([id])=>id===canonicalTarget(wanted))
+    ?entries.find(([id])=>id===wanted)??entries.find(([,spec])=>modelOf(spec.command)===wanted)??entries.find(([id])=>id===canonicalTarget(wanted))
     :entries.find(([id])=>id===HEADLESS_AGENTS[family].default);
   if(!hit)return null;
   if(wanted)return {id:hit[0],family,executable,model:modelOf(hit[1].command),command:[...hit[1].command]};

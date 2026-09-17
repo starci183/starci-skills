@@ -39,9 +39,12 @@ function readJson(file,fallback){try{return JSON.parse(fs.readFileSync(file,'utf
  * `store`, when given, is used directly instead of opening one from `cwd` and closing it here - the kernel's
  * own loop already holds the workflow's store, whose repo need not be `cwd` (a routed frontend/backend split
  * keeps the Work ledger in a different repository than the source worktree an operation runs in, §1); the CLI
- * path (no `store` given) still opens and closes its own, exactly as before.
+ * path (no `store` given) still opens and closes its own, exactly as before. A caller that hands over both
+ * `store` and `workflow` must name the same workflow as the store it opened - never silently trusted, the
+ * mismatch is refused rather than reported against whichever one happened to win.
  */
 export function reportOutcome(orca,{cwd,kind='op',run,from,task,dispatch,outcome,summary,files=[],checksFile=null,checks=[],open=[],question=null,blocker=null,credentialRequest=null,credentialRequestFile=null,branch=null,head=null,gates=[],observations=[],workflow=null,capability=null,fileKey=null,opId=null,attempt=null,generation=null,now=Date.now,store:givenStore=null}){
+  if(givenStore&&workflow!=null)need(workflow===givenStore.id,`reportOutcome was given a workflow id (${workflow}) that does not match the store it was also given (${givenStore.id})`);
   const workflowId=givenStore?givenStore.id:required(workflow,'workflow id'),key=fileKey??required(dispatch,'dispatch id');
   const store=givenStore??createStore({repoRoot:repositoryRoot(cwd),id:workflowId});
   try{
@@ -91,7 +94,8 @@ export const DEFAULT_TICK_MS=120000;
  * once per tick while the supervisor keeps waiting; the call returns at the first boundary (report, stalled,
  * dead) or after the whole timeout with `timeout`. `store`, when given, is used as-is (see `reportOutcome`);
  * the kernel's own loop passes its already-open store so a routed repo (worktree != Work-owning repo) reads
- * the exact same ledger `acceptReports` just wrote to, not a second one reconstructed from `cwd`.
+ * the exact same ledger `acceptReports` just wrote to, not a second one reconstructed from `cwd`. When the
+ * caller also names `workflow`, it must be that store's own id (see `reportOutcome`'s note on the same seam).
  */
 export function waitTick(orca,{cwd,run,from,timeoutMs=900000,tickMs=DEFAULT_TICK_MS,workflow=null,store=null,stalledAfterMs=DEFAULT_STALLED_AFTER_MS,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack=null,noAck=false,now=Date.now,wake=null,wait=sleepSync}){
   const started=now();
@@ -118,6 +122,7 @@ export function waitTick(orca,{cwd,run,from,timeoutMs=900000,tickMs=DEFAULT_TICK
  */
 const waitStateKeyFor=run=>`wait-state:${required(run,'run id')}`;
 function singleTick(orca,{cwd,run,from,timeoutMs,workflow,store:givenStore,stalledAfterMs,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack,noAck,now,wait}){
+  if(givenStore&&workflow!=null)need(workflow===givenStore.id,`waitTick was given a workflow id (${workflow}) that does not match the store it was also given (${givenStore.id})`);
   const workflowId=givenStore?givenStore.id:required(workflow,'workflow id'),waitStateKey=waitStateKeyFor(run);
   const store=givenStore??createStore({repoRoot:repositoryRoot(cwd),id:workflowId});
   try{

@@ -31,8 +31,18 @@ const plain=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const need=(condition,message)=>{if(!condition)throw Error(message);};
 const unique=list=>[...new Set(list)];
 
-/** Provider syntax is family-specific; model identities come from the same registry as native workers. */
-export function headlessProvidersFromRegistry(registry,profiles){
+/**
+ * Provider syntax is family-specific; model identities come from the same registry as native workers.
+ * `runtimes`, when given, is `model/runtimes.yaml`'s pool map (`kernel/schedule.mjs`'s `loadRuntimes()`
+ * shape): a provider-window pool pins a different model per *role*, not just working/reasoning (the
+ * `codex-agent` pool decides on `gpt-6-astra`, implements/writes on `gpt-5.6-luna` and verifies on
+ * `gpt-5.6-sol` - five roles, per `model/runtimes.yaml`), and `registry.targets[id].profiles` alone only
+ * ever carries the two the registry itself names (working/reasoning). Without the pool's own role map, an
+ * explicit `--model gpt-5.6-sol` request found no headless line for that exact model and silently fell back
+ * to `canonicalTarget`'s default entry - launching `gpt-5.6-luna`, attesting a model the caller never asked
+ * for. Every distinct role model, from either source, gets its own headless line keyed `<target>~<model>`.
+ */
+export function headlessProvidersFromRegistry(registry,profiles,runtimes={}){
   const families={
     codex:model=>({command:['codex','exec','--json','--model',model],extract:extractCodex,usage:usageCodex}),
     claude:model=>({command:['claude','-p','--output-format','json','--model',model],extract:extractClaude,usage:usageClaude}),
@@ -45,12 +55,12 @@ export function headlessProvidersFromRegistry(registry,profiles){
     const model=target.headlessModel??target.requestedModel??profiles[target.runtime]?.profiles?.[profile]?.model;
     if(typeof model!=='string'||!model.trim())continue;
     providers[id]=make(model);
-    // A provider-window pool pins a different model per role (codex-agent decides on gpt-6-astra but implements
-    // on gpt-5.6-sol): every distinct role model gets its own headless line keyed `<target>~<model>` so an
-    // explicit request for that model attests the model it actually launched, not the pool's working model.
-    for(const profileId of Object.values(target.profiles??{})){
-      const roleModel=profiles[target.runtime]?.profiles?.[profileId]?.model;
-      if(typeof roleModel!=='string'||!roleModel.trim()||roleModel===model)continue;
+    const roleModels=unique([
+      ...Object.values(target.profiles??{}).map(profileId=>profiles[target.runtime]?.profiles?.[profileId]?.model),
+      ...Object.values(runtimes[id]?.models??{})
+    ].filter(value=>typeof value==='string'&&value.trim()));
+    for(const roleModel of roleModels){
+      if(roleModel===model||providers[`${id}~${roleModel}`])continue;
       providers[`${id}~${roleModel}`]=make(roleModel);
     }
   }
@@ -58,7 +68,8 @@ export function headlessProvidersFromRegistry(registry,profiles){
 }
 /** The prompt goes on stdin; each family extracts its own response envelope. Eligibility remains a separate gate. */
 export const HEADLESS_PROVIDERS=headlessProvidersFromRegistry(readDistJson('model','registry.json'),
-  Object.fromEntries(['codex','claude','qwen'].map(family=>[family,readDistJson('model',`${family}.json`)])));
+  Object.fromEntries(['codex','claude','qwen'].map(family=>[family,readDistJson('model',`${family}.json`)])),
+  readDistJson('model','runtimes.json').runtimes);
 /** A provider that refuses with a quota signal is not broken: the chain moves on without retrying it. */
 export const RATE_LIMITED=/429|rate.?limit|too many requests|overloaded/i;
 function extractClaude(stdout){

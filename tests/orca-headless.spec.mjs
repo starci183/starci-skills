@@ -383,17 +383,18 @@ test('the root follows the store, then the environment the kernel gave the child
 test('the supervisor starts the next kernel of a headless workflow on the headless host',()=>{
   const base=tmp();
   try{
-    const dir=path.join(base,'.starciwork','_local','workflows','w1');fs.mkdirSync(dir,{recursive:true});
-    fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id:'w1',approved:true,finished:null,worktree:base,host:'H',hostAdapter:'headless'}));
-    fs.writeFileSync(path.join(dir,'events.jsonl'),`${JSON.stringify({at:1,seq:1,event:'tick'})}\n`);
-    const info=inspectWorkflow({id:'w1',dir},{now:()=>2});
+    // inspectWorkflow no longer reads a workflow directory off disk (there is none, under the ledger) - the
+    // caller loads the state the way the real supervisor loop does, via listWorkflows(repoRoot) -> {id, dir:
+    // null, state, updatedAt}, and hands it the loaded state directly instead of a dir to read state.json from.
+    const state={schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id:'w1',approved:true,finished:null,worktree:base,host:'H',hostAdapter:'headless'};
+    const info=inspectWorkflow({id:'w1',dir:null,state},{now:()=>2});
     assert.equal(info.hostAdapter,'headless');
     const spawned=[];
     startKernel(info,{launcher:'L.mjs',spawnFn:(exe,args)=>{spawned.push(args);return {pid:1,unref(){}};}});
     assert.deepEqual(spawned[0].slice(-2),['--host-adapter','headless']);
     // A workflow that never recorded a host is started as before: on Orca, with no flag.
-    fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id:'w1',approved:true,finished:null,worktree:base,host:'H'}));
-    const plain=inspectWorkflow({id:'w1',dir},{now:()=>2});
+    const {hostAdapter:_omit,...withoutHostAdapter}=state;
+    const plain=inspectWorkflow({id:'w1',dir:null,state:withoutHostAdapter},{now:()=>2});
     assert.equal(plain.hostAdapter,null);
     startKernel(plain,{launcher:'L.mjs',spawnFn:(exe,args)=>{spawned.push(args);return {pid:1,unref(){}};}});
     assert.equal(spawned[1].includes('--host-adapter'),false);
