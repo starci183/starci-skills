@@ -11,7 +11,7 @@ import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateBindingWrite
 import {candidateRootBindingDigest} from './candidate-roots.mjs';
 import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
 import {reconcilePureModelJobs} from './job-reconcile.mjs';
-import {openJournal} from './journal.mjs';
+import {inspectLedger,ledgerFileFor,machineFileFor,openLedger,openMachine} from './ledger-db.mjs';
 import {GLOBAL_AI_RESOURCE,createAdmission} from './admission.mjs';
 import {resourceLocks} from './guards.mjs';
 import {ENGINE_SCHEMA,isEnrolled,kindRole,predatesEngineSchema,sealedRuntimeOf} from './common.mjs';
@@ -28,9 +28,8 @@ export function deferJob(result){
   const error=new Error(result.reasons?.join('; ')||`Waiting for ${result.identity?.jobId??'durable job'}`);
   error.code='STARCI_JOB_PENDING';error.job=result;throw error;
 }
-/** The machine-local runtime root: the shared admission journal, candidates and probation ledgers live here. */
+/** The machine-local runtime root: runtime pins, the machine DB and candidate scratch live here. */
 export const runtimeRootFor=(env=process.env)=>path.join(env.LOCALAPPDATA||path.join(os.homedir(),'.local','state'),'StarCi','runtime');
-export const journalFileFor=(env=process.env)=>path.join(runtimeRootFor(env),'journal.sqlite');
 const opIdentity=(state,op)=>({workflowId:state.id,opId:op?.id??null,attempt:op?.attempt??1,generation:state.engine.generation});
 const modelInput=input=>{
   const copy=structuredClone(input);
@@ -40,8 +39,30 @@ const modelInput=input=>{
   if(Array.isArray(copy.resolvedReferences)){const normalized=normalizeResolvedReferences(copy.resolvedReferences);copy.resolvedReferences=normalized.entries;copy.resolvedReferencesTruncated=normalized.truncated;copy.resolvedReferenceBytes=normalized.bytes;}
   return copy;
 };
+/** Open the machine arbiter, then the ledger registered against it; `journalFile` is the pre-1.0.4 spelling of `ledgerFile`. */
+const openPair=({ledgerFile,journalFile,machineFile=null,now=Date.now}={})=>{
+  const machine=openMachine({file:machineFile??machineFileFor(),now});
+  let ledger;
+  try{ledger=openLedger({file:ledgerFile??journalFile,now,machine});}catch(error){try{machine.close();}catch{}throw error;}
+  return {ledger,machine};
+};
+const closePair=({ledger,machine})=>{try{ledger?.close();}catch{}try{machine?.close();}catch{}};
+/** `machine_ref` tokens a job's ledger lease rows pair with; read before the rows are deleted. */
+const machineRefs=(ledger,jobId)=>ledger.db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(jobId).map(row=>row.machine_ref);
+const releaseRefs=(machine,refs)=>{for(const ref of refs){try{machine.release(ref);}catch{}}};
+/** `jobs.complete` (jobs.mjs) drops lease rows but does not know about paired machine tokens; release them here. */
+const settleJob=({jobs,ledger,machine,spec})=>{
+  const refs=machineRefs(ledger,spec.jobId);
+  const settled=jobs.complete(spec);
+  if(settled.ok)releaseRefs(machine,refs);
+  return settled;
+};
+
 /** Release old-generation leases only after the native dispatches named by the caller were proven stopped. */
-export function settleGenerationLeases({journalFile,leases=[],reason='fresh workflow generation after confirmed native stop'}={}){const journal=openJournal({file:journalFile}),admission=createAdmission({journal}),jobs=createJobs({journal,admission});try{return leases.map(lease=>jobs.complete({...lease,eventId:`${lease.jobId}:generation-settled`,status:'cancelled',result:{reason}}));}finally{journal.close();}}
+export function settleGenerationLeases({ledgerFile,journalFile,machineFile=null,leases=[],reason='fresh workflow generation after confirmed native stop'}={}){
+  const pair=openPair({ledgerFile,journalFile,machineFile}),admission=createAdmission({journal:pair.ledger,machine:pair.machine}),jobs=createJobs({journal:pair.ledger,admission});
+  try{return leases.map(lease=>settleJob({jobs,ledger:pair.ledger,machine:pair.machine,spec:{...lease,eventId:`${lease.jobId}:generation-settled`,status:'cancelled',result:{reason}}}));}finally{closePair(pair);}
+}
 /** Event kinds that prove a durable operation job reached a launch boundary or produced an effect. */
 const OPERATION_EFFECT_EVENTS=new Set(['operation-launch-intent','operation-launched','operation-launch-observed','operation-worker-stopped','job-spawned','job-completion-replay-spawned','job-succeeded','job-failed']);
 /**
@@ -57,27 +78,28 @@ const neverLaunchedCancelledJob=(journal,job)=>job?.status==='cancelled'
  * neither the job nor a lease row for it, or holds the job in a terminal state with no lease row. The proof is the
  * journal's own answer, and the caller records it before clearing the field. A live or unknown lease answers null.
  */
-export function staleLeaseProof({journalFile,lease}={}){
-  if(!journalFile||!fs.existsSync(journalFile)||!lease?.jobId)return null;
-  const journal=openJournal({file:journalFile});
+export function staleLeaseProof({ledgerFile,journalFile,lease}={}){
+  const file=ledgerFile??journalFile;
+  if(!file||!fs.existsSync(file)||!lease?.jobId)return null;
+  const ledger=inspectLedger({file});
   try{
-    const job=journal.getJob(lease.jobId);
-    const held=journal.transaction(db=>db.prepare('SELECT COUNT(*) AS n FROM leases WHERE job_id=?').get(lease.jobId)?.n??0);
+    const job=ledger.getJob(lease.jobId);
+    const held=ledger.db.prepare('SELECT COUNT(*) AS n FROM leases WHERE job_id=?').get(lease.jobId)?.n??0;
     if(held>0)return null;
-    if(!job)return `the journal holds neither job ${lease.jobId} nor a lease for it`;
+    if(!job)return `the ledger holds neither job ${lease.jobId} nor a lease for it`;
     if(['succeeded','failed','cancelled'].includes(job.status))return `job ${lease.jobId} is ${job.status} and holds no lease`;
     return null;
-  }finally{journal.close();}
+  }finally{ledger.close();}
 }
 /**
- * Move a workflow's journal binding: the former journal must hold nothing live of it. Its settled rows are then
- * retired there and the probation ledgers beside the former journal are copied beside the new one when the new
+ * Move a workflow's ledger binding: the former ledger must hold nothing live of it. Its settled rows are then
+ * retired there and the probation ledgers beside the former file are copied beside the new one when the new
  * root has none. The state itself is bound to the new file by enrollment, not here.
  */
 export function relocateJournal({from,to,workflowId}={}){
   const source=path.resolve(from),target=path.resolve(to);
-  if(!fs.existsSync(source))return {ok:true,from:source,to:target,retired:null,copied:[],note:'the former journal does not exist'};
-  const journal=openJournal({file:source});
+  if(!fs.existsSync(source))return {ok:true,from:source,to:target,retired:null,copied:[],note:'the former ledger does not exist'};
+  const journal=openLedger({file:source});
   let retired;
   try{const live=journal.liveRows(workflowId);if(live.leases.length||live.jobs.length)return {ok:false,from:source,to:target,reason:`${live.leases.length} lease(s) and ${live.jobs.length} unsettled job(s) remain`,live};
     retired=journal.retireWorkflow(workflowId).removed??null;}
@@ -93,9 +115,10 @@ export function relocateJournal({from,to,workflowId}={}){
  * their fences and any staged result remains available for the normal completion replay. A `check` job may have
  * touched the tree, so it always keeps its fence until separately reconciled.
  */
-export function settleNeverStartedModelJobs({journalFile,workflowId,generation,now=Date.now}={}){
-  if(!journalFile||!fs.existsSync(journalFile))return [];
-  const journal=openJournal({file:journalFile,now});
+export function settleNeverStartedModelJobs({ledgerFile,journalFile,machineFile=null,workflowId,generation,now=Date.now}={}){
+  const file=ledgerFile??journalFile;
+  if(!file||!fs.existsSync(file))return [];
+  const pair=openPair({ledgerFile:file,machineFile,now}),journal=pair.ledger;
   try{
     const events=journal.events({workflowId});
     const stranded=journal.listJobs().filter(job=>job.workflow_id===workflowId&&job.generation===generation
@@ -105,7 +128,7 @@ export function settleNeverStartedModelJobs({journalFile,workflowId,generation,n
         &&['job-spawned','job-completion-replay-spawned'].includes(event.kind)&&Number.isInteger(event.payload?.pid))
       &&!hasReplayableStagedResult(journal.path,job));
     if(!stranded.length)return [];
-    const admission=createAdmission({journal,now});
+    const admission=createAdmission({journal,machine:pair.machine,now});
     const settled=[];
     for(const job of stranded){
       const reason={reason:'the worker never started: spawn failed with no spawned PID, no worker binding and no staged result'};
@@ -116,21 +139,23 @@ export function settleNeverStartedModelJobs({journalFile,workflowId,generation,n
       if(result.ok)settled.push(job.job_id);
     }
     return settled;
-  }finally{journal.close();}
+  }finally{closePair(pair);}
 }
 
 /** Read-only retry fence: pure model and command jobs must settle in their current generation before it advances. */
-export function unsettledGenerationJobs({journalFile,workflowId,generation}={}){
-  if(!journalFile||!fs.existsSync(journalFile))return [];
-  const journal=openJournal({file:journalFile});
-  try{return journal.listJobs().filter(job=>job.workflow_id===workflowId&&job.generation===generation&&['model','judge','check'].includes(job.kind)&&!['succeeded','failed','cancelled'].includes(job.status)).map(job=>job.job_id);}
-  finally{journal.close();}
+export function unsettledGenerationJobs({ledgerFile,journalFile,workflowId,generation}={}){
+  const file=ledgerFile??journalFile;
+  if(!file||!fs.existsSync(file))return [];
+  const ledger=inspectLedger({file});
+  try{return ledger.listJobs().filter(job=>job.workflow_id===workflowId&&job.generation===generation&&['model','judge','check'].includes(job.kind)&&!['succeeded','failed','cancelled'].includes(job.status)).map(job=>job.job_id);}
+  finally{ledger.close();}
 }
 /** Cancel only never-launched queued pure jobs, then report every job whose effect still needs settlement. */
-export function prepareGenerationRetry({journalFile,workflowId,generation,now=Date.now,pidAliveFn=pidAlive}={}){
-  if(!journalFile||!fs.existsSync(journalFile))return {cancelled:[],unsettled:[]};
-  const neverStarted=settleNeverStartedModelJobs({journalFile,workflowId,generation,now});
-  const journal=openJournal({file:journalFile,now});
+export function prepareGenerationRetry({ledgerFile,journalFile,machineFile=null,workflowId,generation,now=Date.now,pidAliveFn=pidAlive}={}){
+  const file=ledgerFile??journalFile;
+  if(!file||!fs.existsSync(file))return {cancelled:[],unsettled:[]};
+  const neverStarted=settleNeverStartedModelJobs({ledgerFile:file,machineFile,workflowId,generation,now});
+  const pair=openPair({ledgerFile:file,machineFile,now}),journal=pair.ledger;
   try{
     // A spawned model/judge/check job whose recorded processes are all gone cannot produce another byte: the
     // kernel that owned it died. The retiring generation settles it as cancelled with the dead-pid set as proof;
@@ -142,7 +167,7 @@ export function prepareGenerationRetry({journalFile,workflowId,generation,now=Da
       if(Number.isInteger(pid)){const list=pidsOf.get(event.entity_id)??[];list.push(pid);pidsOf.set(event.entity_id,list);}
     }
     const deadSettled=[];
-    const admission=createAdmission({journal,now});
+    const admission=createAdmission({journal,machine:pair.machine,now});
     for(const job of journal.listJobs().filter(job=>job.workflow_id===workflowId&&job.generation===generation&&['model','judge','check'].includes(job.kind)&&!['succeeded','failed','cancelled'].includes(job.status))){
       const pids=pidsOf.get(job.job_id)??[];
       if(!pids.length||pids.some(pid=>pidAliveFn(pid))||hasReplayableStagedResult(journal.path,job))continue;
@@ -162,13 +187,13 @@ export function prepareGenerationRetry({journalFile,workflowId,generation,now=Da
             // Every generation up to this one: a queued job of a retired generation that never launched (no lease, no
       // receipt of any kind) would otherwise bind the workflow to its old journal for good and refuse the relocation.
       const rows=db.prepare("SELECT j.job_id FROM jobs j WHERE j.workflow_id=? AND j.generation<=? AND j.kind IN ('model','judge','check','operation') AND j.status='queued' AND NOT EXISTS (SELECT 1 FROM leases l WHERE l.job_id=j.job_id) AND NOT EXISTS (SELECT 1 FROM events e WHERE e.workflow_id=j.workflow_id AND e.entity_type='job' AND e.entity_id=j.job_id) ORDER BY j.job_id").all(workflowId,generation);
-      const stamp=now(),update=db.prepare("UPDATE jobs SET status='cancelled',result_json=?,updated_at=? WHERE job_id=? AND status='queued'"),event=db.prepare("INSERT OR IGNORE INTO events(event_id,workflow_id,entity_type,entity_id,generation,kind,payload_json,created_at) VALUES(?,?,?,?,?,?,?,?)");
-      for(const row of rows){update.run(JSON.stringify({reason:'workflow retry cancelled a proven never-launched queued job'}),stamp,row.job_id);event.run(`${row.job_id}:retry-queued-cancelled`,workflowId,'job',row.job_id,generation,'job-retry-queued-cancelled',JSON.stringify({proof:'queued, unleased, and no job-spawned receipt'}),stamp);}
+      const stamp=now(),update=db.prepare("UPDATE jobs SET status='cancelled',result_json=?,updated_at=? WHERE job_id=? AND status='queued'");
+      for(const row of rows){update.run(JSON.stringify({reason:'workflow retry cancelled a proven never-launched queued job'}),stamp,row.job_id);journal.appendEvent({eventId:`${row.job_id}:retry-queued-cancelled`,workflowId,entityType:'job',entityId:row.job_id,generation,kind:'job-retry-queued-cancelled',payload:{proof:'queued, unleased, and no job-spawned receipt'},createdAt:stamp});}
       return rows.map(row=>row.job_id);
     });
     const unsettled=journal.listJobs().filter(job=>job.workflow_id===workflowId&&job.generation===generation&&['model','judge','check'].includes(job.kind)&&!['succeeded','failed','cancelled'].includes(job.status)).map(job=>job.job_id);
     return {cancelled,unsettled,neverStarted,deadSettled};
-  }finally{journal.close();}
+  }finally{closePair(pair);}
 }
 const modelRole=name=>['critiqueGoal','validateOp','classifyScreen'].includes(name)?'verify':['assessGoal','planOp','presentOwnerQuestion'].includes(name)?'plan':'decide';
 const configuredModelRole=name=>['assessGoal','planOp','presentOwnerQuestion'].includes(name)?'planner':['critiqueGoal','validateOp','classifyScreen'].includes(name)?'validator':'kernelManager';
@@ -229,16 +254,23 @@ export function validateCandidateRoot(value){
   return fs.realpathSync(resolved);
 }
 
-export const candidateBaseFor=(state,explicit=null)=>explicit??path.join(state?.engine?.candidateRoot??path.join(path.dirname(state.engine.journalFile),'candidates'),state.id);
+export const candidateBaseFor=(state,explicit=null)=>explicit??path.join(state?.engine?.candidateRoot??path.join(path.dirname(state.engine.machineFile??machineFileFor()),'candidates'),state.id);
 
-export function enrollEngine(store,state,{journalFile=journalFileFor(),runtimePin=null,candidateRoot=null,now=Date.now}={}){
+export function enrollEngine(store,state,{ledgerFile=ledgerFileFor(store.repoRoot),machineFile=machineFileFor(),runtimePin=null,candidateRoot=null,now=Date.now}={}){
   if(state.ops.some(op=>op.dispatch&&['running','answering'].includes(op.status)))throw Error('Settle live operation dispatches before enrolling a workflow in the durable engine');
-  const previous=state.engine;
-  state.engine={schema:ENGINE_SCHEMA,version:ENGINE_VERSION,generation:(previous?.generation??0)+1,journalFile:path.resolve(journalFile),
-    assurance:'detection-only',coordination:'agent-v1',runtimePin:runtimePin??previous?.runtimePin??null,
-    ...(candidateRoot??previous?.candidateRoot?{candidateRoot:path.resolve(candidateRoot??previous.candidateRoot)}:{}),enrolledAt:now()};
-  state.finished=null;state.phase='run';
-  store.appendEvent({event:'engine-enrolled',schema:ENGINE_SCHEMA,generation:state.engine.generation,version:ENGINE_VERSION,
+  const previous=state.engine,generation=(previous?.generation??0)+1;
+  const machine=openMachine({file:machineFile,now});
+  let ledger;
+  try{
+    ledger=openLedger({file:ledgerFile,now,machine});
+    state.engine={schema:ENGINE_SCHEMA,version:ENGINE_VERSION,generation,ledgerFile:path.resolve(ledgerFile),machineFile:path.resolve(machineFile),
+      assurance:'detection-only',coordination:'agent-v1',runtimePin:runtimePin??previous?.runtimePin??null,
+      ...(candidateRoot??previous?.candidateRoot?{candidateRoot:path.resolve(candidateRoot??previous.candidateRoot)}:{}),enrolledAt:now()};
+    state.finished=null;state.phase='run';
+    store.bindJournal?.(ledger,generation,{state,goalIdentity:state.goalDigest??null});
+  }catch(error){try{ledger?.close();}catch{}throw error;}
+  finally{machine.close();}
+  store.appendEvent({event:'engine-enrolled',schema:ENGINE_SCHEMA,generation,version:ENGINE_VERSION,
     assurance:state.engine.assurance,coordination:state.engine.coordination,note:'Existing accepted Work remains accepted; only unfinished operations receive the new execution policy.'});
   store.saveState(state);
   return state.engine;
@@ -248,7 +280,7 @@ export function enrollEngine(store,state,{journalFile=journalFileFor(),runtimePi
 export function createEngineRuntime({store,state,now=Date.now,eligibility,modelPolicy=null,bridge=null,spawnChild=null,candidateBase=null,git=null,exec=null,modelBudget=null,modelCooling=null,runtimeProfile=null}={}){
   if(!isEnrolled(state))return null;
   const owned=!bridge;
-  bridge??=createJobBridge({journalFile:state.engine.journalFile,now,...(spawnChild?{spawnChild}:{}),eligibility:job=>job.kind==='model'||job.kind==='judge'?{eligible:Array.isArray(job.input?.args?.providers)&&job.input.args.providers.length>0,reasons:['no evaluated provider in durable model job']}:{eligible:false,reasons:['operation eligibility must name its selected runtime']},beforeSpawn:({job})=>{const meta=job.payload?.admission;if(meta?.mode!=='probation')return {ok:true,code:'qualified'};const consumed=modelPolicy?.consumeProbation?.({kind:job.kind,role:job.role,input:job.payload,workflowId:job.workflow_id,opId:job.op_id,attempt:job.attempt,generation:job.generation,jobId:job.job_id},meta.runtime);if(!consumed?.ok)return {ok:false,code:consumed?.code??'probation-unavailable'};store.saveState(state);return consumed;}});
+  bridge??=createJobBridge({ledgerFile:state.engine.ledgerFile,machineFile:state.engine.machineFile,now,...(spawnChild?{spawnChild}:{}),eligibility:job=>job.kind==='model'||job.kind==='judge'?{eligible:Array.isArray(job.input?.args?.providers)&&job.input.args.providers.length>0,reasons:['no evaluated provider in durable model job']}:{eligible:false,reasons:['operation eligibility must name its selected runtime']},beforeSpawn:({job})=>{const meta=job.payload?.admission;if(meta?.mode!=='probation')return {ok:true,code:'qualified'};const consumed=modelPolicy?.consumeProbation?.({kind:job.kind,role:job.role,input:job.payload,workflowId:job.workflow_id,opId:job.op_id,attempt:job.attempt,generation:job.generation,jobId:job.job_id},meta.runtime);if(!consumed?.ok)return {ok:false,code:consumed?.code??'probation-unavailable'};store.saveState(state);return consumed;}});
   const {journal,admission}=bridge,jobs=createJobs({journal,admission,now});
   runtimeProfile??=loadRuntimes();
   const providerResource=provider=>`ai/provider:${provider}`;

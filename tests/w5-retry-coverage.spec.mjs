@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {createJobBridge} from '../kernel/job-bridge.mjs';
+import {ledgerFileFor,machineFileFor,openLedger,openMachine} from '../kernel/ledger-db.mjs';
 import {prepareGenerationRetry} from '../kernel/engine.mjs';
 import {retryableOperation} from '../kernel/kernel.mjs';
 
@@ -119,31 +119,29 @@ test('owner-only pending kinds never hold a writer lease',()=>{
 
 test('prepareGenerationRetry drains the durable side so the op-level reconcile paths can run',t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-w5-retry-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
-  const journalFile=path.join(dir,'journal.sqlite');
-  const bridge=createJobBridge({journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})});
-  const journal=bridge.journal;
+  const ledgerFile=ledgerFileFor(dir),machineFile=path.join(dir,'machine.sqlite');
+  const machine=openMachine({file:machineFile}),journal=openLedger({file:ledgerFile,machine});
   journal.enqueueJob({jobId:'queued-never-launched',workflowId:'wf',opId:'op',attempt:1,generation:2,kind:'operation',role:'implement',payload:{runtime:'x'}});
   journal.enqueueJob({jobId:'dead-check',workflowId:'wf',opId:'op',attempt:1,generation:2,kind:'check',role:'machine-check',payload:{command:'x'}});
   journal.db.prepare("UPDATE jobs SET status='running',lease_token='lt' WHERE job_id='dead-check'").run();
   journal.appendEvent({eventId:'dead-check:spawned',workflowId:'wf',entityType:'job',entityId:'dead-check',generation:2,kind:'job-spawned',payload:{pid:4242}});
-  const prepared=prepareGenerationRetry({journalFile,workflowId:'wf',generation:2,pidAliveFn:()=>false});
+  journal.close();machine.close();
+  const prepared=prepareGenerationRetry({ledgerFile,machineFile,workflowId:'wf',generation:2,pidAliveFn:()=>false});
   // The never-launched queued job is cancelled and the dead-process leased job settles, so retry's
   // op-level readmissions and lease settlement run against an empty durable fence.
   assert.deepEqual(prepared.cancelled,['queued-never-launched']);
   assert.deepEqual(prepared.deadSettled,['dead-check']);
   assert.deepEqual(prepared.unsettled,[]);
-  bridge.close();
 });
 
 test('a still-live durable job stays unsettled and keeps retry fenced',t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-w5-retry-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
-  const journalFile=path.join(dir,'journal.sqlite');
-  const bridge=createJobBridge({journalFile,eligibility:()=>({eligible:true}),spawnChild:()=>({pid:7,once(){},unref(){}})});
-  const journal=bridge.journal;
+  const ledgerFile=ledgerFileFor(dir),machineFile=path.join(dir,'machine.sqlite');
+  const machine=openMachine({file:machineFile}),journal=openLedger({file:ledgerFile,machine});
   journal.enqueueJob({jobId:'live-check',workflowId:'wf',opId:'op',attempt:1,generation:2,kind:'check',role:'machine-check',payload:{command:'x'}});
   journal.db.prepare("UPDATE jobs SET status='running',lease_token='lt' WHERE job_id='live-check'").run();
   journal.appendEvent({eventId:'live-check:spawned',workflowId:'wf',entityType:'job',entityId:'live-check',generation:2,kind:'job-spawned',payload:{pid:4242}});
-  const prepared=prepareGenerationRetry({journalFile,workflowId:'wf',generation:2,pidAliveFn:()=>true});
+  journal.close();machine.close();
+  const prepared=prepareGenerationRetry({ledgerFile,machineFile,workflowId:'wf',generation:2,pidAliveFn:()=>true});
   assert.deepEqual(prepared.unsettled,['live-check'],'a job whose recorded process is alive must keep the retry fence up');
-  bridge.close();
 });
