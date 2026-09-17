@@ -65,10 +65,15 @@ test('runtime pin reuses identical bytes and rejects changed or unsealed executa
 test('the supervisor retains the lock until the former kernel is confirmed dead',t=>{
   const root=fixture(t),pin=pinAt(root),store=createStore({repoRoot:root,id:'wf'});
   store.saveState({schema:store.schema,id:'wf',approved:true,worktree:root,host:root,engine:{schema:'starci/engine@1',runtimePin:pin}});
-  store.appendEvent({event:'tick',at:1});fs.writeFileSync(path.join(store.dir,'kernel.lock'),JSON.stringify({pid:process.pid}));
+  store.appendEvent({event:'tick',at:1});
+  // §4/§8: kernel.lock is a `signals` row now (scope = workflow id, key 'kernel-lock'), the same shape
+  // kernel/launch.mjs's setSignal writes.
+  store.signal.set('wf','kernel-lock',{pid:process.pid,token:'tok',value:{phase:'running'}});
   let spawns=0;
   const out=superviseOnce({repoRoot:root,launcher:'wrong.mjs',now:()=>999999999,killFn:()=>{},aliveFn:()=>true,spawnFn:()=>{spawns++;return {unref(){}};}});
-  assert.equal(spawns,0);assert.equal(out.rounds[0].outcome.ok,false);assert.equal(fs.existsSync(path.join(store.dir,'kernel.lock')),true);
+  assert.equal(spawns,0);assert.equal(out.rounds[0].outcome.ok,false);
+  assert.equal(store.signal.get('wf','kernel-lock')?.pid,process.pid,'the lock is retained until the former kernel is confirmed dead');
+  store.close();
 });
 
 test('owner inbox commits the actual choice and requester continuation once',t=>{
