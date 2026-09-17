@@ -168,7 +168,12 @@ const readHead=(root,git)=>{
 };
 const runtimePinIdentity=pin=>pin?{schema:pin.schema??null,digest:pin.digest??null,version:pin.version??null}:null;
 
-/** Expected-head and byte-level CAS immediately before the single canonical writer is allowed to promote. */
+/**
+ * Expected-head and byte-level CAS immediately before promotion. Under `detection-canonical` the writer pool is
+ * bounded, not exclusive: a disjoint sibling can commit between this candidate's seal and its integration, so a
+ * moved canonical head is reported as `canonical-advanced-during-run` (a retryable quarantine) ahead of the exact
+ * expected/observed pair instead of ever promoting over it. Hard-isolation mode is unchanged.
+ */
 export function prepareCandidateIntegration(snapshot,packet,{canonicalRoot,canonicalRoots=null,git,ignoreCanonicalPaths=[],mode='hard-isolation'}={}){
   if(snapshot?.schema==='starci/candidate-root-snapshot@1'||packet?.schema==='starci/candidate-root-packet@1'){
     const reasons=[],roots=[],expected=new Map(Object.entries(canonicalRoots??{}).map(([id,root])=>[id,path.resolve(root)]));
@@ -203,7 +208,10 @@ export function prepareCandidateIntegration(snapshot,packet,{canonicalRoot,canon
   if(mismatches.length)mismatches.unshift('canonical-drift');
   identity.mismatches.push(...mismatches);identity.ok=identity.mismatches.length===0;identity.verdict=identity.ok?'pass':'quarantine';
   const reasons=[...identity.mismatches];
-  if(head!==packet.acceptedHead)reasons.push(`expected-head-mismatch: expected ${packet.acceptedHead}, observed ${head??'unavailable'}`);
+  if(head!==packet.acceptedHead){
+    if(detection&&head!==null)reasons.push('canonical-advanced-during-run');
+    reasons.push(`expected-head-mismatch: expected ${packet.acceptedHead}, observed ${head??'unavailable'}`);
+  }
   return {schema:'starci/candidate-integration@1',...identityOf(packet),candidateDigest:packet.candidateDigest,
     snapshotDigest:packet.snapshotDigest,mode,expectedHead:packet.acceptedHead,observedHead:head,status:reasons.length?'quarantine':'ready',reasons,
     changes:packet.changes,preparedAt:new Date().toISOString()};

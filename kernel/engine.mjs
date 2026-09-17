@@ -7,7 +7,7 @@ import {createJobs} from './jobs.mjs';
 import {rankJobs,updateProgressBudget,progressExhausted} from './scheduler.mjs';
 import {ADAPTIVE_CAPACITY,OWNER_PREFERENCE_MULTIPLIER,loadRuntimes} from './schedule.mjs';
 import {canonicalTarget} from './chains.mjs';
-import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateBindingWriterResource,candidateRecord,candidateWriterResource,freezeDetectionCandidate,prepareCandidateDependencies,readCandidateBridge,readCandidatePacket,readCandidateSnapshot} from './candidate-bridge.mjs';
+import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateBindingWriterResource,candidateRecord,candidateWriterResource,freezeDetectionCandidate,maxConcurrentWriters,prepareCandidateDependencies,readCandidateBridge,readCandidatePacket,readCandidateSnapshot} from './candidate-bridge.mjs';
 import {candidateRootBindingDigest} from './candidate-roots.mjs';
 import {normalizeResolvedReferences} from '../models/validator-transport.mjs';
 import {reconcilePureModelJobs} from './job-reconcile.mjs';
@@ -282,7 +282,11 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
     }
     return {source:'sqlite-admission',providers};
   };
-  const writer=candidateWriterResource(state.worktree);admission.setCapacity(writer.key,1);
+  // The per-repo writer pool is bounded, not exclusive: ops that run together already proved disjoint write
+  // scopes at the launch fence, and freeze-time detection reclassifies their in-flight writes instead of
+  // quarantining on them. `allocation.maxConcurrentWriters` overrides the default bound.
+  const writerCapacity=maxConcurrentWriters(runtimeProfile);
+  const writer=candidateWriterResource(state.worktree);admission.setCapacity(writer.key,writerCapacity);
   const declareMachineResources=value=>resourceLocks(value).map(machineResource).map(resource=>{admission.setCapacity(resource.key,1);return resource;});
   candidateBase=candidateBaseFor(state,candidateBase);
   const identity=op=>opIdentity(state,op);
@@ -301,7 +305,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
     const input={handler:'model-function',functionName:name,args:selected.args,admission:{runtime:saved.runtime,mode:saved.mode}};
     return unwrap(bridge.request({...bound,kind,role,input,resources:[{key:GLOBAL_AI_RESOURCE,units:1},...(provider?[{key:providerResource(provider),units:1}]:[])]}));};
   return {
-    journal,admission,jobs,bridge,identity,requiredValidation:true,providerAdmissionView,
+    journal,admission,jobs,bridge,identity,requiredValidation:true,providerAdmissionView,writerCapacity,
     model:requestModel,
     manageWorkflow(snapshot,{providers=nonOperationModels('kernelManager')}={}){if(state.engine.coordination!=='agent-v1')throw Error('Agent-led coordination is not enrolled');return requestModel('manageWorkflow',{snapshot,providers},{id:snapshot.decisionId,attempt:1});},
     check(command,options={},op=null){const resources=declareMachineResources({kind:op?.kind,checks:[{command}],resources:options.resources});return unwrap(bridge.request({...identity(op),kind:'check',role:'machine-check',...(resources.length?{resources}:{}),input:{handler:'command',shellCommand:command,cwd:options.cwd??state.worktree,timeoutMs:options.timeoutMs??1800000,
@@ -323,7 +327,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       const bindings=op.candidateRootBindings?.bindings,rootWriters=Array.isArray(bindings)
         ?bindings.filter(binding=>binding.workerWritable||binding.runtimeWritable).map(candidateBindingWriterResource)
         :((op.allowlist??[]).length?[writer]:[]);
-      for(const resource of rootWriters)admission.setCapacity(resource.key,1);
+      for(const resource of rootWriters)admission.setCapacity(resource.key,writerCapacity);
       const provider=pool.provider,machineResources=declareMachineResources(op),resources=[{key:GLOBAL_AI_RESOURCE,units:1},...(provider?[{key:providerResource(provider),units:1}]:[]),...rootWriters,...machineResources]
         .sort((a,b)=>a.key.localeCompare(b.key));
       if(existing&&existing.lease_token&&['leased','running','effect_unknown'].includes(existing.status)){
@@ -417,7 +421,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
      * Filesystem effects are not called absent: the launch candidate is frozen under the retained writer fence,
      * and its observed byte delta becomes the only baseline a fresh attempt may inherit.
      */
-    settleStoppedOperation(op,{dispatch=op?.dispatch,settlement=null,reason='native worker stopped without a report',acceptedPreparedDecision=false}={}){
+    settleStoppedOperation(op,{dispatch=op?.dispatch,settlement=null,reason='native worker stopped without a report',acceptedPreparedDecision=false,foreignAllowlists=[],concurrentScopes=[]}={}){
       const lease=op?.lease;if(!lease)return {ok:false,reason:'operation has no durable native lease'};
       const effectState=settlement?.effectState??'unknown';
       const preparedTakeover=acceptedPreparedDecision&&settlement?.schema==='starci/orca-user-takeover-settlement@1'&&
@@ -452,7 +456,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       const worker=this.settled(op,{workerOnly:true,reason:`${reason}; exact Dispatch ${dispatch} stopped`});
       if(!worker.ok)return {ok:false,effectState:'unknown',reason:'worker resources could not be settled'};
       let frozen;
-      try{frozen=this.freezeCandidate(op,{reportedFiles:[]});}
+      try{frozen=this.freezeCandidate(op,{reportedFiles:[],foreignAllowlists:[...foreignAllowlists,...concurrentScopes]});}
       catch(error){return {ok:false,effectState:'unknown',reason:`candidate freeze failed after native stop: ${String(error?.message??error)}`};}
       if(frozen.status!=='sealed')return {ok:false,effectState:'unknown',reason:'candidate effects could not be sealed',pending:frozen};
       const observed=[...new Set(frozen.observedFiles??[])].sort();
@@ -474,7 +478,8 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       return completed.ok?{ok:true,effectState:'none',observedFiles:observed,candidateDigest:op.candidateDigest??null}:{ok:false,effectState:'unknown',reason:completed.reason??'durable native job could not be completed'};
     },
     beginCandidate(op,{repoRoot=state.worktree,allowlist=op.allowlist??[],references=op.references??[],inputPaths=[],oraclePaths=[],ownedDirtyPaths=[],
-      dependencyDigests={},environmentDigest=null,runtimeManagedFiles=[],dependencyInstall=null,dependencyRequired=false,roots=null,bindingDigest=null}={}){
+      dependencyDigests={},environmentDigest=null,runtimeManagedFiles=[],dependencyInstall=null,dependencyRequired=false,roots=null,bindingDigest=null,
+      foreignAllowlists=[],concurrentScopes=[]}={}){
       if(!git)throw Error('the candidate lifecycle requires the kernel Git adapter');
       const lease=op.lease;if(!lease)throw Error(`reserve ${op.id} before beginning its candidate`);
       if(op.candidate?.identity?.jobId===lease.jobId){const existing=this.candidateBridge(op),expected=bindingDigest??(roots?candidateRootBindingDigest(roots):null);
@@ -484,6 +489,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       const root=path.join(candidateBase,lease.jobId),bridgeRecord=beginDetectionCandidate({identity:{workflowId:lease.workflowId,opId:lease.opId,
         attempt:lease.attempt,generation:lease.generation,jobId:lease.jobId},repoRoot,workerRoot:path.join(root,'worker'),controlRoot:path.join(root,'control'),
         allowlist,references,inputPaths,oraclePaths,ownedDirtyPaths,dependencyDigests,environmentDigest,runtimeManagedFiles,dependencyInstall,dependencyRequired,
+        maxWriters:writerCapacity,concurrentScopes:[...foreignAllowlists,...concurrentScopes],
         ...(roots?{roots,bindingDigest:bindingDigest??candidateRootBindingDigest(roots)}:{}),git,now});
       op.candidate=candidateRecord(bridgeRecord);return bridgeRecord;
     },
@@ -498,12 +504,14 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
         :{source:{id:'source',role:'source',repoRoot:bridge.repoRoot,snapshot,workerRoot:snapshot.workerRoot,baseRoot:snapshot.baseRoot,oracleRoot:snapshot.oracleRoot}};
       return {bridge,snapshot,roots,source:roots.source??Object.values(roots)[0],work:roots.work??roots.source??Object.values(roots)[0]};
     },
-    freezeCandidate(op,{reportedFiles=[],requireReported=false}={}){
+    freezeCandidate(op,{reportedFiles=[],requireReported=false,foreignAllowlists=[],concurrentScopes=[]}={}){
       if(op.candidate?.status==='sealed')return op.candidate;
       const frozen=freezeDetectionCandidate(this.candidateBridge(op),{git,reportedFiles,requireReported,
+        foreignAllowlists:[...foreignAllowlists,...concurrentScopes],
         housekeeping:{workflowId:state.id,opId:op.id,dispatch:op.dispatch??op.launch?.dispatch??null},now});
       const {packet}=frozen;
       op.candidate={...op.candidate,status:frozen.status,observedFiles:[...(frozen.observedFiles??[])],assurance:frozen.assurance,
+        concurrentWriterDrift:[...(frozen.concurrentWriterDrift??[])],
         reportDiagnostics:{unmatched:[...(frozen.reportDiagnostics?.unmatched??[])]},housekeepingObserved:[...(frozen.housekeepingObserved??[])],
         runtimeAcknowledgements:(frozen.runtimeAcknowledgements??[]).map(record=>({...record,paths:(record.paths??[]).map(item=>typeof item==='object'?{...item}:item)})),
         ...(frozen.observedByRoot?{observedByRoot:frozen.observedByRoot.map(item=>({...item}))}:{}),
