@@ -1,4 +1,4 @@
-schema: starci/work-layout@2
+schema: starci/work-layout@3
 format: YAML 1.2
 node: index.yaml
 identity: stable metadata id; folder path is not identity
@@ -13,11 +13,13 @@ shape:
     index.yaml, without an evidence folder.
   evidence: Profiles using execution proof may retain <node>/evidence/<id>/manifest.yaml; this is not
     a required folder for every layer.
-  workflowRunState: internal
-    .starciwork/_local/workflows/<workflow-id>/{state.json,events.jsonl,kernel.lock,stop.flag,checks/**,contracts/**,inbox/**,reports/**};
-    workflow-level files .starciwork/_local/workflows/{supervisor.lock,supervisor.log,runtime-loads.json,runtime-budget.json};
-    staged owner inputs .starciwork/_local/inputs/<workflow-id>/**; run reports .starciwork/_local/runtime/reports/<run>/**;
-    rejected drafts .starciwork/_local/drafts/**
+  workflowRunState: one SQLite file, .starciwork/runtime.sqlite (plus its -wal and -shm siblings),
+    holding state, events, jobs, leases, goals, reports, contracts, checks, inbox, signals and owner inputs.
+    Untracked. See ledger-db.md; .starciwork/_local is retired and is only an import source for ledger-migrate.
+  workflowAnchor: .starciwork/ledger-anchor.json - TRACKED, the head of every live workflow, so a restored or
+    rolled-back ledger is refused instead of resumed
+  kernelCustody: .starciwork/{kernel-evidence,kernel-strays,kernel-headless,kernel-approvals}/** - kernel-owned
+    working state with a real lifetime, untracked, excluded from Work validation, never canonical Work
   moduleUI: features/<feature>/ui/**/{index.yaml,assets/**}
   implementation: features/<feature>/implementation/{index.yaml,frontend/**/index.yaml,backend/**/index.yaml}
   frontendCaptures: features/<feature>/implementation/frontend/assets/<running-page-screenshot>
@@ -34,6 +36,20 @@ rules:
     code. SRS owns required behavior and SDS owns target technical design. UI, implementation and
     UAT trace to them through stable IDs; current code may prove conformance or expose a gap, but
     never supplies or silently redefines either root.
+  - "A business or architecture record carries two claims, and they are separate fields because they are
+    separate facts. `state: done` says the record is agreed and implementable. `proven` - written by the
+    kernel, naming the implementation, ui and uat nodes that demonstrated it, with the digest of the slice
+    they demonstrated - says it has been shown to work. An empty `proven` on a done record is honest and
+    expected: the specification is a skeleton that implementation completes. What is refused is the two
+    collapsing into one word, because then a record that was agreed is indistinguishable from a record that
+    was demonstrated, and the whole tree's credibility rests on telling those apart."
+  - "Implementation, ui and uat keep their own state. They are evidence of a specification AND assets with a
+    lifetime of their own: a dependency upgrade, a security patch or a refactor is work on them while every
+    specification stays correct. Collapsing them into pure evidence of a record would leave nowhere to
+    schedule that work except by suspending a specification that is not wrong."
+  - "`proven` is counted, not merely stored: the ledger summary reports agreed and proven separately per kind,
+    so the gap between a specification corpus and its demonstration is a number an owner reads rather than an
+    inference. An unmeasured gap becomes the comfortable default."
   - "A product's brand is one record: brand/index.yaml at the tree root, a sibling of features/, with
     kind brand and its masters in brand/assets/**. At most one brand node exists per tree; a second
     one, or a brand node anywhere else, is refused. It is a decision kind, done only through a
@@ -77,16 +93,25 @@ rules:
     stable semantic IDs. Parent indexes aggregate; they never repeat descendant detail.
   - Create a detailed child only for an actual FR, NFR, rule, decision, data definition or journey.
     Further folders may group large scopes, but each parent still owns only aggregate metadata.
-  - "Only leaves author state: uninvestigate, todo or done. todo is confirmed incomplete work and
-    requires no investigation receipt. activity is auxiliary: idle, investigating, implementing or
-    verifying. blockers[] explains impediments without becoming lifecycle state. Parents author no
-    state or completion and derive progress from required descendants."
+  - "Only leaves author state: uninvestigate, todo, suspended or done. todo is confirmed incomplete work and
+    requires no investigation receipt. suspended is work that WAS done and whose bound input changed: it keeps
+    its completion, its evidence and its history, and the work it schedules is re-verification against the new
+    input, never re-authoring - which is why it is a state and not a deletion. done is the only state that
+    requires bound proof. activity is auxiliary: idle, investigating, implementing or verifying. blockers[]
+    explains impediments without becoming lifecycle state. Parents author no state or completion and derive
+    progress from required descendants."
+  - "A state with no producer is vocabulary, not a state. Every authored value has a writer named in the
+    runtime and a lane that can pick it up: a node the scheduler never offers is work that disappeared
+    quietly, which is worse than work that failed loudly."
   - When investigation occurs, investigation.contextDigest binds semantic context, excluding child
     rollup and auxiliary activity, blockers and history. A semantic parent change makes every
     affected descendant effectively uninvestigate while preserving stored done, completion, history
     and evidence.
-  - dependsOn uses stable node IDs. A semantic dependency change invalidates affected dependent
-    nodes transitively; refs bind semantic inputs without implying execution order.
+  - "dependsOn uses stable node IDs; refs bind semantic inputs without implying execution order. An edge
+    records the digest of the slice it bound, so a change invalidates exactly the dependents that bound the
+    changed slice - one hop, at the edge. Invalidation is not transitive: a dependent whose own bound slice
+    did not change stays as it is, and a root edit therefore cannot suspend a subtree that never read the
+    part that moved. Where a dependent is genuinely affected it becomes suspended, keeping its proof."
   - Done is a current status, never an edit lock. Authorized revisions may edit the node and its
     owned assets. Re-evaluate changed inputs and affected dependents; never copy stale completion
     onto changed content. Preserve unrelated work and useful media. New required work prevents
@@ -117,8 +142,15 @@ rules:
     record. refs and dependsOn remain stable technical node IDs for digest propagation.
   - UAT accounts.yaml uses work/disposable-accounts@1 and may contain only synthetic disposable
     local role, username and password values. Images and video remain original binary assets.
-  - Workflow run state lives inside .starciwork/_local/workflows and never enters canonical Work
-    hashes; a write outside the declared layout fails checks.
+  - "Workflow run state lives in .starciwork/runtime.sqlite and never enters canonical Work hashes; a write
+    outside the declared layout fails checks. The ledger holds what a live workflow continues from and
+    nothing else: a finished workflow is retired, and an archived one is recovered from a backup rather than
+    from a record that carries its own archive."
+  - "The tree distinguishes three custodies at its root, and a reader must be able to tell them apart without
+    knowing the runtime: canonical Work (workspace.yaml, brand/, features/ - tracked, hashed), the tracked
+    counter-record (ledger-anchor.json - tracked, not hashed into Work), and runtime custody (runtime.sqlite
+    and the kernel-* directories - untracked, never hashed, excluded from validation). A file at the root that
+    is none of these is drift."
   - interface.draw writes one or more selected nodes at ui/index.yaml or recursively below ui/.
     Store all actual drawings, reference images and motion previews in each owning node assets/**,
     in their original formats. Declare design inputs in ui.assets and top-level assets. Every asset
