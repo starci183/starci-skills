@@ -463,7 +463,7 @@ function freezeSingleDetectionCandidate(bridge,{git,reportedFiles=[],housekeepin
   const reasons=[...baselineTouched.map(file=>`pre-existing-user-work-modified:${file}`),...runtimeDrift.map(file=>`kernel-owned-write-drift:${file}`),...[...foreignDriftPaths].map(file=>`concurrent-writer-drift:${file}`),...outside.map(file=>`outside-allowlist:${file}`)];
   const currentHead=bridge.nonGit?contentHead(repoRoot,snapshot.source.entries.map(item=>item.path)):headOf(git,repoRoot);
   if(currentHead!==bridge.acceptedHead)reasons.push('canonical-head-drift');
-  if(reasons.length)return {schema:DETECTION_BRIDGE,status:'quarantine',reasons,concurrentWriterDrift:[...foreignDriftPaths],observedFiles:observable,housekeepingObserved,runtimeAcknowledgements:runtimeAcknowledgement.records,assurance:bridge.writer};
+  if(reasons.length)return {schema:DETECTION_BRIDGE,status:'quarantine',reasons,concurrentWriterDrift:[...foreignDriftPaths],observedFiles:observable,baselineTouched:[...baselineTouched],cleanNow:baselineTouched.filter(file=>!postDirty.includes(file)),housekeepingObserved,runtimeAcknowledgements:runtimeAcknowledgement.records,assurance:bridge.writer};
   const alreadySealed=fs.existsSync(path.join(snapshot.controlRoot,CANDIDATE_FILES.packet));
   // Runtime-managed-only bytes are rebound into both verifier views before the first seal. This is the same
   // narrow mechanism as other kernel-owned writes, but selected only after proving the surrounding human bytes
