@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
-import {inspectLedger,verifyChain} from './ledger-db.mjs';
+import {inspectLedger,verifyAnchor,verifyChain} from './ledger-db.mjs';
 import {replaceStateSnapshot,stateGoalIdentity} from './store.mjs';
 
 export const CONTINUATION_BRIEF='starci/workflow-continuation@1';
@@ -35,9 +35,17 @@ function readController(store,state){
   }catch{return {pid:null,startedAt:null,startupTokenDigest:null,alive:false};}
 }
 
+// The repo that owns `.starciwork` and, with it, the tracked anchor (`.starciwork/ledger-anchor.json`):
+// ledgerFileFor(repoRoot) joins the same two segments, so this is the exact inverse.
+const anchorRepoRoot=file=>path.dirname(path.dirname(file));
+
 function readLedger(state){
   const file=state?.engine?.ledgerFile;
-  if(typeof file!=='string'||!fs.existsSync(file))return {file:file??null,jobs:[],leases:[],snapshot:null,snapshotHead:null,eventsHead:null,kernelLock:null,chain:null,error:null};
+  if(typeof file!=='string')return {file:null,jobs:[],leases:[],snapshot:null,snapshotHead:null,eventsHead:null,kernelLock:null,chain:null,anchor:null,error:null};
+  if(!fs.existsSync(file)){
+    let anchor=null;try{anchor=verifyAnchor(null,anchorRepoRoot(file));}catch(error){anchor={ok:false,reason:String(error?.message??error)};}
+    return {file,jobs:[],leases:[],snapshot:null,snapshotHead:null,eventsHead:null,kernelLock:null,chain:null,anchor,error:null};
+  }
   let ledger;
   try{
     ledger=inspectLedger({file});
@@ -50,8 +58,10 @@ function readLedger(state){
     if(row?.state_json){try{snapshot={...row,state:JSON.parse(row.state_json)};}catch{snapshot={...row,state:null,error:'latest durable state body is unreadable'};}}
     let chain=null;
     try{chain=verifyChain(ledger.db,{workflowId:state.id});}catch(error){chain={ok:false,reason:String(error?.message??error)};}
-    return {file:path.resolve(file),version:ledger.version,jobs,leases,snapshot,snapshotHead:row?.events_head??null,eventsHead,kernelLock,chain,error:null};
-  }catch(error){return {file:path.resolve(file),jobs:[],leases:[],snapshot:null,snapshotHead:null,eventsHead:null,kernelLock:null,chain:null,error:String(error?.message??error)};}
+    let anchor=null;
+    try{anchor=verifyAnchor(ledger,anchorRepoRoot(file));}catch(error){anchor={ok:false,reason:String(error?.message??error)};}
+    return {file:path.resolve(file),version:ledger.version,jobs,leases,snapshot,snapshotHead:row?.events_head??null,eventsHead,kernelLock,chain,anchor,error:null};
+  }catch(error){return {file:path.resolve(file),jobs:[],leases:[],snapshot:null,snapshotHead:null,eventsHead:null,kernelLock:null,chain:null,anchor:null,error:String(error?.message??error)};}
   finally{ledger?.close();}
 }
 
@@ -73,6 +83,11 @@ export function durableContinuationState(state,ledgerView){
 export function continuationBoundary(state,{ledgerView=readLedger(state),controller={alive:false}}={}){
   if(typeof state?.engine?.journalFile==='string'&&typeof state?.engine?.ledgerFile!=='string')
     return {ok:false,reason:'ledger-unmigrated',findings:[{code:'ledger-unmigrated',detail:'the workflow record still names journalFile without a ledgerFile; ledger-migrate must run before any continuation'}],ledgerView};
+  // The anchor is the tracked counter-record (§12): a file the hash chain alone cannot prove, because anyone
+  // able to write the untracked ledger can recompute a self-consistent chain for it. A restored, rolled-back
+  // or never-cloned ledger fails here before its chain is even read as authoritative.
+  if(ledgerView.anchor&&ledgerView.anchor.ok===false)
+    return {ok:false,reason:ledgerView.anchor.reason,findings:[{code:ledgerView.anchor.reason,detail:`the tracked ledger anchor does not verify against this ledger file${ledgerView.anchor.workflowId?` for workflow ${ledgerView.anchor.workflowId}`:''}`,...(ledgerView.anchor.workflowId?{anchorWorkflowId:ledgerView.anchor.workflowId}:{})}],ledgerView};
   if(ledgerView.chain&&ledgerView.chain.ok===false)
     return {ok:false,reason:'ledger-chain-broken',findings:[{code:'ledger-chain-broken',detail:`the workflow event hash chain does not verify${Number.isInteger(ledgerView.chain.brokenAt)?` at seq ${ledgerView.chain.brokenAt}`:''}${ledgerView.chain.reason?`: ${ledgerView.chain.reason}`:''}`}],ledgerView};
   // One transaction commits snapshot+events+jobs+leases, so a live head newer than the snapshot's events_head is

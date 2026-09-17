@@ -12,6 +12,7 @@ import {createWorkflowState,kernelMain,reconcileContinuationPreflight} from '../
 import {toOp} from '../kernel/common.mjs';
 import {buildReport} from '../kernel/reports.mjs';
 import {openJournal} from '../kernel/journal.mjs';
+import {ledgerFileFor,ledgerIdOf,openLedger,writeAnchor} from '../kernel/ledger-db.mjs';
 import {createEngineRuntime} from '../kernel/engine.mjs';
 import {stagedResultFile} from '../kernel/job-worker.mjs';
 import {sealRuntime} from '../kernel/runtime-pin.mjs';
@@ -52,7 +53,7 @@ test('an existing friendly public brief that names the exact workflow receives t
   assert.equal(fs.existsSync(path.join(root,'workflows','wf-resume.md')),false);
 });
 
-const fixtureLedgerView=({jobs=[],leases=[],error=null}={})=>({file:'fixture.sqlite',error,snapshot:null,snapshotHead:null,eventsHead:null,kernelLock:null,chain:null,jobs,leases});
+const fixtureLedgerView=({jobs=[],leases=[],error=null}={})=>({file:'fixture.sqlite',error,snapshot:null,snapshotHead:null,eventsHead:null,kernelLock:null,chain:null,anchor:null,jobs,leases});
 
 test('boundary audit catches a stranded writer and exact dispatch drift without clearing either',()=>{
   const current=state(process.cwd()),op=current.ops[0];Object.assign(op,{status:'done',task:'task-1',dispatch:'ctx-live',terminal:'term-live',
@@ -89,6 +90,49 @@ test('continuationBoundary fails closed on journalFile-only states, a broken has
   const liveLock=continuationBoundary(current,{ledgerView:{...fixtureLedgerView(),snapshotHead:'digest-a',eventsHead:{seq:9,digest:'digest-b'},
     kernelLock:{holder_pid:process.pid,token:'tok',value_json:null,at:Date.now(),expires_at:Date.now()+60000}},controller:{alive:false}});
   assert.equal(liveLock.ok,true,JSON.stringify(liveLock.findings));
+});
+
+test('continuationBoundary fails closed on every §12 anchor mismatch, and passes when the anchor is silent or verified',()=>{
+  const current=state(process.cwd());
+  for(const [reason,workflowId] of [['ledger-missing',undefined],['ledger-identity-mismatch',undefined],['ledger-behind-anchor','wf-resume']]){
+    const checked=continuationBoundary(current,{ledgerView:{...fixtureLedgerView(),anchor:{ok:false,reason,...(workflowId?{workflowId}:{})}},controller:{alive:false}});
+    assert.equal(checked.ok,false);assert.equal(checked.reason,reason);
+    assert.equal(checked.findings[0].code,reason);
+    if(workflowId)assert.equal(checked.findings[0].anchorWorkflowId,workflowId);
+  }
+  const noAnchor=continuationBoundary(current,{ledgerView:{...fixtureLedgerView(),anchor:null},controller:{alive:false}});
+  assert.equal(noAnchor.ok,true,JSON.stringify(noAnchor.findings));
+  const firstBoot=continuationBoundary(current,{ledgerView:{...fixtureLedgerView(),anchor:{ok:true,checked:0}},controller:{alive:false}});
+  assert.equal(firstBoot.ok,true,JSON.stringify(firstBoot.findings));
+  const verified=continuationBoundary(current,{ledgerView:{...fixtureLedgerView(),anchor:{ok:true,checked:1}},controller:{alive:false}});
+  assert.equal(verified.ok,true,JSON.stringify(verified.findings));
+});
+
+test('continuationBoundary reads a real tracked anchor beside the ledger file and fails closed on loss or rewind',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-anchor-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const ledgerFile=ledgerFileFor(root),ledger=openLedger({file:ledgerFile});
+  const workflowId='wf-anchor';
+  ledger.ensureWorkflow({workflowId});
+  const event=ledger.appendEvent({workflowId,entityType:'workflow',entityId:workflowId,generation:1,kind:'goal-approved'});
+  ledger.db.prepare('INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,events_head,created_at) VALUES(?,?,?,?,?,?,?)')
+    .run('bind:wf-anchor:1','wf-anchor',1,'a'.repeat(64),'{}',event.digest,Date.now());
+  const ledgerId=ledgerIdOf(ledger);
+  writeAnchor(root,{ledgerId,workflowId,generation:1,checkpointId:'bind:wf-anchor:1',eventsHead:event.digest,seq:event.seq});
+  ledger.close();
+  const current={...state(root),id:workflowId,engine:{schema:'starci/engine@1',generation:1,ledgerFile}};
+  assert.equal(continuationBoundary(current).ok,true);
+
+  // A tracked anchor naming a generation the ledger has not reached: a restored or rolled-back file.
+  writeAnchor(root,{ledgerId,workflowId,generation:2,checkpointId:'bind:wf-anchor:2',eventsHead:event.digest,seq:event.seq});
+  const behind=continuationBoundary(current);assert.equal(behind.ok,false);assert.equal(behind.reason,'ledger-behind-anchor');
+
+  // The ledger file is gone but the tracked anchor survived (a re-clone with no ledger restored/migrated).
+  fs.rmSync(ledgerFile,{force:true});fs.rmSync(`${ledgerFile}-wal`,{force:true});fs.rmSync(`${ledgerFile}-shm`,{force:true});
+  const missing=continuationBoundary(current);assert.equal(missing.ok,false);assert.equal(missing.reason,'ledger-missing');
+
+  // A different ledger dropped into the same checkout: it mints its own ledger_id, so the old anchor no longer matches.
+  openLedger({file:ledgerFile}).close();
+  const mismatched=continuationBoundary(current);assert.equal(mismatched.ok,false);assert.equal(mismatched.reason,'ledger-identity-mismatch');
 });
 
 test('public same-ID stop, run recovery and retry use a real journal without discarding unknown or staged work',t=>{
