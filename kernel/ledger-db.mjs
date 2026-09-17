@@ -157,8 +157,17 @@ export function readInput(db,{workflowId,key}={}){
 /** Walk one workflow's events by seq, recomputing the chain: {ok,checked,brokenAt} where brokenAt is a seq. */
 export function verifyChain(db,{workflowId}={}){
   need(workflowId,'verifyChain needs a workflow id');
-  let prev=null,checked=0;
+  // The walk starts from the first row this ledger still holds, whatever `prev_digest` that row carries.
+  // Retention (`pruneRetiredGenerations`) legitimately removes a retired generation's rows, and the surviving
+  // head then names a predecessor that is gone - which is the whole point of the link: the truncation stays
+  // visible. Seeding `prev` with `null` instead called every workflow that ever retired a generation broken,
+  // so `ledger-verify` and the §12 continuation boundary refused every real workflow after its first retry.
+  // Everything the chain actually proves is kept: each row's own digest is recomputed (so a tampered or
+  // reordered row still fails) and every link inside the retained range must hold. Which history is the agreed
+  // one is the anchor's question (§12), never the chain's.
+  let prev,checked=0;
   for(const row of db.prepare('SELECT seq,event_id,kind,payload_json,created_at,prev_digest,digest FROM events WHERE workflow_id=? ORDER BY seq').all(workflowId)){
+    if(prev===undefined)prev=row.prev_digest??null;
     if((row.prev_digest??null)!==prev||digestOf(prev,row)!==row.digest)return {ok:false,checked,brokenAt:row.seq};
     prev=row.digest;checked+=1;
   }

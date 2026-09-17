@@ -82,7 +82,15 @@ export function createStore({repoRoot,id}){
   // The tab speaks the host's configured language; the events it renders stay as recorded.
   const reportProgress=createProgressReporter({language:configuredProgressLanguage(),debug:configuredProgressDebug()});
   const bound=()=>durable?.ledger.db??db;
-  const insertEvent=(inner,{eventId=newToken(),generation=durable?.generation??0,entityType='workflow',entityId=workflowId,kind,payload=null,createdAt=now(),ignore=false}={})=>{
+  /**
+   * The generation an event belongs to when no durable binding is held. It is the workflow's own bound
+   * generation (the `workflows` row), not 0: `pruneRetiredGenerations` deletes everything below the bound
+   * generation, so filing a current event under 0 handed it to the next retention pass. That is how the
+   * kernel's own `run-bound`/`run-resumed` receipt - written before the run binds its ledger handle - was
+   * recorded and then deleted on the same start. 0 remains right for a workflow that was never enrolled.
+   */
+  const currentGeneration=inner=>inner.prepare('SELECT generation FROM workflows WHERE workflow_id=?').get(workflowId)?.generation??0;
+  const insertEvent=(inner,{eventId=newToken(),generation=durable?.generation??currentGeneration(inner),entityType='workflow',entityId=workflowId,kind,payload=null,createdAt=now(),ignore=false}={})=>{
     const payloadJson=json(payload),prevDigest=eventsHead(inner,workflowId);
     inner.prepare(`INSERT ${ignore?'OR IGNORE ':''}INTO events(event_id,workflow_id,generation,entity_type,entity_id,kind,payload_json,prev_digest,digest,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)`)
       .run(eventId,workflowId,generation,entityType,entityId,kind,payloadJson,prevDigest,eventDigest({prevDigest,eventId,kind,payloadJson,createdAt}),createdAt);
@@ -315,6 +323,19 @@ export function createStore({repoRoot,id}){
         return next;
       });
       return {revision,identity:goalIdentity};
+    },
+    /**
+     * Rewrite the current revision's rendered page in place. The kernel splices the critique section and the
+     * lane header into goal.md after the phase rendered it; in 1.0.3 that edited the one goal.md file, so it
+     * must not become a second `goals` row here. A revision is what `goal.revise`/`workflow-amend` moves -
+     * inputs are bound to it (`inputs.goal_revision`) - never a re-render of the same goal.
+     */
+    reviseGoalMarkdown(markdown){
+      need(typeof markdown==='string','reviseGoalMarkdown needs goal markdown');
+      const row=bound().prepare('SELECT revision FROM goals WHERE workflow_id=? ORDER BY revision DESC LIMIT 1').get(workflowId);
+      need(row,`No goal revision to revise for ${workflowId}`);
+      bound().prepare('UPDATE goals SET markdown=? WHERE workflow_id=? AND revision=?').run(markdown,workflowId,row.revision);
+      return {revision:row.revision};
     },
     /** `workflow-export`: today's `_local` file layout, written under `dir` for humans. Never the record. */
     exportTo(dir){

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import crypto from 'node:crypto';
-import {ENGINE_SCHEMA,ENGINE_VERSION,candidateBaseFor,createEngineRuntime,enrollEngine,isEnrolled,isJobPending,predatesEngineSchema,relocateJournal,settleGenerationLeases,prepareGenerationRetry,staleLeaseProof,validateCandidateRoot} from './engine.mjs';
+import {ENGINE_SCHEMA,ENGINE_VERSION,candidateBaseFor,createEngineRuntime,enrollEngine,hasNumberedEngineMarker,isEnrolled,isJobPending,predatesEngineSchema,relocateJournal,settleGenerationLeases,prepareGenerationRetry,staleLeaseProof,validateCandidateRoot} from './engine.mjs';
 import {applyOwnerInbox} from './owner-inbox.mjs';
 import {verifyAcceptedIntegrationOwnerRequests} from './owner-requests.mjs';
 import {verifyRuntimePin} from './runtime-pin.mjs';
@@ -1621,6 +1621,10 @@ export function releaseSettledOperationLeases(store,state,ctx,{settle=settleGene
 const withAnchorVerified=(boundary,store,state)=>{
   if(typeof ledgerDb.verifyAnchor!=='function')return boundary;
   let anchor;
+  // `verifyAnchor(ledger,repoRoot)` reads the tracked anchor beside the ledger; it takes the repo root, not an
+  // options object. Handing it one made every resume throw ERR_INVALID_ARG_TYPE inside `readAnchor`, which the
+  // catch below turned into a permanent, unearned `ledger-behind-anchor`. The workflow scope is §12's own
+  // boundary: one ledger holds every workflow of its Work root, and only this one is resuming.
   try{anchor=ledgerDb.verifyAnchor(store.ledger,store.repoRoot,{workflowId:state.id});}
   catch(error){anchor={ok:false,reason:error?.code??'ledger-anchor-unavailable',detail:String(error?.message??error)};}
   if(anchor?.ok!==false)return boundary;
@@ -4092,7 +4096,8 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
   // Operations created before a rule change carry their old check lists: the kernel-owned checks are stripped on load.
   reconcileCanonicalDecisionInputs(store,state,ctx);
   for(const op of state.ops)if(Array.isArray(op.checks))op.checks=op.checks.filter(check=>!KERNEL_CHECK.test(check.name??''));
-  reconcileWithOrca(orca,store,state,{cwd,wait,allocator});
+  const settleStoppedNative=ctx.engine?(op,{settlement,reason})=>reconcileStoppedNativeAttempt(store,state,op,ctx,settlement,reason):null;
+  reconcileWithOrca(orca,store,state,{cwd,wait,allocator,settleStopped:settleStoppedNative});
   // The shared runtime ledger is a repository-wide file: this kernel's own entries for operations that are no
   // longer running are leftovers of a crashed start and would hold a slot of an expensive runtime for everybody.
   const swept=allocator.sharedSync?.(state.ops.filter(op=>op.status==='running').map(op=>op.id));
@@ -4122,7 +4127,7 @@ export function runLoop(orca,store,state,{cwd=state.worktree,allocator,planOp=ll
     ctx.currentOp=null;
     if(iteration>0)headroom();
     ctx.engine?.pulse();
-    if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator});if(!ctx.engine)sweepTreeStrays(store,state,ctx);}
+    if(iteration>0&&iteration%RECONCILE_EVERY===0){reconcileWithOrca(orca,store,state,{cwd,wait,allocator,settleStopped:settleStoppedNative});if(!ctx.engine)sweepTreeStrays(store,state,ctx);}
     if((iteration>0&&iteration%RECONCILE_EVERY===0)||now()-(state.lastSweepAt??0)>=SWEEP_MS){sweepStaleTerminals(orca,store,state,{cwd,now});reviveSupervisor(store,state,ctx,{now});}
     if(stopRequested(store)){store.appendEvent({event:'stopped',reason:'stop flag'});releaseKernelTab(orca,store,state,{cwd,reason:'paused by stop flag'});store.saveState(state);return state;}
     reconcileCanonicalDecisionInputs(store,state,ctx);
@@ -4417,7 +4422,10 @@ export function buildStamp(){try{return KERNEL_MODULE?Math.round(fs.statSync(KER
  * their own control roots, the engine record given its schema. Nothing is answered, settled or refunded here.
  */
 export function migrateEngineState(store,state){
-  if(!predatesEngineSchema(state))return {migrated:false};
+  // Only a numbered engine marker is this migration's business (§8): a schema-tagged record is untouched
+  // whatever else it carries, and a state that merely still names the retired journal is `ledger-unmigrated`
+  // - the ledger-migrate step, refused at the boundary below, never rewritten and stamped as migrated here.
+  if(!hasNumberedEngineMarker(state))return {migrated:false};
   const prefix=`v${state.engine.major}`,renamed=[],candidates=[],dropped=[];
   const renameOf=key=>Number.isInteger(state.engine.major)&&key.startsWith(prefix)&&/^[A-Z]/.test(key.slice(prefix.length))?key.charAt(prefix.length).toLowerCase()+key.slice(prefix.length+1):null;
   for(const op of state.ops??[]){
@@ -4828,9 +4836,11 @@ function kernelMainDispatch(command,options={},{orca,cwd=process.cwd(),wait=slee
     if(rotated?.rotated)store.appendEvent({event:'events-rotated',generation:priorGeneration,segment:path.basename(rotated.rotated)});
     const journalChosen=Boolean(options['journal-file'])||state.engine?.journalChosen===true;
     const previousCandidateRoot=state.engine?.candidateRoot??null;
-    const engine=enrollEngine(store,state,{runtimePin:pin,ledgerFile:targetJournal,candidateRoot});state.launcher=checked.launcher;
+    // One handle for this retry, opened here and closed in the `finally` below: enrolling with it keeps
+    // `enrollEngine` from opening a second handle on the same ledger that nothing would ever close.
     const retryJournal=openJournal({file:targetJournal});
     try{
+      const engine=enrollEngine(store,state,{runtimePin:pin,ledgerFile:targetJournal,candidateRoot,ledger:retryJournal});state.launcher=checked.launcher;
       store.bindJournal(retryJournal,engine.generation,{state,goalIdentity:state.goalDigest??undefined});
       if(journalChosen)state.engine.journalChosen=true;
       if(relocation)store.appendEvent({event:'journal-relocated',from:relocation.from,to:relocation.to,retired:relocation.retired,copied:relocation.copied});
@@ -4950,13 +4960,18 @@ function kernelMainDispatch(command,options={},{orca,cwd=process.cwd(),wait=slee
       return modelPolicy.eligibility(actual,runtime);
     }):null;
     store.signal.clear(store.id,'stop');
+    // Built here, not inline in the options: this allocator opens the repository's shared runtime ledger, and
+    // whoever creates that handle closes it (`ownAllocator` below). An allocator a caller supplied through
+    // `functions` is that caller's to close, so it is neither built nor closed here.
+    const ownAllocator=functions.allocator?null:createAllocator({runtimes:runtimeProfile,state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:store.ledgerFile,workflow:state.id},budget:{path:path.join(store.repoRoot,'.starciwork')},sequential:host.sequential,executionHost:host.name,eligibility});
+    try{
     const finished=runLoop(orca,store,state,{cwd:worktree,wait,
       // Slots are derived from the operations that are actually running; saved loads may belong to a dead kernel.
       supervisor:supervisorRuntimes(workflowModelConfigRoot(state)),validator:validatorRuntimes(workflowModelConfigRoot(state)),
       // Every kernel of this repository shares one runtime ledger beside the workflow directories, so an
       // expensive runtime another workflow is on is load here too and a provider cooldown is seen by all.
       // A sequential host (headless) caps the allocator at one operation whatever the approved quota says.
-      allocator:createAllocator({runtimes:runtimeProfile,state:{...(state.allocation??{}),loads:Object.fromEntries(Object.entries(state.ops.filter(op=>op.status==='running'&&op.runtime).reduce((acc,op)=>{acc[op.runtime]=(acc[op.runtime]??0)+1;return acc;},{})))},quota:state.quota??null,shared:{path:store.ledgerFile,workflow:state.id},budget:{path:path.join(store.repoRoot,'.starciwork')},sequential:host.sequential,executionHost:host.name,eligibility}),template:templateOf(isEnrolled(state)?state.engine.runtimePin.root:state.host),host,
+      allocator:ownAllocator,template:templateOf(isEnrolled(state)?state.engine.runtimePin.root:state.host),host,
       modelEligibility:eligibility,modelPolicy,runtimeBinding,
       ledgerRoot:options['ledger-root']??null,
       maxIterations:options['max-iterations']?Number(options['max-iterations']):Infinity,...functions});
@@ -4975,6 +4990,7 @@ function kernelMainDispatch(command,options={},{orca,cwd=process.cwd(),wait=slee
       ledgerSummary:finished.ledgerSummary,needUser:finished.needUser,head:finished.head,iterations:finished.iterations,
       ledgerRoot:finished.ledgerRoot?slash(finished.ledgerRoot):null,ledgerShared:Boolean(finished.ledgerShared),
       ledgerOwner:finished.ledgerShared?(finished.ledgerOwner?.repository??slash(finished.ledgerOwner?.repoRoot??'')):null};
+    }finally{ownAllocator?.close?.();}
     }finally{releaseKernel();}
   }
   throw Error(`Unsupported workflow kernel command: ${command}`);

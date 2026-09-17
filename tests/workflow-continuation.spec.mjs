@@ -208,7 +208,13 @@ test('public retry re-admits a completed report without replacing its candidate 
 
 test('public stop, valid-pin retry and pinned same-ID run preserve accepted history while completing remaining work',async t=>{
   const temp=fs.mkdtempSync(path.join(os.tmpdir(),'starci-continuation-positive-')),root=path.join(temp,'repo');let runtime=null,pinnedStore=null;fs.mkdirSync(root);
-  t.after(()=>{try{runtime?.close();store.close();pinnedStore?.close();}finally{fs.rmSync(temp,{recursive:true,force:true,maxRetries:5,retryDelay:100});}});
+  // Cleanup never depends on the code under test: one handle refusing to close must not leave the other two
+  // open (and the tree undeletable on Windows), so each close stands alone and the removal always runs.
+  t.after(()=>{
+    for(const handle of [runtime,pinnedStore,store])try{handle?.close();}catch{}
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,150);
+    fs.rmSync(temp,{recursive:true,force:true,maxRetries:30,retryDelay:150});
+  });
   assert.equal(spawnSync('git',['init','-q'],{cwd:root,windowsHide:true}).status,0);
   assert.equal(spawnSync('git',['config','user.email','fixture@example.test'],{cwd:root,windowsHide:true}).status,0);
   assert.equal(spawnSync('git',['config','user.name','Fixture'],{cwd:root,windowsHide:true}).status,0);
@@ -236,6 +242,7 @@ test('public stop, valid-pin retry and pinned same-ID run preserve accepted hist
   assert.equal(retried.ok,true);assert.equal(retried.id,current.id);assert.equal(retried.generation,2);assert.deepEqual(retried.retried,[]);
   const afterRetry=store.loadState();assert.equal(afterRetry.engine.coordination,'agent-v1');assert.equal(afterRetry.ops.find(op=>op.id==='accepted').status,'done');
   assert.deepEqual(afterRetry.decisions,current.decisions);assert.equal(afterRetry.ops.find(op=>op.id==='remaining').status,'ready');
+  assert.ok(store.readEvents().some(event=>event.event==='workflow-retried'),'the retry is on the record while the workflow is live');
 
   const nonce=`positive-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const pinnedKernel=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','kernel.mjs')).href}?${nonce}`);
@@ -313,6 +320,10 @@ test('public stop, valid-pin retry and pinned same-ID run preserve accepted hist
     assert.deepEqual(settledJournal.liveRows(current.id),{leases:[],jobs:[]});
   }finally{settledJournal.close();}
   assert.equal(fs.readFileSync(path.join(root,'src','app.txt'),'utf8'),'ready\n');
-  assert.ok(pinnedStore.readEvents().some(event=>event.event==='run-resumed'));
-  assert.ok(pinnedStore.readEvents().some(event=>event.event==='workflow-retried'));
+  // A finished durable workflow retires its operational rows on its way out (`retireFinishedWorkflowRows` ->
+  // `retireWorkflow({preserveRuntimeCustody:true})`): what stays is the final state body and the newest
+  // receipt per runtime file, never the audit log. So the run's own receipts are read where they ARE the
+  // record - `workflow-retried` right after the retry, above - and what survives the finish is asserted here.
+  assert.equal(final.run,'run-positive','the pinned kernel joined the run it already had; it never bound a new one');
+  assert.deepEqual(pinnedStore.readEvents(),[],'a finished workflow keeps its custody receipts, not its operational history');
 });

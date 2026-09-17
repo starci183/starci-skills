@@ -6,6 +6,7 @@ import path from 'node:path';
 import {applyOwnerAction,applyOwnerVerification,deriveOwnerRequests,verifyAcceptedIntegrationOwnerRequests} from '../kernel/owner-requests.mjs';
 import {applyOwnerInbox,enqueueOwnerInbox} from '../kernel/owner-inbox.mjs';
 import {continueOwnerRequest,settleOwnerAsk} from '../kernel/owner.mjs';
+import {WORKFLOW_STATE,createStore} from '../kernel/store.mjs';
 
 const state=()=>({id:'wf',job:'implement-backend',generation:3,engine:{generation:3,jobId:'job-1'},inputs:['srs:one','sds:two'],ops:[{id:'ask-1',kind:'provision.ask',status:'waiting-owner',attempt:2,question:{kind:'credential',subject:'Payments sandbox',text:'Provide access',why:'Verify checkout'},credential:{provider:'Payments',custody:'identity:payments',variables:['PAYMENTS_KEY'],preparations:[{preparation:{credential:{obtain:'Provider console'},sources:[{title:'Official',url:'https://example.test/docs'}],prerequisites:[{owner:'owner',action:'Create sandbox key',reason:'Account custody'}]}}]}}]});
 const actor={type:'owner',receiptId:'orca-message-1',channel:'orca'};
@@ -31,4 +32,25 @@ test('a prepared legacy decision remains owner-answerable while superseded revie
 test('an authenticated owner receipt is idempotent and stale replay cannot change authority',()=>{const s=state();s.ops[0]={id:'ask-auth',kind:'decision.prepare',status:'waiting-owner',question:{kind:'authority',subject:'Publish'}};const r=deriveOwnerRequests(s)[0],action={type:'confirm',workflowId:'wf',requestId:r.id,generation:3,revision:0,actor,value:true};assert.equal(applyOwnerAction(s,action).ok,true);assert.equal(applyOwnerAction(s,action).code,'request-stale');assert.equal(s.ops[0].ownerAnswer.receiptId,actor.receiptId);});
 test('a successful inbox receipt resumes its requester once with the normalized answer',()=>{const events=[],store={appendEvent:event=>events.push(event)},s=state();s.ops=[{id:'work',kind:'backend.implement',status:'paused',waitingFor:'ask-auth'},{id:'ask-auth',kind:'decision.prepare',status:'waiting-owner',requesters:['work'],question:{kind:'business-decision',subject:'Retention',record:'RETENTION',options:[{id:'short',label:'30 days'}]}}];const r=deriveOwnerRequests(s)[0],applied=applyOwnerAction(s,{type:'choose',workflowId:'wf',requestId:r.id,generation:3,revision:0,actor,value:'short'});assert.equal(continueOwnerRequest(store,s,{receipt:applied.receipt,currentRequest:applied.request}).code,'continued');assert.equal(s.ops[0].status,'ready');assert.match(s.ops[0].answer,/RETENTION: selected 30 days/);assert.deepEqual(continueOwnerRequest(store,s,{receipt:applied.receipt,currentRequest:applied.request}),{ok:true,code:'already-continued',resumed:[]});assert.equal(events.filter(event=>event.event==='owner-action-continued').length,1);});
 test('an enrolled workflow never turns an ask report recommendation into a provisional owner decision',()=>{const events=[],s=state();s.engine={schema:'starci/engine@1'};s.provisional=[];s.needUser=[];s.ops=[{id:'requester',kind:'backend.implement',status:'paused'},{id:'ask-decision',kind:'decision.prepare',status:'running',requesters:['requester'],question:{kind:'business-decision',text:'Choose retention',options:['30 days','1 year']}}];settleOwnerAsk({appendEvent:event=>events.push(event)},s,s.ops[1],{summary:'decision: RETENTION recommended: 1 1. 30 days 2. 1 year'});assert.deepEqual(s.provisional,[]);assert.equal(s.ops[0].status,'paused');assert.equal(s.ops[1].ownerRequestStatus,'waiting-owner');assert.equal(s.needUser.length,1);assert.equal(events.at(-1).ownerRequired,true);});
-test('HTTP seam queues only and kernel applies once through the canonical inbox',t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const events=[],store={paths:{inbox:dir},appendEvent:e=>events.push(e),saveState:()=>events.push({event:'saved'})};const s=state(),r=deriveOwnerRequests(s)[0],payload={schema:'starci/owner-action@1',action:{type:'credential-saved',workflowId:'wf',opId:'ask-1',attempt:2,jobId:'owner-job',requestId:r.id,generation:3,revision:0,actor,storageReceipt:{status:'present',custody:'identity:payments',variables:['PAYMENTS_KEY']}}};const result=enqueueOwnerInbox(store,payload,{now:()=>1,random:()=> 'x'});assert.equal(result.code,'queued');assert.equal(result.job.kind,'owner-action');assert.equal(result.eventId,'owner-1-x');assert.equal(s.ops[0].ownerAnswer,undefined);const queued=JSON.parse(fs.readFileSync(path.join(dir,'owner-1-x.json'),'utf8'));assert.equal(applyOwnerInbox(store,s,queued).ok,true);assert.equal(events.some(e=>e.event==='owner-inbox-applied'),true);});
+/**
+ * §8 of docs/ledger-db.md removed `store.paths.inbox`: the queue is the ledger's `inbox` table, pushed by the
+ * HTTP seam and read back by the kernel through `store.inbox.pending()`. The seam is exercised against a real
+ * store, so what proves "queued only" is the row plus an untouched operation record - never a file on disk.
+ */
+test('HTTP seam queues only and kernel applies once through the canonical inbox',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-owner-'));
+  const store=createStore({repoRoot:root,id:'wf'});
+  // Cleanup never depends on the code under test: the handle closes if it can, the tree goes either way.
+  t.after(()=>{try{store.close();}catch{}fs.rmSync(root,{recursive:true,force:true,maxRetries:30,retryDelay:150});});
+  const s={...state(),schema:WORKFLOW_STATE},r=deriveOwnerRequests(s)[0];
+  const payload={schema:'starci/owner-action@1',action:{type:'credential-saved',workflowId:'wf',opId:'ask-1',attempt:2,jobId:'owner-job',
+    requestId:r.id,generation:3,revision:0,actor,storageReceipt:{status:'present',custody:'identity:payments',variables:['PAYMENTS_KEY']}}};
+  const result=enqueueOwnerInbox(store,payload,{now:()=>1,random:()=>'x'});
+  assert.equal(result.code,'queued');assert.equal(result.job.kind,'owner-action');assert.equal(result.eventId,'owner-1-x');
+  assert.equal(s.ops[0].ownerAnswer,undefined,'queuing grants no authority of its own');
+  const pending=store.inbox.pending();
+  assert.deepEqual(pending.map(item=>[item.kind,item.key,item.status]),[['owner-action','owner-1-x','pending']]);
+  assert.deepEqual(pending[0].payload,result.job,'the queued bytes are the job the seam built');
+  assert.equal(applyOwnerInbox(store,s,pending[0].payload).ok,true);
+  assert.ok(store.readEvents().some(event=>event.event==='owner-inbox-applied'));
+});
