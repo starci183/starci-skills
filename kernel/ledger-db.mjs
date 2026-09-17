@@ -11,7 +11,22 @@ export const LEDGER_SCHEMA='starci/ledger-db@1';
 export const LEDGER_VERSION=1;
 export const MACHINE_SCHEMA='starci/machine-db@1';
 export const MACHINE_VERSION=1;
-export const ledgerFileFor=repoRoot=>path.join(repoRoot,'.starciwork','runtime.sqlite');
+/**
+ * `.claude` is the runtime every project loads, never a Work root of its own: the Work root is the project's
+ * backend, reached through `.workspaces`. But the runtime is its own git checkout, and the Work root is
+ * resolved with `git rev-parse --git-common-dir` - so any CLI or worker whose cwd sat inside the runtime
+ * resolved the runtime as its own Work root and quietly opened a SECOND ledger there. One was found holding
+ * a live workflow's id. A parallel record is worse than no record, so this refuses by name instead.
+ */
+const RUNTIME_MARKER=root=>fs.existsSync(path.join(root,'bin','starci.mjs'))
+  &&(fs.existsSync(path.join(root,'kernel','ledger-db.mjs'))||fs.existsSync(path.join(root,'.dist','kernel','ledger-db.mjs')));
+export const isRuntimeRoot=root=>RUNTIME_MARKER(path.resolve(root));
+export const ledgerFileFor=repoRoot=>{
+  if(typeof repoRoot!=='string'||!repoRoot.trim())throw Error('ledgerFileFor needs a repository root');
+  const root=path.resolve(repoRoot);
+  if(isRuntimeRoot(root))throw Object.assign(Error(`ledger-root-is-runtime: ${root} is the StarCi runtime, not a Work root; route the project through .workspaces`),{code:'STARCI_LEDGER_ROOT_IS_RUNTIME'});
+  return path.join(root,'.starciwork','runtime.sqlite');
+};
 // Same root as engine.mjs's runtimeRootFor, kept local so this module never imports the engine.
 const runtimeRootFor=(env=process.env)=>path.join(env.LOCALAPPDATA||path.join(os.homedir(),'.local','state'),'StarCi','runtime');
 export const machineFileFor=(env=process.env)=>path.join(runtimeRootFor(env),'machine.sqlite');
