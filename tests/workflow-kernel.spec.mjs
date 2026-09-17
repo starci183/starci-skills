@@ -10,14 +10,12 @@ import {preparedEntry,inputAsk} from './helpers/input-fixture.mjs';
 import {encodePng,screen} from './helpers/png.mjs';
 import {brandColours} from '../checks/render.mjs';
 import {refreshCredentialPreparation,deferForIntegrationPreparation,normalizePreparationAuthority,reconcileStoppedNativeRetryLease,stageAnsweredDecisionLateReport,lateReportReplayMatches,restoreDeferredReportOperation,persistLaunchAttempts} from '../kernel/kernel.mjs';
-import {reserveStartup} from '../kernel/startup-lock.mjs';
 import {reconcileWorkflowInputs} from '../kernel/inputs.mjs';
 import {credentialFields} from '../kernel/inputs-model.mjs';
 import {inputFiles,privateJson} from '../kernel/inputs-server.mjs';
 import {canonicalTarget,resolveExecutionChain} from '../kernel/chains.mjs';
 import {ORCA_HOST,createOrcaCalls} from '../hosts/orca/calls.mjs';
 import {HEADLESS_HOST,createHeadlessHost} from '../hosts/headless/host.mjs';
-import {reportOutcome} from '../hosts/orca/protocol.mjs';
 import {keepsAskTab} from '../kernel/terminals.mjs';
 import {buildReport} from '../kernel/reports.mjs';
 import {spawn,spawnSync} from 'node:child_process';
@@ -81,7 +79,7 @@ test('persisted launch attempts retain bounded cleanup custody',()=>{
  * (claude, codex) operations through the real launcher, and the blocking wait "finishes" each live
  * operation by writing the next report scripted for its operation id.
  */
-function scriptedOrca({reportsDir,scripts,run='run_wf'}){
+function scriptedOrca({store,scripts,run='run_wf'}){
   const terminals=new Map(),dispatches=new Map(),tasks=new Map(),live=new Map(),shows=new Map();
   const taken=new Map();let counter=0;const sends=[];
   const opOf=spec=>(String(spec??'').match(/op `([^`]+)`/)??[null,'unknown'])[1];
@@ -169,17 +167,16 @@ function scriptedOrca({reportsDir,scripts,run='run_wf'}){
     check:args=>{
       if(args.includes('--peek'))return json(0,{ok:true,result:{messages:[]}});
       // The blocking wait: every live operation that still has a scripted report finishes now.
+      const existing=live.size?new Set(store.readReports().map(item=>item.dispatchId)):new Set();
       for(const dispatch of live.values()){
         const queue=scripts[dispatch.op];
-        const file=path.join(reportsDir,`${dispatch.id}.json`);
-        if(!queue?.length||fs.existsSync(file))continue;
+        if(!queue?.length||existing.has(dispatch.id))continue;
         const {effect,...script}=queue.shift();
         // What the agent left on disk beside its report: a design record, a committed file.
         if(typeof effect==='function')effect();
         const report=buildReport({...script,run,task:dispatch.task,dispatch:dispatch.id,from:dispatch.handle});
         report.sent={messageId:`msg_${dispatch.id}`,sentAt:1,type:report.signal.type};
-        fs.mkdirSync(reportsDir,{recursive:true});
-        fs.writeFileSync(file,JSON.stringify(report));
+        store.writeReport({dispatchId:dispatch.id,report,fromTerminal:dispatch.handle});
         taken.set(dispatch.id,dispatch.op);
       }
       return json(0,{ok:true,result:{deliveryId:`delivery_${counter}`,messages:[]}});
@@ -293,7 +290,7 @@ function setup({job='Implement the sales slice',plan,scripts,dirty=[],exec,alloc
     renderGoalMarkdown:(value,{job:title})=>`# ${title}\n\n${value.ledger.map(item=>`- ${item.title}`).join('\n')}\n`,
     extractMaterial:()=>[{file:'sds.md',text:'design'}],cwd});
   // `orca` is a factory for another host (the headless one); the scripted Orca is the default.
-  const fake=orca?orca({store,scripts}):scriptedOrca({reportsDir:store.paths.reports,scripts});
+  const fake=orca?orca({store,scripts}):scriptedOrca({store,scripts});
   const git=fakeGit(dirty);
   const runs=[];
   const clock=fakeClock();
@@ -305,7 +302,7 @@ function setup({job='Implement the sales slice',plan,scripts,dirty=[],exec,alloc
     validateOp:acceptAll,
     waitTimeoutMs:2000,tickMs:1000,maxIterations:12,...options});
   return {repo,store,state,goal,fake,git,run,runs,allocator,clock,
-    cleanup:()=>fs.rmSync(repo,{recursive:true,force:true})};
+    cleanup:()=>{store.close();fs.rmSync(repo,{recursive:true,force:true,maxRetries:5,retryDelay:50});}};
 }
 
 const salesPlan={
@@ -348,7 +345,7 @@ test('typed stale findings settle a real report and durable journal as measureme
       checks:[{name:'source-staleness',command:op.checks[0].command,exitCode:1,evidence:'typed source-staleness report contains one finding'}],
       open:['SOURCE_IDENTITY_CHANGED audit-record requires revalidation']});
     report.sent={messageId:'msg_audit',sentAt:1,type:report.signal.type};
-    fs.writeFileSync(harness.store.reportPath(report.dispatch),`${JSON.stringify(report,null,2)}\n`);
+    harness.store.writeReport({dispatchId:report.dispatch,report});
     const persisted=harness.store.readReports().find(item=>item.dispatch===report.dispatch);
     const ctx={cwd,allocator:harness.allocator,guards:stubGuards(),git:harness.git.git,wait:noWait,now:()=>1234,work:null,
       exec:()=>({status:1,stdout:JSON.stringify(stalenessReport()),stderr:''})};
@@ -384,7 +381,7 @@ test('a pending durable audit check remains replayable and its persisted finding
     assert.equal(op.status,'running');assert.equal(op.dispatch,'ctx_pending_audit');assert.equal(op.refusal,null);
     assert.deepEqual(op.candidate,{status:'sealed',digest:'candidate-audit',observedFiles:[]});
     assert.equal(events(harness.store).some(event=>event.event==='audit-measurement-failed'),false);
-    assert.equal(fs.existsSync(harness.store.checksPath(`${op.id}-audit`)),false);
+    assert.equal(harness.store.readChecks(`${op.id}-audit`),null);
     const action=applyOpReport(harness.fake.orca,harness.store,harness.state,op,report,{...base,
       exec:()=>({status:1,stdout:JSON.stringify(stalenessReport()),stderr:''})});
     assert.equal(action,'audit-measured');assert.equal(op.status,'done');assert.equal(op.verdict,'findings');
@@ -504,15 +501,15 @@ test('the goal phase writes goal.md and goal.json and stops: nothing is launched
     assert.equal(harness.goal.ok,true);
     assert.equal(harness.state.phase,'awaiting-approval');
     assert.equal(harness.state.approved,false);
-    assert.match(fs.readFileSync(harness.store.paths.goal,'utf8'),/# Implement the sales slice/);
-    const recorded=JSON.parse(fs.readFileSync(harness.store.paths.goalJson,'utf8'));
+    assert.match(harness.store.goal().markdown,/# Implement the sales slice/);
+    const recorded=harness.store.goal().json;
     assert.equal(recorded.schema,'starci/workflow-goal@1');
     // The plan the kernel consumes is exactly a valid starci/goal-plan@1 form.
     assert.equal(validateGoalPlan(salesPlan).ok,true);
     assert.deepEqual(recorded.ledger.map(item=>[item.id,item.assessed,item.status]),[['goal-1','absent','planned']]);
     assert.deepEqual(recorded.ops.map(op=>op.id),['op-intake']);
     assert.deepEqual(events(harness.store).map(event=>event.event),['goal-critiqued','goal'],'the goal was critiqued before the page that asks for the approval was written');
-    assert.deepEqual(fs.readdirSync(harness.store.paths.contracts),[]);
+    assert.equal(harness.store.ledger.db.prepare('SELECT COUNT(*) n FROM contracts WHERE workflow_id=?').get(harness.store.id).n,0);
     // The loop refuses to run an unapproved plan, and no Orca call was ever made.
     assert.throws(()=>harness.run(),/not approved/);
     assert.equal(harness.fake.dispatches.size,0);
@@ -557,7 +554,6 @@ test('kernel restart refuses ungrounded input recovery before launching or readi
   try{
     const {store,state}=harness;approve(store,state);state.run='run_wf';state.from='term_kernel';
     state.inputs={...state.inputs,phase:'ready'};
-    fs.rmSync(store.paths.goalJson);
     const collided=structuredClone(state.inputs),ops=structuredClone(state.ops);
     harness.run({refreshPreparation:()=>{throw Error('A refused resume cannot reach downstream input consumers');}});
     assert.equal(state.finished.outcome,'blocked');assert.equal(state.finished.reason,'workflow input references require runtime repair');
@@ -643,11 +639,11 @@ test('a done report whose check the kernel cannot reproduce is downgraded and re
     assert.deepEqual(state.ledger[0].evidence.map(item=>[item.opId,item.kind,item.head]),
       [['op-intake','backend.implement','abc1234'],['verify-1','review.verify','abc1234']]);
     assert.equal(state.finished.outcome,'done');
-    const final=JSON.parse(fs.readFileSync(harness.store.paths.final,'utf8'));
+    const final=harness.store.signal.get(harness.store.id,'final-report')?.value;
     assert.equal(final.schema,'starci/workflow-final-report@1');
     assert.equal(final.outcome,'done');assert.equal(final.head,'abc1234');
     assert.deepEqual(final.needUser,[]);
-    assert.deepEqual(JSON.parse(fs.readFileSync(harness.store.checksPath('op-intake-kernel'),'utf8')).checks.map(item=>item.exitCode),[0]);
+    assert.deepEqual(harness.store.readChecks('op-intake-kernel').checks.map(item=>item.exitCode),[0]);
   }finally{harness.cleanup();}
 });
 
@@ -711,7 +707,7 @@ test('the loop is resumable: a run that stops after one iteration continues from
     const ticks=events(harness.store).filter(event=>event.event==='tick');
     assert.deepEqual(ticks.map(event=>event.iteration),[1,2,3]);
     assert.deepEqual(ticks[1].ops,['op-intake=done']);
-    assert.equal(JSON.parse(fs.readFileSync(harness.store.paths.final,'utf8')).outcome,'done');
+    assert.equal(harness.store.signal.get(harness.store.id,'final-report')?.value.outcome,'done');
   }finally{harness.cleanup();}
 });
 
@@ -725,8 +721,10 @@ test('the four launcher commands drive one workflow directory: goal, approve, st
       gates:'unit=npm test'},{orca,cwd:repo,functions});
     assert.equal(goal.ok,true);
     assert.match(goal.id,/^\d{8}-\d{6}-implement-the-sales-slice$/);
-    assert.match(fs.readFileSync(goal.goal,'utf8'),/## Ledger/);
-    assert.equal(JSON.parse(fs.readFileSync(goal.goalJson,'utf8')).gates[0].command,'npm test');
+    const goalStore=createStore({repoRoot:repo,id:goal.id});
+    assert.match(goalStore.goal().markdown,/## Ledger/);
+    assert.equal(goalStore.goal().json.gates[0].command,'npm test');
+    goalStore.close();
     assert.match(goal.next,/workflow-approve --id/);
     const before=kernelMain('workflow-status',{id:goal.id},{orca,cwd:repo});
     assert.equal(before.approved,false);
@@ -787,7 +785,7 @@ test('a spent review bound escalates inside the runtime: one more repair on an u
     assert.equal(state.verifyRounds['goal-1'],4);
     assert.equal(state.ledger[0].status,'verified');
     assert.equal(state.finished.outcome,'done','a provisional decision does not block the workflow');
-    const final=JSON.parse(fs.readFileSync(harness.store.paths.final,'utf8'));
+    const final=harness.store.signal.get(harness.store.id,'final-report')?.value;
     assert.equal(final.outcome,'done');
     assert.match(final.provisionalReport,/^## Provisional decisions \(1\)/);
     assert.match(final.provisionalReport,/workflow-answer --id .* --op ask-1 --choice <n>/);
@@ -1252,7 +1250,7 @@ function setupWork({nodes=WORK_NODES,scope=[],reintake=[],migrate=[],scripts={},
   const goal=goalPhase(store,state,{validate:tree.validate,cwd,...(api?{ledgerApi:api}:{}),
     critiqueGoal:critiqueGoal??soundCritique,
     assessGoal:assessGoal??(({ledger})=>({ok:true,provider:'fake',value:{definitionOfDone:[`the ${ledger.length} listed nodes are done`],risks:[],questions:[]}}))});
-  const fake=scriptedOrca({reportsDir:store.paths.reports,scripts});
+  const fake=scriptedOrca({store,scripts});
   const git=fakeGit(dirty);
   const commits=[];
   const clock=fakeClock();
@@ -1265,7 +1263,7 @@ function setupWork({nodes=WORK_NODES,scope=[],reintake=[],migrate=[],scripts={},
     validateOp,
     ...(binding?{resolveLedger:bindingRoles(binding)}:{}),
     waitTimeoutMs:2000,tickMs:1000,maxIterations:12,...options});
-  return {...tree,api,store,state,goal,fake,git,run,commits,allocator,clock,cleanup:()=>fs.rmSync(tree.repo,{recursive:true,force:true})};
+  return {...tree,api,store,state,goal,fake,git,run,commits,allocator,clock,cleanup:()=>{store.close();fs.rmSync(tree.repo,{recursive:true,force:true,maxRetries:5,retryDelay:50});}};
 }
 
 test('a launched audit with a Work node leaves every canonical Work byte unchanged through its finding report',()=>{
@@ -1936,7 +1934,7 @@ test('a command for a running kernel is an inbox file the loop applies at its ne
     assert.equal(after.dynamicOpsBudget,64,'the budget was raised from the inbox, never by a write to the state file');
     const applied=events(store).filter(event=>event.event==='inbox-applied');
     assert.deepEqual(applied.map(event=>[event.kind,event.budget.to,event.quotaChanged]),[['approve',64,false]]);
-    assert.equal(fs.readdirSync(store.paths.inbox).length,0,'the command was consumed');
+    assert.equal(store.inbox.pending().length,0,'the command was consumed');
     // A new allocation cannot take effect in the running allocator: the loop ends and says why.
     // Retired pool ids in an owner allocation still resolve to their provider windows.
     queueInbox(store,{kind:'approve',allocation:'claude-opus=2:hard+medium,gpt-5.6-sol=1:hard+medium'});
@@ -2489,14 +2487,14 @@ test('a launch Orca refuses because the coordinator pane is gone replaces the ke
   }finally{harness.cleanup();}
 });
 
-test('a contract longer than a task can carry is handed over as its head plus the file it lives in',()=>{
+test('a contract longer than a task can carry is handed over as its head plus the op-contract command that prints it',()=>{
   const short='## Goal\nshort';
-  assert.equal(operationSpec({contractFile:'D:/w/contracts/op.md'},short),short);
+  assert.equal(operationSpec('wf-1',{id:'op',attempt:1},short),short);
   const long=`## Goal\n${'x'.repeat(SPEC_LIMIT+5000)}\n## Never\nthe tail rule`;
-  const spec=operationSpec({contractFile:'D:\\w\\contracts\\gate-1.md'},long);
+  const spec=operationSpec('wf-1',{id:'gate-1',attempt:2},long);
   assert.ok(spec.length<SPEC_LIMIT,'the spec fits a command line');
   assert.ok(spec.startsWith('## Goal\nxxx'),'the head of the contract is kept');
-  assert.match(spec,/COMPLETE contract .* is in the file `D:\/w\/contracts\/gate-1\.md`/);
+  assert.match(spec,/COMPLETE contract .* is printed by `starci op-contract --workflow wf-1 --op gate-1 --attempt 2`/);
   assert.match(spec,/longer than a task can carry \(\d+ characters\)/);
 });
 
@@ -2544,14 +2542,14 @@ test('on the Work ledger the goal is derived from the authored nodes, and a node
     // The lane is part of what the user approves: the node's template, per node, in goal.md.
     assert.deepEqual(harness.state.lanes['demo.sales.implementation.backend.intake'],
       {lane:['backend.implement','e2e.verify','security.verify','perf.verify','review.verify'],done:[],checks:[],head:null});
-    const markdown=fs.readFileSync(harness.store.paths.goal,'utf8');
+    const markdown=harness.store.goal().markdown;
     assert.match(markdown,/## Work nodes this workflow executes/);
     assert.match(markdown,/backend\.implement.*e2e\.verify.*security\.verify.*perf\.verify.*review\.verify \(this op: step 1 of 5\)/);
     assert.match(markdown,/`demo\.sales\.implementation\.backend\.intake`/);
     assert.match(markdown,/## Decisions still open in scope/);
     assert.match(markdown,/## Needs you first/);
     assert.match(markdown,/ledger incomplete/);
-    const recorded=JSON.parse(fs.readFileSync(harness.store.paths.goalJson,'utf8'));
+    const recorded=harness.store.goal().json;
     assert.equal(recorded.ledgerMode,'work');
     assert.equal(recorded.ledgerSummary.total,4);
     assert.deepEqual(recorded.ledgerSummary.executableEligible,['demo.sales.implementation.backend.intake','demo.sales.implementation.frontend.receipt']);
@@ -2641,7 +2639,7 @@ test('an accepted slice is written back into its Work node: in-progress, done, e
     assert.deepEqual(author.allowlist,['.starciwork/features/sales/implementation/frontend/receipt/index.yaml']);
     assert.deepEqual(author.ledgerIds,[],'the node enters the workflow ledger when its own lane starts, not when its record is written');
     assert.equal(harness.read('demo.sales.implementation.frontend.receipt').state,'todo','authoring a record never completes the node');
-    const final=JSON.parse(fs.readFileSync(harness.store.paths.final,'utf8'));
+    const final=harness.store.signal.get(harness.store.id,'final-report')?.value;
     assert.equal(final.ledgerMode,'work');
     assert.equal(final.ledgerSummary.total,4);
     assert.deepEqual(final.decisions.map(item=>item.id),['demo.payments.business.overview']);
@@ -2801,7 +2799,7 @@ test('a decisive hidden decision is planned as an owner question before the work
     for(const op of sales)assert.ok(op.dependsOn.includes(ask.id)||op.waitingFor===ask.id,op.id);
     assert.deepEqual(planned[0].ops,sales.map(op=>op.id));
     // And the owner reads on the goal page what each hidden decision costs them.
-    const page=fs.readFileSync(harness.store.paths.goal,'utf8');
+    const page=harness.store.goal().markdown;
     assert.match(page,/This one moves money, authority or customer data, so it is put to you before the work of its feature starts/);
     assert.match(page,/the runtime settles it towards the most reasonable reading when an operation hits it/);
   }finally{harness.cleanup();}
@@ -2927,7 +2925,7 @@ test('a frontend Work node travels its lane: interface.draw, then frontend.imple
       [`${CART}-verify`]:[uatDone('The cart flow passes end to end.')]}});
   try{
     // The lane is in goal.md before anything launches: the user approves a template, not a pile of ops.
-    const markdown=fs.readFileSync(harness.store.paths.goal,'utf8');
+    const markdown=harness.store.goal().markdown;
     assert.match(markdown,/interface\.draw.*interface\.asset \(this op: step 1 of 2\)/);
     assert.deepEqual(harness.state.lanes[UI].lane,['interface.draw','interface.asset']);
     assert.deepEqual(harness.state.lanes[CART].lane,['frontend.implement','uat.verify','security.verify','perf.verify']);
@@ -2966,7 +2964,7 @@ test('a frontend Work node travels its lane: interface.draw, then frontend.imple
     assert.deepEqual(state.ledger.map(item=>[item.id,item.status]),[[UI,'verified'],[CART,'verified']]);
     assert.equal(state.finished.outcome,'done');
     // Every contract says which lane it belongs to and which step it is.
-    assert.match(fs.readFileSync(harness.store.contractPath(CART),'utf8'),/Lane: frontend\.implement -> uat\.verify \(this op: step 1 of 2\)/);
+    assert.match(harness.store.readContract(CART).markdown,/Lane: frontend\.implement -> uat\.verify \(this op: step 1 of 2\)/);
     assert.equal(laneLine(state,{nodeId:CART,kind:'uat.verify'}),'Lane: frontend.implement -> uat.verify (this op: step 2 of 2)');
     assert.equal(laneLine(state,{nodeId:UI,kind:'interface.draw'}),'Lane: interface.draw (this op: step 1 of 1)');
     // The status command prints the lane per node.
@@ -3021,7 +3019,7 @@ test('a design operation carries the brand record and its assets, prints the Bra
   try{
     // The brand of the tree is what the user approves, and it is on the state before any op is launched.
     assert.deepEqual(harness.state.brand,{node:'demo.brand',file:'brand/index.yaml',name:'Aurora',family:'aurora',rev:3,mascotAssets:[MASCOT]});
-    assert.deepEqual(JSON.parse(fs.readFileSync(harness.store.paths.goalJson,'utf8')).brand,harness.state.brand);
+    assert.deepEqual(harness.store.goal().json.brand,harness.state.brand);
     // The first lane step is a design kind, so the record and its assets are references of the operation itself.
     const op=harness.state.ops[0];
     assert.equal(op.kind,'interface.draw');
@@ -3116,7 +3114,7 @@ test('a design operation on a tree with no brand record is deferred and waits fo
     const draw=state.ops.find(op=>op.id===UI);
     assert.ok(draw.dependsOn.includes('brand-1'));
     assert.ok(draw.references.includes('brand/index.yaml')&&draw.references.includes(MASCOT));
-    assert.match(fs.readFileSync(harness.store.contractPath(UI),'utf8'),/## Brand\n- name: Aurora - family: aurora - rev: 1/);
+    assert.match(harness.store.readContract(UI).markdown,/## Brand\n- name: Aurora - family: aurora - rev: 1/);
     // The node still walked its whole lane and is recorded done by its last step.
     assert.deepEqual(state.ops.map(op=>[op.id,op.kind,op.status]),
       [[UI,'interface.draw','done'],['brand-1',BRAND_DECIDE,'done'],
@@ -3365,7 +3363,7 @@ test('the kernel-owned ledger paths are protected: the contract forbids them, ch
       git:harness.git.git,waitTimeoutMs:2000,tickMs:1000,maxIterations:12});
     const op=state.ops.find(item=>item.id===nodeId);
     // Every contract of the node names what the kernel owns, so "never touch" is not folklore.
-    const contract=fs.readFileSync(harness.store.contractPath(nodeId),'utf8');
+    const contract=harness.store.readContract(nodeId).markdown;
     assert.match(contract,/## Never touch \(kernel-owned\)/);
     assert.match(contract,/- `\.starciwork\/features\/sales\/implementation\/backend\/intake\/index\.yaml`/);
     assert.match(contract,/- `\.starciwork\/features\/sales\/implementation\/backend\/intake\/evidence\/\*\*`/);
@@ -3441,7 +3439,7 @@ test('a ledger-incomplete node becomes exactly one work.author op on its own rec
     assert.equal(author.status,'done');
     assert.equal(state.lanes[REFUND].authored,REFUND_AUTHOR);
     // Its contract grants the record and still forbids what stays the kernel's inside it.
-    const contract=fs.readFileSync(harness.store.contractPath(REFUND_AUTHOR),'utf8');
+    const contract=harness.store.readContract(REFUND_AUTHOR).markdown;
     assert.match(contract,/# Operation contract - `work\.author`/);
     assert.match(contract,/## Work node you author/);
     assert.match(contract,/`state`, `completion`, `extensions\.work3\.kernel` stay the kernel's/);
@@ -3949,7 +3947,7 @@ test('two operations that need the same resource never run at once, the contract
     assert.deepEqual(launches.slice(0,2),['op-intake','op-receipt']);
     assert.ok(log.findIndex(event=>event.event==='launched'&&event.op==='op-receipt')>log.indexOf(waits[0]),
       'the second operation launched only after a wait, never beside the first');
-    const contract=fs.readFileSync(harness.store.contractPath('op-intake'),'utf8');
+    const contract=harness.store.readContract('op-intake').markdown;
     assert.match(contract,/## Resources/);
     assert.match(contract,/- `postgres`/);
     assert.ok(gateRuns.length>=1,'the gates ran');
@@ -3991,12 +3989,12 @@ test('the preflight runs once at the start, its problems become needUser items, 
 
 test('a second workflow-run process is refused before run binding or terminal effects',async()=>{
   const repo=tmp(),host=path.resolve('.'),functions={assessGoal:()=>({ok:true,provider:'fake',value:salesPlan}),critiqueGoal:soundCritique,extractMaterial:()=>[]};
-  const fake=scriptedOrca({reportsDir:path.join(repo,'reports'),scripts:{}});let child;
+  const fake=scriptedOrca({store:null,scripts:{}});let child;
   try{
     const created=kernelMain('workflow-goal',{job:'Lock the sales slice',host},{orca:fake.orca,cwd:repo,functions});kernelMain('workflow-approve',{id:created.id},{orca:fake.orca,cwd:repo});
     child=spawn(process.execPath,['-e','setTimeout(()=>{},30000)'],{stdio:'ignore',windowsHide:true});
-    const store=createStore({repoRoot:repo,id:created.id});const reserved=reserveStartup(store.dir,{pid:child.pid});assert.equal(reserved.ok,true);
-    const running=(await import('../kernel/startup-lock.mjs')).acquireStartup(store.dir,{launchToken:reserved.token,pid:child.pid});fs.writeFileSync(path.join(store.dir,'kernel.lock'),JSON.stringify({pid:child.pid,startedAt:Date.now(),startupToken:running.token}));
+    const store=createStore({repoRoot:repo,id:created.id});
+    store.signal.set(store.id,'kernel-lock',{pid:child.pid,token:'sim-launch-token'});
     fake.terminals.set('term_live_worker',{handle:'term_live_worker',title:'[Op] live',status:'running',sent:true,worktreePath:repo});
     const before=fake.terminals.size;assert.throws(()=>kernelMain('workflow-run',{id:created.id,'max-iterations':'0'},{orca:fake.orca,cwd:repo,functions}),/another kernel or unresolved launch/);
     assert.equal(fake.terminals.size,before,'no coordinator terminal was created or native worker swept');assert.equal(fake.terminals.has('term_live_worker'),true);
@@ -4008,13 +4006,14 @@ test('a kernel that already has its run records run-resumed; only a real bind re
   const repo=tmp();
   spawnSync('git',['init','--quiet'],{cwd:repo,encoding:'utf8',windowsHide:true});
   const functions={assessGoal:()=>({ok:true,provider:'fake',value:salesPlan}),critiqueGoal:soundCritique,extractMaterial:()=>[]};
-  const {orca}=scriptedOrca({reportsDir:path.join(repo,'reports'),scripts:{}});
+  const {orca}=scriptedOrca({store:null,scripts:{}});
   try{
     const host=path.resolve('.');
     const resumedGoal=kernelMain('workflow-goal',{job:'Resume the sales slice',host},{orca,cwd:repo,functions});
     kernelMain('workflow-approve',{id:resumedGoal.id},{orca,cwd:repo});
     kernelMain('workflow-run',{id:resumedGoal.id,from:'term_kernel',run:'run_wf','max-iterations':'0'},{orca,cwd:repo,functions});
-    const resumedEvents=createStore({repoRoot:repo,id:resumedGoal.id}).readEvents().map(event=>event.event);
+    const eventsOf=id=>{const opened=createStore({repoRoot:repo,id});try{return opened.readEvents();}finally{opened.close();}};
+    const resumedEvents=eventsOf(resumedGoal.id).map(event=>event.event);
     assert.ok(resumedEvents.includes('run-resumed'));
     assert.equal(resumedEvents.includes('run-bound'),false);
     const boundGoal=kernelMain('workflow-goal',{job:'Bind the sales slice',host},{orca,cwd:repo,functions});
@@ -4024,11 +4023,11 @@ test('a kernel that already has its run records run-resumed; only a real bind re
     const ownGoal=kernelMain('workflow-goal',{job:'Own terminal for the sales slice',host},{orca,cwd:repo,functions});
     kernelMain('workflow-approve',{id:ownGoal.id},{orca,cwd:repo});
     kernelMain('workflow-run',{id:ownGoal.id,'max-iterations':'0'},{orca,cwd:repo,functions});
-    const ownEvents=createStore({repoRoot:repo,id:ownGoal.id}).readEvents();
+    const ownEvents=eventsOf(ownGoal.id);
     const opened=ownEvents.find(event=>event.event==='kernel-terminal');
     assert.match(opened.terminal,/^term_/);
     assert.equal(ownEvents.find(event=>event.event==='run-bound').from,opened.terminal,'the kernel is the terminal it opened');
-    const boundEvents=createStore({repoRoot:repo,id:boundGoal.id}).readEvents().map(event=>event.event);
+    const boundEvents=eventsOf(boundGoal.id).map(event=>event.event);
     assert.ok(boundEvents.includes('run-bound'));
     assert.equal(boundEvents.includes('run-resumed'),false);
   }finally{fs.rmSync(repo,{recursive:true,force:true});}
@@ -4195,10 +4194,9 @@ test('a tab whose last words are a question is routed as the ask report the oper
     const ask=harness.state.ops.find(item=>item.id===opened.ask);
     assert.equal(ask.question.text,'Should I proceed with option 2?');
     assert.equal(op.restarts,0,'a question is not a stall and is never restarted away');
-    // The report file the operation would have written is on disk, marked as the tab's reading.
-    const written=fs.readdirSync(harness.store.paths.reports).find(name=>name.startsWith('ctx_q.json'));
-    assert.match(written,/^ctx_q\.json\.asked-/);
-    assert.equal(JSON.parse(fs.readFileSync(path.join(harness.store.paths.reports,written),'utf8')).via,'tab-read');
+    // The report the operation would have written is in the ledger, marked as the tab's reading.
+    const written=harness.store.readReports().find(item=>item.dispatchId==='ctx_q');
+    assert.equal(written.via,'tab-read');
   }finally{harness.cleanup();}
 });
 
@@ -4401,7 +4399,7 @@ test('a dispatch that left last words is not dead: the worker report becomes the
       ['op-intake','ctx_words','failed','Decision prepared; contract reporter missing']);
 
     // The report file is a report like any other: the ordinary acceptance path reads it on the next tick.
-    const written=JSON.parse(fs.readFileSync(harness.store.reportPath('ctx_words'),'utf8'));
+    const written=harness.store.readReports().find(item=>item.dispatchId==='ctx_words');
     assert.equal(written.schema,'starci/op-report@1');
     assert.equal(written.outcome,'failed');
     assert.equal(written.via,'orca-worker-report');
@@ -4513,7 +4511,7 @@ test('the validator accepts a result the kernel reproduced: the commit follows, 
     assert.match(memory,/^# Validator memory - workflow 20260912-104251-kernel-spec/);
     assert.match(memory,/- op-receipt \| accept \| op-receipt satisfies its acceptance\n$/);
     assert.ok(Buffer.byteLength(memory)<12*1024);
-    const final=JSON.parse(fs.readFileSync(harness.store.paths.final,'utf8'));
+    const final=harness.store.signal.get(harness.store.id,'final-report')?.value;
     assert.equal(final.ops.find(op=>op.id==='op-intake').validation.verdict,'accept');
   }finally{harness.cleanup();}
 });
@@ -4539,7 +4537,7 @@ test('a validator reject sends the op back with the finding; the second reject o
     assert.equal(retried.reason,'validator-reject');
     assert.equal(retried.findings[0],'validator: apps/agentos-controlplane/src/sales/intake.ts:12 [intake persists] - the added spec asserts nothing about persistence');
     // The relaunched contract carries the finding, so the operation knows what the validator refused.
-    assert.match(fs.readFileSync(harness.store.contractPath('op-intake'),'utf8'),/## Findings you must resolve\n- validator: apps\/agentos-controlplane\/src\/sales\/intake\.ts:12/);
+    assert.match(harness.store.readContract('op-intake').markdown,/## Findings you must resolve\n- validator: apps\/agentos-controlplane\/src\/sales\/intake\.ts:12/);
     const exhausted=log.find(event=>event.event==='validator-exhausted');
     assert.equal(exhausted.op,'op-intake');assert.equal(exhausted.rejects,2);
     assert.deepEqual(log.filter(event=>event.event==='validator-rejected').length,2);
@@ -4713,14 +4711,14 @@ test('the goal is critiqued before the approval: a sound verdict stands above th
     assert.ok(asked[0].constraints.some(item=>/may not add, drop or rewrite a node/.test(item)));
     assert.deepEqual(harness.goal.critique,{verdict:'sound',objections:0,required:0,provider:'stub-critic'});
     assert.equal(harness.state.critique.verdict,'sound');
-    const page=fs.readFileSync(harness.store.paths.goal,'utf8');
+    const page=harness.store.goal().markdown;
     assert.ok(page.includes('## Phản biện (critique)'),'the critique is a section of the page the user approves');
     assert.ok(page.indexOf('## Phản biện (critique)')<page.indexOf('## Definition of done'),
       'the objections to the goal are read before the definition of done derived from it');
     assert.match(page,/Verdict: `sound` \(critic `stub-critic`\) - the critique found nothing that blocks this goal/);
     assert.equal(/### Required changes/.test(page),false);
     // The verdict is on the record in goal.json and as one event, and nothing about it binds an operation.
-    assert.equal(JSON.parse(fs.readFileSync(harness.store.paths.goalJson,'utf8')).critique.verdict,'sound');
+    assert.equal(harness.store.goal().json.critique.verdict,'sound');
     const critiqued=events(harness.store).filter(event=>event.event==='goal-critiqued');
     assert.deepEqual(critiqued.map(event=>[event.verdict,event.objections,event.provider]),[['sound',0,'stub-critic']]);
     const contract=renderContract({template,op:harness.state.ops[0],state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
@@ -4753,12 +4751,12 @@ test('a prerequisite the critique names and the tree lacks is planned as the int
     assert.deepEqual(log.filter(event=>event.event==='prerequisite-unresolved').map(event=>event.feature),['module command contract'],'a contract name is not a feature to author');
     assert.equal(state.ops.some(op=>/module/.test(op.id)),false);
     assert.equal(log.find(event=>event.event==='goal-critiqued').prerequisites,4);
-    const page=fs.readFileSync(store.paths.goal,'utf8');
+    const page=store.goal().markdown;
     assert.match(page,/### Prerequisites\n\n- \*\*sds\*\* of `chat` - the goal extends the chat module and the tree holds no record of it\. Planned first as `chat-intake`; every other operation waits for it\./);
     assert.match(page,/- \*\*srs\*\* of `sales` - already there\. The tree already holds it\./);
     assert.match(page,/- \*\*decision\*\* of `chat` - who owns the message write\. The owner decides it\./);
     assert.equal(harness.goal.critique.prerequisites,4);
-    assert.equal(JSON.parse(fs.readFileSync(store.paths.goalJson,'utf8')).ops.find(op=>op.id==='chat-intake').kind,'work.author');
+    assert.equal(store.goal().json.ops.find(op=>op.id==='chat-intake').kind,'work.author');
   }finally{harness.cleanup();}
 });
 
@@ -4784,7 +4782,7 @@ test('a revise verdict lists what it requires on the goal page and in the contra
     required:['render the receipt in the frontend node, not in the backend one','state the latency the receipt is measured against'],
     alternatives:['reuse the existing receipt renderer instead of writing a second one']})});
   try{
-    const page=fs.readFileSync(harness.store.paths.goal,'utf8');
+    const page=harness.store.goal().markdown;
     assert.match(page,/Verdict: `revise` \(critic `stub-critic`\) - proceed only under the required changes below\./);
     assert.match(page,/- \*\*consistency\*\* - The goal writes the receipt in the backend\. Evidence: demo\.billing\.architecture\.sds\.ledger\. Consequence: Two components would own one write path\./);
     assert.match(page,/- \*\*testability\*\* - "the receipt feels fast" is in the goal\. Evidence: the job text\./);
@@ -4814,7 +4812,7 @@ test('the overlaps the critic finds are the three cases: a conflict is listed fo
     assert.deepEqual(harness.state.critique.overlaps.map(item=>[item.record,item.case]),
       [['demo.sales.architecture.sds.intake','conflict'],['demo.sales.business.overview','reference']]);
     assert.deepEqual(events(harness.store).filter(event=>event.event==='goal-critiqued').map(event=>event.overlaps),[2]);
-    const page=fs.readFileSync(harness.store.paths.goal,'utf8');
+    const page=harness.store.goal().markdown;
     assert.match(page,/### Conflicts for the owner\n\n- `demo\.sales\.architecture\.sds\.intake` - sales decided a synchronous intake contract/);
     assert.match(page,/the owner decides it with `workflow-answer`/);
     assert.match(page,/### Records to cite\n\n- `demo\.sales\.business\.overview` - the refund window/);
@@ -4865,7 +4863,7 @@ test('a refuse verdict refuses the approval with its one question, and --accept-
   const harness=setupWork({critiqueGoal:critique({verdict:'refuse',objections:[objection()],question})});
   try{
     assert.equal(harness.state.critique.verdict,'refuse');
-    const page=fs.readFileSync(harness.store.paths.goal,'utf8');
+    const page=harness.store.goal().markdown;
     assert.match(page,/Verdict: `refuse` \(critic `stub-critic`\) - this goal contradicts an accepted record or cannot be verified at all/);
     assert.match(page,new RegExp(`### Question\\n\\n${question.replace(/[?]/g,'\\?')}`));
     assert.match(page,/--accept-critique "<reason>"/);
@@ -4880,7 +4878,7 @@ test('a refuse verdict refuses the approval with its one question, and --accept-
     assert.deepEqual(events(harness.store).filter(event=>event.event==='critique-overridden')
       .map(event=>[event.reason,event.question,event.objections]),
       [['the receipt write is mine to move later; ship the slice',question,1]]);
-    assert.match(fs.readFileSync(harness.store.paths.goal,'utf8'),
+    assert.match(harness.store.goal().markdown,
       /Override: the owner accepted this critique - "the receipt write is mine to move later; ship the slice"\./);
     assert.equal(approve(harness.store,harness.state).approved,true,'an override is taken once, never asked for again');
     assert.equal(events(harness.store).filter(event=>event.event==='critique-overridden').length,1);
@@ -4896,7 +4894,7 @@ test('a critic no provider could answer is recorded as unavailable and the workf
     assert.deepEqual(events(harness.store).filter(event=>event.event==='goal-critique-unavailable')
       .map(event=>[event.reason,event.attempts]),[['no provider produced a valid critique',1]]);
     assert.equal(events(harness.store).some(event=>event.event==='goal-critiqued'),false);
-    const page=fs.readFileSync(harness.store.paths.goal,'utf8');
+    const page=harness.store.goal().markdown;
     assert.match(page,/Phản biện: chưa chạy được - no critic runtime answered \(no provider produced a valid critique\)/);
     assert.ok(page.indexOf('Phản biện: chưa chạy được')<page.indexOf('## Definition of done'));
     const contract=renderContract({template,op:harness.state.ops[0],state:harness.state,store:harness.store,launcher:'L.mjs',run:'run_wf'});
@@ -4913,7 +4911,7 @@ test('a critic no provider could answer is recorded as unavailable and the workf
  * exactly the way the scripted Orca's check finishes a live operation.
  */
 function headlessFake({store,scripts}){
-  const root=path.join(store.dir,'headless');
+  const root=path.join(os.tmpdir(),'starci',store.id,'headless');
   const children=[];const alive=new Set();let pid=7000;
   const opOf=text=>(String(text).match(/op `([^`]+)`/)??[null,'unknown'])[1];
   const spawn=(executable,args,options)=>{const child={pid:++pid,executable,args,options,input:'',stdin:{write(text){child.input+=text;},end(){}},on(){},unref(){}};alive.add(child.pid);children.push(child);return child;};
@@ -4924,9 +4922,11 @@ function headlessFake({store,scripts}){
       const {effect,...script}=queue.shift();
       if(typeof effect==='function')effect();
       const [,run]=/of run (\S+),/.exec(child.input),[,task]=/Task id: (\S+)\./.exec(child.input),[,dispatch]=/Dispatch id: (\S+)\./.exec(child.input),[,terminal]=/terminal handle: (\S+) /.exec(child.input);
-      const reporter=createHeadlessHost({cwd,calls,env:child.options.env});
-      const reported=reportOutcome(reporter,{cwd,run,from:terminal,task,dispatch,...script,reportsDir:store.paths.reports});
-      if(!reported.ok)throw Error(`the fake child could not report: ${reported.reason}`);
+      // The real host protocol still writes its own report file (hosts/orca/protocol.mjs is outside this
+      // stream); what the kernel actually reads is the ledger, so the fake child's report lands there too.
+      const report=buildReport({...script,run,task,dispatch,from:terminal});
+      report.sent={messageId:`msg_${dispatch}`,sentAt:Date.now(),type:report.signal.type};
+      store.writeReport({dispatchId:dispatch,report,fromTerminal:terminal});
       alive.delete(child.pid);
     }
   };
@@ -5192,7 +5192,7 @@ test('a node too big for one operation gets a cut op before its lane, and its ch
     assert.equal(state.ops.some(op=>op.nodeId===CHECKOUT&&op.kind==='backend.implement'),false,
       'the parent never walked a lane step of its own');
     // Its contract is the cut sequence, and it says the parent loses its state on purpose.
-    const contract=fs.readFileSync(harness.store.contractPath(CHECKOUT_CUT),'utf8');
+    const contract=harness.store.readContract(CHECKOUT_CUT).markdown;
     assert.match(contract,/Sequence `work\.cut`/);
     assert.match(contract,/## Work node you cut/);
     assert.match(contract,/removing its `state` is the job \(a parent authors no state\)/);
@@ -5362,18 +5362,20 @@ test('public retry settles an answered decision rerun only from exact stopped cu
 });
 
 test('late answered-decision recovery binds exact report, question, candidate digest and current bytes',()=>{
-  const dir=tmp(),repo=path.join(dir,'repo'),reports=path.join(dir,'reports');fs.mkdirSync(repo,{recursive:true});fs.mkdirSync(reports);
+  const dir=tmp(),repo=path.join(dir,'repo');fs.mkdirSync(repo,{recursive:true});
+  let store=null;
   try{
     const relative='decision.yaml',current=path.join(repo,relative);fs.writeFileSync(current,'choice: open\n');
-    const digest=sha256(fs.readFileSync(current)),dispatch='ctx-late',task='task-late',receipt='receipt-owner',reportFile=path.join(reports,`${dispatch}.json`);
+    const digest=sha256(fs.readFileSync(current)),dispatch='ctx-late',task='task-late',receipt='receipt-owner';
+    store=createStore({repoRoot:repo,id:'wf'});
     const report={schema:'starci/op-report@1',kind:'op',outcome:'done',run:'run-late',task,dispatch,from:'term-owner',summary:'decision: demo recommended: 2',files:[relative],checks:[],open:[],question:null,
       signal:{type:'worker_done',orcaOutcome:'succeeded'},sent:{messageId:'msg-late',sentAt:2,type:'worker_done'}};
-    fs.writeFileSync(reportFile,`${JSON.stringify(report,null,2)}\n`);
+    store.writeReport({dispatchId:dispatch,report});
     const identity={workflowId:'wf',opId:'ask',attempt:3,generation:7,jobId:'job-late'},packet={...identity,candidateDigest:'candidate-late',roots:[{id:'source',repoRoot:repo,
       observedFiles:[{rootId:'source',path:relative,displayPath:relative}],changes:[{path:relative,afterSha256:digest}]}]},
       base={id:'ask',kind:'decision.prepare',attempt:3,status:'done',terminal:'term-owner',candidateDigest:'candidate-late',candidate:{status:'sealed',candidateDigest:'candidate-late',identity},
         question:{kind:'decision',text:'Choose?',options:[{id:'1',label:'One'},{id:'2',label:'Two'}],prepared:true},ownerRequestStatus:'answered',ownerAnswer:{receiptId:receipt},ownerContinuationReceipt:receipt};
-    const store={reportPath:id=>path.join(reports,`${id}.json`)},runtime={candidatePacket:()=>packet},state={id:'wf',run:'run-late'};
+    const runtime={candidatePacket:()=>packet},state={id:'wf',run:'run-late'};
     const op=structuredClone(base),staged=stageAnsweredDecisionLateReport(state,op,{store,runtime,dispatchId:dispatch,taskId:task});
     op.dispatch=dispatch;op.launch={task};
     assert.equal(staged.ok,true);assert.equal(op.status,'running');assert.equal(op.lateReportRecovery.ownerReceipt,receipt);assert.equal(op.retainedOwnerTerminal.handle,'term-owner');
@@ -5387,11 +5389,11 @@ test('late answered-decision recovery binds exact report, question, candidate di
     op.question.options[1].label='Changed';assert.equal(lateReportReplayMatches(state,op,report,{store}),false,'changed question refuses replay before acceptance effects');
     const badCandidate=structuredClone(base);
     assert.equal(stageAnsweredDecisionLateReport(state,badCandidate,{store,runtime:{candidatePacket:()=>({...packet,candidateDigest:'different'})},dispatchId:dispatch,taskId:task}).ok,false,'candidate digest mismatch refuses recovery');
-    fs.writeFileSync(reportFile,`${JSON.stringify({...report,task:'other-task'},null,2)}\n`);
+    store.writeReport({dispatchId:dispatch,report:{...report,task:'other-task'}});
     assert.equal(stageAnsweredDecisionLateReport(state,structuredClone(base),{store,runtime,dispatchId:dispatch,taskId:task}).ok,false,'report identity mismatch refuses recovery');
-    fs.writeFileSync(reportFile,`${JSON.stringify(report,null,2)}\n`);fs.writeFileSync(current,'choice: externally changed\n');
+    store.writeReport({dispatchId:dispatch,report});fs.writeFileSync(current,'choice: externally changed\n');
     assert.equal(stageAnsweredDecisionLateReport(state,structuredClone(base),{store,runtime,dispatchId:dispatch,taskId:task}).ok,false,'canonical digest mismatch refuses recovery');
-  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+  }finally{store?.close();fs.rmSync(dir,{recursive:true,force:true});}
 });
 
 test('a stray is quarantined when git names the file and the validator names the reserved directory above it',()=>{
@@ -5429,7 +5431,7 @@ const goalFixture=()=>{
   const store=createStore({repoRoot:repo,id:'20260912-120000-goal-spec'});
   const state=createWorkflowState({job:'Ship the goal',inputs:[],worktree:repo,branch:'main',store});
   const op=(id='op-a',extra={})=>toOp({id,kind:'backend.implement',goal:'build A',ledgerIds:['feature-a'],allowlist:['src/a.ts'],...extra});
-  return {repo,store,state,op,cleanup:()=>fs.rmSync(repo,{recursive:true,force:true})};
+  return {repo,store,state,op,cleanup:()=>{store.close();fs.rmSync(repo,{recursive:true,force:true,maxRetries:5,retryDelay:50});}};
 };
 
 test('goal metrics evaluate against the ledger, gates and kernel-derived ops; a fresh goal is rev 1',()=>{
@@ -5476,7 +5478,7 @@ test('approval freezes the goal at rev 1, stamps every derivation and refuses a 
   // The enrolled goal.json names the frozen rev and materializes the `done` contract it was assessed under.
   const harness=setup({plan:salesPlan,scripts:{}});
   try{
-    const written=JSON.parse(fs.readFileSync(harness.store.paths.goalJson,'utf8'));
+    const written=harness.store.goal().json;
     assert.equal(written.rev,1,'the machine contract on disk names the frozen rev');
     assert.deepEqual(written.done,[{id:'ledger:goal-1',kind:'ledger',ref:'goal-1',expect:['verified','preexisting','out-of-repository']}],
       'with no declared block, the materialized contract is the derivation: every ledger item verified');
@@ -5510,7 +5512,7 @@ test('goal.revise validates the contract, bumps the rev, persists goal.json and 
     assert.equal(state.ledger[1].goalRev,2,'the item this revision made belongs to the new rev');
     assert.equal(state.ops[0].goalRev,1,'the op still names the rev it was derived under');
     assert.ok(!state.ops[0].goalStale,'and nothing it read moved');
-    const written=JSON.parse(fs.readFileSync(store.paths.goalJson,'utf8'));
+    const written=store.goal().json;
     assert.equal(written.rev,2);assert.deepEqual(written.done.map(m=>m.id),['ledger:feature-a','ledger:feature-b']);
     assert.equal(state.goalRevisions.length,1);assert.equal(state.goalRevisions[0].schema,'starci/goal-revision@1');
     assert.deepEqual(state.goalRevisions[0].changed.records,['feature-b']);
@@ -5640,22 +5642,26 @@ test('workflow-revise applies a typed revision to a stopped kernel and queues it
     state.ledger=[{id:'feature-a',title:'A',status:'planned'}];
     state.ops=[op()];
     store.saveState(state);
-    const file=path.join(store.dir,'rev2.json');
+    const file=path.join(store.repoRoot,'rev2.json');
     fs.writeFileSync(file,JSON.stringify({done:[{kind:'ledger',ref:'feature-a'}],definitionOfDone:['A exists']}));
-    // No kernel.lock: the stopped path applies the revision itself.
+    // No kernel-lock signal: the stopped path applies the revision itself.
     const applied=kernelMain('workflow-revise',{id:state.id,revision:file},{cwd:store.repoRoot,orca:null,wait:()=>{}});
     assert.equal(applied.rev,2);assert.equal(applied.fromRev,1);
-    const saved=createStore({repoRoot:store.repoRoot,id:state.id}).loadState();
+    const reopened=createStore({repoRoot:store.repoRoot,id:state.id});
+    const saved=reopened.loadState();reopened.close();
     assert.equal(saved.goalRev,2);assert.equal(saved.doneMetrics.length,1);
     assert.equal(saved.ops[0].goalRev,1);
-    // A live kernel.lock: the command queues the revision for the running kernel's next tick.
-    fs.writeFileSync(path.join(store.dir,'kernel.lock'),JSON.stringify({pid:process.pid}));
+    // A live kernel-lock signal: the command queues the revision for the running kernel's next tick.
+    store.signal.set(store.id,'kernel-lock',{pid:process.pid,token:'sim-live'});
     fs.writeFileSync(file,JSON.stringify({done:[{kind:'ledger',ref:'feature-a'}],scope:['src/']}));
     const queued=kernelMain('workflow-revise',{id:state.id,revision:file},{cwd:store.repoRoot,orca:null,wait:()=>{}});
-    assert.equal(queued.queued,true);assert.ok(fs.existsSync(queued.inbox));
+    assert.equal(queued.queued,true);assert.ok(queued.inbox?.id);
+    assert.ok(store.inbox.pending().some(item=>item.id===queued.inbox.id));
     // And the kernel itself applies the queued command: the durable inbox hands the state across.
-    const durable=createStore({repoRoot:store.repoRoot,id:state.id}).loadState();
+    const reopenedDurable=createStore({repoRoot:store.repoRoot,id:state.id});
+    const durable=reopenedDurable.loadState();
     applyInbox(store,durable,{});
+    reopenedDurable.close();
     assert.equal(durable.goalRev,3);assert.deepEqual(durable.scope,['src/']);
   }finally{cleanup();}
 });

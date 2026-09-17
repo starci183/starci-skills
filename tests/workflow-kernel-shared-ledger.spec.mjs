@@ -12,7 +12,7 @@ import {fakeAllocator,passing,scriptedOrca} from './helpers/kernel-harness.mjs';
 import {encodePng,screen} from './helpers/png.mjs';
 import {toOp} from '../kernel/common.mjs';
 import {buildReport} from '../kernel/reports.mjs';
-import {openJournal} from '../kernel/journal.mjs';
+import {openLedger as openJournal} from '../kernel/ledger-db.mjs';
 import {sealRuntime} from '../kernel/runtime-pin.mjs';
 
 /**
@@ -266,7 +266,10 @@ before(()=>{
 after(()=>{if(baseFixtureRoot)fs.rmSync(baseFixtureRoot,{recursive:true,force:true});});
 function fixture(t){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-shared-ledger-'));
-  t.after(()=>{assert.equal(path.dirname(root),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(root).startsWith('starci-shared-ledger-'));fs.rmSync(root,{recursive:true,force:true});});
+  t.after(()=>{assert.equal(path.dirname(root),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(root).startsWith('starci-shared-ledger-'));
+    // A sqlite handle on Windows can outlive its own close() by a beat (node:sqlite is still experimental);
+    // the OS reclaims a leftover temp dir on its own, so a stubborn one here is not this test's failure.
+    try{fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:100});}catch(error){if(error?.code!=='EPERM'&&error?.code!=='EBUSY')throw error;}});
   fs.cpSync(baseFixtureRoot,root,{recursive:true});
   return handleFor(root);
 }
@@ -280,6 +283,7 @@ function started(t){
   assert.equal(detectLedgerMode(fixed.code,null,path.join(fixed.owner,'.starciwork')),'work',
     'the mode follows the resolved tree, not a `.starciwork` the frontend does not have');
   const store=createStore({repoRoot:fixed.owner,id:'20260912-120000-shared-ledger'});
+  t.after(()=>store.close());
   const state=createWorkflowState({job:'Render the receipt page',worktree:fixed.code,branch:'session/receipt',
     store,host:fixed.host,launcher:'L.mjs',ledgerMode:'work',repoRoot:fixed.code});
   const goal=goalPhase(store,state,{validate:validateWorkTree,cwd:fixed.code,
@@ -310,11 +314,11 @@ test('a frontend workflow binds the Work tree its backend owns and takes only th
   assert.deepEqual(run.state.needUser,[]);
   // The frontend repository keeps no Work tree of its own, not even the workflow's own runtime directory.
   assert.equal(fs.existsSync(path.join(run.code,'.starciwork')),false);
-  assert.equal(run.store.dir.startsWith(run.owner),true);
-  const goal=fs.readFileSync(run.store.paths.goal,'utf8');
+  assert.equal(path.resolve(run.store.repoRoot),path.resolve(run.owner));
+  const goal=run.store.goal().markdown;
   assert.match(goal,/owned by `demo-backend`/);
   assert.match(goal,/every Work record is written and committed in the owner/);
-  const record=JSON.parse(fs.readFileSync(run.store.paths.goalJson,'utf8'));
+  const record=run.store.goal().json;
   assert.equal(record.ledgerShared,true);
   assert.equal(record.codeRepository,'demo-frontend');
   assert.equal(record.codeSide,'frontend');
@@ -324,7 +328,7 @@ test('the accepted slice is recorded and committed in the owner, names the front
   const run=started(t);
   approve(run.store,run.state);
   run.state.run='run_wf';run.state.from='term_kernel';
-  const orca=scriptedOrca({reportsDir:run.store.paths.reports,worktree:run.code,
+  const orca=scriptedOrca({store:run.store,worktree:run.code,
     // The frontend lane: the surface is drawn, then built, then walked; the node is done only after the walk.
     scripts:{[UI]:[{outcome:'done',summary:'The receipt surface is drawn.',
       files:[`${run.owner.replaceAll('\\','/')}/.starciwork/features/sales/ui/index.yaml`],
@@ -421,7 +425,7 @@ test('a workflow refuses to start on a shared ledger that carries changes the ke
   // Somebody is authoring business material in the owner repository right now.
   fs.writeFileSync(path.join(run.work,'features','sales','brief.md'),'# Sales\n\nA pending draft nobody committed.\n');
   git(run.owner,'add','--','.starciwork/features/sales/brief.md');
-  const orca=scriptedOrca({reportsDir:run.store.paths.reports,worktree:run.code,scripts:{}});
+  const orca=scriptedOrca({store:run.store,worktree:run.code,scripts:{}});
   const state=runLoop(orca.orca,run.store,run.state,{cwd:run.code,allocator:fakeAllocator(),template,wait:noWait,
     validate:validateWorkTree,git:spawnSync,exec:()=>({status:0,stdout:'',stderr:''}),
     launch:()=>{throw Error('nothing may be launched over a ledger the kernel cannot commit into');},
@@ -473,13 +477,13 @@ test('public retry and pinned enrolled run preserve accepted history while settl
   for(const op of run.state.ops)op.references=(op.references??[]).map(reference=>{if(typeof reference!=='string')return reference;const normalized=slash(reference);
     if(!normalized.startsWith(`${currentPrefix}/knowledge/`))return reference;relocatedReferences+=1;return `${authoredPrefix}${normalized.slice(currentPrefix.length)}`;});
   assert.ok(relocatedReferences>0,'the pre-pin operation carries authored runtime provenance before sealing');
-  const pin=sealRuntime({sourceRoot:authoredRuntime,buildsRoot:path.join(run.root,'builds'),version:'1.0.0'}),pinFile=path.join(run.root,'accepted-runtime-pin.json'),journalFile=path.join(run.root,'runtime','journal.sqlite');
+  const pin=sealRuntime({sourceRoot:authoredRuntime,buildsRoot:path.join(run.root,'builds'),version:'1.0.0'}),pinFile=path.join(run.root,'accepted-runtime-pin.json'),journalFile=path.join(run.root,'runtime','journal.sqlite'),machineFile=path.join(run.root,'runtime','machine.sqlite');
   assert.equal(pin.sourceRoot,slash(fs.realpathSync(authoredRuntime)));fs.writeFileSync(pinFile,`${JSON.stringify(pin,null,2)}\n`);
   fs.renameSync(authoredRuntime,path.join(run.root,'relocated-authored-runtime'));
   assert.equal(fs.existsSync(authoredRuntime),false,'the original authored runtime is absent before public retry');
   Object.assign(run.state,{approved:true,phase:'run',run:'run-shared-enrolled',from:'term-shared',goalDigest:'f'.repeat(64),
     definitionOfDone:['backend-owned design and evidence are accepted','frontend source is accepted'],head:accepted.head,
-    engine:{schema:'starci/engine@1',version:'1.0.0',generation:1,journalFile,journalChosen:true,runtimePin:pin,coordination:'kernel-v0'}});
+    engine:{schema:'starci/engine@1',version:'1.0.0',generation:1,ledgerFile:journalFile,machineFile,journalChosen:true,runtimePin:pin,coordination:'kernel-v0'}});
   run.store.saveState(run.state);openJournal({file:journalFile}).close();
   const stopped=kernelMain('workflow-stop',{id:run.state.id,host:run.host},{orca:{},cwd:run.code});assert.equal(stopped.id,run.state.id);
   const retried=kernelMain('workflow-retry',{id:run.state.id,host:run.host,'runtime-pin':pinFile},{orca:{},cwd:run.code});assert.equal(retried.ok,true);assert.equal(retried.generation,2);
@@ -494,6 +498,7 @@ test('public retry and pinned enrolled run preserve accepted history while settl
     pinnedStoreModule=await import(`${pathToFileURL(path.join(pin.root,'.dist','kernel','store.mjs')).href}?${nonce}`);
   const pinnedStore=pinnedStoreModule.createStore({repoRoot:run.owner,id:run.state.id}),engineState=pinnedStore.loadState(),
     gitAdapter=(executable,args,options={})=>spawnSync(executable,args,{encoding:'utf8',windowsHide:true,...options});
+  t.after(()=>pinnedStore.close());
   const foreign=path.join(run.root,'unrelated','knowledge','grammars','index.yaml');fs.mkdirSync(path.dirname(foreign),{recursive:true});fs.writeFileSync(foreign,'schema: grammar/index@1\n');
   const prePinOp=engineState.ops.find(op=>op.kind==='interface.draw');
   assert.throws(()=>pinnedKernel.candidateReferences({...prePinOp,references:[foreign]},engineState,{work:{ledger:{repoRoot:run.owner,workRoot:run.work},loaded:{nodes:new Map(),list:[]}}}),
@@ -529,7 +534,7 @@ test('public retry and pinned enrolled run preserve accepted history while settl
       files=[PAGE,path.join(assets,'receipt-resting.png'),path.join(assets,'receipt-resting.html')];
     }
     const checks=(op.checks??[]).map(check=>({name:check.name,command:check.command,exitCode:0,evidence:'fixture pass'})),report=buildReport({outcome:'done',run:'run-shared-enrolled',task:`task-${op.id}`,dispatch,from:'term-worker',summary:`${op.id} complete`,files,checks});
-    fs.writeFileSync(pinnedStore.checksPath(op.id),`${JSON.stringify(checks)}\n`);fs.writeFileSync(pinnedStore.reportPath(dispatch),`${JSON.stringify(report)}\n`);deliverPending=false;};
+    pinnedStore.writeChecks({opId:op.id,attempt:op.attempt??1,checks});pinnedStore.writeReport({dispatchId:dispatch,opId:op.id,attempt:op.attempt??1,report});deliverPending=false;};
   const receipt=result=>({outcome:'ok',effectState:'none',receipt:{ok:true,result}}),orca={host:{name:'orca',capabilities:['design-tool'],sequential:false},invoke(name,args={}){
     if(name==='run-show')return receipt({run:{id:'run-shared-enrolled',coordinator_handle:'term-shared'}});
     if(name==='worker-list')return receipt({workers:workerLive?[...dispatches].map(([id,value])=>({dispatchId:id,taskId:value.task,workerState:'unsupervised',dispatchStatus:'dispatched',agentTerminalHandle:'term-worker'})):[]});

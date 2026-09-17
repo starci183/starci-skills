@@ -68,12 +68,12 @@ const retryOpSpec=(id= 'impl-1')=>({id,kind:'backend.implement',goal:'Change one
 function quarantinedFixture(t,{id='impl-1',pending={kind:'native-stop-reconciliation',effectState:'unknown',reasons:['fixture quarantine']},change='export const a=2;\n',dispatch=true}={}){
   const {root,work}=gitRepo(t);
   const store=createStore({repoRoot:work,id:`wf-w1-${id}`});
-  const journalFile=path.join(root,'runtime','journal.sqlite');
+  const journalFile=path.join(root,'runtime','journal.sqlite'),machineFile=path.join(root,'runtime','machine.sqlite');
   const pin=sealRuntime({sourceRoot:process.cwd(),buildsRoot:path.join(root,'builds'),version:'1.0.0'});
   const current=createWorkflowState({job:'Reconcile a quarantined native stop',worktree:work,branch:'main',store});
   const op=toOp(retryOpSpec(id),0);
   Object.assign(current,{approved:true,phase:'run',run:'run-w1',from:'term-kernel',goalDigest:DIGEST,ops:[op],
-    engine:{schema:'starci/engine@1',version:'1.0.0',generation:GENERATION,journalFile,journalChosen:true,runtimePin:pin,coordination:'agent-v1'}});
+    engine:{schema:'starci/engine@1',version:'1.0.0',generation:GENERATION,ledgerFile:journalFile,machineFile,journalChosen:true,runtimePin:pin,coordination:'agent-v1'}});
   Object.assign(op,{attempt:3,status:'running',runtime:'gpt-5.6-luna',dispatch:dispatch?'ctx-stopped':null,terminal:dispatch?'term-stopped':null});
   const runtime=createEngineRuntime({store,state:current,git,candidateBase:path.join(root,'runtime','candidates'),
     eligibility:()=>({eligible:true}),spawnChild:()=>({pid:1,once(){},unref(){}})});
@@ -90,7 +90,7 @@ function quarantinedFixture(t,{id='impl-1',pending={kind:'native-stop-reconcilia
   store.saveState(current);
   const lease=structuredClone(op.lease);
   store.unbindJournal(runtime.journal);runtime.close();
-  fs.writeFileSync(path.join(store.dir,'stop.flag'),'stopped');
+  store.signal.set(store.id,'stop',{value:{at:Date.now()}});
   return {root,work,store,state:current,op,lease,journalFile};
 }
 const heldLease=(journalFile,jobId)=>{
@@ -202,7 +202,7 @@ test('candidate custody lost returns the staged late report to retry without re-
     checks:[{name:'decision-shape',command:'node -e "process.exit(0)"'}],acceptance:['the exact decision draft is preserved']},0);
   Object.assign(current,{approved:true,phase:'run',run:'run-late',from:'term-kernel',goalDigest:'d'.repeat(64),repoRoot:work,ops:[op],
     head:git('git',['rev-parse','HEAD'],{cwd:work}).stdout.trim(),
-    engine:{schema:'starci/engine@1',version:'1.0.0',generation:1,journalFile:path.join(temp,'runtime','journal.sqlite'),runtimePin:pin,coordination:'agent-v1'}});
+    engine:{schema:'starci/engine@1',version:'1.0.0',generation:1,ledgerFile:path.join(temp,'runtime','journal.sqlite'),machineFile:path.join(temp,'runtime','machine.sqlite'),runtimePin:pin,coordination:'agent-v1'}});
   Object.assign(op,{status:'running',runtime:'gpt-5.6-luna',dispatch:dispatchId,terminal:'term-owner',workerSettled:true,
     question:{kind:'decision',text:'Which ledger?',options:[{id:'1',label:'Customer'},{id:'2',label:'Platform'}],prepared:true},
     ownerRequestStatus:'answered',ownerAnswer:{receiptId:receipt,value:'2'},ownerContinuationReceipt:receipt});
@@ -218,7 +218,7 @@ test('candidate custody lost returns the staged late report to retry without re-
     summary:'decision: demo.ledger recommended: 2',files:['app.txt'],
     checks:[{name:'decision-shape',command:'node -e "process.exit(0)"',exitCode:0,evidence:'valid'}]});
   report.sent={messageId:'msg-late',sentAt:2,type:'worker_done'};
-  fs.writeFileSync(store.reportPath(dispatchId),`${JSON.stringify(report,null,2)}\n`);
+  store.writeReport({dispatchId,opId:op.id,attempt:op.attempt,report,fromTerminal:op.terminal});
   assert.equal(stageAnsweredDecisionLateReport(current,op,{store,runtime,dispatchId,taskId}).ok,true);
   // Custody is gone before the replay pass: the sealed candidate's control root no longer exists.
   fs.rmSync(op.candidate.controlRoot,{recursive:true,force:true});

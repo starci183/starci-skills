@@ -19,7 +19,7 @@ const flag=(args,name)=>{const index=args.indexOf(`--${name}`);return index<0?nu
  * (claude, codex) operations through the real launcher, and the blocking wait "finishes" each live
  * operation by writing the next report scripted for its operation id.
  */
-export function scriptedOrca({reportsDir,scripts,worktree,run='run_wf',worktrees=null}){
+export function scriptedOrca({store,scripts,worktree,run='run_wf',worktrees=null}){
   const terminals=new Map(),dispatches=new Map(),tasks=new Map(),live=new Map();
   const taken=new Map();let counter=0;const sends=[];
   /**
@@ -102,17 +102,16 @@ export function scriptedOrca({reportsDir,scripts,worktree,run='run_wf',worktrees
     check:args=>{
       if(args.includes('--peek'))return json(0,{ok:true,result:{messages:[]}});
       // The blocking wait: every live operation that still has a scripted report finishes now.
+      const existing=live.size?new Set(store.readReports().map(item=>item.dispatchId)):new Set();
       for(const dispatch of live.values()){
         const queue=scripts[dispatch.op];
-        const file=path.join(reportsDir,`${dispatch.id}.json`);
-        if(!queue?.length||fs.existsSync(file))continue;
+        if(!queue?.length||existing.has(dispatch.id))continue;
         const {effect,...script}=queue.shift();
         // What the agent left on disk beside its report: a design record, a committed file.
         if(typeof effect==='function')effect();
         const report=buildReport({...script,run,task:dispatch.task,dispatch:dispatch.id,from:dispatch.handle});
         report.sent={messageId:`msg_${dispatch.id}`,sentAt:1,type:report.signal.type};
-        fs.mkdirSync(reportsDir,{recursive:true});
-        fs.writeFileSync(file,JSON.stringify(report));
+        store.writeReport({dispatchId:dispatch.id,report,fromTerminal:dispatch.handle});
         taken.set(dispatch.id,dispatch.op);
       }
       return json(0,{ok:true,result:{deliveryId:`delivery_${counter}`,messages:[]}});
