@@ -67,17 +67,17 @@ test('every operator has an ordered external-agent chain and skill-level default
     assert.ok(route.candidates.every(candidate=>candidate.orcaLaunch.kind==='managed-agent'||(candidate.orcaLaunch.kind==='command-terminal'&&candidate.orcaLaunch.dispatch==='return-preamble-and-send')),op);
   }
   assert.deepEqual(resolveExecutionChain({op:'interface.draw'}).candidates.map(x=>x.target),['codex-agent']);
-  assert.equal(resolveExecutionChain({op:'interface.draw'}).candidates[0].model,'gpt-5.6-sol');
+  assert.equal(resolveExecutionChain({op:'interface.draw'}).candidates[0].model,'gpt-5.6-luna');
   // Generating the declared artwork is the same image-model requirement, so it cannot fall through to a runtime
   // that would defer the slot: a deferred slot is exactly what this operation exists to close.
   assert.deepEqual(resolveExecutionChain({op:'interface.asset'}).candidates.map(x=>x.target),['codex-agent']);
-  assert.equal(resolveExecutionChain({op:'interface.asset'}).candidates[0].model,'gpt-5.6-sol');
+  assert.equal(resolveExecutionChain({op:'interface.asset'}).candidates[0].model,'gpt-5.6-luna');
   assert.equal(resolveExecutionChain({op:'interface.asset'}).role,'working');
   assert.equal(selectExecutionTarget({op:'interface.asset',inventory:['codex','claude','qwen']}).selected.target,'codex-agent');
   // Growing the grammar is a code-and-publish job: the strongest coding runtimes, and never the image model.
   assert.deepEqual(resolveExecutionChain({op:'grammar.update'}).candidates.map(x=>x.target),['claude-agent','codex-agent','devin-agent']);
   assert.equal(resolveExecutionChain({op:'grammar.update'}).role,'working');
-  assert.deepEqual(resolveExecutionChain({op:'grammar.update'}).candidates.map(x=>x.profile),['opus','gpt-5.6-sol','devin-worker']);
+  assert.deepEqual(resolveExecutionChain({op:'grammar.update'}).candidates.map(x=>x.profile),['opus','gpt-5.6-luna','devin-worker']);
   assert.deepEqual(resolveExecutionChain({op:'interface.implement'}).candidates.map(x=>x.target),['qwen-agent','devin-agent','claude-agent','codex-agent']);
   assert.deepEqual(resolveExecutionChain({op:'interface.implement'}).candidates[0].orcaLaunch,qwenLaunch);
   assert.equal(registry.orchestration.defaultOperationTarget,'qwen-agent');
@@ -103,10 +103,10 @@ test('every operator has an ordered external-agent chain and skill-level default
   // API end-to-end proof runs code, so its chain is the verify-role runtimes that can: the Codex pool first, then Claude, Qwen and Devin.
   assert.deepEqual(resolveExecutionChain({op:'e2e.verify'}).candidates.map(x=>x.target),['codex-agent','claude-agent','qwen-agent','devin-agent']);
   // It runs code rather than reasoning about it, so the working profile applies, not the reviewer one.
-  assert.equal(resolveExecutionChain({op:'e2e.verify'}).candidates[0].profile,'gpt-5.6-sol');
+  assert.equal(resolveExecutionChain({op:'e2e.verify'}).candidates[0].profile,'gpt-5.6-luna');
   // A live call to a declared provider is the same work against a different surface, so it is the same chain.
   assert.deepEqual(resolveExecutionChain({op:'integration.verify'}).candidates.map(x=>x.target),['codex-agent','claude-agent','qwen-agent','devin-agent']);
-  assert.equal(resolveExecutionChain({op:'integration.verify'}).candidates[0].profile,'gpt-5.6-sol');
+  assert.equal(resolveExecutionChain({op:'integration.verify'}).candidates[0].profile,'gpt-5.6-luna');
   // Completing a Work record is reading work, so it runs on the plan-role runtimes with the reasoning profiles.
   // Authoring records leads with the strongest reasoning runtimes and never the cheap pool, and carries the
   // downgrade under them so a spent week hands the authoring on instead of holding it.
@@ -118,7 +118,7 @@ test('every operator has an ordered external-agent chain and skill-level default
   // runtimes follow as the candidates the allocator actually prefers.
   assert.deepEqual(resolveExecutionChain({op:'brand.decide'}).candidates.map(x=>x.target),['codex-agent','claude-agent']);
   assert.equal(resolveExecutionChain({op:'brand.decide'}).role,'working','it generates the placeholder mascot, so it runs on the working profiles where image generation is');
-  assert.deepEqual(resolveExecutionChain({op:'brand.decide'}).candidates.map(x=>x.profile),['gpt-5.6-sol','opus']);
+  assert.deepEqual(resolveExecutionChain({op:'brand.decide'}).candidates.map(x=>x.profile),['gpt-5.6-luna','opus']);
   assert.deepEqual(registry.skills.starci.chains.working,['qwen-agent','devin-agent','claude-agent','codex-agent']);
   assert.deepEqual(registry.skills.starci.chains.reasoning,['claude-fable','codex-agent']);
   assert.equal(registry.supervisors.schema,'starci/supervisor-chains@1');

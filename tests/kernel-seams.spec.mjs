@@ -31,6 +31,9 @@ const tmp=()=>{const dir=path.join(os.tmpdir(),'starci-kernel-seams',`${Date.now
 
 function stubStore(dir){
   const events=[];
+  // §8: the validator's memory page and verdict log are `signals` rows now, not files under a store
+  // directory that no longer exists. The stub carries the same keyed surface the real store exposes.
+  const signals=new Map();
   return {id:'wf-seam',dir,events,
     paths:{reports:path.join(dir,'reports'),goal:path.join(dir,'goal.md'),goalJson:path.join(dir,'goal.json'),
       inbox:path.join(dir,'inbox'),final:path.join(dir,'final.json'),launch:path.join(dir,'launch.json'),
@@ -42,7 +45,10 @@ function stubStore(dir){
     writeChecks({opId,attempt}={}){return {opId,attempt};},
     checksPath:id=>path.join(dir,'checks',`${id}.json`),
     contractPath:id=>path.join(dir,'contracts',`${id}.md`),
-    reportPath:dispatch=>path.join(dir,'reports',`${dispatch}.json`)};
+    reportPath:dispatch=>path.join(dir,'reports',`${dispatch}.json`),
+    signal:{get:(scope,key)=>signals.get(`${scope}/${key}`)??null,
+      set:(scope,key,row)=>{signals.set(`${scope}/${key}`,{...row});return row;},
+      clear:(scope,key)=>signals.delete(`${scope}/${key}`)}};
 }
 const stubState=(store,ops=[])=>({id:store.id,dir:store.dir,job:'a seam under test',worktree:store.dir,branch:'seam',
   ledgerMode:'plan',scope:[],inputs:[],ledger:[],ops,needUser:[],lanes:{},gates:[],gateResults:[],verifyRounds:{},

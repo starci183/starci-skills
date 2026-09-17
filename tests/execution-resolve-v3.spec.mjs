@@ -55,13 +55,13 @@ test('resolver selects deterministically and preserves unavailable observations'
         {profile: 'qwen3.8-flash-worker', status: 'unavailable', reason: 'quota-exhausted'}
       ]},
       {environment: 'codex', status: 'ready', profiles: [
-        {profile: 'gpt-5.6-sol', status: 'ready', observedModel: 'gpt-5.6-sol'}
+        {profile: 'gpt-5.6-luna', status: 'ready', observedModel: 'gpt-5.6-luna'}
       ]}
     ]
   });
   assert.equal(result.selected.target, 'codex-agent');
-  assert.equal(result.selected.requestedModel, 'gpt-5.6-sol');
-  assert.equal(result.selected.observedModel, 'gpt-5.6-sol');
+  assert.equal(result.selected.requestedModel, 'gpt-5.6-luna');
+  assert.equal(result.selected.observedModel, 'gpt-5.6-luna');
   assert.equal(result.observations.find(value => value.target === 'codex-agent').reason, null);
   assert.equal(result.observations[0].status, 'unavailable');
   assert.equal(result.observations[0].observation.environment, 'qwen');
