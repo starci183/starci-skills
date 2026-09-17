@@ -541,7 +541,7 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],requireRep
   for(const file of trustedHousekeeping){const routed=pathInCandidateRoots(file,bridge.rootBindings);housekeepingByRoot.get(routed.rootId)?.push(routed.relative);}
   const foreignByRoot=new Map(bridge.roots.map(root=>[root.id,[]]));
   for(const scope of foreignScopes){try{const routed=pathInCandidateRoots(scope,bridge.rootBindings);foreignByRoot.get(routed.rootId)?.push(routed.relative);}catch{}}
-  const roots=[],observed=[],housekeepingObserved=[],runtimeAcknowledgements=[],concurrentDrift=[];let quarantined=false;
+  const roots=[],observed=[],housekeepingObserved=[],runtimeAcknowledgements=[],concurrentDrift=[],baselineTouched=[],cleanNow=[];let quarantined=false;
   for(const root of bridge.roots){
     const frozen=freezeSingleDetectionCandidate(root.bridge,{git,reportedFiles:[],housekeepingPaths:housekeepingByRoot.get(root.id)??[],foreignAllowlists:foreignByRoot.get(root.id)??[],now});
     if(frozen.status!=='sealed')quarantined=true;
@@ -549,6 +549,9 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],requireRep
     housekeepingObserved.push(...(frozen.housekeepingObserved??[]).map(file=>({rootId:root.id,path:file,displayPath:candidateDisplayPath(root,file)})));
     runtimeAcknowledgements.push(...(frozen.runtimeAcknowledgements??[]).map(record=>({rootId:root.id,...record})));
     concurrentDrift.push(...(frozen.concurrentWriterDrift??[]).map(file=>({rootId:root.id,path:file,displayPath:candidateDisplayPath(root,file)})));
+    // Reasons name the root-relative path; observed files carry the display path. Both spellings are kept so the
+    // engine can match a `pre-existing-user-work-modified:<file>` reason and exclude that file from the observed set.
+    baselineTouched.push(...(frozen.baselineTouched??[]).map(file=>candidateDisplayPath(root,file)));cleanNow.push(...(frozen.cleanNow??[]));
     roots.push({id:root.id,role:root.role,repoRoot:root.repoRoot,controlRoot:root.controlRoot,runtimePin:root.runtimePin?{...root.runtimePin}:null,workerWritable:Boolean(root.workerWritable),
       runtimeWritable:Boolean(root.runtimeWritable),readOnly:Boolean(root.readOnly),status:frozen.status,reasons:[...(frozen.reasons??[])],observedFiles:changed,
       concurrentWriterDrift:[...(frozen.concurrentWriterDrift??[])],
@@ -556,7 +559,7 @@ export function freezeDetectionCandidate(bridge,{git,reportedFiles=[],requireRep
       ...(frozen.status==='sealed'?{acceptedHead:frozen.packet.acceptedHead,snapshotDigest:frozen.packet.snapshotDigest,candidateDigest:frozen.packet.candidateDigest,
         oracleDigest:frozen.packet.oracleDigest,environmentDigest:frozen.packet.environmentDigest,files:frozen.packet.files,changes:frozen.packet.changes}:{}),packet:frozen.packet});
   }
-  if(quarantined)return {schema:ROOT_DETECTION_BRIDGE,status:'quarantine',reasons:roots.flatMap(root=>root.reasons.map(reason=>`${root.id}:${reason}`)),concurrentWriterDrift:concurrentDrift.map(item=>item.displayPath),observedFiles:observed.map(item=>item.displayPath),housekeepingObserved:housekeepingObserved.map(item=>item.displayPath),runtimeAcknowledgements,roots,assurance:bridge.writer};
+  if(quarantined)return {schema:ROOT_DETECTION_BRIDGE,status:'quarantine',reasons:roots.flatMap(root=>root.reasons.map(reason=>`${root.id}:${reason}`)),concurrentWriterDrift:concurrentDrift.map(item=>item.displayPath),observedFiles:observed.map(item=>item.displayPath),baselineTouched,cleanNow,housekeepingObserved:housekeepingObserved.map(item=>item.displayPath),runtimeAcknowledgements,roots,assurance:bridge.writer};
   const mismatch=requireReported?reportMismatch(bridge.rootBindings,observed,reportedFiles):{missing:[],extra:[]};
   const reportDiagnostics={unmatched:mismatch.extra};
   if(mismatch.missing.length)return {schema:ROOT_DETECTION_BRIDGE,status:'quarantine',reasons:mismatch.missing.map(file=>`unreported-changed-file:${file}`),reportDiagnostics,

@@ -539,7 +539,7 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
         housekeeping:{workflowId:state.id,opId:op.id,dispatch:op.dispatch??op.launch?.dispatch??null},now});
       const {packet}=frozen;
       op.candidate={...op.candidate,status:frozen.status,observedFiles:[...(frozen.observedFiles??[])],assurance:frozen.assurance,
-        concurrentWriterDrift:[...(frozen.concurrentWriterDrift??[])],
+        concurrentWriterDrift:[...(frozen.concurrentWriterDrift??[])],baselineTouched:[...(frozen.baselineTouched??[])],cleanNow:[...(frozen.cleanNow??[])],
         reportDiagnostics:{unmatched:[...(frozen.reportDiagnostics?.unmatched??[])]},housekeepingObserved:[...(frozen.housekeepingObserved??[])],
         runtimeAcknowledgements:(frozen.runtimeAcknowledgements??[]).map(record=>({...record,paths:(record.paths??[]).map(item=>typeof item==='object'?{...item}:item)})),
         ...(frozen.observedByRoot?{observedByRoot:frozen.observedByRoot.map(item=>({...item}))}:{}),
