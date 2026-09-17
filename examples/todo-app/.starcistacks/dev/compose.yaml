@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16
+    env_file:
+      - runtime/env/app.env
+    volumes:
+      - ./seeds:/docker-entrypoint-initdb.d:ro
+  api:
+    image: todo-app/api
+    depends_on:
+      - postgres
+    env_file:
+      - runtime/env/app.env
+    ports:
+      - "3001:3001"
+  web:
+    image: todo-app/web
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+

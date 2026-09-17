@@ -1,0 +1,6 @@
+schema: work/node
+id: todo.task
+kind: business
+required: true
+description: A task a person creates, completes and deletes.
+

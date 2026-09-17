@@ -1,0 +1,27 @@
+schema: work/node
+id: todo.brand
+kind: brand
+required: true
+description: The one brand record of this product.
+state: done
+activity: idle
+brand:
+  rev: 2
+  colour:
+    primary: "#2F6BFF"
+    surface: "#FFFFFF"
+  typography:
+    sans: Inter
+  donts:
+    - Never place text on the primary colour below a 4.5 to 1 contrast ratio.
+completion:
+  review:
+    schema: starci/design-review
+    reviewer: brand owner
+    authority: Owner settled rev 2.
+    reviewedAt: 2026-09-18T05:00:00.000Z
+    observations:
+      - id: tokens-exist-in-the-frontend
+        outcome: pass
+        observation: The named token file declares every colour above.
+

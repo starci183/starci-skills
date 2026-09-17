@@ -1,0 +1,43 @@
+schema: work/node
+id: todo.task.business.srs.br.br-task-single-owner
+kind: business
+required: true
+description: BR-TASK-SINGLE-OWNER
+state: done
+activity: idle
+assertions:
+  - complete-current-content
+  - stable-traceability
+extensions:
+  work3:
+    srs:
+      schema: starci/srs-business-rule
+      status: accepted
+      id: BR-TASK-SINGLE-OWNER
+      title: A task has exactly one owner
+      statements:
+        - A task belongs to exactly one person, and only that person may complete or delete it.
+      acceptanceCriteria:
+        - id: AC-BR-TASK-SINGLE-OWNER
+          given: A task exists with an owner
+          when: Somebody who is not the owner attempts to complete or delete it
+          then:
+            - The attempt is refused and the task is unchanged.
+completion:
+  inputDigest: 4c1f0b9e2d7a5c3f8e1b6d4a9c2f7e0b5d8a3c6f1e4b7d0a9c2e5f8b1d4a7c30
+  review:
+    schema: starci/design-review
+    reviewer: design integration writer
+    authority: Owner accepted the rule as implementable.
+    reviewedAt: 2026-09-18T02:10:00.000Z
+    observations:
+      - id: rule-is-decidable
+        outcome: pass
+        observation: Every term in the statement resolves to a data definition this SRS owns.
+proven:
+  by:
+    - todo.task.implementation.backend
+    - todo.task.uat.create-task
+  digest: 4c1f0b9e2d7a5c3f8e1b6d4a9c2f7e0b5d8a3c6f1e4b7d0a9c2e5f8b1d4a7c30
+  at: 2026-09-18T04:40:00.000Z
+

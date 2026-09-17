@@ -1,0 +1,8 @@
+schema: work/node
+id: todo
+kind: feature-catalog
+required: true
+description: Product catalog. Every actual feature owns its own directory beside this file.
+children:
+  - todo.task
+

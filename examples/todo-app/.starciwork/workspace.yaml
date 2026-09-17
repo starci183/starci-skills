@@ -1,0 +1,10 @@
+schema: work/workspace
+id: todo-app
+project: todo-app
+description: A todo application, written out as the readable example of the Work layout.
+repositories:
+  - role: be
+    name: todo-app
+  - role: fe
+    name: todo-app-web
+

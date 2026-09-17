@@ -1,0 +1,44 @@
+schema: starci/application-stacks
+sources:
+  - repository: todo-app
+components:
+  api:
+    image: todo-app/api
+    role: service
+  web:
+    image: todo-app/web
+    role: service
+  postgres:
+    image: postgres:16
+    role: stateful
+environments:
+  dev:
+    status: supported
+    runtime: docker-compose
+    composeFiles:
+      - compose.yaml
+    components:
+      api: {}
+      web: {}
+      postgres: {}
+    runbook: README.md
+    secrets:
+      - name: uat
+        where: secrets/uat
+  vps:
+    status: supported
+    runtime: docker-swarm
+    composeFiles:
+      - stack.yaml
+    components:
+      api: {}
+      web: {}
+      postgres: {}
+    runbook: README.md
+    secrets:
+      - name: uat
+        where: secrets/uat
+k8s:
+  status: deferred
+  reason: One VPS serves the current load; a cluster would add a control plane nobody operates yet.
+
