@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 import test from 'node:test';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
@@ -171,7 +172,7 @@ test('executes from a relocated installed payload using only its compiled schema
   fs.copyFileSync(new URL('../checks/stacks.mjs',import.meta.url),path.join(dist,'checks','stacks.mjs'));fs.copyFileSync(new URL('../core/yaml.mjs',import.meta.url),path.join(dist,'core','yaml.mjs'));
   const schema=parseYaml(fs.readFileSync(new URL('../schemas/application-stacks.schema.yaml',import.meta.url),'utf8'));fs.writeFileSync(path.join(dist,'schemas','application-stacks.schema.json'),JSON.stringify(schema));
   assert.equal(fs.existsSync(path.join(dist,'schemas','application-stacks.schema.yaml')),false);
-  const relocated=await import(`${new URL(`../${path.basename(payload)}/.dist/checks/stacks.mjs`,import.meta.url).href}?relocated=${Date.now()}`);
+  const relocated=await import(`${pathToFileURL(path.join(payload,'.dist','checks','stacks.mjs')).href}?relocated=${Date.now()}`);
   const result=relocated.checkApplicationStacks({repoRoot:f.root,environment:'dev',deploymentModelFile:f.modelFile});assert.equal(result.ok,true,result.errors.map(x=>x.code).join(','));
 });
 

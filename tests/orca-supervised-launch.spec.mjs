@@ -11,14 +11,18 @@ import {ensureAgentTrust} from '../hosts/orca/launch.mjs';
 import {dispatchLastWords,parseLastFailure,workerLastWords} from '../hosts/orca/launch.mjs';
 
 const calls=parseYaml(fs.readFileSync(new URL('../providers/orca/calls.yaml',import.meta.url),'utf8'));
-// Fake launch writes must not race installers copying the packaged fixtures.
-// Keep this relative-path fixture on the current drive, outside every payload root.
-const suiteRoot=fs.mkdtempSync(path.join(os.tmpdir(),'starci-orca-launch-'));
+// Fake launch writes must not race installers copying the packaged fixtures, and a worktree input must be
+// relative (hosts/orca/launch.mjs), which rules out `os.tmpdir()` here: it is on another drive, so
+// `path.relative` from this checkout answers with an absolute path. The fixture therefore lives on the
+// current drive's root - relative from here, and outside both the runtime tree and every payload root.
+const suiteTemp=path.join(path.parse(process.cwd()).root,'starci-tmp');
+fs.mkdirSync(suiteTemp,{recursive:true});
+const suiteRoot=fs.mkdtempSync(path.join(suiteTemp,'orca-launch-'));
 const worktree=path.relative(process.cwd(),suiteRoot);
 const worktreePath=fs.realpathSync(suiteRoot);
 after(()=>{
-  assert.equal(path.dirname(suiteRoot),process.cwd());
-  assert.ok(path.basename(suiteRoot).startsWith('.orca-launch-test-'));
+  assert.equal(path.dirname(suiteRoot),suiteTemp);
+  assert.ok(path.basename(suiteRoot).startsWith('orca-launch-'));
   fs.rmSync(suiteRoot,{recursive:true,force:true});
 });
 const noWait=()=>{};
