@@ -33,7 +33,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {sealRuntime,verifyRuntimePin} from '../kernel/runtime-pin.mjs';
 import {createStore} from '../kernel/store.mjs';
-import {openJournal} from '../kernel/journal.mjs';
+import {openLedger,ledgerFileFor} from '../kernel/ledger-db.mjs';
 import {enrollEngine} from '../kernel/engine.mjs';
 import {deriveOwnerRequests} from '../kernel/owner-requests.mjs';
 import {enqueueOwnerInbox} from '../kernel/owner-inbox.mjs';
@@ -69,7 +69,7 @@ test('the supervisor retains the lock until the former kernel is confirmed dead'
 });
 
 test('owner inbox commits the actual choice and requester continuation once',t=>{
-  const root=fixture(t),store=createStore({repoRoot:root,id:'wf'}),journal=openJournal({file:path.join(root,'journal.sqlite')});
+  const root=fixture(t),store=createStore({repoRoot:root,id:'wf'}),journal=openLedger({file:ledgerFileFor(root)});
   const state={schema:store.schema,id:'wf',job:'synthetic approval fixture',approved:true,inputs:['approved-ref'],scope:[],definitionOfDone:[],ledgerMode:'plan',engine:{schema:'starci/engine@1',generation:2},needUser:[{op:'ask',kind:'decision',record:'decision.theme',options:['Use the blue theme.','Use the green theme.']}],ops:[
     {id:'ask',kind:'decision.prepare',status:'running',attempt:1,ownerRequestStatus:'waiting-owner',decisionOptionsDigest:'a'.repeat(64),
       question:{kind:'decision',record:'decision.theme',text:'Choose the theme',options:[{id:'1',label:'Use the blue theme.'},{id:'2',label:'Use the green theme.'}]},requesters:['work']},

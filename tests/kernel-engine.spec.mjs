@@ -6,6 +6,7 @@ import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {openJournal,sqliteAtLeast,compactSnapshots,SNAPSHOT_BODIES_KEPT} from '../kernel/journal.mjs';
+import {openLedger,ledgerFileFor} from '../kernel/ledger-db.mjs';
 import {createAdmission,GLOBAL_AI_RESOURCE} from '../kernel/admission.mjs';
 import {createJobs,createJobRunner} from '../kernel/jobs.mjs';
 import {rankJobs,scheduleJobs,updateProgressBudget,progressExhausted} from '../kernel/scheduler.mjs';
@@ -167,14 +168,19 @@ test('progress budgets reset only on a new evidence fingerprint',()=>{
   p=updateProgressBudget(p,{attempts:1,progressFingerprint:'b'});assert.equal(p.attempts,0);assert.equal(p.progressed,true);
 });
 
-test('journal-bound store recovers committed state when the JSON projection is lost',async()=>{
+// §8: state has no on-disk JSON projection any more (`paths.state` is removed) - recovery reads the ledger
+// snapshot alone, so a fresh store on the same repo sees the latest committed state with nothing to tear.
+test('durable state recovers from the ledger alone; a fresh store on the same repo sees the latest commit',async()=>{
   const repo=temporary(),store=createStore({repoRoot:repo,id:'wf'}),state={schema:WORKFLOW_STATE,id:'wf',job:'goal',ops:[],counter:1};store.saveState(state);
-  const journal=openJournal({file:path.join(repo,'journal.sqlite')});store.bindJournal(journal,1,{state});store.saveState({...state,counter:2});fs.writeFileSync(store.paths.state,'{"torn":');assert.equal(store.loadState().counter,2);journal.close();fs.rmSync(repo,{recursive:true,force:true});
+  const journal=openLedger({file:ledgerFileFor(repo)});store.bindJournal(journal,1,{state});store.saveState({...state,counter:2});
+  const reopened=createStore({repoRoot:repo,id:'wf'});
+  assert.equal(reopened.loadState().counter,2);
+  reopened.close();store.close();journal.close();fs.rmSync(repo,{recursive:true,force:true});
 });
 
 test('the snapshot ledger keeps one body and the transition checkpoints of the bound generation, and nothing of a retired one',async()=>{
   const repo=temporary(),store=createStore({repoRoot:repo,id:'wf'}),state={schema:WORKFLOW_STATE,id:'wf',job:'goal',ops:[],counter:0};store.saveState(state);
-  const journal=openJournal({file:path.join(repo,'journal.sqlite')});store.bindJournal(journal,1,{state});
+  const journal=openLedger({file:ledgerFileFor(repo)});store.bindJournal(journal,1,{state});
   for(let counter=1;counter<=6;counter+=1)store.saveState({...state,counter});
   const rows=()=>journal.db.prepare('SELECT snapshot_id,checkpoint_id,generation,length(state_json) body FROM state_snapshots ORDER BY snapshot_id').all();
   assert.equal(rows().length,2,'the bind checkpoint and the latest save: an older save is a duplicate of a state the next save replaced');
@@ -193,25 +199,25 @@ test('the snapshot ledger keeps one body and the transition checkpoints of the b
   assert.equal(reopened.loadState().counter,23);
   journal.db.prepare("INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at) VALUES('save:wf:1:stale','wf',1,?,'{\"stale\":true}',1)").run(stateGoalIdentity(state));
   journal.close();
-  const again=openJournal({file:path.join(repo,'journal.sqlite')});
-  assert.equal(again.db.prepare('SELECT count(*) n FROM state_snapshots WHERE generation=1').get().n,0,'opening the journal compacts what an older runtime left behind');
+  const again=openLedger({file:ledgerFileFor(repo)});
+  assert.equal(again.db.prepare('SELECT count(*) n FROM state_snapshots WHERE generation=1').get().n,0,'opening the ledger compacts what an older runtime left behind');
   assert.equal(compactSnapshots(again.db),0,'compaction is idempotent');
-  again.close();fs.rmSync(repo,{recursive:true,force:true});
+  again.close();reopened.close();store.close();fs.rmSync(repo,{recursive:true,force:true});
 });
 
 test('durable transition applies continuation and its event once',async()=>{
-  const repo=temporary(),store=createStore({repoRoot:repo,id:'wf'}),state={schema:WORKFLOW_STATE,id:'wf',job:'goal',ops:[],counter:0};store.saveState(state);const journal=openJournal({file:path.join(repo,'journal.sqlite')});store.bindJournal(journal,1,{state});let applied=0;
-  const options={transitionId:'owner-action-1',event:{kind:'owner-action-applied',payload:{requestId:'r'}},apply:next=>{applied+=1;next.counter+=1;}};const first=store.transition(state,options),second=store.transition(state,options);assert.equal(first.counter,1);assert.equal(second.counter,1);assert.equal(applied,1);assert.equal(journal.events().filter(event=>event.kind==='owner-action-applied').length,1);journal.close();fs.rmSync(repo,{recursive:true,force:true});
+  const repo=temporary(),store=createStore({repoRoot:repo,id:'wf'}),state={schema:WORKFLOW_STATE,id:'wf',job:'goal',ops:[],counter:0};store.saveState(state);const journal=openLedger({file:ledgerFileFor(repo)});store.bindJournal(journal,1,{state});let applied=0;
+  const options={transitionId:'owner-action-1',event:{kind:'owner-action-applied',payload:{requestId:'r'}},apply:next=>{applied+=1;next.counter+=1;}};const first=store.transition(state,options),second=store.transition(state,options);assert.equal(first.counter,1);assert.equal(second.counter,1);assert.equal(applied,1);assert.equal(journal.events().filter(event=>event.kind==='owner-action-applied').length,1);journal.close();store.close();fs.rmSync(repo,{recursive:true,force:true});
 });
 
 test('durable recovery rejects the same job text with changed approved inputs',async()=>{
-  const repo=temporary(),store=createStore({repoRoot:repo,id:'wf'}),a={schema:WORKFLOW_STATE,id:'wf',job:'same',inputs:['input-a'],scope:['x'],definitionOfDone:['done'],ops:[]};store.saveState(a);const journal=openJournal({file:path.join(repo,'journal.sqlite')});store.bindJournal(journal,1,{state:a});
-  const reopened=createStore({repoRoot:repo,id:'wf'}),b={...a,inputs:['input-b']};assert.throws(()=>reopened.bindJournal(journal,1,{state:b}),/different approved goal/);journal.close();fs.rmSync(repo,{recursive:true,force:true});
+  const repo=temporary(),store=createStore({repoRoot:repo,id:'wf'}),a={schema:WORKFLOW_STATE,id:'wf',job:'same',inputs:['input-a'],scope:['x'],definitionOfDone:['done'],ops:[]};store.saveState(a);const journal=openLedger({file:ledgerFileFor(repo)});store.bindJournal(journal,1,{state:a});
+  const reopened=createStore({repoRoot:repo,id:'wf'}),b={...a,inputs:['input-b']};assert.throws(()=>reopened.bindJournal(journal,1,{state:b}),/different approved goal/);journal.close();reopened.close();store.close();fs.rmSync(repo,{recursive:true,force:true});
 });
 
 test('replaying transition A after B returns B and cannot roll state backward',async()=>{
-  const repo=temporary(),store=createStore({repoRoot:repo,id:'wf'}),state={schema:WORKFLOW_STATE,id:'wf',job:'goal',inputs:[],ops:[],counter:0};store.saveState(state);const journal=openJournal({file:path.join(repo,'journal.sqlite')});store.bindJournal(journal,1,{state});
-  const a=store.transition(state,{transitionId:'a',apply:next=>{next.counter=1;}}),b=store.transition(a,{transitionId:'b',apply:next=>{next.counter=2;}}),replayA=store.transition(b,{transitionId:'a',apply:()=>{throw Error('must not run');}});assert.equal(replayA.counter,2);assert.equal(store.loadState().counter,2);journal.close();fs.rmSync(repo,{recursive:true,force:true});
+  const repo=temporary(),store=createStore({repoRoot:repo,id:'wf'}),state={schema:WORKFLOW_STATE,id:'wf',job:'goal',inputs:[],ops:[],counter:0};store.saveState(state);const journal=openLedger({file:ledgerFileFor(repo)});store.bindJournal(journal,1,{state});
+  const a=store.transition(state,{transitionId:'a',apply:next=>{next.counter=1;}}),b=store.transition(a,{transitionId:'b',apply:next=>{next.counter=2;}}),replayA=store.transition(b,{transitionId:'a',apply:()=>{throw Error('must not run');}});assert.equal(replayA.counter,2);assert.equal(store.loadState().counter,2);journal.close();store.close();fs.rmSync(repo,{recursive:true,force:true});
 });
 
 test('dead read-only tool-disabled model is settled, while host-owned operation never enters PID reconciliation',()=>withJournal(journal=>{
