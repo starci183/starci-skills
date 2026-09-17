@@ -65,6 +65,12 @@ starci workflow-answer  --id <id> --op <ask op> [--choice <n>] [--note "<the own
 starci workflow-run     --id <id> [--from <own terminal> --run <run>] [--launch-file <f>] [--max-iterations N]
 starci workflow-status  --id <id>
 starci workflow-lane-close --id <id>
+starci workflow-export  --id <id> --to <dir>
+starci op-contract      --workflow <id> --op <op> [--attempt N] [--dispatch <id>] [--json]
+starci ledger-verify     --repo <ledger root>
+starci ledger-migrate    --repo <ledger root> [--journal-file <old>] [--dry-run] [--archive true]
+starci ledger-prune      --repo <ledger root>
+starci ledger-retire     --repo <ledger root>
 ```
 
 Every command also takes `--host-adapter orca|headless` (default `orca`, or `headless` when `STARCI_HOST=headless`
@@ -74,15 +80,17 @@ is set): see [Hosts: Orca and headless](#hosts-orca-and-headless-one-chat--one-w
 reinstates the operations the dynamic-op gate refused. Re-approving is how a user answers that gate.
 `--accept-critique "<reason>"` is how a user approves a goal whose critique returned `refuse` (see **Phases**).
 
-All runtime state of one workflow lives in one directory (`kernel/store.mjs`):
-`state.json` (atomic snapshot), `events.jsonl` (append-only audit), `goal.md` / `goal.json`, `contracts/`,
-`reports/`, `checks/`, `validator/` (the validator's memory and verdict log), `final-report.json`.
-For enrolled workflows, each completed state projection, event append and exact kernel/native operation artifact
-records a byte/size receipt in that workflow's operational journal. Linked branch checkouts can keep their
-authored Work root on the branch while their store resolves through Git's common directory; candidates recognize
-concurrent foreign runtime writes only through the latest exact post-baseline receipts, not through a live
-process, plausible event JSON or an operation-shaped filename. Completion deletes operational jobs/history but
-keeps one final state and the latest receipt per runtime path for candidates which were already open.
+Runtime 1.0.4: everything a workflow needs lives in one ledger, `<ledger repo>/.starciwork/runtime.sqlite`
+(`kernel/store.mjs` over `kernel/ledger-db.mjs`) — state snapshots, the append-only hash-chained event log,
+the goal (a `goals` row per revision, never a `goal.md`/`goal.json` file), jobs, leases, reports, contracts,
+checks, inbox and signals (`kernel.lock`/`supervisor.lock`/`stop.flag`/`inputs-lock`/`launch`/`final-report`,
+formerly separate files). `.starciwork/_local` is import/export only: `ledger-migrate` reads it once,
+`workflow-export --id <id> --to <dir>` writes today's file layout back out for a human to read, and the kernel
+itself never opens it. See [ledger-db.md](ledger-db.md) for the schema, the module API and the migration and
+verification bar; see **Persistence** in `goal.md` for the rule in one paragraph. Linked branch checkouts can
+keep their authored Work root on the branch while their ledger resolves through Git's common directory;
+candidates recognize concurrent foreign runtime writes only through the latest exact post-baseline receipts,
+not through a live process, plausible event JSON or an operation-shaped filename.
 
 ## Two ledgers
 

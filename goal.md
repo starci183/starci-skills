@@ -24,7 +24,8 @@ verified goal instead of stalling at `finished: blocked`.
 
 - A workflow starts in a **chat app** (Devin/Claude/Codex CLI), not in Orca. The chat runs the
   intake (`request.analyze`/`scope.define`), hands the result to the Orca host, and the kernel
-  writes `_local/workflows/<id>/goal.json` (machine contract) + `goal.md` (human read).
+  writes the goal as a `goals` row of the ledger DB (`store.setGoal`: machine contract + human
+  read together, revision-stamped) — see §8 Persistence. There is no `goal.json`/`goal.md` file.
 - Goal is **frozen with `goalRev`** at approval. Every op, decision and artifact binds the rev it
   was derived from.
 - Goal is **dynamic through `goal.revise` only** — a typed op that produces goal v(n+1) with a diff
@@ -188,6 +189,40 @@ Every dispatch/settle/block emits a human-readable line (a parallel `trace.log` 
 `events.jsonl`): which op, why picked (gap + requires state), exact inputs (file+digest), chosen
 model + reason, what the op returned, and the block classification with its route. Debug off → the
 existing event stream, unchanged.
+
+## 8. Persistence — runtime 1.0.4
+
+Everything a workflow needs lives in `.starciwork/runtime.sqlite`; the kernel never writes or
+reads `.starciwork/_local` again.
+
+- **The ledger DB is the record.** `<ledger repo>/.starciwork/runtime.sqlite` holds state, events,
+  jobs, leases, goals, reports, contracts, checks, inbox, signals, loads and budgets — everything a
+  workflow needs to continue, to be audited and to be archived. See `docs/ledger-db.md` for the
+  schema, module API, two-phase reservation and migration.
+- **`_local` is import/export only.** `.starciwork/_local/workflows/<id>/` is never written or read
+  by the kernel. `ledger-migrate` imports it once; `workflow-export` writes today's file layout back
+  out for a human to read. A kernel that finds a `_local` workflow directory with no matching
+  `workflows` row fails closed with `ledger-unmigrated` — it never reads the files as authority.
+- **The machine DB holds only `ai/*` and machine budgets.** `%LOCALAPPDATA%/StarCi/runtime/machine.sqlite`
+  is the cross-ledger arbiter for provider quota and machine budgets, which span ledgers by
+  construction; nothing else lives there. Every other resource (repo fences, `maxConcurrentWriters`)
+  is a ledger `resources` row, reserved in the same transaction as the job it belongs to.
+  `runtime-budget.json` (Orca's own provider-quota probe, a different concept from the ledger's
+  `budgets` table) lives beside the ledger at `.starciwork/runtime-budget.json`, never under
+  `_local`.
+- **Worktrees are scratch.** A worktree holds code and the git history; nothing durable lives
+  there except what git tracks. Coordination files a detached worker needs (an owner-input helper's
+  session token, a dispatch context file a host adapter must put on disk) live under
+  `os.tmpdir()/starci/`, never under `.starciwork`.
+- **Ignore it in the host repository, not here.** `.starciwork/runtime.sqlite*` is a runtime file of
+  the *product* repository this skill is installed into, not of this skill's own repository — add it
+  to the product repository's own `.gitignore` (it is never product completion storage, the same as
+  `worktrees/`). This runtime's own `.gitignore` gains no such rule unless a test starts creating one
+  in-tree.
+- **Deletion of a worktree resumes at the checkpoint.** Because the record is the ledger DB and the
+  ledger DB is in the Work-owning repository — outside every worker's allowlist — a worktree
+  deletion, a repo re-clone or a process crash all keep the record: recreate the worktree and the
+  workflow resumes exactly at its last checkpoint. Nothing durable was ever inside the worktree.
 
 ## Contract rules
 

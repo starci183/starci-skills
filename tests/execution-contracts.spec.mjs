@@ -29,9 +29,37 @@ const workflow = () => ({
 
 test('execution request and receipt schemas compile in strict draft-2020 mode', () => {
   const ajv = new Ajv2020({strict: true,formats:{'date-time':true}});
-  for (const name of ['execution-request.schema.yaml', 'execution-receipt.schema.yaml', 'profile-registry-v3.schema.yaml', 'orca-call.schema.yaml', 'workflow-amendment.schema.yaml']) {
+  for (const name of ['execution-request.schema.yaml', 'execution-receipt.schema.yaml', 'profile-registry-v3.schema.yaml', 'orca-call.schema.yaml', 'workflow-amendment.schema.yaml', 'workflow-state.schema.yaml', 'ledger-db.schema.yaml']) {
     assert.doesNotThrow(() => ajv.compile(parseYaml(fs.readFileSync(new URL(`../schemas/${name}`, import.meta.url), 'utf8'))));
   }
+});
+
+// goal.md §8 Persistence: `engine.journalFile` is deprecated-but-allowed only while `ledgerFile` is
+// absent (the `ledger-unmigrated` boundary); a state naming neither is not a recognized engine record.
+test('workflow-state schema accepts engine.ledgerFile/machineFile and a deprecated journalFile-only state, refuses neither', () => {
+  const schema = parseYaml(fs.readFileSync(new URL('../schemas/workflow-state.schema.yaml', import.meta.url), 'utf8'));
+  const validate = new Ajv2020({strict: true}).compile(schema);
+  const base = {schema: 'starci/engine@1', version: '1.0.4', generation: 1};
+  assert.equal(validate({...base, ledgerFile: '/repo/.starciwork/runtime.sqlite', machineFile: '/machine.sqlite'}), true, JSON.stringify(validate.errors));
+  assert.equal(validate({...base, journalFile: '/repo/.starciwork/_local/journal.sqlite'}), true, 'a pre-1.0.4 record naming only journalFile is the ledger-unmigrated shape, not an invalid one');
+  assert.equal(validate(base), false, 'an engine record naming neither store is not recognized');
+});
+
+// docs/ledger-db.md §4/§5 name the exact tables kernel/ledger-db.mjs creates; the schema catalog must
+// never drift from either without the mismatch failing here first.
+test('ledger-db schema catalog names exactly the tables kernel/ledger-db.mjs creates', () => {
+  const schema = parseYaml(fs.readFileSync(new URL('../schemas/ledger-db.schema.yaml', import.meta.url), 'utf8'));
+  const validate = new Ajv2020({strict: true}).compile(schema);
+  const source = fs.readFileSync(new URL('../kernel/ledger-db.mjs', import.meta.url), 'utf8');
+  const created = [...source.matchAll(/CREATE TABLE (\w+)/g)].map(match => match[1]);
+  const ledgerTables = created.slice(0, created.indexOf('ledgers'));
+  const machineTables = created.slice(created.indexOf('ledgers'));
+  const catalog = {schema: 'starci/ledger-db-catalog@1', ledgerVersion: 1,
+    ledgerTables: Object.fromEntries(ledgerTables.map(name => [name, {columns: ['*']}])),
+    machineTables: Object.fromEntries(machineTables.map(name => [name, {columns: ['*']}]))};
+  assert.equal(validate(catalog), true, JSON.stringify(validate.errors));
+  assert.deepEqual(schema.properties.ledgerTables.required.sort(), [...new Set(ledgerTables)].sort());
+  assert.deepEqual(schema.properties.machineTables.required.sort(), [...new Set(machineTables)].sort());
 });
 
 test('workflow amendment schema and runtime validator accept the same bounded overlay shape', async t => {
