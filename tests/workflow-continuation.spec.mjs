@@ -18,7 +18,7 @@ import {sealRuntime} from '../kernel/runtime-pin.mjs';
 
 const state=dir=>({schema:WORKFLOW_STATE,kernel:'starci/workflow-kernel@1',id:'wf-resume',job:'Continue the approved UI delivery',phase:'run',approved:true,
   goalDigest:'a'.repeat(64),scope:['features/chat'],definitionOfDone:['Accepted UI and browser UAT'],worktree:dir,repoRoot:dir,branch:'main',head:'b'.repeat(40),
-  engine:{schema:'starci/engine@1',generation:4,journalFile:path.join(dir,'missing-journal.sqlite'),runtimePin:{root:path.join(dir,'.claude'),digest:'c'.repeat(64)}},
+  engine:{schema:'starci/engine@1',generation:4,ledgerFile:path.join(dir,'missing-ledger.sqlite'),runtimePin:{root:path.join(dir,'.claude'),digest:'c'.repeat(64)}},
   decisions:[{id:'decision-1',choice:2,answer:'Keep the accepted direction'}],needUser:[{kind:'environment',detail:'reconcile the exact stopped dispatch'}],
   ops:[{id:'draw-1',kind:'interface.draw',status:'done',attempt:1,head:'d'.repeat(40),files:['.starciwork/features/chat/ui/index.yaml'],reports:[]},
     {id:'implement-1',kind:'frontend.implement',status:'ready',attempt:3,lease:null,task:null,dispatch:null,terminal:null,reports:[]}],ledger:[],gateResults:[]});
@@ -30,7 +30,7 @@ test('continuation export is a stable workflows/<id>.md projection with exact so
   assert.equal(result.file,path.join(root,'workflows','wf-resume.md'));
   const markdown=fs.readFileSync(result.file,'utf8');
   for(const expected of ['starci/workflow-continuation@1','wf-resume','implement-1','decision-1','Runtime pin digest',current.engine.runtimePin.digest,'Observed source HEAD','Next safe action'])assert.match(markdown,new RegExp(expected));
-  assert.match(markdown,/journal, state, runtime pin, candidate packets, reports and source commits remain authoritative/i);
+  assert.match(markdown,/the ledger record, runtime pin, candidate packets, reports and source commits remain authoritative/i);
   assert.equal(exportContinuationBrief(store,current,{now:()=>1,git:()=>({status:1})}).file,result.file,'the same workflow updates one stable brief');
 });
 
@@ -52,16 +52,18 @@ test('an existing friendly public brief that names the exact workflow receives t
   assert.equal(fs.existsSync(path.join(root,'workflows','wf-resume.md')),false);
 });
 
+const fixtureLedgerView=({jobs=[],leases=[],error=null}={})=>({file:'fixture.sqlite',error,snapshot:null,snapshotHead:null,eventsHead:null,kernelLock:null,chain:null,jobs,leases});
+
 test('boundary audit catches a stranded writer and exact dispatch drift without clearing either',()=>{
   const current=state(process.cwd()),op=current.ops[0];Object.assign(op,{status:'done',task:'task-1',dispatch:'ctx-live',terminal:'term-live',
     launch:{task:'task-1',dispatch:'ctx-other'},lease:{workflowId:current.id,opId:op.id,attempt:1,generation:4,jobId:'job-1',leaseToken:'lease-1'}});
-  const journalView={file:'fixture.sqlite',error:null,snapshot:null,
+  const ledgerView=fixtureLedgerView({
     jobs:[{job_id:'job-1',workflow_id:current.id,op_id:op.id,attempt:1,generation:4,kind:'operation',status:'effect_unknown',lease_token:'lease-1'}],
-    leases:[{job_id:'job-1',workflow_id:current.id,op_id:op.id,attempt:1,generation:4,resource_key:'writer:test'}]};
-  const checked=continuationBoundary(current,{journalView,controller:{alive:false}});
+    leases:[{job_id:'job-1',workflow_id:current.id,op_id:op.id,attempt:1,generation:4,resource_key:'writer:test'}]});
+  const checked=continuationBoundary(current,{ledgerView,controller:{alive:false}});
   assert.equal(checked.ok,false);assert.ok(checked.findings.some(item=>item.code==='dispatch-identity-drift'));
   assert.ok(checked.findings.some(item=>item.code==='settled-operation-retains-writer'));
-  assert.equal(op.lease.jobId,'job-1');assert.equal(journalView.leases.length,1,'the read-only audit never releases unknown effects');
+  assert.equal(op.lease.jobId,'job-1');assert.equal(ledgerView.leases.length,1,'the read-only audit never releases unknown effects');
   const brief=buildContinuationBrief({id:current.id,dir:'.',paths:{state:'state.json',final:'final.json',continuation:'workflow.md'}},current,
     {now:()=>0,git:()=>({status:1})});assert.match(brief.markdown,/reconcile the exact identities/i);
 });
@@ -69,10 +71,24 @@ test('boundary audit catches a stranded writer and exact dispatch drift without 
 test('model, judge and check leases are validated by their own exact identity rather than classified as orphan operation writers',()=>{
   const current=state(process.cwd()),jobs=['model','judge','check'].map((kind,index)=>({job_id:`job-${kind}`,workflow_id:current.id,op_id:`logical-${index}`,attempt:2,generation:4,kind,status:'effect_unknown',lease_token:`token-${kind}`}));
   const leases=jobs.map(job=>({job_id:job.job_id,workflow_id:job.workflow_id,op_id:job.op_id,attempt:job.attempt,generation:job.generation,resource_key:`ai/${job.kind}`,token:job.lease_token}));
-  const checked=continuationBoundary(current,{journalView:{file:'fixture.sqlite',error:null,snapshot:null,jobs,leases},controller:{alive:false}});
+  const checked=continuationBoundary(current,{ledgerView:fixtureLedgerView({jobs,leases}),controller:{alive:false}});
   assert.equal(checked.ok,true,JSON.stringify(checked.findings));
-  leases[0].token='wrong';const drift=continuationBoundary(current,{journalView:{file:'fixture.sqlite',error:null,snapshot:null,jobs,leases},controller:{alive:false}});
+  leases[0].token='wrong';const drift=continuationBoundary(current,{ledgerView:fixtureLedgerView({jobs,leases}),controller:{alive:false}});
   assert.ok(drift.findings.some(item=>item.code==='job-reservation-identity-drift'));
+});
+
+test('continuationBoundary fails closed on journalFile-only states, a broken hash chain and a rewound head without a live kernel lock',()=>{
+  const current=state(process.cwd());
+  const unmigrated={...current,engine:{...current.engine,journalFile:path.join(process.cwd(),'x.sqlite'),ledgerFile:undefined}};
+  assert.deepEqual(continuationBoundary(unmigrated,{ledgerView:fixtureLedgerView(),controller:{alive:false}}),
+    {ok:false,reason:'ledger-unmigrated',findings:[{code:'ledger-unmigrated',detail:'the workflow record still names journalFile without a ledgerFile; ledger-migrate must run before any continuation'}],ledgerView:fixtureLedgerView()});
+  const broken=continuationBoundary(current,{ledgerView:{...fixtureLedgerView(),chain:{ok:false,checked:2,brokenAt:3}},controller:{alive:false}});
+  assert.equal(broken.ok,false);assert.equal(broken.reason,'ledger-chain-broken');assert.match(broken.findings[0].detail,/at seq 3/);
+  const rewound=continuationBoundary(current,{ledgerView:{...fixtureLedgerView(),snapshotHead:'digest-a',eventsHead:{seq:9,digest:'digest-b'},kernelLock:null},controller:{alive:false}});
+  assert.equal(rewound.ok,false);assert.equal(rewound.reason,'ledger-head-mismatch');
+  const liveLock=continuationBoundary(current,{ledgerView:{...fixtureLedgerView(),snapshotHead:'digest-a',eventsHead:{seq:9,digest:'digest-b'},
+    kernelLock:{holder_pid:process.pid,token:'tok',value_json:null,at:Date.now(),expires_at:Date.now()+60000}},controller:{alive:false}});
+  assert.equal(liveLock.ok,true,JSON.stringify(liveLock.findings));
 });
 
 test('public same-ID stop, run recovery and retry use a real journal without discarding unknown or staged work',t=>{

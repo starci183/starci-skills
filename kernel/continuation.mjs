@@ -74,7 +74,7 @@ export function continuationBoundary(state,{ledgerView=readLedger(state),control
   if(typeof state?.engine?.journalFile==='string'&&typeof state?.engine?.ledgerFile!=='string')
     return {ok:false,reason:'ledger-unmigrated',findings:[{code:'ledger-unmigrated',detail:'the workflow record still names journalFile without a ledgerFile; ledger-migrate must run before any continuation'}],ledgerView};
   if(ledgerView.chain&&ledgerView.chain.ok===false)
-    return {ok:false,reason:'ledger-chain-broken',findings:[{code:'ledger-chain-broken',detail:`the workflow event hash chain does not verify${ledgerView.chain.seq?` at seq ${ledgerView.chain.seq}`:''}${ledgerView.chain.reason?`: ${ledgerView.chain.reason}`:''}`}],ledgerView};
+    return {ok:false,reason:'ledger-chain-broken',findings:[{code:'ledger-chain-broken',detail:`the workflow event hash chain does not verify${Number.isInteger(ledgerView.chain.brokenAt)?` at seq ${ledgerView.chain.brokenAt}`:''}${ledgerView.chain.reason?`: ${ledgerView.chain.reason}`:''}`}],ledgerView};
   // One transaction commits snapshot+events+jobs+leases, so a live head newer than the snapshot's events_head is
   // legal only while a kernel holds the lock: a crash mid-tick commits neither; a rewound file leaves orphans.
   const headDigest=ledgerView.eventsHead?.digest??null;
