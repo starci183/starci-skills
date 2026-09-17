@@ -19,8 +19,6 @@ function fixture(t){
   fs.writeFileSync(path.join(root,'test','oracle.test.mjs'),
     "import fs from 'node:fs';\nconst ok=fs.readFileSync('app.txt','utf8').includes('ready');\nconsole.log(ok?'ready':'expected-pending');\nprocess.exit(ok?0:1);\n");
   assert.equal(git('git',['init','-q'],{cwd:root}).status,0);
-  // The kernel writes evidence under .starciwork/ beside the ledger (§7); a real repo excludes it.
-  fs.appendFileSync(path.join(root,'.git','info','exclude'),'.starciwork/\n');
   assert.equal(git('git',['config','user.email','fixture@example.test'],{cwd:root}).status,0);
   assert.equal(git('git',['config','user.name','Fixture'],{cwd:root}).status,0);
   assert.equal(git('git',['add','.'],{cwd:root}).status,0);
@@ -28,8 +26,18 @@ function fixture(t){
   const head=git('git',['rev-parse','HEAD'],{cwd:root}).stdout.trim();
   const dir=path.join(temp,'kernel');
   const events=[];
-  const store={id:'wf-engine-flow',dir,repoRoot:root,events,paths:{},appendEvent(event){events.push(event);return event;},saveState(){},
-    writeChecks(){},readChecks(){return null;}};
+  // A minimal in-memory stand-in for store.signal (§8: validator memory/verdicts now live there, keyed by
+  // workflow - see kernel/verify.mjs's recordVerdict/readValidatorMemory), matching the real get/set shape.
+  const signals=new Map();
+  // repoRoot is the kernel's own scratch area, not the git worktree (`root`): kernel-owned evidence now writes
+  // beside the ledger under repoRoot (kernel.mjs's kernelEvidenceRoot), and it must never land inside the
+  // tracked source repo, exactly as `store.dir` never did under the pre-ledger layout this fixture ported. A
+  // directory of its own, not `dir` (the engine's own ledger root) - Windows will not clean up a tree it is
+  // still enumerating a sibling SQLite handle inside.
+  const repoRoot=path.join(temp,'ledger-repo');fs.mkdirSync(repoRoot,{recursive:true});
+  const store={id:'wf-engine-flow',dir,repoRoot,events,paths:{},appendEvent(event){events.push(event);return event;},saveState(){},
+    writeChecks(){},readChecks(){return null;},
+    signal:{get(scope,key){return signals.get(`${scope}:${key}`)??null;},set(scope,key,{value}={}){signals.set(`${scope}:${key}`,{value});return {scope,key,value};}}};
   const op={id:'implement-ready',kind:'backend.implement',goal:'Make the application ready.',acceptance:['app.txt contains the exact ready state'],
     allowlist:['app.txt'],checks:[{name:'ready-oracle',command}],attempt:1,status:'running',runtime:'gpt-5.6-sol',dispatch:'ctx-1',
     launchedAt:Date.now(),baseHead:head,reports:[],findings:[],dependsOn:[],ledgerIds:[],expectedBaseFailures:{'test/oracle.test.mjs':'expected-pending'}};
@@ -60,7 +68,17 @@ function fixture(t){
   return {temp,root,store,state,op,runtime,ctx,report,head};
 }
 
-const dispose=f=>{f.runtime.close();fs.rmSync(f.temp,{recursive:true,force:true});};
+// createEngineRuntime.close() never closes the machine arbiter handle (machine.sqlite): correct in production,
+// where it is process-lifetime and shared across every ledger on the machine (§5), but this fixture points
+// each test's own runtime at a throwaway temp copy, which then outlives the test with an open WAL handle.
+// Retry the transient case (kernel/store.mjs's replaceStateSnapshot bounds the same class of Windows
+// EPERM/EBUSY); a still-locked machine.sqlite after that is the held-open-by-design case, not a leak this
+// suite can close from the outside, so clean up everything else and leave that one file for the OS.
+const dispose=f=>{
+  f.runtime.close();
+  try{fs.rmSync(f.temp,{recursive:true,force:true,maxRetries:5,retryDelay:50});}
+  catch{for(const entry of fs.readdirSync(f.temp,{withFileTypes:true}))try{fs.rmSync(path.join(f.temp,entry.name),{recursive:true,force:true,maxRetries:5,retryDelay:50});}catch{}}
+};
 
 function lateDecisionFixture(t){
   const f=fixture(t),receipt='receipt-owner';f.state.run='run-fixture';
@@ -69,18 +87,15 @@ function lateDecisionFixture(t){
     question:{kind:'decision',text:'Which ledger?',options:[{id:'1',label:'Customer'},{id:'2',label:'Platform'}],prepared:true},
     ownerRequestStatus:'answered',ownerAnswer:{receiptId:receipt,value:'2'},ownerContinuationReceipt:receipt});
   f.report={...f.report,from:'term-owner',summary:'decision: demo.ledger recommended: 2\n1. Customer\n2. Platform',sent:{messageId:'msg-late',sentAt:2,type:'worker_done'}};
-  const reportFile=path.join(f.store.dir,'reports',`${f.op.dispatch}.json`);fs.mkdirSync(path.dirname(reportFile),{recursive:true});
-  const reportJson=`${JSON.stringify(f.report,null,2)}\n`;fs.writeFileSync(reportFile,reportJson);
-  // stageAnsweredDecisionLateReport hashes the report's immutable bytes straight off the `reports` row
-  // (kernel.mjs's reportJsonBytes/reportDigest: store.ledger.db, the same handle this fixture's runtime
-  // already has open), the ledger's replacement for a report file's own sha256 - so the row has to exist
-  // there too, byte-identical to what readReports() below replays.
-  f.store.ledger=f.runtime.journal;
-  f.runtime.journal.db.prepare('INSERT INTO reports(workflow_id,dispatch_id,op_id,attempt,generation,outcome,report_json,from_terminal,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
-    .run(f.state.id,f.op.dispatch,f.op.id,f.op.attempt,f.state.engine.generation,f.report.outcome,reportJson.replace(/\n$/,''),f.op.terminal,Date.now());
-  // readReports() (kernel/store.mjs) always adds `dispatchId` from the reports row alongside the raw
-  // report JSON's own `dispatch` field; stageAnsweredDecisionLateReport looks the row up by `dispatchId`.
-  Object.assign(f.store,{reportPath:id=>path.join(f.store.dir,'reports',`${id}.json`),readReports:()=>[{...JSON.parse(fs.readFileSync(reportFile,'utf8')),dispatchId:f.op.dispatch}],acknowledgeRuntimeFile(){},saveState(){}});
+  const reportFile=path.join(f.store.dir,'reports',`${f.op.dispatch}.json`);fs.mkdirSync(path.dirname(reportFile),{recursive:true});fs.writeFileSync(reportFile,`${JSON.stringify(f.report,null,2)}\n`);
+  // §8: the real store.readReports() row wraps the report body with a `dispatchId` column (from `dispatch_id`),
+  // which stageAnsweredDecisionLateReport now matches against - mirror that shape, not the bare report body.
+  Object.assign(f.store,{reportPath:id=>path.join(f.store.dir,'reports',`${id}.json`),
+    readReports:()=>{const row=JSON.parse(fs.readFileSync(reportFile,'utf8'));return [{...row,dispatchId:row.dispatch}];},
+    // reportDigest(store,dispatchId) reads the immutable stored bytes straight off store.ledger.db; a minimal
+    // stand-in that always answers with this fixture's one row, the same bytes readReports() parsed above.
+    ledger:{db:{prepare:()=>({get:()=>({report_json:fs.readFileSync(reportFile,'utf8')})})}},
+    acknowledgeRuntimeFile(){},saveState(){}});
   const staged=stageAnsweredDecisionLateReport(f.state,f.op,{store:f.store,runtime:f.runtime,dispatchId:f.op.dispatch,taskId:f.report.task});assert.equal(staged.ok,true,staged.reason);
   f.ctx.allocator={snapshot:()=>({cooling:[]}),release(){}};
   f.ctx.kindsProfile={kinds:{'decision.prepare':{family:'design',role:'decide',readOnly:false,reads:[],writes:['code']}}};
@@ -99,6 +114,8 @@ test('real applyOpReport commits only a sealed candidate with reproduced checks 
   assert.equal(f.op.verifiedChecks[0].name,'ready-oracle');
   assert.equal(f.op.proof.verdict,'pass');
   assert.ok(f.store.events.some(event=>event.event==='op-done'));
+  // Kernel-owned validation evidence now lives beside the ledger under repoRoot, never store.dir (kernel.mjs's
+  // kernelEvidenceRoot: a non-_local corner of .starciwork outside every op's allowlist).
   assert.ok(fs.existsSync(path.join(f.store.repoRoot,'.starciwork','kernel-evidence',f.store.id,'evidence',`${f.op.candidate.identity.jobId}-validation.json`)));
 });
 

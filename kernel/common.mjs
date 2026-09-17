@@ -466,8 +466,13 @@ export function grammarReferences(root=skillRoot){
   return unique(found).sort();
 }
 
-/** Job-wide rulings the user gave at approval time (`<store>/rulings.md`) travel inside every contract and in the validator memory. */
+/**
+ * Job-wide rulings the user gave at approval time (`<store>/rulings.md`) travel inside every contract and in
+ * the validator memory. `store.dir` is `null` for a ledger-backed store (§8: no filesystem workflow directory
+ * exists any more) — there is not yet a ledger home for this owner-authored file, so there is nothing to read.
+ */
 export function rulingsText(store){
+  if(!store.dir)return '';
   const file=path.join(store.dir,'rulings.md');
   if(!fs.existsSync(file))return '';
   return fs.readFileSync(file,'utf8').trim();

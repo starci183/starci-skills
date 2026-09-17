@@ -34,10 +34,16 @@ const FENCED_DELIVERY_REASON='This mailbox Delivery belongs to a fenced consumer
 
 function readJson(file,fallback){try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return fallback;}}
 
-/** One typed outcome: validate, write the file, send the matching Orca signal once, record the send. */
-export function reportOutcome(orca,{cwd,kind='op',run,from,task,dispatch,outcome,summary,files=[],checksFile=null,checks=[],open=[],question=null,blocker=null,credentialRequest=null,credentialRequestFile=null,branch=null,head=null,gates=[],observations=[],workflow=null,capability=null,fileKey=null,opId=null,attempt=null,generation=null,now=Date.now}){
-  const workflowId=required(workflow,'workflow id'),key=fileKey??required(dispatch,'dispatch id');
-  const store=createStore({repoRoot:repositoryRoot(cwd),id:workflowId});
+/**
+ * One typed outcome: validate, write the file, send the matching Orca signal once, record the send.
+ * `store`, when given, is used directly instead of opening one from `cwd` and closing it here - the kernel's
+ * own loop already holds the workflow's store, whose repo need not be `cwd` (a routed frontend/backend split
+ * keeps the Work ledger in a different repository than the source worktree an operation runs in, §1); the CLI
+ * path (no `store` given) still opens and closes its own, exactly as before.
+ */
+export function reportOutcome(orca,{cwd,kind='op',run,from,task,dispatch,outcome,summary,files=[],checksFile=null,checks=[],open=[],question=null,blocker=null,credentialRequest=null,credentialRequestFile=null,branch=null,head=null,gates=[],observations=[],workflow=null,capability=null,fileKey=null,opId=null,attempt=null,generation=null,now=Date.now,store:givenStore=null}){
+  const workflowId=givenStore?givenStore.id:required(workflow,'workflow id'),key=fileKey??required(dispatch,'dispatch id');
+  const store=givenStore??createStore({repoRoot:repositoryRoot(cwd),id:workflowId});
   try{
   const file=reportRef(workflowId,key);
   const existing=store.readReports().find(row=>row.dispatchId===key);
@@ -62,7 +68,7 @@ export function reportOutcome(orca,{cwd,kind='op',run,from,task,dispatch,outcome
   return {schema:REPORT_RESULT,ok:sent.outcome==='ok',file,outcome:report.outcome,signal:report.signal,messageId,
     send:{outcome:sent.outcome,effectState:sent.effectState,reason:sent.reason},
     reason:sent.outcome==='ok'?null:`report recorded but the ${type} signal was not accepted (${sent.reason??sent.outcome}); the receiver's wait tick still reads the row`};
-  }finally{store.close();}
+  }finally{if(!givenStore)store.close();}
 }
 
 const isLive=w=>['ready','running','starting'].includes(w.workerState)||(w.workerState==='unsupervised'&&['dispatched','pending','ready'].includes(w.dispatchStatus));
@@ -83,16 +89,18 @@ export const DEFAULT_TICK_MS=120000;
 /**
  * Ping-pong: the blocking check is sliced into short ticks so every live worker is inspected at least
  * once per tick while the supervisor keeps waiting; the call returns at the first boundary (report, stalled,
- * dead) or after the whole timeout with `timeout`.
+ * dead) or after the whole timeout with `timeout`. `store`, when given, is used as-is (see `reportOutcome`);
+ * the kernel's own loop passes its already-open store so a routed repo (worktree != Work-owning repo) reads
+ * the exact same ledger `acceptReports` just wrote to, not a second one reconstructed from `cwd`.
  */
-export function waitTick(orca,{cwd,run,from,timeoutMs=900000,tickMs=DEFAULT_TICK_MS,workflow=null,stalledAfterMs=DEFAULT_STALLED_AFTER_MS,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack=null,noAck=false,now=Date.now,wake=null,wait=sleepSync}){
+export function waitTick(orca,{cwd,run,from,timeoutMs=900000,tickMs=DEFAULT_TICK_MS,workflow=null,store=null,stalledAfterMs=DEFAULT_STALLED_AFTER_MS,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack=null,noAck=false,now=Date.now,wake=null,wait=sleepSync}){
   const started=now();
   const ticks=[];
   let ackOnce=ack,noAckOnce=noAck;
   for(;;){
     const remaining=timeoutMs-(now()-started);
     const slice=Math.max(1000,Math.min(tickMs,remaining));
-    const tick=singleTick(orca,{cwd,run,from,timeoutMs:slice,workflow,stalledAfterMs,heartbeatGraceMs,ack:ackOnce,noAck:noAckOnce,now,wait});
+    const tick=singleTick(orca,{cwd,run,from,timeoutMs:slice,workflow,store,stalledAfterMs,heartbeatGraceMs,ack:ackOnce,noAck:noAckOnce,now,wait});
     ackOnce=null;noAckOnce=false;
     ticks.push({at:now(),event:tick.event,liveness:tick.liveness.map(item=>`${item.dispatch}:${item.liveness}`)});
     if(tick.event!=='timeout'||now()-started>=timeoutMs)return {...tick,ticks:ticks.length,elapsedMs:now()-started};
@@ -109,9 +117,9 @@ export function waitTick(orca,{cwd,run,from,timeoutMs=900000,tickMs=DEFAULT_TICK
  * workflow state, so it belongs beside them rather than forcing a schema change for one more JSON blob).
  */
 const waitStateKeyFor=run=>`wait-state:${required(run,'run id')}`;
-function singleTick(orca,{cwd,run,from,timeoutMs,workflow,stalledAfterMs,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack,noAck,now,wait}){
-  const workflowId=required(workflow,'workflow id'),waitStateKey=waitStateKeyFor(run);
-  const store=createStore({repoRoot:repositoryRoot(cwd),id:workflowId});
+function singleTick(orca,{cwd,run,from,timeoutMs,workflow,store:givenStore,stalledAfterMs,heartbeatGraceMs=DEFAULT_HEARTBEAT_GRACE_MS,ack,noAck,now,wait}){
+  const workflowId=givenStore?givenStore.id:required(workflow,'workflow id'),waitStateKey=waitStateKeyFor(run);
+  const store=givenStore??createStore({repoRoot:repositoryRoot(cwd),id:workflowId});
   try{
   const recorded=store.readReports();
   const saved=store.signal.get(workflowId,waitStateKey)?.value;
@@ -187,7 +195,7 @@ function singleTick(orca,{cwd,run,from,timeoutMs,workflow,stalledAfterMs,heartbe
   const event=messages.length||reports.length?'report':stalled.length?stalled[0].liveness:checked.outcome==='ok'?'timeout':'check-failed';
   return {schema:WAIT_TICK,run,event,deliveryId,check:{outcome:checked.outcome,reason:checked.reason??null},messages,reports,liveness,renamed,approvals,sweep:{closed:sweep.closed,kept:sweep.kept.length},
     next:event==='timeout'?'call wait again; a timeout is not a boundary':event==='report'?'process every message and report, then call wait again':event==='rate-limited'?'the provider refused with a quota signal: park that runtime (allocator.failed with the reason) and re-dispatch the op elsewhere, then call wait again':event==='stalled-prompt'?'the agent is inside a confirmation dialog and cannot read a notify: settle it (--close true) and start-op again, then call wait again':'act on the stalled or dead worker (notify to report, or settle and retry), then call wait again'};
-  }finally{store.close();}
+  }finally{if(!givenStore)store.close();}
 }
 
 
