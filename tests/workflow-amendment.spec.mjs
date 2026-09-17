@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {stringifyYaml} from '../core/yaml.mjs';
@@ -11,12 +12,14 @@ import {createStore,stateGoalIdentity} from '../kernel/store.mjs';
 import {acquireStartup,releaseStartup,reserveStartup} from '../kernel/launch.mjs';
 
 function fixture(t){
-  const root=fs.mkdtempSync(path.join(process.cwd(),'.workflow-amendment-test-'));
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-workflow-amendment-'));
   assert.equal(spawnSync('git',['init','-q'],{cwd:root,windowsHide:true}).status,0);
   const store=createStore({repoRoot:root,id:'wf-existing'});
   // Runtime 1.0.4: the store holds a real ledger handle; it must close before the temp directory is
-  // removed, or Windows refuses to delete the file still open underneath it.
-  t.after(()=>{store.close();assert.equal(path.dirname(root),process.cwd());assert.ok(path.basename(root).startsWith('.workflow-amendment-test-'));fs.rmSync(root,{recursive:true,force:true});});
+  // removed, or Windows refuses to delete the file still open underneath it. Cleanup must never depend
+  // on the code under test succeeding: close() itself may throw (that is what this cluster's own bugs
+  // looked like), so it is caught here and rmSync always runs regardless (tests/runtime-tree-hygiene.spec.mjs).
+  t.after(()=>{try{store.close();}catch{}fs.rmSync(root,{recursive:true,force:true});});
   const state=createWorkflowState({job:'Deliver the originally approved slice',worktree:root,branch:'main',store,scope:['features/existing']});
   state.phase='finished';state.approved=true;state.goalDigest='a'.repeat(64);state.definitionOfDone=['Original acceptance'];
   state.decisions=[{id:'decision-1',answer:'Keep historical decision'}];
@@ -25,7 +28,7 @@ function fixture(t){
     {id:'remaining-1',kind:'frontend.implement',status:'blocked',attempt:3,findings:['Historical blocker'],files:[],reports:[],
       lease:{workflowId:'wf-existing',opId:'remaining-1',attempt:3,generation:2,jobId:'job-unknown',leaseToken:'lease-token'}}
   ];
-  state.finished={outcome:'blocked',reason:'owner clarification required',report:'signal:final-report'};
+  state.finished={outcome:'blocked',reason:'owner clarification required',report:store.paths.final};
   // Runtime 1.0.4: `jobs`/`leases` live in the same ledger `store` already has open (docs/ledger-db.md §4),
   // not a separate journal.sqlite - kernel.mjs's own `openJournal` alias now opens this exact file
   // (kernel/ledger-db.mjs's `openLedger`, keyed by `state.engine.ledgerFile`).
