@@ -1,12 +1,25 @@
 schema: work/sds-component
 id: sds.task.completion-state
-title: How completion is stored
+title: How completion is stored and undone
 state: todo
-responsibility: A boolean column with a timestamp, both cleared when the owner reopens the task.
+responsibility: A boolean column and a timestamp, both cleared when the owner reopens the task.
 refs: [br.task.complete.once]
-blockedBy:
-  - br.task.complete.once is todo at rev 2; the reversible design is not settled.
+dependsOn: [integration.login.postgres]
+
+stateMachine:
+  states: [open, complete]
+  initial: open
+  transitions:
+    - {id: t-complete, from: open, to: complete, on: owner-completes, effect: completedAt is set.}
+    - {id: t-complete-again, from: complete, to: complete, on: owner-completes, effect: Nothing changes and the response is success.}
+    - {id: t-reopen, from: complete, to: open, on: owner-reopens, effect: completedAt is cleared.}
 
 requiresProof:
   implementation:
     required: true
+  transitions:
+    forEach: stateMachine.transitions
+
+blockedBy:
+  - br.task.complete.once is todo at rev 2; t-reopen has no implementation and no test.
+

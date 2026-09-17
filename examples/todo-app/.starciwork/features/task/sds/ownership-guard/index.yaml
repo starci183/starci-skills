@@ -6,13 +6,54 @@ responsibility: Every mutation names the actor and compares it with the row's ow
 interfaces:
   - No write path reaches the repository without passing this guard.
 refs: [br.task.single-owner]
-evidence: proves-guard
+dependsOn: [integration.login.postgres]
+
+stateMachine:
+  states: [unchecked, owned, foreign]
+  initial: unchecked
+  terminal: [owned, foreign]
+  transitions:
+    - {id: t-owner, from: unchecked, to: owned, on: actor-matches-owner, effect: The write proceeds.}
+    - {id: t-stranger, from: unchecked, to: foreign, on: actor-differs, effect: The write is refused and nothing is written.}
+
+sequence:
+  participants: [browser, api, postgres]
+  steps:
+    - {from: browser, to: api, message: PATCH /tasks/:id with the actor's session, observable: http}
+    - {from: api, to: postgres, message: SELECT the row's owner, observable: read}
+    - {from: api, to: browser, message: the refusal, when the actor is not the owner, observable: http}
+    - {from: api, to: postgres, message: UPDATE the row, only when the actor is the owner, observable: write}
 
 requiresProof:
   implementation:
     required: true
+  transitions:
+    forEach: stateMachine.transitions
 
-# provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
-# An agent-authored provenBy is refused: it would be this record speaking for another one.
 provenBy:
   implementation: [impl.task.todo-app.ownership]
+  transitions: [t-owner, t-stranger]
+
+# evidence is written by starci-kernel when it settles the operation: the assertions below are the
+# checks it re-ran itself, not what the worker reported.
+
+evidence:
+  recordDigest: 1b4e7d0a3c6f9b24c1f0b9e2d7a5c3f8e1b6d4a9c2f5b8e1d4a7c0f3b6e9d2a5
+  outcome: pass
+  assertions:
+    - id: t-owner
+      outcome: pass
+      observation: npm run test:unit -- src/task/ownership/allows exited 0
+    - id: t-stranger
+      outcome: pass
+      observation: npm run test:unit -- src/task/ownership/refuses exited 0
+  provenance:
+    actor: starci-kernel
+    tool: starci-kernel
+    environment: local
+    servedVersions:
+      - repository: todo-app
+        commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+        artifact: worktree
+    capturedAt: 2026-09-18T04:40:00.000Z
+

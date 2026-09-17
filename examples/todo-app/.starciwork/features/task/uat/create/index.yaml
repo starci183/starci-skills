@@ -10,5 +10,26 @@ steps:
   - Sign in as the stranger and attempt to delete it.
   - See the refusal, and the owner's list unchanged.
 proves: [fr.task.create, br.task.single-owner]
-evidence: walks-create
 
+# evidence is written by starci-kernel when it settles the operation: the assertions below are
+# the checks it re-ran itself, not what the worker reported. An operation may edit this file, so
+# the kernel overwrites this block on every settle - that overwrite is what makes it proof.
+evidence:
+  recordDigest: 140158647ba83671cf4f5a27afdc20ce01f8ed9236c31ca1e9c576c13ffd48f7
+  outcome: pass
+  assertions:
+    - id: main-flow-creates-one-task
+      outcome: pass
+      observation: step 3 captured a list with exactly one row
+    - id: stranger-cannot-delete
+      outcome: pass
+      observation: step 5 captured the refusal and an unchanged list
+  provenance:
+    actor: starci-kernel
+    tool: starci-kernel
+    environment: local
+    servedVersions:
+      - repository: todo-app
+        commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+        artifact: worktree
+    capturedAt: 2026-09-18 04:39:00+00:00

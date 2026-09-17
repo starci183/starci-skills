@@ -7,7 +7,6 @@ statements:
   - The owner may reopen a task they completed.
 acceptanceCriteria: [is-idempotent, is-reversible]
 module: src/task/complete
-evidence: proves-completion
 change:
   rev: 2
   kind: breaking
@@ -16,3 +15,24 @@ change:
   reason: The owner decided completion is reversible. The withdrawn clause was proven, so its evidence
     becomes history and the rule returns to todo until the reversible statement is proven in its place.
 
+# evidence is written by starci-kernel when it settles the operation: the assertions below are
+# the checks it re-ran itself, not what the worker reported. An operation may edit this file, so
+# the kernel overwrites this block on every settle - that overwrite is what makes it proof.
+evidence:
+  recordDigest: 0000000013b2847d653c57bd812f5ce1c2e06cd28f54cb5b7503096d3629ede3
+  outcome: pass
+  stale: true
+  staleReason: Proven against rev 1, whose never-reopen clause rev 2 withdrew. Kept as history; ac.task.complete.once.is-reversible has no evidence yet.
+  assertions:
+    - id: ac.task.complete.once.is-idempotent
+      outcome: pass
+      observation: npm run test:unit -- src/task/complete exited 0
+  provenance:
+    actor: starci-kernel
+    tool: starci-kernel
+    environment: local
+    servedVersions:
+      - repository: todo-app
+        commit: 0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1b4e7d0a3
+        artifact: worktree
+    capturedAt: 2026-09-17 19:38:00+00:00
