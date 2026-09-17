@@ -1,31 +1,34 @@
 import test from 'node:test';
 import {staleLeaseProof as staleLeaseProofUnderTest} from '../kernel/engine.mjs';
-import {openJournal as openJournalForStale} from '../kernel/journal.mjs';
+import {openLedger as openLedgerForStale} from '../kernel/ledger-db.mjs';
 import fsForStale from 'node:fs';
 import osForStale from 'node:os';
 import pathForStale from 'node:path';
 
-test('a lease the journal no longer backs is stale, a held one is live, an unknown journal answers nothing',()=>{
+// staleLeaseProof reads via inspectLedger (docs §3), which needs a real ledger's meta table; a
+// kernel/journal.mjs handle has none, so this fixture opens a ledger, not a journal.
+test('a lease the ledger no longer backs is stale, a held one is live, an unknown ledger answers nothing',()=>{
   const dir=fsForStale.mkdtempSync(pathForStale.join(osForStale.tmpdir(),'starci-stale-lease-'));
   try{
-    const file=pathForStale.join(dir,'journal.sqlite');
-    const journal=openJournalForStale({file});journal.close();
+    const file=pathForStale.join(dir,'runtime.sqlite');
+    const journal=openLedgerForStale({file});journal.close();
     const lease={jobId:'operation-abc',attempt:1,generation:2,workflowId:'wf',opId:'op'};
-    assert.match(staleLeaseProofUnderTest({journalFile:file,lease}),/holds neither job operation-abc nor a lease/);
-    assert.equal(staleLeaseProofUnderTest({journalFile:pathForStale.join(dir,'missing.sqlite'),lease}),null);
-    assert.equal(staleLeaseProofUnderTest({journalFile:file,lease:{}}),null);
-    const held=openJournalForStale({file});
+    assert.match(staleLeaseProofUnderTest({ledgerFile:file,lease}),/holds neither job operation-abc nor a lease/);
+    assert.equal(staleLeaseProofUnderTest({ledgerFile:pathForStale.join(dir,'missing.sqlite'),lease}),null);
+    assert.equal(staleLeaseProofUnderTest({ledgerFile:file,lease:{}}),null);
+    const held=openLedgerForStale({file});
     held.transaction(db=>{
+      db.prepare("INSERT INTO workflows (workflow_id,title,created_at,updated_at) VALUES ('wf',NULL,1,1)").run();
       db.prepare("INSERT INTO jobs (job_id,workflow_id,op_id,attempt,generation,kind,role,payload_json,status,priority_json,lease_token,worker_id,deadline,result_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run('operation-abc','wf','op',1,2,'operation','implement','{}','running','{}','tok',null,null,null,1,1);
       db.prepare("INSERT INTO leases (resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at) VALUES (?,?,?,?,?,?,?,?,?,?)").run('ai/global','operation-abc','wf','op',1,2,'tok',1,1,9e15);
     });
     held.close();
-    assert.equal(staleLeaseProofUnderTest({journalFile:file,lease}),null,'a held lease row is live');
-    const done=openJournalForStale({file});
+    assert.equal(staleLeaseProofUnderTest({ledgerFile:file,lease}),null,'a held lease row is live');
+    const done=openLedgerForStale({file});
     done.transaction(db=>{db.prepare("DELETE FROM leases WHERE job_id=?").run('operation-abc');db.prepare("UPDATE jobs SET status='failed' WHERE job_id=?").run('operation-abc');});
     done.close();
-    assert.match(staleLeaseProofUnderTest({journalFile:file,lease}),/job operation-abc is failed and holds no lease/);
-  }finally{try{fsForStale.rmSync(dir,{recursive:true,force:true});}catch{/* Windows may still hold the just-closed journal for a moment */}}
+    assert.match(staleLeaseProofUnderTest({ledgerFile:file,lease}),/job operation-abc is failed and holds no lease/);
+  }finally{try{fsForStale.rmSync(dir,{recursive:true,force:true});}catch{/* Windows may still hold the just-closed ledger for a moment */}}
 });
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -33,7 +36,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {sealRuntime,verifyRuntimePin} from '../kernel/runtime-pin.mjs';
 import {createStore} from '../kernel/store.mjs';
-import {openJournal} from '../kernel/journal.mjs';
+import {ledgerFileFor,openLedger} from '../kernel/ledger-db.mjs';
 import {enrollEngine} from '../kernel/engine.mjs';
 import {deriveOwnerRequests} from '../kernel/owner-requests.mjs';
 import {enqueueOwnerInbox} from '../kernel/owner-inbox.mjs';
@@ -69,7 +72,7 @@ test('the supervisor retains the lock until the former kernel is confirmed dead'
 });
 
 test('owner inbox commits the actual choice and requester continuation once',t=>{
-  const root=fixture(t),store=createStore({repoRoot:root,id:'wf'}),journal=openJournal({file:path.join(root,'journal.sqlite')});
+  const root=fixture(t),store=createStore({repoRoot:root,id:'wf'}),journal=openLedger({file:ledgerFileFor(root)});
   const state={schema:store.schema,id:'wf',job:'synthetic approval fixture',approved:true,inputs:['approved-ref'],scope:[],definitionOfDone:[],ledgerMode:'plan',engine:{schema:'starci/engine@1',generation:2},needUser:[{op:'ask',kind:'decision',record:'decision.theme',options:['Use the blue theme.','Use the green theme.']}],ops:[
     {id:'ask',kind:'decision.prepare',status:'running',attempt:1,ownerRequestStatus:'waiting-owner',decisionOptionsDigest:'a'.repeat(64),
       question:{kind:'decision',record:'decision.theme',text:'Choose the theme',options:[{id:'1',label:'Use the blue theme.'},{id:'2',label:'Use the green theme.'}]},requesters:['work']},
@@ -77,12 +80,12 @@ test('owner inbox commits the actual choice and requester continuation once',t=>
   ]};store.bindJournal(journal,2,{state});
   const request=deriveOwnerRequests(state)[0],queued=enqueueOwnerInbox(store,{schema:'starci/owner-action@1',action:{type:'choose',workflowId:'wf',requestId:request.id,generation:2,revision:request.revision,
     optionsDigest:request.optionsDigest,value:'2',actor:{type:'owner',receiptId:'synthetic-authenticated-server-receipt',channel:'orca'}}});
-  const bytes=JSON.stringify(queued.job);
   applyInbox(store,state,{engine:{journal}});
   assert.equal(state.ops[1].status,'ready');assert.match(state.ops[1].answer,/green theme/);assert.deepEqual(state.inputs,['approved-ref']);
-  fs.writeFileSync(path.join(store.paths.inbox,'replay.json'),bytes);applyInbox(store,state,{engine:{journal}});
+  // §8: paths.inbox is removed; a replayed inbox item is a second store.inbox.push of the exact same job.
+  store.inbox.push({kind:'owner-action',key:'replay',payload:queued.job});applyInbox(store,state,{engine:{journal}});
   assert.equal(state.ops[1].ownerContinuationReceipts.length,1);assert.equal(journal.events().filter(event=>event.kind==='owner-action-applied').length,1);
-  journal.close();
+  journal.close();store.close();
 });
 
 test('pending durable work does not count as a kernel error or spend an operation retry',()=>{
