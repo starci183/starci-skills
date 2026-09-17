@@ -268,15 +268,23 @@ export function enrollEngine(store,state,{ledgerFile,machineFile,runtimePin=null
   ledgerFile??=ledgerFileFor(store.repoRoot);machineFile??=machineFileFor();
   const previous=state.engine,generation=(previous?.generation??0)+1;
   const machine=openMachine({file:machineFile,now});
-  let ledger;
+  let ledger,owned=false;
   try{
-    ledger=openLedger({file:ledgerFile,now,machine});
+    // One ledger per Work root (§3/§8), and `store.bindJournal` only accepts a handle on the store's own
+    // ledger file: a second connection to that same file is waste, and waste nobody can release. This
+    // function returns `state.engine`, never the handle, so anything opened here and left bound stays open
+    // for the life of the process - a leaked SQLite connection, and on Windows a directory that can never
+    // be removed underneath it. The store already holds that file open and closes it in `close()`, so the
+    // durable binding reuses the store's handle; only a genuinely different file is opened here.
+    const resolved=path.resolve(ledgerFile),shared=Boolean(store?.ledger?.db)&&Boolean(store.ledgerFile)&&path.resolve(store.ledgerFile)===resolved;
+    if(shared){ledger=store.ledger;machine.registerLedger?.({ledgerId:ledger.ledgerId,file:resolved});}
+    else{ledger=openLedger({file:ledgerFile,now,machine});owned=true;}
     state.engine={schema:ENGINE_SCHEMA,version:ENGINE_VERSION,generation,ledgerFile:path.resolve(ledgerFile),machineFile:path.resolve(machineFile),
       assurance:'detection-only',coordination:'agent-v1',runtimePin:runtimePin??previous?.runtimePin??null,
       ...(candidateRoot??previous?.candidateRoot?{candidateRoot:path.resolve(candidateRoot??previous.candidateRoot)}:{}),enrolledAt:now()};
     state.finished=null;state.phase='run';
     store.bindJournal?.(ledger,generation,{state,goalIdentity:state.goalDigest??null});
-  }catch(error){try{ledger?.close();}catch{}throw error;}
+  }catch(error){if(owned)try{ledger?.close();}catch{}throw error;}
   finally{machine.close();}
   store.appendEvent({event:'engine-enrolled',schema:ENGINE_SCHEMA,generation,version:ENGINE_VERSION,
     assurance:state.engine.assurance,coordination:state.engine.coordination,note:'Existing accepted Work remains accepted; only unfinished operations receive the new execution policy.'});

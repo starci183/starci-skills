@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {RATE_WINDOW_MS,buildList,buildView,featureOf,renderJson,renderList,renderView} from '../kernel/view.mjs';
+import {createStore} from '../kernel/store.mjs';
 
 const root=path.resolve(import.meta.dirname,'..');
 const NOW=1_700_000_000_000;
@@ -376,18 +377,34 @@ proof:
   assert.doesNotMatch(renderView(gone),/## Integrations/);
 });
 
+/**
+ * Runtime 1.0.4 §8: a workflow list is read from the ledger - `workflows`, the latest `state_snapshots` body,
+ * the last `events` row and the `kernel-lock`/`stop` `signals` rows. There is no workflow directory to write,
+ * so this fixture writes those rows through the store instead of a `_local/workflows/<id>/` tree.
+ */
+function ledgerWorkflow(repoRoot,{id,state,events,kernelPid=null,stopRequested=false}){
+  const store=createStore({repoRoot,id});
+  try{
+    store.saveState({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id,...state});
+    for(const event of events)store.appendEvent(event);
+    if(kernelPid!==null)store.signal.set(id,'kernel-lock',{pid:kernelPid,value:{phase:'running'}});
+    if(stopRequested)store.signal.set(id,'stop',{value:{at:ago(1)}});
+  }finally{try{store.close();}catch{}}
+}
+
 test('workflow-list is one row per workflow of the repository, newest first',t=>{
   const repoRoot=tmp(t);
-  richStore(repoRoot);
-  const finishedDir=path.join(workflows(repoRoot),'20250101-000000-finished');
-  fs.mkdirSync(finishedDir,{recursive:true});
-  fs.writeFileSync(path.join(finishedDir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',
-    kernel:'starci/workflow-kernel@1',id:'20250101-000000-finished',phase:'run',approved:true,
+  ledgerWorkflow(repoRoot,{id:'20260101-000000-rich',kernelPid:process.pid,
+    state:{phase:'run',approved:true,lane:null,finished:null,ledger:[],
+      ops:[op('a','done'),op('r1','running'),op('r2','running'),op('p1','paused'),op('shared-1','blocked'),op('x1','blocked')]},
+    events:[{at:ago(240),event:'created'},{at:NOW-90_000,event:'tick',iteration:12}]});
+  ledgerWorkflow(repoRoot,{id:'20250101-000000-finished',
     // This one owned a lane and it went home: the row says so without anybody opening the workflow.
-    lane:{name:'20250101-000000-finished',worktree:'W:/workspaces/demo/20250101-000000-finished',branch:'orca/finished',
-      base:{worktree:'W:/demo',branch:'main'},merged:{commit:'feed1234feed',into:'main',at:ago(600)}},
-    finished:{outcome:'done',reason:'every item verified'},ops:[op('a','done'),op('b','done')],ledger:[]}));
-  writeLines(path.join(finishedDir,'events.jsonl'),[{at:ago(600),seq:1,event:'final'}]);
+    state:{phase:'run',approved:true,
+      lane:{name:'20250101-000000-finished',worktree:'W:/workspaces/demo/20250101-000000-finished',branch:'orca/finished',
+        base:{worktree:'W:/demo',branch:'main'},merged:{commit:'feed1234feed',into:'main',at:ago(600)}},
+      finished:{outcome:'done',reason:'every item verified'},ops:[op('a','done'),op('b','done')],ledger:[]},
+    events:[{at:ago(600),event:'final'}]});
 
   const list=buildList({repoRoot,now:NOW});
   assert.deepEqual(list.map(entry=>entry.id),['20260101-000000-rich','20250101-000000-finished']);

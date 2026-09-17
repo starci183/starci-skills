@@ -7,6 +7,17 @@ purpose: |-
   `starci update` prints the note of the version it installed whenever the installed version changed, so an
   operator who only ever runs the installer is still told where to read.
 upgrades:
+  - version: 1.0.4
+    note: upgrades/1.0.4.md
+    summary: >-
+      A workflow's record is one SQLite ledger per Work root, `.starciwork/runtime.sqlite`; the kernel no
+      longer writes or reads `.starciwork/_local/workflows/<id>/`, and a workflow directory with no ledger row
+      stops the kernel with `ledger-unmigrated`. Run `starci ledger-migrate --repo <root>` once per Work root,
+      with the supervisor and its kernels stopped; nothing is deleted and a second run is a no-op. Commit the
+      tracked `.starciwork/ledger-anchor.json`, which is what makes a lost or rolled-back ledger a refusal
+      instead of a silent restart at generation 0. `journal-prune`/`journal-retire` are now
+      `ledger-prune`/`ledger-retire` and take `--repo`; workers read their contract through
+      `starci op-contract` and files are produced by `workflow-export`, never read as the record.
   - version: 1.0.0
     note: upgrades/1.0.0.md
     summary: >-

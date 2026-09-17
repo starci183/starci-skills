@@ -121,6 +121,14 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
     try{return fs.readdirSync(dir,{withFileTypes:true}).some(ent=>{if(ent.name==='.git'||ent.name==='assets'||ent.name.startsWith('_'))return false;const p=path.join(dir,ent.name);if(ent.isDirectory())return hasCanonicalNode(p);if(ent.name!=='index.yaml')return false;try{return /(?:^|\n)\s*schema:\s*work\/node@2(?:\s|$)/.test(fs.readFileSync(p,'utf8'));}catch{return false;}});}catch{return false;}
   }
   const canonicalV2=hasCanonicalNode(absolute);
+  // The runtime's own record at the workspace root, not Work artifacts. 1.0.4 moved every piece of it out of
+  // `_local`: the ledger is `.starciwork/runtime.sqlite` (+ its WAL siblings) with the tracked anchor
+  // `.starciwork/ledger-anchor.json` beside it (docs/ledger-db.md §3, §12), and the kernel's own immutable
+  // validation receipts live under `.starciwork/kernel-evidence/<workflow>/`. All of it is JSON on purpose and
+  // none of it is a Work record, so reading it as one makes every tree that has ever been run invalid on
+  // `JSON_ARTIFACT` - and an invalid tree derives no node at all, which strands the whole run.
+  const runtimeCustody=new Set(['runtime.sqlite','runtime.sqlite-journal','runtime.sqlite-wal','runtime.sqlite-shm','ledger-anchor.json']);
+  const runtimeCustodyDirectories=new Set(['kernel-evidence']);
   function walk(dir, inAssets=false) {
     let entries;
     try { entries=fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name)); } catch { issue('READ_DIRECTORY',rel(dir),'Cannot enumerate directory.'); return; }
@@ -128,6 +136,7 @@ function validate(root,completions=null,candidate=null,authoredTargets=null) {
       if (ent.name === '.git') continue;
       const p=path.join(dir,ent.name);
       if (ent.isSymbolicLink()) { issue('SYMLINK',rel(p),'Symlinks are not accepted in canonical workspace artifacts.'); continue; }
+      if (dir===absolute && (ent.isFile()?runtimeCustody.has(ent.name):runtimeCustodyDirectories.has(ent.name))) continue;
       // Asset folders contain payloads, not Work metadata. Still traverse them
       // to reject symlinks; a fixture named index.yaml is not a child node.
       if(inAssets){if(ent.isDirectory())walk(p,true);continue;}
