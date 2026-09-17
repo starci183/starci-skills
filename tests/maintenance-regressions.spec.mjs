@@ -8,14 +8,21 @@ import {validateWorkspace,previewCompletion,previewEvidence,sha256} from '../cor
 import {stringifyYaml} from '../core/yaml.mjs';
 import {checkEntry} from '../scripts/check-entry.mjs';
 import {publishEvidence} from '../workflows/evidence.mjs';
+import {evidenceStagingRoot} from '../core/index.mjs';
 function fixture(t) {
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-maintenance-'));
- t.after(()=>{assert.equal(path.dirname(dir),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(dir).startsWith('starci-maintenance-'));fs.rmSync(dir,{recursive:true,force:true});});
  const root=path.join(dir,'.starciwork'),put=(p,x)=>{fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,stringifyYaml(x));};
+ // Staging moved out of the Work root, so cleanup owns both directories and never depends on publication.
+ const staging=evidenceStagingRoot(root);
+ t.after(()=>{
+  assert.equal(path.dirname(dir),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(dir).startsWith('starci-maintenance-'));
+  assert.equal(path.dirname(staging),path.join(fs.realpathSync(os.tmpdir()),'starci','evidence-staging'));
+  fs.rmSync(dir,{recursive:true,force:true});fs.rmSync(staging,{recursive:true,force:true});
+ });
  put(path.join(root,'workspace.yaml'),{schema:'work/workspace@1',id:'synthetic'});
  for(const id of ['piece','neighbor'])put(path.join(root,id,'index.yaml'),{schema:'work/node@2',id,kind:'operations',required:true,state:'todo',assertions:['first','second'],description:'Synthetic maintenance regression; no product acceptance.'});
  const manifest=(id='proof',assertions=['first','second'])=>({schema:'work/evidence@1',id,nodeId:'piece',inputDigest:validateWorkspace(root).nodes.find(n=>n.id==='piece').inputDigest,outcome:'pass',assertions:assertions.map(id=>({id,outcome:'pass',observation:'Synthetic observation'})),assets:[]});
- const stage=(name='new-proof')=>{const directory=path.join(dir,'.starciwork/_local','evidence-staging',name);put(path.join(directory,'manifest.yaml'),manifest(name));return directory;};
+ const stage=(name='new-proof')=>{const directory=path.join(staging,name);put(path.join(directory,'manifest.yaml'),manifest(name));return directory;};
  return {dir,root,put,manifest,stage};
 }
 test('root local plans are excluded from Work hashes and cannot satisfy canonical dependencies',t=>{
@@ -48,12 +55,23 @@ test('current host entry with stale task INDEX.md is a context refresh, not miss
  assert.equal(checkEntry(f.dir).status,'bootstrap-review-required');
  assert.equal(checkEntry(path.join(f.dir,'missing')).status,'missing-runtime');
 });
-test('saveRun terminates for Windows slash variants without changing frozen request digests',t=>{
+/**
+ * The original regression was `saveRun` hanging on a Windows slash variant: it walked a path's ancestors to
+ * the filesystem root and a mixed-separator root never reached a fixed point. `saveRun` is retired with
+ * `_local` (docs/ledger-db.md §13), but the ancestor walk is not - `assertNewStoragePath` still has one, and
+ * it is still reached from a live entry point (`starci workspace init`). The regression is kept pointed at
+ * the walk that survives, and the assertion is still termination: the child is given 3s and must exit.
+ */
+test('the storage ancestor walk terminates for Windows slash variants without changing a frozen run',t=>{
  const f=fixture(t),url=new URL('../workflows/lifecycle.mjs',import.meta.url).href;
+ const storage=new URL('../workflows/storage.mjs',import.meta.url).href;
  const goal={schema:'starci/goal@1',id:'synthetic',workflow:'prepare-work',requestId:'request',originalRequest:'Synthetic metadata preparation',finalOutcome:'Valid metadata',scope:{business:['synthetic'],paths:[],resources:['work'],exclusions:[]},criteria:['valid'],businessChanges:['Synthetic metadata only'],impacts:[],resourceEffects:[{target:'work',operation:'prepare',postcondition:'valid'}],inputs:{request:'synthetic'},workTargets:[],cells:[{id:'prepare-work',op:'workspace.manage',operation:'prepare',purpose:'Synthetic scope',finalOutput:'Work',criteria:['valid'],inputs:{request:{from:'request',key:'request'}},outputSchema:{type:'object',properties:{result:{type:'string'}},required:['result'],additionalProperties:false}}]};
  const variants=process.platform==='win32'?[f.root,f.root.replaceAll('\\','/'),f.root.replace('\\','/')]:[f.root];
  for(const [i,root]of variants.entries()) {
-  const code=`import {propose,saveRun,workflowDigest} from ${JSON.stringify(url)};const run=propose(${JSON.stringify(goal)},{workRoot:${JSON.stringify(root)}});const before=workflowDigest(run);saveRun(run,'variant-${i}');if(workflowDigest(run)!==before)throw Error('Frozen run changed');`;
+  const code=`import {propose,workflowDigest} from ${JSON.stringify(url)};import {assertNewStoragePath} from ${JSON.stringify(storage)};`
+   +`const run=propose(${JSON.stringify(goal)},{workRoot:${JSON.stringify(root)}});const before=workflowDigest(run);`
+   +`assertNewStoragePath(${JSON.stringify(root)}+'/variant-${i}');`
+   +`if(workflowDigest(run)!==before)throw Error('Frozen run changed');`;
   const child=spawnSync(process.execPath,['--input-type=module','-e',code],{encoding:'utf8',timeout:3000});
   assert.equal(child.error,undefined);assert.equal(child.status,0,child.stderr);
  }

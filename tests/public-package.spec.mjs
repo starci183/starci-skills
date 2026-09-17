@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {stateRoot,inspectStorage} from '../workflows/storage.mjs';
+import {isLocalOnlyWorkspace,inspectStorage} from '../workflows/storage.mjs';
 import {init,update} from '../bin/starci-skills.mjs';
 
 const runtime=fileURLToPath(new URL('../',import.meta.url));
@@ -53,10 +53,24 @@ test('storage reports legacy and mixed names read-only and init cannot create pa
 test('retired temp destination is refused and split-storage bootstraps upgrade without losing user text',t=>{
  const host=temp(t),opts={dir:host,force:false,bootstrap:true,upgradeMajor:false};
  installFromGolden(host);
- const split=fs.readFileSync(path.join(runtime,'init/AGENTS.md'),'utf8').replace("The project's backend owns shared `.starciwork`; Plan/run state lives inside `.starciwork/_local/plans` for both backend and frontend.","The project's backend owns the shared `.starciwork` and sibling `.starcitemp` for both backend and frontend.");
- for(const name of ['AGENTS.md','CLAUDE.md'])fs.writeFileSync(path.join(host,name),split+'\nCustom rule stays.\n');
- update(opts,()=>{});
- for(const name of ['AGENTS.md','CLAUDE.md']){const content=fs.readFileSync(path.join(host,name),'utf8');assert.match(content,/\.starciwork\/_local\/plans/);assert.ok(content.endsWith('Custom rule stays.\n'));}
+ // Every storage sentence this bootstrap has carried must still be RECOGNIZED on update, or a host keeps two
+ // homes for the same rule. `_local/plans` is the variant the 1.0.4 cutover retires (docs/ledger-db.md §13):
+ // it is recognized and replaced, never installed.
+ const current="The project's backend owns shared `.starciwork`; its runtime record is the ledger `.starciwork/runtime.sqlite` for both backend and frontend.";
+ const installed=fs.readFileSync(path.join(runtime,'init/AGENTS.md'),'utf8');
+ assert.ok(installed.includes(current),'the shipped bootstrap carries the current storage sentence');
+ for(const legacy of ["The project's backend owns shared `.starciwork`; Plan/run state lives inside `.starciwork/_local/plans` for both backend and frontend.",
+                      "The project's backend owns the shared `.starciwork` and sibling `.starcitemp` for both backend and frontend."]) {
+  const stale=installed.replace(current,legacy);
+  for(const name of ['AGENTS.md','CLAUDE.md'])fs.writeFileSync(path.join(host,name),stale+'\nCustom rule stays.\n');
+  update(opts,()=>{});
+  for(const name of ['AGENTS.md','CLAUDE.md']){
+   const content=fs.readFileSync(path.join(host,name),'utf8');
+   assert.ok(content.includes(current),`update replaced the legacy sentence in ${name}`);
+   assert.ok(!content.includes(legacy),`the legacy sentence is gone from ${name}`);
+   assert.ok(content.endsWith('Custom rule stays.\n'));
+  }
+ }
  assert.notEqual(invoke('workspace','init',path.join(host,'.starcitemp'),'--id','synthetic').status,0);
  assert.equal(fs.existsSync(path.join(host,'.starcitemp')),false);
 });
@@ -85,9 +99,17 @@ test('storage does not follow backend or storage symlinks',t=>{
 test('state follows the explicit root, never the presence of a competing tree or a digest rewrite',t=>{
  const base=temp(t);
  for(const dir of ['.starci','.starcitemp'])fs.mkdirSync(path.join(base,dir));
- assert.equal(stateRoot(path.join(base,'.starciwork')),path.join(base,'.starciwork','_local'));
- assert.equal(stateRoot(path.join(base,'.work')),path.join(base,'.starci'));
- assert.equal(stateRoot(path.join(base,'custom-metadata')),path.join(base,'custom-metadata','_local'));
+ // `stateRoot` is retired with `_local` (docs/ledger-db.md §13). What still has to be true is the reason it
+ // existed: a competing tree beside a root never redirects anything, and a root holding only reserved
+ // runtime state is not Work - including a root holding only a ledger, which is the 1.0.4 shape.
+ const root=path.join(base,'.starciwork');fs.mkdirSync(root);
+ assert.equal(isLocalOnlyWorkspace(root),false,'an empty root holds nothing, reserved or otherwise');
+ fs.writeFileSync(path.join(root,'runtime.sqlite'),'');
+ assert.equal(isLocalOnlyWorkspace(root),true,'a root holding only its ledger has no Work in it yet');
+ fs.mkdirSync(path.join(root,'_local'));
+ assert.equal(isLocalOnlyWorkspace(root),true,'an unmigrated _local is reserved state too');
+ fs.writeFileSync(path.join(root,'workspace.yaml'),'schema: work/workspace@1\nid: synthetic\n');
+ assert.equal(isLocalOnlyWorkspace(root),false,'a workspace record is Work');
  assert.deepEqual(fs.readdirSync(path.join(base,'.starci')),[]);
  assert.deepEqual(fs.readdirSync(path.join(base,'.starcitemp')),[]);
 });
@@ -95,7 +117,14 @@ test('state follows the explicit root, never the presence of a competing tree or
 test('update migrates known pre-rename bootstraps and preserves custom instructions and product bytes',t=>{
  const host=temp(t),opts={dir:host,force:false,bootstrap:true,upgradeMajor:false};
  installFromGolden(host);
- const split=fs.readFileSync(path.join(runtime,'init/AGENTS.md'),'utf8').replace("The project's backend owns shared `.starciwork`; Plan/run state lives inside `.starciwork/_local/plans` for both backend and frontend.","The project's backend owns the shared `.starciwork` and sibling `.starcitemp` for both backend and frontend.");
+ // The pre-rename bootstrap is reconstructed from the CURRENT template the same way bin/starci-skills.mjs
+ // reconstructs it - by putting that era's storage sentence back. Reconstructing it from a sentence the
+ // template no longer carries would silently produce today's bootstrap and assert nothing.
+ const current="The project's backend owns shared `.starciwork`; its runtime record is the ledger `.starciwork/runtime.sqlite` for both backend and frontend.";
+ const template=fs.readFileSync(path.join(runtime,'init/AGENTS.md'),'utf8');
+ assert.ok(template.includes(current),'the shipped bootstrap carries the current storage sentence');
+ const split=template.replace(current,"The project's backend owns the shared `.starciwork` and sibling `.starcitemp` for both backend and frontend.");
+ assert.notEqual(split,template,'the split-storage bootstrap is a real historical variant, not a copy of today');
  const old=split.replaceAll('.starciwork','.work').replaceAll('.starcitemp','.starci');
  for(const name of ['AGENTS.md','CLAUDE.md'])fs.writeFileSync(path.join(host,name),old+'\nCustom: keep project rules.\n');
  for(const dir of ['.work','.starci','.starciwork','.starcitemp']){fs.mkdirSync(path.join(host,dir));fs.writeFileSync(path.join(host,dir,'owned.txt'),'user data');}

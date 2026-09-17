@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {stateRoot} from './storage.mjs';
-import {previewEvidence,sha256,canonicalJSON} from '../core/index.mjs';
+import {previewEvidence,evidenceStagingRoot,sha256,canonicalJSON} from '../core/index.mjs';
 import {parseYaml} from '../core/yaml.mjs';
 import {scopedWorkStatus} from './work-binding.mjs';
 const within=(base,file)=>{const r=path.relative(base,file);return r!== '..'&&!r.startsWith('..'+path.sep)&&!path.isAbsolute(r);};
@@ -12,7 +11,7 @@ function snapshot(dir) {
 }
 function staging(workRoot,directory) {
  const root=fs.realpathSync(workRoot),stage=fs.realpathSync(directory);
- const stagingRoot=path.join(stateRoot(root),'evidence-staging');
+ const stagingRoot=evidenceStagingRoot(root);
  if(!within(stagingRoot,stage)||stage===stagingRoot||fs.realpathSync(path.dirname(stage))!==stagingRoot||fs.lstatSync(directory).isSymbolicLink())throw Error('Use a direct owned staging directory under '+stagingRoot);
  return {root,stage};
 }

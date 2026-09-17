@@ -25,8 +25,12 @@ The existing manual goal approval, scoped cell requests, typed outputs, result
 review and completion checks still apply. Do not manufacture a Plan, Plan
 acceptance or fake user reply just to satisfy old ceremony.
 
-The standalone record lives under `.starciwork/_local/workflows/<id>/`, not the
-Plan tree. Existing Plan runs and their receipts stay unchanged. Scoped
+A standalone run has no on-disk record of its own. It used to be written under
+`.starciwork/_local/workflows/<id>/`; `_local` does not survive the 1.0.4 cutover
+(docs/ledger-db.md §13), and nothing executable ever read that record back. The
+run is a plain value: a caller that needs it to outlive a process serializes the
+value it already holds, and the runtime's own record is the ledger. Existing Plan
+runs and their receipts stay unchanged. Scoped
 coordinator mandates and auto remain Plan-bound; this standalone path is direct
 manual approval and does not silently migrate an active delegated run.
 

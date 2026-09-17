@@ -373,7 +373,10 @@ test('the root follows the store, then the environment the kernel gave the child
   assert.equal(headlessRoot({cwd,env:{[HEADLESS_ROOT_ENV]:'/env/root'}}),path.resolve('/env/root'));
   assert.equal(headlessRoot({cwd,env:{},reportsDir:'/s/w/reports'}),path.join(path.resolve('/s/w'),'headless'));
   assert.equal(headlessRoot({cwd,root:'/explicit'}),path.resolve('/explicit'));
-  assert.ok(headlessRoot({cwd,env:{}}).endsWith(path.join('.starciwork','_local','headless')));
+  // The lane-opened-at-goal-time fallback is a kernel-owned corner beside the ledger now, not `_local`,
+  // which 1.0.4 retires (docs/ledger-db.md §13). It sits alongside `kernel-evidence/`, and `core/index.mjs`
+  // excludes it from Work validation for the same reason.
+  assert.ok(headlessRoot({cwd,env:{}}).endsWith(path.join('.starciwork','kernel-headless')));
   const base=tmp();
   try{
     const host=createHeadlessHost({cwd:base,calls,env:{}});

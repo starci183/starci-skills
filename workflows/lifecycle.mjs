@@ -1,8 +1,8 @@
 import {validatePlan,planProgress} from './plan.mjs';
 import {verifyPresentation} from './presentation.mjs';
-import {stateRoot,assertNewStoragePath,isLocalOnlyWorkspace} from './storage.mjs';
-import {assertAutoGoal,hasAutoAcceptance,verifyAutoEvidence,verifyAutoPredecessors,completeAutoPlan} from './auto.mjs';
-import {readScopedMandate,validateDelegationSource,assertDelegatedGoal,assertDelegatedAssessment,assertDelegatedDispatch,hasDelegatedAcceptance,verifyDelegatedResult,completeDelegatedPlan,closeScopedMandate} from './delegation.mjs';
+import {isLocalOnlyWorkspace} from './storage.mjs';
+import {assertAutoGoal,hasAutoAcceptance,verifyAutoEvidence,verifyAutoPredecessors} from './auto.mjs';
+import {readScopedMandate,validateDelegationSource,assertDelegatedGoal,assertDelegatedAssessment,assertDelegatedDispatch,hasDelegatedAcceptance,verifyDelegatedResult} from './delegation.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {canonicalJSON,sha256,validateWorkspace,previewCompletion} from '../core/index.mjs';
@@ -169,106 +169,36 @@ export function acceptCell(run,response,{evidenceRoot}){bound(run);verifyRequire
 export function acceptDelivery(run,receipt){bound(run);requireThat(!run.delegated&&!run.automatic,'Use the actual authority-specific result decision');requireThat(run.status==='awaiting-acceptance'&&run.resultDigest===digest({goalDigest:run.goalDigest,responses:run.responses}),'A complete unchanged result is required');verifyProducerResult(run);decision(receipt,'acceptance',run.resultDigest);const accepted={...run,status:'accepted',approvals:[...run.approvals,structuredClone(receipt)]};requireThat(hasDirectProducerAcceptance(accepted),'A distinct actual direct goal and result decision are required');return accepted;}
 export function markWorkDone(run,completions){bound(run);requireThat(run.status==='accepted'&&run.resultDigest===digest({goalDigest:run.goalDigest,responses:run.responses}),'User acceptance is required before Work done');requireThat(deliveryAuthorized(run),'Missing bound user acceptance');const before=validateWorkspace(run.workRoot);requireThat(same(Object.keys(completions).sort(),[...run.goal.workTargets].sort()),'Completion cannot target other Work nodes');const preview=preflightCompletion(run,completions);requireThat(preview.ok,'Completion preflight failed; no Work files changed: '+JSON.stringify(preview.errors));const writes=[];for(const [id,completion]of Object.entries(completions)){const node=before.nodes.find(n=>n.id===id);requireThat(node&&node.children.length===0,'Only selected leaf nodes can be marked; parents derive done');const file=path.resolve(run.workRoot,node.path);requireThat(inside(fs.realpathSync(run.workRoot),fs.realpathSync(file)),'Node escapes Work');const original=fs.readFileSync(file,'utf8');let meta,body='';if(file.endsWith('.md')){const m=original.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/);requireThat(m,'Malformed legacy node');meta=parseYaml(m[1]);body=m[2];}else meta=parseYaml(original);meta.state='done';meta.completion=completion;const bytes=file.endsWith('.md')?'---\n'+stringifyYaml(meta)+'---\n'+body:stringifyYaml(meta);writes.push({file,original,bytes});}
  try{for(const w of writes){requireThat(fs.readFileSync(w.file,'utf8')===w.original,'Concurrent node change');fs.writeFileSync(w.file,w.bytes);}const verified=validateWorkspace(run.workRoot);requireThat(scopedWorkStatus(verified,run.goal.workTargets,{done:true,authored:run.goal.cells.some(c=>c.workPolicy),requiredChildrenOnly:run.goal.workflow==='implement-backend'}).ok,'Completion proof failed; Work done rolled back');verifyRunWork({...run,status:'done'});return {...run,status:'done'};}catch(error){for(const w of writes)if(fs.readFileSync(w.file,'utf8')===w.bytes)fs.writeFileSync(w.file,w.original);throw error;}}
-export {digest as workflowDigest};
-function standaloneDirectory(workRoot,id){
- requireThat(/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id),'Unsafe workflow ID');
- const dir=path.resolve(stateRoot(workRoot),'workflows',id),base=path.dirname(path.resolve(workRoot));
- assertNewStoragePath(dir);
- for(let file=dir;file!==base;file=path.dirname(file)){
-  requireThat(inside(base,file),'Workflow path escaped its owner');
-  requireThat(!fs.existsSync(file)||!fs.lstatSync(file).isSymbolicLink(),'Local workflow cannot follow symlinks');
- }
- return dir;
-}
-export function saveStandaloneRun(run,id=run.goal.id){
- bound(run);workStatus(run.workRoot);verifyPresentation(run,catalog);
- requireThat(run.presentation.scope.schema==='starci/workflow-scope@1'&&id===run.goal.id,'Standalone workflow must retain its own ID');
- const dir=standaloneDirectory(run.workRoot,id);
- for(const name of ['goal.yaml','run.yaml'])requireThat(!fs.existsSync(path.join(dir,name))||!fs.lstatSync(path.join(dir,name)).isSymbolicLink(),'Workflow record cannot follow symlinks');
- const file=path.join(dir,'run.yaml');
- if(fs.existsSync(file)){const old=parseYaml(fs.readFileSync(file,'utf8'));bound(old);requireThat(old.goalDigest===run.goalDigest&&same(old.presentation,run.presentation),'Workflow goal changed; use a new ID and reapprove');}
- fs.mkdirSync(dir,{recursive:true});
- fs.writeFileSync(path.join(dir,'goal.yaml'),stringifyYaml(run.goal));
- fs.writeFileSync(file,stringifyYaml(run));return dir;
-}
-export function loadStandaloneRun(workRoot,id){
- const dir=standaloneDirectory(workRoot,id);
- const read=name=>{const file=path.join(dir,name);requireThat(!fs.lstatSync(file).isSymbolicLink(),'Workflow record cannot follow symlinks');return parseYaml(fs.readFileSync(file,'utf8'));};
- const run=read('run.yaml');bound(run);verifyPresentation(run,catalog);
- requireThat(run.presentation.scope.schema==='starci/workflow-scope@1'&&run.goal.id===id&&run.workRoot===workRoot&&same(read('goal.yaml'),run.goal),'Standalone workflow records disagree');return run;
-}
-export function saveRun(run,planId=run.presentation?.scope.id??run.goal.id){
- if(run.presentation?.scope.schema==='starci/workflow-scope@1')return saveStandaloneRun(run,planId);
- bound(run);workStatus(run.workRoot);
- if(run.delegated)assertDelegatedGoal(run,{active:false});
- requireThat(!run.presentation||planId===run.presentation.scope.id,'All workflow runs must remain in their one presented Plan bundle');
- requireThat(/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(planId),'Unsafe Plan ID');
- // Normalize only I/O paths: never rewrite the request-bound Work root or its digest.
- const base=path.dirname(path.resolve(run.workRoot)),state=path.relative(base,stateRoot(run.workRoot)),dir=path.join(base,state,'plans',planId);
- if(!fs.existsSync(path.join(dir,'goal/index.yaml')))assertNewStoragePath(dir);
- const paths=['index.yaml','goal/index.yaml','approval/index.yaml','run/index.yaml'];
- for(const relative of [state,state+'/plans',state+'/plans/'+planId,...paths.map(p=>state+'/plans/'+planId+'/'+p)]){
-  let file=path.join(base,relative);while(file!==base){requireThat(inside(base,file),'Plan ancestor escaped its owner');requireThat(!fs.existsSync(file)||!fs.lstatSync(file).isSymbolicLink(),'Local Plan cannot follow symlinks');const parent=path.dirname(file);requireThat(parent!==file,'Plan ancestor walk reached the filesystem root');file=parent;}
- }
- const read=relative=>fs.existsSync(path.join(dir,relative))?parseYaml(fs.readFileSync(path.join(dir,relative),'utf8')):null;
- const oldGoal=read('goal/index.yaml'),jobId=run.presentation?.jobId??run.goal.id;
- const plan=run.presentation?.scope??null,planDigest=plan?validatePlan(plan,catalog).digest:run.goalDigest;
- requireThat(!oldGoal||oldGoal.planDigest===planDigest||(!oldGoal.plan&&oldGoal.jobs?.[jobId]?.goalDigest===run.goalDigest),'Plan changed; present a revised Plan instead of overwriting an existing bundle');
- const oldApproval=read('approval/index.yaml'),oldExecution=read('run/index.yaml');
- if(oldGoal)requireThat(oldApproval?.planDigest===oldGoal.planDigest&&oldExecution?.planDigest===oldGoal.planDigest,'Incomplete or mismatched Plan bundle; reconcile before saving');
- const goals=oldGoal?.jobs??{},approvals=oldApproval?.jobs??{},runs=oldExecution?.jobs??{};
- for(const job of plan?.workflows??[]) {
-  approvals[job.id]??={status:'pending',presentation:null,receipts:[]};
-  runs[job.id]??={workflow:job.workflow,status:'planned',dependsOn:job.dependsOn,requests:{},responses:{},evidence:[]};
- }
- requireThat(!goals[jobId]||goals[jobId].goalDigest===run.goalDigest,'Job goal changed; revise and reapprove before replacing execution');
- goals[jobId]={goal:run.goal,goalDigest:run.goalDigest,scopeDigest:run.scopeDigest,workRoot:run.workRoot,repositories:run.repositories};
- approvals[jobId]={status:run.approvals.length?'recorded':'pending',presentation:run.presentation?{messageId:run.presentation.messageId,...(run.presentation.provenance?{provenance:run.presentation.provenance}:{}),goalDigest:run.goalDigest,planDigest}:null,receipts:run.approvals};
- const {goal,presentation,approvals:receipts,repositories,workRoot,...execution}=run;runs[jobId]=execution;
- if(oldExecution?.completion)requireThat(oldExecution.completion.planDigest===planDigest&&Object.entries(oldExecution.completion.resultDigests).every(([id,d])=>runs[id]?.status==='done'&&runs[id]?.resultDigest===d),'Completed Plan results changed; explicit revision is required');
- const documents={
-  'index.yaml':{schema:'starci/plan-index@1',id:planId,goal:'goal/index.yaml',approval:'approval/index.yaml',run:'run/index.yaml'},
-  'goal/index.yaml':{schema:'starci/plan-goal@1',planDigest,plan,jobs:goals},
-  'approval/index.yaml':{schema:'starci/plan-approval@1',planDigest,jobs:approvals},
-  'run/index.yaml':{schema:'starci/plan-run@1',planDigest,...(plan?{status:oldExecution?.completion?'done':Object.values(runs).some(r=>r.delegated)&&plan.workflows.every(j=>runs[j.id]?.status==='done')?'awaiting-terminal-review':planProgress(plan,runs)}:{}),jobs:runs,...(oldExecution?.completion?{completion:oldExecution.completion}:{})}
- };
- for(const [relative,doc]of Object.entries(documents)){const file=path.join(dir,relative);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,stringifyYaml(doc));}
- return dir;
-}
-export function saveAutoCompletion(plan,{authorization,criteria}) {
- const dir=path.join(stateRoot(authorization.presentation.workRoot),'plans',plan.id);
- requireThat(/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(plan.id),'Unsafe Plan ID');
- const read=relative=>{const file=path.join(dir,relative);requireThat(fs.realpathSync(file).toLowerCase()===file.toLowerCase(),'Plan completion cannot follow links');return fs.readFileSync(file,'utf8');};
- const goal=parseYaml(read('goal/index.yaml')),approval=parseYaml(read('approval/index.yaml')),original=read('run/index.yaml'),execution=parseYaml(original);
- const planDigest=validatePlan(plan,catalog).digest;
- requireThat(goal.planDigest===planDigest&&same(goal.plan,plan)&&approval.planDigest===planDigest&&execution.planDigest===planDigest,'Mismatched Plan bundle; reconcile before completion');
- const runs={};
- for(const job of plan.workflows) {
-  const g=goal.jobs[job.id],a=approval.jobs[job.id],r=execution.jobs[job.id];
-  requireThat(g&&a?.presentation&&r,'Missing workflow records');
-  runs[job.id]={...r,...g,approvals:a.receipts,presentation:{...a.presentation,scope:plan,scopeDigest:planDigest,jobId:job.id}};
- }
- const completion=completeAutoPlan(plan,{authorization,runs,criteria});
- const file=path.join(dir,'run/index.yaml');requireThat(fs.readFileSync(file,'utf8')===original,'Concurrent Plan change');
- fs.writeFileSync(file,stringifyYaml({...execution,status:'done',completion}));return completion;
+/**
+ * The status of a Plan as a whole, from the Plan and the runs it owns. `planProgress` alone is not it: an
+ * auto Plan whose jobs are all done awaits terminal review, and so does a DELEGATED one - but that second
+ * rule used to be computed inside `saveRun`, which is retired with `.starciwork/_local` (docs/ledger-db.md
+ * §13). Left there it would have gone with the writer, and a delegated Plan still owing its terminal review
+ * would have become indistinguishable from a finished one: a contract change wearing a refactor's clothes.
+ *
+ * `completion` is the recorded terminal review, when there is one; a reviewed Plan is done whatever the rule
+ * would otherwise say, because the review is the thing the status was waiting for.
+ */
+export function planStatus(plan,runs,{completion=null}={}) {
+ requireThat(plan?.workflows?.length>0&&runs&&typeof runs==='object','A Plan with workflows and its runs are required');
+ if(completion)return 'done';
+ const everyJobDone=plan.workflows.every(job=>runs[job.id]?.status==='done');
+ if(everyJobDone&&Object.values(runs).some(run=>run?.delegated))return 'awaiting-terminal-review';
+ return planProgress(plan,runs);
 }
 
-/** Read the same four-file bundle without manufacturing presentation/approval IDs. */
-export function loadPlanRuns(plan,workRoot) {
- const dir=path.join(stateRoot(workRoot),'plans',plan.id),planDigest=validatePlan(plan,catalog).digest;
- requireThat(/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(plan.id),'Unsafe Plan ID');
- const read=relative=>{const file=path.join(dir,relative);requireThat(fs.realpathSync(file).toLowerCase()===file.toLowerCase(),'Plan bundle cannot follow links');return parseYaml(fs.readFileSync(file,'utf8'));};
- const g=read('goal/index.yaml'),a=read('approval/index.yaml'),r=read('run/index.yaml');
- requireThat(g.planDigest===planDigest&&same(g.plan,plan)&&a.planDigest===planDigest&&r.planDigest===planDigest,'Mismatched Plan bundle');
- const runs={};
- for(const job of plan.workflows){if(!g.jobs[job.id])continue;const approval=a.jobs[job.id],execution=r.jobs[job.id];requireThat(approval?.presentation&&execution,'Incomplete workflow records');const presentation={...approval.presentation,scope:plan,scopeDigest:planDigest,jobId:job.id};delete presentation.planDigest;const run={...execution,...g.jobs[job.id],approvals:approval.receipts,presentation};bound(run);if(run.delegated)assertDelegatedGoal(run,{active:false});runs[job.id]=run;}
- return runs;
-}
-export function saveDelegatedCompletion(plan,{reference,criteria,source}) {
- const {mandate}=readScopedMandate(plan,reference),file=path.join(stateRoot(mandate.binding.workRoot),'plans',plan.id,'run/index.yaml');
- const runs=loadPlanRuns(plan,mandate.binding.workRoot),original=fs.readFileSync(file,'utf8');
- const completion=completeDelegatedPlan(plan,{reference,runs,criteria,source});
- requireThat(fs.readFileSync(file,'utf8')===original,'Concurrent Plan change');
- fs.writeFileSync(file,stringifyYaml({...parseYaml(original),status:'done',completion}));
- closeScopedMandate(plan,reference,completion);return completion;
-}
+export {digest as workflowDigest};
+
+/**
+ * The Plan v2 / standalone-run persistence that used to live here (`standaloneDirectory`,
+ * `saveStandaloneRun`, `loadStandaloneRun`, `saveRun`, `saveAutoCompletion`, `loadPlanRuns`,
+ * `saveDelegatedCompletion`) is retired with `.starciwork/_local` itself (docs/ledger-db.md §13): only
+ * `_local/workflows/` migrates, and the directory those writers wrote into does not survive the 1.0.4
+ * cutover. Nothing executable reached them - every caller was a spec - so nothing here needs a new home.
+ *
+ * What they persisted was never the semantics: a run is a plain value, and `propose` -> `presentGoal` ->
+ * `approveGoal` -> `requestCell` -> `acceptCell` -> `acceptDelivery` -> `markWorkDone` is a pure sequence
+ * over it. A caller that needs a run to outlive a process serializes the value it already holds; the
+ * runtime's own record is the ledger DB, reached through `kernel/store.mjs`.
+ */
+

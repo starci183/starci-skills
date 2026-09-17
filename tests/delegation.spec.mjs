@@ -7,11 +7,26 @@ import os from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {sha256,validateWorkspace} from '../core/index.mjs';
 import {stringifyYaml,parseYaml} from '../core/yaml.mjs';
-import {registerScopedMandate,readScopedMandate,revokeScopedMandate,delegatedContext,hasDelegatedAcceptance} from '../workflows/delegation.mjs';
-import {propose,presentGoal,approveGoal,presentDelegatedGoal,authorizeDelegatedGoal,requestCell,acceptCell,acceptDelivery,acceptDelegatedDelivery,markWorkDone,saveRun,loadPlanRuns,saveDelegatedCompletion,workflowDigest} from '../workflows/lifecycle.mjs';
+import {registerScopedMandate,readScopedMandate,revokeScopedMandate,delegatedContext,hasDelegatedAcceptance,completeDelegatedPlan,closeScopedMandate,assertDelegatedGoal,mandateRoot} from '../workflows/delegation.mjs';
+import {propose,presentGoal,approveGoal,presentDelegatedGoal,authorizeDelegatedGoal,requestCell,acceptCell,acceptDelivery,acceptDelegatedDelivery,markWorkDone,workflowDigest,planStatus} from '../workflows/lifecycle.mjs';
 import {validBackendRun} from '../workflows/select.mjs';
+import {planProgress} from '../workflows/plan.mjs';
 import {presentAutoPlan,approveAutoPlan} from '../workflows/auto.mjs';
 import {authorizeAutoGoal} from '../workflows/lifecycle.mjs';
+
+/**
+ * `saveRun` + `loadPlanRuns` (a four-document YAML bundle under `.starciwork/_local/plans/<id>/`) retire with
+ * `_local` (docs/ledger-db.md §13); nothing executable ever called them - the reload was a test vehicle for
+ * "does this survive being carried, and does it stop verifying when the disk moves". `carried` is that
+ * vehicle without the writer, and stricter: a JSON round-trip carries no schema knowledge of its own.
+ *
+ * The terminal-completion writers go the same way. `saveDelegatedCompletion` was
+ * `completeDelegatedPlan` + write the bundle + `closeScopedMandate`, and `saveAutoCompletion` was
+ * `completeAutoPlan` + write the bundle. The verification those two performed is the exported function in
+ * each pair, called directly here; the mandate is closed explicitly where closing it is the point.
+ */
+const carried=run=>JSON.parse(JSON.stringify(run));
+
 
 const source=(actor,threadId,quote)=>({actor,threadId,messageId:null,messageIdAvailability:'not-exposed',quote,assurance:'conversation-context-not-authenticated'});
 function fixture(t,{count=2,workflow='implement-backend'}={}) {
@@ -46,12 +61,30 @@ function fixture(t,{count=2,workflow='implement-backend'}={}) {
 
 test('manual scoped approval completes sequentially with honest absent native IDs, persists and closes only after terminal review',t=>{
  const f=fixture(t),reference=f.register(),runs={};
- for(let i=0;i<2;i++){runs['job-'+i]=f.finish(f.approve(reference,i,runs),i,runs);saveRun(runs['job-'+i]);assert.equal(runs['job-'+i].approvals.some(a=>a.actor==='user'),false);assert.equal(runs['job-'+i].automatic,undefined);}
- const recovered=loadPlanRuns(f.plan,f.root);assert.deepEqual(recovered['job-0'].presentation,runs['job-0'].presentation);assert.equal(hasDelegatedAcceptance(recovered['job-0']),true);
- const file=path.join(f.root,'_local/plans',f.plan.id,'run/index.yaml');assert.equal(parseYaml(fs.readFileSync(file,'utf8')).status,'awaiting-terminal-review');
- assert.throws(()=>saveDelegatedCompletion(f.plan,{reference,criteria:[],source:f.review}),/terminal/);
+ // The mandate is kernel-owned state beside the ledger, not `_local/approvals`, which 1.0.4 retires
+ // (docs/ledger-db.md §13). `core/index.mjs` excludes the corner from Work validation, so registering one
+ // leaves the tree valid.
+ assert.equal(path.dirname(reference.file),mandateRoot(f.root));
+ assert.equal(mandateRoot(f.root),path.join(f.root,'kernel-approvals'));
+ assert.equal(fs.existsSync(path.join(f.root,'_local')),false);
+ assert.equal(validateWorkspace(f.root).ok,true,JSON.stringify(validateWorkspace(f.root).errors));
+ for(let i=0;i<2;i++){runs['job-'+i]=f.finish(f.approve(reference,i,runs),i,runs);assert.equal(runs['job-'+i].approvals.some(a=>a.actor==='user'),false);assert.equal(runs['job-'+i].automatic,undefined);}
+ const recovered=Object.fromEntries(Object.entries(runs).map(([id,run])=>[id,carried(run)]));
+ assert.deepEqual(recovered['job-0'].presentation,runs['job-0'].presentation);assert.equal(hasDelegatedAcceptance(recovered['job-0']),true);
+ // Every job is accepted and nothing is left to run, and the Plan is still NOT done: a delegated Plan owes a
+ // terminal review first. `planProgress` alone says 'done' here - the override used to live inside `saveRun`
+ // and would have been lost with it, so it is now `planStatus`, a named function, and the status string it
+ // returns is asserted as well as the properties that make it true.
+ assert.equal(planProgress(f.plan,recovered),'done','every job is individually done');
+ assert.equal(planStatus(f.plan,recovered),'awaiting-terminal-review','but the delegated Plan owes its review');
+ assert.equal(readScopedMandate(f.plan,reference,{active:false}).status,'active','the Plan is not closed yet');
+ assert.throws(()=>completeDelegatedPlan(f.plan,{reference,runs:recovered,criteria:[],source:f.review}),/terminal/);
  const criteria=[{id:'terminal',status:'pass',observation:'All synthetic producers inspected',evidence:[0,1].map(i=>({jobId:'job-'+i,cellId:'implement-backend',criterionId:'backend-e2e-pass'}))}];
- const completion=saveDelegatedCompletion(f.plan,{reference,criteria,source:f.review});assert.equal(completion.status,'done');assert.equal(parseYaml(fs.readFileSync(file,'utf8')).status,'done');assert.equal(readScopedMandate(f.plan,reference,{active:false}).status,'completed');assert.throws(()=>f.approve(reference),/terminal/);assert.equal(validBackendRun(recovered['job-0']),true);
+ const completion=completeDelegatedPlan(f.plan,{reference,runs:recovered,criteria,source:f.review});assert.equal(completion.status,'done');
+ closeScopedMandate(f.plan,reference,completion);
+ // The review is what the status was waiting for, so with it recorded the Plan is done.
+ assert.equal(planStatus(f.plan,recovered,{completion}),'done');
+ assert.equal(readScopedMandate(f.plan,reference,{active:false}).status,'completed');assert.throws(()=>f.approve(reference),/terminal/);assert.equal(validBackendRun(recovered['job-0']),true);
 });
 
 test('ordinary manual goal requires actual user reply; observer and fabricated unavailable IDs cannot grant approval',t=>{
@@ -121,19 +154,23 @@ function technicalFixture(t,{count=1}={}) {
 
 test('exact reviewed technical answer frozen before presentation works through dispatch, acceptance, persistence and terminal closure',t=>{
  const f=technicalFixture(t),reference=f.register();let run=f.shown(reference,0,f.technicalGoal);
- run=authorizeDelegatedGoal(run,{reference,assessment:f.assessment(run,'goal'),source:f.review});run=f.finish(run);saveRun(run);
- const restored=loadPlanRuns(f.plan,f.root)['job-0'];assert.equal(hasDelegatedAcceptance(restored),true);assert.deepEqual(restored.goal.inputs.planQuestionAnswers,[technicalPair]);
+ run=authorizeDelegatedGoal(run,{reference,assessment:f.assessment(run,'goal'),source:f.review});run=f.finish(run);
+ const restored=carried(run);assert.equal(hasDelegatedAcceptance(restored),true);assert.deepEqual(restored.goal.inputs.planQuestionAnswers,[technicalPair]);
  const criteria=[{id:'terminal',status:'pass',observation:'Synthetic accepted technical scope verified',evidence:[{jobId:'job-0',cellId:'implement-backend',criterionId:'backend-e2e-pass'}]}];
- assert.equal(saveDelegatedCompletion(f.plan,{reference,criteria,source:f.review}).status,'done');assert.equal(hasDelegatedAcceptance(restored),true);assert.throws(()=>f.issue(restored),/terminal/);
+ const completion=completeDelegatedPlan(f.plan,{reference,runs:{'job-0':restored},criteria,source:f.review});assert.equal(completion.status,'done');
+ closeScopedMandate(f.plan,reference,completion);
+ assert.equal(hasDelegatedAcceptance(restored),true);assert.throws(()=>f.issue(restored),/terminal/);
 });
 
 test('future technical answers are discovered per goal under the same mandate without guessing them during Plan review',t=>{
  const f=fixture(t);f.plan.workflows[1].openQuestions=[technicalPair.question];f.options.jobs[1].technicalQuestions=[technicalPair.question];
- const reference=f.register(),runs={'job-0':f.finish(f.approve(reference))};saveRun(runs['job-0']);
+ const reference=f.register(),runs={'job-0':f.finish(f.approve(reference))};
  const goal=f.goal(1);goal.inputs.planQuestionAnswers=[{question:technicalPair.question,answer:'Inspected prior synthetic result: '+runs['job-0'].resultDigest}];
- let run=f.shown(reference,1,goal);run=authorizeDelegatedGoal(run,{reference,assessment:f.assessment(run,'goal'),source:f.review,priorRuns:runs});runs['job-1']=f.finish(run,1,runs);saveRun(runs['job-1']);
+ let run=f.shown(reference,1,goal);run=authorizeDelegatedGoal(run,{reference,assessment:f.assessment(run,'goal'),source:f.review,priorRuns:runs});runs['job-1']=f.finish(run,1,runs);
  const criteria=[{id:'terminal',status:'pass',observation:'Both synthetic results share one unchanged mandate',evidence:[0,1].map(i=>({jobId:'job-'+i,cellId:'implement-backend',criterionId:'backend-e2e-pass'}))}];
- assert.equal(saveDelegatedCompletion(f.plan,{reference,criteria,source:f.review}).status,'done');assert.equal(readScopedMandate(f.plan,reference,{active:false}).digest,reference.digest);
+ const completion=completeDelegatedPlan(f.plan,{reference,runs,criteria,source:f.review});assert.equal(completion.status,'done');
+ closeScopedMandate(f.plan,reference,completion);
+ assert.equal(readScopedMandate(f.plan,reference,{active:false}).digest,reference.digest);
 });
 
 for(const [name,answers]of [
@@ -242,19 +279,28 @@ test('mid-Plan adoption preserves valid direct-user predecessors without rewriti
  const f=fixture(t);let first=presentGoal(propose(f.goal(),{workRoot:f.root,repositories:{repo:f.dir}}),{messageId:'synthetic-native-presentation',scope:f.plan,jobId:'job-0'});
  first=approveGoal(first,{actor:'user',phase:'goal',approved:true,digest:first.goalDigest,messageId:'synthetic-native-goal-reply',replyTo:first.presentation.messageId,quote:'Synthetic direct user approves this goal'});
  first=f.pass(first);first=acceptDelivery(first,{actor:'user',phase:'acceptance',approved:true,digest:first.resultDigest,messageId:'synthetic-native-result-reply',quote:'Synthetic direct user accepts actual result'});
- const node=validateWorkspace(f.root).nodes.find(n=>n.id==='piece-0');f.put(path.join(f.root,'piece-0/evidence/direct/manifest.yaml'),{schema:'work/evidence@1',id:'direct-proof',nodeId:node.id,inputDigest:node.inputDigest,outcome:'pass',assertions:first.goal.criteria.map(id=>({id,outcome:'pass',observation:'Synthetic direct result'})),assets:[]});first=markWorkDone(first,{[node.id]:{inputDigest:node.inputDigest,evidence:['direct-proof']}});saveRun(first);
- const receipts=structuredClone(first.approvals),reference=f.register(),runs={'job-0':first};runs['job-1']=f.finish(f.approve(reference,1,runs),1,runs);saveRun(runs['job-1']);
+ const node=validateWorkspace(f.root).nodes.find(n=>n.id==='piece-0');f.put(path.join(f.root,'piece-0/evidence/direct/manifest.yaml'),{schema:'work/evidence@1',id:'direct-proof',nodeId:node.id,inputDigest:node.inputDigest,outcome:'pass',assertions:first.goal.criteria.map(id=>({id,outcome:'pass',observation:'Synthetic direct result'})),assets:[]});first=markWorkDone(first,{[node.id]:{inputDigest:node.inputDigest,evidence:['direct-proof']}});
+ const receipts=structuredClone(first.approvals),reference=f.register(),runs={'job-0':first};runs['job-1']=f.finish(f.approve(reference,1,runs),1,runs);
  const criteria=[{id:'terminal',status:'pass',observation:'Existing direct and new delegated producers checked',evidence:[0,1].map(i=>({jobId:'job-'+i,cellId:'implement-backend',criterionId:'backend-e2e-pass'}))}];
- assert.equal(saveDelegatedCompletion(f.plan,{reference,criteria,source:f.review}).status,'done');assert.deepEqual(loadPlanRuns(f.plan,f.root)['job-0'].approvals,receipts);
+ const completion=completeDelegatedPlan(f.plan,{reference,runs,criteria,source:f.review});assert.equal(completion.status,'done');
+ closeScopedMandate(f.plan,reference,completion);
+ // Adopting a direct-user predecessor mid-Plan never rewrites its receipts.
+ assert.deepEqual(carried(runs['job-0']).approvals,receipts);
 });
 
 test('mandate tampering, root changes, escaping paths/resources and corrupted resume fail closed',t=>{
  const f=fixture(t,{count:1});f.plan.workflows[0].paths=['repo:../outside.txt'];assert.throws(()=>f.register(),/escapes/);f.plan.workflows[0].paths=[];
  f.plan.workflows[0].resources.push('work:.claude/SKILL.md');f.options.jobs[0].resourceEffects.push({target:'work:.claude/SKILL.md',operation:'write-work',postcondition:'Changed runtime',category:'work-record'});assert.throws(()=>f.register(),/Runtime/);f.options.jobs[0].resourceEffects.pop();f.plan.workflows[0].resources.pop();
- const reference=f.register(),run=f.approve(reference);saveRun(run);
+ const reference=f.register(),run=f.approve(reference);
  const state=parseYaml(fs.readFileSync(reference.file,'utf8'));f.put(reference.file,{...state,mandate:{...state.mandate,coordinatorThreadId:'foreign'}});assert.throws(()=>f.issue(run),/changed/);f.put(reference.file,state);
  const other=structuredClone(run);other.repositories.repo=path.dirname(f.dir);assert.throws(()=>f.issue(other));
- const file=path.join(f.root,'_local/plans',f.plan.id,'approval/index.yaml'),approval=parseYaml(fs.readFileSync(file,'utf8'));approval.jobs['job-0'].presentation.provenance.quote='Changed brief';f.put(file,approval);assert.throws(()=>loadPlanRuns(f.plan,f.root),/decision/);
+ // The bundle that used to carry this back is retired, and the tamper it caught was never a property of the
+ // bundle: the coordinator's receipt binds the presentation by digest, so editing the brief anywhere - on
+ // the way to disk, on the way back, or in the value itself - unbinds the decision.
+ const tampered=carried(run);tampered.presentation.provenance.quote='Changed brief';
+ assert.throws(()=>assertDelegatedGoal(tampered),/decision/);
+ assert.throws(()=>f.issue(tampered),/decision/);
+ assert.equal(hasDelegatedAcceptance(tampered),false);
 });
 
 test('done producer rejects corrupt completion proof while unrelated stale Work remains isolated',t=>{

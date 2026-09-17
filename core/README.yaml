@@ -13,7 +13,8 @@ sections:
         rejected in canonical records except for two workspace-root contracts. Root _local is excluded
         execution state; root _resources contains typed resource.yaml custody records and their declared
         opaque or encrypted payloads. Nested _local and nested _resources remain invalid. Central schemas
-        remain in .claude; Plan/run records live in .starciwork/_local/plans.
+        remain in .claude. A Plan bundle is not Work, so it lives in a caller-chosen directory outside
+        .starciwork, never in .starciwork/_local, which does not survive the 1.0.4 cutover.
       - SRS and SDS are upstream source-of-truth contracts. SRS owns required behavior and SDS owns
         the prescribed technical design; implementation and UAT provide actual conformance proof.
         Source provenance is direct through sourceRefs on proof-owning nodes, with full lowercase
@@ -29,12 +30,12 @@ sections:
     blocks:
       - previewCompletion(root, completions) predicts proposed leaf state/completion using the same
         validators entirely in memory. previewEvidence(root, {directory,nodeId,name}) validates a
-        sealed new evidence bundle outside canonical records (including the direct root
-        _local/evidence-staging area) against current owners, IDs, schemas and asset hashes. Both
-        return preview:true and never write, publish, accept results or establish actual done.
+        sealed new evidence bundle outside canonical records (a direct child of the transient staging
+        area os.tmpdir()/starci/evidence-staging/<workspace>) against current owners, IDs, schemas and
+        asset hashes. Both return preview:true and never write, publish, accept results or establish actual done.
         Workflow preflightCompletion additionally binds the unchanged result and exact target set;
-        publishEvidence publishes only a prevalidated new immutable evidence directory from backend
-        .starciwork/_local/evidence-staging.
+        publishEvidence publishes only a prevalidated new immutable evidence directory out of that
+        staging area and into the owning node's own evidence/<id>/ folder, which is the record.
       - "`validateWorkspace(root)` is synchronous and returns
         `{ok,errors,warnings,nodes,resources}`. Each diagnostic has `code,path,message`; paths are
         workspace-relative. Node summaries expose

@@ -22,7 +22,7 @@ import {repositoryRoot} from '../../kernel/reports.mjs';
  * - terminals are handles in a table, never a pty: a terminal's screen is synthesized from the liveness of the
  *   process it stands for, so the protocol's observer reads `working`, `dead` or `stalled-silent` from facts;
  * - runs, tasks, terminals, dispatches and lane worktrees live in `<root>/table.json`, where `<root>` is
- *   `<workflow store>/headless` once the kernel binds its store and the repository's `_local/headless` before;
+ *   `<workflow store>/headless` once the kernel binds its store, and the repository's own corner before;
  * - lane worktrees are plain `git worktree` operations under `<repo>/.worktrees/lanes/<name>`.
  *
  * What this host cannot do it says so: `account list` (the provider quota Orca reads) is `unsupported`, never a
@@ -122,14 +122,18 @@ export function providerFor({agent=null,model=null,command=null}={},providers=HE
  * Where the host keeps its files. The kernel binds its workflow store, so the table, the mailbox and every
  * dispatch log sit beside the workflow's own events; a child process finds that same directory through the
  * environment the kernel gave it, and a `report` run by hand finds it beside the `--reports-dir` it was given.
- * Before any of those is known (a lane opened at goal time) the repository's `_local/headless` is the root.
+ * Before any of those is known (a lane opened at goal time) the repository's own kernel-owned corner beside
+ * the ledger is the root: `.starciwork/kernel-headless/`, alongside `kernel-evidence/<workflowId>/`. This is
+ * kernel-owned working state with a real lifetime, not a scratch file, so it does not go to `os.tmpdir()`
+ * the way §9's dispatch context does - and it is not `_local`, which does not survive the 1.0.4 cutover
+ * (docs/ledger-db.md §13).
  */
 export function headlessRoot({cwd=process.cwd(),root=null,storeDir=null,reportsDir=null,env=process.env}={}){
   if(root)return path.resolve(root);
   if(storeDir)return path.join(path.resolve(storeDir),'headless');
   if(text(env?.[HEADLESS_ROOT_ENV]))return path.resolve(env[HEADLESS_ROOT_ENV]);
   if(reportsDir)return path.join(path.dirname(path.resolve(cwd,reportsDir)),'headless');
-  return path.join(repositoryRoot(path.resolve(cwd)),'.starciwork','_local','headless');
+  return path.join(repositoryRoot(path.resolve(cwd)),'.starciwork','kernel-headless');
 }
 
 /** `path:<p>` and `id:headless::<p>` both name a directory; a bare value is taken as one. */
