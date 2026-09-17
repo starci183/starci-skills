@@ -14,7 +14,7 @@ import {reconcilePureModelJobs} from './job-reconcile.mjs';
 import {inspectLedger,ledgerFileFor,machineFileFor,openLedger,openMachine} from './ledger-db.mjs';
 import {GLOBAL_AI_RESOURCE,createAdmission} from './admission.mjs';
 import {resourceLocks} from './guards.mjs';
-import {ENGINE_SCHEMA,isEnrolled,kindRole,predatesEngineSchema,sealedRuntimeOf} from './common.mjs';
+import {ENGINE_SCHEMA,hasNumberedEngineMarker,isEnrolled,kindRole,predatesEngineSchema,sealedRuntimeOf} from './common.mjs';
 import {nonOperationModels} from '../scripts/config.mjs';
 import {budgetVerdict,readRuntimeBudget} from './budget.mjs';
 import {pidAlive,readLoads} from './loads.mjs';
@@ -22,7 +22,7 @@ import {readDistJson} from '../core/runtime-root.mjs';
 
 /** The engine version is the package version: one build, one name. */
 export const ENGINE_VERSION=readDistJson('manifest.json').version;
-export {ENGINE_SCHEMA,isEnrolled,predatesEngineSchema,sealedRuntimeOf};
+export {ENGINE_SCHEMA,hasNumberedEngineMarker,isEnrolled,predatesEngineSchema,sealedRuntimeOf};
 export const isJobPending=error=>error?.code==='STARCI_JOB_PENDING';
 export function deferJob(result){
   const error=new Error(result.reasons?.join('; ')||`Waiting for ${result.identity?.jobId??'durable job'}`);
@@ -260,7 +260,13 @@ export function validateCandidateRoot(value){
 
 export const candidateBaseFor=(state,explicit=null)=>explicit??path.join(state?.engine?.candidateRoot??path.join(path.dirname(state.engine.machineFile??machineFileFor()),'candidates'),state.id);
 
-export function enrollEngine(store,state,{ledgerFile,machineFile,runtimePin=null,candidateRoot=null,now=Date.now}={}){
+/**
+ * `ledger` lets a caller that already holds the workflow's ledger open hand it in. Without it this function
+ * opens a second handle on the same file and binds THAT to the store; a caller that then binds its own handle
+ * (the retry path does) silently orphaned this one, and the sqlite file stayed open for the life of the
+ * process. A supplied handle is used and never closed here: it belongs to whoever opened it.
+ */
+export function enrollEngine(store,state,{ledgerFile,machineFile,runtimePin=null,candidateRoot=null,ledger=null,now=Date.now}={}){
   if(state.ops.some(op=>op.dispatch&&['running','answering'].includes(op.status)))throw Error('Settle live operation dispatches before enrolling a workflow in the durable engine');
   // Defaults computed here, not in the parameter list: a param default is evaluated eagerly at call time,
   // before this guard runs, so a caller with no usable store.repoRoot (or none at all) would fail on the
@@ -268,15 +274,15 @@ export function enrollEngine(store,state,{ledgerFile,machineFile,runtimePin=null
   ledgerFile??=ledgerFileFor(store.repoRoot);machineFile??=machineFileFor();
   const previous=state.engine,generation=(previous?.generation??0)+1;
   const machine=openMachine({file:machineFile,now});
-  let ledger;
+  const supplied=Boolean(ledger);
   try{
-    ledger=openLedger({file:ledgerFile,now,machine});
+    ledger??=openLedger({file:ledgerFile,now,machine});
     state.engine={schema:ENGINE_SCHEMA,version:ENGINE_VERSION,generation,ledgerFile:path.resolve(ledgerFile),machineFile:path.resolve(machineFile),
       assurance:'detection-only',coordination:'agent-v1',runtimePin:runtimePin??previous?.runtimePin??null,
       ...(candidateRoot??previous?.candidateRoot?{candidateRoot:path.resolve(candidateRoot??previous.candidateRoot)}:{}),enrolledAt:now()};
     state.finished=null;state.phase='run';
     store.bindJournal?.(ledger,generation,{state,goalIdentity:state.goalDigest??null});
-  }catch(error){try{ledger?.close();}catch{}throw error;}
+  }catch(error){if(!supplied)try{ledger?.close();}catch{}throw error;}
   finally{machine.close();}
   store.appendEvent({event:'engine-enrolled',schema:ENGINE_SCHEMA,generation,version:ENGINE_VERSION,
     assurance:state.engine.assurance,coordination:state.engine.coordination,note:'Existing accepted Work remains accepted; only unfinished operations receive the new execution policy.'});

@@ -48,6 +48,17 @@ export function goalPhase(store,state,options={}){
   return {...phased,...(plain(state.lane)?{lane:laneView(state)}:{}),...(plain(state.critique)?{critique:critiqueView(state)}:{})};
 }
 
+/**
+ * Re-render the goal page that is already recorded. Splicing the critique section or the lane header into
+ * goal.md is an edit of the current goal, not an amendment of it: 1.0.3 edited the one goal.md file, and a new
+ * `goals` row here would move `goalRevision` - what `inputs.put` binds bytes to - for a purely rendered
+ * change. `setGoal` is kept for the one case where there is no revision to revise yet.
+ */
+function writeGoalPage(store,state,current,markdown){
+  if(current&&typeof store.reviseGoalMarkdown==='function')return store.reviseGoalMarkdown(markdown);
+  return store.setGoal({markdown,json:current?.json??{schema:GOAL_RECORD,id:state.id},amendment:current?.amendment??null});
+}
+
 /** The two lines of goal.md that name the lane and the base it goes home to, under the title. */
 export function laneHeaderLines(state){
   const lane=state.lane;
@@ -62,7 +73,7 @@ export function noteLaneInGoal(store,state){
   const title=lines.findIndex(line=>line.startsWith('# '));
   const header=['',...laneHeaderLines(state)];
   lines.splice(title<0?0:title+1,0,...header);
-  store.setGoal({markdown:lines.join('\n'),json:current?.json??{schema:GOAL_RECORD,id:state.id},amendment:current?.amendment??null});
+  writeGoalPage(store,state,current,lines.join('\n'));
 }
 
 /* ------------------------------------------------------------------ the critique of the goal */
@@ -424,7 +435,7 @@ export function noteCritiqueInGoal(store,state){
     lines.splice(heading>=0?heading:title<0?lines.length:title+1,0,...section);
   }
   const text=lines.join('\n');
-  store.setGoal({markdown:text.endsWith('\n')?text:`${text}\n`,json:current?.json??{schema:GOAL_RECORD,id:state.id},amendment:current?.amendment??null});
+  writeGoalPage(store,state,current,text.endsWith('\n')?text:`${text}\n`);
 }
 
 /* ------------------------------------------------------------------ phase: goal on a plan ledger */

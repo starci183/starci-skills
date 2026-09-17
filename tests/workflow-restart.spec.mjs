@@ -12,6 +12,7 @@ import {createStore} from '../kernel/store.mjs';
 import {createWorkflowState,runLoop} from '../kernel/kernel.mjs';
 import {goalPhase,approve} from '../kernel/goal.mjs';
 import {enrollEngine,createEngineRuntime} from '../kernel/engine.mjs';
+import {MANAGER_DECISION} from '../models/manager-contract.mjs';
 import {fakeAllocator} from './helpers/kernel-harness.mjs';
 import {withLedger} from './_ledger-fixture.mjs';
 
@@ -20,6 +21,7 @@ const json=(status,value)=>({status,stdout:JSON.stringify(value),stderr:''});
 const flag=(args,name)=>{const index=args.indexOf(`--${name}`);return index<0?null:args[index+1];};
 const git=(cwd,...args)=>{const ran=spawnSync('git',args,{cwd,encoding:'utf8'});assert.equal(ran.status,0,`git ${args.join(' ')}: ${ran.stderr}`);return ran.stdout.trim();};
 const noWait=()=>{};
+const template=fs.readFileSync(new URL('../docs/supervision-templates/op.md',import.meta.url),'utf8');
 
 /**
  * The §11 host: Orca's typed surface scripted to drive ops through `worker-start` dispatches, with reports
@@ -38,9 +40,15 @@ function scriptedLedgerOrca({store,scripts,worktree,run='run_wf'}){
     'task-create':args=>{const id=`task_${++counter}`;tasks.set(id,{id,display_name:flag(args,'display-name'),op:opOf(flag(args,'spec'))});return json(0,{ok:true,result:{task:{id,display_name:flag(args,'display-name'),task_id:id}}});},
     'task-update':()=>json(0,{ok:true,result:{task:{status:'ready'}}}),
     'task-list':()=>json(0,{ok:true,result:{tasks:[...tasks.values()].map(task=>({id:task.id,display_name:task.display_name}))}}),
-    'terminal-create':args=>{const handle=`term_${++counter}`;terminals.set(handle,{handle,title:flag(args,'title'),status:'running',worktreePath:worktree,lastOutputAt:Date.now()});return json(0,{ok:true,result:{terminal:{handle}}});},
-    'terminal-read':args=>{const handle=flag(args,'terminal');return json(0,{ok:true,result:{terminal:{handle,status:terminals.get(handle)?.status??'running',tail:['∵ Thinking…','⠼ working (12s · esc to cancel)']}}});},
-    'terminal-send':()=>json(0,{ok:true,result:{}}),
+    'terminal-create':args=>{const handle=`term_${++counter}`;terminals.set(handle,{handle,title:flag(args,'title'),status:'running',sent:false,worktreePath:worktree,lastOutputAt:Date.now()});return json(0,{ok:true,result:{terminal:{handle}}});},
+    // The launcher proves prompt delivery by reading the screen: a terminal that has not been given its task
+    // yet shows the agent's input prompt, and only a terminal that has shows work in progress. A fake that is
+    // always "working" never presents a prompt, so every launch dies on the readiness timeout.
+    'terminal-read':args=>{const handle=flag(args,'terminal'),terminal=terminals.get(handle);
+      return json(0,{ok:true,result:{terminal:{handle,status:terminal?.status??'running',
+        tail:terminal?.sent?['∵ Thinking… 1s','⠼ working (12s · esc to cancel)','qwen3.8-flash (Token Plan Singapore)']
+          :['>_ Qwen Code (v0.23.3)','>   Type your message or @path/to/file','qwen3.8-flash (Token Plan Singapore)']}}});},
+    'terminal-send':args=>{const terminal=terminals.get(flag(args,'terminal'));if(terminal)terminal.sent=true;return json(0,{ok:true,result:{}});},
     'terminal-list':()=>json(0,{ok:true,result:{terminals:[...terminals.values()]}}),
     'terminal-close':args=>{terminals.delete(flag(args,'terminal'));return json(0,{ok:true,result:{}});},
     'terminal-rename':args=>{const terminal=terminals.get(flag(args,'terminal'));if(terminal)terminal.title=flag(args,'title');return json(0,{ok:true,result:{}});},
@@ -49,10 +57,12 @@ function scriptedLedgerOrca({store,scripts,worktree,run='run_wf'}){
       dispatches.set(id,{id,task,handle,op:tasks.get(task)?.op??'unknown'});live.set(id,dispatches.get(id));
       return json(0,{ok:true,result:{dispatch:{id,task_id:task},preamble:'=== PREAMBLE ===\nreport once\n=== TASK ===\nDo it'}});
     },
-    'dispatch-show':args=>{const found=dispatches.get(flag(args,'dispatch'))??[...dispatches.values()].find(item=>item.task===flag(args,'task'));return json(0,{ok:true,result:{dispatch:{id:found?.id,task_id:found?.task,status:'dispatched'}}});},
+    // The launcher attests that the Dispatch it started is assigned to the terminal it started: the receipt
+    // has to name that terminal (`assignee_handle`), or the attestation fails and the candidate is fenced.
+    'dispatch-show':args=>{const found=dispatches.get(flag(args,'dispatch'))??[...dispatches.values()].find(item=>item.task===flag(args,'task'));return json(0,{ok:true,result:{dispatch:{id:found?.id,task_id:found?.task,assignee_handle:found?.handle,status:'dispatched'}}});},
     'worker-start':args=>{
       const id=`ctx_${++counter}`,handle=`term_${++counter}`,task=flag(args,'task');
-      terminals.set(handle,{handle,title:`Terminal ${counter}`,status:'running',worktreePath:worktree,lastOutputAt:Date.now()});
+      terminals.set(handle,{handle,title:`Terminal ${counter}`,status:'running',sent:true,worktreePath:worktree,lastOutputAt:Date.now()});
       dispatches.set(id,{id,task,handle,agent:flag(args,'agent'),model:flag(args,'model'),op:tasks.get(task)?.op??'unknown'});
       live.set(id,dispatches.get(id));launches.push({dispatch:id,op:tasks.get(task)?.op??'unknown'});
       return json(0,{ok:true,result:{state:'ready',dispatchId:id,taskId:task,launch:{effective:{agent:flag(args,'agent'),model:flag(args,'model')??null}},
@@ -66,9 +76,12 @@ function scriptedLedgerOrca({store,scripts,worktree,run='run_wf'}){
         observation:{exactWorker:true,status:'exited'},
         terminal:{handle:found.handle,connected:false,writable:false,paneRuntimeId:null}}});
       return json(0,{ok:true,result:{dispatch:{id:found.id,task_id:found.task,run_id:run,status:'dispatched'},
-        worker:{state:'ready',dispatch_id:found.id,agent_terminal_handle:found.handle},
+        // The launcher attests the effective provider/model it actually got from the worker's own receipt.
+        worker:{state:'ready',dispatch_id:found.id,agent_terminal_handle:found.handle,
+          startOptions:{launch:{effective:{agent:found.agent,model:found.model??null}}},
+          effects:[{kind:'dispatch_input',state:'accepted'}]},
         observation:{exactWorker:true,status:'running'},
-        terminal:{handle:found.handle,connected:true,writable:true}}});
+        terminal:{handle:found.handle,title:terminals.get(found.handle)?.title??null,worktreePath:worktree,connected:true,writable:true}}});
     },
     'worker-list':()=>json(0,{ok:true,result:{workers:[...live.values()].map(item=>({dispatchId:item.id,taskId:item.task,
       workerState:'running',dispatchStatus:'dispatched',agentTerminalHandle:item.handle}))}}),
@@ -81,9 +94,14 @@ function scriptedLedgerOrca({store,scripts,worktree,run='run_wf'}){
       for(const dispatch of live.values()){
         const queue=scripts[dispatch.op];
         if(!queue?.length)continue;
-        const report=buildReport({...queue.shift(),run,task:dispatch.task,dispatch:dispatch.id,from:dispatch.handle});
+        // `effect` is what the agent left on disk beside its report: without a real change inside the op's
+        // allowlist the acceptance gate has no diff to judge and the operation never leaves `running`.
+        const {effect,...script}=queue.shift();
+        if(typeof effect==='function')effect();
+        const report=buildReport({...script,run,task:dispatch.task,dispatch:dispatch.id,from:dispatch.handle});
         report.sent={messageId:`msg_${dispatch.id}`,sentAt:1,type:report.signal.type};
-        store.writeReport({dispatchId:dispatch.id,...report});
+        // §8: `writeReport` takes the report as `report`, not spread - spreading it stored `report_json` null.
+        store.writeReport({dispatchId:dispatch.id,report,fromTerminal:dispatch.handle});
       }
       return json(0,{ok:true,result:{deliveryId:`delivery_${++counter}`,messages:[]}});
     },
@@ -99,7 +117,13 @@ function scriptedLedgerOrca({store,scripts,worktree,run='run_wf'}){
     kill:dispatchId=>{dead.add(dispatchId);live.delete(dispatchId);const found=dispatches.get(dispatchId);if(found)terminals.delete(found.handle);}};
 }
 
-const acceptAll=()=>({ok:true,verdict:'accept',summary:'stub validator: accepted',findings:[],dropped:[],provider:'stub',usage:null});
+/**
+ * The independent reviewer, stubbed. A durable (enrolled) workflow judges strictly: `attestModelResult` is what
+ * normally stamps a real validator answer as complete, independent of the attempt and read in a fresh context,
+ * and an accept without that attestation is `inconclusive`, never an acceptance. The stub therefore attests.
+ */
+const acceptAll=()=>({ok:true,verdict:'accept',summary:'stub validator: accepted',findings:[],dropped:[],provider:'stub',usage:null,
+  complete:true,independentFromAttempt:true,freshContext:true,reviewerAttemptId:'stub-reviewer'});
 
 /**
  * The engine is the real `createEngineRuntime` - the lease/candidate/settle custody under test - wrapped so
@@ -107,17 +131,38 @@ const acceptAll=()=>({ok:true,verdict:'accept',summary:'stub validator: accepted
  * worker. `manageWorkflow` dispatches every offered op in snapshot order.
  */
 function engineFixture({store,state,now}){
-  const runtime=createEngineRuntime({store,state,now,eligibility:()=>({eligible:true}),
+  // The candidate lifecycle is Git custody: `runLoop` hands its own adapter to the engine it builds, so an
+  // engine supplied as `engineRuntime` has to carry one too or every launch refuses before it starts.
+  const runtime=createEngineRuntime({store,state,now,eligibility:()=>({eligible:true}),git:spawnSync,
     spawnChild:()=>({pid:1,once(){},unref(){}})});
   return {...runtime,journal:runtime.journal,close:()=>runtime.close(),
     model:(name)=>name==='validateOp'?acceptAll():{ok:true,value:{option:'1'}},
     check:()=>({status:0,stdout:'ok',stderr:''}),
-    manageWorkflow:snapshot=>({value:{orderedActionIds:(snapshot.actions??[]).filter(action=>action.type==='dispatch').map(action=>action.id),rationale:'fixture dispatch order'}})};
+    // A manager decision is bound to exactly one snapshot (models/manager-contract.mjs): it carries that
+    // snapshot's identity, and selecting nothing while the snapshot offers actions is itself invalid. Without
+    // the identity fields every turn was refused as `manager-invalid` and no operation was ever dispatched.
+    manageWorkflow:snapshot=>({value:{schema:MANAGER_DECISION,workflowId:snapshot.workflowId,decisionId:snapshot.decisionId,
+      generation:snapshot.generation,version:snapshot.version,digest:snapshot.digest,basisDigest:snapshot.basisDigest,
+      // This fixture's manager advances the two planned operations and nothing else. It never asks for the
+      // verification pass: that is its own subject, and here it would open a third operation no script answers.
+      // A selection may not be empty while the snapshot offers actions, so an all-verification turn takes them.
+      orderedActionIds:(()=>{const ids=(snapshot.actions??[]).map(action=>action.id),work=ids.filter(id=>id!=='plan-verification');
+        return work.length?work:ids;})(),rationale:'fixture dispatch order'}})};
 }
 
 test('§11 restart proof: kill mid-op, delete and recreate the worktree, resume from the ledger alone',async t=>{
-  await withLedger(t,({repoRoot,machine,ledgerFile,machineFile})=>{
+  await withLedger(t,({root,repoRoot,machine,ledgerFile,machineFile,track})=>{
+    // `state.host` is the Source that owns the skill, not the Work repo: the kernel reads its non-operation
+    // model bindings from that root's config (`workflowModelConfigRoot`). Give the fixture one, the way the
+    // lane fixture does, instead of pointing the config loader at a repo that has no config at all.
+    const host=path.join(root,'source','.claude');
+    fs.mkdirSync(host,{recursive:true});
+    fs.copyFileSync(new URL('../config.example.yaml',import.meta.url),path.join(host,'config.example.yaml'));
     git(repoRoot,'init','-b','main');
+    // Windows Git ships `core.autocrlf=true` in its system config. Under it a file this fixture writes with LF
+    // comes back out of a fresh worktree with CRLF, so the candidate's frozen baseline no longer matches the
+    // bytes on disk and the restart reconciliation quarantines on a line ending. The fixture owns its policy.
+    git(repoRoot,'config','core.autocrlf','false');
     fs.writeFileSync(path.join(repoRoot,'README.md'),'fixture\n');
     git(repoRoot,'add','README.md');git(repoRoot,'-c','user.email=t@t','-c','user.name=t','commit','-m','init');
 
@@ -126,8 +171,8 @@ test('§11 restart proof: kill mid-op, delete and recreate the worktree, resume 
     const lane=path.join(repoRoot,'..','lane-1');
     git(repoRoot,'worktree','add','-b',branch,lane,'main');
 
-    const store=createStore({repoRoot,id});
-    const state=createWorkflowState({job:'Two operations, one killed kernel',worktree:lane,branch,store,host:repoRoot,launcher:'L.mjs'});
+    const store=track(createStore({repoRoot,id}));
+    const state=createWorkflowState({job:'Two operations, one killed kernel',worktree:lane,branch,store,host,launcher:'L.mjs'});
     const plan={definitionOfDone:['both operations done'],
       ledger:[{id:'scope-1',title:'Scope',inputRef:'goal:job',status:'absent'}],
       ops:[
@@ -145,15 +190,25 @@ test('§11 restart proof: kill mid-op, delete and recreate the worktree, resume 
     const enrolled=enrollEngine(store,state,{ledgerFile,runtimePin:null,candidateRoot:path.join(repoRoot,'.starciwork','candidates'),now:()=>1});
     assert.equal(enrolled.generation,1);assert.equal(enrolled.ledgerFile,path.resolve(ledgerFile));
 
-    const goals=inspectLedger({file:ledgerFile}).db.prepare('SELECT revision,goal_identity FROM goals WHERE workflow_id=?').all(id);
+    const goals=track(inspectLedger({file:ledgerFile})).db.prepare('SELECT revision,goal_identity FROM goals WHERE workflow_id=?').all(id);
     assert.equal(goals.length,1,'the goal row exists in the ledger, not in a file');
 
     // ---- phase 1: goal approved, ops run; the kernel is killed while op-2 is in flight
-    const reportDone=(summary)=>({outcome:'done',summary,files:[],checks:[],open:[],question:null,blocker:null});
-    const orca1=scriptedLedgerOrca({store,scripts:{'op-1':[reportDone('op-1 complete')],'op-2':[]},worktree:lane});
-    state.run='run_wf';state.from='term_kernel';
+    // A `done` report must name at least one check that was actually run (kernel/reports.mjs): an empty list
+    // is refused when the report is built, before it ever reaches the ledger.
+    const wrote=(file,body)=>()=>{fs.mkdirSync(path.dirname(path.join(lane,file)),{recursive:true});fs.writeFileSync(path.join(lane,file),body);};
+    const reportDone=(summary,file)=>({outcome:'done',summary,files:[file],open:[],question:null,blocker:null,
+      checks:[{name:'unit',command:'npm test',exitCode:0,evidence:'ok'}],effect:wrote(file,`${summary}\n`)});
+    // The kernel plans its own verification pass once the group is implemented. It is part of this workflow, so
+    // the host answers it too: a review that repairs nothing reports `done` with an empty `open[]`.
+    const reviewDone=summary=>({outcome:'done',summary,files:[],open:[],question:null,blocker:null,
+      checks:[{name:'review',command:'npm test',exitCode:0,evidence:'ok'}]});
+    const orca1=scriptedLedgerOrca({store,scripts:{'op-1':[reportDone('op-1 complete','src/one/a.txt')],'op-2':[],'verify-1':[reviewDone('verify-1 accepts the group')]},worktree:lane});
+    // The run binding belongs to the checkpoint, not to this object: `runLoop` restores the durable state
+    // first, and a binding that was never saved is overwritten by the `run:null` the snapshot carries.
+    state.run='run_wf';state.from='term_kernel';store.saveState(state);
     const engine1=engineFixture({store,state,now:()=>Date.now()});
-    runLoop(orca1.orca,store,state,{cwd:lane,allocator:fakeAllocator({maxParallelOps:1}),template:'contract',
+    runLoop(orca1.orca,store,state,{cwd:lane,allocator:fakeAllocator({maxParallelOps:1}),template,
       wait:noWait,exec:()=>({status:0,stdout:'ok',stderr:''}),git:spawnSync,
       engineRuntime:engine1,validateOp:acceptAll,maxIterations:12,waitTimeoutMs:1,tickMs:1,pollMs:1});
     engine1.close();
@@ -181,20 +236,20 @@ test('§11 restart proof: kill mid-op, delete and recreate the worktree, resume 
     assert.equal(survivedAnchor.generation,1,'anchored at the checkpoint generation bound at enrollment');
 
     // ---- phase 2: a new process: fresh store, fresh engine, state re-read from the ledger
-    const store2=createStore({repoRoot,id});
+    const store2=track(createStore({repoRoot,id}));
     const resumed=store2.loadState();
     assert.ok(resumed,'the workflow reloads from the ledger alone');
     assert.equal(resumed.ops.find(op=>op.id==='op-1').status,'done','op-1 stays done across the restart');
     assert.equal(resumed.ops.find(op=>op.id==='op-2').status,'running','op-2 is still in flight until reconciled');
     resumed.run='run_wf';resumed.from='term_kernel';resumed.iterations=resumed.iterations??0;
 
-    const orca2=scriptedLedgerOrca({store:store2,scripts:{'op-2':[reportDone('op-2 complete on retry')]},worktree:lane});
+    const orca2=scriptedLedgerOrca({store:store2,scripts:{'op-2':[reportDone('op-2 complete on retry','src/two/b.txt')],'verify-1':[reviewDone('verify-1 accepts the group')]},worktree:lane});
     orca2.kill(killedDispatch);   // the killed attempt's dispatch answers dead to the new kernel too
     const engine2=engineFixture({store:store2,state:resumed,now:()=>Date.now()});
     const settleCalls=[];
     const realSettle=engine2.settleStoppedOperation.bind(engine2);
     engine2.settleStoppedOperation=(op,input)=>{settleCalls.push({op:op.id,dispatch:input?.dispatch});return realSettle(op,input);};
-    runLoop(orca2.orca,store2,resumed,{cwd:lane,allocator:fakeAllocator({maxParallelOps:1}),template:'contract',
+    runLoop(orca2.orca,store2,resumed,{cwd:lane,allocator:fakeAllocator({maxParallelOps:1}),template,
       wait:noWait,exec:()=>({status:0,stdout:'ok',stderr:''}),git:spawnSync,
       engineRuntime:engine2,validateOp:acceptAll,maxIterations:12,waitTimeoutMs:1,tickMs:1,pollMs:1});
     engine2.close();
@@ -216,7 +271,9 @@ test('§11 restart proof: kill mid-op, delete and recreate the worktree, resume 
     }finally{ledger.close();}
     assert.equal(machine.db.prepare('SELECT count(*) AS n FROM leases').get().n,0,'the machine arbiter holds zero leases');
     assert.equal(fs.existsSync(path.join(repoRoot,'.starciwork','_local')),false,'resume still wrote nothing under _local');
-  });
+  // The kernel hands the launcher a worktree relative to `process.cwd()` and refuses an absolute one, so this
+  // world has to sit on the same volume as the runtime checkout - never inside it (runtime-tree-hygiene).
+  },{parentDir:path.join(path.parse(process.cwd()).root,'starci-tmp')});
 });
 
 test('§5/§6 identity: a relocated ledger keeps its machine leases; a path rebuilt fresh does not inherit them',async t=>{

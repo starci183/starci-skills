@@ -30,6 +30,11 @@ export function trackHandles(t){
 }
 
 /**
+ * `parentDir` places that world somewhere other than `os.tmpdir()`. A spec whose kernel path takes a
+ * *relative* worktree (`path.relative(process.cwd(),state.worktree)`, refused when it is absolute) needs the
+ * fixture on the same volume as the runtime checkout, because `path.relative` across two Windows drives can
+ * only answer with an absolute path: pass `path.join(path.parse(process.cwd()).root,'starci-tmp')`.
+ *
  * One temp world for a ledger-backed spec: a repo root that owns `.starciwork/`, the ledger opened on it,
  * and a machine DB inside the same temp root. `process.env.LOCALAPPDATA` is repointed at the temp root for
  * the test's duration so no code path can reach the real machine arbiter; the after hook restores it,
@@ -39,8 +44,9 @@ export function trackHandles(t){
  *     const store=track(createStore({repoRoot,id}));   // closed automatically, same as ledger/machine
  *   });
  */
-export function withLedger(t,fn){
-  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-ledger-'));
+export function withLedger(t,fn,{parentDir=os.tmpdir()}={}){
+  fs.mkdirSync(parentDir,{recursive:true});
+  const root=fs.mkdtempSync(path.join(parentDir,'starci-ledger-'));
   const repoRoot=path.join(root,'repo');
   fs.mkdirSync(path.join(repoRoot,'.starciwork'),{recursive:true});
   const machineHome=path.join(root,'machine');

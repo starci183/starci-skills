@@ -66,6 +66,13 @@ export const isEnrolled=state=>state?.engine?.schema===ENGINE_SCHEMA;
  * retired journal (`journalFile` without `ledgerFile`): it runs only through workflow-retry, which migrates it.
  */
 export const predatesEngineSchema=state=>Boolean(state?.engine)&&typeof state.engine==='object'&&typeof state.engine.journalFile==='string'&&typeof state.engine.ledgerFile!=='string';
+/**
+ * The narrower half of the pair: a state whose engine is still named by a number, which is the only thing the
+ * record migration (`migrateEngineState`) renames. It is deliberately NOT `predatesEngineSchema` - that one is
+ * also true of a schema-tagged state that merely still names the retired journal, and a ledger that has not
+ * been through `ledger-migrate` is not a record this build may rewrite and stamp as migrated.
+ */
+export const hasNumberedEngineMarker=state=>Boolean(state?.engine)&&typeof state.engine==='object'&&Number.isInteger(state.engine.major);
 /** The sealed build a durable workflow runs from, whatever shape its engine record has. */
 export const sealedRuntimeOf=state=>{const pin=state?.engine?.runtimePin;return pin&&typeof pin==='object'&&typeof pin.root==='string'?pin:null;};
 export const AUTHOR_KIND='work.author';

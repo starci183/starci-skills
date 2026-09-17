@@ -605,6 +605,14 @@ export function createAllocator({runtimes=loadRuntimes(),now=Date.now,state=null
     },
     /** The shared ledger of this repository, or null when this allocator is the only one of its runtimes. */
     sharedLedger:ledger,
+    /**
+     * Release what this allocator owns. `sharedLedgerOf` opens the repository's ledger when it is handed a
+     * `{path,workflow}` instead of a live handle, and that sqlite handle stayed open for the life of the
+     * process because nothing ever asked for it back - one leaked handle per `workflow-run`, which on Windows
+     * also makes the store's own directory undeletable. A handle the caller passed in is left alone, because
+     * `createLoadsLedger` only closes the one it opened itself.
+     */
+    close(){try{ledger?.close?.();}catch{}},
     /** What the other kernels hold right now: `{loads, ops, cooling}`, empty when there is no shared ledger. */
     sharedView(){return ledger?outside():EMPTY_SHARED;},
     /** At start: drop this workflow's own leftovers - ledger entries of operations that are no longer running. */

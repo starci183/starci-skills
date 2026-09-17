@@ -233,7 +233,14 @@ export function writeLastWordsReport(store,state,op,words){
   store.writeReport({dispatchId:op.dispatch,opId:op.id,attempt:op.attempt,report,fromTerminal:op.terminal??state.from??'kernel'});
   return report;
 }
-export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=sleepSync,allocator=null}={}){
+/**
+ * `settleStopped(op,{settlement,reason})` is the durable half of this reconciliation, injected by the kernel so
+ * this module never has to import the engine. An enrolled operation holds a ledger job and a lease; flipping its
+ * record back to `ready` without settling that job leaves the lease behind, and every scheduler seam refuses an
+ * operation that still holds one - the op would sit `ready` for good, dispatched by nobody. It returns false
+ * when the stop could not be reconciled (the attempt is quarantined instead of silently requeued).
+ */
+export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=sleepSync,allocator=null,settleStopped=null}={}){
   const listed=orca.invoke('worker-list',{run:state.run},{cwd});
   if(listed.outcome!=='ok')return {orphans:[],dead:[],reason:listed.reason};
   const live=(getPath(listed.receipt,'result.workers')??[]).filter(w=>['ready','running','starting'].includes(w.workerState)||(w.workerState==='unsupervised'&&['dispatched','pending','ready'].includes(w.dispatchStatus)));
@@ -272,6 +279,12 @@ export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=slee
       const report=writeLastWordsReport(store,state,op,words.report);
       store.appendEvent({event:'dispatch-last-words',op:op.id,dispatch:op.dispatch,outcome:report.outcome,subject:heard?.subject??null});
       dead.push({...entry,cause:'worker-report',restarts:op.restarts});
+      continue;
+    }
+    // Nothing spoke for this Dispatch. Settle the durable attempt first, while the writer fence is still held:
+    // only then is the record free to be requeued or blocked.
+    if(op.lease&&settleStopped&&!settleStopped(op,{settlement,reason:'dead: no worker and no terminal'})){
+      dead.push({...entry,cause:'native-stop-unreconciled',restarts:op.restarts});
       continue;
     }
     if(allocator&&op.runtime)allocator.release(op.runtime,{op:op.id});
