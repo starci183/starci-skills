@@ -1,0 +1,27 @@
+schema: work/contract
+id: contract.task.list-for-dashboard
+title: What a dashboard may read about a person's tasks
+state: todo
+between:
+  provider: task
+  consumer: dashboard
+owner: task
+surface:
+  - name: countsFor
+    shape: (personId) -> {open, complete}
+    guarantee: Two integers for one person. Never the tasks themselves, never another person's.
+    stability: Adding a counter is additive; changing what open means is breaking.
+guarantees:
+  - The counts obey br.task.list.owned: they cover exactly the person's own tasks.
+consumerObligations:
+  - The dashboard renders counts and never derives a task list from them.
+refs: [br.task.list.owned]
+
+requiresProof:
+  provider: {required: true}
+  consumer: {required: true}
+
+blockedBy:
+  - br.task.list.owned is todo, and decision.task.list.scope has not chosen whether an organization
+    owner reads member tasks. A contract written before that decision would encode the wrong boundary.
+

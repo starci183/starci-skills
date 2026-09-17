@@ -1,0 +1,11 @@
+{
+  "name": "todo-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:unit": "node --test app/src/**/*.test.mjs",
+    "test:unit:task": "node --test app/src/task/*.test.mjs",
+    "test:unit:auth": "node --test app/src/auth/*.test.mjs"
+  }
+}
+

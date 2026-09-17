@@ -4,9 +4,9 @@ title: A new person captures their first task
 state: done
 crossesFeatures: [login, task]
 steps:
-  - {actor: person, does: Signs in and lands on an empty list, expects: An empty state that says what to do next.}
-  - {actor: person, does: Types a title and submits, expects: The task appears immediately, owned by them.}
-  - {actor: person, does: Returns the next day, expects: The task is still there.}
+  - {actor: person, does: "Signs in and lands on an empty list, expects: An empty state that says what to do next."}
+  - {actor: person, does: "Types a title and submits, expects: The task appears immediately, owned by them."}
+  - {actor: person, does: "Returns the next day, expects: The task is still there."}
 requirements: [fr.login.sign-in, fr.task.create]
 
 requiresProof:

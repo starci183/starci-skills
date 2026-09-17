@@ -46,11 +46,11 @@ stateMachine:
 sequence:
   participants: [browser, api, keycloak, postgres]
   steps:
-    - {from: browser, to: api, message: POST /auth/sign-in with the pair, observable: http}
-    - {from: api, to: keycloak, message: token request for the pair, observable: http}
-    - {from: keycloak, to: api, message: subject, or a refusal that names nothing, observable: http}
-    - {from: api, to: postgres, message: INSERT one session row with its expiry, observable: write}
-    - {from: api, to: browser, message: the session cookie and a redirect to the list, observable: http}
+    - {from: browser, to: api, message: "POST /auth/sign-in with the pair, observable: http"}
+    - {from: api, to: keycloak, message: "token request for the pair, observable: http"}
+    - {from: keycloak, to: api, message: "subject, or a refusal that names nothing, observable: http"}
+    - {from: api, to: postgres, message: "INSERT one session row with its expiry, observable: write"}
+    - {from: api, to: browser, message: "the session cookie and a redirect to the list, observable: http"}
   note: Only interactions an end-to-end run can observe are bound here. Internal call order is the
     implementation's business; binding it would make a correct refactor read as a defect.
 

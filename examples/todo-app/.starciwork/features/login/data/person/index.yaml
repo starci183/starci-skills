@@ -3,8 +3,8 @@ id: data.login.person
 title: Person
 state: done
 fields:
-  - {name: id, type: text, required: true, note: Opaque, assigned at sign-up, never reused.}
-  - {name: email, type: text, required: true, note: Unique, lowercased on write.}
+  - {name: id, type: text, required: true, note: "Opaque, assigned at sign-up, never reused."}
+  - {name: email, type: text, required: true, note: "Unique, lowercased on write."}
   - {name: passwordHash, type: text, required: true}
   - {name: createdAt, type: timestamp, required: true}
 invariants:

@@ -3,7 +3,7 @@ id: data.task.task
 title: Task
 state: done
 fields:
-  - {name: id, type: text, required: true, note: Opaque, assigned at creation, never reused.}
+  - {name: id, type: text, required: true, note: "Opaque, assigned at creation, never reused."}
   - {name: owner, type: text, required: true, note: Bound at creation and never rewritten.}
   - {name: title, type: text, required: true}
   - {name: complete, type: boolean, required: true, default: false}

@@ -19,10 +19,10 @@ stateMachine:
 sequence:
   participants: [browser, api, postgres]
   steps:
-    - {from: browser, to: api, message: PATCH /tasks/:id with the actor's session, observable: http}
-    - {from: api, to: postgres, message: SELECT the row's owner, observable: read}
-    - {from: api, to: browser, message: the refusal, when the actor is not the owner, observable: http}
-    - {from: api, to: postgres, message: UPDATE the row, only when the actor is the owner, observable: write}
+    - {from: browser, to: api, message: "PATCH /tasks/:id with the actor's session, observable: http"}
+    - {from: api, to: postgres, message: "SELECT the row's owner, observable: read"}
+    - {from: api, to: browser, message: "the refusal, when the actor is not the owner, observable: http"}
+    - {from: api, to: postgres, message: "UPDATE the row, only when the actor is the owner, observable: write"}
 
 requiresProof:
   implementation:
