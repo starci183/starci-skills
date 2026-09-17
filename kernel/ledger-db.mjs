@@ -79,12 +79,14 @@ export function retireWorkflow(db,workflowId,{preserveRuntimeCustody=false}={}){
       jobs:drop('jobs'),
       events:keep?db.prepare(`DELETE FROM events WHERE workflow_id=? AND seq NOT IN (${keep})`).run(workflowId,...receipts).changes:db.prepare('DELETE FROM events WHERE workflow_id=?').run(workflowId).changes,
       incidents:drop('incidents'),goals:drop('goals'),reports:drop('reports'),contracts:drop('contracts'),checks:drop('checks'),inbox:drop('inbox'),
+      inputs:drop('inputs'),
       signals:db.prepare('DELETE FROM signals WHERE scope=?').run(workflowId).changes};
     return {ok:true,workflowId,removed,retained:{snapshots:latest?1:0,runtimeFileReceipts:receipts.length,generation:latest?.generation??null}};
   }
   const removed={
     snapshots:drop('state_snapshots'),jobs:drop('jobs'),events:drop('events'),incidents:drop('incidents'),
     goals:drop('goals'),reports:drop('reports'),contracts:drop('contracts'),checks:drop('checks'),inbox:drop('inbox'),
+    inputs:drop('inputs'),
     signals:db.prepare('DELETE FROM signals WHERE scope=?').run(workflowId).changes,
     workflows:db.prepare('DELETE FROM workflows WHERE workflow_id=?').run(workflowId).changes};
   return {ok:true,workflowId,removed};
@@ -105,6 +107,15 @@ export function ensureWorkflow(db,{workflowId,title=null,ledgerMode=null,sourceR
 /** The digest of the workflow's newest event row, or null when it has none. */
 export function eventsHead(db,workflowId){
   return db.prepare('SELECT digest FROM events WHERE workflow_id=? ORDER BY seq DESC LIMIT 1').get(workflowId)?.digest??null;
+}
+export const inputRef=(workflowId,key,digest)=>`ledger://inputs/${workflowId}/${key}#sha256=${digest}`;
+/** The input's bytes with their recorded digest proven on read: a tampered row refuses `input-digest-mismatch`. */
+export function readInput(db,{workflowId,key}={}){
+  need(workflowId&&key,'readInput needs a workflow id and a key');
+  const row=db.prepare('SELECT * FROM inputs WHERE workflow_id=? AND key=?').get(workflowId,key);
+  if(!row)return null;
+  need(sha256(row.bytes)===row.sha256,'input-digest-mismatch');
+  return {...row,ref:inputRef(row.workflow_id,row.key,row.sha256)};
 }
 /** Walk one workflow's events by seq, recomputing the chain: {ok,checked,brokenAt} where brokenAt is a seq. */
 export function verifyChain(db,{workflowId}={}){
@@ -193,6 +204,14 @@ const LEDGER_DDL=`
     holder_pid INTEGER, token TEXT, value_json TEXT, at INTEGER NOT NULL, expires_at INTEGER,
     PRIMARY KEY(scope,key));
   CREATE TABLE runtime_loads(runtime TEXT PRIMARY KEY, loads_json TEXT NOT NULL, at INTEGER NOT NULL);
+  -- owner-named external inputs, frozen at goal time (today: copies under the WORKTREE's .starciwork/_local/inputs/<wf>/,
+  -- which die with the worktree — restart test 2026-09-17 lost 1-be-architecture-business-handoff.md and
+  -- 1-architecture-partition.md this way). The bytes are the record; an op binds them by sha256, never by path.
+  CREATE TABLE inputs(
+    workflow_id TEXT NOT NULL REFERENCES workflows(workflow_id), key TEXT NOT NULL,      -- '<index>-<basename>' as today
+    goal_revision INTEGER NOT NULL, sha256 TEXT NOT NULL, size INTEGER NOT NULL, media_type TEXT,
+    origin TEXT NOT NULL,           -- the owner's original absolute path or URL, for provenance only
+    bytes BLOB NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(workflow_id,key));
   CREATE TABLE migrations(source TEXT PRIMARY KEY, kind TEXT NOT NULL, rows_json TEXT NOT NULL, at INTEGER NOT NULL);`;
 
 const MACHINE_DDL=`
@@ -295,6 +314,20 @@ export function openLedger({file,now=Date.now,busyTimeoutMs=5000,journalMode='DE
     workflows(){return ledgerWorkflows(db);},
     eventsHead(workflowId){return eventsHead(db,workflowId);},
     verifyChain(options={}){return verifyChain(db,options);},
+    inputs:{
+      put({workflowId,key,goalRevision,bytes,origin,mediaType=null}={}){
+        need(workflowId&&key&&Number.isInteger(goalRevision)&&bytes&&origin,'inputs.put needs a workflow, key, goal revision, bytes and origin');
+        ensureWorkflow(db,{workflowId,at:now()});
+        const body=Buffer.isBuffer(bytes)?bytes:Buffer.from(bytes),digest=sha256(body);
+        db.prepare('INSERT INTO inputs(workflow_id,key,goal_revision,sha256,size,media_type,origin,bytes,created_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(workflow_id,key) DO UPDATE SET goal_revision=excluded.goal_revision,sha256=excluded.sha256,size=excluded.size,media_type=excluded.media_type,origin=excluded.origin,bytes=excluded.bytes,created_at=excluded.created_at')
+          .run(workflowId,key,goalRevision,digest,body.length,mediaType,origin,body,now());
+        return {ref:inputRef(workflowId,key,digest),sha256:digest};
+      },
+      get({workflowId,key}={}){return readInput(db,{workflowId,key});},
+      list({workflowId}={}){need(workflowId,'inputs.list needs a workflow id');return db.prepare('SELECT workflow_id,key,goal_revision,sha256,size,media_type,origin,created_at FROM inputs WHERE workflow_id=? ORDER BY key').all(workflowId).map(row=>({...row,ref:inputRef(row.workflow_id,row.key,row.sha256)}));},
+      /** Digest-checked copy for a worker that needs a file on disk; never the record. */
+      materialise({workflowId,key,dir}={}){const input=readInput(db,{workflowId,key});need(input&&dir,'inputs.materialise needs a known input and a directory');fs.mkdirSync(dir,{recursive:true});const file=path.join(dir,input.key);fs.writeFileSync(file,input.bytes);return {file,ref:input.ref,sha256:input.sha256};}
+    },
     close(){db.close();}
   };
   return handle;
