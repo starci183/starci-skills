@@ -21,7 +21,7 @@ folders:
   knowledge: Lazy-loaded JSON guidance
   contracts: Validation code
   core: Work validation runtime
-  schemas: JSON schemas
+  schemas: JSON schemas (workflow-state.schema.yaml documents the durable engine record; ledger-db.schema.yaml documents the runtime.sqlite/machine.sqlite table catalog of docs/ledger-db.md)
   specifications: Business and architecture contracts
   cli: Inspection commands
   scripts: Build tooling

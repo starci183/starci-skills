@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawn} from 'node:child_process';
@@ -12,6 +13,14 @@ import {deriveOwnerRequests} from './owner-requests.mjs';
 const read=file=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}};
 const OK=result=>result?.outcome==='ok';
 const WAIT_MS=30000;
+/**
+ * The detached input helper is a worker like any other: it never touches the ledger file directly, so its
+ * session/launch/lock/server coordination lives in scratch, under `os.tmpdir()/starci/<id>/` - never in
+ * `.starciwork`. `inputs.lock` itself is the one signal of the four the kernel also reads on its own tick,
+ * so it lives in the ledger's `signals` table instead (scope the workflow id, key `inputs-lock`).
+ */
+export const inputScratchDir=id=>path.join(os.tmpdir(),'starci',required(id,'workflow id'));
+function required(value,label){if(typeof value!=='string'||!value.trim())throw Error(`Missing ${label}`);return value.trim();}
 const bindingMatches=(a,b)=>a&&b&&['id','dir','workRoot','worktree','host'].every(key=>a[key]===b[key]);
 // Approved goal references remain in state.inputs; the owner surface has its own lifecycle.
 const status=(state,phase,extra={})=>(state.ownerInputs={...state.ownerInputs,phase,...extra});
@@ -44,7 +53,7 @@ export function recoverWorkflowInputReferences(store,state){
   const validRefs=items=>Array.isArray(items)&&items.every(item=>plain(item)&&Object.keys(item).length===2
     &&REF_KINDS.includes(item.kind)&&typeof item.ref==='string'&&item.ref.trim().length>0);
   if(!validRefs(refs)||(state.ownerInputs!=null&&!plain(state.ownerInputs)))return refused('input-reference-shape-invalid');
-  const goal=read(store.paths.goalJson);
+  const goal=store.goal()?.json??null;
   if(!plain(goal))return refused('input-reference-goal-unavailable');
   const equalRefs=(a,b)=>a.length===b.length&&a.every((item,index)=>item.kind===b[index].kind&&item.ref===b[index].ref);
   if(!state.approved||goal.schema!==GOAL_RECORD||goal.id!==state.id||goal.job!==state.job
@@ -71,12 +80,14 @@ export function reconcileWorkflowInputs(orca,store,state,{host=orca?.host,now=Da
   if(!waiting.length&&!state.ownerInputs)return {phase:'idle'};
   // The helper reads this snapshot independently while the kernel uses synchronous waits.
   store.saveState(state);
+  const scratch=inputScratchDir(state.id);
+  fs.mkdirSync(scratch,{recursive:true});
   let binding;
-  try{binding=inputBinding(state,store.dir);}catch{return status(state,'unavailable',{reason:'workflow-binding-unavailable'});}
-  const files=inputFiles(store.dir),at=now();
-  let session=read(files.session),lock=read(files.lock),launch=read(files.launch),server=read(files.server);
+  try{binding=inputBinding(state,scratch);}catch{return status(state,'unavailable',{reason:'workflow-binding-unavailable'});}
+  const files=inputFiles(scratch),at=now();
+  let session=read(files.session),lock=store.signal.get(state.id,'inputs-lock'),launch=read(files.launch),server=read(files.server);
   if(session&&!bindingMatches(session.binding,binding))return status(state,'unavailable',{reason:'workflow-binding-changed'});
-  if(lock&&!alive(lock.pid)){fs.rmSync(files.lock,{force:true});lock=null;}
+  if(lock&&!alive(lock.pid)){store.signal.clear(state.id,'inputs-lock');lock=null;}
   if(session&&lock&&session.runtimeVersion!==runtimeVersion()){
     if(!session.retire){session.retire=true;privateJson(files.session,session);}
     return status(state,'restarting',{reason:null});
@@ -86,7 +97,8 @@ export function reconcileWorkflowInputs(orca,store,state,{host=orca?.host,now=Da
     // A crashed launcher with an unrecorded child is fenced by a new session generation AND the exclusive helper lock.
     if(launch?.phase==='starting'&&at-launch.at<WAIT_MS)return status(state,'starting');
     let language='vi';try{language=loadConfig(state.host).language;}catch{}
-    session={schema:'starci/input-session@1',id:crypto.randomBytes(16).toString('hex'),token:crypto.randomBytes(32).toString('base64url'),binding,language,createdAt:at,runtimeVersion:runtimeVersion()};
+    session={schema:'starci/input-session@1',id:crypto.randomBytes(16).toString('hex'),token:crypto.randomBytes(32).toString('base64url'),
+      binding,repoRoot:state.repoRoot,language,createdAt:at,runtimeVersion:runtimeVersion()};
     privateJson(files.session,session);
     privateJson(files.launch,{session:session.id,phase:'starting',pid:null,at});
     try{
@@ -98,7 +110,7 @@ export function reconcileWorkflowInputs(orca,store,state,{host=orca?.host,now=Da
       return status(state,'starting',{reason:null});
     }catch{return status(state,'unavailable',{reason:'input-helper-start-failed'});}
   }
-  if(!session||server?.session!==session.id||!alive(server.pid)||lock?.session!==session.id)return status(state,'starting');
+  if(!session||server?.session!==session.id||!alive(server.pid)||lock?.value?.session!==session.id)return status(state,'starting');
   const url=`http://127.0.0.1:${server.port}/inputs/${session.id}#${session.token}`;
   if(at-(state.ownerInputs?.lastCheckedAt??0)<WAIT_MS&&state.ownerInputs?.session===session.id&&state.ownerInputs?.page)return state.ownerInputs;
   const previousSession=state.ownerInputs?.session!==session.id?state.ownerInputs?.session:state.ownerInputs?.priorSession;

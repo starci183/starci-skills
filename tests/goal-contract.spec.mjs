@@ -8,7 +8,8 @@ import {KINDS,FAMILIES,ROLES,BLOCKERS,OUTCOMES,CAPABILITIES,kindRecord,loadKinds
 import {RECORD_KINDS} from '../kernel/io.mjs';
 import {resolveExecutionChain} from '../kernel/chains.mjs';
 import {createAllocator} from '../kernel/schedule.mjs';
-import {goalApprovalBlocks,approve} from '../kernel/goal.mjs';
+import {goalApprovalBlocks,approve,reviseGoal} from '../kernel/goal.mjs';
+import {GOAL_RECORD} from '../kernel/common.mjs';
 import {createWorkflowState,runLoop} from '../kernel/kernel.mjs';
 import {goalPhase} from '../kernel/kernel.mjs';
 import {createStore} from '../kernel/store.mjs';
@@ -232,6 +233,29 @@ test('approval freezes the goal with goalRev and every derived artifact binds it
   assert.equal(state.goalRev,1,'the approval freezes the goal at rev 1');
   for(const op of state.ops){assert.equal(op.goalRev,1,`op ${op.id} binds the rev it was derived under`);assert.equal(op.question?.goalRev??1,1,`op ${op.id} question binds the rev`);}
   assert.equal(state.decisions[0].goalRev,1,'decisions bind the rev they were taken under');
+});
+// docs/ledger-db.md §8, goal.md §8 Persistence: workflow-goal/workflow-amend write `goals` rows via
+// `store.setGoal`; no goal.md/goal.json file, revision increments, goal_identity is recomputed.
+test('goal.revise persists a new goals row via store.setGoal: revision increments, the amendment body is recorded',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-goal-revise-rows-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const store=createStore({repoRoot:root,id:'wf-goal-revise-rows'});
+  const state=createWorkflowState({job:'x',inputs:[],worktree:root,branch:'main',store,host:path.resolve(import.meta.dirname,'..'),launcher:'L.mjs'});
+  state.definitionOfDone=['`op-0` settles'];
+  state.doneMetrics=[{kind:'operation',ref:'op-0'}];
+  state.critique={verdict:'sound'};
+  state.ops=[{id:'op-0',kind:'backend.implement',status:'pending',dependsOn:[],references:[],checks:[{name:'c',command:'true'}],allowlist:['src/**']}];
+  approve(store,state);
+  const first=store.setGoal({markdown:'# x',json:{schema:GOAL_RECORD,id:state.id,rev:state.goalRev,done:state.doneMetrics}});
+  assert.equal(first.revision,1,'the first persisted goal is revision 1');
+  const revised=reviseGoal(store,state,{done:[{kind:'operation',ref:'op-0'}],risks:['new risk']},{source:'owner'});
+  assert.equal(revised.ok,true,JSON.stringify(revised));
+  assert.equal(state.goalRev,2,'reviseGoal bumps the in-memory goal revision');
+  const row=store.goal();
+  assert.equal(row.revision,2,'the ledger goals row advanced to the new revision');
+  assert.equal(row.json.rev,2,'the persisted json carries the same revision');
+  assert.equal(row.markdown,'# x','a revision that never touches the markdown carries the prior one forward unchanged');
+  assert.deepEqual(row.amendment,{done:[{kind:'operation',ref:'op-0'}],risks:['new risk']},'the amendment body is recorded beside the json it produced');
 });
 test('goal.revise produces goal v(n+1), bumps the rev and stales derived work',()=>{
   assert.ok(KINDS.includes('goal.revise'),'goal.revise is the typed revision kind');

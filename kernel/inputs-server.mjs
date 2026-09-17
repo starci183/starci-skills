@@ -4,6 +4,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import {createInputModel,readInputState} from './inputs-model.mjs';
 import {inputPage} from './inputs-ui.mjs';
+import {createStore} from './store.mjs';
 
 export const INPUT_BODY_LIMIT=128*1024;
 const read=file=>{try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{return null;}};
@@ -54,17 +55,29 @@ export async function startInputServer({token,model,language='vi',port=0,session
   return {server,origin,url:`${origin}/inputs/${sessionId}#${token}`,close:()=>new Promise(resolve=>{server.close(resolve);server.closeIdleConnections();})};
 }
 
-/** Detached helper for the public workflow-inputs command. Only helper sidecars and custody are writable. */
+/**
+ * Detached helper for the public workflow-inputs command. Only helper sidecars and custody are writable.
+ *
+ * The helper is a worker of the kernel like any other: it never opens `.starciwork/runtime.sqlite` for
+ * writes beyond the one signal it owns. `inputs-lock` (the mutex a second accidental spawn must respect)
+ * and `kernel-lock` (whether the owning kernel is still alive) are both rows of the ledger's `signals`
+ * table; a store is opened here only to read and hold them, closed on the way out.
+ */
 export async function serveWorkflowInputs(sessionFile,{now=Date.now,alive=processAlive,graceMs=120000,intervalMs=2000}={}){
   const session=read(sessionFile);
-  if(session?.schema!=='starci/input-session@1'||!session?.binding?.dir||!session.id)throw Error('Invalid workflow input session.');
+  if(session?.schema!=='starci/input-session@1'||!session?.binding?.dir||!session.id||!session.repoRoot)throw Error('Invalid workflow input session.');
   const files=inputFiles(session.binding.dir);
   if(path.resolve(sessionFile)!==files.session||!readInputState(session.binding))throw Error('Workflow input binding is unavailable.');
-  let lock;
-  try{lock=fs.openSync(files.lock,'wx',0o600);fs.writeFileSync(lock,JSON.stringify({pid:process.pid,session:session.id}));fs.closeSync(lock);}
-  catch{throw Error('A workflow input helper already owns this workflow.');}
+  let store;
+  try{store=createStore({repoRoot:session.repoRoot,id:session.binding.id});}
+  catch{throw Error('Workflow input binding is unavailable.');}
+  // `signal.set` replaces unconditionally, so exclusivity is a read-then-write in application code: a live
+  // holder refuses the second spawn, and a dead one's row is simply overwritten by the one that wins the race.
+  const holder=store.signal.get(session.binding.id,'inputs-lock');
+  if(holder&&alive(holder.pid)){store.close();throw Error('A workflow input helper already owns this workflow.');}
+  store.signal.set(session.binding.id,'inputs-lock',{pid:process.pid,value:{session:session.id}});
   let app=null,timer=null,goneAt=null;
-  const removeOwned=()=>{if(read(files.lock)?.pid===process.pid)fs.rmSync(files.lock,{force:true});};
+  const removeOwned=()=>{if(store.signal.get(session.binding.id,'inputs-lock')?.pid===process.pid)store.signal.clear(session.binding.id,'inputs-lock');};
   try{
     if(read(files.session)?.id!==session.id)throw Error('Workflow input session was replaced before startup.');
     const model=createInputModel({binding:session.binding});
@@ -74,13 +87,13 @@ export async function serveWorkflowInputs(sessionFile,{now=Date.now,alive=proces
       const stop=()=>{clearInterval(timer);app.server.close(()=>resolve());app.server.closeIdleConnections();};
       process.once('SIGTERM',stop);process.once('SIGINT',stop);
       timer=setInterval(()=>{
-        const state=readInputState(session.binding),kernel=read(path.join(session.binding.dir,'kernel.lock'));
+        const state=readInputState(session.binding),kernel=store.signal.get(session.binding.id,'kernel-lock');
         const noOwner=!state||Boolean(state.finished)||!alive(kernel?.pid);
         const current=read(files.session);
         if(current?.id!==session.id||current.retire){stop();return;}
         if(noOwner){goneAt??=now();if(now()-goneAt>=graceMs)stop();}else goneAt=null;
       },intervalMs);
     });
-  }finally{clearInterval(timer);removeOwned();}
+  }finally{clearInterval(timer);removeOwned();store.close();}
   return {ok:true,workflow:session.binding.id,closed:true};
 }
