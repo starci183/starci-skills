@@ -166,7 +166,7 @@ test('validates malformed nested fields in the unselected environment',t=>{
 });
 
 test('executes from a relocated installed payload using only its compiled schema JSON',async t=>{
-  const f=fixture(t),payload=fs.mkdtempSync(path.join(process.cwd(),'tmp-stack-runtime-'));t.after(()=>fs.rmSync(payload,{recursive:true,force:true}));
+  const f=fixture(t),payload=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stack-runtime-'));t.after(()=>fs.rmSync(payload,{recursive:true,force:true}));
   const dist=path.join(payload,'.dist');fs.mkdirSync(path.join(dist,'checks'),{recursive:true});fs.mkdirSync(path.join(dist,'core'),{recursive:true});fs.mkdirSync(path.join(dist,'schemas'),{recursive:true});
   fs.copyFileSync(new URL('../checks/stacks.mjs',import.meta.url),path.join(dist,'checks','stacks.mjs'));fs.copyFileSync(new URL('../core/yaml.mjs',import.meta.url),path.join(dist,'core','yaml.mjs'));
   const schema=parseYaml(fs.readFileSync(new URL('../schemas/application-stacks.schema.yaml',import.meta.url),'utf8'));fs.writeFileSync(path.join(dist,'schemas','application-stacks.schema.json'),JSON.stringify(schema));

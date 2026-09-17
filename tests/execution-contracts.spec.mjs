@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import path from 'node:path';
+import os from 'node:os';
+
 import Ajv2020 from 'ajv/dist/2020.js';
 import {parseYaml} from '../core/yaml.mjs';
 import {PLAN_OP_KINDS} from '../models/functions.mjs';
@@ -63,7 +64,7 @@ test('ledger-db schema catalog names exactly the tables kernel/ledger-db.mjs cre
 });
 
 test('workflow amendment schema and runtime validator accept the same bounded overlay shape', async t => {
-  const dir=fs.mkdtempSync(path.join(process.cwd(),'.amendment-schema-test-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-amendment-schema-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const schema=parseYaml(fs.readFileSync(new URL('../schemas/workflow-amendment.schema.yaml',import.meta.url),'utf8'));
   const validate=new Ajv2020({strict:true,formats:{'date-time':true}}).compile(schema);
   const record={schema:'starci/workflow-amendment@1',workflowId:'wf',baseGoalIdentity:'goal',
