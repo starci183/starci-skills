@@ -12,3 +12,11 @@ measurement:
 appliesTo: [br.login.password.sign-in]
 evidence: measures-timing
 
+requiresProof:
+  measurement:
+    required: true
+
+# provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
+# An agent-authored provenBy is refused: it would be this record speaking for another one.
+provenBy:
+  measurement: [measures-timing]

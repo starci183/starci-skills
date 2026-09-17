@@ -9,3 +9,11 @@ interfaces:
 refs: [br.login.session.restores]
 evidence: proves-session-store
 
+requiresProof:
+  implementation:
+    required: true
+
+# provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
+# An agent-authored provenBy is refused: it would be this record speaking for another one.
+provenBy:
+  implementation: [impl.login.todo-app.auth]

@@ -9,3 +9,14 @@ steps:
 requirements: [fr.login.sign-in]
 evidence: walks-first-sign-in
 
+requiresProof:
+  uat:
+    required: true
+  requirements:
+    forEach: requirements
+
+# provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
+# An agent-authored provenBy is refused: it would be this record speaking for another one.
+provenBy:
+  uat: [uat.login.sign-in]
+  requirements: [fr.login.sign-in]

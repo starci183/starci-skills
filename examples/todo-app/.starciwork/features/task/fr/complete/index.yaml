@@ -15,3 +15,10 @@ composes:
 blockedBy:
   - br.task.complete.once is todo at rev 2; its reversible statement has no evidence yet.
 
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- tasks/complete
+  uat:
+    required: true

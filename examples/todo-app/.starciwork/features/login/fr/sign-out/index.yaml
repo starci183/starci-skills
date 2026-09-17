@@ -14,3 +14,10 @@ composes:
 blockedBy:
   - br.login.session.single-device is todo; the device rule it composes has no evidence yet.
 
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- auth/sign-out
+  uat:
+    required: true

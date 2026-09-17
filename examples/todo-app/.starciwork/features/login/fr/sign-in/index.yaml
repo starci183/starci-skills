@@ -18,3 +18,21 @@ composes:
     module: src/auth/session
 evidence: composes-sign-in
 
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- auth/sign-in
+  uat:
+    required: true
+  perf:
+    optional: true
+    command: node scripts/load/sign-in-timing.mjs
+
+# provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
+# An agent-authored provenBy is refused: it would be this record speaking for another one.
+provenBy:
+  unit: [impl.login.todo-app.auth]
+  e2e: [composes-sign-in#refusal-path-reaches-the-guard]
+  uat: [uat.login.sign-in]
+  perf: []

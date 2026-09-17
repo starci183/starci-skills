@@ -16,3 +16,17 @@ composes:
   - {rule: br.task.title.required, module: src/task/create}
 evidence: composes-create
 
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- tasks/create
+  uat:
+    required: true
+
+# provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
+# An agent-authored provenBy is refused: it would be this record speaking for another one.
+provenBy:
+  unit: [impl.task.todo-app.ownership]
+  e2e: [composes-create#guard-is-reached-on-the-create-path]
+  uat: [uat.task.create]
