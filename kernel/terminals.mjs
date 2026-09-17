@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import {getPath} from '../hosts/orca/calls.mjs';
 import {dispatchLastWords,settleDispatch} from '../hosts/orca/launch.mjs';
@@ -130,7 +129,7 @@ export function sweepStaleTerminals(orca,store,state,{cwd=state.worktree,now=Dat
   seedCoordinatorTerminals(store.ledger,state.id,{logFile:path.join(path.dirname(store.ledgerFile),'supervisor.log')});
   for(const handle of Object.keys(attempts))if(!listed.some(item=>item.handle===handle))delete attempts[handle];
   const recorded=closeStaleCoordinatorTerminals(store.ledger,state.id,{keep:state.from?[state.from]:[],known:listed.map(item=>item.handle),close:tryClose});
-  for(const terminal of recorded.closed)closed.push({terminal,reason:'stale kernel tab'});
+  for(const item of recorded.closed)if(item.reason!=='coordinator terminal already gone')closed.push({terminal:item.terminal,reason:'stale kernel tab'});
   // A tab whose close was answered earlier but which Orca still lists: asked again only after the window, reported once.
   const listedHandles=listed.map(item=>item.handle);
   for(const handle of readClosedCoordinatorTerminals(store.ledger,state.id))if(listedHandles.includes(handle)&&handle!==state.from&&tryClose(handle))closed.push({terminal:handle,reason:'stale kernel tab'});
@@ -231,7 +230,7 @@ export function writeLastWordsReport(store,state,op,words){
   if(words.outcome!=='done')try{report=buildReport({...base,outcome:words.outcome,open:words.open??[],blocker:words.blocker??null,question:words.question??null});}catch{report=null;}
   if(!report)report=buildReport({...base,outcome:'failed'});
   report.via='orca-worker-report';
-  fs.writeFileSync(store.reportPath(op.dispatch),`${JSON.stringify(report)}\n`);
+  store.writeReport({dispatchId:op.dispatch,opId:op.id,attempt:op.attempt,report,fromTerminal:op.terminal??state.from??'kernel'});
   return report;
 }
 export function reconcileWithOrca(orca,store,state,{cwd=state.worktree,wait=sleepSync,allocator=null}={}){

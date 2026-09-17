@@ -3,48 +3,73 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {closeStaleCoordinatorTerminals,readClosedCoordinatorTerminals,readCoordinatorTerminals,recordCoordinatorTerminal} from '../kernel/coordinator-terminals.mjs';
+import {ensureWorkflow,ledgerFileFor,openLedger} from '../kernel/ledger-db.mjs';
+import {LAUNCH_WINDOW_MS,bindStartupTerminal,closeStaleCoordinatorTerminals,readClosedCoordinatorTerminals,
+  readCoordinatorTerminals,recordCoordinatorTerminal,reserveStartup} from '../kernel/launch.mjs';
 import {startKernel} from '../kernel/supervisor.mjs';
 import {UNCLOSABLE_RETRY_MS,sweepStaleTerminals} from '../kernel/terminals.mjs';
-import {LAUNCH_WINDOW_MS,bindStartupTerminal,reserveStartup} from '../kernel/startup-lock.mjs';
 
-const tmp=t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-coordinator-terminals-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true,maxRetries:10,retryDelay:100}));return dir;};
+/**
+ * The coordinator-terminal record (docs/ledger-db.md §4 `signals`, key `coordinator-terminals`) and the
+ * kernel-lock startup reservation (§4 `signals`, key `kernel-lock`) it leans on to protect a sibling
+ * workflow's own live launch - both now `kernel/launch.mjs` rows, superseding the file-based
+ * `kernel/coordinator-terminals.mjs` and `kernel/startup-lock.mjs` this file used to import.
+ */
+function ledgerRoot(t){
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-coordinator-terminals-'));
+  t.after(()=>{Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,150);try{fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:150});}catch{}});
+  return root;
+}
+function openedLedger(t,root=ledgerRoot(t)){
+  const ledger=openLedger({file:ledgerFileFor(root)});
+  t.after(()=>{try{ledger.close();}catch{}});
+  return {root,ledger};
+}
+/** A minimal store: what `sweepStaleTerminals`/`startKernel` read of it is `.ledger`, `.ledgerFile` and `.appendEvent`. */
+const storeOf=(ledger,root)=>{const events=[];return {ledger,ledgerFile:ledger.path,events,appendEvent:event=>events.push(event)};};
+/** `siblingKernelGone` reads a sibling's latest state snapshot; an unfinished one is all these tests need. */
+function seedSiblingState(ledger,id,state={finished:null}){
+  ensureWorkflow(ledger.db,{workflowId:id,at:1});
+  ledger.db.prepare('INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at) VALUES(?,?,?,?,?,?)')
+    .run(`seed:${id}`,id,0,'goal',JSON.stringify({id,...state}),1);
+}
 
 test('the record keeps every coordinator terminal once and closes all but the one to keep',t=>{
-  const dir=tmp(t);
-  assert.deepEqual(readCoordinatorTerminals(dir),[]);
-  recordCoordinatorTerminal(dir,'term_a');recordCoordinatorTerminal(dir,'term_b');recordCoordinatorTerminal(dir,'term_a');recordCoordinatorTerminal(dir,'');
-  assert.deepEqual(readCoordinatorTerminals(dir),['term_a','term_b']);
+  const {ledger}=openedLedger(t);
+  assert.deepEqual(readCoordinatorTerminals(ledger,'wf'),[]);
+  recordCoordinatorTerminal(ledger,'wf','term_a');recordCoordinatorTerminal(ledger,'wf','term_b');recordCoordinatorTerminal(ledger,'wf','term_a');
+  assert.throws(()=>recordCoordinatorTerminal(ledger,'wf',''),/coordinator terminal name/);
+  assert.deepEqual(readCoordinatorTerminals(ledger,'wf'),['term_a','term_b']);
   const closes=[];
-  const first=closeStaleCoordinatorTerminals(dir,{keep:'term_b',close:handle=>{closes.push(handle);return handle!=='term_a';}});
-  assert.deepEqual(closes,['term_a']);assert.deepEqual(first.closed,[]);assert.deepEqual(first.kept,['term_a','term_b'],'a terminal whose close failed stays recorded');
-  const second=closeStaleCoordinatorTerminals(dir,{keep:'term_b',close:()=>true});
-  assert.deepEqual(second.closed.map(item=>item.terminal),['term_a']);assert.deepEqual(readCoordinatorTerminals(dir),['term_b']);
-  const gone=closeStaleCoordinatorTerminals(dir,{keep:null,known:[],close:()=>{throw Error('never asked');}});
-  assert.deepEqual(gone.closed,[{terminal:'term_b',reason:'coordinator terminal already gone'}]);assert.deepEqual(readCoordinatorTerminals(dir),[]);
+  const first=closeStaleCoordinatorTerminals(ledger,'wf',{keep:['term_b'],close:handle=>{closes.push(handle);return handle!=='term_a';}});
+  assert.deepEqual(closes,['term_a']);assert.deepEqual(first.closed,[]);assert.deepEqual(first.open,['term_a','term_b'],'a terminal whose close failed stays recorded');
+  const second=closeStaleCoordinatorTerminals(ledger,'wf',{keep:['term_b'],close:()=>true});
+  assert.deepEqual(second.closed.map(item=>item.terminal),['term_a']);assert.deepEqual(readCoordinatorTerminals(ledger,'wf'),['term_b']);
+  const gone=closeStaleCoordinatorTerminals(ledger,'wf',{keep:[],known:[],close:()=>{throw Error('never asked');}});
+  assert.deepEqual(gone.closed,[{terminal:'term_b',reason:'coordinator terminal already gone'}]);assert.deepEqual(readCoordinatorTerminals(ledger,'wf'),[]);
 });
 
 test('a supervisor start closes the coordinator terminals of the dead kernels before it opens the new one, by handle',t=>{
-  const dir=tmp(t);
+  const {ledger}=openedLedger(t);
   const calls=[];let created=0;
   const orca={invoke:(name,params)=>{calls.push([name,params?.terminal??params?.title??null]);if(name==='terminal-create'){created+=1;return {outcome:'ok',receipt:{result:{terminal:{handle:`term_${created}`}}}};}return {outcome:'ok',receipt:{result:{}}};}};
-  const info={id:'wf',dir,worktree:'D:/repo',host:'D:/host',hostAdapter:'orca',run:'run_wf'};
-  const first=startKernel(info,{launcher:'D:/host/launch.mjs',orca});
-  assert.equal(first.terminal,'term_1');assert.deepEqual(readCoordinatorTerminals(dir),['term_1']);
+  const info={id:'wf',worktree:'D:/repo',host:'D:/host',hostAdapter:'orca',run:'run_wf'};
+  const first=startKernel(info,{launcher:'D:/host/launch.mjs',orca,ledger});
+  assert.equal(first.terminal,'term_1');assert.deepEqual(readCoordinatorTerminals(ledger,'wf'),['term_1']);
   assert.deepEqual(calls.map(([name])=>name),['terminal-create','terminal-read','terminal-send'],'nothing to close on the first start');
   calls.length=0;const events=[];
   // The first kernel died (disk full) and Orca now titles its tab `powershell.exe`; the supervisor starts again.
-  const second=startKernel(info,{launcher:'D:/host/launch.mjs',orca,log:event=>events.push(event)});
+  const second=startKernel(info,{launcher:'D:/host/launch.mjs',orca,ledger,log:event=>events.push(event)});
   assert.equal(second.terminal,'term_2');
   assert.deepEqual(calls.map(([name,arg])=>`${name}:${arg}`),['terminal-close:term_1','terminal-create:[Kernel] wf','terminal-read:term_2','terminal-send:term_2']);
-  assert.deepEqual(readCoordinatorTerminals(dir),['term_2']);
+  assert.deepEqual(readCoordinatorTerminals(ledger,'wf'),['term_2']);
   assert.deepEqual(events.find(event=>event.event==='stale-kernel-terminals-closed').closed.map(item=>item.terminal),['term_1']);
 });
 
 test('a running kernel sweep closes the recorded coordinator terminals of earlier kernels but never its own',t=>{
-  const dir=tmp(t);
-  recordCoordinatorTerminal(dir,'term_old1');recordCoordinatorTerminal(dir,'term_old2');recordCoordinatorTerminal(dir,'term_gone');recordCoordinatorTerminal(dir,'term_live');
-  const events=[],store={dir,appendEvent:event=>events.push(event)};
+  const {ledger}=openedLedger(t);
+  recordCoordinatorTerminal(ledger,'wf','term_old1');recordCoordinatorTerminal(ledger,'wf','term_old2');recordCoordinatorTerminal(ledger,'wf','term_gone');recordCoordinatorTerminal(ledger,'wf','term_live');
+  const store=storeOf(ledger);
   const state={id:'wf',worktree:'D:/repo',from:'term_live',ops:[]};
   const closes=[];
   const orca={invoke:(name,params)=>{
@@ -57,48 +82,53 @@ test('a running kernel sweep closes the recorded coordinator terminals of earlie
   const closed=sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now:()=>5});
   assert.deepEqual(closes.sort(),['term_old1','term_old2'],'the shell-titled tabs of the dead kernels are closed by handle; the live kernel tab and the owner tab are not');
   assert.deepEqual(closed.map(item=>item.terminal).sort(),['term_old1','term_old2']);
-  assert.deepEqual(readCoordinatorTerminals(dir),['term_live'],'a terminal Orca no longer lists is dropped from the record without a close call');assert.deepEqual(readClosedCoordinatorTerminals(dir).sort(),['term_old1','term_old2'],'answered closes are remembered while Orca lists the tabs');
-  assert.equal(events.at(-1).event,'terminals-swept');
+  assert.deepEqual(readCoordinatorTerminals(ledger,'wf'),['term_live'],'a terminal Orca no longer lists is dropped from the record without a close call');
+  assert.deepEqual(readClosedCoordinatorTerminals(ledger,'wf').sort(),['term_old1','term_old2'],'answered closes are remembered while Orca lists the tabs');
+  assert.equal(store.events.at(-1).event,'terminals-swept');
 });
 
 test('a start also closes the coordinator terminals the supervisor log remembers from before the record existed',t=>{
-  const root=tmp(t),dir=path.join(root,'wf');fs.mkdirSync(dir);
-  fs.writeFileSync(path.join(root,'supervisor.log'),[JSON.stringify({at:1,event:'kernel-started-in-coordinator',id:'wf',terminal:'term_old_a',run:'run_wf'}),'not json',JSON.stringify({at:2,event:'kernel-started-in-coordinator',id:'other',terminal:'term_other',run:'run_o'}),JSON.stringify({at:3,event:'kernel-started-in-coordinator',id:'wf',terminal:'term_old_b',run:'run_wf'})].join('\n')+'\n');
+  const root=ledgerRoot(t);
+  const ledger=openLedger({file:ledgerFileFor(root)});t.after(()=>{try{ledger.close();}catch{}});
+  fs.writeFileSync(path.join(root,'.starciwork','supervisor.log'),[JSON.stringify({at:1,event:'kernel-started-in-coordinator',id:'wf',terminal:'term_old_a',run:'run_wf'}),'not json',JSON.stringify({at:2,event:'kernel-started-in-coordinator',id:'other',terminal:'term_other',run:'run_o'}),JSON.stringify({at:3,event:'kernel-started-in-coordinator',id:'wf',terminal:'term_old_b',run:'run_wf'})].join('\n')+'\n');
   const closed=[];let created=0;
   const orca={invoke:(name,params)=>{if(name==='terminal-create'){created+=1;return {outcome:'ok',receipt:{result:{terminal:{handle:`term_new_${created}`}}}};}if(name==='terminal-close'){closed.push(params.terminal);return {outcome:'ok'};}return {outcome:'ok',receipt:{result:{}}};}};
-  const started=startKernel({id:'wf',dir,worktree:'D:/repo',host:'D:/host',hostAdapter:'orca',run:'run_wf'},{launcher:'D:/host/launch.mjs',orca});
+  const started=startKernel({id:'wf',worktree:'D:/repo',host:'D:/host',hostAdapter:'orca',run:'run_wf'},{launcher:'D:/host/launch.mjs',orca,ledger});
   assert.equal(started.terminal,'term_new_1');assert.deepEqual(closed.sort(),['term_old_a','term_old_b'],'both logged terminals of this workflow are closed, the other workflow untouched');
-  assert.deepEqual(readCoordinatorTerminals(dir),['term_new_1']);
+  assert.deepEqual(readCoordinatorTerminals(ledger,'wf'),['term_new_1']);
 });
 
 test('a running kernel sweep also seeds the record from the supervisor log, so tabs opened before the record existed are closed',t=>{
-  const root=tmp(t),dir=path.join(root,'wf');fs.mkdirSync(dir);
-  fs.writeFileSync(path.join(root,'supervisor.log'),JSON.stringify({at:1,event:'kernel-started-in-coordinator',id:'wf',terminal:'term_before_record',run:'run_wf'})+String.fromCharCode(10));
-  const events=[],store={dir,appendEvent:event=>events.push(event)},state={id:'wf',worktree:'D:/repo',from:'term_live',ops:[]},closes=[];
+  const root=ledgerRoot(t);
+  const ledger=openLedger({file:ledgerFileFor(root)});t.after(()=>{try{ledger.close();}catch{}});
+  fs.writeFileSync(path.join(root,'.starciwork','supervisor.log'),JSON.stringify({at:1,event:'kernel-started-in-coordinator',id:'wf',terminal:'term_before_record',run:'run_wf'})+String.fromCharCode(10));
+  const store=storeOf(ledger),state={id:'wf',worktree:'D:/repo',from:'term_live',ops:[]},closes=[];
   const orca={invoke:(name,params)=>{if(name==='terminal-list')return {outcome:'ok',receipt:{result:{terminals:[{handle:'term_before_record',title:'powershell.exe'},{handle:'term_live',title:'[Kernel] wf'}]}}};if(name==='terminal-close'){closes.push(params.terminal);return {outcome:'ok'};}throw Error(name);}};
   sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now:()=>5});
-  assert.deepEqual(closes,['term_before_record']);assert.deepEqual(readCoordinatorTerminals(dir),[],'the closed tab leaves the record; the kernel never recorded its own');
+  assert.deepEqual(closes,['term_before_record']);assert.deepEqual(readCoordinatorTerminals(ledger,'wf'),[],'the closed tab leaves the record; the kernel never recorded its own');
 });
 
 test('a sibling native startup reservation protects only its attested terminal through command delivery and expiry',t=>{
-  const root=tmp(t),current=path.join(root,'current'),sibling=path.join(root,'business');fs.mkdirSync(current);fs.mkdirSync(sibling);
-  fs.writeFileSync(path.join(sibling,'state.json'),JSON.stringify({id:'business',finished:null}));
-  const launch=reserveStartup(sibling,{pid:999999,now:()=>1,alive:()=>false});
-  assert.equal(bindStartupTerminal(sibling,{token:launch.token,terminal:'term_business',now:()=>2}).ok,true);
-  const events=[],closed=[],store={dir:current,appendEvent:event=>events.push(event)},state={id:'current',worktree:'D:/repo',from:'term_current',ops:[]};
+  const root=ledgerRoot(t);
+  const ledger=openLedger({file:ledgerFileFor(root)});t.after(()=>{try{ledger.close();}catch{}});
+  seedSiblingState(ledger,'business');
+  const launch=reserveStartup(ledger,'business',{pid:999999,now:()=>1,alive:()=>false});
+  assert.equal(bindStartupTerminal(ledger,'business',{token:launch.token,terminal:'term_business',now:()=>2}).ok,true);
+  const store=storeOf(ledger),closed=[],state={id:'current',worktree:'D:/repo',from:'term_current',ops:[]};
   const orca={invoke:(name,params)=>{if(name==='terminal-list')return {outcome:'ok',receipt:{result:{terminals:[
     {handle:'term_current',title:'[Kernel] current'},{handle:'term_business',title:'[Kernel] business'},{handle:'term_unattested',title:'[Kernel] business'}]}}};
     if(name==='terminal-close'){closed.push(params.terminal);return {outcome:'ok'};}throw Error(name);}};
   sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now:()=>LAUNCH_WINDOW_MS+10});
   assert.deepEqual(closed,['term_unattested'],'the exact startup terminal survives; another same-title terminal has no startup identity');
-  assert.equal(events.at(-1).closed[0].terminal,'term_unattested');
+  assert.equal(store.events.at(-1).closed[0].terminal,'term_unattested');
 });
 
 test('a sibling launch reservation defers kernel-tab cleanup only through its live creation-to-binding window',t=>{
-  const root=tmp(t),current=path.join(root,'current'),sibling=path.join(root,'business');fs.mkdirSync(current);fs.mkdirSync(sibling);
-  fs.writeFileSync(path.join(sibling,'state.json'),JSON.stringify({id:'business',finished:null}));
-  reserveStartup(sibling,{pid:999999,now:()=>1,alive:()=>false});
-  const closed=[],store={dir:current,appendEvent(){}},state={id:'current',worktree:'D:/repo',from:'term_current',ops:[]},orca={invoke:(name,params)=>{
+  const root=ledgerRoot(t);
+  const ledger=openLedger({file:ledgerFileFor(root)});t.after(()=>{try{ledger.close();}catch{}});
+  seedSiblingState(ledger,'business');
+  reserveStartup(ledger,'business',{pid:999999,now:()=>1,alive:()=>false});
+  const closed=[],store={ledger,ledgerFile:ledger.path,appendEvent(){}},state={id:'current',worktree:'D:/repo',from:'term_current',ops:[]},orca={invoke:(name,params)=>{
     if(name==='terminal-list')return {outcome:'ok',receipt:{result:{terminals:[{handle:'term_current',title:'[Kernel] current'},{handle:'term_business',title:'[Kernel] business'}]}}};
     if(name==='terminal-close'){closed.push(params.terminal);return {outcome:'ok'};}throw Error(name);}};
   sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now:()=>LAUNCH_WINDOW_MS-1});assert.deepEqual(closed,[]);
@@ -106,17 +136,18 @@ test('a sibling launch reservation defers kernel-tab cleanup only through its li
 });
 
 test('a tab Orca answers a close for but still lists is reported unclosable once and not asked again for half an hour',t=>{
-  const dir=tmp(t);recordCoordinatorTerminal(dir,'term_zombie');
-  const events=[],store={dir,appendEvent:event=>events.push(event)},state={id:'wf',worktree:'D:/repo',from:'term_live',ops:[]},closes=[];
+  const {ledger}=openedLedger(t);
+  recordCoordinatorTerminal(ledger,'wf','term_zombie');
+  const store=storeOf(ledger),state={id:'wf',worktree:'D:/repo',from:'term_live',ops:[]},closes=[];
   const orca={invoke:(name,params)=>{if(name==='terminal-list')return {outcome:'ok',receipt:{result:{terminals:[{handle:'term_zombie',title:'powershell.exe'},{handle:'term_live',title:'[Kernel] wf'}]}}};if(name==='terminal-close'){closes.push(params.terminal);return {outcome:'ok'};}throw Error(name);}};
   let clock=1_000_000;const now=()=>clock;
   sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now});
-  assert.deepEqual(closes,['term_zombie']);assert.equal(events.filter(event=>event.event==='terminals-swept').length,1);
+  assert.deepEqual(closes,['term_zombie']);assert.equal(store.events.filter(event=>event.event==='terminals-swept').length,1);
   clock+=30_000;sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now});
   clock+=30_000;sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now});
   assert.deepEqual(closes,['term_zombie'],'the tab still listed after its close is not closed again');
-  assert.deepEqual(events.filter(event=>event.event==='terminals-unclosable').map(event=>event.terminals),[['term_zombie']],'reported exactly once');
-  assert.equal(events.filter(event=>event.event==='terminals-swept').length,1,'no sweep event without a close');
+  assert.deepEqual(store.events.filter(event=>event.event==='terminals-unclosable').map(event=>event.terminals),[['term_zombie']],'reported exactly once');
+  assert.equal(store.events.filter(event=>event.event==='terminals-swept').length,1,'no sweep event without a close');
   clock+=UNCLOSABLE_RETRY_MS;sweepStaleTerminals(orca,store,state,{cwd:'D:/repo',now});
   assert.deepEqual(closes,['term_zombie','term_zombie'],'after the window one more close is tried');
   const gone={invoke:(name,params)=>{if(name==='terminal-list')return {outcome:'ok',receipt:{result:{terminals:[{handle:'term_live',title:'[Kernel] wf'}]}}};throw Error(name);}};

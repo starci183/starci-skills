@@ -160,16 +160,26 @@ export function recordCoordinatorTerminal(ledger,id,handle,{now=Date.now}={}){
     return{ok:true,opened:[...open,name]};
   });
 }
-export function closeStaleCoordinatorTerminals(ledger,id,{keep=[],close,known,now=Date.now}={}){
+/**
+ * Close every recorded coordinator terminal except `keep` through `close(handle)` (true when closed). A
+ * terminal `known` no longer lists is dropped from the record as already gone, with no `close` call spent on
+ * it; one whose `close` call fails for another reason stays recorded for the next pass. `closed` entries are
+ * `{terminal,reason}`, so a caller can log or attribute each one without a second lookup.
+ */
+export function closeStaleCoordinatorTerminals(ledger,id,{keep=[],close,known=null,now=Date.now}={}){
   need(typeof close==='function','closeStaleCoordinatorTerminals needs a close callback');
-  const keepSet=new Set([keep].flat().filter(Boolean)),listed=known?new Set(known):null;
+  const keepSet=new Set([keep].flat().filter(Boolean));
   return ledger.transaction(()=>{
     const open=readCoordinatorTerminals(ledger,id),closed=readClosedCoordinatorTerminals(ledger,id);
-    const stale=open.filter(name=>!keepSet.has(name)&&(listed===null||listed.has(name)));
+    const candidates=open.filter(name=>!keepSet.has(name));
     const closedNow=[];
-    for(const name of stale)try{if(close(name))closedNow.push(name);}catch{}
-    const stillOpen=open.filter(name=>!closedNow.includes(name));
-    setSignal(ledger.db,id,'coordinator-terminals',{value:{open:stillOpen,closed:[...new Set([...closed,...closedNow])]},at:now()});
+    for(const name of candidates){
+      if(Array.isArray(known)&&!known.includes(name)){closedNow.push({terminal:name,reason:'coordinator terminal already gone'});continue;}
+      try{if(close(name))closedNow.push({terminal:name,reason:'coordinator terminal of a kernel that is not running'});}catch{}
+    }
+    const closedNames=closedNow.map(item=>item.terminal);
+    const stillOpen=open.filter(name=>!closedNames.includes(name));
+    setSignal(ledger.db,id,'coordinator-terminals',{value:{open:stillOpen,closed:[...new Set([...closed,...closedNames])]},at:now()});
     return{ok:true,closed:closedNow,open:stillOpen};
   });
 }

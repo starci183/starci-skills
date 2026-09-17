@@ -39,6 +39,7 @@ function stubStore(dir){
     saveState(){},
     readEvents(){return events;},
     readReports(){return [];},
+    writeChecks({opId,attempt}={}){return {opId,attempt};},
     checksPath:id=>path.join(dir,'checks',`${id}.json`),
     contractPath:id=>path.join(dir,'contracts',`${id}.md`),
     reportPath:dispatch=>path.join(dir,'reports',`${dispatch}.json`)};
@@ -1075,7 +1076,7 @@ test('a settled operation releases the canonical writer it reserved, and an oper
   const cancelled={id:'old',kind:'work.author',status:'cancelled',lease:lease('old')};
   const skipped={id:'not-needed',kind:'work.author',status:'skipped',lease:lease('not-needed')};
   const dispatched={id:'busy',kind:'work.author',status:'done',lease:lease('busy'),dispatch:'d-1'};
-  const state={id:'wf',host:process.cwd(),engine:{schema:'starci/engine@1',generation:3,journalFile:'J'},needUser:[],
+  const state={id:'wf',host:process.cwd(),engine:{schema:'starci/engine@1',generation:3,ledgerFile:'L.sqlite'},needUser:[],
     ops:[accepted,live,cancelled,skipped,dispatched]};
   const status={'operation-ask-2':'effect_unknown','operation-intake':'running','operation-old':'succeeded','operation-not-needed':'failed','operation-busy':'effect_unknown'};
   const ctx={engine:{journal:{getJob:id=>({status:status[id]})}}};
@@ -1105,7 +1106,7 @@ test('the frozen copy of a settled launch is removed, the copy of anything still
   const base=path.join(runtime,'candidates','wf');
   for(const name of ['job-done','job-failed','job-running','job-leased-by-op'])fs.mkdirSync(path.join(base,name),{recursive:true});
   const events=[],store={appendEvent:event=>events.push(event),saveState(){}};
-  const state={id:'wf',host:process.cwd(),engine:{schema:'starci/engine@1',generation:3,journalFile:path.join(runtime,'journal.sqlite')},needUser:[],
+  const state={id:'wf',host:process.cwd(),engine:{schema:'starci/engine@1',generation:3,ledgerFile:path.join(runtime,'runtime.sqlite'),candidateRoot:path.join(runtime,'candidates')},needUser:[],
     ops:[{id:'op-a',kind:'backend.implement',status:'running',lease:{jobId:'job-leased-by-op'}}]};
   const journal={listJobs:()=>[
     {job_id:'job-done',status:'succeeded'},{job_id:'job-failed',status:'failed'},

@@ -99,7 +99,6 @@ models/validator-transport.mjs
 kernel/lanes.mjs
 kernel/launch.mjs
 kernel/terminals.mjs
-kernel/coordinator-terminals.mjs
 kernel/tab.mjs
 kernel/verify.mjs
 kernel/contract.mjs
