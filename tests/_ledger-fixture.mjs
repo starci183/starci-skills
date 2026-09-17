@@ -13,12 +13,31 @@ const EVENT_META=new Set(['at','seq','event','kind','event_id','eventId','entity
 const json=value=>JSON.stringify(value??null);
 
 /**
+ * A leaked ledger/store/machine sqlite handle holds its file open, which EPERMs a later `fs.rmSync` on
+ * Windows (the cause s3 proved for `kernelMain`, and the same shape hit a dozen specs across this suite in
+ * wave 2). `track(handle)` makes leaking one impossible: every tracked handle is closed, in reverse
+ * acquisition order, before `t.after`'s own cleanup runs - close a `createStore()` result, a second
+ * `openLedger`/`openMachine`/`inspectLedger` opened inside a test, anything shaped `{close()}`.
+ *
+ *   const track=trackHandles(t);
+ *   const store=track(createStore({repoRoot,id}));
+ *   const foreign=track(openLedger({file:otherFile}));
+ */
+export function trackHandles(t){
+  const handles=[];
+  t.after(()=>{for(const handle of handles.reverse())try{handle?.close();}catch{}});
+  return handle=>{handles.push(handle);return handle;};
+}
+
+/**
  * One temp world for a ledger-backed spec: a repo root that owns `.starciwork/`, the ledger opened on it,
  * and a machine DB inside the same temp root. `process.env.LOCALAPPDATA` is repointed at the temp root for
  * the test's duration so no code path can reach the real machine arbiter; the after hook restores it,
- * closes both handles and removes the tree.
+ * closes both handles (and anything `track`ed) and removes the tree.
  *
- *   withLedger(t,({repoRoot,ledger,machine,ledgerFile,machineFile})=>{ ... });
+ *   withLedger(t,({repoRoot,ledger,machine,ledgerFile,machineFile,track})=>{
+ *     const store=track(createStore({repoRoot,id}));   // closed automatically, same as ledger/machine
+ *   });
  */
 export function withLedger(t,fn){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-ledger-'));
@@ -28,15 +47,18 @@ export function withLedger(t,fn){
   fs.mkdirSync(machineHome,{recursive:true});
   const ledgerFile=ledgerFileFor(repoRoot),machineFile=machineFileFor({LOCALAPPDATA:machineHome});
   const ledger=openLedger({file:ledgerFile}),machine=openMachine({file:machineFile});
+  const tracked=[];
+  const track=handle=>{tracked.push(handle);return handle;};
   const saved=process.env.LOCALAPPDATA;
   process.env.LOCALAPPDATA=machineHome;
   t.after(()=>{
     if(saved===undefined)delete process.env.LOCALAPPDATA;else process.env.LOCALAPPDATA=saved;
+    for(const handle of tracked.reverse())try{handle?.close();}catch{}
     try{ledger.close();}catch{}
     try{machine.close();}catch{}
     fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25});
   });
-  return fn({root,repoRoot,machineHome,ledger,machine,ledgerFile,machineFile});
+  return fn({root,repoRoot,machineHome,ledger,machine,ledgerFile,machineFile,track});
 }
 
 /**

@@ -8,8 +8,8 @@ import {bindContinuationPath,CONTINUATION_SECTION_START,CONTINUATION_SECTION_END
 
 function fixture(t){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-continuation-binding-'));
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const store=createStore({repoRoot:root,id:'wf-one'}),folder=path.join(root,'workflows');
+  t.after(()=>{try{store.close();}catch{}fs.rmSync(root,{recursive:true,force:true});});
   fs.mkdirSync(folder,{recursive:true});
   const write=(name,body)=>{const file=path.join(folder,name);fs.writeFileSync(file,body);return file;};
   return {store,write,canonical:path.join(folder,'wf-one.md')};
