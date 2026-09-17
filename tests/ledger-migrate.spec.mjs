@@ -145,14 +145,30 @@ test('a dead kernel lock does not refuse; --dry-run writes nothing at all',async
   assert.ok(fs.existsSync(path.join(wdir,'state.json')),'dry-run never moves sources');
 });
 
-test('--archive moves an imported directory to workflows-archive/<id>.migrated',async t=>{
+test('--archive archives the imported directory and then sets the whole `_local` aside as `_local.migrated` (§13)',async t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
   makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
   const summary=await migrateLedger({repoRoot:repo,journalFile,machineFile,archive:true});
   assert.equal(summary.ok,true);
-  assert.equal(fs.existsSync(path.join(workflowsRoot(repo),ID)),false);
-  assert.ok(fs.existsSync(path.join(repo,'.starciwork','_local','workflows-archive',`${ID}.migrated`,'state.json')));
+  const moved=path.join(repo,'.starciwork','_local.migrated');
+  assert.equal(summary.archivedLocalRoot,moved);
+  assert.equal(fs.existsSync(path.join(repo,'.starciwork','_local')),false,'a root that migrated whole keeps no `_local`');
+  assert.equal(fs.existsSync(path.join(moved,'workflows',ID)),false,'§10 archived the imported directory before the root moved');
+  assert.ok(fs.existsSync(path.join(moved,'workflows-archive',`${ID}.migrated`,'state.json')));
+  assert.ok(fs.existsSync(path.join(repo,'.starciwork','runtime.sqlite')),'the ledger is outside `_local` and does not move with it');
+});
+
+test('a root that refused a workflow keeps `_local` where it is, even with --archive',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  const wdir=makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  fs.writeFileSync(path.join(wdir,'kernel.lock'),JSON.stringify({pid:process.pid,at:Date.now()}));
+  const summary=await migrateLedger({repoRoot:repo,journalFile,machineFile,archive:true});
+  assert.equal(summary.ok,false);
+  assert.equal(summary.archivedLocalRoot,undefined);
+  assert.ok(fs.existsSync(path.join(repo,'.starciwork','_local')),'`_local` is set aside only once the whole root reports ok');
+  assert.equal(fs.existsSync(path.join(repo,'.starciwork','_local.migrated')),false);
 });
 
 /** goal.mjs's `stageExternalInputs` copies an owner file here; declare it on both `state.json` and `goal.json`. */
@@ -252,4 +268,185 @@ test('a second run neither reseeds `meta` nor rewrites the anchor entry it alrea
     assert.equal(db2.prepare("SELECT count(*) n FROM meta WHERE key='ledger_id'").get().n,1,'meta is never rewritten');
     assert.equal(db2.prepare("SELECT value FROM meta WHERE key='ledger_id'").get().value,ledgerIdBefore);
   }finally{db2.close();}
+});
+
+
+/* ---------------------------------------------------------------------------------------------------
+ * §13 — only `_local/workflows/` migrates. Every other family is deleted, rows included, so the migrator's
+ * whole job with them is to name them and their size before anything removes them.
+ * ------------------------------------------------------------------------------------------------- */
+
+const localRoot=repo=>path.join(repo,'.starciwork','_local');
+const write=(file,text)=>{fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,text);};
+
+/** A Plan v2 bundle as `workflows/lifecycle.mjs` writes it — a family §13 deletes rather than imports. */
+function makePlan(repo,id){
+  const dir=path.join(localRoot(repo),'plans',id);
+  write(path.join(dir,'index.yaml'),`schema: starci/plan-index@1\nid: ${id}\n`);
+  write(path.join(dir,'goal','index.yaml'),`schema: starci/plan-goal@1\nplanDigest: digest-${id}\n`);
+  write(path.join(dir,'approval','index.yaml'),`schema: starci/plan-approval@1\nplanDigest: digest-${id}\n`);
+  write(path.join(dir,'run','index.yaml'),`schema: starci/plan-run@1\nstatus: awaiting-plan-approval\n`);
+  write(path.join(dir,'PLAN.md'),'# Plan\n\nTwo streams.\n');
+  return dir;
+}
+
+function makeHistory(repo,entry='canonical-json-migration-20260916'){
+  const dir=path.join(localRoot(repo),'history',entry);
+  write(path.join(dir,'workflows','agentos-alpha','debug.json'),JSON.stringify({schema:'starci/workflow-debug@1',workflowId:'agentos-alpha'}));
+  write(path.join(dir,'notes.md'),'renamed by hand on the 16th\n');
+  return dir;
+}
+
+/** A retired workflow body inside one of the three archive families: a whole workflow, and still deleted. */
+function makeArchivedBody(repo,family,relative,{id,generation=3,bytes=4096}={}){
+  const dir=path.join(localRoot(repo),family,...relative.split('/'));
+  write(path.join(dir,'goal.md'),`# ${id}\n`);
+  write(path.join(dir,'goal.json'),JSON.stringify({schema:'starci/goal-record@1',id,rev:1,job:{title:`retired ${id}`}}));
+  write(path.join(dir,'state.json'),JSON.stringify({schema:WORKFLOW_STATE,id,phase:'stopped',createdAt:500,goalDigest:`retired-${id}`,worktree:repo,job:{title:`retired ${id}`},engine:{generation}}));
+  write(path.join(dir,'events.jsonl'),'x'.repeat(bytes)+'\n');
+  return dir;
+}
+
+const draftsOf=repo=>{const dir=path.join(localRoot(repo),'drafts','nivo-group-chat-5-6');write(path.join(dir,'index.html'),'<!doctype html><title>draft</title>');write(path.join(dir,'dist','bundle.js'),'x'.repeat(2048));return dir;};
+const dispatchCtxOf=repo=>{const dir=path.join(localRoot(repo),'runtime');write(path.join(dir,'orca-dispatch-ctx_202e50121946.md'),'# dispatch context\n');write(path.join(dir,'orca-dispatch-ctx_27fa95b7f7ff.md'),'# dispatch context\n');return dir;};
+/** Everything §13's table lists beside `workflows/`, at once. */
+function makeEveryFamily(repo){
+  makePlan(repo,'agentos-two-streams');makeHistory(repo);draftsOf(repo);dispatchCtxOf(repo);
+  makeArchivedBody(repo,'workflow-archive','agentos-alpha-20260915',{id:'agentos-alpha'});
+  makeArchivedBody(repo,'workflows-archive','brand',{id:'brand'});
+  makeArchivedBody(repo,'workflow-retirement','20260915-alpha/old-workflow',{id:'retired-alpha'});
+}
+const familyNames=summary=>summary.families.map(entry=>entry.family).sort();
+
+test('every family beside `workflows/` is named with its byte size and the verdict `deleted-not-imported`',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  makeEveryFamily(repo);
+  const summary=await migrateLedger({repoRoot:repo,journalFile,machineFile});
+  assert.equal(summary.ok,true,'a family that is about to be deleted is reported, never a reason to refuse the root');
+  assert.deepEqual(familyNames(summary),['drafts','history','plans','runtime','workflow-archive','workflow-retirement','workflows-archive']);
+  for(const family of summary.families){
+    assert.equal(family.verdict,'deleted-not-imported');
+    assert.equal(family.source,path.join(localRoot(repo),family.family));
+    assert.ok(family.files>0&&family.bytes>0,`${family.family} is reported with what it weighs`);
+  }
+  const drafts=summary.families.find(family=>family.family==='drafts');
+  assert.ok(drafts.bytes>2048,'the size is the whole tree, not one level of it');
+  assert.equal(drafts.files,2);
+  assert.deepEqual(drafts.entries,['nivo-group-chat-5-6'],'each family names what is inside it, so the owner recognises what goes');
+});
+
+test('not one row of any deleted family reaches the ledger — least of all the archives',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  makeEveryFamily(repo);
+  const summary=await migrateLedger({repoRoot:repo,journalFile,machineFile});
+  assert.equal(summary.ok,true);
+  assert.deepEqual(summary.workflows.map(entry=>entry.id),[ID],'only `_local/workflows/` migrates');
+  const db=ledgerDb(repo);
+  try{
+    assert.deepEqual(db.prepare('SELECT workflow_id FROM workflows ORDER BY workflow_id').all().map(row=>row.workflow_id),[ID],
+      'a retired body is a finished workflow: its rows do not migrate either');
+    assert.equal(db.prepare('SELECT count(*) n FROM goals').get().n,1);
+    assert.equal(db.prepare('SELECT count(*) n FROM events').get().n,6,'the live workflow`s own events, and nothing else');
+    assert.equal(db.prepare('SELECT count(*) n FROM contracts').get().n,1,'dispatch context never becomes a contract (§9)');
+    assert.equal(db.prepare('SELECT count(*) n FROM inputs').get().n,0,'a draft is not an input');
+    const tables=db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name);
+    assert.equal(tables.includes('plans'),false,'§13 reversed the `plans` table; the migrator does not create one');
+    assert.equal(tables.includes('history'),false,'nor a `history` table');
+    const recorded=db.prepare("SELECT source,rows_json FROM migrations WHERE kind='local-family-deleted' ORDER BY source").all();
+    assert.equal(recorded.length,7,'every family is recorded, which is what makes the second run a no-op');
+    for(const row of recorded)assert.equal(JSON.parse(row.rows_json).verdict,'deleted-not-imported');
+  }finally{db.close();}
+  assert.ok(fs.existsSync(path.join(localRoot(repo),'workflow-archive','agentos-alpha-20260915','events.jsonl')),
+    'the migrator reports what is about to be lost; it removes nothing itself');
+  assert.ok(fs.existsSync(path.join(localRoot(repo),'runtime','orca-dispatch-ctx_202e50121946.md')));
+  assert.ok(fs.existsSync(path.join(localRoot(repo),'plans','agentos-two-streams','PLAN.md')));
+});
+
+test('a file sitting directly under `_local` is a family of one, named like the rest',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  write(path.join(localRoot(repo),'notes-to-self.md'),'x'.repeat(512));
+  const summary=await migrateLedger({repoRoot:repo,journalFile,machineFile});
+  assert.deepEqual(familyNames(summary),['notes-to-self.md']);
+  const [family]=summary.families;
+  assert.equal(family.files,1);assert.equal(family.bytes,512);
+  assert.equal(family.verdict,'deleted-not-imported');
+  assert.deepEqual(family.entries,[]);
+});
+
+test('a second run is a no-op for the deleted families too: reported once, recorded once, re-read never',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  makeEveryFamily(repo);
+  const first=await migrateLedger({repoRoot:repo,journalFile,machineFile});
+  assert.equal(first.families.length,7);
+  const counts=db=>Object.fromEntries(['workflows','goals','events','migrations'].map(table=>[table,db.prepare(`SELECT count(*) n FROM ${table}`).get().n]));
+  const before=(()=>{const db=ledgerDb(repo);try{return counts(db);}finally{db.close();}})();
+  const again=await migrateLedger({repoRoot:repo,journalFile,machineFile});
+  assert.equal(again.ok,true);
+  assert.deepEqual(again.workflows,[]);
+  assert.deepEqual(again.families,[]);
+  assert.deepEqual(again.skipped.filter(entry=>entry.reason==='already-reported').map(entry=>path.basename(entry.source)).sort(),
+    ['drafts','history','plans','runtime','workflow-archive','workflow-retirement','workflows-archive']);
+  const after=(()=>{const db=ledgerDb(repo);try{return counts(db);}finally{db.close();}})();
+  assert.deepEqual(after,before,'not one row is written twice');
+});
+
+test('a root whose `workflows/` is already gone still names the 2 GB beside it',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),machineFile=path.join(dir,'machine.sqlite');
+  makeEveryFamily(repo);
+  const summary=await migrateLedger({repoRoot:repo,journalFile:path.join(dir,'absent.sqlite'),machineFile});
+  assert.equal(summary.ok,true);
+  assert.deepEqual(summary.workflows,[]);
+  assert.equal(summary.families.length,7,'the report does not depend on there being a workflow to migrate');
+});
+
+test('--dry-run names every family and writes nothing at all',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  makeEveryFamily(repo);
+  const dry=await migrateLedger({repoRoot:repo,journalFile,machineFile,dryRun:true,archive:true});
+  assert.equal(dry.ok,true);
+  assert.equal(dry.families.length,7);
+  for(const family of dry.families)assert.equal(family.verdict,'deleted-not-imported');
+  assert.equal(dry.archivedLocalRoot,undefined,'--dry-run never moves `_local`, even with --archive');
+  assert.equal(fs.existsSync(path.join(repo,'.starciwork','runtime.sqlite')),false);
+  assert.ok(fs.existsSync(path.join(localRoot(repo),'plans','agentos-two-streams','index.yaml')));
+});
+
+test('--archive carries every deleted family into `_local.migrated`, which is the copy the owner still holds',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  makeEveryFamily(repo);
+  const summary=await migrateLedger({repoRoot:repo,journalFile,machineFile,archive:true});
+  assert.equal(summary.ok,true);
+  const moved=path.join(repo,'.starciwork','_local.migrated');
+  assert.equal(summary.archivedLocalRoot,moved);
+  assert.equal(fs.existsSync(path.join(repo,'.starciwork','_local')),false);
+  for(const family of ['plans','history','runtime','drafts','workflow-archive','workflows-archive','workflow-retirement'])
+    assert.ok(fs.existsSync(path.join(moved,family)),`${family} is set aside, not deleted by the migrator`);
+  assert.equal(summary.families.length,7,'the report is measured before the move, so it says what was there');
+});
+
+test('`_local/inputs` is never reported as deleted: §10 imports it into the `inputs` table with its workflow',async t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const repo=path.join(dir,'repo'),journalFile=path.join(dir,'journal.sqlite'),machineFile=path.join(dir,'machine.sqlite');
+  const wdir=makeWorkflow(repo,ID,{journalFile});makeJournal(journalFile,ID);
+  declareInputs(wdir,ID,[{name:'srs.md',bytes:Buffer.from('the SRS, verbatim.\n'),sourceRef:'/owner/srs.md'}]);
+  makeEveryFamily(repo);
+  const summary=await migrateLedger({repoRoot:repo,journalFile,machineFile});
+  assert.equal(summary.ok,true);
+  assert.equal(familyNames(summary).includes('inputs'),false,'telling the owner they are about to lose an imported input would be a lie');
+  assert.equal(summary.workflows[0].imported.inputs,1);
+  const db=ledgerDb(repo);
+  try{assert.equal(db.prepare('SELECT count(*) n FROM inputs WHERE workflow_id=?').get(ID).n,1);}finally{db.close();}
 });

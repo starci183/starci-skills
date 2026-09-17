@@ -189,6 +189,86 @@ function archiveDir(root,id){
   return name;
 }
 
+/* ---------------------------------------------------------------------------------------------------
+ * §13 — the rest of `_local`. Only `workflows/` migrates. Every other family is deleted, rows included, so
+ * the migrator's one job with them is to say what they are and how large, before anything removes them:
+ * the report is the owner's last look at 2 GB of archives. The rule it applies, so the next family is
+ * decided the same way: the ledger holds what a live workflow continues from, and nothing else.
+ * ------------------------------------------------------------------------------------------------- */
+
+export const localRootFor=repoRoot=>path.join(path.resolve(repoRoot),'.starciwork','_local');
+/**
+ * The families §10 imports. `workflows/` is the one §13 names; `inputs/` is not a family of its own but the
+ * bytes of the `inputs` table (§4), imported per workflow beside its directory — reporting it as deleted
+ * would tell the owner they are about to lose what the ledger has already taken in.
+ */
+const MIGRATING_FAMILIES=new Set(['workflows','inputs']);
+const DELETED_VERDICT='deleted-not-imported';
+
+/** Every regular file under `dir` with its size. Symlinks are neither followed nor counted: no cycle, no double count. */
+function walkFiles(dir,{maxDepth=Infinity}={}){
+  const found=[];
+  const walk=(current,level)=>{
+    let entries;try{entries=fs.readdirSync(current,{withFileTypes:true});}catch{return;}
+    for(const entry of entries){
+      const file=path.join(current,entry.name);
+      if(entry.isDirectory()){if(level<maxDepth)walk(file,level+1);continue;}
+      if(!entry.isFile())continue;
+      found.push({file,size:(()=>{try{return fs.statSync(file).size;}catch{return 0;}})()});
+    }
+  };
+  walk(dir,0);
+  return found;
+}
+const measure=dir=>{const files=walkFiles(dir);return {files:files.length,bytes:files.reduce((total,entry)=>total+entry.size,0)};};
+const childDirs=dir=>{try{return fs.readdirSync(dir,{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name).sort();}catch{return [];}};
+
+const sizeOf=source=>{
+  let stat;try{stat=fs.statSync(source);}catch{return {files:0,bytes:0};}
+  return stat.isFile()?{files:1,bytes:stat.size}:measure(source);
+};
+/**
+ * Read what `_local` holds beside `workflows/`, before the workflows loop archives anything into it. Pure:
+ * measuring is all it does. A file directly under `_local` is a family of one, counted the same way — a
+ * family that goes unnamed is bytes the owner loses without being shown them.
+ */
+function collectDeletedFamilies(localRoot){
+  let entries;try{entries=fs.readdirSync(localRoot,{withFileTypes:true});}catch{return [];}
+  return entries.filter(item=>!MIGRATING_FAMILIES.has(item.name)&&(item.isDirectory()||item.isFile()))
+    .map(item=>item.name).sort()
+    .map(name=>{
+      const source=path.join(localRoot,name),size=sizeOf(source);
+      return {family:name,source,bytes:size.bytes,files:size.files,entries:childDirs(source),verdict:DELETED_VERDICT};
+    });
+}
+
+/**
+ * Name every family §13 deletes, and record it once so a second run neither re-reports nor re-writes — the
+ * same `migrations`-keyed rule §10 uses for a workflow directory. Nothing here reads a row into the ledger
+ * and nothing here removes bytes: `--archive true` moves the whole `_local` aside, and the owner deletes it
+ * once `ledger-verify` passes.
+ */
+function reportDeletedFamilies({summary,families,prior,ledger,dryRun,now}){
+  for(const family of families){
+    if(prior.has(family.source)){summary.skipped.push({source:family.source,reason:'already-reported'});continue;}
+    if(!dryRun){
+      try{
+        ledger.transaction(db=>db.prepare('INSERT INTO migrations(source,kind,rows_json,at) VALUES(?,?,?,?)')
+          .run(family.source,'local-family-deleted',JSON.stringify({family:family.family,bytes:family.bytes,files:family.files,entries:family.entries,verdict:DELETED_VERDICT}),now()));
+      }catch(error){summary.refused.push({source:family.source,reason:`report-failed:${String(error?.message??error).slice(0,160)}`});continue;}
+    }
+    summary.families.push(family);
+  }
+}
+
+/** Move the whole `_local` aside once the root migrated ok (§13). Never merges into an existing pile. */
+function archiveLocalRoot(localRoot){
+  let target=`${localRoot}.migrated`,n=2;
+  while(fs.existsSync(target))target=`${localRoot}.migrated.${n++}`;
+  fs.renameSync(localRoot,target);
+  return target;
+}
+
 /**
  * §10: fold `.starciwork/_local/workflows/<id>` plus the retired journal's rows for it into
  * `.starciwork/runtime.sqlite`, per workflow and atomically.
@@ -196,8 +276,10 @@ function archiveDir(root,id){
 export async function migrateLedger({repoRoot,journalFile=journalFileFor(),machineFile=machineFileFor(),dryRun=false,archive=false,now=Date.now,pidAliveFn=pidAlive}={}){
   need(typeof repoRoot==='string'&&repoRoot.trim(),'migrateLedger needs a repository root');
   const resolvedRoot=path.resolve(repoRoot),root=workflowsRoot(resolvedRoot),ledgerFile=ledgerFileFor(resolvedRoot);
-  const summary={ok:true,workflows:[],skipped:[],refused:[]};
-  if(!fs.existsSync(root))return summary;
+  const localRoot=localRootFor(resolvedRoot);
+  const summary={ok:true,workflows:[],skipped:[],refused:[],families:[]};
+  // §13's families live beside `workflows/`: a root with no `workflows/` left still has 2 GB to be named.
+  if(!fs.existsSync(localRoot))return summary;
   const journal=journalFile&&fs.existsSync(journalFile)?inspectJournal({file:journalFile}):null;
   let ledger=null,machine=null,prior=new Set(),ledgerId=null;
   const closeAll=()=>{try{ledger?.close();}catch{}try{machine?.close();}catch{}try{journal?.close();}catch{}};
@@ -212,10 +294,13 @@ export async function migrateLedger({repoRoot,journalFile=journalFileFor(),machi
       ledgerId=ledger.ledgerId;
       try{prior=new Set(ledger.db.prepare('SELECT source FROM migrations').all().map(row=>row.source));}catch{prior=new Set();}
     }
-    const ids=fs.readdirSync(root,{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name).sort();
+    const ids=fs.existsSync(root)?childDirs(root):[];
     const inputsRoot=path.join(path.dirname(root),'inputs');
     const shared=collectShared(journal),sharedSource=`${journalFile}#shared`;
     let sharedDone=prior.has(sharedSource);
+    // Measured BEFORE the workflows loop: §10's `--archive` moves imported directories INTO
+    // `workflows-archive`, and what this run put there is not what the owner is about to lose.
+    const families=collectDeletedFamilies(localRoot);
     for(const id of ids){
       const dir=path.join(root,id);
       if(prior.has(dir)){summary.skipped.push({id,reason:'already-migrated'});continue;}
@@ -241,7 +326,11 @@ export async function migrateLedger({repoRoot,journalFile=journalFileFor(),machi
         summary.workflows.push({id,imported:plan.counts,...(plan.inputs.lost.length?{inputsLost:plan.inputs.lost}:{})});
       }catch(error){summary.refused.push({id,reason:`import-failed:${String(error?.message??error).slice(0,160)}`});}
     }
+    reportDeletedFamilies({summary,families,prior,ledger,dryRun,now});
     summary.ok=summary.refused.length===0;
+    // §13: `_local` is set aside only once the whole root reports ok. Every family named above rides along
+    // inside `_local.migrated`, which is the owner's last copy until `ledger-verify` passes and they delete it.
+    if(archive&&!dryRun&&summary.ok&&fs.existsSync(localRoot))summary.archivedLocalRoot=archiveLocalRoot(localRoot);
     return summary;
   }finally{closeAll();}
 }
