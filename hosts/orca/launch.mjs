@@ -337,7 +337,9 @@ function completedWorkerProof(orca,dispatchId,{cwd}={}){
 }
 
 export function settleDispatch(orca,dispatchId,{cwd,reason='fence-failed-attempt',wait,terminalHandle=null,closeTerminal=false,now=Date.now}={}){
-  const completedWorker=closeTerminal?completedWorkerProof(orca,dispatchId,{cwd}):{proven:false};
+  // A completed, capability-revoked, settled worker whose tab is gone is proof on its own - whoever closed the tab
+  // (the kernel, the user, a wiped worktree): asking Orca to stop and release it again answers `identity_unproven`.
+  const completedWorker=completedWorkerProof(orca,dispatchId,{cwd});
   if(completedWorker.proven)return {schema:SETTLEMENT,dispatchId,reason,effectState:'none',residualTerminal:completedWorker.cleanup.complete?null:{state:'retained',reason:completedWorker.cleanup.reason,processAction:'none'},
     reconciliation:null,closedTerminal:null,completedWorker,cleanup:completedWorker.cleanup,
     stop:{outcome:'skipped',effectState:'none',state:'succeeded',alreadySettled:true,reason:'exact completed worker already exited'},
