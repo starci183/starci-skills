@@ -30,7 +30,7 @@ const GENERATION=8,DIGEST='e'.repeat(64);
 function gitRepo(t){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'w1-reconcile-')),work=path.join(root,'repo');
   fs.mkdirSync(work,{recursive:true});
-  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:25}));
   for(const args of [['init'],['config','user.email','w1@test'],['config','user.name','W1']])
     assert.equal(git('git',args,{cwd:work}).status,0);
   fs.mkdirSync(path.join(work,'src'),{recursive:true});
