@@ -37,7 +37,10 @@ const candidate=(t,root,options={})=>{
 const engineFixture=(t,{allocation={},root=null}={})=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-w2-engine-'));t.after(()=>{try{fs.rmSync(dir,{recursive:true,force:true});}catch{}});
   const worktree=root??path.join(dir,'repo');fs.mkdirSync(worktree,{recursive:true});
-  const state={id:'wf-w2',worktree,head:'a'.repeat(40),createdAt:1,engine:{schema:'starci/engine@1',generation:1,ledgerFile:path.join(dir,'runtime.sqlite')},ops:[]};
+  // Isolated from the real default %LOCALAPPDATA%/StarCi/runtime/machine.sqlite: every spec file that leaves
+  // an ai/global lease there without releasing it starves a later reserveOperation of capacity in the same
+  // `npm test` run, which is exactly what was happening here.
+  const state={id:'wf-w2',worktree,head:'a'.repeat(40),createdAt:1,engine:{schema:'starci/engine@1',generation:1,ledgerFile:path.join(dir,'runtime.sqlite'),machineFile:path.join(dir,'machine.sqlite')},ops:[]};
   const store={dir:path.join(dir,'workflow'),appendEvent(){},saveState(){}};
   const runtime=createEngineRuntime({store,state,git,eligibility:()=>({eligible:true,mode:'qualified'}),
     spawnChild:()=>({pid:1,once(){},unref(){}}),runtimeProfile:{schema:'starci/runtimes@1',runtimes:{},allocation}});

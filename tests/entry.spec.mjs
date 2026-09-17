@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {WORKFLOW_STATE,createStore} from '../kernel/store.mjs';
 
 // `bin/starci.mjs` is the one command line of the runtime: a workflow command reaches the launcher in
 // `hosts/orca/launch.mjs` with its argv untouched, and every command the CLI already owned still reaches
@@ -12,11 +13,11 @@ const repository=t=>{
   const parent=fs.mkdtempSync(path.join(os.tmpdir(),'starci-entry-'));
   t.after(()=>{assert.equal(path.dirname(parent),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(parent).startsWith('starci-entry-'));fs.rmSync(parent,{recursive:true,force:true});});
   const name='repo',repoRoot=path.join(parent,name);
-  const dir=path.join(repoRoot,'.starciwork','_local','workflows','20260101-000000-entry');
-  fs.mkdirSync(dir,{recursive:true});
-  fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',
-    kernel:'starci/workflow-kernel@1',id:'20260101-000000-entry',phase:'goal',approved:false,
-    finished:null,lane:null,ops:[],ledger:[]}));
+  // The launcher's `workflow-list`/`workflow-status` read the ledger now (docs §8), not a `_local` state.json.
+  const store=createStore({repoRoot,id:'20260101-000000-entry'});
+  store.saveState({schema:WORKFLOW_STATE,id:'20260101-000000-entry',phase:'goal',approved:false,
+    finished:null,lane:null,ops:[],ledger:[]});
+  store.close();
   return {parent,name,repoRoot};
 };
 

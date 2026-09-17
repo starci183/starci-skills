@@ -5,6 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import {BUDGET_FILE,RUNTIME_BUDGET,budgetVerdict,normalizeBudget,probeRuntimeBudget,readRuntimeBudget,runtimeWindows,writeRuntimeBudget} from '../kernel/budget.mjs';
 import {superviseForever} from '../kernel/supervisor.mjs';
+import {acquireStartup} from '../kernel/launch.mjs';
+import {WORKFLOW_STATE,createStore} from '../kernel/store.mjs';
+import {ledgerFileFor,inspectLedger} from '../kernel/ledger-db.mjs';
+import {readProviderLoads} from '../kernel/loads.mjs';
 
 /** The receipt Orca prints for `account list --json`, trimmed to the rate-limit block the status bar shows. */
 const RECEIPT={ok:true,result:{rateLimits:{
@@ -79,11 +83,15 @@ test('the supervisor probes the quota on its own cadence and writes the budget b
   try{
     const workflows=path.join(root,'.starciwork','_local','workflows');
     let clock=1_000_000;
-    // One approved, healthy, unfinished workflow keeps the supervisor alive for three rounds.
-    const dir=path.join(workflows,'w');fs.mkdirSync(dir,{recursive:true});
-    fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({schema:'starci/workflow-state@1',kernel:'starci/workflow-kernel@1',id:'w',approved:true,finished:null,worktree:root,host:'H'}));
-    fs.writeFileSync(path.join(dir,'events.jsonl'),JSON.stringify({at:clock-1000,seq:1,event:'tick'})+'\n');
-    fs.writeFileSync(path.join(dir,'kernel.lock'),JSON.stringify({pid:process.pid}));
+    // One approved, healthy, unfinished workflow keeps the supervisor alive for three rounds. The workflow
+    // list and the kernel-lock startup reservation supervisor.mjs reads are both ledger rows now (docs §4) -
+    // "healthy" no longer means a kernel.lock file, it means an `acquireStartup` row in phase 'running'
+    // whose pid a real process.kill(pid,0) proves alive.
+    const store=createStore({repoRoot:root,id:'w'});
+    store.saveState({schema:WORKFLOW_STATE,id:'w',job:'goal',approved:true,finished:null,worktree:root,host:'H',ops:[]});
+    store.appendEvent({event:'tick'});
+    acquireStartup(store.ledger,'w',{pid:process.pid});
+    store.close();
     const logged=[];let probes=0;
     superviseForever({repoRoot:root,roots:[root],launcher:'L.mjs',maxRounds:3,sleep:()=>{clock+=60_000;},now:()=>clock,log:event=>logged.push(event),
       probe:()=>{probes+=1;return probes===2?{ok:false,reason:'orca away'}:{ok:true,budget:normalizeBudget(RECEIPT,{at:clock})};},probeMs:120_000});
@@ -91,6 +99,10 @@ test('the supervisor probes the quota on its own cadence and writes the budget b
     assert.equal(probes,2);
     assert.deepEqual(logged.filter(event=>event.event==='budget-probed').map(event=>event.providers.claude.fableWeekly),[96]);
     assert.deepEqual(logged.filter(event=>event.event==='budget-probe-failed').map(event=>event.reason),['orca away']);
-    assert.equal(readRuntimeBudget(workflows).providers.claude.windows.session.usedPercent,33);
+    // recordProviderLoads writes the probed quota into the ledger's runtime_loads table now (kernel/loads.mjs) -
+    // "beside every store root it covers" means one row per claimed ledger, not a file beside `workflows`.
+    const inspect=inspectLedger({file:ledgerFileFor(root)});
+    assert.equal(readProviderLoads({ledger:inspect}).providers.claude.windows.session.usedPercent,33);
+    inspect.close();
   }finally{fs.rmSync(root,{recursive:true,force:true});}
 });

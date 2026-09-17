@@ -13,11 +13,11 @@ const exclusiveQuota=profile=>({order:['gpt-5.6-luna'],slots:Object.fromEntries(
 test('Luna references land on the codex-agent window and an explicit Luna model still launches Luna',()=>{
   const profile=loadRuntimes(),defaultAllocator=createAllocator({runtimes:profile});
   assert.equal(defaultAllocator.allocate('task.execute',{restrictTo:['gpt-5.6-luna'],difficulty:'medium'}).runtime,'codex-agent');
-  assert.equal(profile.runtimes['codex-agent'].maxParallel,8);
+  assert.equal(profile.runtimes['codex-agent'].maxParallel,10);
   const allocator=createAllocator({runtimes:profile,quota:exclusiveQuota(profile)});
   const selection=allocator.candidateFor('task.execute','gpt-5.6-luna');
   assert.equal(selection.target,'codex-agent');
-  assert.equal(selection.model,'gpt-5.6-sol');
+  assert.equal(selection.model,'gpt-5.6-luna');
   assert.equal(selection.runtime,'codex');
   assert.equal(selection.orcaLaunch.agent,'codex');
   assert.equal(profile.runtimes['codex-agent'].provider,'codex');
@@ -27,7 +27,7 @@ test('Luna references land on the codex-agent window and an explicit Luna model 
   // The retired id is never a chain member: every chain names the provider window, not the model profile.
   for(const kind of ['interface.draw','business.decide','work.author','backend.implement','interface.implement','review.verify','runtime.operate','content.generate'])
     assert.equal(resolveExecutionChain({op:kind}).candidates.some(item=>item.target==='gpt-5.6-luna'),false);
-  assert.equal(selectExecutionTarget({op:'task.execute',inventory:[{runtime:'codex',status:'ready',profiles:['gpt-5.6-sol']}]}).selected.model,'gpt-5.6-sol');
+  assert.equal(selectExecutionTarget({op:'task.execute',inventory:[{runtime:'codex',status:'ready',profiles:['gpt-5.6-luna']}]}).selected.model,'gpt-5.6-luna');
   // The decide above already holds one of the ten granted codex-agent slots: one window, one count.
   for(let index=0;index<9;index++){
     const picked=allocator.allocate('task.execute',{difficulty:'hard',restrictTo:allocator.launchableTargets('task.execute')});
