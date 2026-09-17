@@ -10,8 +10,13 @@ measurement:
   threshold: p95 < 200ms
   environment: dev
 appliesTo: [br.task.list.owned]
-proven:
-  by: [impl.task.todo-app.list]
-  evidence: measures-latency
-  at: 2026-09-18T04:41:00.000Z
+evidence: measures-latency
 
+requiresProof:
+  measurement:
+    required: true
+
+# provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
+# An agent-authored provenBy is refused: it would be this record speaking for another one.
+provenBy:
+  measurement: [measures-latency]

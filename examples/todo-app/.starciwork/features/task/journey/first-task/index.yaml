@@ -8,8 +8,16 @@ steps:
   - {actor: person, does: Types a title and submits, expects: The task appears immediately, owned by them.}
   - {actor: person, does: Returns the next day, expects: The task is still there.}
 requirements: [fr.login.sign-in, fr.task.create]
-proven:
-  by: [uat.task.create, uat.login.sign-in]
-  evidence: walks-first-task
-  at: 2026-09-18T04:39:00.000Z
+evidence: walks-first-task
 
+requiresProof:
+  uat:
+    required: true
+  requirements:
+    forEach: requirements
+
+# provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
+# An agent-authored provenBy is refused: it would be this record speaking for another one.
+provenBy:
+  uat: [uat.task.create, uat.login.sign-in]
+  requirements: [fr.login.sign-in, fr.task.create]

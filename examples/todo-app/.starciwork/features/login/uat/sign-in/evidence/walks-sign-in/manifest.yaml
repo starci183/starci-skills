@@ -1,6 +1,7 @@
 schema: work/evidence
 id: walks-sign-in
 record: uat.login.sign-in
+recordDigest: 0180b30576090e73de581f4acd361c1e3edab8d08dd03aad652f1b206af13f8c
 outcome: pass
 assertions:
   - id: signed-in-and-restored

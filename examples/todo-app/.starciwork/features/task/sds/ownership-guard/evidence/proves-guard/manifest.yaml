@@ -1,6 +1,7 @@
 schema: work/evidence
 id: proves-guard
 record: sds.task.ownership-guard
+recordDigest: 3b4619424956d0395502323b5a8c7573fb3f3c6d5bdac5b540c72b5f42907914
 outcome: pass
 assertions:
   - id: stranger-is-refused-before-any-write

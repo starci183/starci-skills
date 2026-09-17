@@ -7,3 +7,6 @@ refs: [br.task.complete.once]
 blockedBy:
   - br.task.complete.once is todo at rev 2; the reversible design is not settled.
 
+requiresProof:
+  implementation:
+    required: true

@@ -1,6 +1,7 @@
 schema: work/evidence
 id: walks-create
 record: uat.task.create
+recordDigest: 140158647ba83671cf4f5a27afdc20ce01f8ed9236c31ca1e9c576c13ffd48f7
 outcome: pass
 assertions:
   - id: main-flow-creates-one-task

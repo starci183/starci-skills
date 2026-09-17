@@ -6,8 +6,13 @@ responsibility: Every mutation names the actor and compares it with the row's ow
 interfaces:
   - No write path reaches the repository without passing this guard.
 refs: [br.task.single-owner]
-proven:
-  by: [impl.task.todo-app.ownership]
-  evidence: proves-guard
-  at: 2026-09-18T04:40:00.000Z
+evidence: proves-guard
 
+requiresProof:
+  implementation:
+    required: true
+
+# provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
+# An agent-authored provenBy is refused: it would be this record speaking for another one.
+provenBy:
+  implementation: [impl.task.todo-app.ownership]

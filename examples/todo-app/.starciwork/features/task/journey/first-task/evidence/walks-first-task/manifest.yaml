@@ -1,6 +1,7 @@
 schema: work/evidence
 id: walks-first-task
 record: journey.task.first-task
+recordDigest: 3635d82a2df91c136fdf14327769588616400ca4f64824a3cbaa4d9390c42783
 outcome: pass
 assertions:
   - id: empty-state-explains-itself

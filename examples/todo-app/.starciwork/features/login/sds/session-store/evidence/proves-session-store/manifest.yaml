@@ -1,6 +1,7 @@
 schema: work/evidence
 id: proves-session-store
 record: sds.login.session-store
+recordDigest: f2a16b78adc89c683757c86ccac061893ac448d5baf9bf16aedc6af52198f618
 outcome: pass
 assertions:
   - id: expiry-is-enforced-on-read
