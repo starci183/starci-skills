@@ -39,31 +39,29 @@ const modelInput=input=>{
   if(Array.isArray(copy.resolvedReferences)){const normalized=normalizeResolvedReferences(copy.resolvedReferences);copy.resolvedReferences=normalized.entries;copy.resolvedReferencesTruncated=normalized.truncated;copy.resolvedReferenceBytes=normalized.bytes;}
   return copy;
 };
-/** Open the ledger and its machine arbiter together; `journalFile` is the pre-1.0.4 spelling of `ledgerFile`. */
+/** Open the machine arbiter, then the ledger registered against it; `journalFile` is the pre-1.0.4 spelling of `ledgerFile`. */
 const openPair=({ledgerFile,journalFile,machineFile=null,now=Date.now}={})=>{
-  const ledger=openLedger({file:ledgerFile??journalFile,now});
-  let machine=null;
-  try{machine=openMachine({file:machineFile??machineFileFor(),now});}catch(error){try{ledger.close();}catch{}throw error;}
+  const machine=openMachine({file:machineFile??machineFileFor(),now});
+  let ledger;
+  try{ledger=openLedger({file:ledgerFile??journalFile,now,machine});}catch(error){try{machine.close();}catch{}throw error;}
   return {ledger,machine};
 };
 const closePair=({ledger,machine})=>{try{ledger?.close();}catch{}try{machine?.close();}catch{}};
 /** `machine_ref` tokens a job's ledger lease rows pair with; read before the rows are deleted. */
 const machineRefs=(ledger,jobId)=>ledger.db.prepare('SELECT machine_ref FROM leases WHERE job_id=? AND machine_ref IS NOT NULL').all(jobId).map(row=>row.machine_ref);
 const releaseRefs=(machine,refs)=>{for(const ref of refs){try{machine.release(ref);}catch{}}};
-/** The ledger transaction settles the job and drops its rows; the paired machine leases release after commit. */
-const settleJob=({jobs,ledger,machine,ledgerId,spec})=>{
+/** `jobs.complete` (jobs.mjs) drops lease rows but does not know about paired machine tokens; release them here. */
+const settleJob=({jobs,ledger,machine,spec})=>{
   const refs=machineRefs(ledger,spec.jobId);
   const settled=jobs.complete(spec);
-  if(settled.ok){releaseRefs(machine,refs);try{machine.releaseJob?.({ledgerId,jobId:spec.jobId});}catch{}}
+  if(settled.ok)releaseRefs(machine,refs);
   return settled;
 };
-/** A lease-identity trigger abort maps back to the named reconciliation failure. */
-const asLeaseFailure=fn=>{try{return fn();}catch(error){if(String(error?.message??'').includes('lease-identity-drift'))return {ok:false,reason:'lease-identity-drift'};throw error;}};
 
 /** Release old-generation leases only after the native dispatches named by the caller were proven stopped. */
 export function settleGenerationLeases({ledgerFile,journalFile,machineFile=null,leases=[],reason='fresh workflow generation after confirmed native stop'}={}){
   const pair=openPair({ledgerFile,journalFile,machineFile}),admission=createAdmission({journal:pair.ledger,machine:pair.machine}),jobs=createJobs({journal:pair.ledger,admission});
-  try{return leases.map(lease=>settleJob({jobs,ledger:pair.ledger,machine:pair.machine,ledgerId:admission.ledgerId,spec:{...lease,eventId:`${lease.jobId}:generation-settled`,status:'cancelled',result:{reason}}}));}finally{closePair(pair);}
+  try{return leases.map(lease=>settleJob({jobs,ledger:pair.ledger,machine:pair.machine,spec:{...lease,eventId:`${lease.jobId}:generation-settled`,status:'cancelled',result:{reason}}}));}finally{closePair(pair);}
 }
 /** Event kinds that prove a durable operation job reached a launch boundary or produced an effect. */
 const OPERATION_EFFECT_EVENTS=new Set(['operation-launch-intent','operation-launched','operation-launch-observed','operation-worker-stopped','job-spawned','job-completion-replay-spawned','job-succeeded','job-failed']);
@@ -261,15 +259,16 @@ export const candidateBaseFor=(state,explicit=null)=>explicit??path.join(state?.
 export function enrollEngine(store,state,{ledgerFile=ledgerFileFor(store.repoRoot),machineFile=machineFileFor(),runtimePin=null,candidateRoot=null,now=Date.now}={}){
   if(state.ops.some(op=>op.dispatch&&['running','answering'].includes(op.status)))throw Error('Settle live operation dispatches before enrolling a workflow in the durable engine');
   const previous=state.engine,generation=(previous?.generation??0)+1;
-  const ledger=openLedger({file:ledgerFile,now,machineFile}),machine=openMachine({file:machineFile,now});
+  const machine=openMachine({file:machineFile,now});
+  let ledger;
   try{
-    try{machine.registerLedger?.(ledger.ledgerId,ledger.path);}catch{}
+    ledger=openLedger({file:ledgerFile,now,machine});
     state.engine={schema:ENGINE_SCHEMA,version:ENGINE_VERSION,generation,ledgerFile:path.resolve(ledgerFile),machineFile:path.resolve(machineFile),
       assurance:'detection-only',coordination:'agent-v1',runtimePin:runtimePin??previous?.runtimePin??null,
       ...(candidateRoot??previous?.candidateRoot?{candidateRoot:path.resolve(candidateRoot??previous.candidateRoot)}:{}),enrolledAt:now()};
     state.finished=null;state.phase='run';
     store.bindJournal?.(ledger,generation,{state,goalIdentity:state.goalDigest??null});
-  }catch(error){try{ledger.close();}catch{}throw error;}
+  }catch(error){try{ledger?.close();}catch{}throw error;}
   finally{machine.close();}
   store.appendEvent({event:'engine-enrolled',schema:ENGINE_SCHEMA,generation,version:ENGINE_VERSION,
     assurance:state.engine.assurance,coordination:state.engine.coordination,note:'Existing accepted Work remains accepted; only unfinished operations receive the new execution policy.'});
@@ -281,7 +280,7 @@ export function enrollEngine(store,state,{ledgerFile=ledgerFileFor(store.repoRoo
 export function createEngineRuntime({store,state,now=Date.now,eligibility,modelPolicy=null,bridge=null,spawnChild=null,candidateBase=null,git=null,exec=null,modelBudget=null,modelCooling=null,runtimeProfile=null}={}){
   if(!isEnrolled(state))return null;
   const owned=!bridge;
-  bridge??=createJobBridge({journalFile:state.engine.journalFile,now,...(spawnChild?{spawnChild}:{}),eligibility:job=>job.kind==='model'||job.kind==='judge'?{eligible:Array.isArray(job.input?.args?.providers)&&job.input.args.providers.length>0,reasons:['no evaluated provider in durable model job']}:{eligible:false,reasons:['operation eligibility must name its selected runtime']},beforeSpawn:({job})=>{const meta=job.payload?.admission;if(meta?.mode!=='probation')return {ok:true,code:'qualified'};const consumed=modelPolicy?.consumeProbation?.({kind:job.kind,role:job.role,input:job.payload,workflowId:job.workflow_id,opId:job.op_id,attempt:job.attempt,generation:job.generation,jobId:job.job_id},meta.runtime);if(!consumed?.ok)return {ok:false,code:consumed?.code??'probation-unavailable'};store.saveState(state);return consumed;}});
+  bridge??=createJobBridge({ledgerFile:state.engine.ledgerFile,machineFile:state.engine.machineFile,now,...(spawnChild?{spawnChild}:{}),eligibility:job=>job.kind==='model'||job.kind==='judge'?{eligible:Array.isArray(job.input?.args?.providers)&&job.input.args.providers.length>0,reasons:['no evaluated provider in durable model job']}:{eligible:false,reasons:['operation eligibility must name its selected runtime']},beforeSpawn:({job})=>{const meta=job.payload?.admission;if(meta?.mode!=='probation')return {ok:true,code:'qualified'};const consumed=modelPolicy?.consumeProbation?.({kind:job.kind,role:job.role,input:job.payload,workflowId:job.workflow_id,opId:job.op_id,attempt:job.attempt,generation:job.generation,jobId:job.job_id},meta.runtime);if(!consumed?.ok)return {ok:false,code:consumed?.code??'probation-unavailable'};store.saveState(state);return consumed;}});
   const {journal,admission}=bridge,jobs=createJobs({journal,admission,now});
   runtimeProfile??=loadRuntimes();
   const providerResource=provider=>`ai/provider:${provider}`;
