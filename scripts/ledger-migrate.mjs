@@ -25,8 +25,35 @@ const eventDigest=(prev,row)=>sha256(`${prev??''}${row.event_id}${row.kind}${row
 
 const journalRows=(journal,sql,args=[])=>{try{return journal.db.prepare(sql).all(...[].concat(args));}catch{return [];}};
 
+/**
+ * Owner-named inputs staged under `_local/inputs/<id>/` (goal.mjs's `stageExternalInputs`). A declared ref the
+ * directory no longer holds is a loss, not a refusal: the workflow still imports, missing bytes are reported.
+ */
+function collectInputs({id,inputsDir,declared,now}){
+  const present=(()=>{try{return new Set(fs.readdirSync(inputsDir));}catch{return null;}})();
+  const items=[],lost=[],seen=new Set();
+  for(const input of declared){
+    const ref=String(input?.ref??'');
+    if(!ref.startsWith(`.starciwork/_local/inputs/${id}/`))continue;
+    const key=path.basename(ref);
+    if(seen.has(key))continue;   // state.json and goal.json both carry `inputs`; the same key is not a second input.
+    seen.add(key);
+    const file=path.join(inputsDir,key);
+    const bytes=present?.has(key)?(()=>{try{return fs.readFileSync(file);}catch{return null;}})():null;
+    if(!bytes){lost.push({key,reason:'input-file-missing'});continue;}
+    items.push({key,bytes,origin:input.sourceRef??ref,created_at:mtime(file)??now()});
+  }
+  for(const key of present??[]){
+    if(seen.has(key))continue;
+    const file=path.join(inputsDir,key);
+    const bytes=(()=>{try{return fs.readFileSync(file);}catch{return null;}})();
+    if(bytes)items.push({key,bytes,origin:file,created_at:mtime(file)??now()});
+  }
+  return {items,lost};
+}
+
 /** Read everything one `_local/workflows/<id>` directory plus the journal hold for it. Pure: touches no target. */
-function collectWorkflow({dir,id,state,stateGen,journal,ledgerFile,machineFile,now}){
+function collectWorkflow({dir,id,state,stateGen,journal,ledgerFile,machineFile,inputsDir,now}){
   const goalMd=readText(path.join(dir,'goal.md')),goalJsonText=readText(path.join(dir,'goal.json')),goalJson=(()=>{try{return goalJsonText?JSON.parse(goalJsonText):null;}catch{return null;}})();
   const goalIdentity=state?stateGoalIdentity(state):sha256(JSON.stringify({job:goalJson?.job??null,inputs:goalJson?.inputs??null,scope:goalJson?.scope??null,definitionOfDone:goalJson?.definitionOfDone??null,ledgerMode:goalJson?.ledgerMode??null}));
   const events=[];
@@ -79,9 +106,11 @@ function collectWorkflow({dir,id,state,stateGen,journal,ledgerFile,machineFile,n
     generation:stateGen,goal_identity:goalIdentity,phase:state?.phase??null,finished_json:plain(state?.finished)?JSON.stringify(state.finished):null,
     pin_digest:state?.engine?.runtimePin?.digest??state?.engine?.runtimePinDigest??null};
   const goal={revision:Number.isInteger(goalJson?.rev)?goalJson.rev:1,goal_identity:goalIdentity,markdown:goalMd??'',json:goalJsonText??'null',created_at:mtime(path.join(dir,'goal.json'))??mtime(path.join(dir,'goal.md'))??now()};
+  const declaredInputs=[...(Array.isArray(state?.inputs)?state.inputs:[]),...(Array.isArray(goalJson?.inputs)?goalJson.inputs:[])];
+  const inputs=collectInputs({id,inputsDir,declared:declaredInputs,now});
   const counts={events:events.length+jevents.length,snapshots:snapshots.length+(importedState?1:0),jobs:jobs.length,leases:leases.length,
-    reports:reports.length,contracts:contracts.length,checks:checks.length,inbox:inbox.length,goals:(goalMd!==null||goalJson!==null)?1:0};
-  return {id,dir,workflow,goal:counts.goals?goal:null,events:[...events,...jevents],snapshots,importedState,jobs,leases,incidents,reservations,reports,contracts,checks,inbox,counts};
+    reports:reports.length,contracts:contracts.length,checks:checks.length,inbox:inbox.length,goals:(goalMd!==null||goalJson!==null)?1:0,inputs:inputs.items.length};
+  return {id,dir,inputsDir,workflow,goal:counts.goals?goal:null,events:[...events,...jevents],snapshots,importedState,jobs,leases,incidents,reservations,reports,contracts,checks,inbox,inputs,counts};
 }
 
 /** Journal-global rows (resources, budgets) have no workflow scope: they import once, under their own migration key. */
@@ -100,7 +129,7 @@ function machineApply(machine,{file,plan,shared,at}){
   for(const row of plan.reservations.filter(row=>machineScoped(row.scope_key)))machine.db.prepare('INSERT OR IGNORE INTO budget_reservations(scope_key,ledger_id,job_id,units) VALUES(?,?,?,?)').run(row.scope_key,ledgerId,row.job_id,row.units);
 }
 
-function ledgerApply(db,{plan,shared,recordShared,journalFile,at}){
+function ledgerApply(db,{plan,shared,recordShared,journalFile,at,ledger}){
   const row=plan.workflow;
   db.prepare('INSERT INTO workflows(workflow_id,title,created_at,updated_at,ledger_mode,source_roots_json,generation,goal_identity,phase,finished_json,pin_digest) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
     .run(row.workflow_id,row.title,row.created_at,row.updated_at,row.ledger_mode,row.source_roots_json,row.generation,row.goal_identity,row.phase,row.finished_json,row.pin_digest);
@@ -130,6 +159,10 @@ function ledgerApply(db,{plan,shared,recordShared,journalFile,at}){
   for(const check of plan.checks)insertCheck.run(plan.id,check.op_id,check.attempt,check.checks_json,check.created_at);
   const insertInbox=db.prepare('INSERT INTO inbox(workflow_id,kind,key,payload_json,status,created_at) VALUES(?,?,?,?,?,?)');
   for(const item of plan.inbox)insertInbox.run(plan.id,item.kind,item.key,item.payload_json,'pending',item.created_at);
+  for(const item of plan.inputs.items)ledger.inputs.put({workflowId:plan.id,key:item.key,goalRevision:plan.goal?.revision??1,bytes:item.bytes,origin:item.origin});
+  // `inputs.put` bumps `workflows.updated_at` to its own clock (via `ensureWorkflow`); restore the imported value.
+  if(plan.inputs.items.length)db.prepare('UPDATE workflows SET updated_at=? WHERE workflow_id=?').run(row.updated_at,plan.id);
+  if(plan.inputs.items.length||plan.inputs.lost.length)db.prepare('INSERT INTO migrations(source,kind,rows_json,at) VALUES(?,?,?,?)').run(plan.inputsDir,'workflow-inputs',JSON.stringify({imported:plan.inputs.items.length,lost:plan.inputs.lost}),at);
   db.prepare('INSERT INTO migrations(source,kind,rows_json,at) VALUES(?,?,?,?)').run(plan.dir,'workflow-dir',JSON.stringify(plan.counts),at);
   db.prepare('INSERT INTO migrations(source,kind,rows_json,at) VALUES(?,?,?,?)').run(`${journalFile}#${plan.id}`,'journal-workflow',JSON.stringify({events:plan.counts.events,jobs:plan.jobs.length,leases:plan.leases.length,snapshots:plan.snapshots.length,incidents:plan.incidents.length}),at);
   if(recordShared)db.prepare('INSERT INTO migrations(source,kind,rows_json,at) VALUES(?,?,?,?)').run(`${journalFile}#shared`,'journal-shared',JSON.stringify({resources:shared.resources.length,budgets:shared.budgets.length}),at);
@@ -168,6 +201,7 @@ export async function migrateLedger({repoRoot,journalFile=journalFileFor(),machi
       try{prior=new Set(ledger.db.prepare('SELECT source FROM migrations').all().map(row=>row.source));}catch{prior=new Set();}
     }
     const ids=fs.readdirSync(root,{withFileTypes:true}).filter(entry=>entry.isDirectory()).map(entry=>entry.name).sort();
+    const inputsRoot=path.join(path.dirname(root),'inputs');
     const shared=collectShared(journal),sharedSource=`${journalFile}#shared`;
     let sharedDone=prior.has(sharedSource);
     for(const id of ids){
@@ -178,15 +212,15 @@ export async function migrateLedger({repoRoot,journalFile=journalFileFor(),machi
       const state=readJson(path.join(dir,'state.json')),stateGen=Number.isInteger(state?.engine?.generation)?state.engine.generation:0;
       const behind=journal?journalRows(journal,`SELECT job_id FROM jobs WHERE workflow_id=? AND generation<? AND status NOT IN (${SETTLED.map(()=>'?').join(',')})`,[id,stateGen,...SETTLED]).length:0;
       if(behind){summary.refused.push({id,reason:'kernel-reconcile-required'});continue;}
-      const plan=collectWorkflow({dir,id,state,stateGen,journal,ledgerFile,machineFile,now});
-      if(dryRun){summary.workflows.push({id,imported:plan.counts});continue;}
+      const plan=collectWorkflow({dir,id,state,stateGen,journal,ledgerFile,machineFile,inputsDir:path.join(inputsRoot,id),now});
+      if(dryRun){summary.workflows.push({id,imported:plan.counts,...(plan.inputs.lost.length?{inputsLost:plan.inputs.lost}:{})});continue;}
       try{
         const needsMachine=plan.leases.some(lease=>machineScoped(lease.resource_key))||plan.reservations.some(row=>machineScoped(row.scope_key))||(!sharedDone&&(shared.resources.some(row=>machineScoped(row.resource_key))||shared.budgets.some(row=>machineScoped(row.scope_key))));
         if(needsMachine){machine??=openMachine({file:machineFile,now});machine.transaction(()=>machineApply(machine,{file:ledgerFile,plan,shared:sharedDone?{resources:[],budgets:[]}:shared,at:now()}));}
-        ledger.transaction(db=>ledgerApply(db,{plan,shared:sharedDone?{resources:[],budgets:[]}:shared,recordShared:!sharedDone,journalFile,at:now()}));
+        ledger.transaction(db=>ledgerApply(db,{plan,shared:sharedDone?{resources:[],budgets:[]}:shared,recordShared:!sharedDone,journalFile,at:now(),ledger}));
         sharedDone=true;
         if(archive)archiveDir(root,id);
-        summary.workflows.push({id,imported:plan.counts});
+        summary.workflows.push({id,imported:plan.counts,...(plan.inputs.lost.length?{inputsLost:plan.inputs.lost}:{})});
       }catch(error){summary.refused.push({id,reason:`import-failed:${String(error?.message??error).slice(0,160)}`});}
     }
     summary.ok=summary.refused.length===0;
