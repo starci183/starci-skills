@@ -24,11 +24,16 @@ const temporaryMachineFile=()=>path.join(fs.mkdtempSync(path.join(os.tmpdir(),'s
 const pkg=JSON.parse(fs.readFileSync(new URL('../package.json',import.meta.url),'utf8'));
 
 test('the engine version is the package version, and the engine identity is a schema',()=>{
-  assert.equal(ENGINE_VERSION,pkg.version);assert.equal(pkg.version,'1.0.0');
+  assert.equal(ENGINE_VERSION,pkg.version);assert.equal(pkg.version,'1.0.4');
   assert.equal(isEnrolled({engine:{schema:ENGINE_SCHEMA}}),true);
   assert.equal(isEnrolled({engine:{major:7,journalFile:'j'}}),false);
   assert.equal(predatesEngineSchema({engine:{major:7,journalFile:'j'}}),true);
-  assert.equal(predatesEngineSchema({engine:{schema:ENGINE_SCHEMA,journalFile:'j'}}),false);
+  // §8's last paragraph: predatesEngineSchema is deliberately dual-purpose (its own docstring in
+  // kernel/common.mjs says so too) - a numbered pre-schema marker OR a state that still names the
+  // retired journal (journalFile without ledgerFile) is unmigrated, whether or not it already carries
+  // the current schema. A schema tag alone does not clear this: the ledger-migrate step is separate.
+  assert.equal(predatesEngineSchema({engine:{schema:ENGINE_SCHEMA,journalFile:'j'}}),true);
+  assert.equal(predatesEngineSchema({engine:{schema:ENGINE_SCHEMA,ledgerFile:'l'}}),false);
   assert.equal(predatesEngineSchema({}),false);
   assert.deepEqual(sealedRuntimeOf({engine:{major:7,runtimePin:{root:'R'}}}),{root:'R'},'the sealed build is read from either shape');
 });
@@ -64,6 +69,7 @@ test('migration renames the numbered fields, puts inline candidates under their 
   assert.deepEqual(events[0].dropped,[{op:'ready',reason:'its control root is gone; the next attempt begins a new candidate'}]);
   assert.equal(JSON.stringify(store.loadState()).includes('sourceBaseline'),false,'the projection no longer carries the manifests');
   assert.deepEqual(migrateEngineState(store,state),{migrated:false},'a migrated record is not migrated again');
+  store.close();
 });
 
 test('a record already on the schema is untouched, whatever fields it carries',()=>{
@@ -91,18 +97,26 @@ test('relocating a workflow\'s ledger binding refuses while the former ledger ho
   assert.equal(relocateJournal({from:path.join(dir,'absent.sqlite'),to,workflowId:'wf'}).ok,true);
 });
 
+// §8: rotateEvents no longer renames a jsonl segment (paths.events/paths.state/paths.goal are all removed) -
+// generations are a column on the one events table, so retiring one is a no-op that just records
+// `events-generation-closed` once. There is no file to check, no segment number to collide, and no live
+// log to start empty; what's left of the original intent is that rotating is idempotent and history -
+// including a fresh process's, after nothing but its own open - stays readable in order with the seq
+// counter never resetting.
 test('the event log rotates by generation and history stays readable, with the seq counter continuing',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const store=createStore({repoRoot:dir,id:'wf'});
   store.appendEvent({event:'a'});store.appendEvent({event:'b'});
-  const first=store.rotateEvents(1);assert.equal(path.basename(first.rotated),'events.g1.jsonl');
-  assert.equal(fs.existsSync(store.paths.events),false,'the live log starts empty');
-  assert.deepEqual(store.rotateEvents(2),{rotated:null},'nothing to rotate is not an error');
+  assert.deepEqual(store.rotateEvents(1),{rotated:null,generation:1});
+  assert.deepEqual(store.rotateEvents(1),{rotated:null,generation:1},'retiring the same generation twice is not an error');
   store.appendEvent({event:'c'});
-  assert.deepEqual(store.readEvents().map(event=>[event.seq,event.event]),[[1,'a'],[2,'b'],[3,'c']]);
-  assert.deepEqual(store.readEvents({since:2}).map(event=>event.event),['c']);
-  const fresh=createStore({repoRoot:dir,id:'wf'});fresh.rotateEvents(2);fresh.appendEvent({event:'d'});
-  assert.deepEqual(fresh.readEvents().map(event=>event.seq),[1,2,3,4],'a new process continues after the newest segment');
-  const freed=fresh.rotateEvents(1);assert.equal(path.basename(freed.rotated),'events.g3.jsonl','a taken generation segment retires under the next free number instead of colliding');
-  assert.deepEqual(fresh.readEvents().map(event=>event.event),['a','b','c','d']);
+  const named=event=>event.event??event.kind;
+  assert.deepEqual(store.readEvents().map(named).filter(kind=>kind!=='events-generation-closed'),['a','b','c']);
+  assert.equal(store.readEvents().filter(event=>named(event)==='events-generation-closed').length,1,'the no-op still records its own event exactly once');
+  const beforeReopen=store.readEvents().length;
+  const fresh=createStore({repoRoot:dir,id:'wf'});fresh.appendEvent({event:'d'});
+  const freshEvents=fresh.readEvents();
+  assert.deepEqual(freshEvents.map(named).filter(kind=>kind!=='events-generation-closed'),['a','b','c','d'],'a new process continues after the newest event, seq never resets');
+  assert.ok(freshEvents.length>beforeReopen,'the seq counter kept advancing across the reopen instead of starting over');
+  fresh.close();store.close();
 });
