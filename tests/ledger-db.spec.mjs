@@ -3,31 +3,37 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {LEDGER_SCHEMA,LEDGER_VERSION,MACHINE_SCHEMA,compactSnapshots,ensureWorkflow,eventsHead,inspectLedger,ledgerFileFor,ledgerIdFor,ledgerWorkflows,liveRows,machineFileFor,openLedger,openMachine,pruneRetiredGenerations,releaseTwoPhase,reserveTwoPhase,retireWorkflow,verifyChain} from '../kernel/ledger-db.mjs';
+import {ANCHOR_SCHEMA,LEDGER_SCHEMA,LEDGER_VERSION,MACHINE_SCHEMA,checkpointLedger,compactSnapshots,ensureWorkflow,eventsHead,inspectLedger,ledgerFileFor,ledgerIdOf,ledgerWorkflows,liveRows,machineFileFor,openLedger,openMachine,pruneRetiredGenerations,readAnchor,releaseTwoPhase,reserveTwoPhase,retireWorkflow,verifyAnchor,verifyChain,writeAnchor} from '../kernel/ledger-db.mjs';
 
 /**
- * The ledger DB contract (docs/ledger-db.md): schema, the leases_match_job invariant, the event hash chain,
- * nested-transaction refusal, two-phase reservation against the machine arbiter, sweep of orphaned machine
- * rows, and the retention semantics ported from journal.mjs.
+ * The ledger DB contract (docs/ledger-db.md): schema, meta identity, WAL-by-default with a recorded DELETE
+ * fallback, the leases_match_job invariant, the event hash chain, nested-transaction refusal, two-phase
+ * reservation against the machine arbiter, sweep of orphaned machine rows (guarded by meta.ledger_id, not a
+ * path), the retention semantics ported from journal.mjs, and the §12 tracked anchor.
  */
 const temporary=()=>fs.mkdtempSync(path.join(os.tmpdir(),'starci-ledger-db-'));
 const snapshot=(ledger,{workflowId='wf',generation,checkpoint,body='{"x":1}'})=>{ensureWorkflow(ledger.db,{workflowId,at:1});ledger.db.prepare('INSERT INTO state_snapshots(checkpoint_id,workflow_id,generation,goal_identity,state_json,created_at) VALUES(?,?,?,?,?,?)').run(checkpoint,workflowId,generation,'goal',body,1);};
 const job=(ledger,{jobId,workflowId='wf',generation,status='succeeded',kind='model'})=>{ledger.enqueueJob({jobId,workflowId,opId:'op',attempt:1,generation,kind,payload:{}});ledger.db.prepare('UPDATE jobs SET status=? WHERE job_id=?').run(status,jobId);ledger.appendEvent({eventId:`${jobId}:event`,workflowId,entityType:'job',entityId:jobId,generation,kind:'job-succeeded'});};
 const lease=(ledger,{jobId,workflowId='wf',generation=1,resource='lane:x',token='tok'})=>{ledger.db.prepare("UPDATE jobs SET status='leased',lease_token=?,deadline=? WHERE job_id=?").run(token,Number.MAX_SAFE_INTEGER,jobId);ledger.db.prepare('INSERT INTO leases(resource_key,job_id,workflow_id,op_id,attempt,generation,token,units,acquired_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run(resource,jobId,workflowId,'op',1,generation,token,1,1,Number.MAX_SAFE_INTEGER);};
 
-test('the ledger schema carries every contract table, the drift trigger, and version 1',t=>{
+test('the ledger schema carries every contract table, the meta identity, the drift trigger, and version 1',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
   assert.equal(ledger.schema,LEDGER_SCHEMA);assert.equal(LEDGER_VERSION,1);
   assert.equal(Number(ledger.db.prepare('PRAGMA user_version').get().user_version),1);
-  assert.equal(ledger.journalMode,'DELETE');assert.equal(ledger.autoVacuum,2);
+  assert.equal(ledger.autoVacuum,2);
   assert.equal(Number(ledger.db.prepare('PRAGMA foreign_keys').get().foreign_keys),1);
   assert.equal(Number(ledger.db.prepare('PRAGMA synchronous').get().synchronous),2,'synchronous=FULL');
   const names=ledger.db.prepare("SELECT name FROM sqlite_master WHERE type IN ('table','trigger','index')").all().map(row=>row.name);
-  for(const table of ['workflows','goals','state_snapshots','events','jobs','resources','leases','budgets','budget_reservations','incidents','reports','contracts','checks','inbox','signals','runtime_loads','inputs','migrations'])
+  for(const table of ['meta','workflows','goals','state_snapshots','events','jobs','resources','leases','budgets','budget_reservations','incidents','reports','contracts','checks','inbox','signals','runtime_loads','inputs','migrations'])
     assert.ok(names.includes(table),`missing table ${table}`);
   assert.ok(names.includes('leases_match_job')&&names.includes('leases_match_job_update'),'the drift trigger covers INSERT and UPDATE');
   for(const index of ['state_snapshots_lookup','events_entity','events_kind','jobs_queue','jobs_op','leases_expiry'])assert.ok(names.includes(index),`missing index ${index}`);
+  assert.match(ledger.ledgerId,/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,'ledger_id is a randomUUID');
+  assert.equal(ledgerIdOf(ledger),ledger.ledgerId);
+  assert.equal(ledger.db.prepare("SELECT value FROM meta WHERE key='schema'").get().value,LEDGER_SCHEMA);
+  assert.equal(Number(ledger.db.prepare("SELECT value FROM meta WHERE key='created_at'").get().value)>0,true);
+  assert.equal(ledger.db.prepare("SELECT value FROM meta WHERE key='journal_mode'").get().value,ledger.journalMode.toLowerCase());
   ledger.close();
 });
 
@@ -38,9 +44,57 @@ test('the machine schema carries ledgers, ai resources, leases and budgets at ve
   assert.equal(Number(machine.db.prepare('PRAGMA user_version').get().user_version),1);
   const names=machine.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(row=>row.name);
   for(const table of ['ledgers','resources','leases','budgets','budget_reservations'])assert.ok(names.includes(table),`missing table ${table}`);
+  assert.equal(machine.journalMode,'WAL');
   assert.ok(machineFileFor({LOCALAPPDATA:dir}).startsWith(dir));
   assert.ok(ledgerFileFor(dir).endsWith(path.join('.starciwork','runtime.sqlite')));
   machine.close();
+});
+
+test('journal_mode defaults to WAL with a 15s busy timeout, an explicit DELETE is honored, and meta.journal_mode tracks the open',t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const file=path.join(dir,'runtime.sqlite');
+  const ledger=openLedger({file});
+  assert.equal(ledger.journalMode,'WAL');
+  assert.equal(Number(ledger.db.prepare('PRAGMA busy_timeout').get().timeout),15000);
+  assert.equal(ledger.db.prepare("SELECT value FROM meta WHERE key='journal_mode'").get().value,'wal');
+  ledger.close();
+  const reopened=openLedger({file,journalMode:'DELETE'});
+  assert.equal(reopened.journalMode,'DELETE');
+  assert.equal(reopened.db.prepare("SELECT value FROM meta WHERE key='journal_mode'").get().value,'delete');
+  assert.equal(reopened.ledgerId,ledger.ledgerId,'a mode change never touches the identity');
+  reopened.close();
+  assert.throws(()=>openLedger({file:path.join(dir,'x.sqlite'),journalMode:'weird'}),/Unsupported journal mode/);
+  const machine=openMachine({file:path.join(dir,'machine.sqlite')});
+  assert.equal(Number(machine.db.prepare('PRAGMA busy_timeout').get().timeout),15000);
+  machine.close();
+});
+
+test('ledger_id is minted once from meta, survives a move, and a rebuilt file at the old path does not inherit it',t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const original=path.join(dir,'runtime.sqlite');
+  const ledger=openLedger({file:original});
+  const id=ledger.ledgerId;
+  ledger.close();
+  const moved=path.join(dir,'moved','runtime.sqlite');
+  fs.mkdirSync(path.dirname(moved),{recursive:true});
+  fs.renameSync(original,moved);
+  const reopened=openLedger({file:moved});
+  assert.equal(reopened.ledgerId,id,'the identity moved with the bytes, not the path');
+  reopened.close();
+  const fresh=openLedger({file:original});
+  assert.notEqual(fresh.ledgerId,id,'a rebuilt file at the old path mints its own identity');
+  fresh.close();
+});
+
+test('checkpointLedger truncates the WAL, and is reachable from the handle and as a standalone export',t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
+  for(let n=0;n<20;n+=1)ledger.appendEvent({workflowId:'wf',entityType:'workflow',entityId:'wf',kind:`k${n}`});
+  const first=ledger.checkpoint();
+  assert.equal(first.ok,true);assert.equal(first.busy,false);
+  assert.deepEqual(checkpointLedger(ledger),{ok:true,busy:false,logFrames:0,checkpointedFrames:0},'nothing left to checkpoint right after a truncate');
+  assert.throws(()=>checkpointLedger({}),/checkpointLedger needs a ledger handle/);
+  ledger.close();
 });
 
 test('a nested transaction is refused by name and the outer transaction still rolls back',t=>{
@@ -90,7 +144,7 @@ test('two-phase reservation mirrors machine tokens into the ledger and releases 
   const machine=openMachine({file:path.join(dir,'machine.sqlite')});
   const ledger=openLedger({file:path.join(dir,'runtime.sqlite'),machine});
   assert.equal(machine.db.prepare('SELECT count(*) n FROM ledgers WHERE ledger_id=?').get(ledger.ledgerId).n,1,'opening with a machine registers the ledger');
-  assert.equal(ledger.ledgerId,ledgerIdFor(ledger.path),'ledger_id is the sha256 realpath prefix');
+  assert.equal(ledger.ledgerId,ledgerIdOf(ledger),'ledger_id comes from meta, not the path');
   machine.setCapacity('ai/global',2);
   ledger.db.prepare('INSERT INTO resources(resource_key,capacity) VALUES(?,?)').run('lane:x',1);
   const reserved=reserveTwoPhase(ledger,machine,{job:{jobId:'j1',workflowId:'wf',opId:'op',generation:1,kind:'model'},
@@ -143,6 +197,24 @@ test('sweep removes expired machine rows and rows whose ledger no longer holds t
   machine.db.prepare('UPDATE leases SET expires_at=?').run(1);
   assert.equal(machine.sweep().expired,1,'expired rows go too');
   machine.close();ledger.close();
+});
+
+test('sweep leaves an orphan alone when its registered path now holds a different ledger',t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const machine=openMachine({file:path.join(dir,'machine.sqlite')});
+  const ledgerFile=path.join(dir,'runtime.sqlite');
+  const ledger=openLedger({file:ledgerFile,machine});
+  machine.setCapacity('ai/global',10);
+  const held=reserveTwoPhase(ledger,machine,{job:{jobId:'j1',workflowId:'wf',generation:1,kind:'model'},machineNeeds:[{resourceKey:'ai/global',units:1}]});
+  assert.ok(held.ok);
+  ledger.close();
+  fs.rmSync(ledgerFile);
+  const different=openLedger({file:ledgerFile});   // a fresh ledger, a fresh meta.ledger_id, at the same path
+  different.close();
+  const swept=machine.sweep();
+  assert.equal(swept.orphaned,0,'a different ledger at the same path proves nothing about the old leases');
+  assert.equal(machine.db.prepare('SELECT count(*) n FROM leases').get().n,1,'the row is left for its TTL, not wrongly released');
+  machine.close();
 });
 
 test('bound compaction keeps the transition checkpoints and the latest save of the bound generation, and drops the generations before it',t=>{
@@ -241,12 +313,54 @@ test('finished shared-store custody keeps one final state and only the latest ex
   ledger.close();
 });
 
-test('WAL stays opt-in and inspectLedger refuses a missing file',t=>{
+test('inspectLedger refuses a missing file, and reflects the identity and version a writer left behind',t=>{
   const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
-  assert.throws(()=>openLedger({file:path.join(dir,'runtime.sqlite'),journalMode:'WAL'}),/WAL requires explicit allowWal/);
   assert.throws(()=>inspectLedger({file:path.join(dir,'missing.sqlite')}),/existing file/);
-  const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});ledger.close();
+  const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});const id=ledger.ledgerId;ledger.close();
   const inspect=inspectLedger({file:path.join(dir,'runtime.sqlite')});
   assert.equal(inspect.version,1);assert.equal(inspect.readOnly,true);assert.deepEqual(inspect.workflows(),[]);
+  assert.equal(inspect.ledgerId,id);assert.equal(inspect.ledgerId,ledgerIdOf(inspect));
   inspect.close();
+});
+
+test('the anchor is written atomically and read back exactly, one workflow at a time',t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  assert.equal(readAnchor(dir),null,'nothing tracked yet');
+  const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
+  const anchor=writeAnchor(dir,{ledgerId:ledger.ledgerId,workflowId:'wf',generation:1,checkpointId:'save:wf:1:1',eventsHead:'abc',seq:3});
+  assert.equal(anchor.schema,ANCHOR_SCHEMA);assert.equal(anchor.ledgerId,ledger.ledgerId);
+  const read=readAnchor(dir);
+  assert.deepEqual(read.workflows.wf,{generation:1,checkpointId:'save:wf:1:1',eventsHead:'abc',seq:3,at:read.workflows.wf.at});
+  assert.equal(fs.readdirSync(path.join(dir,'.starciwork')).some(name=>name.includes('.tmp')),false,'no leftover temp file after the atomic rename');
+  writeAnchor(dir,{ledgerId:ledger.ledgerId,workflowId:'wf2',generation:5,checkpointId:'save:wf2:5:1'});
+  assert.deepEqual(Object.keys(readAnchor(dir).workflows).sort(),['wf','wf2'],'writing a second workflow keeps the first');
+  assert.throws(()=>writeAnchor(dir,{ledgerId:'not-the-tracked-ledger',workflowId:'wf3',generation:1,checkpointId:'save:wf3:1:1'}),/ledger-identity-mismatch/);
+  ledger.close();
+});
+
+test('verifyAnchor: no tracked anchor is a legitimate first boot, and the three named refusals of §12',t=>{
+  const dir=temporary();t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const ledger=openLedger({file:path.join(dir,'runtime.sqlite')});
+  assert.deepEqual(verifyAnchor(ledger,dir),{ok:true,checked:0},'no tracked anchor at all');
+
+  snapshot(ledger,{generation:1,checkpoint:'save:wf:1:1'});
+  const head=ledger.appendEvent({workflowId:'wf',entityType:'workflow',entityId:'wf',generation:1,kind:'checkpoint'});
+  writeAnchor(dir,{ledgerId:ledger.ledgerId,workflowId:'wf',generation:1,checkpointId:'save:wf:1:1',eventsHead:head.digest,seq:head.seq});
+  assert.deepEqual(verifyAnchor(ledger,dir),{ok:true,checked:1},'the ledger holds exactly the anchored head');
+
+  assert.deepEqual(verifyAnchor(null,dir),{ok:false,reason:'ledger-missing'},'a tracked anchor with no ledger at all');
+  assert.deepEqual(verifyAnchor(undefined,dir),{ok:false,reason:'ledger-missing'});
+
+  const other=openLedger({file:path.join(dir,'other.sqlite')});
+  assert.deepEqual(verifyAnchor(other,dir),{ok:false,reason:'ledger-identity-mismatch'});
+  other.close();
+
+  ledger.db.prepare('DELETE FROM state_snapshots').run();
+  assert.deepEqual(verifyAnchor(ledger,dir),{ok:false,reason:'ledger-behind-anchor',workflowId:'wf'},'the anchored generation has no snapshot any more');
+  snapshot(ledger,{generation:1,checkpoint:'save:wf:1:1'});
+  assert.deepEqual(verifyAnchor(ledger,dir),{ok:true,checked:1},'restoring the snapshot clears the refusal');
+
+  ledger.db.prepare('UPDATE events SET digest=? WHERE workflow_id=?').run('tampered','wf');
+  assert.deepEqual(verifyAnchor(ledger,dir),{ok:false,reason:'ledger-behind-anchor',workflowId:'wf'},'the anchored event digest is no longer there');
+  ledger.close();
 });
