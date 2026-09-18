@@ -1514,7 +1514,8 @@ records:
     schema: work/implementation
     feature: audit
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: digest-mismatch
   impl.login.todo-app-backend.auth:
     schema: work/implementation
     feature: login
@@ -2181,7 +2182,8 @@ records:
     schema: work/ui-screen
     feature: login
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   ui.notify.preferences:
     schema: work/ui-screen
     feature: notify
@@ -2212,22 +2214,22 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 133
+    done: 131
     todo: 32
-    stale: 2
+    stale: 4
     blocked: 36
     total: 203
   byFeature:
     audit:
-      done: 21
+      done: 20
       todo: 6
-      stale: 0
+      stale: 1
       blocked: 3
       total: 30
     login:
-      done: 16
+      done: 15
       todo: 4
-      stale: 1
+      stale: 2
       blocked: 3
       total: 24
     notify:
