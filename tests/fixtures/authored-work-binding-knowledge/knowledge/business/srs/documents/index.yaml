@@ -1,0 +1,5 @@
+schema: work/node@2
+required: true
+id: example.business.srs.documents
+kind: business
+description: Document capabilities aggregate.
