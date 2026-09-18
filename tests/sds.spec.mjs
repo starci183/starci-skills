@@ -38,7 +38,10 @@ test('SDS rejects missing design semantics, broken references and source-shaped 
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-sds-'));
-  fs.cpSync(new URL('../examples/nested-business/', import.meta.url), root, {recursive: true});
+  // examples/nested-business was deleted (owner ruling: examples/ keeps only the todo-app repositories);
+  // tests/fixtures/nested-business/ reconstructs the deleted example's knowledge/business SRS tree,
+  // which the current todo-app-backend/frontend examples do not carry.
+  fs.cpSync(new URL('fixtures/nested-business/', import.meta.url), root, {recursive: true});
   t.after(() => { assert.equal(path.dirname(root), os.tmpdir()); assert.ok(path.basename(root).startsWith('starci-sds-')); fs.rmSync(root, {recursive: true, force: true}); });
   const write = (relative, value) => {const file = path.join(root, relative); fs.mkdirSync(path.dirname(file), {recursive: true}); fs.writeFileSync(file, stringifyYaml(value));};
   const node = (id, more = {}) => ({schema: 'work/node@2', id, kind: 'architecture', required: true, description: 'Synthetic owned design scope.', ...more});

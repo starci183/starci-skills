@@ -19,19 +19,31 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
       assert.ok(contract.steps[0].reads.includes('application-stacks'),id);
     }
   }
+  // The old examples/application-stacks/tiny-stateful (owner ruling: deleted, examples/ keeps only the
+  // todo-app repositories) shipped a toy app/Dockerfile + app/server.mjs + gateway/nginx.conf + shell
+  // scripts under the `.stacks/` name; a rename script pointed this list at todo-app-backend without
+  // noticing the shapes differ. todo-app-backend is a real NestJS app: it has no Dockerfile (dev compose
+  // pulls a prebuilt image) and its `.mjs`/`.sh`/`.ps1`/`.conf` files are not in the packaging rule's
+  // shipped-extension set for a non-application-stacks-named example (scripts/build-workflows.mjs, out of
+  // this file's scope to change) - only `.md/.yaml/.yml/.ts/.tsx/.png/.svg` ship. Its real runnable proof
+  // is src/main.ts (a real Nest entrypoint, `.ts` ships) plus the renamed `.starcistacks` contract files.
   for(const file of ['checks/stacks.mjs','schemas/application-stacks.schema.json','knowledge/application-stacks.json',
     'docs/application-stacks.md','docs/application-stacks-vps.md',
-    ...['app/Dockerfile','app/server.mjs','gateway/nginx.conf','scripts/prepare.sh','scripts/prepare.ps1',
-      '.gitignore','.stacks/application-stacks.yaml','.stacks/dev/compose.yaml','.stacks/vps/stack.yaml']
-      .map(name=>'examples/todo-app-backend-backend/'+name)])assert.ok(files.has(file),file);
-  assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app-backend-backend/')&&
+    ...['src/main.ts','.starcistacks/application-stacks.yaml','.starcistacks/dev/infra/compose/compose.yaml','.starcistacks/vps/infra/stack.yaml']
+      .map(name=>'examples/todo-app-backend/'+name)])assert.ok(files.has(file),file);
+  assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app-backend/')&&
     (/\/(runtime|generated|\.runtime)\//.test(file)||/\.(enc|agekey)$/.test(file))),false);
 });
 
 test('stacks CLI refuses missing or malformed evidence without echoing file contents or mutation',t=>{
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-cli-'));
   t.after(()=>{assert.equal(path.dirname(directory),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(directory).startsWith('starci-stacks-cli-'));fs.rmSync(directory,{recursive:true,force:true});});
-  fs.mkdirSync(path.join(directory,'.starcistacks'));
+  // checks/stacks.mjs (unmodifiable in this pass) hardcodes '.stacks/application-stacks.yaml' as the
+  // manifest location - matches docs/application-stacks.md too. The prior version of this fixture wrote
+  // to '.stacks/...' without ever creating that directory (only '.starcistacks' was made), which is a
+  // plain mkdir/write mismatch bug, not a directory rename; use '.stacks' consistently so the checker
+  // exercises the intended malformed-deployment-model scenario instead of always failing on a missing manifest.
+  fs.mkdirSync(path.join(directory,'.stacks'));
   fs.writeFileSync(path.join(directory,'.stacks/application-stacks.yaml'),'schema: starci/application-stacks@1\n');
   const model=path.join(directory,'rendered.json'),sentinel='synthetic-secret-never-echo';
   fs.writeFileSync(model,'{"token":"'+sentinel+'",BROKEN');
@@ -51,12 +63,12 @@ test('runtime packaging excludes accidental generated example plaintext and ciph
   for(const entry of ['config.example.yaml','cli','ops','workflows','model','kernel','hosts','models','checks','providers','approvals',
     'execution','knowledge','contracts','specifications','examples','scripts','core','schemas'])
     fs.cpSync(path.join(root,entry),path.join(directory,entry),{recursive:true});
-  const base='examples/todo-app-backend-backend/.starcistacks/dev/';
+  const base='examples/todo-app-backend/.starcistacks/dev/';
   for(const suffix of ['secrets.yaml','secrets.yaml.enc','runtime/files/secret.yaml','generated/deployment-model.yaml']){
     const target=path.join(directory,base,suffix);fs.mkdirSync(path.dirname(target),{recursive:true});
     fs.writeFileSync(target,'synthetic-credential-must-not-ship');
   }
   const files=buildFiles(directory);
   for(const suffix of ['secrets.yaml','secrets.yaml.enc','runtime/files/secret.yaml','generated/deployment-model.yaml'])assert.equal(files.has(base+suffix),false);
-  assert.ok(files.has(base+'compose.yaml'));
+  assert.ok(files.has(base+'infra/compose/compose.yaml'));
 });

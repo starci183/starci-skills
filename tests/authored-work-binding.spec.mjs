@@ -29,7 +29,15 @@ const carried=run=>JSON.parse(JSON.stringify(run));
 function fixture(t,{mode='manual',legacy=false,ui=false}={}){
  const workflow=ui?'design-interface':'design-architecture',op=ui?'interface.draw':'architecture.decide';
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'starci-authored-')),root=path.join(dir,'.starciwork');
- fs.cpSync(new URL('../examples/todo-app-backend-backend/.starciwork/',import.meta.url),root,{recursive:true});
+ // This fixture needs a workspace whose SRS/overview nodes are already `done` under the older, plain
+ // `work/workspace@1` root schema `validateWorkspace` treats as canonical. todo-app-backend is the
+ // wrong precondition for that: it is a `work/catalog` product tree (workspace.yaml/brand use their own
+ // unversioned schemas) that itself fails `validateWorkspace` outside its own looser example gate, and
+ // it carries no business/SRS records at all. The deleted `nested-business` example used to supply this
+ // shape; `tests/fixtures/nested-business/` reconstructs the minimal
+ // workspace.yaml + knowledge/business/{overview,srs} tree it had, so this file keeps exercising real
+ // lifecycle code against a workspace `validateWorkspace` actually accepts.
+ fs.cpSync(new URL('fixtures/nested-business/',import.meta.url),root,{recursive:true});
  t.after(()=>{assert.equal(path.dirname(dir),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(dir).startsWith('starci-authored-'));fs.rmSync(dir,{recursive:true,force:true});});
  const read=p=>parseYaml(fs.readFileSync(path.join(root,p),'utf8')),put=(p,x)=>{const f=path.join(root,p);fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,stringifyYaml(x));};
  const review=()=>({schema:'starci/design-review@1',reviewer:'Synthetic reviewer',authority:'Synthetic fixture authority only',reviewedAt:'2026-09-09T00:00:00Z',observations:[{id:'scope-reviewed',outcome:'pass',observation:'Synthetic substantive review fixture, no real design accepted'}],limitations:['Fixture only']});

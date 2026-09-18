@@ -1,0 +1,11 @@
+schema: work/node@2
+required: true
+id: example.business.overview
+kind: business-overview
+state: uninvestigate
+businessOverview:
+  purpose: Help an owner correct their knowledge.
+  customerUnderstanding: I edit my saved document without losing existing content.
+  desiredOutcome: I know whether my changes were saved, cancelled or rejected.
+  scope: Synthetic text update example only.
+  openQuestions: All proposed policies require real product approval.
