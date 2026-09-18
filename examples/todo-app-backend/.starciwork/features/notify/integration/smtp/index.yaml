@@ -24,8 +24,4 @@ requiresProof:
       list.
 
 blockedBy:
-  - "No live SMTP boundary is reachable from this worktree: no server is declared or running, and this
-    lane owns no infrastructure to add one honestly without also owning the shared stacks file other
-    lanes touch. Nothing in src/notify (none of which exists yet either) has ever spoken to a real SMTP
-    host, so this record cannot claim done, and no fake run counts as this integration's proof - a run
-    against a fake would only prove it against the fake, per the common brief's own rule."
+  - {record: gap.notify.unbuilt-module, because: "No live SMTP boundary is reachable from this worktree: no server is declared or running, and this lane owns no infrastructure to add one honestly without also owning the shared stacks file other lanes touch. Nothing in src/notify (none of which exists yet either) has ever spoken to a real SMTP host, so this record cannot claim done, and no fake run counts as this integration's proof - a run against a fake would only prove it against the fake, per the common brief's own rule."}

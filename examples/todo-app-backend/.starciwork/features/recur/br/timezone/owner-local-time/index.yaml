@@ -18,5 +18,4 @@ acceptanceCriteria: [dst-spring-forward-shifts-by-gap, dst-fall-back-picks-earli
 module: src/recur/zone
 change: {rev: 1, kind: initial, at: 2026-09-18T05:14:00.000Z}
 blockedBy:
-  - No implementation yet. The example's backend target moved to NestJS and this feature has not been
-    built there; there is no zone-conversion module to run these fixed instants against.
+  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The example's backend target moved to NestJS and this feature has not been built there; there is no zone-conversion module to run these fixed instants against."}

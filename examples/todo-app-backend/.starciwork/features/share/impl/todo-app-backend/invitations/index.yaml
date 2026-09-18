@@ -3,10 +3,8 @@ id: impl.share.todo-app-backend.invitations
 title: The invitation store and its lifecycle
 state: todo
 repository: todo-app
-directory: src/share
+owners:
+  - {role: module, path: src/share}
 proves: [br.share.invite.expiry, br.share.revoke.on-read, sds.share.invitation-lifecycle]
 blockedBy:
-  - Not written yet. The example backend is moving to NestJS with its own architecture checks
-    (checks/architecture.mjs, checks/code-patterns/nest*.mjs); this module will live at
-    src/share/invitation.service.ts once that scaffold lands, and no prior .mjs draft is being carried
-    forward into it.
+  - {record: gap.share.unbuilt-module, because: "Not written yet. The example backend is moving to NestJS with its own architecture checks (checks/architecture.mjs, checks/code-patterns/nest*.mjs); this module will live at src/share/invitation.service.ts once that scaffold lands, and no prior .mjs draft is being carried forward into it."}

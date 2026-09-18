@@ -1,0 +1,14 @@
+schema: work/event
+id: event.login.signed-out
+title: A person signed out
+state: todo
+producer: fr.login.sign-out
+payload:
+  - {name: personId, type: text}
+  - {name: signedOutAt, type: timestamp}
+  - {name: sourceEventId, type: text, note: "Stable and unique per real sign-out."}
+delivery: {guarantee: at-least-once, ordering: per-key}
+refs: [fr.login.sign-out]
+blockedBy:
+  - {record: gap.audit.emitted-events, because: "fr.login.sign-out has no evidence yet (br.login.session.single-device is todo) and raises no event today."}
+change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}

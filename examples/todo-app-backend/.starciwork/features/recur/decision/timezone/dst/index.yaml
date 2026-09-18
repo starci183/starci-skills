@@ -2,7 +2,8 @@ schema: work/policy-decision
 id: decision.recur.timezone.dst
 title: What a rule does at a DST gap and at a DST fold
 state: done
-outcome: shift-forward-by-gap-and-earliest-of-fold
+outcome: decided
+chosen: shift-forward-by-gap-and-earliest-of-fold
 question: Given decision.recur.timezone.anchor (the owner's clock, resolved fresh each time), what happens
   when that clock lies about the local time twice a year - a spring-forward gap where the nominal local
   time never occurs, and a fall-back fold where it occurs twice?

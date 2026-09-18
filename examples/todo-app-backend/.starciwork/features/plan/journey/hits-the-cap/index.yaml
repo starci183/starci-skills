@@ -17,6 +17,6 @@ requiresProof:
     forEach: requirements
 
 blockedBy:
-  - fr.plan.upgrade and fr.plan.usage.view are todo, and the cap guard they depend on is not wired into
-    fr.task.create at all (see contract.plan.create-precondition); a walk of this journey today would create
-    a 21st task on the free plan without ever being asked to pay.
+  - {record: fr.plan.upgrade, because: "fr.plan.upgrade and fr.plan.usage.view are todo, and the cap guard they depend on is not wired into fr.task.create at all (see contract.plan.create-precondition); a walk of this journey today would create a 21st task on the free plan without ever being asked to pay."}
+  - {record: fr.plan.usage.view, because: "fr.plan.upgrade and fr.plan.usage.view are todo, and the cap guard they depend on is not wired into fr.task.create at all (see contract.plan.create-precondition); a walk of this journey today would create a 21st task on the free plan without ever being asked to pay."}
+  - {record: contract.plan.create-precondition, because: "fr.plan.upgrade and fr.plan.usage.view are todo, and the cap guard they depend on is not wired into fr.task.create at all (see contract.plan.create-precondition); a walk of this journey today would create a 21st task on the free plan without ever being asked to pay."}

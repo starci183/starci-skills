@@ -18,6 +18,4 @@ requiresProof:
     required: true
 
 blockedBy:
-  - No implementation yet. The example's backend target moved to NestJS and this feature has not been
-    built there; there is no calendar walk or zone conversion to run the pinned DST and impossible-date
-    acceptance criteria against.
+  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The example's backend target moved to NestJS and this feature has not been built there; there is no calendar walk or zone conversion to run the pinned DST and impossible-date acceptance criteria against."}

@@ -10,11 +10,10 @@ measurement:
     400 days without invoking any deletion path, and asserts line count and verifyChain are unchanged.
   threshold: 0 lines lost, chain valid, at T+400d
   environment: dev
-appliesTo: [br.audit.retention]
-
+refs: [br.audit.retention]
 requiresProof:
   measurement:
     required: true
 
 blockedBy:
-  - No implementation and no fake-clock harness exist yet under the NestJS layout.
+  - {record: gap.audit.unbuilt-module, because: "No implementation and no fake-clock harness exist yet under the NestJS layout."}

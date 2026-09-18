@@ -20,5 +20,4 @@ requiresProof:
     note: A migration applied and a row round-tripped against the real server, not against a fake.
 
 blockedBy:
-  - No migration has been applied against the dev server yet; the schema exists only in data.login.person.
-
+  - {record: gap.login.migration-not-applied, because: "No migration has been applied against the dev server yet; the schema exists only in data.login.person."}

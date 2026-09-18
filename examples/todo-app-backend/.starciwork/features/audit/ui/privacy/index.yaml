@@ -7,5 +7,4 @@ brand: {rev: 2}
 refs: [fr.audit.erasure.request, fr.audit.export]
 
 blockedBy:
-  - The frontend example is moving to Next.js consuming the Grammar core package; no screen exists to
-    describe states against yet, and drawing one against the toy frontend would be thrown away with it.
+  - {record: gap.audit.unbuilt-module, because: "The frontend example is moving to Next.js consuming the Grammar core package; no screen exists to describe states against yet, and drawing one against the toy frontend would be thrown away with it."}

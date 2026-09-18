@@ -13,6 +13,4 @@ acceptanceCriteria: [refuses-over-cap]
 module: src/plan/cap-guard
 change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}
 blockedBy:
-  - No module exists yet at src/plan/cap-guard. The example backend is moving to NestJS
-    (checks/architecture.mjs, checks/code-patterns/nest*.mjs); the guard is specified here but not built
-    against that layout, so there is nothing to run and nothing to prove.
+  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/cap-guard. The example backend is moving to NestJS (checks/architecture.mjs, checks/code-patterns/nest*.mjs); the guard is specified here but not built against that layout, so there is nothing to run and nothing to prove."}

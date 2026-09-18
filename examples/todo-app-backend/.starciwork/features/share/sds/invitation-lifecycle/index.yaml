@@ -11,8 +11,7 @@ interfaces:
 refs: [br.share.invite.expiry, br.share.revoke.on-read, br.share.role.permissions]
 dependsOn: [integration.login.postgres]
 blockedBy:
-  - "This component is designed but not built: the example is moving to a real NestJS backend and
-    src/share/invitation.service.ts does not exist yet. No transition below has been run."
+  - {record: gap.share.unbuilt-module, because: "This component is designed but not built: the example is moving to a real NestJS backend and src/share/invitation.service.ts does not exist yet. No transition below has been run."}
 
 stateMachine:
   states: [requested, pending, accepted, expired, revoked]

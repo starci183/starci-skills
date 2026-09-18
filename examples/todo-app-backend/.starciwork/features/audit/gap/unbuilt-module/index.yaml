@@ -1,0 +1,9 @@
+schema: work/gap
+id: gap.audit.unbuilt-module
+title: No audit module exists under the NestJS layout yet
+state: todo
+statement: The example backend is moving to NestJS (checks/architecture.mjs, checks/code-patterns/nest*.mjs).
+  No src/audit directory or Nest module has been written under that layout at this commit, so nothing in
+  this feature has code to run acceptance criteria, load tests or UAT walks against.
+closedBy: impl.audit.todo-app-backend.log
+change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}

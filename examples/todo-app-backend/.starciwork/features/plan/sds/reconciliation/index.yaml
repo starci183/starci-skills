@@ -27,7 +27,5 @@ requiresProof:
     required: true
 
 blockedBy:
-  - No module exists yet at src/plan/reconcile. The example backend is moving to NestJS; this component is
-    specified but not built.
-  - integration.plan.sepay is todo; a poll against a gateway that has never been called for real cannot
-    itself be proven live yet, only unit-tested against a fake once the module exists.
+  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/reconcile. The example backend is moving to NestJS; this component is specified but not built."}
+  - {record: integration.plan.sepay, because: "integration.plan.sepay is todo; a poll against a gateway that has never been called for real cannot itself be proven live yet, only unit-tested against a fake once the module exists."}

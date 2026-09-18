@@ -6,5 +6,4 @@ states: [under-cap, at-cap, over-cap-frozen, paid-unlimited]
 brand: {rev: 2}
 refs: [fr.plan.usage.view, fr.plan.upgrade]
 blockedBy:
-  - No screen exists yet. The frontend is moving to Next.js consuming the Grammar core package the way
-    nivo-fe does; no captures exist for any of the four states against that layout.
+  - {record: gap.plan.unbuilt-module, because: "No screen exists yet. The frontend is moving to Next.js consuming the Grammar core package the way nivo-fe does; no captures exist for any of the four states against that layout."}

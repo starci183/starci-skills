@@ -11,4 +11,4 @@ fields:
 invariants:
   - A collaborator row exists only for an invitation that was accepted at least once.
   - role and status are always read from the current data.share.invitation row, never stored separately.
-appliesTo: [br.share.role.permissions, br.share.revoke.on-read]
+refs: [br.share.role.permissions, br.share.revoke.on-read]

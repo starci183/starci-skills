@@ -1,0 +1,15 @@
+schema: work/event
+id: event.task.created
+title: A task was created
+state: todo
+producer: fr.task.create
+payload:
+  - {name: taskId, type: text, note: "The created task's id."}
+  - {name: ownerId, type: text, note: "The submitter, bound at creation and never rewritten."}
+  - {name: createdAt, type: timestamp}
+  - {name: sourceEventId, type: text, note: "Stable and unique per real create; the only thing a subscriber's dedupe key can honestly hash."}
+delivery: {guarantee: at-least-once, ordering: per-key}
+refs: [fr.task.create]
+blockedBy:
+  - {record: gap.audit.emitted-events, because: "fr.task.create's implementation (impl.task.todo-app-backend.ownership) raises no event today; this record specifies the shape a future emit must have, not a signal that fires yet."}
+change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}

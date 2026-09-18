@@ -3,21 +3,14 @@ id: impl.notify.todo-app-backend.pipeline
 title: The notify pipeline module
 state: todo
 repository: todo-app
-directory: src/notify
-targetFiles:
-  - notify.module.ts
-  - dedupe.service.ts
-  - digest.service.ts
-  - delivery.service.ts
-  - preferences.service.ts
+owners:
+  - {role: module, path: src/notify/notify.module.ts}
+  - {role: module, path: src/notify/dedupe.service.ts}
+  - {role: module, path: src/notify/digest.service.ts}
+  - {role: module, path: src/notify/delivery.service.ts}
+  - {role: module, path: src/notify/preferences.service.ts}
 willProve: [br.notify.delivery.once, br.notify.digest.window, br.notify.failure.classified,
   br.notify.unsubscribe.honored, sds.notify.delivery-lifecycle]
 
 blockedBy:
-  - "No file listed above exists. An earlier version of this lane's work wrote a plain .mjs prototype
-    of this module directly under app/src/notify and it has been removed: the owner set the stack to a
-    real NestJS backend that must pass this runtime's own architecture checks
-    (checks/architecture.mjs, checks/code-patterns/nest*.mjs) driven by an architecture.json this
-    repository does not yet have, and five lanes each inventing an incompatible Nest scaffold was
-    judged worse than one lane leaving this todo. This record names the target shape and defers the
-    actual module, its files and its tests to whoever builds the shared Nest scaffold."
+  - {record: gap.notify.unbuilt-module, because: "No file listed above exists. An earlier version of this lane's work wrote a plain .mjs prototype of this module directly under app/src/notify and it has been removed: the owner set the stack to a real NestJS backend that must pass this runtime's own architecture checks (checks/architecture.mjs, checks/code-patterns/nest*.mjs) driven by an architecture.json this repository does not yet have, and five lanes each inventing an incompatible Nest scaffold was judged worse than one lane leaving this todo. This record names the target shape and defers the actual module, its files and its tests to whoever builds the shared Nest scaffold."}

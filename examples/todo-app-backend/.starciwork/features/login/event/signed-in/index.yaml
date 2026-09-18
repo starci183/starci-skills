@@ -1,0 +1,14 @@
+schema: work/event
+id: event.login.signed-in
+title: A person signed in
+state: todo
+producer: fr.login.sign-in
+payload:
+  - {name: personId, type: text}
+  - {name: signedInAt, type: timestamp}
+  - {name: sourceEventId, type: text, note: "Stable and unique per real sign-in."}
+delivery: {guarantee: at-least-once, ordering: per-key}
+refs: [fr.login.sign-in]
+blockedBy:
+  - {record: gap.audit.emitted-events, because: "fr.login.sign-in's implementation raises no event today; audit's fr.audit.log.append has nothing to subscribe to yet."}
+change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}

@@ -10,5 +10,4 @@ acceptanceCriteria: [suppresses-future-sends]
 module: src/notify/preferences
 change: {rev: 1, kind: initial, at: 2026-09-18T06:03:00.000Z}
 blockedBy:
-  - No code exists yet at src/notify/preferences. The example is moving to a NestJS backend and this
-    module has not been written against that layout, so the rule stays todo.
+  - {record: gap.notify.unbuilt-module, because: "No code exists yet at src/notify/preferences. The example is moving to a NestJS backend and this module has not been written against that layout, so the rule stays todo."}

@@ -1,0 +1,15 @@
+schema: work/event
+id: event.task.deleted
+title: A task was deleted
+state: todo
+producer: br.task.delete.final
+payload:
+  - {name: taskId, type: text}
+  - {name: ownerId, type: text}
+  - {name: deletedAt, type: timestamp}
+  - {name: sourceEventId, type: text, note: "Stable and unique per real delete."}
+delivery: {guarantee: at-least-once, ordering: per-key}
+refs: [br.task.delete.final]
+blockedBy:
+  - {record: gap.audit.emitted-events, because: "no fr or implementation exists for delete beyond br.task.delete.final's acceptance criterion; nothing emits this event yet."}
+change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}

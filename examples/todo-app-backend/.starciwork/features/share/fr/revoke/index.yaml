@@ -14,7 +14,7 @@ postconditions:
 composes:
   - {rule: br.share.revoke.on-read, module: src/share/invitation.service.ts}
 blockedBy:
-  - br.share.revoke.on-read is todo; the NestJS module it composes does not exist yet.
+  - {record: br.share.revoke.on-read, because: "br.share.revoke.on-read is todo; the NestJS module it composes does not exist yet."}
 
 requiresProof:
   unit:

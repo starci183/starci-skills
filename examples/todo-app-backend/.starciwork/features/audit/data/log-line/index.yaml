@@ -16,7 +16,7 @@ fields:
 invariants:
   - Once appended, at, action, target, keyId, actor, prevHash and hash never change.
   - actor decrypts to a real person's id only while that person's key exists in the keystore.
-appliesTo: [br.audit.append-only, br.audit.retention, br.audit.erasure.right]
+refs: [br.audit.append-only, br.audit.retention, br.audit.erasure.right]
 conflictsWith:
   - record: br.task.delete.final
     rev: 1

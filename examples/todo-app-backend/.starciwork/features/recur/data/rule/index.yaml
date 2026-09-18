@@ -18,4 +18,4 @@ invariants:
   - endedAt, once set, is never cleared; ending a rule is not reversible into the same rule.
   - dayOfMonth is required and between 1 and 31 when frequency is monthly-day, and absent otherwise; n is
     required and a positive integer when frequency is every-n-days, and absent otherwise.
-appliesTo: [br.recur.impossible-date.skips, br.recur.timezone.owner-local-time, br.recur.ending.preserves-history]
+refs: [br.recur.impossible-date.skips, br.recur.timezone.owner-local-time, br.recur.ending.preserves-history]

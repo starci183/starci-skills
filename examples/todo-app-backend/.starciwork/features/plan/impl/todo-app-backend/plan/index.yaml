@@ -3,15 +3,14 @@ id: impl.plan.todo-app-backend.plan
 title: The plan module - cap guard, subscription lifecycle, payments and reconciliation
 state: todo
 repository: todo-app
-directory: src/plan
-files: [cap-guard.ts, subscription.ts, payments.ts, reconcile.ts]
+owners:
+  - {role: module, path: src/plan/cap-guard.ts}
+  - {role: module, path: src/plan/subscription.ts}
+  - {role: module, path: src/plan/payments.ts}
+  - {role: module, path: src/plan/reconcile.ts}
 proves: [br.plan.caps.limit, br.plan.active-scope, br.plan.downgrade.freeze, br.plan.payment.idempotent,
   br.plan.lapse.reverts-on-read, sds.plan.subscription-lifecycle, sds.plan.cap-guard, sds.plan.reconciliation]
 verification: []
 verificationSource: authored-claim
 blockedBy:
-  - The example backend is moving to NestJS, conforming to checks/architecture.mjs and
-    checks/code-patterns/nest*.mjs. Nothing under src/plan exists yet in that layout; an earlier draft of
-    this module was written directly under app/src/plan as a plain .mjs module and has been removed rather
-    than kept as a second, incompatible scaffold. No test has been run against real code, so no evidence.yaml
-    exists for this record or for anything it would prove.
+  - {record: gap.plan.unbuilt-module, because: "The example backend is moving to NestJS, conforming to checks/architecture.mjs and checks/code-patterns/nest*.mjs. Nothing under src/plan exists yet in that layout; an earlier draft of this module was written directly under app/src/plan as a plain .mjs module and has been removed rather than kept as a second, incompatible scaffold. No test has been run against real code, so no evidence.yaml exists for this record or for anything it would prove."}

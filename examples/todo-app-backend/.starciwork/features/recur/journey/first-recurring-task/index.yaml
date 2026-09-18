@@ -17,5 +17,5 @@ requiresProof:
     forEach: requirements
 
 blockedBy:
-  - No implementation yet; fr.recur.make-recurring and fr.recur.end-rule have no uat evidence to compose
-    into a cross-feature proof.
+  - {record: fr.recur.make-recurring, because: "No implementation yet; fr.recur.make-recurring and fr.recur.end-rule have no uat evidence to compose into a cross-feature proof."}
+  - {record: fr.recur.end-rule, because: "No implementation yet; fr.recur.make-recurring and fr.recur.end-rule have no uat evidence to compose into a cross-feature proof."}

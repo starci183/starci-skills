@@ -15,10 +15,9 @@ composes:
   - {rule: br.share.role.permissions, module: src/share/access.service.ts}
 refs: [contract.share.completion-guard-for-task]
 blockedBy:
-  - br.task.complete.once is todo at rev 2; its reversible statement has no evidence yet.
-  - br.task.single-owner is todo at rev 2; the split it made between complete and delete is not proven.
-  - "contract.share.completion-guard-for-task is todo: neither its provider (share) nor its consumer call
-    from this flow exists, so an editor completing a shared task is a specified path with no implementation."
+  - {record: br.task.complete.once, rev: 2, because: "br.task.complete.once is todo at rev 2; its reversible statement has no evidence yet."}
+  - {record: br.task.single-owner, rev: 2, because: "br.task.single-owner is todo at rev 2; the split it made between complete and delete is not proven."}
+  - {record: contract.share.completion-guard-for-task, because: "contract.share.completion-guard-for-task is todo: neither its provider (share) nor its consumer call from this flow exists, so an editor completing a shared task is a specified path with no implementation."}
 
 requiresProof:
   unit:

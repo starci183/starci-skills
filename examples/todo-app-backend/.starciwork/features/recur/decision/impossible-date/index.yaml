@@ -2,7 +2,8 @@ schema: work/policy-decision
 id: decision.recur.impossible-date
 title: Skip, clamp, or refuse a monthly rule's day that a month does not have
 state: done
-outcome: skip
+outcome: decided
+chosen: skip
 question: A rule says "the 31st". February never has one, and April, June, September and November do not
   either. What happens to the rule, and what happens to that month?
 options:

@@ -2,7 +2,8 @@ schema: work/policy-decision
 id: decision.share.roles.count
 title: Why exactly two roles, viewer and editor
 state: done
-outcome: two-roles
+outcome: decided
+chosen: two-roles
 question: How many roles should a collaborator be able to hold - one undifferentiated "collaborator", two
   (viewer, editor), or a finer set (viewer, commenter, editor, co-owner)?
 options:

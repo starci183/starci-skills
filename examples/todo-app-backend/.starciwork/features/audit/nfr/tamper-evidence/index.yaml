@@ -16,15 +16,10 @@ measurement:
     passing run of this criterion; the harness must assert it actually executed >0 mutation cases.
   threshold: 100% of attempted mutations detected; 0 false positives on the unmutated baseline
   environment: dev
-appliesTo: [br.audit.append-only]
-
+refs: [br.audit.append-only]
 requiresProof:
   measurement:
     required: true
 
 blockedBy:
-  - "No implementation exists yet under the NestJS layout, so this measurement cannot be run. This is
-    also the record naming the check the earlier .mjs prototype (removed from this worktree on the
-    lead's instruction) used to satisfy the same property with node:test - the design is not lost,
-    only its executable form, and whoever writes the Nest module should port that harness shape:
-    mutate the store directly, then call the module's own verify method, never the other way round."
+  - {record: gap.audit.unbuilt-module, because: "No implementation exists yet under the NestJS layout, so this measurement cannot be run. This is also the record naming the check the earlier .mjs prototype (removed from this worktree on the lead's instruction) used to satisfy the same property with node:test - the design is not lost, only its executable form, and whoever writes the Nest module should port that harness shape: mutate the store directly, then call the module's own verify method, never the other way round."}

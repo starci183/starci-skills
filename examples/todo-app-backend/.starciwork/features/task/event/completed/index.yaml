@@ -1,0 +1,15 @@
+schema: work/event
+id: event.task.completed
+title: A task was completed
+state: todo
+producer: fr.task.complete
+payload:
+  - {name: taskId, type: text}
+  - {name: ownerId, type: text}
+  - {name: completedAt, type: timestamp}
+  - {name: sourceEventId, type: text, note: "Stable and unique per real completion, including a reopen-then-complete cycle producing a new one."}
+delivery: {guarantee: at-least-once, ordering: per-key}
+refs: [fr.task.complete]
+blockedBy:
+  - {record: gap.notify.task-completion-event, because: "task has no completion event today: fr.task.complete is itself todo and nothing in the task feature's code emits one; this record specifies the shape notify (and audit) will subscribe to once it does."}
+change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}

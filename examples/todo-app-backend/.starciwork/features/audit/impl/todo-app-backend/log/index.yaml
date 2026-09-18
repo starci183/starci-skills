@@ -3,15 +3,11 @@ id: impl.audit.todo-app-backend.log
 title: The log module
 state: todo
 repository: todo-app
-directory: src/audit
-files: [log.service.ts, log.repository.ts, keystore.service.ts]
+owners:
+  - {role: module, path: src/audit/log.service.ts}
+  - {role: module, path: src/audit/log.repository.ts}
+  - {role: module, path: src/audit/keystore.service.ts}
 proves: [br.audit.append-only, br.audit.retention, sds.audit.log-chain]
 
 blockedBy:
-  - "The owner has set the example's backend stack to NestJS, conforming to checks/architecture.mjs
-    and checks/code-patterns/nest*.mjs. No src/audit/ directory or Nest module exists in this worktree.
-    This record names the files the module will need (a service holding the append/verify/readLine
-    behaviour, a repository for the append-only store, and a keystore service for per-person keys) but
-    authors no verification, no revision and no provenBy, because none of that would be true. Writing
-    a passing evidence.yaml against files that do not exist is exactly the failure this lane was told
-    to avoid."
+  - {record: gap.audit.unbuilt-module, because: "The owner has set the example's backend stack to NestJS, conforming to checks/architecture.mjs and checks/code-patterns/nest*.mjs. No src/audit/ directory or Nest module exists in this worktree. This record names the files the module will need (a service holding the append/verify/readLine behaviour, a repository for the append-only store, and a keystore service for per-person keys) but authors no verification, no revision and no provenBy, because none of that would be true. Writing a passing evidence.yaml against files that do not exist is exactly the failure this lane was told to avoid."}

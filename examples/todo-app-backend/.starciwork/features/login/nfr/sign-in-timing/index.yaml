@@ -9,8 +9,7 @@ measurement:
   how: node scripts/load/sign-in-timing.mjs with 1000 attempts of each shape
   threshold: p95 delta < 10ms
   environment: dev
-appliesTo: [br.login.password.sign-in]
-
+refs: [br.login.password.sign-in]
 requiresProof:
   measurement:
     required: true

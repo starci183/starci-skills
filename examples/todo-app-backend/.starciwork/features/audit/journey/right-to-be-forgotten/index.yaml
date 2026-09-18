@@ -18,4 +18,4 @@ requiresProof:
     forEach: requirements
 
 blockedBy:
-  - Depends on every fr in requirements, none of which are implemented yet.
+  - {record: gap.audit.unbuilt-module, because: "Depends on every fr in requirements, none of which are implemented yet."}

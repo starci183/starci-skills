@@ -1,0 +1,15 @@
+schema: work/event
+id: event.login.new-device-signin
+title: A person signed in from a device that ended a prior session
+state: todo
+producer: fr.login.sign-in
+payload:
+  - {name: personId, type: text}
+  - {name: deviceId, type: text, note: "Identifies the device well enough that the same device signing in twice reads as not new."}
+  - {name: signedInAt, type: timestamp}
+  - {name: sourceEventId, type: text, note: "Stable and unique per sign-in."}
+delivery: {guarantee: at-least-once, ordering: per-key}
+refs: [fr.login.sign-in, br.login.session.single-device]
+blockedBy:
+  - {record: gap.login.device-field, because: "no deviceId exists to put in this payload until decision.login.session.devices is settled and a device field is added to the session/person shape."}
+change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}

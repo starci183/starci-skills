@@ -11,5 +11,4 @@ fields:
 invariants:
   - owner is never null and never changes for a given id.
   - completedAt is set if and only if complete is true.
-appliesTo: [br.task.single-owner, br.task.complete.once]
-
+refs: [br.task.single-owner, br.task.complete.once]

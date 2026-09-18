@@ -25,5 +25,4 @@ requiresProof:
     required: true
 
 blockedBy:
-  - No implementation yet. The example's backend target moved to NestJS and the frontend to Next.js; the
-    schedule screen has not been built on either side.
+  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The example's backend target moved to NestJS and the frontend to Next.js; the schedule screen has not been built on either side."}

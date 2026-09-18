@@ -19,7 +19,7 @@ stateMachine:
     - id: t-materialise
       from: scheduled
       to: materialised
-      on: generation-run
+      on: {timer: "integration.recur.scheduler's tick, currently a 5-minute CRON interval"}
       guard: The rule fires on this local date and no row exists yet for this rule's windowKey on it.
       effect: One row is written with its dueAtUtc resolved from the rule's zone and local time
         (decision.recur.timezone.anchor), and its windowKey (decision.recur.occurrence.identity). A second
@@ -62,5 +62,4 @@ requiresProof:
     forEach: stateMachine.transitions
 
 blockedBy:
-  - No implementation yet. The example's backend target moved to NestJS and this feature has not been
-    built there; none of these five transitions has a function behind it.
+  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The example's backend target moved to NestJS and this feature has not been built there; none of these five transitions has a function behind it."}

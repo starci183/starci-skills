@@ -13,5 +13,4 @@ acceptanceCriteria: [skips-nonexistent-day]
 module: src/recur/rule
 change: {rev: 1, kind: initial, at: 2026-09-18T05:11:00.000Z}
 blockedBy:
-  - No implementation yet. The example's backend target moved to NestJS and this feature has not been
-    built there; there is no rule module to walk a month's calendar dates.
+  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The example's backend target moved to NestJS and this feature has not been built there; there is no rule module to walk a month's calendar dates."}

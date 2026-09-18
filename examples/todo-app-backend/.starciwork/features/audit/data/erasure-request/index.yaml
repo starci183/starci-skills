@@ -16,8 +16,6 @@ fields:
 invariants:
   - personId is dropped from this record once state reaches complete; only requestId and the
     timestamps remain, so this table does not itself become a second place a person's identity lingers.
-appliesTo: [br.audit.erasure.right, br.audit.erasure.logged]
+refs: [br.audit.erasure.right, br.audit.erasure.logged]
 blockedBy:
-  - The dropped-personId-on-completion invariant is stated here but not yet implemented in
-    src/audit/erasure.mjs, which keeps personId in the in-memory request record for the life of the
-    process. sds.audit.erasure-request tracks this as the same gap.
+  - {record: sds.audit.erasure-request, because: "The dropped-personId-on-completion invariant is stated here but not yet implemented in src/audit/erasure.mjs, which keeps personId in the in-memory request record for the life of the process. sds.audit.erasure-request tracks this as the same gap."}

@@ -1,0 +1,10 @@
+schema: work/gap
+id: gap.share.unbuilt-module
+title: No share module exists under the NestJS/Next.js layout yet
+state: todo
+statement: The example is moving to a real NestJS backend and a Next.js frontend. src/share/access.service.ts
+  and src/share/invitation.service.ts do not exist yet, and neither does the frontend invite screen, so no
+  rule, flow, component or screen in this feature has anything to run acceptance criteria or a UAT walk
+  against.
+closedBy: impl.share.todo-app-backend.access
+change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}

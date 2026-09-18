@@ -1,0 +1,7 @@
+schema: work/gap
+id: gap.login.migration-not-applied
+title: No migration has been applied against the dev server
+state: todo
+statement: No migration has been applied against the dev Postgres server yet; the schema exists only in
+  data.login.person, not as real tables integration.login.postgres can be proven live against.
+change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}

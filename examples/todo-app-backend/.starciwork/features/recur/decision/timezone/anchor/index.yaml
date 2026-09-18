@@ -2,7 +2,8 @@ schema: work/policy-decision
 id: decision.recur.timezone.anchor
 title: Does an occurrence's due instant follow a stored UTC offset or the owner's clock
 state: done
-outcome: owner-local-time
+outcome: decided
+chosen: owner-local-time
 question: A rule says "09:00". Is that resolved once at creation into a fixed UTC instant-of-day (e.g.
   "02:00 UTC"), or is it resolved fresh, from the owner's declared IANA time zone, every time an occurrence
   for it is generated?

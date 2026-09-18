@@ -12,12 +12,11 @@ measurement:
     every occurrence materialised by the live integration.recur.scheduler tick in the window.
   threshold: p95 lag < 5 minutes
   environment: dev
-appliesTo: [br.recur.generation.once]
-refs: [integration.recur.scheduler]
 
+refs: [integration.recur.scheduler, br.recur.generation.once]
 requiresProof:
   measurement:
     required: true
 
 blockedBy:
-  - No implementation yet; there is no scheduler tick or generator to measure against.
+  - {record: gap.recur.unbuilt-module, because: "No implementation yet; there is no scheduler tick or generator to measure against."}

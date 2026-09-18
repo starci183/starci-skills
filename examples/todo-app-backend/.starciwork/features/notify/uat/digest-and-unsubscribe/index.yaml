@@ -13,8 +13,6 @@ steps:
 proves: [fr.notify.digest, fr.notify.unsubscribe, br.notify.digest.window, br.notify.unsubscribe.honored]
 
 blockedBy:
-  - Cannot be walked. ui.notify.preferences (step 4's surface) is todo, and there is no real product
-    action that triggers a "notify-worthy event" (steps 2 and 5) because fr.notify.on-completion and
-    fr.notify.on-new-device - the only two things a real person could do to produce one - are both todo,
-    each conflictsWith a foreign gap. A synthetic event injected outside the product would not be a UAT
-    walk of the product surface; it would be a call into internals wearing a UAT record's shape.
+  - {record: ui.notify.preferences, because: "Cannot be walked. ui.notify.preferences (step 4's surface) is todo, and there is no real product action that triggers a \"notify-worthy event\" (steps 2 and 5) because fr.notify.on-completion and fr.notify.on-new-device - the only two things a real person could do to produce one - are both todo, each conflictsWith a foreign gap. A synthetic event injected outside the product would not be a UAT walk of the product surface; it would be a call into internals wearing a UAT record's shape."}
+  - {record: fr.notify.on-completion, because: "Cannot be walked. ui.notify.preferences (step 4's surface) is todo, and there is no real product action that triggers a \"notify-worthy event\" (steps 2 and 5) because fr.notify.on-completion and fr.notify.on-new-device - the only two things a real person could do to produce one - are both todo, each conflictsWith a foreign gap. A synthetic event injected outside the product would not be a UAT walk of the product surface; it would be a call into internals wearing a UAT record's shape."}
+  - {record: fr.notify.on-new-device, because: "Cannot be walked. ui.notify.preferences (step 4's surface) is todo, and there is no real product action that triggers a \"notify-worthy event\" (steps 2 and 5) because fr.notify.on-completion and fr.notify.on-new-device - the only two things a real person could do to produce one - are both todo, each conflictsWith a foreign gap. A synthetic event injected outside the product would not be a UAT walk of the product surface; it would be a call into internals wearing a UAT record's shape."}

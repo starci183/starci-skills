@@ -15,5 +15,4 @@ module: src/plan/subscription
 change: {rev: 1, kind: initial, at: 2026-09-18T07:01:00.000Z}
 refs: [decision.plan.downgrade.policy, br.plan.caps.limit]
 blockedBy:
-  - No module exists yet at src/plan/subscription. The decision is settled; nothing has been built or run
-    against the NestJS layout.
+  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/subscription. The decision is settled; nothing has been built or run against the NestJS layout."}

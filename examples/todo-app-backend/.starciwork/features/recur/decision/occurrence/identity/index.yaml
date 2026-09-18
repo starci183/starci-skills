@@ -2,7 +2,8 @@ schema: work/policy-decision
 id: decision.recur.occurrence.identity
 title: What makes two generator runs agree they made the same occurrence
 state: done
-outcome: rule-id-plus-local-date
+outcome: decided
+chosen: rule-id-plus-local-date
 question: The generator may be called twice for an overlapping window - a retry, an overlapping cron tick,
   a backfill that recovers a range it partly already covered. What key must two calls agree on before the
   second one refuses to write a second row?

@@ -36,6 +36,4 @@ requiresProof:
     note: notify proves it only ever reads deviceId from this surface.
 
 blockedBy:
-  - Owned entirely by the notify side of an interface that login has not built, and blocked further
-    upstream by decision.login.session.devices being open. This record cannot move to done without a
-    change in features/login, which this lane does not own.
+  - {record: decision.login.session.devices, because: "Owned entirely by the notify side of an interface that login has not built, and blocked further upstream by decision.login.session.devices being open. This record cannot move to done without a change in features/login, which this lane does not own."}

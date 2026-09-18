@@ -10,14 +10,10 @@ measurement:
     group's closesAt and its first dispatch attempt, once the pipeline exists.
   threshold: p95 < 5s
   environment: dev
-appliesTo: [br.notify.digest.window]
-
+refs: [br.notify.digest.window]
 requiresProof:
   measurement:
     required: true
 
 blockedBy:
-  - No implementation exists to measure. The example is moving to a NestJS backend and neither the
-    pipeline nor a scheduler that closes windows on a clock (rather than on the next enqueue call) has
-    been built; today closing a window requires another admit call to observe it, which the measurement
-    above cannot honestly claim meets a wall-clock bound.
+  - {record: gap.notify.unbuilt-module, because: "No implementation exists to measure. The example is moving to a NestJS backend and neither the pipeline nor a scheduler that closes windows on a clock (rather than on the next enqueue call) has been built; today closing a window requires another admit call to observe it, which the measurement above cannot honestly claim meets a wall-clock bound."}

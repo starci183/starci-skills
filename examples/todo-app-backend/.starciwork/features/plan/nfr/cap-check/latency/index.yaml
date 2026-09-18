@@ -10,12 +10,10 @@ measurement:
     guard stubbed to always allow - and diff the p95.
   threshold: p95 regression < 10ms
   environment: dev
-appliesTo: [br.plan.caps.limit]
-
+refs: [br.plan.caps.limit]
 requiresProof:
   measurement:
     required: true
 
 blockedBy:
-  - No create path or cap guard exists yet to measure; the example backend is moving to NestJS and no
-    load-test harness has been pointed at it.
+  - {record: gap.plan.unbuilt-module, because: "No create path or cap guard exists yet to measure; the example backend is moving to NestJS and no load-test harness has been pointed at it."}

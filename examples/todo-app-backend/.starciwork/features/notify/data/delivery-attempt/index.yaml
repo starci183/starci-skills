@@ -14,7 +14,6 @@ invariants:
   - state is exactly one of the five sds.notify.delivery-lifecycle states at any time.
   - endedAt is set if and only if state is delivered, bounced or suppressed.
   - failureClass is set if and only if the attempt is or was in a failure-carrying state.
-appliesTo: [br.notify.failure.classified, br.notify.unsubscribe.honored]
+refs: [br.notify.failure.classified, br.notify.unsubscribe.honored]
 blockedBy:
-  - No entity or table exists yet. The example is moving to a NestJS/TypeORM backend and this shape has
-    not been created against that layout.
+  - {record: gap.notify.unbuilt-module, because: "No entity or table exists yet. The example is moving to a NestJS/TypeORM backend and this shape has not been created against that layout."}

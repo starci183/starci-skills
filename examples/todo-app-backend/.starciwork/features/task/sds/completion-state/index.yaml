@@ -21,5 +21,4 @@ requiresProof:
     forEach: stateMachine.transitions
 
 blockedBy:
-  - br.task.complete.once is todo at rev 2; t-reopen has no implementation and no test.
-
+  - {record: br.task.complete.once, rev: 2, because: "br.task.complete.once is todo at rev 2; t-reopen has no implementation and no test."}

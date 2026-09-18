@@ -1,0 +1,10 @@
+schema: work/gap
+id: gap.notify.task-completion-event
+title: task never emits a completion event today
+state: todo
+statement: task has no completion event today - ownership.mjs (the only task code that exists at this
+  commit) has no complete transition, fr.task.complete is itself todo, and sds.task.completion-state's
+  transitions have no implementation and no sourceEventId concept anywhere in the task feature's records
+  or code. contract.notify.task-completion-feed's onTaskComplete surface has nothing to call it.
+closedBy: event.task.completed
+change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}

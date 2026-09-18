@@ -11,4 +11,4 @@ steps:
 proves: [fr.audit.erasure.request, fr.audit.erasure.complete, fr.audit.export, fr.audit.log.read]
 
 blockedBy:
-  - No screen and no implementation exist yet to walk.
+  - {record: gap.audit.unbuilt-module, because: "No screen and no implementation exist yet to walk."}

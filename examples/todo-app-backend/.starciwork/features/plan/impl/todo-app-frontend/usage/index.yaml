@@ -3,12 +3,11 @@ id: impl.plan.todo-app-frontend.usage
 title: The usage screen and its upgrade action
 state: todo
 repository: todo-app-frontend
-directory: app/plan
-files: [usage-screen.tsx, upgrade-button.tsx]
+owners:
+  - {role: module, path: app/plan/usage-screen.tsx}
+  - {role: module, path: app/plan/upgrade-button.tsx}
 proves: [ui.plan.usage]
 verification: []
 verificationSource: authored-claim
 blockedBy:
-  - The frontend is moving to Next.js, consuming the Grammar core package the way nivo-fe does. Nothing
-    under app/plan exists yet in that layout; an earlier draft was written directly under src/plan as a
-    plain .mjs module and has been removed rather than kept as a second, incompatible scaffold.
+  - {record: gap.plan.unbuilt-module, because: "The frontend is moving to Next.js, consuming the Grammar core package the way nivo-fe does. Nothing under app/plan exists yet in that layout; an earlier draft was written directly under src/plan as a plain .mjs module and has been removed rather than kept as a second, incompatible scaffold."}

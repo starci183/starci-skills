@@ -17,6 +17,4 @@ requiresProof:
     required: true
 
 blockedBy:
-  - No module exists yet at src/plan/cap-guard or the usage screen; the example backend is moving to NestJS
-    and the frontend to Next.js consuming the Grammar core package, and this flow is specified but not built
-    against either layout.
+  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/cap-guard or the usage screen; the example backend is moving to NestJS and the frontend to Next.js consuming the Grammar core package, and this flow is specified but not built against either layout."}

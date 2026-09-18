@@ -4,6 +4,10 @@
 schema: work/evidence
 record: br.login.password.sign-in
 recordDigest: b76d94eb8bd9a9b9f9df7b87487bf3dc4b382eea4a62714b586c7439158a8ff1
+stale: true
+staleSince: {record: br.login.password.sign-in}
+staleReason: The record's index.yaml bytes no longer match recordDigest above; something
+  edited the record after this run captured it, and no fresh run has re-verified it since.
 outcome: pass
 assertions:
   - id: ac.login.password.sign-in.wrong-pair-is-refused

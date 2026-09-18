@@ -13,6 +13,4 @@ acceptanceCriteria: [dedupe-collapses-retry]
 module: src/notify/dedupe
 change: {rev: 1, kind: initial, at: 2026-09-18T06:00:00.000Z}
 blockedBy:
-  - No code exists yet at src/notify/dedupe. The example is moving to a NestJS backend and this module
-    has not been written against that layout; the statement is agreed but not implementable-and-proven
-    until it is, so it stays todo rather than done on the strength of a design alone.
+  - {record: gap.notify.unbuilt-module, because: "No code exists yet at src/notify/dedupe. The example is moving to a NestJS backend and this module has not been written against that layout; the statement is agreed but not implementable-and-proven until it is, so it stays todo rather than done on the strength of a design alone."}

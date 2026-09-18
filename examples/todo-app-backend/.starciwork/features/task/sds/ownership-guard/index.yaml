@@ -12,10 +12,8 @@ interfaces:
 refs: [br.task.single-owner]
 dependsOn: [integration.login.postgres, contract.share.completion-guard-for-task]
 blockedBy:
-  - br.task.single-owner is todo at rev 2. Its t-owner/t-stranger transitions below described an
-    owner-or-nobody guard for every mutation; that is still true for delete but no longer for complete,
-    and this component has not been rebuilt to call contract.share.completion-guard-for-task. Its previous
-    proof stood for the withdrawn rev 1 statement, not for this one.
+  - {record: br.task.single-owner, rev: 2, because: "br.task.single-owner is todo at rev 2. Its t-owner/t-stranger transitions below described an owner-or-nobody guard for every mutation; that is still true for delete but no longer for complete, and this component has not been rebuilt to call contract.share.completion-guard-for-task. Its previous proof stood for the withdrawn rev 1 statement, not for this one."}
+  - {record: contract.share.completion-guard-for-task, rev: 2, because: "br.task.single-owner is todo at rev 2. Its t-owner/t-stranger transitions below described an owner-or-nobody guard for every mutation; that is still true for delete but no longer for complete, and this component has not been rebuilt to call contract.share.completion-guard-for-task. Its previous proof stood for the withdrawn rev 1 statement, not for this one."}
 
 stateMachine:
   states: [unchecked, owned, collaborating, foreign]

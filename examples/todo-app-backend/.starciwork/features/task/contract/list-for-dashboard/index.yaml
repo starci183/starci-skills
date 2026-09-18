@@ -22,6 +22,5 @@ requiresProof:
   consumer: {required: true}
 
 blockedBy:
-  - br.task.list.owned is todo, and decision.task.list.scope has not chosen whether an organization
-    owner reads member tasks. A contract written before that decision would encode the wrong boundary.
-
+  - {record: br.task.list.owned, because: "br.task.list.owned is todo, and decision.task.list.scope has not chosen whether an organization owner reads member tasks. A contract written before that decision would encode the wrong boundary."}
+  - {record: decision.task.list.scope, because: "br.task.list.owned is todo, and decision.task.list.scope has not chosen whether an organization owner reads member tasks. A contract written before that decision would encode the wrong boundary."}
