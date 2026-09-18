@@ -7,5 +7,9 @@ module.exports = {
   },
   testRegex: '.*\\.spec\\.ts$',
   moduleFileExtensions: ['ts', 'js', 'json'],
+  moduleNameMapper: {
+    '^@modules/(.*)$': '<rootDir>/modules/$1',
+    '^@features/(.*)$': '<rootDir>/features/$1',
+  },
   collectCoverageFrom: ['**/*.ts', '!**/*.spec.ts', '!main.ts'],
 };

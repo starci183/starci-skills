@@ -1,26 +1,32 @@
-import { Injectable, Module } from '@nestjs/common';
+import { Global, Injectable, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
+import { CqrsModule } from '@nestjs/cqrs';
 import request from 'supertest';
-import { AppModule } from './app.module';
-import { PostgresModule } from './modules/integrations/postgres';
+import { TodoGraphqlModule } from './features/todo/graphql/graphql.module';
+import { PlatformEventsModule } from './modules/platform/events';
 import {
   InvalidCredentialsException,
-  SessionModule,
   SessionNotFoundException,
   SessionRecord,
-  SessionRepository,
-} from './modules/domain/session';
+  SessionService,
+  SignInHandler,
+  SignOutHandler,
+} from './modules/bussiness/session';
 import {
+  CompleteTaskHandler,
+  CreateTaskHandler,
+  DeleteTaskHandler,
+  ListTasksHandler,
+  ReopenTaskHandler,
   TaskCreationPolicyRegistry,
   TaskForbiddenException,
-  TaskModule,
   TaskNotFoundException,
   TaskRecord,
-  TaskRepository,
+  TaskService,
   TaskTitleRequiredException,
-} from './modules/domain/task';
-import { KeycloakClient, KeycloakInvalidCredentialsException, KeycloakModule, KeycloakSignInResult } from './modules/integrations/keycloak';
+} from './modules/bussiness/task';
+import { KeycloakClient, KeycloakInvalidCredentialsException, KeycloakSignInResult } from './modules/integrations/keycloak';
 
 const DEMO_EMAIL = 'demo@todo.dev';
 const DEMO_PASSWORD = 'todo-demo-pass';
@@ -47,7 +53,7 @@ class FakeKeycloakClient {
   }
 }
 
-class FakeSessionRepository {
+class FakeSessionService {
   private readonly byToken = new Map<string, SessionRecord>();
 
   tBegin(email: string): void {
@@ -77,7 +83,7 @@ class FakeSessionRepository {
   }
 }
 
-class FakeTaskRepository {
+class FakeTaskService {
   private readonly byId = new Map<string, TaskRecord>();
   private seq = 0;
 
@@ -135,41 +141,75 @@ class FakeTaskRepository {
   }
 }
 
-@Module({ providers: [{ provide: KeycloakClient, useClass: FakeKeycloakClient }], exports: [KeycloakClient] })
-class FakeKeycloakModule {}
-
-@Module({ providers: [{ provide: SessionRepository, useClass: FakeSessionRepository }], exports: [SessionRepository] })
+/**
+ * Fakes only the Keycloak boundary; SessionService, the real SignIn/SignOutHandler and PlatformEventBus
+ * are all real, in-process code - the same boundary choice the former REST-transport boot test made
+ * ("fakes at exactly the two boundaries this example cannot prove in a unit test process: Keycloak and
+ * Postgres"). `@Global()` so the five GraphQL task resolvers, which never import SessionModule
+ * themselves and rely on the app's one global registration (see `session-context.ts`), can still resolve
+ * `SessionService` here.
+ *
+ * WHY THIS TEST BUILDS ITS OWN ROOT MODULE INSTEAD OF `AppModule` + `overrideModule`: NestJS's
+ * `TestingModuleBuilder.overrideModule()` matches an import-array entry by strict reference equality
+ * against the *entry itself* (`@nestjs/core/scanner.js`'s `getOverrideModuleByModule`), but a dynamic
+ * module import (`SessionModule.register(...)`, `TaskModule.register()`, `PostgresqlPrimaryModule
+ * .register()`) puts the whole `DynamicModule` object in that slot, not the bare class - so
+ * `.overrideModule(SessionModule)` never matches and the *real* module (with its real
+ * `TypeOrmModule.forFeature`/`forRootAsync` calls) still loads, which is exactly what produced the
+ * "Unable to connect to the database" retries and the missing-repository DI errors this file used to
+ * fail with. Composing a small test-only root module out of the real GraphQL transport
+ * (`TodoGraphqlModule`, unchanged) plus these two fake capability modules sidesteps that limitation
+ * entirely, and is the same shape nivo's own capability specs use (construct the collaborators
+ * directly; see `sign-in.service.spec.ts`) rather than booting the full app for a unit boundary test.
+ */
+@Global()
+@Module({
+  imports: [CqrsModule, PlatformEventsModule],
+  providers: [
+    { provide: SessionService, useClass: FakeSessionService },
+    { provide: KeycloakClient, useClass: FakeKeycloakClient },
+    SignInHandler,
+    SignOutHandler,
+  ],
+  exports: [SessionService],
+})
 class FakeSessionModule {}
 
 @Module({
-  providers: [{ provide: TaskRepository, useClass: FakeTaskRepository }, TaskCreationPolicyRegistry],
-  exports: [TaskRepository, TaskCreationPolicyRegistry],
+  imports: [CqrsModule, PlatformEventsModule],
+  providers: [
+    { provide: TaskService, useClass: FakeTaskService },
+    TaskCreationPolicyRegistry,
+    CreateTaskHandler,
+    CompleteTaskHandler,
+    ReopenTaskHandler,
+    DeleteTaskHandler,
+    ListTasksHandler,
+  ],
+  exports: [TaskService, TaskCreationPolicyRegistry],
 })
 class FakeTaskModule {}
 
-@Module({})
-class FakePostgresModule {}
+@Module({ imports: [FakeSessionModule, FakeTaskModule, TodoGraphqlModule] })
+class TestAppModule {}
 
 /**
  * fr.task.create/complete/reopen/delete/list plus br.login.password.sign-in and fr.login.sign-out, driven
- * end to end through the real Nest app - routing, controllers, use cases - against fakes at exactly the
- * two boundaries this example cannot prove in a unit test process: Keycloak and Postgres. This is the same
- * route sequence the live proof drives against the real stack.
+ * end to end through the real GraphQL transport (`TodoGraphqlModule`, unchanged from what `AppModule`
+ * composes) and the real CQRS handlers - against fakes at exactly the two boundaries this example cannot
+ * prove in a unit test process: Keycloak and Postgres. This is the same route sequence the live proof
+ * drives against the real stack, now speaking GraphQL instead of REST.
  */
 describe('todo-app-backend boot', () => {
   let app: INestApplication;
 
+  const graphql = (query: string, variables?: Record<string, unknown>, sessionToken?: string) => {
+    const req = request(app.getHttpServer()).post('/graphql').send({ query, variables });
+    return sessionToken ? req.set('x-session-token', sessionToken) : req;
+  };
+
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideModule(PostgresModule)
-      .useModule(FakePostgresModule)
-      .overrideModule(KeycloakModule)
-      .useModule(FakeKeycloakModule)
-      .overrideModule(SessionModule)
-      .useModule(FakeSessionModule)
-      .overrideModule(TaskModule)
-      .useModule(FakeTaskModule)
-      .compile();
+    const moduleRef = await Test.createTestingModule({ imports: [TestAppModule] }).compile();
     app = moduleRef.createNestApplication();
     app.enableCors({ origin: 'http://localhost:3000' });
     await app.init();
@@ -180,72 +220,74 @@ describe('todo-app-backend boot', () => {
   });
 
   it('refuses sign-in with the wrong password and with an unknown email identically', async () => {
-    const wrongPassword = await request(app.getHttpServer())
-      .post('/auth/sign-in')
-      .send({ email: DEMO_EMAIL, password: 'not-it' });
-    const unknownEmail = await request(app.getHttpServer())
-      .post('/auth/sign-in')
-      .send({ email: 'nobody@todo.dev', password: 'anything' });
+    const query = 'mutation SignIn($input: SignInInput!) { signIn(input: $input) { sessionToken personId } }';
+    const wrongPassword = await graphql(query, { input: { email: DEMO_EMAIL, password: 'not-it' } });
+    const unknownEmail = await graphql(query, { input: { email: 'nobody@todo.dev', password: 'anything' } });
 
-    expect(wrongPassword.status).toBe(401);
-    expect(unknownEmail.status).toBe(401);
+    expect(wrongPassword.status).toBe(200);
+    expect(wrongPassword.body.errors[0].extensions.code).toBe('INVALID_CREDENTIALS');
     expect(wrongPassword.body).toEqual(unknownEmail.body);
   });
 
-  it('drives sign-in, the full task lifecycle, and sign-out through the real routes', async () => {
-    const signIn = await request(app.getHttpServer())
-      .post('/auth/sign-in')
-      .send({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
-    expect(signIn.status).toBe(201);
-    const token = signIn.body.sessionToken as string;
+  it('drives sign-in, the full task lifecycle, and sign-out through the real GraphQL operations', async () => {
+    const signIn = await graphql(
+      'mutation SignIn($input: SignInInput!) { signIn(input: $input) { sessionToken personId } }',
+      { input: { email: DEMO_EMAIL, password: DEMO_PASSWORD } },
+    );
+    expect(signIn.body.errors).toBeUndefined();
+    const token = signIn.body.data.signIn.sessionToken as string;
     expect(token).toEqual(expect.any(String));
 
-    const create = await request(app.getHttpServer())
-      .post('/tasks')
-      .set('x-session-token', token)
-      .send({ title: 'Prove the boot path' });
-    expect(create.status).toBe(201);
-    const taskId = create.body.taskId as string;
+    const create = await graphql(
+      'mutation CreateTask($input: CreateTaskInput!) { createTask(input: $input) { taskId title } }',
+      { input: { title: 'Prove the boot path' } },
+      token,
+    );
+    expect(create.body.errors).toBeUndefined();
+    const taskId = create.body.data.createTask.taskId as string;
 
-    const list1 = await request(app.getHttpServer()).get('/tasks').set('x-session-token', token);
-    expect(list1.status).toBe(200);
-    expect(list1.body.tasks).toHaveLength(1);
-    expect(list1.body.tasks[0].complete).toBe(false);
+    const list1 = await graphql('query { tasks { taskId title complete } }', undefined, token);
+    expect(list1.body.data.tasks).toHaveLength(1);
+    expect(list1.body.data.tasks[0].complete).toBe(false);
 
-    const complete1 = await request(app.getHttpServer()).post(`/tasks/${taskId}/complete`).set('x-session-token', token);
-    expect(complete1.status).toBe(201);
-    expect(complete1.body.complete).toBe(true);
+    const complete1 = await graphql(
+      'mutation CompleteTask($id: ID!) { completeTask(id: $id) { taskId complete } }',
+      { id: taskId },
+      token,
+    );
+    expect(complete1.body.data.completeTask.complete).toBe(true);
 
-    const complete2 = await request(app.getHttpServer()).post(`/tasks/${taskId}/complete`).set('x-session-token', token);
-    expect(complete2.status).toBe(201);
-    expect(complete2.body.complete).toBe(true);
+    const complete2 = await graphql(
+      'mutation CompleteTask($id: ID!) { completeTask(id: $id) { taskId complete } }',
+      { id: taskId },
+      token,
+    );
+    expect(complete2.body.data.completeTask.complete).toBe(true);
 
-    const reopen = await request(app.getHttpServer()).post(`/tasks/${taskId}/reopen`).set('x-session-token', token);
-    expect(reopen.status).toBe(201);
-    expect(reopen.body.complete).toBe(false);
+    const reopen = await graphql('mutation ReopenTask($id: ID!) { reopenTask(id: $id) { taskId complete } }', { id: taskId }, token);
+    expect(reopen.body.data.reopenTask.complete).toBe(false);
 
-    const del = await request(app.getHttpServer()).delete(`/tasks/${taskId}`).set('x-session-token', token);
-    expect(del.status).toBe(200);
+    const del = await graphql('mutation DeleteTask($id: ID!) { deleteTask(id: $id) { deleted } }', { id: taskId }, token);
+    expect(del.body.data.deleteTask.deleted).toBe(true);
 
-    const list2 = await request(app.getHttpServer()).get('/tasks').set('x-session-token', token);
-    expect(list2.status).toBe(200);
-    expect(list2.body.tasks).toHaveLength(0);
+    const list2 = await graphql('query { tasks { taskId title complete } }', undefined, token);
+    expect(list2.body.data.tasks).toHaveLength(0);
 
-    const signOut = await request(app.getHttpServer())
-      .post('/auth/sign-out')
-      .send({ sessionToken: token });
-    expect(signOut.status).toBe(201);
-    expect(signOut.body.signedOut).toBe(true);
+    const signOut = await graphql(
+      'mutation SignOut($input: SignOutInput!) { signOut(input: $input) { signedOut } }',
+      { input: { sessionToken: token } },
+    );
+    expect(signOut.body.data.signOut.signedOut).toBe(true);
 
-    const afterSignOut = await request(app.getHttpServer()).get('/tasks').set('x-session-token', token);
-    expect(afterSignOut.status).toBe(401);
+    const afterSignOut = await graphql('query { tasks { taskId title complete } }', undefined, token);
+    expect(afterSignOut.body.errors[0].extensions.code).toBe('SESSION_NOT_FOUND');
   });
 
   it('answers a cross-origin preflight with Access-Control-Allow-Origin for http://localhost:3000', async () => {
     const response = await request(app.getHttpServer())
-      .options('/tasks')
+      .options('/graphql')
       .set('Origin', 'http://localhost:3000')
-      .set('Access-Control-Request-Method', 'GET');
+      .set('Access-Control-Request-Method', 'POST');
 
     expect(response.headers['access-control-allow-origin']).toBe('http://localhost:3000');
   });

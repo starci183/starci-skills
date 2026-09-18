@@ -1,13 +1,13 @@
 import { Repository } from 'typeorm';
-import { TaskEntity } from '../../integrations/postgres';
-import { TaskRepository } from './task.repository';
+import { TaskEntity } from '../../platform/databases/postgresql/primary';
+import { TaskService } from './task.service';
 
 /**
- * A minimal in-memory stand-in for Repository<TaskEntity>: only the methods TaskRepository actually
+ * A minimal in-memory stand-in for Repository<TaskEntity>: only the methods TaskService actually
  * calls. It is not a real TypeORM repository, so it is cast through `unknown` at the injection site
  * rather than claimed to satisfy the full Repository surface.
  */
-class FakeTaskRepository {
+class FakeTaskService {
   private readonly byId = new Map<string, TaskEntity>();
 
   async findOneBy(where: { id: string }): Promise<TaskEntity | null> {
@@ -29,9 +29,9 @@ class FakeTaskRepository {
   }
 }
 
-const buildRepository = () => new TaskRepository(new FakeTaskRepository() as unknown as Repository<TaskEntity>);
+const buildRepository = () => new TaskService(new FakeTaskService() as unknown as Repository<TaskEntity>);
 
-describe('TaskRepository', () => {
+describe('TaskService', () => {
   it('br.task.single-owner: a task belongs to exactly one person, and only that person may complete or delete it', async () => {
     const repository = buildRepository();
     const record = await repository.create('owner-1', 'Ship it');

@@ -1,4 +1,4 @@
-import { TaskRecord } from './task-record.types';
+import { TaskRecord } from './types/task-record';
 import { TaskForbiddenException } from './task.exception';
 
 /**

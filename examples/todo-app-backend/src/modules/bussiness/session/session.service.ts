@@ -3,8 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { AppConfigService } from '../../platform/config';
-import { SessionEntity } from '../../integrations/postgres';
-import { SessionRecord } from './session-record.types';
+import { SessionEntity } from '../../platform/databases/postgresql/primary';
+import { SessionRecord } from './types/session-record';
 import { InvalidCredentialsException, SessionExpiredException, SessionNotFoundException } from './session.exception';
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -15,9 +15,14 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * a stopped sweeper can never leave a session alive past its time. Method names mirror the record's five
  * transitions (t-begin, t-accept, t-refuse, t-expire, t-revoke) so the record and the code read together.
  * The row lives in Postgres, through the platform database module's SessionEntity.
+ *
+ * Renamed from the former `SessionRepository` (under `modules/domain/session`) to `SessionService` under
+ * `modules/bussiness/session`: nivo's capability modules own persistence and business rules together in
+ * one `*.service.ts` (see `agent-workspace-operation.service.ts`), rather than a separate
+ * `*.repository.ts` layer.
  */
 @Injectable()
-export class SessionRepository {
+export class SessionService {
   constructor(
     @InjectRepository(SessionEntity) private readonly rows: Repository<SessionEntity>,
     private readonly config: AppConfigService,

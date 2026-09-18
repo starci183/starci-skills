@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
-import { TaskEntity } from '../../integrations/postgres';
+import { TaskEntity } from '../../platform/databases/postgresql/primary';
 import { OwnershipGuard } from './ownership.guard';
 import { CompletionAuthorityRegistry } from './completion-authority.providers';
-import { TaskRecord } from './task-record.types';
+import { TaskRecord } from './types/task-record';
 import { TaskNotFoundException, TaskTitleRequiredException } from './task.exception';
 
 /**
@@ -17,9 +17,12 @@ import { TaskNotFoundException, TaskTitleRequiredException } from './task.except
  * br.task.single-owner rev 2: delete is checked against OwnershipGuard, unconditionally and always; who
  * may complete/reopen is checked against the CompletionAuthorityRegistry's current authority instead, so
  * a future `share` feature can widen that half alone without touching delete's guard.
+ *
+ * Renamed from the former `TaskRepository` (under `modules/domain/task`) to `TaskService` under
+ * `modules/bussiness/task` - same rationale as SessionService beside it.
  */
 @Injectable()
-export class TaskRepository {
+export class TaskService {
   private readonly guard = new OwnershipGuard();
 
   constructor(

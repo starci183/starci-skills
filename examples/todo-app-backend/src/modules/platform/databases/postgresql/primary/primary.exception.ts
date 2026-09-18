@@ -1,6 +1,6 @@
-import { AbstractException } from '../../platform/errors';
+import { AbstractException } from '../../../errors';
 
-export class PostgresUnavailableException extends AbstractException {
+export class PostgresPrimaryUnavailableException extends AbstractException {
   constructor(reason: string) {
     super('The database could not be reached.', 'POSTGRES_UNAVAILABLE', { reason });
   }
