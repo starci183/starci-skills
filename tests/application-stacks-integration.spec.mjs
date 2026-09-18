@@ -22,9 +22,9 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
   for(const file of ['checks/stacks.mjs','schemas/application-stacks.schema.json','knowledge/application-stacks.json',
     'docs/application-stacks.md','docs/application-stacks-vps.md',
     ...['app/Dockerfile','app/server.mjs','gateway/nginx.conf','scripts/prepare.sh','scripts/prepare.ps1',
-      '.gitignore','.stacks/application-stacks.yaml','.stacks/dev/compose.yaml','.stacks/vps/stack.yaml']
-      .map(name=>'examples/todo-app-backend-backend/'+name)])assert.ok(files.has(file),file);
-  assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app-backend-backend/')&&
+      '.gitignore','.starcistacks/application-stacks.yaml','.starcistacks/dev/compose.yaml','.starcistacks/vps/stack.yaml']
+      .map(name=>'examples/todo-app-backend/'+name)])assert.ok(files.has(file),file);
+  assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app-backend/')&&
     (/\/(runtime|generated|\.runtime)\//.test(file)||/\.(enc|agekey)$/.test(file))),false);
 });
 
@@ -32,7 +32,7 @@ test('stacks CLI refuses missing or malformed evidence without echoing file cont
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-cli-'));
   t.after(()=>{assert.equal(path.dirname(directory),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(directory).startsWith('starci-stacks-cli-'));fs.rmSync(directory,{recursive:true,force:true});});
   fs.mkdirSync(path.join(directory,'.starcistacks'));
-  fs.writeFileSync(path.join(directory,'.stacks/application-stacks.yaml'),'schema: starci/application-stacks@1\n');
+  fs.writeFileSync(path.join(directory,'.starcistacks/application-stacks.yaml'),'schema: starci/application-stacks@1\n');
   const model=path.join(directory,'rendered.json'),sentinel='synthetic-secret-never-echo';
   fs.writeFileSync(model,'{"token":"'+sentinel+'",BROKEN');
   const before=fs.readFileSync(model);
@@ -51,7 +51,7 @@ test('runtime packaging excludes accidental generated example plaintext and ciph
   for(const entry of ['config.example.yaml','cli','ops','workflows','model','kernel','hosts','models','checks','providers','approvals',
     'execution','knowledge','contracts','specifications','examples','scripts','core','schemas'])
     fs.cpSync(path.join(root,entry),path.join(directory,entry),{recursive:true});
-  const base='examples/todo-app-backend-backend/.starcistacks/dev/';
+  const base='examples/todo-app-backend/.starcistacks/dev/';
   for(const suffix of ['secrets.yaml','secrets.yaml.enc','runtime/files/secret.yaml','generated/deployment-model.yaml']){
     const target=path.join(directory,base,suffix);fs.mkdirSync(path.dirname(target),{recursive:true});
     fs.writeFileSync(target,'synthetic-credential-must-not-ship');

@@ -25,7 +25,7 @@ These components are not necessarily alternative copies of one local Compose sta
 Keep a single selected placement for each component; do not start a local duplicate
 of the remote API merely to satisfy an application inventory check.
 
-The caller's `.stacks` declaration must identify the remote API's actual owner,
+The caller's `.starcistacks` declaration must identify the remote API's actual owner,
 failure domain, separately maintained deployment declaration, accepted API contract,
 endpoint binding, credential reference, timeout and readiness verification. Keep
 credential values in their declared custody. A remote API is external to the

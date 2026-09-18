@@ -103,6 +103,6 @@ pairRules:
   - Package manager and source topology are project choices. A single application does not need a workspace manifest; npm, pnpm and other workspace tools use their actual manifests. TypeScript project configuration is checked by architecture check, not by demanding a root tsconfig or src directory in every layout.
   - Host owns the only .claude/SKILL.md runtime identity and .workspaces project/route registry. Backend owns the project's only .starciwork.
   - Routed backend and frontend sources contain no duplicate StarCi runtime or route-registry identity and no product workspace outside the backend-owned .starciwork.
-  - A project-owned .claude or .workspaces directory without those identity markers is not rejected by name alone; .stacks may hold legitimate repository deployment knowledge.
+  - A project-owned .claude or .workspaces directory without those identity markers is not rejected by name alone; .starcistacks may hold legitimate repository deployment knowledge.
   - The bound Work root is exactly <backend>/.starciwork and contains features/index.yaml.
   - Required path checks do not prove application behavior, build success, source completeness or production readiness.

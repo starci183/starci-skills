@@ -17,11 +17,11 @@ function fixture(t,{hostIsBackend=false}={}){
  for(const relative of ['AGENTS.md','CLAUDE.md'])make(host,relative,'Read .claude/SKILL.md\n');
  make(host,'.claude/SKILL.md','Synthetic runtime entry.\n');
  for(const relative of ['.git','src'])make(be,relative,null);
- make(be,'.claude/deployments',null);make(be,'.workspaces/device-state.json','{}');make(be,'.stacks/deployment.json','{}');
+ make(be,'.claude/deployments',null);make(be,'.workspaces/device-state.json','{}');make(be,'.starcistacks/deployment.json','{}');
  make(be,'.starciwork/workspace.yaml','schema: work/workspace@1\nid: synthetic\n');make(be,'.starciwork/features/index.yaml','schema: work/node@2\nid: features\nkind: business\nrequired: true\ndescription: Synthetic feature catalog.\n');
  make(be,'package.json','{}');make(be,'pnpm-workspace.yaml','packages: []\n');make(be,'tsconfig.json','{}');
  for(const relative of ['.git','apps'])make(fe,relative,null);
- make(fe,'.claude/sources',null);make(fe,'.stacks/frontend-deployment.json','{}');
+ make(fe,'.claude/sources',null);make(fe,'.starcistacks/frontend-deployment.json','{}');
  make(fe,'package.json','{}');make(fe,'pnpm-workspace.yaml','packages: []\n');
  return {host,be,fe};
 }

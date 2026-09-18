@@ -444,7 +444,7 @@ executionModes:
         path: knowledge/application-stacks.json + docs/application-stacks.md +
           docs/application-stacks-vps.md + schemas/application-stacks.schema.json
         purpose:
-          en: When the imported source contains application deployment, .stacks compose material or
+          en: When the imported source contains application deployment, .starcistacks compose material or
             bootstrap/recovery declarations, load the whole-application dev/VPS contract and its
             .starciwork schema so deployment files are classified and mapped as stack material -
             observed facts with provenance, checked against `starci stacks check` where a rendered
@@ -614,7 +614,7 @@ executionModes:
           - evidence
         action:
           en: Read the bounded source and tests; map routes/actions/data/rules to source facts at actual
-            commits, and map .stacks compose/bootstrap material against the declared stack contract
+            commits, and map .starcistacks compose/bootstrap material against the declared stack contract
             where it is present. Report contradictions and missing behavior. Label inferred business
             as candidate, never approved intent; old checkmarks and test file existence prove no
             current execution.

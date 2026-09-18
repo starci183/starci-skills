@@ -11,23 +11,23 @@ import {checkApplicationStacks} from '../checks/stacks.mjs';
 
 const manifestFor=root=>({schema:'starci/application-stacks@1',components:[
   {id:'api',role:'backend',required:true},{id:'db',role:'stateful',required:true},{id:'mail',role:'gateway',required:false}],
-environments:{dev:{status:'supported',runtime:'docker-compose',composeFiles:['.stacks/dev/compose.yaml'],components:{
+environments:{dev:{status:'supported',runtime:'docker-compose',composeFiles:['.starcistacks/dev/compose.yaml'],components:{
   api:{ownership:'managed',service:'api',failureDomain:'dev-compose'},db:{ownership:'managed',service:'db',failureDomain:'dev-compose'},
   mail:{ownership:'external',owner:'developer',failureDomain:'provider-account',endpointRef:'MAIL_URL'}},
   runbook:{prepare:'dev prepare',doctor:'dev doctor',up:'dev up',status:'dev status',logs:'dev logs',down:'dev down',verification:{coldStart:'verify cold',restart:'verify restart',persistence:'verify data'}},
-  secrets:[{name:'db-password',source:'generated',generationAlgorithm:'CSPRNG',formatPolicy:'32-byte base64url',encryptedRef:'.stacks/dev/db-password.txt.enc',materializedPath:'.stacks/dev/db-password.txt',recipientPolicy:'policy:owner-age',keyCustody:'custody:owner-password-manager'}]},
-vps:{status:'supported',runtime:'docker-swarm',composeFiles:['.stacks/vps/compose.yaml'],components:{api:{ownership:'managed',service:'api',failureDomain:'vps-compose'},db:{ownership:'external',owner:'database-provider',failureDomain:'provider-region',endpointRef:'DATABASE_URL'},mail:{ownership:'external',owner:'mail-provider',failureDomain:'provider-account',endpointRef:'MAIL_URL'}},
-  runbook:{prepare:'vps prepare',doctor:'vps doctor',up:'vps up',status:'vps status',logs:'vps logs',down:'vps down',update:'vps update',rollback:'vps rollback',backup:'vps backup',restore:'vps restore',verification:{coldStart:'verify cold',restart:'verify restart',persistence:'verify data'}},platform:{ubuntu:'24.04 LTS',architectures:['amd64']},secrets:[{name:'app-token',source:'provider-issued',sourceOwner:'application owner',encryptedRef:'.stacks/vps/app-token.yaml.enc',runtimeName:'app-token-v1',version:'v1',recipientPolicy:'policy:owner-age',keyCustody:'custody:owner-password-manager'}]}},k8s:{status:'deferred',reason:'not in the current delivery target'}});
+  secrets:[{name:'db-password',source:'generated',generationAlgorithm:'CSPRNG',formatPolicy:'32-byte base64url',encryptedRef:'.starcistacks/dev/db-password.txt.enc',materializedPath:'.starcistacks/dev/db-password.txt',recipientPolicy:'policy:owner-age',keyCustody:'custody:owner-password-manager'}]},
+vps:{status:'supported',runtime:'docker-swarm',composeFiles:['.starcistacks/vps/compose.yaml'],components:{api:{ownership:'managed',service:'api',failureDomain:'vps-compose'},db:{ownership:'external',owner:'database-provider',failureDomain:'provider-region',endpointRef:'DATABASE_URL'},mail:{ownership:'external',owner:'mail-provider',failureDomain:'provider-account',endpointRef:'MAIL_URL'}},
+  runbook:{prepare:'vps prepare',doctor:'vps doctor',up:'vps up',status:'vps status',logs:'vps logs',down:'vps down',update:'vps update',rollback:'vps rollback',backup:'vps backup',restore:'vps restore',verification:{coldStart:'verify cold',restart:'verify restart',persistence:'verify data'}},platform:{ubuntu:'24.04 LTS',architectures:['amd64']},secrets:[{name:'app-token',source:'provider-issued',sourceOwner:'application owner',encryptedRef:'.starcistacks/vps/app-token.yaml.enc',runtimeName:'app-token-v1',version:'v1',recipientPolicy:'policy:owner-age',keyCustody:'custody:owner-password-manager'}]}},k8s:{status:'deferred',reason:'not in the current delivery target'}});
 
 function fixture(t,environment='dev'){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  fs.mkdirSync(path.join(root,'.stacks','dev'),{recursive:true});fs.mkdirSync(path.join(root,'.stacks','vps'),{recursive:true});
-  fs.writeFileSync(path.join(root,'.stacks','dev','compose.yaml'),'services: {}\n');fs.writeFileSync(path.join(root,'.stacks','vps','compose.yaml'),'services: {}\n');
-  fs.writeFileSync(path.join(root,'.stacks','dev','db-password.txt.enc'),'data: ENC[AES256_GCM,data:cipher,iv:a,tag:b,type:str]\nsops:\n  age: []\n');
-  fs.writeFileSync(path.join(root,'.stacks','vps','app-token.yaml.enc'),'data: ENC[AES256_GCM,data:cipher,iv:a,tag:b,type:str]\nsops:\n  age: []\n');
-  const manifest=manifestFor(root),modelFile=path.join(root,'rendered.json'),materialized=path.join(root,'.stacks','dev','db-password.txt');
+  fs.mkdirSync(path.join(root,'.starcistacks','dev'),{recursive:true});fs.mkdirSync(path.join(root,'.starcistacks','vps'),{recursive:true});
+  fs.writeFileSync(path.join(root,'.starcistacks','dev','compose.yaml'),'services: {}\n');fs.writeFileSync(path.join(root,'.starcistacks','vps','compose.yaml'),'services: {}\n');
+  fs.writeFileSync(path.join(root,'.starcistacks','dev','db-password.txt.enc'),'data: ENC[AES256_GCM,data:cipher,iv:a,tag:b,type:str]\nsops:\n  age: []\n');
+  fs.writeFileSync(path.join(root,'.starcistacks','vps','app-token.yaml.enc'),'data: ENC[AES256_GCM,data:cipher,iv:a,tag:b,type:str]\nsops:\n  age: []\n');
+  const manifest=manifestFor(root),modelFile=path.join(root,'rendered.json'),materialized=path.join(root,'.starcistacks','dev','db-password.txt');
   const model=environment==='dev'?{services:{api:{environment:{DB_PASSWORD_FILE:'/run/secrets/db-password'},secrets:['db-password']},db:{}},secrets:{'db-password':{file:materialized}}}:{services:{api:{image:'example/api@sha256:fixture',environment:{APP_TOKEN_FILE:'/run/secrets/app_token'},secrets:[{source:'app-token',target:'app_token'}],deploy:{replicas:1},healthcheck:{test:['CMD','node','health.js']},networks:['app-overlay']}},networks:{'app-overlay':{driver:'overlay'}},secrets:{'app-token':{external:true,name:'app-token-v1'}}};
-  const write=()=>{fs.writeFileSync(path.join(root,'.stacks','application-stacks.yaml'),stringifyYaml(manifest));fs.writeFileSync(modelFile,JSON.stringify(model));};write();
+  const write=()=>{fs.writeFileSync(path.join(root,'.starcistacks','application-stacks.yaml'),stringifyYaml(manifest));fs.writeFileSync(modelFile,JSON.stringify(model));};write();
   return {root,manifest,model,modelFile,write,check:()=>checkApplicationStacks({repoRoot:root,environment,deploymentModelFile:modelFile})};
 }
 
@@ -38,7 +38,7 @@ function dualProfileFixture(t,selected='docker-apps'){
   fs.writeFileSync(path.join(sourceRoot,'apps','api','package.json'),JSON.stringify({private:true,scripts:{dev:'node src/main.mjs'}}));
   fs.writeFileSync(path.join(sourceRoot,'apps','api','Dockerfile'),'FROM scratch\n');
   fs.writeFileSync(path.join(sourceRoot,'apps','api','src','main.mjs'),'export {}\n');
-  fs.mkdirSync(path.join(f.root,'.stacks','dev','runtime'),{recursive:true});fs.writeFileSync(path.join(f.root,'.stacks','dev','runtime','api.env'),'# generated private env fixture\n');
+  fs.mkdirSync(path.join(f.root,'.starcistacks','dev','runtime'),{recursive:true});fs.writeFileSync(path.join(f.root,'.starcistacks','dev','runtime','api.env'),'# generated private env fixture\n');
   const revision='a'.repeat(40),dbImage=`postgres@sha256:${'b'.repeat(64)}`;
   f.manifest.sources=[{id:'backend',repositoryRole:'backend',rootRef:'BACKEND_SOURCE_ROOT',revision}];
   f.manifest.environments.dev.components.api={ownership:'managed',failureDomain:'selected-dev-profile'};
@@ -49,29 +49,29 @@ function dualProfileFixture(t,selected='docker-apps'){
       mail:{mode:'external',owner:'developer',failureDomain:'provider-account',endpointRef:'MAIL_URL'},
     }},
     'native-apps':{exclusiveGroup:'dev-app-runtime',components:{
-      api:{mode:'host-process',source:'backend',sourceRoot:'apps/api',command:'dev',envFile:'.stacks/dev/runtime/api.env',readiness:{scheme:'http',host:'127.0.0.1',port:3068,path:'/health'},ports:[{name:'http',host:3068}],connections:[{component:'db',variable:'DATABASE_HOST',host:'127.0.0.1',port:5432}]},
+      api:{mode:'host-process',source:'backend',sourceRoot:'apps/api',command:'dev',envFile:'.starcistacks/dev/runtime/api.env',readiness:{scheme:'http',host:'127.0.0.1',port:3068,path:'/health'},ports:[{name:'http',host:3068}],connections:[{component:'db',variable:'DATABASE_HOST',host:'127.0.0.1',port:5432}]},
       db:{mode:'docker-service',service:'db',image:dbImage,ports:[{name:'postgres',host:5432,container:5432}],storage:[{volume:'db-data',custody:'application-owner encrypted backup',backupRef:'dev-backup/postgres'}]},
       mail:{mode:'external',owner:'developer',failureDomain:'provider-account',endpointRef:'MAIL_URL'},
     }},
   };
   const db={image:dbImage,ports:['5432:5432'],volumes:['db-data:/var/lib/postgresql/data'],environment:{DB_PASSWORD_FILE:'/run/secrets/db-password'},secrets:['db-password']};
   for(const key of Object.keys(f.model))delete f.model[key];
-  Object.assign(f.model,{'x-starci-profile':selected,'x-starci-sources':{backend:{root:sourceRoot,revision}},services:{db},volumes:{'db-data':{}},secrets:{'db-password':{file:path.join(f.root,'.stacks','dev','db-password.txt')}}});
+  Object.assign(f.model,{'x-starci-profile':selected,'x-starci-sources':{backend:{root:sourceRoot,revision}},services:{db},volumes:{'db-data':{}},secrets:{'db-password':{file:path.join(f.root,'.starcistacks','dev','db-password.txt')}}});
   if(selected==='docker-apps')f.model.services.api={build:{context:sourceRoot,dockerfile:'apps/api/Dockerfile'},ports:['3068:3068'],environment:{},secrets:[]};
   f.write();
   return {...f,sourceRoot,revision,dbImage};
 }
 
 function addRemoteApi(f,{publicApi=false}={}){
-  const token='controlplane-api-token',enc='.stacks/dev/controlplane-api-token.enc',plain='.stacks/dev/runtime/controlplane-api-token';
-  fs.mkdirSync(path.join(f.root,'.stacks','deployments'),{recursive:true});fs.mkdirSync(path.join(f.root,'contracts'),{recursive:true});fs.mkdirSync(path.join(f.root,'scripts'),{recursive:true});
-  fs.writeFileSync(path.join(f.root,'.stacks','deployments','controlplane.json'),JSON.stringify({component:'controlplane',placement:'external-application-workload'}));
+  const token='controlplane-api-token',enc='.starcistacks/dev/controlplane-api-token.enc',plain='.starcistacks/dev/runtime/controlplane-api-token';
+  fs.mkdirSync(path.join(f.root,'.starcistacks','deployments'),{recursive:true});fs.mkdirSync(path.join(f.root,'contracts'),{recursive:true});fs.mkdirSync(path.join(f.root,'scripts'),{recursive:true});
+  fs.writeFileSync(path.join(f.root,'.starcistacks','deployments','controlplane.json'),JSON.stringify({component:'controlplane',placement:'external-application-workload'}));
   fs.writeFileSync(path.join(f.root,'contracts','controlplane.openapi.yaml'),'openapi: 3.1.0\ninfo: {title: Fixture, version: 1.0.0}\n');
   fs.writeFileSync(path.join(f.root,'scripts','verify-controlplane.mjs'),'export {}\n');
   f.manifest.components.push({id:'controlplane',role:'backend',required:true});
   f.manifest.environments.dev.components.controlplane={ownership:'external',owner:'controlplane-application-owner',failureDomain:'remote-application-deployment',endpointRef:'CONTROLPLANE_API_URL'};
   f.manifest.environments.vps.components.controlplane={ownership:'external',owner:'controlplane-application-owner',failureDomain:'remote-application-deployment',endpointRef:'CONTROLPLANE_API_URL'};
-  const remoteApi={deploymentRef:'.stacks/deployments/controlplane.json',contractRef:'contracts/controlplane.openapi.yaml',readiness:{scheme:'https',path:'/health/ready',verificationRef:'scripts/verify-controlplane.mjs'},callers:[{component:'api',timeoutMs:15000,...(publicApi?{publicAuthRationale:'published anonymous status API'}:{authRef:token})}]};
+  const remoteApi={deploymentRef:'.starcistacks/deployments/controlplane.json',contractRef:'contracts/controlplane.openapi.yaml',readiness:{scheme:'https',path:'/health/ready',verificationRef:'scripts/verify-controlplane.mjs'},callers:[{component:'api',timeoutMs:15000,...(publicApi?{publicAuthRationale:'published anonymous status API'}:{authRef:token})}]};
   for(const profile of Object.values(f.manifest.environments.dev.profiles))profile.components.controlplane={mode:'external',owner:'controlplane-application-owner',failureDomain:'remote-application-deployment',endpointRef:'CONTROLPLANE_API_URL',remoteApi:structuredClone(remoteApi)};
   if(!publicApi){
     fs.writeFileSync(path.join(f.root,...enc.split('/')),'data: ENC[AES256_GCM,data:cipher,iv:a,tag:b,type:str]\nsops:\n  age: []\n');
@@ -96,7 +96,7 @@ test('fails missing component coverage and ambiguous external ownership',t=>{
 test('rejects unsafe or symlinked repository assets',t=>{
   const f=fixture(t),outside=path.join(path.dirname(f.root),'outside-compose.yaml');fs.writeFileSync(outside,'services: {}\n');
   f.manifest.environments.dev.composeFiles=['../outside-compose.yaml'];f.write();assert.ok(f.check().errors.some(x=>x.code==='compose-path-unsafe'));
-  f.manifest.environments.dev.composeFiles=['.stacks/dev/link.yaml'];try{fs.symlinkSync(outside,path.join(f.root,'.stacks','dev','link.yaml'));}catch{return;}f.write();assert.ok(f.check().errors.some(x=>x.code==='compose-path-unsafe'));
+  f.manifest.environments.dev.composeFiles=['.starcistacks/dev/link.yaml'];try{fs.symlinkSync(outside,path.join(f.root,'.starcistacks','dev','link.yaml'));}catch{return;}f.write();assert.ok(f.check().errors.some(x=>x.code==='compose-path-unsafe'));
 });
 
 test('reports plaintext sensitive environment keys without returning their values',t=>{
@@ -105,7 +105,7 @@ test('reports plaintext sensitive environment keys without returning their value
 });
 
 test('rejects encrypted files mounted directly and unresolved Compose placeholders',t=>{
-  const f=fixture(t);f.model.secrets['db-password'].file=path.join(f.root,'.stacks','dev','db-password.txt.enc');f.model.services.api.image='app:${TAG}';f.write();
+  const f=fixture(t);f.model.secrets['db-password'].file=path.join(f.root,'.starcistacks','dev','db-password.txt.enc');f.model.services.api.image='app:${TAG}';f.write();
   const codes=f.check().errors.map(x=>x.code);assert.ok(codes.includes('encrypted-secret-mounted'));assert.ok(codes.includes('compose-placeholder-unresolved'));
 });
 
@@ -138,21 +138,21 @@ test('malformed null inventory component fails VPS checking without crashing lat
 });
 
 test('rejects primitive, oversized, and unknown manifest shapes without throwing',t=>{
-  const f=fixture(t);fs.writeFileSync(path.join(f.root,'.stacks','application-stacks.yaml'),'null\n');assert.doesNotThrow(()=>f.check());assert.equal(f.check().ok,false);
-  fs.writeFileSync(path.join(f.root,'.stacks','application-stacks.yaml'),'x'.repeat(4*1024*1024+1));assert.ok(f.check().errors.some(x=>x.code==='input-too-large'));
+  const f=fixture(t);fs.writeFileSync(path.join(f.root,'.starcistacks','application-stacks.yaml'),'null\n');assert.doesNotThrow(()=>f.check());assert.equal(f.check().ok,false);
+  fs.writeFileSync(path.join(f.root,'.starcistacks','application-stacks.yaml'),'x'.repeat(4*1024*1024+1));assert.ok(f.check().errors.some(x=>x.code==='input-too-large'));
   f.write();f.manifest.unrecognized=true;f.write();assert.ok(f.check().errors.some(x=>x.code==='schema-shape-invalid'&&x.message==='unknown field'));
 });
 
 test('requires exact secret inventory, grants, and a recognizable SOPS envelope',t=>{
-  const f=fixture(t);f.model.secrets.extra={file:path.join(f.root,'.stacks','dev','extra')};f.model.services.api.secrets.push('missing');f.write();let codes=f.check().errors.map(x=>x.code);
+  const f=fixture(t);f.model.secrets.extra={file:path.join(f.root,'.starcistacks','dev','extra')};f.model.services.api.secrets.push('missing');f.write();let codes=f.check().errors.map(x=>x.code);
   assert.ok(codes.includes('compose-secret-unclassified'));assert.ok(codes.includes('service-secret-grant-invalid'));
-  f.model.secrets={ 'db-password':{file:path.join(f.root,'.stacks','dev','db-password.txt')} };f.model.services.api.secrets=['db-password'];f.manifest.environments.dev.secrets.push({...f.manifest.environments.dev.secrets[0]});
-  fs.writeFileSync(path.join(f.root,'.stacks','dev','db-password.txt.enc'),'plaintext renamed as encrypted');f.write();codes=f.check().errors.map(x=>x.code);assert.ok(codes.includes('secret-duplicate'));assert.ok(codes.includes('encrypted-ref-invalid'));
+  f.model.secrets={ 'db-password':{file:path.join(f.root,'.starcistacks','dev','db-password.txt')} };f.model.services.api.secrets=['db-password'];f.manifest.environments.dev.secrets.push({...f.manifest.environments.dev.secrets[0]});
+  fs.writeFileSync(path.join(f.root,'.starcistacks','dev','db-password.txt.enc'),'plaintext renamed as encrypted');f.write();codes=f.check().errors.map(x=>x.code);assert.ok(codes.includes('secret-duplicate'));assert.ok(codes.includes('encrypted-ref-invalid'));
 });
 
 test('rejects a materialization path through a symlink ancestor without reading plaintext',t=>{
   const f=fixture(t),outside=fs.mkdtempSync(path.join(os.tmpdir(),'starci-secret-outside-'));t.after(()=>fs.rmSync(outside,{recursive:true,force:true}));
-  const link=path.join(f.root,'.stacks','dev','linked');try{fs.symlinkSync(outside,link,'junction');}catch{return;}f.manifest.environments.dev.secrets[0].materializedPath='.stacks/dev/linked/secret.txt';f.model.secrets['db-password'].file=path.join(link,'secret.txt');f.write();assert.ok(f.check().errors.some(x=>x.code==='materialized-path-invalid'));
+  const link=path.join(f.root,'.starcistacks','dev','linked');try{fs.symlinkSync(outside,link,'junction');}catch{return;}f.manifest.environments.dev.secrets[0].materializedPath='.starcistacks/dev/linked/secret.txt';f.model.secrets['db-password'].file=path.join(link,'secret.txt');f.write();assert.ok(f.check().errors.some(x=>x.code==='materialized-path-invalid'));
 });
 
 test('allows escaped shell interpolation while rejecting unresolved host fields',t=>{
@@ -162,7 +162,7 @@ test('allows escaped shell interpolation while rejecting unresolved host fields'
 
 test('validates malformed nested fields in the unselected environment',t=>{
   const f=fixture(t,'dev');f.manifest.environments.vps.runbook.prepare={command:'bad'};f.manifest.environments.vps.platform.architectures=['riscv'];
-  f.manifest.environments.vps.components.db=null;f.manifest.environments.vps.secrets=[{name:'issued',source:'provider-issued',encryptedRef:'.stacks/vps/issued.yaml.enc',materializedPath:'.stacks/vps/issued.yaml',recipientPolicy:'policy',keyCustody:'custody'}];f.write();
+  f.manifest.environments.vps.components.db=null;f.manifest.environments.vps.secrets=[{name:'issued',source:'provider-issued',encryptedRef:'.starcistacks/vps/issued.yaml.enc',materializedPath:'.starcistacks/vps/issued.yaml',recipientPolicy:'policy',keyCustody:'custody'}];f.write();
   const result=f.check();assert.equal(result.ok,false);assert.ok(result.errors.some(x=>x.code==='schema-shape-invalid'&&x.path.includes('/vps/runbook/prepare')));assert.ok(result.errors.some(x=>x.path.includes('/vps/platform/architectures/0')));assert.ok(result.errors.some(x=>x.path.includes('/vps/components/db')));assert.ok(result.errors.some(x=>x.code==='schema-policy-invalid'&&x.path.includes('secrets[0]')));
 });
 
@@ -186,7 +186,7 @@ test('checks Docker-app and host-native dev profiles against one immutable split
   const docker=dualProfileFixture(t,'docker-apps'),dockerResult=docker.check();
   assert.equal(dockerResult.ok,true,JSON.stringify(dockerResult.errors,null,2));assert.equal(dockerResult.profile,'docker-apps');
   const native=dualProfileFixture(t,'native-apps');
-  fs.writeFileSync(path.join(native.root,'.stacks','dev','runtime','api.env'),'PRIVATE_SENTINEL=never-echo-this\n');
+  fs.writeFileSync(path.join(native.root,'.starcistacks','dev','runtime','api.env'),'PRIVATE_SENTINEL=never-echo-this\n');
   const nativeResult=native.check();assert.equal(nativeResult.ok,true,JSON.stringify(nativeResult.errors,null,2));assert.equal(nativeResult.profile,'native-apps');
   assert.equal(JSON.stringify(nativeResult).includes('PRIVATE_SENTINEL'),false,'checker never reads or returns native env contents');
   for(const fixture of [docker,native]){
@@ -219,7 +219,7 @@ test('validates closure for unselected profiles without claiming their runtime w
 });
 
 test('selected native profile requires an existing private env file and one shared exclusive group',t=>{
-  const f=dualProfileFixture(t,'native-apps');fs.rmSync(path.join(f.root,'.stacks','dev','runtime','api.env'));
+  const f=dualProfileFixture(t,'native-apps');fs.rmSync(path.join(f.root,'.starcistacks','dev','runtime','api.env'));
   f.manifest.environments.dev.profiles['native-apps'].exclusiveGroup='different-runtime-group';f.write();
   const codes=f.check().errors.map(item=>item.code);
   assert.ok(codes.includes('native-env-unavailable'),codes.join(','));
@@ -230,13 +230,13 @@ test('native host connections use target host ports and docker-to-host routing f
   const f=dualProfileFixture(t,'native-apps'),source=f.sourceRoot;
   fs.mkdirSync(path.join(source,'apps','web','src'),{recursive:true});fs.writeFileSync(path.join(source,'apps','web','package.json'),JSON.stringify({private:true,scripts:{dev:'node src/main.mjs'}}));
   fs.writeFileSync(path.join(source,'apps','web','Dockerfile'),'FROM scratch\n');fs.writeFileSync(path.join(source,'apps','web','src','main.mjs'),'export {}\n');
-  fs.writeFileSync(path.join(f.root,'.stacks','dev','runtime','web.env'),'# generated private env fixture\n');
+  fs.writeFileSync(path.join(f.root,'.starcistacks','dev','runtime','web.env'),'# generated private env fixture\n');
   f.manifest.components.push({id:'web',role:'frontend',required:true});
   f.manifest.sources.push({id:'frontend',repositoryRole:'frontend',rootRef:'FRONTEND_SOURCE_ROOT',revision:f.revision});
   f.manifest.environments.dev.components.web={ownership:'managed',failureDomain:'selected-dev-profile'};
   f.manifest.environments.vps.components.web={ownership:'external',owner:'future-vps-release',failureDomain:'vps-release',endpointRef:'WEB_URL'};
   f.manifest.environments.dev.profiles['docker-apps'].components.web={mode:'docker-service',service:'web',source:'frontend',sourceRoot:'apps/web',build:{context:'.',dockerfile:'apps/web/Dockerfile',inputs:['package.json','apps/web']},readiness:{scheme:'http',host:'127.0.0.1',port:3067,path:'/health'},ports:[{name:'http',host:3067,container:3067}]};
-  f.manifest.environments.dev.profiles['native-apps'].components.web={mode:'host-process',source:'frontend',sourceRoot:'apps/web',command:'dev',envFile:'.stacks/dev/runtime/web.env',readiness:{scheme:'http',host:'127.0.0.1',port:3067,path:'/health'},ports:[{name:'http',host:3067}],connections:[{component:'api',variable:'API_HOST',host:'wrong-host',port:9999}]};
+  f.manifest.environments.dev.profiles['native-apps'].components.web={mode:'host-process',source:'frontend',sourceRoot:'apps/web',command:'dev',envFile:'.starcistacks/dev/runtime/web.env',readiness:{scheme:'http',host:'127.0.0.1',port:3067,path:'/health'},ports:[{name:'http',host:3067}],connections:[{component:'api',variable:'API_HOST',host:'wrong-host',port:9999}]};
   f.model['x-starci-sources'].frontend={root:source,revision:f.revision};f.write();
   let codes=f.check().errors.map(item=>item.code);assert.ok(codes.includes('native-connection-invalid'),codes.join(','));
   const web=f.manifest.environments.dev.profiles['native-apps'].components.web;
@@ -286,4 +286,24 @@ test('remote application API fails unresolved evidence, caller, auth, and local-
   f.model.services.controlplane={image:`example/controlplane@sha256:${'c'.repeat(64)}`};f.write();
   const codes=new Set(f.check().errors.map(item=>item.code));
   for(const code of ['remote-api-contract-ref-unavailable','remote-api-caller-invalid','remote-api-auth-invalid','remote-api-local-service-conflict','remote-api-authority-mismatch','remote-api-readiness-invalid'])assert.ok(codes.has(code),`${code}: ${[...codes].join(',')}`);
+});
+
+test('a legacy .stacks-only tree without .starcistacks fires STACKS_LEGACY_DIRECTORY instead of crashing or being accepted silently',t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-legacy-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  fs.mkdirSync(path.join(root,'.stacks','dev'),{recursive:true});
+  fs.writeFileSync(path.join(root,'.stacks','application-stacks.yaml'),stringifyYaml(manifestFor(root)));
+  const modelFile=path.join(root,'rendered.json');fs.writeFileSync(modelFile,JSON.stringify({}));
+  assert.doesNotThrow(()=>checkApplicationStacks({repoRoot:root,environment:'dev',deploymentModelFile:modelFile}));
+  const result=checkApplicationStacks({repoRoot:root,environment:'dev',deploymentModelFile:modelFile});
+  assert.equal(result.ok,false);
+  const finding=result.errors.find(x=>x.code==='STACKS_LEGACY_DIRECTORY');
+  assert.ok(finding,result.errors.map(x=>x.code).join(','));
+  assert.match(finding.message,/renamed.*\.starcistacks/);
+});
+
+test('a .starcistacks tree never fires STACKS_LEGACY_DIRECTORY, including when a leftover .stacks directory also exists',t=>{
+  const f=fixture(t);
+  assert.equal(f.check().errors.some(x=>x.code==='STACKS_LEGACY_DIRECTORY'),false);
+  fs.mkdirSync(path.join(f.root,'.stacks'),{recursive:true});
+  assert.equal(f.check().errors.some(x=>x.code==='STACKS_LEGACY_DIRECTORY'),false);
 });
