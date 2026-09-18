@@ -3666,3 +3666,42 @@ unclassifiedEdges:
   - from: uat.task.create
     field: proves
     target: fr.task.create
+  - from: ui.audit.privacy
+    field: assets.generation.inputRefs
+    target: fr.audit.erasure.request
+  - from: ui.audit.privacy
+    field: assets.generation.inputRefs
+    target: fr.audit.export
+  - from: ui.login.sign-in
+    field: assets.generation.inputRefs
+    target: fr.login.sign-in
+  - from: ui.notify.preferences
+    field: assets.generation.inputRefs
+    target: fr.notify.unsubscribe
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
+    target: fr.plan.upgrade
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
+    target: fr.plan.usage.view
+  - from: ui.recur.schedule
+    field: assets.generation.inputRefs
+    target: fr.recur.end-rule
+  - from: ui.recur.schedule
+    field: assets.generation.inputRefs
+    target: fr.recur.make-recurring
+  - from: ui.recur.schedule
+    field: assets.generation.inputRefs
+    target: fr.recur.see-upcoming
+  - from: ui.share.invite
+    field: assets.generation.inputRefs
+    target: fr.share.invite
+  - from: ui.share.invite
+    field: assets.generation.inputRefs
+    target: fr.share.list
+  - from: ui.task.list
+    field: assets.generation.inputRefs
+    target: br.task.title.required
+  - from: ui.task.list
+    field: assets.generation.inputRefs
+    target: fr.task.create
