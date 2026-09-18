@@ -39,6 +39,7 @@ export const TaskListBlock = (props: TaskListBlockProps) => {
       refusal={refusal}
       newTitle={newTitle}
       isCreating={createTask.isMutating}
+      isDeleting={deleteTask.isMutating}
       onNewTitleChange={setNewTitle}
       onCreate={onCreate}
       onToggleComplete={(id, complete) => {

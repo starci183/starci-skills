@@ -1039,11 +1039,11 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.plan.live-proof
-        rootKind: gap
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
         cyclic: false
-        because: The screen exists and is render-proven, but this record requires live uat proof and
-          uat.verify has not run the downgrade surface against the running product yet.
+        because: No usage screen or downgrade action exists yet at app/plan for an owner to actually reach;
+          this backend-only lane does not build the frontend.
   fr.plan.reconcile:
     schema: work/functional-requirement
     feature: plan
@@ -1090,6 +1090,11 @@ records:
         because: uat.verify has not run this flow against the running product yet, and
           integration.plan.sepay (the live gateway leg the mainFlow's checkout step depends on) is
           still todo.
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
+        cyclic: false
+        because: No usage screen or upgrade action exists yet at app/plan for an owner to actually reach;
+          this backend-only lane does not build the frontend.
   fr.plan.usage.view:
     schema: work/functional-requirement
     feature: plan
@@ -1101,11 +1106,11 @@ records:
       blockedBy:
         - journey.plan.hits-the-cap
     blockers:
-      - id: gap.plan.live-proof
-        rootKind: gap
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
         cyclic: false
-        because: The screen exists and is render-proven, but this record requires live uat proof and
-          uat.verify has not run the usage surface against the running product yet.
+        because: No usage screen exists yet at app/plan/usage-screen.tsx for an owner to actually open; this
+          backend-only lane does not build the frontend.
   fr.recur.edit-rule:
     schema: work/functional-requirement
     feature: recur
@@ -1372,10 +1377,8 @@ records:
     effectiveState: todo
     usedBy:
       blockedBy:
-        - fr.plan.downgrade
         - fr.plan.reconcile
         - fr.plan.upgrade
-        - fr.plan.usage.view
         - uat.plan.upgrade-after-cap
   gap.plan.no-load-harness:
     schema: work/gap
@@ -1507,12 +1510,6 @@ records:
     feature: audit
     state: todo
     effectiveState: todo
-  impl.audit.todo-app-frontend.privacy:
-    schema: work/implementation
-    feature: audit
-    state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
   impl.login.todo-app-backend.auth:
     schema: work/implementation
     feature: login
@@ -1535,12 +1532,6 @@ records:
     feature: notify
     state: done
     effectiveState: done
-  impl.notify.todo-app-frontend.preferences:
-    schema: work/implementation
-    feature: notify
-    state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
   impl.plan.todo-app-backend.plan:
     schema: work/implementation
     feature: plan
@@ -1549,9 +1540,14 @@ records:
   impl.plan.todo-app-frontend.usage:
     schema: work/implementation
     feature: plan
-    state: done
-    effectiveState: suspended
-    suspensionReason: code-digest-mismatch
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - fr.plan.downgrade
+        - fr.plan.upgrade
+        - fr.plan.usage.view
+        - uat.plan.upgrade-after-cap
   impl.recur.todo-app-backend.engine:
     schema: work/implementation
     feature: recur
@@ -1560,9 +1556,8 @@ records:
   impl.recur.todo-app-frontend.schedule:
     schema: work/implementation
     feature: recur
-    state: done
-    effectiveState: suspended
-    suspensionReason: code-digest-mismatch
+    state: todo
+    effectiveState: todo
   impl.share.todo-app-backend.access:
     schema: work/implementation
     feature: share
@@ -1634,8 +1629,8 @@ records:
   impl.task.todo-app-frontend.task-list:
     schema: work/implementation
     feature: task
-    state: todo
-    effectiveState: todo
+    state: done
+    effectiveState: done
   integration.login.keycloak:
     schema: work/integration
     feature: login
@@ -1779,6 +1774,11 @@ records:
         because: uat.verify has not run this flow against the running product yet, and
           integration.plan.sepay (the live gateway leg the mainFlow's checkout step depends on) is
           still todo.
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
+        cyclic: false
+        because: No usage screen or upgrade action exists yet at app/plan for an owner to actually reach;
+          this backend-only lane does not build the frontend.
   journey.recur.first-recurring-task:
     schema: work/customer-journey
     feature: recur
@@ -2113,6 +2113,11 @@ records:
         because: uat.verify has not run this flow against the running product yet, and
           integration.plan.sepay (the live gateway leg the mainFlow's checkout step depends on) is
           still todo.
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
+        cyclic: false
+        because: No usage screen or upgrade action exists yet at app/plan for an owner to actually reach;
+          this backend-only lane does not build the frontend.
   uat.recur.make-recurring:
     schema: work/uat-flow
     feature: recur
@@ -2171,8 +2176,7 @@ records:
     schema: work/ui-screen
     feature: login
     state: done
-    effectiveState: suspended
-    suspensionReason: code-digest-mismatch
+    effectiveState: done
   ui.notify.preferences:
     schema: work/ui-screen
     feature: notify
@@ -2200,43 +2204,44 @@ records:
     schema: work/ui-screen
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
 tally:
   overall:
-    done: 131
-    todo: 30
-    stale: 7
+    done: 132
+    todo: 31
+    stale: 3
     blocked: 36
-    total: 204
+    total: 202
   byFeature:
     audit:
       done: 20
       todo: 6
-      stale: 1
+      stale: 0
       blocked: 3
-      total: 30
+      total: 29
     login:
-      done: 15
+      done: 16
       todo: 4
-      stale: 2
+      stale: 1
       blocked: 3
       total: 24
     notify:
       done: 19
       todo: 6
-      stale: 1
+      stale: 0
       blocked: 6
-      total: 32
+      total: 31
     plan:
       done: 17
-      todo: 3
-      stale: 1
+      todo: 4
+      stale: 0
       blocked: 9
       total: 30
     recur:
       done: 19
-      todo: 2
-      stale: 1
+      todo: 3
+      stale: 0
       blocked: 6
       total: 28
     share:
@@ -2247,8 +2252,8 @@ tally:
       total: 26
     task:
       done: 23
-      todo: 6
-      stale: 1
+      todo: 5
+      stale: 2
       blocked: 4
       total: 34
   gaps:
@@ -2484,9 +2489,15 @@ frontier:
   - id: gap.plan.sepay-not-reachable
     feature: plan
     title: No live run has completed a checkout against the real SePay sandbox
+  - id: impl.plan.todo-app-frontend.usage
+    feature: plan
+    title: The usage screen and its upgrade action
   - id: gap.recur.live-proof
     feature: recur
     title: No uat.verify run has produced a live run for recur.make-recurring
+  - id: impl.recur.todo-app-frontend.schedule
+    feature: recur
+    title: The schedule screen
   - id: nfr.recur.generation.timeliness
     feature: recur
     title: A due occurrence is materialised close to its due instant
@@ -2511,9 +2522,6 @@ frontier:
   - id: gap.task.share-edge-hold
     feature: task
     title: br.task.single-owner's done flag is held by an out-of-lane blocker edge
-  - id: impl.task.todo-app-frontend.task-list
-    feature: task
-    title: The list screen and the create form
   - id: nfr.task.list.latency
     feature: task
     title: A list read feels immediate
@@ -2794,9 +2802,6 @@ unclassifiedEdges:
   - from: impl.audit.todo-app-backend.operator-read
     field: proves
     target: fr.audit.log.read
-  - from: impl.audit.todo-app-frontend.privacy
-    field: proves
-    target: ui.audit.privacy
   - from: impl.login.todo-app-backend.auth
     field: proves
     target: br.login.password.sign-in
@@ -2824,9 +2829,6 @@ unclassifiedEdges:
   - from: impl.notify.todo-app-backend.pipeline
     field: proves
     target: sds.notify.delivery-lifecycle
-  - from: impl.notify.todo-app-frontend.preferences
-    field: proves
-    target: ui.notify.preferences
   - from: impl.plan.todo-app-backend.plan
     field: proves
     target: br.plan.active-scope
@@ -3171,6 +3173,12 @@ unclassifiedEdges:
     target: fr.login.sign-in
   - from: ui.login.sign-in
     field: assets.generation.inputRefs
+    target: fr.login.sign-in
+  - from: ui.login.sign-in
+    field: assets.generation.inputRefs
+    target: sds.login.session-store
+  - from: ui.login.sign-in
+    field: assets.generation.inputRefs
     target: sds.login.session-store
   - from: ui.login.sign-in
     field: ui.acceptedInputs.business.id
@@ -3183,18 +3191,18 @@ unclassifiedEdges:
     target: fr.login.sign-in
   - from: ui.login.sign-in
     field: ui.assets.generation.inputRefs
+    target: fr.login.sign-in
+  - from: ui.login.sign-in
+    field: ui.assets.generation.inputRefs
+    target: sds.login.session-store
+  - from: ui.login.sign-in
+    field: ui.assets.generation.inputRefs
     target: sds.login.session-store
   - from: ui.notify.preferences
     field: assets.generation.inputRefs
     target: fr.notify.unsubscribe
   - from: ui.notify.preferences
     field: assets.generation.inputRefs
-    target: fr.notify.unsubscribe
-  - from: ui.notify.preferences
-    field: assets.generation.inputRefs
-    target: sds.notify.delivery-lifecycle
-  - from: ui.notify.preferences
-    field: assets.generation.inputRefs
     target: sds.notify.delivery-lifecycle
   - from: ui.notify.preferences
     field: ui.acceptedInputs.business.id
@@ -3205,12 +3213,6 @@ unclassifiedEdges:
   - from: ui.notify.preferences
     field: ui.assets.generation.inputRefs
     target: fr.notify.unsubscribe
-  - from: ui.notify.preferences
-    field: ui.assets.generation.inputRefs
-    target: fr.notify.unsubscribe
-  - from: ui.notify.preferences
-    field: ui.assets.generation.inputRefs
-    target: sds.notify.delivery-lifecycle
   - from: ui.notify.preferences
     field: ui.assets.generation.inputRefs
     target: sds.notify.delivery-lifecycle
@@ -3219,13 +3221,28 @@ unclassifiedEdges:
     target: br.plan.caps.limit
   - from: ui.plan.usage
     field: assets.generation.inputRefs
+    target: br.plan.caps.limit
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
+    target: decision.plan.downgrade.policy
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
     target: decision.plan.downgrade.policy
   - from: ui.plan.usage
     field: assets.generation.inputRefs
     target: fr.plan.upgrade
   - from: ui.plan.usage
     field: assets.generation.inputRefs
+    target: fr.plan.upgrade
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
     target: fr.plan.usage.view
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
+    target: fr.plan.usage.view
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
+    target: sds.plan.subscription-lifecycle
   - from: ui.plan.usage
     field: assets.generation.inputRefs
     target: sds.plan.subscription-lifecycle
@@ -3249,13 +3266,28 @@ unclassifiedEdges:
     target: br.plan.caps.limit
   - from: ui.plan.usage
     field: ui.assets.generation.inputRefs
+    target: br.plan.caps.limit
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
+    target: decision.plan.downgrade.policy
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
     target: decision.plan.downgrade.policy
   - from: ui.plan.usage
     field: ui.assets.generation.inputRefs
     target: fr.plan.upgrade
   - from: ui.plan.usage
     field: ui.assets.generation.inputRefs
+    target: fr.plan.upgrade
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
     target: fr.plan.usage.view
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
+    target: fr.plan.usage.view
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
+    target: sds.plan.subscription-lifecycle
   - from: ui.plan.usage
     field: ui.assets.generation.inputRefs
     target: sds.plan.subscription-lifecycle
@@ -3318,7 +3350,16 @@ unclassifiedEdges:
     target: fr.share.invite
   - from: ui.share.invite
     field: assets.generation.inputRefs
+    target: fr.share.invite
+  - from: ui.share.invite
+    field: assets.generation.inputRefs
     target: fr.share.list
+  - from: ui.share.invite
+    field: assets.generation.inputRefs
+    target: fr.share.list
+  - from: ui.share.invite
+    field: assets.generation.inputRefs
+    target: fr.share.revoke
   - from: ui.share.invite
     field: assets.generation.inputRefs
     target: fr.share.revoke
@@ -3336,7 +3377,16 @@ unclassifiedEdges:
     target: fr.share.invite
   - from: ui.share.invite
     field: ui.assets.generation.inputRefs
+    target: fr.share.invite
+  - from: ui.share.invite
+    field: ui.assets.generation.inputRefs
     target: fr.share.list
+  - from: ui.share.invite
+    field: ui.assets.generation.inputRefs
+    target: fr.share.list
+  - from: ui.share.invite
+    field: ui.assets.generation.inputRefs
+    target: fr.share.revoke
   - from: ui.share.invite
     field: ui.assets.generation.inputRefs
     target: fr.share.revoke
