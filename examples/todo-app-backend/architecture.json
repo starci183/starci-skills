@@ -19,6 +19,7 @@
     {"id": "module-domain-task", "root": "src/modules/domain/task", "entry": "src/modules/domain/task/index.ts"},
     {"id": "module-platform-config", "root": "src/modules/platform/config", "entry": "src/modules/platform/config/index.ts"},
     {"id": "module-platform-errors", "root": "src/modules/platform/errors", "entry": "src/modules/platform/errors/index.ts"},
+    {"id": "module-platform-events", "root": "src/modules/platform/events", "entry": "src/modules/platform/events/index.ts"},
     {"id": "module-integrations-keycloak", "root": "src/modules/integrations/keycloak", "entry": "src/modules/integrations/keycloak/index.ts"},
     {"id": "module-integrations-postgres", "root": "src/modules/integrations/postgres", "entry": "src/modules/integrations/postgres/index.ts"}
   ]

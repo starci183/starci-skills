@@ -3,6 +3,7 @@ import { SessionRepository } from '../../../modules/domain/session';
 import { SessionEntity } from '../../../modules/integrations/postgres';
 import { KeycloakClient } from '../../../modules/integrations/keycloak';
 import { AppConfigService } from '../../../modules/platform/config';
+import { PlatformEvent, PlatformEventBus, SignedOutEvent } from '../../../modules/platform/events';
 import { SignOutUseCase } from './sign-out.use-case';
 
 class FakeSessionRepository {
@@ -38,5 +39,26 @@ describe('SignOutUseCase', () => {
 
     expect(result.signedOut).toBe(true);
     await expect(sessionRepository.findActive(session.token)).rejects.toThrow();
+  });
+
+  it('event.login.signed-out: publishes on the PlatformEventBus after the session is revoked', async () => {
+    const sessionRepository = new SessionRepository(
+      new FakeSessionRepository() as unknown as Repository<SessionEntity>,
+      new AppConfigService(),
+    );
+    const session = await sessionRepository.tAccept('person-1');
+    const keycloakClient = new KeycloakClient(new AppConfigService());
+    jest.spyOn(keycloakClient, 'notifySignOut').mockResolvedValue(undefined);
+    const events = new PlatformEventBus();
+    const received: PlatformEvent[] = [];
+    events.subscribe(event => received.push(event));
+
+    const useCase = new SignOutUseCase(sessionRepository, keycloakClient, events);
+    await useCase.execute({ sessionToken: session.token });
+
+    expect(received).toHaveLength(1);
+    const [published] = received as [SignedOutEvent];
+    expect(published).toBeInstanceOf(SignedOutEvent);
+    expect(published.personId).toBe('person-1');
   });
 });

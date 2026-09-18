@@ -1,6 +1,8 @@
 import { Repository } from 'typeorm';
-import { TaskRepository } from '../../../modules/domain/task';
+import { AbstractException } from '../../../modules/platform/errors';
+import { CreateTaskInput, CreateTaskPrincipal, TaskCreationPolicy, TaskCreationPolicyRegistry, TaskRepository } from '../../../modules/domain/task';
 import { TaskEntity } from '../../../modules/integrations/postgres';
+import { PlatformEvent, PlatformEventBus, TaskCreatedEvent } from '../../../modules/platform/events';
 import { CreateTaskUseCase } from './create-task.use-case';
 
 class FakeTaskRepository {
@@ -47,5 +49,57 @@ describe('CreateTaskUseCase', () => {
       code: 'TASK_TITLE_REQUIRED',
     });
     expect(await taskRepository.listOwnedBy('owner-1')).toHaveLength(0);
+  });
+
+  it('event.task.created: publishes on the PlatformEventBus after the write succeeds', async () => {
+    const events = new PlatformEventBus();
+    const received: PlatformEvent[] = [];
+    events.subscribe(event => received.push(event));
+    const withEvents = new CreateTaskUseCase(taskRepository, new TaskCreationPolicyRegistry(), events);
+
+    const result = await withEvents.execute({ ownerId: 'owner-1', title: 'Write the report' });
+
+    expect(received).toHaveLength(1);
+    const [published] = received as [TaskCreatedEvent];
+    expect(published).toBeInstanceOf(TaskCreatedEvent);
+    expect(published.taskId).toBe(result.taskId);
+    expect(published.ownerId).toBe('owner-1');
+    expect(published.sourceEventId).toEqual(expect.any(String));
+  });
+});
+
+class TaskCreationRefusedException extends AbstractException {
+  constructor() {
+    super('Creation refused by policy.', 'TASK_CREATION_REFUSED');
+  }
+}
+
+class RefusingPolicy implements TaskCreationPolicy {
+  async assertMayCreate(_principal: CreateTaskPrincipal, _input: CreateTaskInput): Promise<void> {
+    throw new TaskCreationRefusedException();
+  }
+}
+
+describe('TaskCreationPolicyRegistry (sds.plan.cap-guard seam)', () => {
+  it('sds.plan.cap-guard: a registered policy can refuse creation before the write, and nothing is written', async () => {
+    const taskRepository = new TaskRepository(new FakeTaskRepository() as unknown as Repository<TaskEntity>);
+    const registry = new TaskCreationPolicyRegistry();
+    registry.register(new RefusingPolicy());
+    const useCase = new CreateTaskUseCase(taskRepository, registry);
+
+    await expect(useCase.execute({ ownerId: 'owner-1', title: 'Blocked' })).rejects.toMatchObject({
+      code: 'TASK_CREATION_REFUSED',
+    });
+    expect(await taskRepository.listOwnedBy('owner-1')).toHaveLength(0);
+  });
+
+  it('an empty registry (the default) blocks nothing', async () => {
+    const taskRepository = new TaskRepository(new FakeTaskRepository() as unknown as Repository<TaskEntity>);
+    const registry = new TaskCreationPolicyRegistry();
+    const useCase = new CreateTaskUseCase(taskRepository, registry);
+
+    const result = await useCase.execute({ ownerId: 'owner-1', title: 'Allowed' });
+
+    expect(result.title).toBe('Allowed');
   });
 });
