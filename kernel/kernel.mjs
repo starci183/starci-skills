@@ -22,7 +22,7 @@ import {TAB_READ_LIMIT,classifyTab} from './tab.mjs';
 import {WORKFLOW_STATE,createStore,newWorkflowId,repositoryRoot} from './store.mjs';
 import {grammarRepository,resolveLedgerRoot,sharedLedgerStatus} from './routing.mjs';
 import {createAllocator,loadRuntimes,withProviderPreference} from './schedule.mjs';
-import {resolveExecutionChain} from '../model/index.mjs';
+import {resolveExecutionChain} from './chains.mjs';
 import {planProtectedProof,proofApplies,proofFinding,proofPlan,protectedProofFinding,runAtBase,runProtectedProof} from '../checks/proof.mjs';
 import {evaluateAcceptance,kernelVerificationReceipt,resolveEvidencePacket} from '../checks/acceptance.mjs';
 import {candidateChecksNeedDependencies,persistInlineCandidate,protectedOracleManifest} from './candidate-bridge.mjs';

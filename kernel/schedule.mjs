@@ -1,5 +1,6 @@
 import {readDistJson} from '../core/runtime-root.mjs';
-import {canonicalTarget,resolveExecutionChain} from '../model/index.mjs';
+import {canonicalTarget} from '../model/index.mjs';
+import {resolveExecutionChain} from './chains.mjs';
 import {roleOf} from './graph.mjs';
 import {SERVICE_OBSERVATION_MS,SHARED_COOLING_KINDS,createLoadsLedger} from './loads.mjs';
 import {budgetVerdict,readRuntimeBudget} from './budget.mjs';
