@@ -3,7 +3,7 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: impl.login.todo-app-frontend.sign-in
-recordDigest: f30937a3e53f7a31191f6ca1b4008259dfa967a692f15125dcf1fa1b86d9e89b
+recordDigest: c5bbc20edea0af2485a788c7317a9058edd4010c90152d67fe2d9e89c8c332e3
 codeDigest:
   algorithm: sha256
   files:
@@ -33,4 +33,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T08:39:09.499Z
+  capturedAt: 2026-09-18T11:18:06.020Z
