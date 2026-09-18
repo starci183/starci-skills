@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../core/yaml.mjs';
+import {readWorkspace, resolveOwnedDirs, missingOwnedDirs, declaresOwnPaths} from './example-ownership.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -52,10 +53,11 @@ const sha256File = file => crypto.createHash('sha256').update(fs.readFileSync(fi
  * refusal strings to `problems`. Exported so the fixture test can point it at a throwaway tree instead of
  * the real example tree.
  */
-export function checkWorkTree(workRoot, problems) {
+export function checkWorkTree(workRoot, problems, warnings = []) {
   const records = new Map(); // id -> {schema, state, change, file, shown, dir, data}
   const refs = [];
   const evidenceFiles = [];
+  const workspaceDoc = readWorkspace(workRoot);
 
   const collect = (node, file, trail) => {
     if (typeof node === 'string') {
@@ -250,6 +252,45 @@ export function checkWorkTree(workRoot, problems) {
       if (!ok) problems.push(`${rec.shown}: business-rule module must be a non-empty string or a non-empty list of strings`);
     }
 
+    // ---- trust concept 3: proves and owners are checked ----
+    // A done record whose `proves` names a target that is itself not done is refused: proof cannot outrun
+    // what it proves. A dangling `proves` target is already caught by the generic ref-resolution check
+    // above, so only a resolving-but-not-done target is new here.
+    if (Array.isArray(data.proves) && data.state === 'done') {
+      for (const targetId of data.proves) {
+        const target = records.get(targetId);
+        if (target && target.state !== 'done') {
+          problems.push(`${rec.shown}: state is done but proves ${targetId}, which is ${target.state ?? '(no state)'}, not done [PROVES_TARGET_NOT_DONE]`);
+        }
+      }
+    }
+    // `owners[].path` / `module` name module-root directories (schemas/work-layout.yaml's `impl` shape
+    // entry; scripts/example-ownership.mjs's moduleRootOf normalises a legacy file or `/**` glob path down
+    // to that root). A done record naming one that does not exist on disk is refused; a todo one is only
+    // warned, since the module a todo record targets may not have been built yet.
+    if (declaresOwnPaths(data)) {
+      const dirs = resolveOwnedDirs(id, rec, records, workspaceDoc, workRoot);
+      const missing = missingOwnedDirs(dirs);
+      if (missing.length) {
+        const list = missing.map(m => m.rel).join(', ');
+        const message = `${rec.shown}: owners/module names a directory that does not exist on disk: ${list} [OWNER_PATH_MISSING]`;
+        if (data.state === 'done') problems.push(message); else warnings.push(message);
+      }
+    }
+
+    // ---- trust concept 4: an sds-component binds to a module ----
+    // A design component's read-scope boundary is a module boundary: a `done` sds-component must name at
+    // least one owners[] directory (checked for existence by the OWNER_PATH_MISSING rule above, since
+    // work/sds-component is not exempted from declaresOwnPaths). A `todo` one with no owners at all is
+    // only warned - the module a design targets may not exist yet.
+    if (schema === 'work/sds-component') {
+      const hasOwners = Array.isArray(data.owners) && data.owners.some(o => o && o.path);
+      if (!hasOwners) {
+        const message = `${rec.shown}: work/sds-component ${data.state === 'done' ? 'is done but carries' : 'carries'} no owners naming a module directory - a design component's read-scope boundary is a module boundary, not a prose claim`;
+        if (data.state === 'done') problems.push(message); else warnings.push(message);
+      }
+    }
+
     // ---- concept 10: a ui record is done only with a generated direction asset and full state coverage ----
     if (schema === 'work/ui-screen' && data.state === 'done') {
       const assets = Array.isArray(data.assets) ? data.assets : [];
@@ -377,13 +418,15 @@ export function checkFamiliesDrift(problems, schemaPath = path.join(root, 'schem
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const problems = [];
+  const warnings = [];
   checkFamiliesDrift(problems);
   let records = 0, refs = 0, evidence = 0;
   for (const workRoot of walk(path.join(root, 'examples')).filter(file => file.endsWith(`.starciwork${path.sep}index.yaml`)).map(path.dirname)) {
-    const counts = checkWorkTree(workRoot, problems);
+    const counts = checkWorkTree(workRoot, problems, warnings);
     records += counts.records; refs += counts.refs; evidence += counts.evidence;
   }
   for (const problem of problems) console.log(`REFUSED ${problem}`);
-  console.log(`${records} record(s), ${refs} ref(s), ${evidence} evidence file(s): ${problems.length ? `${problems.length} refused` : 'every id matches its place, every ref resolves, and every new-concept rule is satisfied'}`);
+  for (const warning of warnings) console.log(`WARN ${warning}`);
+  console.log(`${records} record(s), ${refs} ref(s), ${evidence} evidence file(s): ${problems.length ? `${problems.length} refused` : 'every id matches its place, every ref resolves, and every new-concept rule is satisfied'}${warnings.length ? `, ${warnings.length} warned` : ''}`);
   process.exitCode = problems.length ? 1 : 0;
 }

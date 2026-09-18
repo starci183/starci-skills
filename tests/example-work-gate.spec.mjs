@@ -86,6 +86,68 @@ test('concept 2: gap records need a valid state, a statement, and a resolving cl
   assert.ok(badClosedBy.some(p => p.includes('closedBy names br.f.ghost')), badClosedBy.join('\n'));
 });
 
+test('trust concept 3: a done record\'s proves target must itself be done (PROVES_TARGET_NOT_DONE)', () => {
+  const workRoot = tree({
+    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/f}]\nproves: [br.f.a]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\n',
+  });
+  fs.mkdirSync(path.join(path.dirname(workRoot), 'src', 'f'), {recursive: true});
+  const notDone = [];
+  checkWorkTree(workRoot, notDone);
+  assert.ok(notDone.some(p => p.includes('proves br.f.a, which is todo, not done [PROVES_TARGET_NOT_DONE]')), notDone.join('\n'));
+
+  fs.writeFileSync(path.join(workRoot, 'features/f/br/a/index.yaml'), 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n', 'utf8');
+  const done = [];
+  checkWorkTree(workRoot, done);
+  assert.equal(done.filter(p => p.includes('PROVES_TARGET_NOT_DONE')).length, 0, done.join('\n'));
+});
+
+test('trust concept 3: owners[]/module paths that do not exist on disk are refused for done records and warned for todo ones (OWNER_PATH_MISSING)', () => {
+  const workRoot = tree({
+    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/ghost}]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/impl/y/index.yaml': 'schema: work/implementation\nid: impl.f.y\ntitle: t\nstate: todo\nrepository: r\nowners: [{role: module, path: src/ghost}]\n',
+  });
+  const problems = [];
+  const warnings = [];
+  checkWorkTree(workRoot, problems, warnings);
+  assert.ok(problems.some(p => p.includes('impl/x') && p.includes('OWNER_PATH_MISSING')), problems.join('\n'));
+  assert.ok(!problems.some(p => p.includes('impl/y')), problems.join('\n'));
+  assert.ok(warnings.some(w => w.includes('impl/y') && w.includes('OWNER_PATH_MISSING')), warnings.join('\n'));
+
+  // a file path (not a bare directory) normalises to its dirname (moduleRootOf) - and an existing dir,
+  // named with a trailing /** glob, resolves clean with no problem or warning at all.
+  const workRoot2 = tree({
+    'features/f/impl/z/index.yaml': 'schema: work/implementation\nid: impl.f.z\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/real/**}]\nverificationSource: authored-claim\nbecause: c\n',
+  });
+  fs.mkdirSync(path.join(path.dirname(workRoot2), 'src', 'real'), {recursive: true});
+  const problems2 = [];
+  const warnings2 = [];
+  checkWorkTree(workRoot2, problems2, warnings2);
+  assert.equal(problems2.length, 0, problems2.join('\n'));
+  assert.equal(warnings2.length, 0, warnings2.join('\n'));
+});
+
+test('trust concept 4: a done sds-component needs owners naming an existing module directory; a todo one without owners is only warned', () => {
+  const workRoot = tree({
+    'features/f/sds/a/index.yaml': 'schema: work/sds-component\nid: sds.f.a\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/sds/b/index.yaml': 'schema: work/sds-component\nid: sds.f.b\ntitle: t\nstate: todo\n',
+  });
+  const problems = [];
+  const warnings = [];
+  checkWorkTree(workRoot, problems, warnings);
+  assert.ok(problems.some(p => p.includes('sds/a') && p.includes('no owners naming a module directory')), problems.join('\n'));
+  assert.ok(!problems.some(p => p.includes('sds/b')), problems.join('\n'));
+  assert.ok(warnings.some(w => w.includes('sds/b') && w.includes('no owners naming a module directory')), warnings.join('\n'));
+
+  const workRoot2 = tree({
+    'features/f/sds/c/index.yaml': 'schema: work/sds-component\nid: sds.f.c\ntitle: t\nstate: done\nowners: [{role: module, path: src/real}]\nverificationSource: authored-claim\nbecause: c\n',
+  });
+  fs.mkdirSync(path.join(path.dirname(workRoot2), 'src', 'real'), {recursive: true});
+  const problems2 = [];
+  checkWorkTree(workRoot2, problems2);
+  assert.equal(problems2.filter(p => p.includes('sds-component')).length, 0, problems2.join('\n'));
+});
+
 test('concept 7: gap.closedBy accepts a bare id (normalised to one entry) or a list, every entry must resolve, and a done gap needs every closer done', () => {
   const bareStringOk = refusalsFor({
     'features/f/gap/absence/index.yaml': 'schema: work/gap\nid: gap.f.absence\ntitle: t\nstate: todo\nstatement: s\nclosedBy: impl.f.thing\n',
