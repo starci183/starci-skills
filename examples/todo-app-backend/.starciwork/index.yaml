@@ -20,4 +20,7 @@ features:
   - id: audit
     directory: features/audit
     description: An append-only record of what happened, and the right to have it erased.
+  - id: recur
+    directory: features/recur
+    description: A task that comes back on a schedule the owner set.
 

@@ -1,0 +1,16 @@
+schema: work/business-rule
+id: br.recur.ending.preserves-history
+title: Ending a rule does not delete what it already made
+state: todo
+statements:
+  - Ending a rule stops it from generating any occurrence dated after the day it ended.
+  - No occurrence the rule already materialised is deleted. Each one already completed or skipped stays
+    exactly as it is; each one still materialised becomes orphaned instead.
+authorityRefs:
+  - "product-intent: a person's completed history must not depend on whether they later stopped the rule that produced it."
+acceptanceCriteria: [ended-rule-keeps-past-occurrences]
+module: src/recur/occurrence
+change: {rev: 1, kind: initial, at: 2026-09-18T05:13:00.000Z}
+blockedBy:
+  - No implementation yet. The example's backend target moved to NestJS and this feature has not been
+    built there; there is no occurrence store to orphan against.

@@ -1,0 +1,8 @@
+schema: work/acceptance-criterion
+id: ac.recur.timezone.owner-local-time.dst-spring-forward-shifts-by-gap
+rule: br.recur.timezone.owner-local-time
+given: A daily rule (Europe/Berlin, local time 02:30) whose next date is 2026-03-29, the night Europe/Berlin
+  clocks jump 02:00 -> 03:00 so that 02:30 never happens
+when: The generator materialises the 2026-03-29 occurrence
+then:
+  - The occurrence's dueAtUtc is exactly 2026-03-29T01:30:00.000Z (03:30 CEST local: the nominal 02:30 shifted forward by the one-hour gap), not 2026-03-29T00:30:00.000Z (03:00 CEST, the transition instant itself) and not any instant that formats to 02:30 local, which does not exist.

@@ -1,0 +1,32 @@
+schema: work/functional-requirement
+id: fr.recur.make-recurring
+title: Make a task recurring
+state: todo
+actors: [owner]
+trigger: The owner turns an existing task, or a new one, into a recurring rule.
+mainFlow:
+  - The owner picks a frequency (every weekday, every N days, or a day of the month), a time of day and
+    a time zone, defaulting to their own.
+  - The rule is created, owned by the submitter, and its first occurrence is previewed.
+exceptionFlows:
+  - A day-of-month rule naming a day that does not exist every month (e.g. the 31st) is accepted; nothing
+    is refused at creation, per decision.recur.impossible-date.
+postconditions:
+  - Exactly one recurrence rule exists for that submission, and it exists whether or not the day it names
+    exists in the current month.
+composes:
+  - {rule: br.recur.impossible-date.skips, module: src/recur/rule}
+  - {rule: br.recur.timezone.owner-local-time, module: src/recur/zone}
+refs: [data.recur.rule]
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- recur/make-recurring
+  uat:
+    required: true
+
+blockedBy:
+  - No implementation yet. The example's backend target moved to NestJS and the frontend to Next.js; this
+    flow has not been built on either side.

@@ -1,0 +1,8 @@
+schema: work/acceptance-criterion
+id: ac.recur.occurrence.owned-by-rule-owner.refuses-non-owner
+rule: br.recur.occurrence.owned-by-rule-owner
+given: A materialised occurrence of a rule owned by p1
+when: p2 attempts to complete or skip it
+then:
+  - The attempt is refused, naming "not the owner".
+  - The occurrence's status, complete and completedAt are unchanged.

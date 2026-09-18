@@ -1,0 +1,28 @@
+schema: work/functional-requirement
+id: fr.recur.end-rule
+title: End a recurring rule
+state: todo
+actors: [owner]
+trigger: The owner ends a rule they no longer want occurrences from.
+mainFlow:
+  - The owner ends the rule.
+  - No occurrence dated after the day it ended is generated.
+  - Every occurrence already materialised is kept; any of them not already completed or skipped becomes
+    orphaned.
+postconditions:
+  - The rule carries an endedAt local date, and nothing it already produced was deleted.
+composes:
+  - {rule: br.recur.ending.preserves-history, module: src/recur/occurrence}
+refs: [data.recur.rule]
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- recur/end-rule
+  uat:
+    required: true
+
+blockedBy:
+  - No implementation yet. The example's backend target moved to NestJS and this feature has not been
+    built there.

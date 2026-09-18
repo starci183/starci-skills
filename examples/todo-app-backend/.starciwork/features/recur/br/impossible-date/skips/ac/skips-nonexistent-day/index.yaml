@@ -1,0 +1,11 @@
+schema: work/acceptance-criterion
+id: ac.recur.impossible-date.skips.skips-nonexistent-day
+rule: br.recur.impossible-date.skips
+given: A monthly-day rule r3 (UTC, 09:00, dayOfMonth 31, startDate 2026-01-01)
+when: The generator runs with now = 2026-03-31T10:00:00.000Z, covering January through March 2026
+then:
+  - Occurrences exist for windowKey r3:2026-01-31 and r3:2026-03-31.
+  - No occurrence exists whose windowKey starts with r3:2026-02, because 2026 is not a leap year and
+    February 2026 has 28 days.
+  - No occurrence's localDate is 2026-02-28 or any other February date; the month is skipped entirely,
+    not clamped to its last day.

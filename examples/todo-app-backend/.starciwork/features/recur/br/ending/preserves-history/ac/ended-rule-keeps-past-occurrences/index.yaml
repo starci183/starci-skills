@@ -1,0 +1,10 @@
+schema: work/acceptance-criterion
+id: ac.recur.ending.preserves-history.ended-rule-keeps-past-occurrences
+rule: br.recur.ending.preserves-history
+given: A weekday rule with one completed occurrence (2026-09-14) and one still-materialised occurrence (2026-09-15)
+when: The owner ends the rule effective 2026-09-15
+then:
+  - The 2026-09-14 occurrence's status stays completed; it is not touched.
+  - The 2026-09-15 occurrence's status becomes orphaned.
+  - No row for either occurrence is deleted.
+  - The generator produces no occurrence dated after 2026-09-15 for this rule on any later run.

@@ -1,0 +1,23 @@
+schema: work/sds-component
+id: sds.recur.generation-engine
+title: How a rule's due dates are computed and resolved to instants
+state: todo
+responsibility: "Walks a rule's real calendar dates one by one between its last-generated date and now,
+  selecting the ones the rule fires on, and resolves each to a UTC instant from the rule's declared time
+  zone. Owns every decision this feature made about time: decision.recur.timezone.anchor,
+  decision.recur.timezone.dst, decision.recur.impossible-date and decision.recur.generation.backfill are
+  all implemented here, not distributed across callers."
+interfaces:
+  - sds.recur.occurrence-lifecycle's t-materialise is the only consumer of the dates this component
+    produces; it does not call the store itself.
+refs: [br.recur.impossible-date.skips, br.recur.timezone.owner-local-time]
+dependsOn: [integration.recur.scheduler]
+
+requiresProof:
+  implementation:
+    required: true
+
+blockedBy:
+  - No implementation yet. The example's backend target moved to NestJS and this feature has not been
+    built there; there is no calendar walk or zone conversion to run the pinned DST and impossible-date
+    acceptance criteria against.

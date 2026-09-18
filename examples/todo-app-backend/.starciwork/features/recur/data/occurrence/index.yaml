@@ -1,0 +1,27 @@
+schema: work/data
+id: data.recur.occurrence
+title: Occurrence
+state: todo
+fields:
+  - {name: id, type: text, required: true, note: "Opaque, assigned at materialisation, never reused."}
+  - {name: ruleId, type: text, required: true, note: The recurrence rule that produced this occurrence.}
+  - {name: owner, type: text, required: true, note: "Copied from the rule's owner at materialisation and never rewritten (br.recur.occurrence.owned-by-rule-owner)."}
+  - {name: windowKey, type: text, required: true, note: "ruleId plus the occurrence's local calendar date, e.g. r1:2026-09-18. The identity decision.recur.occurrence.identity names; unique across every occurrence."}
+  - {name: localDate, type: text, required: true, note: "The calendar date, in the rule's time zone, this occurrence is for."}
+  - {name: dueAtUtc, type: timestamp, required: true, note: "The instant resolved from the rule's local time and time zone at generation time (decision.recur.timezone.anchor); not recomputed once written."}
+  - {name: title, type: text, required: true}
+  - {name: complete, type: boolean, required: true, default: false}
+  - {name: completedAt, type: timestamp, required: false}
+  - {name: status, type: text, required: true, note: "scheduled | materialised | completed | skipped | orphaned; see sds.recur.occurrence-lifecycle."}
+invariants:
+  - windowKey is unique across every occurrence of every rule; this is what makes generation idempotent
+    (br.recur.generation.once).
+  - owner is never null and never changes for a given id.
+  - completedAt is set if and only if complete is true.
+  - status becomes orphaned only once, only after the owning rule has ended, and only if the occurrence
+    was not already completed or skipped (br.recur.ending.preserves-history).
+appliesTo: [br.recur.generation.once, br.recur.occurrence.owned-by-rule-owner, br.recur.ending.preserves-history]
+
+conflictsWith:
+  - {record: data.task.task, rev: 1, because: "an occurrence needs windowKey and dueAtUtc to prove idempotent generation across a time zone; data.task.task does not declare either field, and this feature does not own that record to add them."}
+  - {record: sds.task.completion-state, rev: 1, because: "an occurrence's lifecycle has five states because a rule can end under it (materialised can become orphaned); sds.task.completion-state models exactly two (open, complete) for a task with no such ending, and this feature does not own that record to widen its state machine."}

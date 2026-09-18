@@ -1,0 +1,17 @@
+schema: work/implementation
+id: impl.recur.todo-app-backend.engine
+title: The rule, occurrence and generation engine
+state: todo
+repository: todo-app
+directory: src/recur
+files: [rule.service.ts, occurrence.service.ts, generator.service.ts, zone.util.ts]
+proves: [br.recur.generation.once, br.recur.impossible-date.skips, br.recur.occurrence.owned-by-rule-owner,
+  br.recur.ending.preserves-history, br.recur.timezone.owner-local-time, sds.recur.occurrence-lifecycle,
+  sds.recur.generation-engine]
+blockedBy:
+  - Not implemented. The example's backend target moved to NestJS; none of these files exist yet under
+    src/recur, and no command has been run against them. The pinned instants in
+    ac.recur.timezone.owner-local-time.dst-spring-forward-shifts-by-gap,
+    ac.recur.timezone.owner-local-time.dst-fall-back-picks-earliest and
+    ac.recur.impossible-date.skips.skips-nonexistent-day are written precisely enough to implement and
+    test against once that module exists.

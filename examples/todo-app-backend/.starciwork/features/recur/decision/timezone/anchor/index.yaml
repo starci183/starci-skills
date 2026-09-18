@@ -1,0 +1,23 @@
+schema: work/policy-decision
+id: decision.recur.timezone.anchor
+title: Does an occurrence's due instant follow a stored UTC offset or the owner's clock
+state: done
+outcome: owner-local-time
+question: A rule says "09:00". Is that resolved once at creation into a fixed UTC instant-of-day (e.g.
+  "02:00 UTC"), or is it resolved fresh, from the owner's declared IANA time zone, every time an occurrence
+  for it is generated?
+options:
+  - id: fixed-utc-offset
+    summary: The rule stores a UTC offset computed once at creation; every occurrence uses it unchanged.
+    consequence: Trivial to compute, and wrong twice a year for any owner whose zone observes DST - their
+      09:00 rule quietly becomes an 08:00 or 10:00 rule until they notice and recreate it.
+  - id: owner-local-time
+    summary: The rule stores an IANA zone and a local time; each occurrence resolves its instant from the
+      zone's rules at the moment it is generated.
+    consequence: Correct across DST without the owner doing anything, at the cost of needing an explicit
+      decision for the gap and the fold a transition creates (decision.recur.timezone.dst).
+recommendation: owner-local-time
+recommendationReason: A recurring 09:00 task that silently becomes an 08:00 task every autumn is not a
+  minor bug; it is the feature failing at the one thing it promises. A fixed offset is only correct in a
+  zone that never observes DST, which excludes Berlin and includes Ho Chi Minh City by accident, not by
+  design.

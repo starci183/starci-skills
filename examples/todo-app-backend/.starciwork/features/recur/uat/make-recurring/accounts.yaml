@@ -1,0 +1,3 @@
+schema: work/disposable-accounts
+accounts:
+  - {role: owner, username: uat-recur-owner, password: uat-recur-owner-disposable}
