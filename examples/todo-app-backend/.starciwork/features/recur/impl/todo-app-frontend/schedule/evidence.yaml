@@ -1,0 +1,54 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: impl.recur.todo-app-frontend.schedule
+recordDigest: 5b0b74900e600fbf41a3ca7fda21d7106f495f70bc8f57d6c80aa67a18a9879e
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/app/recur/page.tsx
+      sha256: d8d02832e499596dad6ec373df5ecfb834553e49f4300cf68f3801d7cd5eda68
+    - path: src/app/recur/recur.css
+      sha256: 5df935c92430b97e1990bb7fd32e705741eaaa8c48300fa5e29c87a279e29fe9
+    - path: src/components/recur/classNames.ts
+      sha256: 37c23074d4cc9285b38f6782da17a63b022a0044649eb1ae4dcf5d7698cf7ba8
+    - path: src/components/recur/end-rule-confirm.tsx
+      sha256: d681f2a97599a25de395da4dfcfdb2ba9553ab5f0595757215f51fef5b3ccec2
+    - path: src/components/recur/index.tsx
+      sha256: 36a113107d35b242c6d9393231f4df56722f3f2e68f0ef3a721585b70168d19c
+    - path: src/components/recur/routes.ts
+      sha256: 32a5fc2267b4a050ec4e4b341ea7de64ea2a941420d329b0a29bc6e4882f3733
+    - path: src/components/recur/schedule-screen.spec.tsx
+      sha256: 5173becaf473d61a668ff72d49c1bd564cd0ba78aa4f8e73e03cd96f22ae1f73
+    - path: src/components/recur/schedule-screen.tsx
+      sha256: 5573323eac00522176dad808afde38e53cd22572f305e302746a3b34d5250270
+    - path: src/components/recur/schedule.tsx
+      sha256: 1e15564cfb492fcac19683f5587c90bcbc87771d695640e078532422ccee6cac
+    - path: src/components/recur/upcoming-list.tsx
+      sha256: c2d535698cdf146c86cd293031b6cfc0263d368f19110ce636444aac06abb39d
+    - path: src/components/recur/workspace.tsx
+      sha256: 93dd41d69be42851e7ea6d51564b40a9009e3fdc24510b58077da3ef02c6d152
+  digest: cacd3592a2f9ffcc2fd65d512f8a7eb648997dc470ea7dac47e272ba9c445a9f
+outcome: pass
+assertions:
+  - id: typecheck
+    command: npx tsc --noEmit
+    exit: 0
+    outcome: pass
+    observation: npx tsc --noEmit exited 0
+  - id: vitest-suite-green
+    command: npx vitest run
+    exit: 0
+    outcome: pass
+    observation: npx vitest run exited 0
+  - id: build
+    command: npm run build
+    exit: 0
+    outcome: pass
+    observation: npm run build exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T14:47:02.312Z

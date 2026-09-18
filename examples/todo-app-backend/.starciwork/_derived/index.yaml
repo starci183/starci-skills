@@ -1556,8 +1556,8 @@ records:
   impl.recur.todo-app-frontend.schedule:
     schema: work/implementation
     feature: recur
-    state: todo
-    effectiveState: todo
+    state: done
+    effectiveState: done
   impl.share.todo-app-backend.access:
     schema: work/implementation
     feature: share
@@ -2207,8 +2207,8 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 132
-    todo: 32
+    done: 133
+    todo: 31
     stale: 2
     blocked: 36
     total: 202
@@ -2238,8 +2238,8 @@ tally:
       blocked: 9
       total: 30
     recur:
-      done: 19
-      todo: 3
+      done: 20
+      todo: 2
       stale: 0
       blocked: 6
       total: 28
@@ -2494,9 +2494,6 @@ frontier:
   - id: gap.recur.live-proof
     feature: recur
     title: No uat.verify run has produced a live run for recur.make-recurring
-  - id: impl.recur.todo-app-frontend.schedule
-    feature: recur
-    title: The schedule screen
   - id: nfr.recur.generation.timeliness
     feature: recur
     title: A due occurrence is materialised close to its due instant
