@@ -1825,6 +1825,14 @@ records:
         - br.task.single-owner
         - fr.task.complete
         - sds.task.ownership-guard
+  gap.task.direction-not-drawn:
+    schema: work/gap
+    feature: task
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - ui.task.list
   gap.task.live-proof:
     schema: work/gap
     feature: task
@@ -2846,14 +2854,21 @@ records:
     schema: work/ui-screen
     feature: task
     state: todo
-    effectiveState: todo
+    effectiveState: blocked
+    blockers:
+      - id: gap.task.direction-not-drawn
+        rootKind: gap
+        cyclic: false
+        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
+          produced the many-tasks representative direction or its sibling prompt bytes yet, only the
+          prompt this record's assets entry names.
 tally:
   overall:
     done: 33
     todo: 42
     stale: 11
-    blocked: 106
-    total: 192
+    blocked: 107
+    total: 193
   byFeature:
     audit:
       done: 0
@@ -2895,8 +2910,8 @@ tally:
       done: 8
       todo: 11
       stale: 6
-      blocked: 6
-      total: 31
+      blocked: 7
+      total: 32
   gaps:
     - id: gap.audit.direction-not-drawn
       feature: audit
@@ -3026,6 +3041,11 @@ tally:
       state: todo
       closedBy:
         - impl.share.todo-app-backend.access
+    - id: gap.task.direction-not-drawn
+      feature: task
+      state: todo
+      closedBy:
+        - ui.task.list
     - id: gap.task.live-proof
       feature: task
       state: todo
@@ -3144,6 +3164,9 @@ frontier:
   - id: gap.task.collaborator-completion
     feature: task
     title: The collaborator completion path is not implemented
+  - id: gap.task.direction-not-drawn
+    feature: task
+    title: No interface.draw run has produced a direction for task.list
   - id: gap.task.live-proof
     feature: task
     title: No uat.verify run has produced a live run for task.create
@@ -3162,9 +3185,6 @@ frontier:
   - id: impl.task.todo-app-frontend.task-list
     feature: task
     title: The list screen and the create form
-  - id: ui.task.list
-    feature: task
-    title: The task list and its create form
 unclassifiedEdges:
   - from: ac.audit.append-only.chain-detects-tamper
     field: rule
@@ -3391,6 +3411,9 @@ unclassifiedEdges:
   - from: gap.task.collaborator-completion
     field: closedBy
     target: impl.share.todo-app-backend.access
+  - from: gap.task.direction-not-drawn
+    field: closedBy
+    target: ui.task.list
   - from: gap.task.live-proof
     field: closedBy
     target: uat.task.create
@@ -3693,43 +3716,4 @@ unclassifiedEdges:
     target: br.task.single-owner
   - from: uat.task.create
     field: proves
-    target: fr.task.create
-  - from: ui.audit.privacy
-    field: assets.generation.inputRefs
-    target: fr.audit.erasure.request
-  - from: ui.audit.privacy
-    field: assets.generation.inputRefs
-    target: fr.audit.export
-  - from: ui.login.sign-in
-    field: assets.generation.inputRefs
-    target: fr.login.sign-in
-  - from: ui.notify.preferences
-    field: assets.generation.inputRefs
-    target: fr.notify.unsubscribe
-  - from: ui.plan.usage
-    field: assets.generation.inputRefs
-    target: fr.plan.upgrade
-  - from: ui.plan.usage
-    field: assets.generation.inputRefs
-    target: fr.plan.usage.view
-  - from: ui.recur.schedule
-    field: assets.generation.inputRefs
-    target: fr.recur.end-rule
-  - from: ui.recur.schedule
-    field: assets.generation.inputRefs
-    target: fr.recur.make-recurring
-  - from: ui.recur.schedule
-    field: assets.generation.inputRefs
-    target: fr.recur.see-upcoming
-  - from: ui.share.invite
-    field: assets.generation.inputRefs
-    target: fr.share.invite
-  - from: ui.share.invite
-    field: assets.generation.inputRefs
-    target: fr.share.list
-  - from: ui.task.list
-    field: assets.generation.inputRefs
-    target: br.task.title.required
-  - from: ui.task.list
-    field: assets.generation.inputRefs
     target: fr.task.create

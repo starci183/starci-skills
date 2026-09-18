@@ -1521,6 +1521,14 @@ findings:
       - gap.share.direction-not-drawn
     because: ui.share.invite is todo, blocked on gap.share.direction-not-drawn - a real product
       question, not missing code; it moves once that is settled.
+  - id: designed-todo:ui.task.list
+    kind: designed-todo
+    severity: info
+    records:
+      - ui.task.list
+      - gap.task.direction-not-drawn
+    because: ui.task.list is todo, blocked on gap.task.direction-not-drawn - a real product question,
+      not missing code; it moves once that is settled.
   - id: leftover-todo:br.audit.append-only
     kind: leftover-todo
     severity: info
