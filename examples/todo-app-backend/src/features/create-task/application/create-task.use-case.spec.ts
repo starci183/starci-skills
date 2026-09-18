@@ -1,8 +1,8 @@
 import { Repository } from 'typeorm';
 import { AbstractException } from '../../../modules/platform/errors';
-import { CreateTaskInput, CreateTaskPrincipal, TaskCreationPolicy, TaskCreationPolicyRegistry, TaskRepository } from '../../../modules/domain/task';
+import { CreateTaskInputParams, CreateTaskPrincipalParams, TaskCreationPolicy, TaskCreationPolicyRegistry, TaskRepository } from '../../../modules/domain/task';
 import { TaskEntity } from '../../../modules/integrations/postgres';
-import { PlatformEvent, PlatformEventBus, TaskCreatedEvent } from '../../../modules/platform/events';
+import { PlatformEventBus, TaskCreatedEvent } from '../../../modules/platform/events';
 import { CreateTaskUseCase } from './create-task.use-case';
 
 class FakeTaskRepository {
@@ -53,7 +53,7 @@ describe('CreateTaskUseCase', () => {
 
   it('event.task.created: publishes on the PlatformEventBus after the write succeeds', async () => {
     const events = new PlatformEventBus();
-    const received: PlatformEvent[] = [];
+    const received: unknown[] = [];
     events.subscribe(event => received.push(event));
     const withEvents = new CreateTaskUseCase(taskRepository, new TaskCreationPolicyRegistry(), events);
 
@@ -74,8 +74,8 @@ class TaskCreationRefusedException extends AbstractException {
   }
 }
 
-class RefusingPolicy implements TaskCreationPolicy {
-  async assertMayCreate(_principal: CreateTaskPrincipal, _input: CreateTaskInput): Promise<void> {
+class RefusingPolicy extends TaskCreationPolicy {
+  async assertMayCreate(_principal: CreateTaskPrincipalParams, _input: CreateTaskInputParams): Promise<void> {
     throw new TaskCreationRefusedException();
   }
 }

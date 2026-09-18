@@ -3,7 +3,7 @@ import { SessionRepository } from '../../../modules/domain/session';
 import { SessionEntity } from '../../../modules/integrations/postgres';
 import { KeycloakClient } from '../../../modules/integrations/keycloak';
 import { AppConfigService } from '../../../modules/platform/config';
-import { PlatformEvent, PlatformEventBus, SignedOutEvent } from '../../../modules/platform/events';
+import { PlatformEventBus, SignedOutEvent } from '../../../modules/platform/events';
 import { SignOutUseCase } from './sign-out.use-case';
 
 class FakeSessionRepository {
@@ -50,7 +50,7 @@ describe('SignOutUseCase', () => {
     const keycloakClient = new KeycloakClient(new AppConfigService());
     jest.spyOn(keycloakClient, 'notifySignOut').mockResolvedValue(undefined);
     const events = new PlatformEventBus();
-    const received: PlatformEvent[] = [];
+    const received: unknown[] = [];
     events.subscribe(event => received.push(event));
 
     const useCase = new SignOutUseCase(sessionRepository, keycloakClient, events);

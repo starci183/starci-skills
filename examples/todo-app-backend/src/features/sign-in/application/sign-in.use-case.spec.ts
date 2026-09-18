@@ -3,7 +3,7 @@ import { AppConfigService } from '../../../modules/platform/config';
 import { SessionRepository } from '../../../modules/domain/session';
 import { SessionEntity } from '../../../modules/integrations/postgres';
 import { KeycloakClient, KeycloakInvalidCredentialsException, KeycloakSignInResult } from '../../../modules/integrations/keycloak';
-import { PlatformEvent, PlatformEventBus, SignedInEvent } from '../../../modules/platform/events';
+import { PlatformEventBus, SignedInEvent } from '../../../modules/platform/events';
 import { SignInUseCase } from './sign-in.use-case';
 
 class FakeSessionRepository {
@@ -89,7 +89,7 @@ describe('SignInUseCase', () => {
 
   it('event.login.signed-in: publishes on the PlatformEventBus after a successful sign-in', async () => {
     const events = new PlatformEventBus();
-    const received: PlatformEvent[] = [];
+    const received: unknown[] = [];
     events.subscribe(event => received.push(event));
     const keycloakClient = new FakeKeycloakClient({ 'person@example.com': 'correct-horse' });
     const withEvents = new SignInUseCase(keycloakClient, sessionRepository, events);
@@ -104,7 +104,7 @@ describe('SignInUseCase', () => {
 
   it('a refused sign-in publishes nothing', async () => {
     const events = new PlatformEventBus();
-    const received: PlatformEvent[] = [];
+    const received: unknown[] = [];
     events.subscribe(event => received.push(event));
     const keycloakClient = new FakeKeycloakClient({ 'person@example.com': 'correct-horse' });
     const withEvents = new SignInUseCase(keycloakClient, sessionRepository, events);

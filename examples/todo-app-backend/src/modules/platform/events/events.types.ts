@@ -73,10 +73,11 @@ export class NewDeviceSigninEvent {
   ) {}
 }
 
-export type PlatformEvent =
-  | TaskCreatedEvent
-  | TaskCompletedEvent
-  | TaskDeletedEvent
-  | SignedInEvent
-  | SignedOutEvent
-  | NewDeviceSigninEvent;
+/**
+ * Deliberately not exported: a type alias naming a union of classes has no statically provable object
+ * shape to the backend source-naming check (BE_SOURCE_NAME_INVALID's naming coverage), because a class
+ * reference resolves to 'unavailable' rather than 'object' or 'not-object'. It stays a same-file type used
+ * only inside event-bus.providers.ts's own local union (see that file); nothing outside this pair of
+ * files needs to name "any platform event" as a single type - each subscriber narrows by `instanceof` or
+ * by the `kind` discriminant on the concrete event it cares about.
+ */

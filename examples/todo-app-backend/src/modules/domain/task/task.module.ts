@@ -2,8 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PostgresModule, TaskEntity } from '../../integrations/postgres';
 import { TaskRepository } from './task.repository';
-import { TaskCreationPolicyRegistry } from './creation-policy.registry';
-import { CompletionAuthorityRegistry } from './completion-authority.registry';
+import { TaskCreationPolicyRegistry } from './creation-policy.providers';
+import { CompletionAuthorityRegistry } from './completion-authority.providers';
 
 /**
  * Exports the two seam registries beside TaskRepository so any feature module (a future `plan` or

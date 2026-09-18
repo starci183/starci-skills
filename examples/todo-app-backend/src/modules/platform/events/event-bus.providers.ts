@@ -1,11 +1,29 @@
 import { Injectable } from '@nestjs/common';
 import { Subject, Subscription } from 'rxjs';
-import { PlatformEvent } from './events.types';
+import {
+  NewDeviceSigninEvent,
+  SignedInEvent,
+  SignedOutEvent,
+  TaskCompletedEvent,
+  TaskCreatedEvent,
+  TaskDeletedEvent,
+} from './events.types';
+
+/**
+ * Not exported (see events.types.ts's comment above the equivalent union it used to declare): a class
+ * union has no statically provable object shape for the backend naming check, so this stays a same-file
+ * type used only by this bus's own method signatures below.
+ */
+type PlatformEvent =
+  | TaskCreatedEvent
+  | TaskCompletedEvent
+  | TaskDeletedEvent
+  | SignedInEvent
+  | SignedOutEvent
+  | NewDeviceSigninEvent;
 
 /** A named contract for a subscriber, instead of an inline function type at the call site. */
-export interface PlatformEventHandler {
-  (event: PlatformEvent): void;
-}
+export type PlatformEventHandler = (event: PlatformEvent) => void;
 
 /**
  * A small typed in-process event bus, chosen over @nestjs/event-emitter: this example has no existing

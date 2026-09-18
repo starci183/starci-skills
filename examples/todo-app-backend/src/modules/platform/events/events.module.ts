@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { PlatformEventBus } from './event-bus';
+import { PlatformEventBus } from './event-bus.providers';
 
 /**
  * The platform events module: every feature that produces or consumes a domain event imports this module

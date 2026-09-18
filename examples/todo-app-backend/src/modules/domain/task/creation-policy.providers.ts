@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CreateTaskInput, CreateTaskPrincipal, TaskCreationPolicy } from './creation-policy';
+import { CreateTaskInputParams, CreateTaskPrincipalParams, TaskCreationPolicy } from './creation-policy.contracts';
 
 /**
  * Empty by default: nothing blocks task creation until a feature registers a policy here from its own
@@ -15,7 +15,7 @@ export class TaskCreationPolicyRegistry {
     this.policies.push(policy);
   }
 
-  async assertMayCreate(principal: CreateTaskPrincipal, input: CreateTaskInput): Promise<void> {
+  async assertMayCreate(principal: CreateTaskPrincipalParams, input: CreateTaskInputParams): Promise<void> {
     for (const policy of this.policies) {
       await policy.assertMayCreate(principal, input);
     }

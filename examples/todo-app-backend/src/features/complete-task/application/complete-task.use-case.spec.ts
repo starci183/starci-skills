@@ -1,7 +1,7 @@
 import { Repository } from 'typeorm';
 import { TaskRepository } from '../../../modules/domain/task';
 import { TaskEntity } from '../../../modules/integrations/postgres';
-import { PlatformEvent, PlatformEventBus, TaskCompletedEvent } from '../../../modules/platform/events';
+import { PlatformEventBus, TaskCompletedEvent } from '../../../modules/platform/events';
 import { CompleteTaskUseCase } from './complete-task.use-case';
 
 class FakeTaskRepository {
@@ -56,7 +56,7 @@ describe('CompleteTaskUseCase', () => {
   it('event.task.completed: publishes on the PlatformEventBus after the write succeeds', async () => {
     const created = await taskRepository.create('owner-1', 'Ship it');
     const events = new PlatformEventBus();
-    const received: PlatformEvent[] = [];
+    const received: unknown[] = [];
     events.subscribe(event => received.push(event));
     const withEvents = new CompleteTaskUseCase(taskRepository, events);
 

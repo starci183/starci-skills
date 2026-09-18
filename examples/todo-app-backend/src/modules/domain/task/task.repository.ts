@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { TaskEntity } from '../../integrations/postgres';
 import { OwnershipGuard } from './ownership.guard';
-import { CompletionAuthorityRegistry } from './completion-authority.registry';
+import { CompletionAuthorityRegistry } from './completion-authority.providers';
 import { TaskRecord } from './task-record.types';
 import { TaskNotFoundException, TaskTitleRequiredException } from './task.exception';
 

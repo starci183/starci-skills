@@ -1,7 +1,7 @@
 import { Repository } from 'typeorm';
 import { TaskEntity } from '../../integrations/postgres';
-import { CompletionAction, CompletionAuthority } from './completion-authority';
-import { CompletionAuthorityRegistry } from './completion-authority.registry';
+import { CompletionAction, CompletionAuthority } from './completion-authority.contracts';
+import { CompletionAuthorityRegistry } from './completion-authority.providers';
 import { TaskRecord } from './task-record.types';
 import { TaskRepository } from './task.repository';
 
@@ -28,8 +28,10 @@ class FakeTaskRepository {
 }
 
 /** A future `share` feature's widened authority: any registered collaborator, not only the owner, may complete/reopen. */
-class WidenedCompletionAuthority implements CompletionAuthority {
-  constructor(private readonly collaborators: Set<string>) {}
+class WidenedCompletionAuthority extends CompletionAuthority {
+  constructor(private readonly collaborators: Set<string>) {
+    super();
+  }
 
   assertMayTransition(record: TaskRecord, actorId: string, _action: CompletionAction): void {
     if (record.owner === actorId || this.collaborators.has(actorId)) return;

@@ -1,7 +1,7 @@
 import { Repository } from 'typeorm';
 import { TaskRepository } from '../../../modules/domain/task';
 import { TaskEntity } from '../../../modules/integrations/postgres';
-import { PlatformEvent, PlatformEventBus, TaskDeletedEvent } from '../../../modules/platform/events';
+import { PlatformEventBus, TaskDeletedEvent } from '../../../modules/platform/events';
 import { DeleteTaskUseCase } from './delete-task.use-case';
 
 class FakeTaskRepository {
@@ -53,7 +53,7 @@ describe('DeleteTaskUseCase', () => {
     const taskRepository = new TaskRepository(new FakeTaskRepository() as unknown as Repository<TaskEntity>);
     const created = await taskRepository.create('owner-1', 'Ship it');
     const events = new PlatformEventBus();
-    const received: PlatformEvent[] = [];
+    const received: unknown[] = [];
     events.subscribe(event => received.push(event));
     const useCase = new DeleteTaskUseCase(taskRepository, events);
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CompletionAuthority, OwnerOnlyCompletionAuthority } from './completion-authority';
+import { CompletionAuthority, OwnerOnlyCompletionAuthority } from './completion-authority.contracts';
 
 /**
  * Holds the one active CompletionAuthority for complete/reopen. Defaults to owner-only; a future `share`

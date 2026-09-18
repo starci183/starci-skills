@@ -1,6 +1,6 @@
 export { PlatformEventsModule } from './events.module';
-export { PlatformEventBus } from './event-bus';
-export type { PlatformEventHandler } from './event-bus';
+export { PlatformEventBus } from './event-bus.providers';
+export type { PlatformEventHandler } from './event-bus.providers';
 export {
   TaskCreatedEvent,
   TaskCompletedEvent,
@@ -9,4 +9,3 @@ export {
   SignedOutEvent,
   NewDeviceSigninEvent,
 } from './events.types';
-export type { PlatformEvent } from './events.types';
