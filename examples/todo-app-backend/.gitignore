@@ -11,3 +11,8 @@ dist/
 !.starcistacks/*/runtime/config/*.yaml.enc
 .starcistacks/*/secrets/*
 !.starcistacks/*/secrets/*.enc
+
+# UAT run videos are real bytes, not canonical Work: the run's manifest.yaml already carries their
+# sha256 as the tracked reference, and a CI job uploads the actual .webm as a build artifact instead of
+# committing it. Screens (PNG) stay tracked, same as every other frontend capture in this tree.
+.starciwork/**/runs/**/videos/*

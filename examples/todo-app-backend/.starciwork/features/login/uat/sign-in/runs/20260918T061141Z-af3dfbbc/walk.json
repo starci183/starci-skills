@@ -1,0 +1,24 @@
+{
+  "schema": "starci/uat-walk@1",
+  "flow": "uat.login.sign-in",
+  "steps": [
+    {
+      "step": "empty",
+      "startedAt": "2026-09-18T06:11:44.810Z",
+      "endedAt": "2026-09-18T06:11:44.877Z",
+      "screenshot": "empty"
+    },
+    {
+      "step": "filled",
+      "startedAt": "2026-09-18T06:11:44.943Z",
+      "endedAt": "2026-09-18T06:11:45.010Z",
+      "screenshot": "filled"
+    },
+    {
+      "step": "working-and-refused",
+      "startedAt": "2026-09-18T06:11:45.060Z",
+      "endedAt": "2026-09-18T06:11:55.074Z",
+      "screenshot": "working-and-refused"
+    }
+  ]
+}

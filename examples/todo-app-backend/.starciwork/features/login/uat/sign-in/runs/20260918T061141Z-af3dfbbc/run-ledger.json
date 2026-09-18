@@ -1,0 +1,15 @@
+{
+  "schema": "starci/uat-run-ledger@1",
+  "runId": "20260918T061141Z-af3dfbbc",
+  "flow": "uat.login.sign-in",
+  "started": "2026-09-18T06:11:42.806Z",
+  "finished": "2026-09-18T06:11:55.517Z",
+  "accountsDeclared": [
+    {
+      "role": "person",
+      "username": "uat-person"
+    }
+  ],
+  "reused": [],
+  "created": []
+}
