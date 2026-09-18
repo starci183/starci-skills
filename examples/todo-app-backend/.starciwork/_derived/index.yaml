@@ -1507,6 +1507,12 @@ records:
     feature: audit
     state: todo
     effectiveState: todo
+  impl.audit.todo-app-frontend.privacy:
+    schema: work/implementation
+    feature: audit
+    state: done
+    effectiveState: suspended
+    suspensionReason: digest-mismatch
   impl.login.todo-app-backend.auth:
     schema: work/implementation
     feature: login
@@ -1529,6 +1535,12 @@ records:
     feature: notify
     state: done
     effectiveState: done
+  impl.notify.todo-app-frontend.preferences:
+    schema: work/implementation
+    feature: notify
+    state: done
+    effectiveState: suspended
+    suspensionReason: digest-mismatch
   impl.plan.todo-app-backend.plan:
     schema: work/implementation
     feature: plan
@@ -1538,7 +1550,8 @@ records:
     schema: work/implementation
     feature: plan
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.recur.todo-app-backend.engine:
     schema: work/implementation
     feature: recur
@@ -1548,7 +1561,8 @@ records:
     schema: work/implementation
     feature: recur
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   impl.share.todo-app-backend.access:
     schema: work/implementation
     feature: share
@@ -2157,7 +2171,8 @@ records:
     schema: work/ui-screen
     feature: login
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: code-digest-mismatch
   ui.notify.preferences:
     schema: work/ui-screen
     feature: notify
@@ -2188,40 +2203,40 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 133
-    todo: 31
-    stale: 2
+    done: 131
+    todo: 30
+    stale: 7
     blocked: 36
-    total: 202
+    total: 204
   byFeature:
     audit:
       done: 20
       todo: 6
-      stale: 0
-      blocked: 3
-      total: 29
-    login:
-      done: 16
-      todo: 4
       stale: 1
+      blocked: 3
+      total: 30
+    login:
+      done: 15
+      todo: 4
+      stale: 2
       blocked: 3
       total: 24
     notify:
       done: 19
       todo: 6
-      stale: 0
+      stale: 1
       blocked: 6
-      total: 31
+      total: 32
     plan:
-      done: 18
+      done: 17
       todo: 3
-      stale: 0
+      stale: 1
       blocked: 9
       total: 30
     recur:
-      done: 20
+      done: 19
       todo: 2
-      stale: 0
+      stale: 1
       blocked: 6
       total: 28
     share:
@@ -2779,6 +2794,9 @@ unclassifiedEdges:
   - from: impl.audit.todo-app-backend.operator-read
     field: proves
     target: fr.audit.log.read
+  - from: impl.audit.todo-app-frontend.privacy
+    field: proves
+    target: ui.audit.privacy
   - from: impl.login.todo-app-backend.auth
     field: proves
     target: br.login.password.sign-in
@@ -2806,6 +2824,9 @@ unclassifiedEdges:
   - from: impl.notify.todo-app-backend.pipeline
     field: proves
     target: sds.notify.delivery-lifecycle
+  - from: impl.notify.todo-app-frontend.preferences
+    field: proves
+    target: ui.notify.preferences
   - from: impl.plan.todo-app-backend.plan
     field: proves
     target: br.plan.active-scope
@@ -3150,12 +3171,6 @@ unclassifiedEdges:
     target: fr.login.sign-in
   - from: ui.login.sign-in
     field: assets.generation.inputRefs
-    target: fr.login.sign-in
-  - from: ui.login.sign-in
-    field: assets.generation.inputRefs
-    target: sds.login.session-store
-  - from: ui.login.sign-in
-    field: assets.generation.inputRefs
     target: sds.login.session-store
   - from: ui.login.sign-in
     field: ui.acceptedInputs.business.id
@@ -3166,18 +3181,18 @@ unclassifiedEdges:
   - from: ui.login.sign-in
     field: ui.assets.generation.inputRefs
     target: fr.login.sign-in
-  - from: ui.login.sign-in
-    field: ui.assets.generation.inputRefs
-    target: fr.login.sign-in
-  - from: ui.login.sign-in
-    field: ui.assets.generation.inputRefs
-    target: sds.login.session-store
   - from: ui.login.sign-in
     field: ui.assets.generation.inputRefs
     target: sds.login.session-store
   - from: ui.notify.preferences
     field: assets.generation.inputRefs
     target: fr.notify.unsubscribe
+  - from: ui.notify.preferences
+    field: assets.generation.inputRefs
+    target: fr.notify.unsubscribe
+  - from: ui.notify.preferences
+    field: assets.generation.inputRefs
+    target: sds.notify.delivery-lifecycle
   - from: ui.notify.preferences
     field: assets.generation.inputRefs
     target: sds.notify.delivery-lifecycle
@@ -3192,34 +3207,25 @@ unclassifiedEdges:
     target: fr.notify.unsubscribe
   - from: ui.notify.preferences
     field: ui.assets.generation.inputRefs
+    target: fr.notify.unsubscribe
+  - from: ui.notify.preferences
+    field: ui.assets.generation.inputRefs
+    target: sds.notify.delivery-lifecycle
+  - from: ui.notify.preferences
+    field: ui.assets.generation.inputRefs
     target: sds.notify.delivery-lifecycle
   - from: ui.plan.usage
     field: assets.generation.inputRefs
     target: br.plan.caps.limit
   - from: ui.plan.usage
     field: assets.generation.inputRefs
-    target: br.plan.caps.limit
-  - from: ui.plan.usage
-    field: assets.generation.inputRefs
-    target: decision.plan.downgrade.policy
-  - from: ui.plan.usage
-    field: assets.generation.inputRefs
     target: decision.plan.downgrade.policy
   - from: ui.plan.usage
     field: assets.generation.inputRefs
     target: fr.plan.upgrade
   - from: ui.plan.usage
     field: assets.generation.inputRefs
-    target: fr.plan.upgrade
-  - from: ui.plan.usage
-    field: assets.generation.inputRefs
     target: fr.plan.usage.view
-  - from: ui.plan.usage
-    field: assets.generation.inputRefs
-    target: fr.plan.usage.view
-  - from: ui.plan.usage
-    field: assets.generation.inputRefs
-    target: sds.plan.subscription-lifecycle
   - from: ui.plan.usage
     field: assets.generation.inputRefs
     target: sds.plan.subscription-lifecycle
@@ -3243,28 +3249,13 @@ unclassifiedEdges:
     target: br.plan.caps.limit
   - from: ui.plan.usage
     field: ui.assets.generation.inputRefs
-    target: br.plan.caps.limit
-  - from: ui.plan.usage
-    field: ui.assets.generation.inputRefs
-    target: decision.plan.downgrade.policy
-  - from: ui.plan.usage
-    field: ui.assets.generation.inputRefs
     target: decision.plan.downgrade.policy
   - from: ui.plan.usage
     field: ui.assets.generation.inputRefs
     target: fr.plan.upgrade
   - from: ui.plan.usage
     field: ui.assets.generation.inputRefs
-    target: fr.plan.upgrade
-  - from: ui.plan.usage
-    field: ui.assets.generation.inputRefs
     target: fr.plan.usage.view
-  - from: ui.plan.usage
-    field: ui.assets.generation.inputRefs
-    target: fr.plan.usage.view
-  - from: ui.plan.usage
-    field: ui.assets.generation.inputRefs
-    target: sds.plan.subscription-lifecycle
   - from: ui.plan.usage
     field: ui.assets.generation.inputRefs
     target: sds.plan.subscription-lifecycle
@@ -3327,16 +3318,7 @@ unclassifiedEdges:
     target: fr.share.invite
   - from: ui.share.invite
     field: assets.generation.inputRefs
-    target: fr.share.invite
-  - from: ui.share.invite
-    field: assets.generation.inputRefs
     target: fr.share.list
-  - from: ui.share.invite
-    field: assets.generation.inputRefs
-    target: fr.share.list
-  - from: ui.share.invite
-    field: assets.generation.inputRefs
-    target: fr.share.revoke
   - from: ui.share.invite
     field: assets.generation.inputRefs
     target: fr.share.revoke
@@ -3354,16 +3336,7 @@ unclassifiedEdges:
     target: fr.share.invite
   - from: ui.share.invite
     field: ui.assets.generation.inputRefs
-    target: fr.share.invite
-  - from: ui.share.invite
-    field: ui.assets.generation.inputRefs
     target: fr.share.list
-  - from: ui.share.invite
-    field: ui.assets.generation.inputRefs
-    target: fr.share.list
-  - from: ui.share.invite
-    field: ui.assets.generation.inputRefs
-    target: fr.share.revoke
   - from: ui.share.invite
     field: ui.assets.generation.inputRefs
     target: fr.share.revoke
