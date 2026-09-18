@@ -44,13 +44,17 @@ test('published JSON Schema accepts every SRS v3 node type and rejects represent
 
 test('legacy SRS specification@2 and SDS specification@3 remain valid under unchanged validators',()=>{
  assert.deepEqual(validateSpecification(documentSDS()),{ok:true,errors:[]});
- const business=JSON.parse(fs.readFileSync(new URL('../.dist/examples/nivo-setup-business.json',import.meta.url),'utf8'));
+ // .dist/examples/nivo-setup-business.json was the build output of the deleted examples/nivo-setup-business.yaml
+ // (owner ruling: examples/ keeps only the todo-app repositories). tests/fixtures/nested-business/ carries a real
+ // starci/specification@2 business document (the deleted nested-business example's SRS leaf), which this test's
+ // own name asks for more literally than the retired file did.
+ const business=parseYaml(fs.readFileSync(new URL('fixtures/nested-business/knowledge/business/srs/documents/update/index.yaml',import.meta.url),'utf8')).extensions.work3.specification;
  assert.deepEqual(validateSpecification(business),{ok:true,errors:[]});
 });
 
 test('untagged SDS@3 imports retain the prior-runtime portable digest baseline',t=>{
  const f=workspace(t,{complete:false}),make=(id,spec)=>({schema:'work/node@2',id,kind:'architecture',required:true,state:'todo',description:`Portable legacy ${id}.`,extensions:{work3:{specification:spec}}}),owner=documentSDS(),consumer=documentSDS();consumer.designRefs=[{nodeId:'legacy-baseline-owner',viewIds:['client']}];consumer.views.find(v=>v.kind==='structure').content.dependencies.push('legacy-baseline-owner#client');
- const business=parseYaml(fs.readFileSync(new URL('../examples/nested-business/knowledge/business/srs/documents/update/index.yaml',import.meta.url),'utf8'));f.write('module/legacy-baseline/business/index.yaml',business);const ownerNode=make('legacy-baseline-owner',owner);ownerNode.refs=['example.business.srs.documents.update'];f.write('module/legacy-baseline/owner/index.yaml',ownerNode);const consumerNode=make('legacy-baseline-consumer',consumer);consumerNode.refs=['example.business.srs.documents.update','legacy-baseline-owner'];f.write('module/legacy-baseline/consumer/index.yaml',consumerNode);const result=f.run();assert.ok(result.ok,JSON.stringify(result.errors));assert.equal(result.nodes.find(n=>n.id==='legacy-baseline-consumer').inputDigest,'76f139f826be4f192f459e70a299bcdd38b4bcd4e39f8927319f45b08de2b49f');
+ const business=parseYaml(fs.readFileSync(new URL('fixtures/nested-business/knowledge/business/srs/documents/update/index.yaml',import.meta.url),'utf8'));f.write('module/legacy-baseline/business/index.yaml',business);const ownerNode=make('legacy-baseline-owner',owner);ownerNode.refs=['example.business.srs.documents.update'];f.write('module/legacy-baseline/owner/index.yaml',ownerNode);const consumerNode=make('legacy-baseline-consumer',consumer);consumerNode.refs=['example.business.srs.documents.update','legacy-baseline-owner'];f.write('module/legacy-baseline/consumer/index.yaml',consumerNode);const result=f.run();assert.ok(result.ok,JSON.stringify(result.errors));assert.equal(result.nodes.find(n=>n.id==='legacy-baseline-consumer').inputDigest,'76f139f826be4f192f459e70a299bcdd38b4bcd4e39f8927319f45b08de2b49f');
 });
 
 test('SRS v3 typed refs resolve exact owners and reject cross-version substitution',()=>{
@@ -96,7 +100,7 @@ test('reciprocal typed freshness includes target ancestor Work imports without i
 });
 
 test('untouched real legacy workspace retains prior-runtime digest bytes',()=>{
- const legacy=validateWorkspace(fileURLToPath(new URL('../examples/nested-business/',import.meta.url)));assert.ok(legacy.ok,JSON.stringify(legacy.errors));assert.equal(legacy.nodes.find(n=>n.id==='example.business.srs.documents.update').inputDigest,'deb5060362d0d2377a8ee9fbdd505f2762bd5fb8de6ddc96ed99d8cc24a3c7c5');
+ const legacy=validateWorkspace(fileURLToPath(new URL('fixtures/nested-business/',import.meta.url)));assert.ok(legacy.ok,JSON.stringify(legacy.errors));assert.equal(legacy.nodes.find(n=>n.id==='example.business.srs.documents.update').inputDigest,'deb5060362d0d2377a8ee9fbdd505f2762bd5fb8de6ddc96ed99d8cc24a3c7c5');
 });
 
 test('dist publication lock preserves stale, live and ambiguous owners for explicit offline recovery',t=>{

@@ -6,7 +6,9 @@ import os from 'node:os';
 import {parseYaml,stringifyYaml} from '../core/yaml.mjs';
 import {validateWorkspace} from '../core/index.mjs';
 import {validateSpecification} from '../specifications/validate.mjs';
-const example=new URL('../examples/nested-business/',import.meta.url);
+// examples/nested-business was deleted (owner ruling: examples/ keeps only the todo-app repositories);
+// tests/fixtures/nested-business/ reconstructs the deleted example's knowledge/business SRS tree.
+const example=new URL('fixtures/nested-business/',import.meta.url);
 const leaf='knowledge/business/srs/documents/update/index.yaml';
 const sample=()=>parseYaml(fs.readFileSync(new URL(leaf,example),'utf8')).extensions.work3.specification;
 function fixture(t){const root=fs.mkdtempSync(path.join(os.tmpdir(),'starci-srs-v2-'));fs.cpSync(example,root,{recursive:true});t.after(()=>fs.rmSync(root,{recursive:true,force:true}));return {root,run:()=>validateWorkspace(root),write:(p,m)=>{const file=path.join(root,p);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,stringifyYaml(m));},mutate:(p,fn)=>{const file=path.join(root,p),m=parseYaml(fs.readFileSync(file,'utf8'));fn(m);fs.writeFileSync(file,stringifyYaml(m));}};}

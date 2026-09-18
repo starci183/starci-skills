@@ -5,7 +5,10 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import test from 'node:test';
 
-const source=new URL('../examples/application-stacks/tiny-stateful/scripts/',import.meta.url);
+// examples/application-stacks/tiny-stateful was deleted (owner ruling: examples/ keeps only the
+// todo-app repositories); its custody scripts moved to examples/todo-app-backend/scripts/ verbatim,
+// including the "tiny-stateful" custody directory/project constants these assertions check for.
+const source=new URL('../examples/todo-app-backend/scripts/',import.meta.url);
 const pwshProbe=spawnSync('pwsh',['-NoProfile','-Command','$PSVersionTable.PSVersion.Major'],{encoding:'utf8'});
 const hasPowerShell7=pwshProbe.status===0&&Number(String(pwshProbe.stdout??'').trim())>=7;
 const needsPowerShell7=hasPowerShell7?false:'PowerShell 7 (pwsh) is unavailable; static script contract tests still run';

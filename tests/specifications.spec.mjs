@@ -8,13 +8,18 @@ import { validateWorkspace } from '../core/index.mjs';
 import { validateFEHandoff } from '../workflows/frontend.mjs';
 import { validateCatalog } from '../ops/validate.mjs';
 import { parseYaml } from '../core/yaml.mjs';
-import {readExample} from './helpers/read-public.mjs';
 import {outputs} from '../ops/generate.mjs';
-const sample = () => readExample('nivo-setup-architecture.json');
+// The deleted examples/nivo-setup-{business,architecture}.yaml (owner ruling: examples/ keeps only the
+// todo-app repositories) were the only real, fully-populated business/architecture specifications
+// (journeys, serviceCalls, patternDecisions, securityReview, handoff...) in the repo; the current
+// todo-app examples carry no such document. tests/fixtures/nivo-setup/ keeps the deleted documents
+// byte-for-byte (still valid, unmodified, under the current validator).
+const readNivoSetupExample = kind => JSON.parse(fs.readFileSync(new URL(`fixtures/nivo-setup/${kind}.json`,import.meta.url),'utf8'));
+const sample = () => readNivoSetupExample('architecture');
 
 test('source-grounded examples are valid draft specifications, never approved product work', () => {
   for (const kind of ['business','architecture']) {
-    const spec = readExample('nivo-setup-' + kind + '.json');
+    const spec = readNivoSetupExample(kind);
     assert.deepEqual(validateSpecification(spec), { ok: true, errors: [] });
     spec.status = 'pass';
     assert.equal(validateSpecification(spec).ok, false);
@@ -67,7 +72,7 @@ test('.work validates specification owner, source revision binding and non-compl
   assert.ok(validateWorkspace(root).errors.some(e => e.code === 'SPECIFICATION_NOT_ACCEPTED'));
   node.state = 'suspended'; node.kind = 'business'; write();
   assert.ok(validateWorkspace(root).errors.some(e => e.code === 'SPECIFICATION_OWNER'));
-  const businessSpec = readExample('nivo-setup-business.json');
+  const businessSpec = readNivoSetupExample('business');
   const businessDir = path.join(root, 'business'); fs.mkdirSync(businessDir);
   fs.writeFileSync(path.join(businessDir, 'node.md'), '---\n' + JSON.stringify({schema:'work/node@1',id:'business-example',kind:'business',required:true,state:'todo',refs:repositories,assertions:['review'],extensions:{work3:{specification:businessSpec}}}) + '\n---\n# Business source example\n');
   node.kind = 'architecture'; node.dependsOn = ['business-example']; write();
