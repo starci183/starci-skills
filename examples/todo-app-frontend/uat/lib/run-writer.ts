@@ -7,7 +7,14 @@ import { stringify as stringifyYaml } from 'yaml';
 import { FLOW_LOCATIONS, readAccounts, readFlowRecord, recordDigest } from './flow-records';
 import { runDir } from './paths';
 import { backendCommit, currentRunId, frontendCommit } from './run-context';
-import { ASSERTION_ANNOTATION, WALK_STEP_ANNOTATION, type AssertionRecord, type WalkStepRecord } from './steps';
+import {
+  ASSERTION_ANNOTATION,
+  RESOURCE_ANNOTATION,
+  WALK_STEP_ANNOTATION,
+  type AssertionRecord,
+  type ResourceEvent,
+  type WalkStepRecord,
+} from './steps';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -64,6 +71,7 @@ export default class RunWriter implements Reporter {
 
     const walkEntries = parseAnnotations<WalkStepRecord>(test, WALK_STEP_ANNOTATION);
     const assertions = parseAnnotations<AssertionRecord>(test, ASSERTION_ANNOTATION);
+    const resourceEvents = parseAnnotations<ResourceEvent>(test, RESOURCE_ANNOTATION);
 
     const assets: Array<{ path: string; sha256: string; size: number }> = [];
     for (const attachment of result.attachments) {
@@ -138,7 +146,7 @@ export default class RunWriter implements Reporter {
           finished: new Date(result.startTime.getTime() + result.duration).toISOString(),
           accountsDeclared: accounts.map(a => ({ role: a.role, username: a.username })),
           reused: [],
-          created: [],
+          created: resourceEvents.filter(e => e.action === 'created').map(e => ({ kind: e.kind, id: e.id, note: e.note })),
         },
         null,
         2,
@@ -159,15 +167,24 @@ export default class RunWriter implements Reporter {
       ),
     );
 
+    const created = resourceEvents.filter(e => e.action === 'created');
+    const deleted = resourceEvents.filter(e => e.action === 'deleted');
+    const verifiedAbsent = resourceEvents.filter(e => e.action === 'verified-absent');
     fs.writeFileSync(
       path.join(dir, 'cleanup.json'),
       JSON.stringify(
         {
           schema: 'starci/uat-cleanup@1',
           flow: record.id,
-          ownedResourcesCreated: [],
-          ownedResourcesDeleted: [],
-          note: 'This run created no run-owned fixture rows against a database this lane owns; nothing to clean up.',
+          ownedResourcesCreated: created.map(e => ({ kind: e.kind, id: e.id, note: e.note })),
+          ownedResourcesDeleted: deleted.map(e => ({ kind: e.kind, id: e.id, note: e.note })),
+          verifiedAbsent: verifiedAbsent.map(e => ({ kind: e.kind, id: e.id, note: e.note })),
+          note:
+            created.length === 0
+              ? 'This run created no run-owned fixture rows against a database this lane owns; nothing to clean up.'
+              : created.length === deleted.length && created.length === verifiedAbsent.length
+                ? 'Every run-owned resource this run created was deleted and its absence verified by read-back.'
+                : 'Unresolved owned resource(s) remain - see ownedResourcesCreated vs ownedResourcesDeleted/verifiedAbsent.',
         },
         null,
         2,

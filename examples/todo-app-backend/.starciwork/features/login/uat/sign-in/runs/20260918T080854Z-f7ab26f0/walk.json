@@ -1,0 +1,42 @@
+{
+  "schema": "starci/uat-walk@1",
+  "flow": "uat.login.sign-in",
+  "steps": [
+    {
+      "step": "empty",
+      "startedAt": "2026-09-18T08:08:54.887Z",
+      "endedAt": "2026-09-18T08:08:54.916Z",
+      "screenshot": "empty"
+    },
+    {
+      "step": "signed-in",
+      "startedAt": "2026-09-18T08:08:54.952Z",
+      "endedAt": "2026-09-18T08:08:55.077Z",
+      "screenshot": "signed-in"
+    },
+    {
+      "step": "task-list-after-sign-in",
+      "startedAt": "2026-09-18T08:08:55.132Z",
+      "endedAt": "2026-09-18T08:08:55.201Z",
+      "screenshot": "task-list-after-sign-in"
+    },
+    {
+      "step": "session-restores-on-reload",
+      "startedAt": "2026-09-18T08:08:55.229Z",
+      "endedAt": "2026-09-18T08:08:55.276Z",
+      "screenshot": "session-restores-on-reload"
+    },
+    {
+      "step": "filled",
+      "startedAt": "2026-09-18T08:08:55.340Z",
+      "endedAt": "2026-09-18T08:08:55.385Z",
+      "screenshot": "filled"
+    },
+    {
+      "step": "working-and-refused",
+      "startedAt": "2026-09-18T08:08:55.431Z",
+      "endedAt": "2026-09-18T08:08:55.516Z",
+      "screenshot": "working-and-refused"
+    }
+  ]
+}

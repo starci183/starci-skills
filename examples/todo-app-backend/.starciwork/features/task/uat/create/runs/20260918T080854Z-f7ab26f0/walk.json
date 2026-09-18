@@ -1,0 +1,18 @@
+{
+  "schema": "starci/uat-walk@1",
+  "flow": "uat.task.create",
+  "steps": [
+    {
+      "step": "owner-signed-in",
+      "startedAt": "2026-09-18T08:08:55.798Z",
+      "endedAt": "2026-09-18T08:08:56.086Z",
+      "screenshot": "owner-signed-in"
+    },
+    {
+      "step": "task-created",
+      "startedAt": "2026-09-18T08:08:56.114Z",
+      "endedAt": "2026-09-18T08:09:06.215Z",
+      "screenshot": "task-created"
+    }
+  ]
+}

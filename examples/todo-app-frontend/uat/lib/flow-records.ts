@@ -65,6 +65,41 @@ export const readFlowRecord = (feature: string, flow: string): UatFlowRecord => 
   };
 };
 
+/**
+ * Both shipped accounts.yaml records (login/sign-in, task/create) carry `{role, identity}`, not the
+ * `{role, username, password}` shape this file originally assumed - `identity` names a shared
+ * `work/resource` (e.g. `identity.todo-app.demo`), which is exactly what operator.yaml's `accounts` read
+ * says this harness must resolve ("Resolve an existing suitable test account..."), not a literal login.
+ * The one identity resource this example ships lists abstract roles it can play (person, owner,
+ * stranger, ...) but never differentiates a concrete seeded row per role, while the realm
+ * (.starcistacks/dev/infra/compose/realm-todo.json) only actually seeds two people: demo@todo.dev and
+ * demo2@todo.dev. Task/create's `owner` and `stranger` both name the same identity yet must be two
+ * distinct signed-in people for the ownership check to mean anything, so this harness treats
+ * demo@todo.dev as that identity's default row and demo2@todo.dev as its second row for any role that
+ * must differ from another role in the same flow - the exact distinction
+ * scripts/live-proof.sh already relies on for its own br.task.list.owned check. This is a harness-side
+ * resolution, not a fix to accounts.yaml itself: the record still only names an identity, and a caller
+ * with a different real mapping may override any role via `UAT_USERNAME_<ROLE>`.
+ */
+const SEEDED_ROWS_BY_IDENTITY: Readonly<Record<string, { readonly primary: string; readonly secondary: string }>> = {
+  'identity.todo-app.demo': { primary: 'demo@todo.dev', secondary: 'demo2@todo.dev' },
+};
+
+/** Roles that must resolve to the identity's *second* seeded row, so they differ from a co-occurring primary role. */
+const SECOND_ROW_ROLES = new Set(['stranger']);
+
+const usernameForIdentity = (identity: string, role: string): string => {
+  const override = process.env[`UAT_USERNAME_${role.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`];
+  if (override) return override;
+  const rows = SEEDED_ROWS_BY_IDENTITY[identity];
+  if (!rows) {
+    throw new Error(
+      `No known seeded username for identity "${identity}" (role "${role}"); set UAT_USERNAME_${role.toUpperCase()}.`,
+    );
+  }
+  return SECOND_ROW_ROLES.has(role) ? rows.secondary : rows.primary;
+};
+
 /** Reads the record's own scoped test-account roster; the password field here is never used at runtime. */
 export const readAccounts = (feature: string, flow: string): ReadonlyArray<DisposableAccount> => {
   const file = flowAccountsPath(feature, flow);
@@ -73,11 +108,24 @@ export const readAccounts = (feature: string, flow: string): ReadonlyArray<Dispo
   if (!raw || raw.schema !== 'work/disposable-accounts' || !Array.isArray(raw.accounts)) {
     throw new Error(`${file} is not a work/disposable-accounts record; refusing to invent one.`);
   }
-  return raw.accounts.map(entry => ({
-    role: String((entry as any).role),
-    username: String((entry as any).username),
-    password: String((entry as any).password),
-  }));
+  return raw.accounts.map(entry => {
+    const role = String((entry as any).role);
+    const literalUsername = (entry as any).username;
+    const identity = (entry as any).identity;
+    const username =
+      literalUsername !== undefined
+        ? String(literalUsername)
+        : identity !== undefined
+          ? usernameForIdentity(String(identity), role)
+          : (() => {
+              throw new Error(`${file}: account for role "${role}" declares neither username nor identity.`);
+            })();
+    return {
+      role,
+      username,
+      password: (entry as any).password !== undefined ? String((entry as any).password) : '',
+    };
+  });
 };
 
 /**

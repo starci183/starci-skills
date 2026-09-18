@@ -1,0 +1,73 @@
+schema: starci/uat-run-manifest@1
+id: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
+nodeId: uat.login.sign-in
+inputDigest: 8afc883dc906083a65f15023e454abe31475699693936a3cef47390411257236
+outcome: fail
+assertions:
+  - id: ux.sign-in.validation-feedback
+    expected: yes
+    observed: yes
+    note: The submit button stays disabled while either field is empty
+      (SignInFormView disabled logic).
+  - id: ux.sign-in.lands-on-task-list
+    expected: yes
+    observed: no
+    note: Signing in does not navigate anywhere; this harness then navigated to
+      /tasks by URL to keep walking the flow.
+  - id: fr.login.sign-in
+    expected: yes
+    observed: yes
+    note: After navigating to /tasks by URL, the browser rendered
+      data-state="empty", matching a correctly-headed API read-back of
+      demo@todo.dev's own 0 task(s).
+  - id: br.login.session.restores
+    expected: yes
+    observed: yes
+    note: The session token lives in localStorage, not a cookie - the record's own
+      wording is stale against src/modules/session - so reloading /tasks re-read
+      it without re-authenticating; the list rendered data-state="empty" after
+      reload. This matches a correctly-headed API read-back of demo@todo.dev's
+      own 0 task(s).
+  - id: ux.sign-in.error-feedback
+    expected: yes
+    observed: yes
+    note: form[data-state="refused"] renders a role="alert" message after the
+      wrong-password submit.
+  - id: br.login.password.sign-in
+    expected: yes
+    observed: yes
+    note: The refusal text is the one normalized SIGN_IN_REFUSAL_MESSAGE regardless
+      of which half of the pair was wrong (src/modules/api/auth.ts) - the same
+      text an unknown email would produce.
+assets:
+  - path: screens/empty.png
+    sha256: 728a1058b8a851c5122aa88d2b745629a63a93b40f61f1be72523a7009b015d8
+    size: 10186
+  - path: screens/signed-in.png
+    sha256: e752be9ca02c72c47d97dbcb98e3b33f4b018e63985a5e2b72690e61ee7e082e
+    size: 11478
+  - path: screens/task-list-after-sign-in.png
+    sha256: 6913f8fceb1f57b872ccde3a0af8df828a3cd74a168b43454c23000e9885f1ae
+    size: 12216
+  - path: screens/session-restores-on-reload.png
+    sha256: 6913f8fceb1f57b872ccde3a0af8df828a3cd74a168b43454c23000e9885f1ae
+    size: 12216
+  - path: screens/filled.png
+    sha256: 4c5ae88e4a348588b92edf0884416d8ed91c54f7b4b8a37d09d34377d0d92925
+    size: 11574
+  - path: screens/working-and-refused.png
+    sha256: 7454aabc66d105fe8e5f5f7b3b22ef8a20e3ca09c90dcfd1a649ad626cbd1d7c
+    size: 13233
+  - path: screens/screenshot.png
+    sha256: d2f6ccf2f88681d128270b8b2e0e64d1dab9bbf82fcf998bdb05a93c650d26e9
+    size: 13895
+  - path: videos/sign-in.webm
+    sha256: 70e852343f42c440d35d8f310002338f91f3b9f92b7ad6977474f988dfe8850d
+    size: 26650
+provenance:
+  tool: playwright
+  version: 1.63.0
+  browser: chromium
+  baseURL: http://localhost:3000
+  frontendCommit: f7ab26f0
+  backendCommit: f7ab26f0
