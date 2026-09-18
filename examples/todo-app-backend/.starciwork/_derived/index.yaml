@@ -3149,18 +3149,153 @@ unclassifiedEdges:
   - from: ui.audit.privacy
     field: assets.generation.inputRefs
     target: fr.audit.export
+  - from: ui.audit.privacy
+    field: assets.generation.inputRefs
+    target: sds.audit.erasure-request
+  - from: ui.audit.privacy
+    field: ui.acceptedInputs.business.id
+    target: fr.audit.erasure.request
+  - from: ui.audit.privacy
+    field: ui.acceptedInputs.business.id
+    target: fr.audit.export
+  - from: ui.audit.privacy
+    field: ui.acceptedInputs.business.id
+    target: sds.audit.erasure-request
+  - from: ui.audit.privacy
+    field: ui.assets.generation.inputRefs
+    target: fr.audit.erasure.request
+  - from: ui.audit.privacy
+    field: ui.assets.generation.inputRefs
+    target: fr.audit.export
+  - from: ui.audit.privacy
+    field: ui.assets.generation.inputRefs
+    target: sds.audit.erasure-request
   - from: ui.login.sign-in
     field: assets.generation.inputRefs
     target: fr.login.sign-in
+  - from: ui.login.sign-in
+    field: assets.generation.inputRefs
+    target: fr.login.sign-in
+  - from: ui.login.sign-in
+    field: assets.generation.inputRefs
+    target: sds.login.session-store
+  - from: ui.login.sign-in
+    field: assets.generation.inputRefs
+    target: sds.login.session-store
+  - from: ui.login.sign-in
+    field: ui.acceptedInputs.business.id
+    target: fr.login.sign-in
+  - from: ui.login.sign-in
+    field: ui.acceptedInputs.business.id
+    target: sds.login.session-store
+  - from: ui.login.sign-in
+    field: ui.assets.generation.inputRefs
+    target: fr.login.sign-in
+  - from: ui.login.sign-in
+    field: ui.assets.generation.inputRefs
+    target: fr.login.sign-in
+  - from: ui.login.sign-in
+    field: ui.assets.generation.inputRefs
+    target: sds.login.session-store
+  - from: ui.login.sign-in
+    field: ui.assets.generation.inputRefs
+    target: sds.login.session-store
   - from: ui.notify.preferences
     field: assets.generation.inputRefs
     target: fr.notify.unsubscribe
+  - from: ui.notify.preferences
+    field: assets.generation.inputRefs
+    target: sds.notify.delivery-lifecycle
+  - from: ui.notify.preferences
+    field: ui.acceptedInputs.business.id
+    target: fr.notify.unsubscribe
+  - from: ui.notify.preferences
+    field: ui.acceptedInputs.business.id
+    target: sds.notify.delivery-lifecycle
+  - from: ui.notify.preferences
+    field: ui.assets.generation.inputRefs
+    target: fr.notify.unsubscribe
+  - from: ui.notify.preferences
+    field: ui.assets.generation.inputRefs
+    target: sds.notify.delivery-lifecycle
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
+    target: br.plan.caps.limit
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
+    target: br.plan.caps.limit
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
+    target: decision.plan.downgrade.policy
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
+    target: decision.plan.downgrade.policy
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
+    target: fr.plan.upgrade
   - from: ui.plan.usage
     field: assets.generation.inputRefs
     target: fr.plan.upgrade
   - from: ui.plan.usage
     field: assets.generation.inputRefs
     target: fr.plan.usage.view
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
+    target: fr.plan.usage.view
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
+    target: sds.plan.subscription-lifecycle
+  - from: ui.plan.usage
+    field: assets.generation.inputRefs
+    target: sds.plan.subscription-lifecycle
+  - from: ui.plan.usage
+    field: ui.acceptedInputs.business.id
+    target: br.plan.caps.limit
+  - from: ui.plan.usage
+    field: ui.acceptedInputs.business.id
+    target: decision.plan.downgrade.policy
+  - from: ui.plan.usage
+    field: ui.acceptedInputs.business.id
+    target: fr.plan.upgrade
+  - from: ui.plan.usage
+    field: ui.acceptedInputs.business.id
+    target: fr.plan.usage.view
+  - from: ui.plan.usage
+    field: ui.acceptedInputs.business.id
+    target: sds.plan.subscription-lifecycle
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
+    target: br.plan.caps.limit
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
+    target: br.plan.caps.limit
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
+    target: decision.plan.downgrade.policy
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
+    target: decision.plan.downgrade.policy
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
+    target: fr.plan.upgrade
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
+    target: fr.plan.upgrade
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
+    target: fr.plan.usage.view
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
+    target: fr.plan.usage.view
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
+    target: sds.plan.subscription-lifecycle
+  - from: ui.plan.usage
+    field: ui.assets.generation.inputRefs
+    target: sds.plan.subscription-lifecycle
+  - from: ui.recur.schedule
+    field: assets.generation.inputRefs
+    target: data.recur.rule
   - from: ui.recur.schedule
     field: assets.generation.inputRefs
     target: fr.recur.end-rule
@@ -3170,12 +3305,150 @@ unclassifiedEdges:
   - from: ui.recur.schedule
     field: assets.generation.inputRefs
     target: fr.recur.see-upcoming
+  - from: ui.recur.schedule
+    field: assets.generation.inputRefs
+    target: sds.recur.generation-engine
+  - from: ui.recur.schedule
+    field: assets.generation.inputRefs
+    target: sds.recur.occurrence-lifecycle
+  - from: ui.recur.schedule
+    field: ui.acceptedInputs.business.id
+    target: data.recur.rule
+  - from: ui.recur.schedule
+    field: ui.acceptedInputs.business.id
+    target: fr.recur.end-rule
+  - from: ui.recur.schedule
+    field: ui.acceptedInputs.business.id
+    target: fr.recur.make-recurring
+  - from: ui.recur.schedule
+    field: ui.acceptedInputs.business.id
+    target: fr.recur.see-upcoming
+  - from: ui.recur.schedule
+    field: ui.acceptedInputs.business.id
+    target: sds.recur.generation-engine
+  - from: ui.recur.schedule
+    field: ui.acceptedInputs.business.id
+    target: sds.recur.occurrence-lifecycle
+  - from: ui.recur.schedule
+    field: ui.assets.generation.inputRefs
+    target: data.recur.rule
+  - from: ui.recur.schedule
+    field: ui.assets.generation.inputRefs
+    target: fr.recur.end-rule
+  - from: ui.recur.schedule
+    field: ui.assets.generation.inputRefs
+    target: fr.recur.make-recurring
+  - from: ui.recur.schedule
+    field: ui.assets.generation.inputRefs
+    target: fr.recur.see-upcoming
+  - from: ui.recur.schedule
+    field: ui.assets.generation.inputRefs
+    target: sds.recur.generation-engine
+  - from: ui.recur.schedule
+    field: ui.assets.generation.inputRefs
+    target: sds.recur.occurrence-lifecycle
+  - from: ui.share.invite
+    field: assets.generation.inputRefs
+    target: fr.share.invite
   - from: ui.share.invite
     field: assets.generation.inputRefs
     target: fr.share.invite
   - from: ui.share.invite
     field: assets.generation.inputRefs
     target: fr.share.list
+  - from: ui.share.invite
+    field: assets.generation.inputRefs
+    target: fr.share.list
+  - from: ui.share.invite
+    field: assets.generation.inputRefs
+    target: fr.share.revoke
+  - from: ui.share.invite
+    field: assets.generation.inputRefs
+    target: fr.share.revoke
+  - from: ui.share.invite
+    field: ui.acceptedInputs.business.id
+    target: fr.share.invite
+  - from: ui.share.invite
+    field: ui.acceptedInputs.business.id
+    target: fr.share.list
+  - from: ui.share.invite
+    field: ui.acceptedInputs.business.id
+    target: fr.share.revoke
+  - from: ui.share.invite
+    field: ui.assets.generation.inputRefs
+    target: fr.share.invite
+  - from: ui.share.invite
+    field: ui.assets.generation.inputRefs
+    target: fr.share.invite
+  - from: ui.share.invite
+    field: ui.assets.generation.inputRefs
+    target: fr.share.list
+  - from: ui.share.invite
+    field: ui.assets.generation.inputRefs
+    target: fr.share.list
+  - from: ui.share.invite
+    field: ui.assets.generation.inputRefs
+    target: fr.share.revoke
+  - from: ui.share.invite
+    field: ui.assets.generation.inputRefs
+    target: fr.share.revoke
+  - from: ui.task.list
+    field: assets.generation.inputRefs
+    target: br.task.delete.final
+  - from: ui.task.list
+    field: assets.generation.inputRefs
+    target: br.task.delete.final
+  - from: ui.task.list
+    field: assets.generation.inputRefs
+    target: br.task.list.owned
+  - from: ui.task.list
+    field: assets.generation.inputRefs
+    target: br.task.list.owned
   - from: ui.task.list
     field: assets.generation.inputRefs
     target: fr.task.create
+  - from: ui.task.list
+    field: assets.generation.inputRefs
+    target: fr.task.create
+  - from: ui.task.list
+    field: assets.generation.inputRefs
+    target: sds.task.completion-state
+  - from: ui.task.list
+    field: assets.generation.inputRefs
+    target: sds.task.completion-state
+  - from: ui.task.list
+    field: ui.acceptedInputs.business.id
+    target: br.task.delete.final
+  - from: ui.task.list
+    field: ui.acceptedInputs.business.id
+    target: br.task.list.owned
+  - from: ui.task.list
+    field: ui.acceptedInputs.business.id
+    target: fr.task.create
+  - from: ui.task.list
+    field: ui.acceptedInputs.business.id
+    target: sds.task.completion-state
+  - from: ui.task.list
+    field: ui.assets.generation.inputRefs
+    target: br.task.delete.final
+  - from: ui.task.list
+    field: ui.assets.generation.inputRefs
+    target: br.task.delete.final
+  - from: ui.task.list
+    field: ui.assets.generation.inputRefs
+    target: br.task.list.owned
+  - from: ui.task.list
+    field: ui.assets.generation.inputRefs
+    target: br.task.list.owned
+  - from: ui.task.list
+    field: ui.assets.generation.inputRefs
+    target: fr.task.create
+  - from: ui.task.list
+    field: ui.assets.generation.inputRefs
+    target: fr.task.create
+  - from: ui.task.list
+    field: ui.assets.generation.inputRefs
+    target: sds.task.completion-state
+  - from: ui.task.list
+    field: ui.assets.generation.inputRefs
+    target: sds.task.completion-state
