@@ -31,11 +31,9 @@ findings:
       - impl.plan.todo-app-frontend.usage
       - impl.recur.todo-app-backend.engine
       - impl.share.todo-app-backend.invitations
-      - impl.task.todo-app-backend.complete-task
       - impl.task.todo-app-backend.create-task
       - impl.task.todo-app-backend.ownership
       - impl.task.todo-app-backend.platform-events
-      - impl.task.todo-app-backend.reopen-task
       - impl.task.todo-app-frontend.task-list
       - integration.login.keycloak
       - integration.login.postgres
@@ -58,10 +56,11 @@ findings:
       - ui.login.sign-in
       - ui.plan.usage
       - ui.task.list
-    because: A breaking change to br.login.password.sign-in sends 51 other record(s) back to todo, would
-      stale 36 evidence file(s), and touches 20 code path(s) (app/plan/upgrade-button.tsx,
+    because: A breaking change to br.login.password.sign-in sends 49 other record(s) back to todo, would
+      stale 28 evidence file(s), and touches 21 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
-      src/components/blocks/task-list/**, src/components/login/sign-in, src/features/pages/tasks/**,
+      src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
+      src/features/pages/sign-in, src/features/pages/tasks/**,
       src/features/todo/graphql/mutations/recur, src/features/todo/graphql/mutations/session,
       src/features/todo/graphql/queries/recur, src/features/todo/http/webhooks/sepay,
       src/modules/bussiness/audit, src/modules/bussiness/plan, src/modules/bussiness/recur,
@@ -99,11 +98,9 @@ findings:
       - impl.plan.todo-app-frontend.usage
       - impl.recur.todo-app-backend.engine
       - impl.share.todo-app-backend.invitations
-      - impl.task.todo-app-backend.complete-task
       - impl.task.todo-app-backend.create-task
       - impl.task.todo-app-backend.ownership
       - impl.task.todo-app-backend.platform-events
-      - impl.task.todo-app-backend.reopen-task
       - impl.task.todo-app-frontend.task-list
       - integration.login.postgres
       - integration.plan.sepay
@@ -124,10 +121,11 @@ findings:
       - ui.login.sign-in
       - ui.plan.usage
       - ui.task.list
-    because: A breaking change to br.login.session.restores sends 50 other record(s) back to todo, would
-      stale 34 evidence file(s), and touches 20 code path(s) (app/plan/upgrade-button.tsx,
+    because: A breaking change to br.login.session.restores sends 48 other record(s) back to todo, would
+      stale 26 evidence file(s), and touches 21 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
-      src/components/blocks/task-list/**, src/components/login/sign-in, src/features/pages/tasks/**,
+      src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
+      src/features/pages/sign-in, src/features/pages/tasks/**,
       src/features/todo/graphql/mutations/recur, src/features/todo/graphql/mutations/session,
       src/features/todo/graphql/queries/recur, src/features/todo/http/webhooks/sepay,
       src/modules/bussiness/audit, src/modules/bussiness/plan, src/modules/bussiness/recur,
@@ -165,11 +163,9 @@ findings:
       - impl.plan.todo-app-frontend.usage
       - impl.recur.todo-app-backend.engine
       - impl.share.todo-app-backend.invitations
-      - impl.task.todo-app-backend.complete-task
       - impl.task.todo-app-backend.create-task
       - impl.task.todo-app-backend.ownership
       - impl.task.todo-app-backend.platform-events
-      - impl.task.todo-app-backend.reopen-task
       - impl.task.todo-app-frontend.task-list
       - integration.login.postgres
       - integration.plan.sepay
@@ -190,10 +186,11 @@ findings:
       - ui.login.sign-in
       - ui.plan.usage
       - ui.task.list
-    because: A breaking change to br.login.session.single-device sends 50 other record(s) back to todo,
-      would stale 34 evidence file(s), and touches 20 code path(s) (app/plan/upgrade-button.tsx,
+    because: A breaking change to br.login.session.single-device sends 48 other record(s) back to todo,
+      would stale 26 evidence file(s), and touches 21 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
-      src/components/blocks/task-list/**, src/components/login/sign-in, src/features/pages/tasks/**,
+      src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
+      src/features/pages/sign-in, src/features/pages/tasks/**,
       src/features/todo/graphql/mutations/recur, src/features/todo/graphql/mutations/session,
       src/features/todo/graphql/queries/recur, src/features/todo/http/webhooks/sepay,
       src/modules/bussiness/audit, src/modules/bussiness/plan, src/modules/bussiness/recur,
@@ -219,7 +216,6 @@ findings:
       - impl.plan.todo-app-backend.plan
       - impl.share.todo-app-backend.invitations
       - impl.share.todo-app-frontend.invite-screen
-      - impl.task.todo-app-backend.complete-task
       - impl.task.todo-app-backend.create-task
       - impl.task.todo-app-backend.ownership
       - impl.task.todo-app-backend.platform-events
@@ -233,8 +229,8 @@ findings:
       - uat.task.create
       - ui.share.invite
       - ui.task.list
-    because: A breaking change to br.share.revoke.on-read sends 27 other record(s) back to todo, would
-      stale 17 evidence file(s), and touches 10 code path(s) (app/share, src/app/tasks/**,
+    because: A breaking change to br.share.revoke.on-read sends 26 other record(s) back to todo, would
+      stale 11 evidence file(s), and touches 10 code path(s) (app/share, src/app/tasks/**,
       src/components/blocks/task-list/**, src/features/pages/tasks/**,
       src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/sepay,
@@ -259,7 +255,6 @@ findings:
       - impl.share.todo-app-backend.access
       - impl.share.todo-app-backend.invitations
       - impl.share.todo-app-frontend.invite-screen
-      - impl.task.todo-app-backend.complete-task
       - impl.task.todo-app-backend.create-task
       - impl.task.todo-app-backend.ownership
       - impl.task.todo-app-backend.platform-events
@@ -272,8 +267,8 @@ findings:
       - uat.task.create
       - ui.share.invite
       - ui.task.list
-    because: A breaking change to br.share.role.permissions sends 27 other record(s) back to todo, would
-      stale 18 evidence file(s), and touches 10 code path(s) (app/share, src/app/tasks/**,
+    because: A breaking change to br.share.role.permissions sends 26 other record(s) back to todo, would
+      stale 12 evidence file(s), and touches 10 code path(s) (app/share, src/app/tasks/**,
       src/components/blocks/task-list/**, src/features/pages/tasks/**,
       src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/sepay,
@@ -295,7 +290,6 @@ findings:
       - impl.audit.todo-app-backend.erasure
       - impl.audit.todo-app-backend.log
       - impl.plan.todo-app-backend.plan
-      - impl.task.todo-app-backend.complete-task
       - impl.task.todo-app-backend.create-task
       - impl.task.todo-app-backend.ownership
       - impl.task.todo-app-backend.platform-database
@@ -308,8 +302,8 @@ findings:
       - sds.task.ownership-guard
       - uat.task.create
       - ui.task.list
-    because: A breaking change to br.task.single-owner sends 24 other record(s) back to todo, would
-      stale 17 evidence file(s), and touches 10 code path(s) (src/app/tasks/**,
+    because: A breaking change to br.task.single-owner sends 23 other record(s) back to todo, would
+      stale 11 evidence file(s), and touches 10 code path(s) (src/app/tasks/**,
       src/components/blocks/task-list/**, src/features/pages/tasks/**,
       src/features/todo/http/webhooks/sepay, src/modules/bussiness/audit,
       src/modules/bussiness/plan, src/modules/bussiness/task, src/modules/integrations/sepay,
@@ -340,7 +334,7 @@ findings:
       - sds.plan.subscription-lifecycle
       - ui.plan.usage
     because: A breaking change to br.plan.caps.limit sends 19 other record(s) back to todo, would stale
-      9 evidence file(s), and touches 5 code path(s) (app/plan/upgrade-button.tsx,
+      8 evidence file(s), and touches 5 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/integrations/sepay) - this is the number a reviewer wants before approving the
       change.
@@ -357,7 +351,6 @@ findings:
       - fr.task.create
       - impl.plan.todo-app-backend.plan
       - impl.share.todo-app-backend.access
-      - impl.task.todo-app-backend.complete-task
       - impl.task.todo-app-backend.create-task
       - impl.task.todo-app-backend.ownership
       - impl.task.todo-app-backend.platform-events
@@ -367,8 +360,8 @@ findings:
       - sds.task.ownership-guard
       - uat.task.create
       - ui.task.list
-    because: A breaking change to br.share.editor.no-delete sends 18 other record(s) back to todo, would
-      stale 13 evidence file(s), and touches 9 code path(s) (src/app/tasks/**,
+    because: A breaking change to br.share.editor.no-delete sends 17 other record(s) back to todo, would
+      stale 7 evidence file(s), and touches 9 code path(s) (src/app/tasks/**,
       src/components/blocks/task-list/**, src/features/pages/tasks/**,
       src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/sepay,
@@ -396,7 +389,7 @@ findings:
       - sds.plan.subscription-lifecycle
       - ui.plan.usage
     because: A breaking change to br.plan.downgrade.freeze sends 16 other record(s) back to todo, would
-      stale 8 evidence file(s), and touches 5 code path(s) (app/plan/upgrade-button.tsx,
+      stale 7 evidence file(s), and touches 5 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/integrations/sepay) - this is the number a reviewer wants before approving the
       change.
@@ -421,7 +414,7 @@ findings:
       - sds.plan.subscription-lifecycle
       - ui.plan.usage
     because: A breaking change to br.plan.lapse.reverts-on-read sends 15 other record(s) back to todo,
-      would stale 7 evidence file(s), and touches 5 code path(s) (app/plan/upgrade-button.tsx,
+      would stale 6 evidence file(s), and touches 5 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/integrations/sepay) - this is the number a reviewer wants before approving the
       change.
@@ -446,7 +439,7 @@ findings:
       - sds.plan.subscription-lifecycle
       - ui.plan.usage
     because: A breaking change to br.plan.payment.idempotent sends 15 other record(s) back to todo,
-      would stale 7 evidence file(s), and touches 5 code path(s) (app/plan/upgrade-button.tsx,
+      would stale 6 evidence file(s), and touches 5 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/integrations/sepay) - this is the number a reviewer wants before approving the
       change.
@@ -509,14 +502,13 @@ findings:
       - fr.audit.log.read
       - impl.audit.todo-app-backend.erasure
       - impl.audit.todo-app-backend.log
-      - impl.audit.todo-app-backend.operator-read
       - nfr.audit.tamper-evidence
       - sds.audit.erasure-request
       - sds.audit.log-chain
       - uat.audit.right-to-be-forgotten
       - ui.audit.privacy
-    because: A breaking change to br.audit.append-only sends 12 other record(s) back to todo, would
-      stale 10 evidence file(s), and touches 1 code path(s) (src/modules/bussiness/audit) - this is
+    because: A breaking change to br.audit.append-only sends 11 other record(s) back to todo, would
+      stale 8 evidence file(s), and touches 1 code path(s) (src/modules/bussiness/audit) - this is
       the number a reviewer wants before approving the change.
   - id: blast-radius:br.notify.digest.window
     kind: blast-radius
@@ -581,7 +573,7 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.task.title.required sends 11 other record(s) back to todo, would
-      stale 8 evidence file(s), and touches 8 code path(s) (src/app/tasks/**,
+      stale 6 evidence file(s), and touches 8 code path(s) (src/app/tasks/**,
       src/components/blocks/task-list/**, src/features/pages/tasks/**,
       src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan, src/modules/bussiness/task,
       src/modules/integrations/sepay, src/modules/platform/events) - this is the number a reviewer
@@ -627,26 +619,6 @@ findings:
     because: A breaking change to br.share.invite.expiry sends 10 other record(s) back to todo, would
       stale 6 evidence file(s), and touches 2 code path(s) (app/share, src/modules/bussiness/share)
       - this is the number a reviewer wants before approving the change.
-  - id: blast-radius:br.task.delete.final
-    kind: blast-radius
-    severity: critical
-    records:
-      - br.task.delete.final
-      - br.plan.active-scope
-      - contract.plan.create-precondition
-      - event.task.deleted
-      - fr.plan.usage.view
-      - impl.plan.todo-app-backend.plan
-      - impl.plan.todo-app-frontend.usage
-      - impl.task.todo-app-backend.delete-task
-      - impl.task.todo-app-backend.platform-events
-      - sds.plan.cap-guard
-      - ui.plan.usage
-    because: A breaking change to br.task.delete.final sends 10 other record(s) back to todo, would
-      stale 8 evidence file(s), and touches 7 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
-      src/modules/bussiness/task, src/modules/integrations/sepay, src/modules/platform/events) -
-      this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.task.list.owned
     kind: blast-radius
     severity: critical
@@ -663,28 +635,29 @@ findings:
       - sds.plan.cap-guard
       - ui.plan.usage
     because: A breaking change to br.task.list.owned sends 10 other record(s) back to todo, would stale
-      6 evidence file(s), and touches 6 code path(s) (app/plan/upgrade-button.tsx,
+      5 evidence file(s), and touches 6 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/bussiness/task, src/modules/integrations/sepay) - this is the number a reviewer
       wants before approving the change.
-  - id: blast-radius:br.task.complete.once
+  - id: blast-radius:br.task.delete.final
     kind: blast-radius
     severity: warn
     records:
-      - br.task.complete.once
-      - data.task.task
-      - event.task.completed
-      - fr.task.complete
-      - fr.task.reopen
-      - impl.task.todo-app-backend.complete-task
-      - impl.task.todo-app-backend.platform-database
+      - br.task.delete.final
+      - br.plan.active-scope
+      - contract.plan.create-precondition
+      - event.task.deleted
+      - fr.plan.usage.view
+      - impl.plan.todo-app-backend.plan
+      - impl.plan.todo-app-frontend.usage
       - impl.task.todo-app-backend.platform-events
-      - impl.task.todo-app-backend.reopen-task
-      - sds.task.completion-state
-    because: A breaking change to br.task.complete.once sends 9 other record(s) back to todo, would
-      stale 6 evidence file(s), and touches 3 code path(s) (src/modules/bussiness/task,
-      src/modules/platform/databases/postgresql/primary, src/modules/platform/events) - this is the
-      number a reviewer wants before approving the change.
+      - sds.plan.cap-guard
+      - ui.plan.usage
+    because: A breaking change to br.task.delete.final sends 9 other record(s) back to todo, would stale
+      5 evidence file(s), and touches 7 code path(s) (app/plan/upgrade-button.tsx,
+      app/plan/usage-screen.tsx, src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
+      src/modules/bussiness/task, src/modules/integrations/sepay, src/modules/platform/events) -
+      this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.audit.erasure.right
     kind: blast-radius
     severity: warn
@@ -699,7 +672,7 @@ findings:
       - uat.audit.right-to-be-forgotten
       - ui.audit.privacy
     because: A breaking change to br.audit.erasure.right sends 8 other record(s) back to todo, would
-      stale 6 evidence file(s), and touches 1 code path(s) (src/modules/bussiness/audit) - this is
+      stale 5 evidence file(s), and touches 1 code path(s) (src/modules/bussiness/audit) - this is
       the number a reviewer wants before approving the change.
   - id: blast-radius:br.notify.unsubscribe.honored
     kind: blast-radius
@@ -788,8 +761,24 @@ findings:
       - nfr.audit.retention
       - sds.audit.erasure-request
       - sds.audit.log-chain
-    because: A breaking change to br.audit.retention sends 7 other record(s) back to todo, would stale 7
+    because: A breaking change to br.audit.retention sends 7 other record(s) back to todo, would stale 6
       evidence file(s), and touches 1 code path(s) (src/modules/bussiness/audit) - this is the
+      number a reviewer wants before approving the change.
+  - id: blast-radius:br.task.complete.once
+    kind: blast-radius
+    severity: warn
+    records:
+      - br.task.complete.once
+      - data.task.task
+      - event.task.completed
+      - fr.task.complete
+      - fr.task.reopen
+      - impl.task.todo-app-backend.platform-database
+      - impl.task.todo-app-backend.platform-events
+      - sds.task.completion-state
+    because: A breaking change to br.task.complete.once sends 7 other record(s) back to todo, would
+      stale 1 evidence file(s), and touches 3 code path(s) (src/modules/bussiness/task,
+      src/modules/platform/databases/postgresql/primary, src/modules/platform/events) - this is the
       number a reviewer wants before approving the change.
   - id: blast-radius:br.plan.active-scope
     kind: blast-radius
@@ -881,6 +870,14 @@ findings:
     because: br.share.role.permissions is used 7 time(s) (top decile of fan-in); it is owned by share
       and read by 1 other feature(s) (task), so a change here is cross-feature coupling, not a local
       edit.
+  - id: fan-in-hotspot:br.task.complete.once
+    kind: fan-in-hotspot
+    severity: info
+    records:
+      - br.task.complete.once
+    because: br.task.complete.once is used 7 time(s) (top decile of fan-in); it is owned by task and
+      read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
+      here is cross-feature coupling, not a local edit.
   - id: fan-in-hotspot:integration.plan.sepay
     kind: fan-in-hotspot
     severity: info
@@ -937,15 +934,22 @@ findings:
     because: integration.login.postgres is used 6 time(s) (top decile of fan-in); it is owned by login
       and read by 4 other feature(s) (plan, recur, share, task), so a change here is cross-feature
       coupling, not a local edit.
-  - id: open-decision:decision.audit.operator-role
-    kind: open-decision
-    severity: info
+  - id: unbound-sds:sds.task.completion-state
+    kind: unbound-sds
+    severity: warn
     records:
-      - decision.audit.operator-role
-      - fr.audit.log.read
-      - journey.audit.right-to-be-forgotten
-    because: decision.audit.operator-role is still open and holds 2 record(s) (fr.audit.log.read,
-      journey.audit.right-to-be-forgotten) - none of them can move until this is decided.
+      - sds.task.completion-state
+    because: sds.task.completion-state authors no owners entry, so it has no bound module and no
+      read-scope boundary - anything could claim to implement it, and nothing narrows what a
+      reviewer must open to check.
+  - id: unbound-sds:sds.task.ownership-guard
+    kind: unbound-sds
+    severity: warn
+    records:
+      - sds.task.ownership-guard
+    because: sds.task.ownership-guard authors no owners entry, so it has no bound module and no
+      read-scope boundary - anything could claim to implement it, and nothing narrows what a
+      reviewer must open to check.
   - id: designed-todo:br.login.session.single-device
     kind: designed-todo
     severity: info
@@ -953,14 +957,6 @@ findings:
       - br.login.session.single-device
       - gap.login.device-field
     because: br.login.session.single-device is todo, blocked on gap.login.device-field - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:br.task.single-owner
-    kind: designed-todo
-    severity: info
-    records:
-      - br.task.single-owner
-      - gap.task.share-edge-hold
-    because: br.task.single-owner is todo, blocked on gap.task.share-edge-hold - a real product
       question, not missing code; it moves once that is settled.
   - id: designed-todo:contract.notify.new-device-signal
     kind: designed-todo
@@ -970,14 +966,6 @@ findings:
       - gap.login.device-field
     because: contract.notify.new-device-signal is todo, blocked on gap.login.device-field - a real
       product question, not missing code; it moves once that is settled.
-  - id: designed-todo:contract.share.completion-guard-for-task
-    kind: designed-todo
-    severity: info
-    records:
-      - contract.share.completion-guard-for-task
-      - gap.task.share-edge-hold
-    because: contract.share.completion-guard-for-task is todo, blocked on gap.task.share-edge-hold - a
-      real product question, not missing code; it moves once that is settled.
   - id: designed-todo:event.login.new-device-signin
     kind: designed-todo
     severity: info
@@ -991,9 +979,9 @@ findings:
     severity: info
     records:
       - fr.audit.log.read
-      - decision.audit.operator-role
-    because: fr.audit.log.read is todo, blocked on decision.audit.operator-role - a real product
-      question, not missing code; it moves once that is settled.
+      - gap.audit.operator-role
+    because: fr.audit.log.read is todo, blocked on gap.audit.operator-role - a real product question,
+      not missing code; it moves once that is settled.
   - id: designed-todo:fr.login.sign-out
     kind: designed-todo
     severity: info
@@ -1016,9 +1004,8 @@ findings:
     records:
       - fr.plan.reconcile
       - gap.plan.live-proof
-      - gap.plan.sepay-not-reachable
-    because: fr.plan.reconcile is todo, blocked on gap.plan.live-proof, gap.plan.sepay-not-reachable - a
-      real product question, not missing code; it moves once that is settled.
+    because: fr.plan.reconcile is todo, blocked on gap.plan.live-proof - a real product question, not
+      missing code; it moves once that is settled.
   - id: designed-todo:fr.plan.upgrade
     kind: designed-todo
     severity: info
@@ -1059,14 +1046,6 @@ findings:
       - gap.recur.live-proof
     because: fr.recur.see-upcoming is todo, blocked on gap.recur.live-proof - a real product question,
       not missing code; it moves once that is settled.
-  - id: designed-todo:fr.task.complete
-    kind: designed-todo
-    severity: info
-    records:
-      - fr.task.complete
-      - gap.task.share-edge-hold
-    because: fr.task.complete is todo, blocked on gap.task.share-edge-hold - a real product question,
-      not missing code; it moves once that is settled.
   - id: designed-todo:integration.notify.smtp
     kind: designed-todo
     severity: info
@@ -1075,31 +1054,13 @@ findings:
       - gap.notify.smtp-host-unreachable
     because: integration.notify.smtp is todo, blocked on gap.notify.smtp-host-unreachable - a real
       product question, not missing code; it moves once that is settled.
-  - id: designed-todo:integration.plan.sepay
-    kind: designed-todo
-    severity: info
-    records:
-      - integration.plan.sepay
-      - gap.plan.sepay-not-reachable
-    because: integration.plan.sepay is todo, blocked on gap.plan.sepay-not-reachable - a real product
-      question, not missing code; it moves once that is settled.
   - id: designed-todo:journey.audit.right-to-be-forgotten
     kind: designed-todo
     severity: info
     records:
       - journey.audit.right-to-be-forgotten
-      - decision.audit.operator-role
       - gap.audit.live-proof
-    because: journey.audit.right-to-be-forgotten is todo, blocked on decision.audit.operator-role,
-      gap.audit.live-proof - a real product question, not missing code; it moves once that is
-      settled.
-  - id: designed-todo:journey.notify.told-about-completion
-    kind: designed-todo
-    severity: info
-    records:
-      - journey.notify.told-about-completion
-      - gap.task.share-edge-hold
-    because: journey.notify.told-about-completion is todo, blocked on gap.task.share-edge-hold - a real
+    because: journey.audit.right-to-be-forgotten is todo, blocked on gap.audit.live-proof - a real
       product question, not missing code; it moves once that is settled.
   - id: designed-todo:journey.plan.hits-the-cap
     kind: designed-todo
@@ -1156,14 +1117,6 @@ findings:
       - nfr.share.revoke.read-latency
       - gap.share.load-proof
     because: nfr.share.revoke.read-latency is todo, blocked on gap.share.load-proof - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:sds.plan.reconciliation
-    kind: designed-todo
-    severity: info
-    records:
-      - sds.plan.reconciliation
-      - gap.plan.sepay-not-reachable
-    because: sds.plan.reconciliation is todo, blocked on gap.plan.sepay-not-reachable - a real product
       question, not missing code; it moves once that is settled.
   - id: designed-todo:uat.audit.right-to-be-forgotten
     kind: designed-todo
@@ -1223,3 +1176,27 @@ findings:
       - gap.share.frontend-unbuilt
     because: impl.share.todo-app-frontend.invite-screen is todo, blocked on gap.share.frontend-unbuilt -
       code that simply has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:integration.plan.sepay
+    kind: leftover-todo
+    severity: info
+    records:
+      - integration.plan.sepay
+      - gap.plan.sepay-not-reachable
+    because: integration.plan.sepay is todo, blocked on gap.plan.sepay-not-reachable - code that simply
+      has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:sds.plan.reconciliation
+    kind: leftover-todo
+    severity: info
+    records:
+      - sds.plan.reconciliation
+      - gap.plan.sepay-not-reachable
+    because: sds.plan.reconciliation is todo, blocked on gap.plan.sepay-not-reachable - code that simply
+      has not been written yet; the owner wants this count at zero.
+  - id: stale-evidence-bulk-edit:br.task.single-owner
+    kind: stale-evidence-bulk-edit
+    severity: warn
+    records:
+      - br.task.single-owner
+    because: br.task.single-owner's evidence is stale with staleSince naming only itself - a bare digest
+      mismatch (the record's own bytes moved after capture), not a change in some other record it
+      depends on.

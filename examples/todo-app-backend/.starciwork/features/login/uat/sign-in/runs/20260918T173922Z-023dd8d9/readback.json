@@ -1,0 +1,8 @@
+{
+  "schema": "starci/uat-readback@1",
+  "flow": "uat.login.sign-in",
+  "checked": [
+    "ux.sign-in.validation-feedback"
+  ],
+  "notRun": []
+}

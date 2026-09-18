@@ -82,4 +82,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T12:02:03.857Z
+  capturedAt: 2026-09-18T11:18:14.041Z

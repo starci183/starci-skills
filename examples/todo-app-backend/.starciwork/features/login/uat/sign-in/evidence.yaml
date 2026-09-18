@@ -1,17 +1,51 @@
 # Written by hand (not scripts/example-evidence.mjs, which only proves unit/integration records
-# against --assert commands): a uat-flow's evidence is the run itself - schemas/work-layout.yaml's
-# uatRun note is what check-example-work.mjs's concept 12 actually checks (a `run` field naming
-# runs/<runId>, that run having screens/, videos/ and a result.md whose outcome is pass).
+# against --assert commands and cannot emit the `run:` field a uat-flow needs): a uat-flow's evidence is
+# the run itself - schemas/work-layout.yaml's uatRun note is what check-example-work.mjs's concept 12
+# actually checks (a `run` field naming runs/<runId>, that run having screens/, videos/ and a result.md
+# whose outcome is pass). Every byte named below was produced by the Playwright harness at
+# examples/todo-app-frontend/uat, which wrote runs/<runId>/ itself; this file only settles which run.
 schema: work/evidence
 record: uat.login.sign-in
-run: runs/20260918T090054Z-240aa95e
+recordDigest: dc1ef715c18fe44e72704eb5751b459a0739bccddaa9cd1507371ddd5e1bfd7b
+run: runs/20260918T174721Z-023dd8d9
 outcome: pass
+# The run's own manifest.yaml carries the full asset list with a sha256 per file; these two lines repeat
+# only the recording concept 12 refuses a done record for lacking, so the video is named by the record
+# that settles on it and not only by a file inside the run it points at.
+assets:
+  - path: runs/20260918T174721Z-023dd8d9/videos/sign-in.webm
+    sha256: 7fa50cc65c40f04462686a68af4a676ea4e292da8e61844857bd72a111b7a910
 provenance:
-  actor: example-evidence
-  tool: 'npm run uat -- uat.login.sign-in.spec.ts (uat/playwright.config.ts), against the real
-    todo-app-dev compose stack (Postgres 5432, Keycloak 8089, another lane''s stack reused
-    read-only) plus this lane''s own backend (ts-node-dev, port 3001) and frontend (next build &&
-    next start -p 3000), with UAT_LIVE_LOGIN_AUTHORIZED=true, UAT_DEMO_PASSWORD=<seeded demo
-    password>, UAT_PASSWORD_STRANGER=<seeded demo2 password>.'
+  # The layout declares exactly two provenance.actor values (schemas/work-layout.yaml's work/evidence
+  # rule): starci-kernel, for a live kernel workflow's own markDone write, and example-evidence, for a
+  # file scripts/example-evidence.mjs produced by running its --assert commands. Neither is true of this
+  # file - no kernel workflow settled it, and example-evidence.mjs cannot produce a `run:` field, so it
+  # never ran here. The value below therefore names the mechanism that actually produced the proof
+  # instead of claiming a writer that did not write it; the missing third value in a two-value vocabulary
+  # is written up as grit ledger item 57 (docs/examples/todo-app-grit.md).
+  actor: playwright-harness
+  tool: 'npm run uat -- uat.login.sign-in.spec.ts (uat/playwright.config.ts, reporter uat/lib/run-writer.ts)'
   environment: local
-  capturedAt: 2026-09-18T09:00:54.900Z
+  capturedAt: '2026-09-18T17:47:21.875Z'
+  stack: >-
+    The todo-app-dev compose infra already running on this machine, used as-is: Postgres on 5432 (database
+    todo, sessions/tasks/migrations tables) and Keycloak 26.0 on 8089 (realm todo, client todo-api). The
+    api was this worktree's own backend, built with npm run build and started with npm run start
+    (node dist/main.js) on 3001, and the page was this worktree's own frontend, next build then
+    npx next start -p 3000, so the browser served and the browser proved are the same bytes as the
+    frontendCommit/backendCommit recorded in the run manifest (023dd8d9 for both).
+  authorization: >-
+    UAT_LIVE_LOGIN_AUTHORIZED=true, UAT_DEMO_PASSWORD and UAT_PASSWORD_STRANGER set to the DEMO-ONLY
+    plaintext users already committed in .starcistacks/dev/infra/compose/realm-todo.json (demo@todo.dev,
+    demo2@todo.dev); no credential value is stored in this record or in the run folder.
+  observed_effect: >-
+    A successful sign-in writes a session row to Postgres, so this run is not the "read-only sign-in
+    against the seeded identity; no row created" the flow record's own effects line describes, and the
+    run's cleanup.json reports zero run-owned resources because the harness does not treat a session row
+    as one it owns. Stated here rather than back in the record's prose, per ops/common.yaml's rule that
+    post-proof observations belong in evidence; the mismatch is grit ledger item 57's second half.
+  recording: >-
+    videos/sign-in.webm, 41,771 bytes, VP8 800x450 at 25 fps, 2.08s, 52 frames decoded with zero errors
+    by Playwright's own bundled ffmpeg (ms-playwright/ffmpeg-1011/ffmpeg-win64.exe -v error -i
+    sign-in.webm). Inspected frame by frame before tracking: the password field renders as the browser's
+    own bullets in every frame, so nothing secret is in the bytes now committed.

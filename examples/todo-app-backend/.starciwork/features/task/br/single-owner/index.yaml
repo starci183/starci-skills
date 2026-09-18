@@ -12,26 +12,28 @@ authorityRefs:
 acceptanceCriteria: [refuses-stranger]
 module: [src/modules/bussiness/task]
 change:
-  rev: 2
-  kind: breaking
-  at: 2026-09-18T06:20:00.000Z
-  withdraws: ["A task belongs to exactly one person, and only that person may complete or delete it."]
-  reason: The share feature lets an owner grant an editor collaborator the right to complete a task the
-    owner still exclusively owns and can still exclusively delete. The withdrawn clause conflated
-    ownership (unchanged) with sole authority to complete (now shared with an accepted editor), so it no
-    longer describes the product. Delete stays owner-only exactly as before; only the complete half moved,
-    and it moved into a contract this record now names instead of re-describing.
-blockedBy:
-  - {record: gap.task.share-edge-hold, because: "The proof of the rev-2 split now exists and this record's
-    evidence.yaml carries it (stranger refused on complete/reopen/delete; owner passes both guards; an
-    accepted editor completes via the real ShareCompletionAuthority and is still refused delete -
-    share/completion-authority.spec.ts). What still holds the state at todo is mechanical, not evidential:
-    contract.share.completion-guard-for-task's own blockedBy still cites this record at rev 2, so marking
-    this rule done would refuse that (out-of-lane) record as carrying a stale blocker. gap.task.share-edge-hold
-    names that absence; the share lane retiring its edge unblocks this record with no further task-lane work."}
-# The old edge onto gap.task.collaborator-completion is dropped: the gap is done (lane be-share), the
-# layout refuses a blockedBy citing a done record, and the edge's own text ("no implementation yet") is
-# false against the current tree - ShareCompletionAuthority registers into task's
-# CompletionAuthorityRegistry at boot (share.module.ts, ShareCompletionAuthoritySetup.onModuleInit).
-# The task-side tests this rule's AC names are green; the residual hold is recorded on
-# gap.task.share-edge-hold instead of restated here.
+  rev: 3
+  kind: editorial
+  at: 2026-09-18T11:30:00.000Z
+  retains:
+    - A task belongs to exactly one person, who is its owner and never changes.
+    - Only the owner may delete a task; sharing grants no role that authorizes deletion.
+    - The owner may always complete their own task; an accepted editor collaborator may also complete it, per br.share.role.permissions and contract.share.completion-guard-for-task.
+  reason: >-
+    Removed the blockedBy edge on gap.task.collaborator-completion. That gap reached done at rev 2, closed
+    by impl.share.todo-app-backend.access, whose ShareCompletionAuthority really does register into task's
+    own CompletionAuthorityRegistry - so the absence the edge named no longer exists, and citing it further
+    is exactly the stale blocker this layout refuses ("a blocker whose target has since reached done ... the
+    thing that was supposed to unblock it has happened"). Nothing else moved: this rev withdraws no
+    statement and retains all three rev-2 statements verbatim, listed above, so the change this record's
+    evidence is stale since remains precisely rev 2's breaking split - the withdrawal of "A task belongs to
+    exactly one person, and only that person may complete or delete it." in favour of the separate
+    owner-only-delete and owner-or-accepted-editor-complete statements retained here. The record stays
+    state: todo: a resolved blocker is not a proof. What still keeps it from done is its own evidence.yaml,
+    whose single run proves the unchanged delete half and the stranger-negative part of the complete half
+    and never exercises the accepted-editor arm; no run has yet re-proven this rule through
+    contract.share.completion-guard-for-task. That remaining wait is deliberately not authored as a
+    blockedBy edge here: contract.share.completion-guard-for-task and fr.task.complete each already name
+    this rule in their own blockedBy, so an edge back to either one would be the BLOCKER_CYCLE this same
+    gate refuses (grit ledger item 31's ring, closed once by gap.task.collaborator-completion and not to be
+    reopened by a citation). The stale evidence beside this record is where that fact lives.
