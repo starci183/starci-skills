@@ -12,24 +12,28 @@
     "uat:typecheck": "tsc --noEmit -p uat/tsconfig.json"
   },
   "dependencies": {
-    "@todo-app/grammar": "file:packages/grammar",
+    "@heroui/react": "^3.2.1",
+    "@heroui/styles": "^3.2.1",
+    "@starci/grammar": "0.4.13",
     "next": "^15.0.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "swr": "^2.2.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@starci/eslint-canon-fe": "^3.0.2",
+    "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/react": "^16.0.1",
     "@types/node": "^22.7.0",
-    "@types/react": "^18.3.11",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@typescript-eslint/eslint-plugin": "^8.70.0",
     "@typescript-eslint/parser": "^8.70.0",
     "eslint": "^10.10.0",
     "jsdom": "^25.0.1",
+    "tailwindcss": "^4",
     "typescript": "^5.6.2",
     "vitest": "^2.1.2",
     "yaml": "^2.9.1"
@@ -54,8 +58,8 @@
         "closedVocabularies": [],
         "grammarGuards": {
           "schema": "starci/grammar-guard-contract@1",
-          "package": "@todo-app/grammar",
-          "entry": "./guards",
+          "package": "@starci/grammar",
+          "entry": "./common",
           "source": {
             "kind": "installed"
           },
