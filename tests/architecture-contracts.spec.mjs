@@ -270,3 +270,53 @@ export class UpdateOrderCommand {constructor(input:{id:string}){const self=this;
   assert.equal(result.violations.some(item => item.ruleId === READONLY_BOUNDARY_RULE_ID
     && item.path.endsWith('/storage.service.ts') && /AliasStorage/.test(item.message)), false, JSON.stringify(result, null, 2));
 });
+
+test('excludes ambient library callable members from the public contract walk but still checks a repository-declared any', t => {
+  const root = fixture(t, {
+    // No strictNullChecks: matches the reference project's tsconfig and is what lets the ambient
+    // ErrorConstructor.prepareStackTrace/captureStackTrace members resolve to plain callables at all.
+    'tsconfig.json': JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler',
+      experimentalDecorators: true, skipLibCheck: true, noEmit: true }, include: ['src/**/*'] }),
+    'node_modules/@types/node/package.json': '{"name":"@types/node","types":"index.d.ts"}',
+    'node_modules/@types/node/index.d.ts': `
+declare global {
+  interface ErrorConstructor {
+    captureStackTrace(targetObject: object, constructorOpt?: Function): void;
+    prepareStackTrace?: (err: Error, stackTraces: unknown[]) => any;
+    stackTraceLimit: number;
+  }
+}
+export {};
+`,
+    'src/features/orders/index.ts': `
+export { NotOwnerException } from './application/not-owner.exception';
+export { LeakyException } from './application/leaky.exception';
+`,
+    'src/features/orders/application/abstract.exception.ts': `
+export abstract class AbstractException extends Error {
+  constructor(message:string){super(message)}
+}
+`,
+    'src/features/orders/application/not-owner.exception.ts': `
+import { AbstractException } from './abstract.exception';
+export class NotOwnerException extends AbstractException {
+  constructor(){super('not owner')}
+  reason():string{return 'not-owner'}
+}
+`,
+    'src/features/orders/application/leaky.exception.ts': `
+import { AbstractException } from './abstract.exception';
+export class LeakyException extends AbstractException {
+  constructor(){super('leaky')}
+  leak():any{return undefined}
+}
+`,
+  });
+  const result = check(root);
+  assert.equal(result.violations.some(item => item.path.endsWith('/not-owner.exception.ts')
+    || item.path.endsWith('/leaky.exception.ts')), false, JSON.stringify(result, null, 2));
+  assert.equal((result.coverage.publicContracts.details ?? []).some(item => /prepareStackTrace|captureStackTrace/.test(item)), false,
+    JSON.stringify(result, null, 2));
+  assert.equal(result.coverage.publicContracts.status, 'unavailable', JSON.stringify(result, null, 2));
+  assert.ok((result.coverage.publicContracts.details ?? []).some(item => /LeakyException\.leak/.test(item)), JSON.stringify(result, null, 2));
+});

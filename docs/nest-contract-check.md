@@ -9,7 +9,11 @@ and results must be explicit. Positional primitives remain valid;
   object, union and intersection boundaries use named declarations. The checker
   unwraps standard `Promise`, `Awaited`, `Readonly`, array and readonly-array
   containers and applies concrete generic arguments to inherited `execute`
-  signatures. It does not require an inherited method to be redeclared.
+  signatures. It does not require an inherited method to be redeclared. A
+  member declared only in an ambient library file, such as `Error`'s static
+  side in `lib.es*.d.ts`, is not part of the repository's public contract and
+  is excluded from the callable walk; a member the checked repository itself
+  declares is still checked.
 - `BE_READONLY_BOUNDARY` checks fields that static Nest identity proves are
   injected dependencies or CQRS command/query payloads. Constructor parameter
   properties and ordinary declared fields assigned in the constructor are both

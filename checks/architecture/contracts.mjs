@@ -364,7 +364,11 @@ function symbolName(symbol) {
   return name === '__call' ? '(callable)' : name;
 }
 
-function callableMembers(ts, checker, symbol, location) {
+function isRepositoryDeclaration(declaration, localFiles) {
+  return localFiles.has(canonical(declaration.getSourceFile().fileName));
+}
+
+function callableMembers(ts, checker, symbol, location, localFiles) {
   const declarations = symbol.getDeclarations?.() ?? [];
   const classExpressions = declarations.flatMap(declaration => ts.isVariableDeclaration(declaration)
     && declaration.initializer && ts.isClassExpression(unwrapExpression(ts, declaration.initializer))
@@ -381,7 +385,7 @@ function callableMembers(ts, checker, symbol, location) {
     const selected = member.getDeclarations?.() ?? [];
     return selected.some(declaration => (ts.isMethodDeclaration(declaration) || ts.isMethodSignature(declaration)
       || ts.isPropertyDeclaration(declaration) || ts.isPropertySignature(declaration) || ts.isGetAccessorDeclaration(declaration))
-      && isPublicMember(ts, declaration))
+      && isPublicMember(ts, declaration) && isRepositoryDeclaration(declaration, localFiles))
       && checker.getSignaturesOfType(checker.getTypeOfSymbolAtLocation(member, location), ts.SignatureKind.Call).length;
   });
   return [...new Set([...direct, ...members])];
@@ -392,11 +396,11 @@ function exportedSymbols(ts, checker, sourceFile) {
   return moduleSymbol ? checker.getExportsOfModule(moduleSymbol).map(symbol => normalizedSymbolValue(ts, checker, symbol)).filter(Boolean) : [];
 }
 
-function checkCallableSymbol(config, context, checker, symbol, location, reportSource, reportNode, violations, reasons, seen) {
+function checkCallableSymbol(config, context, checker, symbol, location, reportSource, reportNode, violations, reasons, seen, localFiles) {
   if (seen.has(symbol)) return 0;
   seen.add(symbol);
   let checked = 0;
-  for (const callable of callableMembers(context.ts, checker, symbol, location)) {
+  for (const callable of callableMembers(context.ts, checker, symbol, location, localFiles)) {
     if (callable !== symbol && seen.has(callable)) continue;
     seen.add(callable);
     const signatures = callableSignatures(context.ts, callable, checker, location);
@@ -730,7 +734,7 @@ export function checkBackendContracts(config, context) {
       const representative = declarations[0];
       if (isFrameworkHelper(representative.getSourceFile(), representative, framework)) continue;
       callableSignatures += checkCallableSymbol(config, context, checker, symbol, representative, representative.getSourceFile(), representative.name ?? representative,
-        violations, publicReasons, publicSeen);
+        violations, publicReasons, publicSeen, localFiles);
     }
   }
 
@@ -789,7 +793,7 @@ export function checkBackendContracts(config, context) {
         const execute = instanceType ? checker.getPropertyOfType(instanceType, 'execute') : null;
         if (!execute) publicReasons.push(`${relativePath(config.root, sourceFile.fileName)} exports a use-case class without a statically resolved execute contract`);
         else callableSignatures += checkCallableSymbol(config, context, checker, execute, statement, sourceFile, statement.name,
-          violations, publicReasons, publicSeen);
+          violations, publicReasons, publicSeen, localFiles);
       }
     }
   }
