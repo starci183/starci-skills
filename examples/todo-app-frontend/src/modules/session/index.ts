@@ -7,30 +7,34 @@ const STORAGE_KEY = 'todo-app.session-token';
 
 type Listener = () => void;
 
-const listeners = new Set<Listener>();
+const LISTENERS = new Set<Listener>();
 
-function notify() {
-  for (const listener of listeners) listener();
-}
+const notify = () => {
+  for (const listener of LISTENERS) listener();
+};
 
-export function getToken(): string | null {
+/** The current session token, or null when signed out. */
+export const getToken = (): string | null => {
   if (typeof window === 'undefined') return null;
   return window.localStorage.getItem(STORAGE_KEY);
-}
+};
 
-export function setToken(token: string): void {
+/** Stores a newly issued session token and notifies every subscriber. */
+export const setToken = (token: string): void => {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(STORAGE_KEY, token);
   notify();
-}
+};
 
-export function clearToken(): void {
+/** Drops the session token and notifies every subscriber. */
+export const clearToken = (): void => {
   if (typeof window === 'undefined') return;
   window.localStorage.removeItem(STORAGE_KEY);
   notify();
-}
+};
 
-export function subscribe(listener: Listener): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
+/** Subscribes to session-token changes; call the returned function to unsubscribe. */
+export const subscribe = (listener: Listener): (() => void) => {
+  LISTENERS.add(listener);
+  return () => LISTENERS.delete(listener);
+};

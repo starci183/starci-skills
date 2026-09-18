@@ -4,6 +4,7 @@
  */
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
 
+/** The one shape every failed transport call throws, carrying the response status that produced it. */
 export class ApiError extends Error {
   readonly status: number;
 
@@ -14,13 +15,15 @@ export class ApiError extends Error {
   }
 }
 
+/** The one options shape every transport call may pass through to fetch. */
 export interface RequestOptions {
   readonly method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   readonly token?: string | null;
   readonly body?: unknown;
 }
 
-export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
+/** The one call that reaches the network; every other module resolves a response or an ApiError through it. */
+export const apiRequest = async <T>(path: string, options: RequestOptions = {}): Promise<T> => {
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (options.token) headers.authorization = `Bearer ${options.token}`;
   const response = await fetch(`${BASE_URL}${path}`, {
@@ -34,4 +37,4 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
-}
+};

@@ -1,5 +1,8 @@
 import { SignInPage } from '@/features/pages/sign-in';
 
-export default function Page() {
+/** The route adapter that mounts the sign-in feature and nothing else. */
+const Page = () => {
   return <SignInPage />;
-}
+};
+
+export default Page;

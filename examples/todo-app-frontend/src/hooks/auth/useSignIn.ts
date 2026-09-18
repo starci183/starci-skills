@@ -2,20 +2,22 @@ import { useState } from 'react';
 import { signIn as requestSignIn } from '@/modules/api/auth';
 import { setToken } from '@/modules/session';
 
-export interface SignInState {
+/** The submitting/refusal snapshot useSignIn drives around the one sign-in call. */
+export interface SignInSnapshot {
   readonly submitting: boolean;
   readonly refusal: string | null;
 }
 
-export interface UseSignIn extends SignInState {
+/** The public shape useSignIn returns: the current snapshot plus the one submit action. */
+export interface UseSignIn extends SignInSnapshot {
   readonly submit: (email: string, password: string) => Promise<void>;
 }
 
 /** ui.login.sign-in: drives the working/refused states around the one sign-in call. */
-export function useSignIn(): UseSignIn {
-  const [state, setState] = useState<SignInState>({ submitting: false, refusal: null });
+export const useSignIn = () => {
+  const [state, setState] = useState<SignInSnapshot>({ submitting: false, refusal: null });
 
-  const submit = async (email: string, password: string) => {
+  const submit = async (email: string, password: string): Promise<void> => {
     setState({ submitting: true, refusal: null });
     try {
       const result = await requestSignIn(email, password);
@@ -27,4 +29,4 @@ export function useSignIn(): UseSignIn {
   };
 
   return { ...state, submit };
-}
+};

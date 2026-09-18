@@ -17,11 +17,15 @@
     "swr": "^2.2.5"
   },
   "devDependencies": {
+    "@starci/eslint-canon-fe": "^3.0.2",
     "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/react": "^16.0.1",
     "@types/node": "^22.7.0",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.70.0",
+    "@typescript-eslint/parser": "^8.70.0",
+    "eslint": "^10.10.0",
     "jsdom": "^25.0.1",
     "typescript": "^5.6.2",
     "vitest": "^2.1.2"
@@ -30,48 +34,208 @@
     "codePatterns": {
       "next": {
         "schema": "starci/next-code-pattern-contract@1",
+        "projects": [
+          "tsconfig.json"
+        ],
+        "owners": [
+          {
+            "root": "src/components/blocks/task-list",
+            "name": "TaskList"
+          },
+          {
+            "root": "src/components/blocks/sign-in-form",
+            "name": "SignInForm"
+          }
+        ],
+        "closedVocabularies": [],
+        "grammarGuards": {
+          "schema": "starci/grammar-guard-contract@1",
+          "package": "@todo-app/grammar",
+          "entry": "./guards",
+          "source": {
+            "kind": "installed"
+          },
+          "vectorProfile": "starci/grammar-guards-v1"
+        },
+        "errorState": {
+          "schema": "starci/next-error-state@1",
+          "sourceRoots": [
+            "src"
+          ],
+          "transports": [
+            {
+              "root": "src/modules/api",
+              "mode": "throwing"
+            }
+          ],
+          "worldMappings": [
+            {
+              "id": "task-list-read-refusal",
+              "owner": {
+                "path": "src/components/blocks/task-list/index.tsx",
+                "export": "TaskListBlock"
+              },
+              "source": {
+                "path": "src/hooks/task/useTasks.ts",
+                "export": "useTasks"
+              },
+              "failurePath": "tasksQuery.error",
+              "state": {
+                "path": "src/components/blocks/task-list/component.tsx",
+                "export": "TaskListState"
+              },
+              "failureState": "refused",
+              "render": {
+                "path": "src/components/blocks/task-list/component.tsx",
+                "symbol": "TaskListView",
+                "stateProp": "state"
+              }
+            },
+            {
+              "id": "sign-in-refusal",
+              "owner": {
+                "path": "src/components/blocks/sign-in-form/index.tsx",
+                "export": "SignInFormBlock"
+              },
+              "source": {
+                "path": "src/hooks/auth/useSignIn.ts",
+                "export": "useSignIn"
+              },
+              "failurePath": "refusal",
+              "state": {
+                "path": "src/components/blocks/sign-in-form/component.tsx",
+                "export": "SignInFormState"
+              },
+              "failureState": "refused",
+              "render": {
+                "path": "src/components/blocks/sign-in-form/component.tsx",
+                "symbol": "SignInFormView",
+                "stateProp": "state"
+              }
+            }
+          ],
+          "envelopes": [],
+          "writes": [
+            {
+              "action": {
+                "path": "src/modules/api/tasks.ts",
+                "export": "createTask"
+              },
+              "feedback": {
+                "path": "src/modules/api/write-feedback.ts",
+                "export": "runWrite"
+              },
+              "binding": "callback",
+              "sites": [
+                {
+                  "path": "src/modules/api/tasks.ts",
+                  "export": "createTaskAndNotify"
+                }
+              ]
+            },
+            {
+              "action": {
+                "path": "src/modules/api/tasks.ts",
+                "export": "setTaskComplete"
+              },
+              "feedback": {
+                "path": "src/modules/api/write-feedback.ts",
+                "export": "runWrite"
+              },
+              "binding": "callback",
+              "sites": [
+                {
+                  "path": "src/modules/api/tasks.ts",
+                  "export": "setTaskCompleteAndNotify"
+                }
+              ]
+            },
+            {
+              "action": {
+                "path": "src/modules/api/tasks.ts",
+                "export": "deleteTask"
+              },
+              "feedback": {
+                "path": "src/modules/api/write-feedback.ts",
+                "export": "runWrite"
+              },
+              "binding": "callback",
+              "sites": [
+                {
+                  "path": "src/modules/api/tasks.ts",
+                  "export": "deleteTaskAndNotify"
+                }
+              ]
+            }
+          ],
+          "boundaries": [],
+          "requiredValues": []
+        },
         "dataLifecycle": {
           "schema": "starci/next-data-lifecycle@1",
-          "swr": { "package": "swr", "major": 2 },
+          "swr": {
+            "package": "swr",
+            "major": 2
+          },
           "hooks": [
             {
               "id": "task-list-query",
-              "path": "src/hooks/task/use-tasks.ts",
+              "path": "src/hooks/task/useTasks.ts",
               "export": "useTasks",
               "kind": "query",
               "resultBinding": "tasksQuery",
               "identities": [
-                { "id": "viewer", "binding": "token", "gatesRequest": true, "resource": true }
+                {
+                  "id": "viewer",
+                  "binding": "token",
+                  "gatesRequest": true,
+                  "resource": true
+                }
               ]
             },
             {
               "id": "task-create-mutation",
-              "path": "src/hooks/task/use-create-task.ts",
+              "path": "src/hooks/task/useCreateTask.ts",
               "export": "useCreateTask",
               "kind": "mutation",
               "resultBinding": "createTask",
               "identities": [
-                { "id": "viewer", "binding": "token", "gatesRequest": true, "resource": true }
+                {
+                  "id": "viewer",
+                  "binding": "token",
+                  "gatesRequest": true,
+                  "resource": true
+                }
               ]
             },
             {
               "id": "task-complete-mutation",
-              "path": "src/hooks/task/use-set-task-complete.ts",
+              "path": "src/hooks/task/useSetTaskComplete.ts",
               "export": "useSetTaskComplete",
               "kind": "mutation",
               "resultBinding": "setTaskComplete",
               "identities": [
-                { "id": "viewer", "binding": "token", "gatesRequest": true, "resource": true }
+                {
+                  "id": "viewer",
+                  "binding": "token",
+                  "gatesRequest": true,
+                  "resource": true
+                }
               ]
             },
             {
               "id": "task-delete-mutation",
-              "path": "src/hooks/task/use-delete-task.ts",
+              "path": "src/hooks/task/useDeleteTask.ts",
               "export": "useDeleteTask",
               "kind": "mutation",
               "resultBinding": "deleteTask",
               "identities": [
-                { "id": "viewer", "binding": "token", "gatesRequest": true, "resource": true }
+                {
+                  "id": "viewer",
+                  "binding": "token",
+                  "gatesRequest": true,
+                  "resource": true
+                }
               ]
             }
           ]

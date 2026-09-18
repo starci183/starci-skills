@@ -1,52 +1,50 @@
 import type { FormEvent } from 'react';
-import { GrammarButton, GrammarCard, GrammarMessage, GrammarTextField } from '@todo-app/grammar/index';
+import { GrammarButton, GrammarMessage, GrammarTextField } from '@todo-app/grammar/index';
 import type { Task } from '@/modules/api/tasks';
+import { cardClassName, rowClassName } from './classNames';
 
 /**
  * ui.task.list states: empty, one-task, many-tasks, refused. A state this record does not name has no
  * branch here - the record's `blockedBy` note about the rev-2 colour token is a capture-set gap, not a
- * license to add a fifth rendering path.
+ * license to add a fifth rendering path. The connected owner in ./index.tsx resolves which state applies
+ * and hands it down explicitly; this view never re-derives it from the query result.
  */
 export type TaskListState = 'empty' | 'one-task' | 'many-tasks' | 'refused';
 
-export interface TaskListViewProps {
-  readonly tasks: readonly Task[];
+/** The one beside-it inventory the TaskListState closed vocabulary is checked against. */
+export const TASK_LIST_STATES: ReadonlyArray<TaskListState> = ['empty', 'one-task', 'many-tasks', 'refused'] as const;
+
+/** The public props of the pure task list view. */
+export type TaskListViewProps = {
+  readonly state: TaskListState;
+  readonly tasks: ReadonlyArray<Task>;
   readonly refusal: string | null;
   readonly newTitle: string;
-  readonly creating: boolean;
+  readonly isCreating: boolean;
   readonly onNewTitleChange: (value: string) => void;
   readonly onCreate: () => void;
   readonly onToggleComplete: (id: string, complete: boolean) => void;
   readonly onDelete: (id: string) => void;
-}
+};
 
-export function taskListState(props: Pick<TaskListViewProps, 'tasks' | 'refusal'>): TaskListState {
-  if (props.refusal) return 'refused';
-  return props.tasks.length === 1 ? 'one-task' : props.tasks.length > 1 ? 'many-tasks' : 'empty';
-}
-
-export function TaskListView(props: TaskListViewProps) {
-  const state = taskListState(props);
-  const handleCreate = (event: FormEvent<HTMLFormElement>) => {
+/** The pure render of ui.task.list; every one of its four states is decided by the caller's `state`. */
+export const TaskListView = (props: TaskListViewProps) => {
+  const state = props.state;
+  const onCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     props.onCreate();
   };
 
   return (
-    <GrammarCard>
+    <div className={cardClassName}>
       <div data-state={state}>
         {state === 'refused' ? (
           <GrammarMessage tone="danger">{props.refusal}</GrammarMessage>
         ) : (
           <>
-            <form onSubmit={handleCreate}>
-              <GrammarTextField
-                id="new-task-title"
-                label="New task"
-                value={props.newTitle}
-                onChange={event => props.onNewTitleChange(event.target.value)}
-              />
-              <GrammarButton type="submit" disabled={props.creating || !props.newTitle.trim()}>
+            <form onSubmit={onCreate}>
+              <GrammarTextField id="new-task-title" label="New task" value={props.newTitle} onChange={props.onNewTitleChange} />
+              <GrammarButton type="submit" isDisabled={props.isCreating || !props.newTitle.trim()}>
                 Add task
               </GrammarButton>
             </form>
@@ -55,7 +53,7 @@ export function TaskListView(props: TaskListViewProps) {
             ) : (
               <ul>
                 {props.tasks.map(task => (
-                  <li key={task.id} className="grammar-row">
+                  <li key={task.id} className={rowClassName}>
                     <label>
                       <input
                         type="checkbox"
@@ -74,6 +72,6 @@ export function TaskListView(props: TaskListViewProps) {
           </>
         )}
       </div>
-    </GrammarCard>
+    </div>
   );
-}
+};
