@@ -17,6 +17,7 @@ composes:
   - {rule: br.notify.delivery.once, module: src/notify/dedupe}
   - {rule: br.notify.digest.window, module: src/notify/digest}
 refs: [contract.notify.task-completion-feed]
+subscribes: [event.task.completed]
 
 conflictsWith:
   - {record: br.task.complete.once, rev: 2, because: "task.complete has no completion event and no
@@ -25,6 +26,4 @@ conflictsWith:
     this requirement has no real trigger to attach to."}
 
 blockedBy:
-  - contract.notify.task-completion-feed is todo; the task feature exposes no completion event today.
-    This record stays todo until that contract is met or the trigger is redesigned around something
-    task actually emits.
+  - {record: gap.notify.task-completion-event, because: "task exposes no completion event today; this record stays todo until event.task.completed is actually raised, which subscribes now names as the trigger instead of overloading contract.notify.task-completion-feed for it."}

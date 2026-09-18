@@ -10,6 +10,4 @@ steps:
 requirements: [fr.task.complete, fr.notify.on-completion, fr.notify.digest, fr.notify.unsubscribe]
 
 blockedBy:
-  - Every requirement this journey needs is todo, and one of them (fr.notify.on-completion) conflictsWith
-    a gap in the feature that would have to start the journey. The journey is real and worth stating -
-    it is the reason notify exists - but nothing in it can be walked today.
+  - {record: fr.notify.on-completion, because: "Every requirement this journey needs is todo, and one of them (fr.notify.on-completion) conflictsWith a gap in the feature that would have to start the journey. The journey is real and worth stating - it is the reason notify exists - but nothing in it can be walked today."}

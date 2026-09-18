@@ -23,5 +23,4 @@ requiresProof:
     command: npm run test:e2e -- notify/digest
 
 blockedBy:
-  - No implementation exists. The example is moving to a NestJS backend and this module has not been
-    built against that layout.
+  - {record: gap.notify.unbuilt-module, because: "No implementation exists. The example is moving to a NestJS backend and this module has not been built against that layout."}

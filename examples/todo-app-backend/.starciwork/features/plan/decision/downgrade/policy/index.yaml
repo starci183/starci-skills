@@ -2,7 +2,8 @@ schema: work/policy-decision
 id: decision.plan.downgrade.policy
 title: What happens when a downgrade leaves a person over the new cap
 state: done
-outcome: accept-and-freeze
+outcome: decided
+chosen: accept-and-freeze
 question: A paid person with 40 active tasks downgrades to free, which holds at most 20. Does the downgrade
   happen at all, and if it does, what stops the count from growing further?
 options:

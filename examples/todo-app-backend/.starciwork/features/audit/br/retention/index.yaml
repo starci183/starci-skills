@@ -12,5 +12,6 @@ authorityRefs:
 acceptanceCriteria: [available-through-window]
 module: src/audit/log
 blockedBy:
-  - No storage layer exists yet under the Nest layout; there is nothing to run a retention check against.
+  - {record: gap.audit.unbuilt-module, because: "No storage layer exists yet under the Nest layout; there is nothing to run a retention check against."}
+
 change: {rev: 1, kind: initial, at: 2026-09-18T06:01:00.000Z}

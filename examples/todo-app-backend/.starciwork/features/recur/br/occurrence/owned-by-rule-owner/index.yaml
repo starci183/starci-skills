@@ -11,5 +11,4 @@ acceptanceCriteria: [refuses-non-owner]
 module: src/recur/occurrence
 change: {rev: 1, kind: initial, at: 2026-09-18T05:12:00.000Z}
 blockedBy:
-  - No implementation yet. The example's backend target moved to NestJS and this feature has not been
-    built there; there is no occurrence store to guard.
+  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The example's backend target moved to NestJS and this feature has not been built there; there is no occurrence store to guard."}

@@ -4,6 +4,10 @@
 schema: work/evidence
 record: journey.login.first-sign-in
 recordDigest: 055afe19000823d18507849ca9416aa870b7db7aa2b64507e193b4788f68a6ba
+stale: true
+staleSince: {record: journey.login.first-sign-in}
+staleReason: The record's index.yaml bytes no longer match recordDigest above; something
+  edited the record after this run captured it, and no fresh run has re-verified it since.
 outcome: pass
 assertions:
   - id: empty-state-explains-itself

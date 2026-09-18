@@ -3,9 +3,10 @@ id: impl.recur.todo-app-frontend.schedule
 title: The schedule screen
 state: todo
 repository: todo-app-frontend
-directory: app/recur
-files: [schedule-screen.tsx, upcoming-list.tsx, end-rule-dialog.tsx]
+owners:
+  - {role: module, path: app/recur/schedule-screen.tsx}
+  - {role: module, path: app/recur/upcoming-list.tsx}
+  - {role: module, path: app/recur/end-rule-dialog.tsx}
 proves: [ui.recur.schedule]
 blockedBy:
-  - Not implemented. The frontend target moved to Next.js and must consume the Grammar core package the
-    way nivo-fe does; none of these files exist yet and no test or capture has been taken.
+  - {record: gap.recur.unbuilt-module, because: "Not implemented. The frontend target moved to Next.js and must consume the Grammar core package the way nivo-fe does; none of these files exist yet and no test or capture has been taken."}

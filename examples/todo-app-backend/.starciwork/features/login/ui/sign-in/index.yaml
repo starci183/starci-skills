@@ -5,4 +5,8 @@ state: done
 states: [empty, filled, refused, working]
 brand: {rev: 2}
 refs: [fr.login.sign-in]
+verificationSource: authored-claim
+because: The four states are the screen's design intent, agreed against fr.login.sign-in; no capture set
+  has been taken against a running build yet, so this is a claim about what the screen is meant to show,
+  not a demonstrated one.
 

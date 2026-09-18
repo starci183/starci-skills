@@ -13,5 +13,4 @@ acceptanceCriteria: [viewer-read-only, editor-can-complete]
 module: src/share/access.service.ts
 change: {rev: 1, kind: initial, at: 2026-09-18T06:00:00.000Z}
 blockedBy:
-  - The example is moving to a real NestJS backend; src/share/access.service.ts does not exist yet, so
-    nothing has proven either acceptance criterion.
+  - {record: gap.share.unbuilt-module, because: "The example is moving to a real NestJS backend; src/share/access.service.ts does not exist yet, so nothing has proven either acceptance criterion."}

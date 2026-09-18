@@ -1,0 +1,10 @@
+schema: work/gap
+id: gap.recur.unbuilt-module
+title: No recur module exists under the NestJS/Next.js layout yet
+state: todo
+statement: The example's backend target moved to NestJS and the frontend to Next.js. Neither side has
+  been built for this feature at this commit - there is no occurrence store, generator, zone-conversion
+  module or schedule screen - so no rule, flow, component or screen in this feature has anything to run
+  acceptance criteria or a UAT walk against.
+closedBy: impl.recur.todo-app-backend.engine
+change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}

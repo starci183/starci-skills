@@ -9,8 +9,7 @@ measurement:
   how: k6 run scripts/load/list.js with 1000 seeded tasks and 50 virtual users for 60 seconds
   threshold: p95 < 200ms
   environment: dev
-appliesTo: [br.task.list.owned]
-
+refs: [br.task.list.owned]
 requiresProof:
   measurement:
     required: true

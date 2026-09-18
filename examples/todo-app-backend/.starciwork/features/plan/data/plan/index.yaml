@@ -9,4 +9,4 @@ fields:
 invariants:
   - taskCap is present and equal to 20 if and only if tier is free.
   - The catalog holds exactly two rows; a plan is a fixed offering, not a per-person configuration.
-appliesTo: [br.plan.caps.limit]
+refs: [br.plan.caps.limit]

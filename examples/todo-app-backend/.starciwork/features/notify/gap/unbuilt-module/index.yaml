@@ -1,0 +1,9 @@
+schema: work/gap
+id: gap.notify.unbuilt-module
+title: No notify module exists under the NestJS/Next.js layout yet
+state: todo
+statement: The example backend is moving to a NestJS/TypeORM backend and the frontend to Next.js. No
+  code exists yet at src/notify/{dedupe,digest,delivery,preferences} or app/notify, so no acceptance
+  criterion, load test or UAT walk in this feature has anything to run against.
+closedBy: impl.notify.todo-app-backend.pipeline
+change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}

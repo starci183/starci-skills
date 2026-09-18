@@ -25,6 +25,4 @@ requiresProof:
     required: true
 
 blockedBy:
-  - "The example has no operator/admin role today - data.login.person has no role field and no
-    existing record establishes who is authorized to read the log. This FR cannot be implemented
-    honestly until that authorization boundary is defined, by this feature or by login."
+  - {record: gap.audit.operator-role, because: "The example has no operator/admin role today - data.login.person has no role field and no existing record establishes who is authorized to read the log. This FR cannot be implemented honestly until that authorization boundary is defined, by this feature or by login."}

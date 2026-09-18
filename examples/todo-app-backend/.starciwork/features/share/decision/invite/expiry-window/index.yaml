@@ -2,7 +2,8 @@ schema: work/policy-decision
 id: decision.share.invite.expiry-window
 title: Why an invitation expires rather than staying pending indefinitely
 state: done
-outcome: fixed-window
+outcome: decided
+chosen: fixed-window
 question: Should a pending invitation stay open until the owner revokes it, or expire on its own after a
   fixed window?
 options:

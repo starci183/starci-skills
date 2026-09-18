@@ -1,0 +1,10 @@
+schema: work/gap
+id: gap.plan.unbuilt-module
+title: No plan module exists under the NestJS/Next.js layout yet
+state: todo
+statement: The example backend is moving to NestJS (checks/architecture.mjs, checks/code-patterns/nest*.mjs)
+  and the frontend to Next.js consuming the Grammar core package. No code exists yet at
+  src/plan/{cap-guard,subscription,reconcile,payments} or app/plan, so no rule, flow, component or screen
+  in this feature has anything to run acceptance criteria or a UAT walk against.
+closedBy: impl.plan.todo-app-backend.plan
+change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}

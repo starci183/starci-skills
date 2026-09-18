@@ -3,6 +3,13 @@ id: decision.audit.erasure-method
 title: How an erasure actually removes identifying data from an append-only, hash-chained log
 state: todo
 outcome: open
+tension:
+  records: [br.audit.append-only, br.audit.retention, br.audit.erasure.right]
+  statement: "Each rule is individually true and agreed. Held together they are jointly unsatisfiable
+    under the plain reading of never lost: append-only forbids altering a line, retention forbids
+    losing one inside 400 days, and erasure.right requires a verified request to make a person
+    unreadable in every line they produced, on demand, inside that same window - no operation on the
+    stored bytes can honor all three until this decision narrows what never lost means."
 question: br.audit.append-only says a line's bytes never change. br.audit.retention says a line is
   never lost inside 400 days. br.audit.erasure.right says a verified request makes a person
   unreadable in every line they produced, on demand, inside that same window. What operation

@@ -25,5 +25,4 @@ requiresProof:
     required: true
 
 blockedBy:
-  - No implementation yet. The example's backend target moved to NestJS and this feature has not been
-    built there.
+  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The example's backend target moved to NestJS and this feature has not been built there."}

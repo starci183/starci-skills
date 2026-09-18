@@ -15,5 +15,5 @@ invariants:
   - appliedAt is set at most once per id; a second application attempt for the same id never changes it -
     this is the idempotency guard of br.plan.payment.idempotent.
   - A payment intent is never deleted; it is the audit trail for a subscription's activations.
-appliesTo: [br.plan.payment.idempotent]
-refs: [data.plan.subscription, integration.plan.sepay]
+
+refs: [data.plan.subscription, integration.plan.sepay, br.plan.payment.idempotent]

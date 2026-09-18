@@ -4,6 +4,10 @@
 schema: work/evidence
 record: sds.login.session-store
 recordDigest: c4f1e0b9d2a5c8f1b4e7d0a3c6f9b24c1f0b9e2d7a5c3f8e1b6d4a9c2f5b8e1d
+stale: true
+staleSince: {record: sds.login.session-store}
+staleReason: The record's index.yaml bytes no longer match recordDigest above; something
+  edited the record after this run captured it, and no fresh run has re-verified it since.
 outcome: pass
 assertions:
   - id: t-accept

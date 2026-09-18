@@ -4,6 +4,10 @@
 schema: work/evidence
 record: br.task.title.required
 recordDigest: ec97228bc4446014a7ce15f08930a29001947b5d0d872052b4a1409558912c07
+stale: true
+staleSince: {record: br.task.title.required}
+staleReason: The record's index.yaml bytes no longer match recordDigest above; something
+  edited the record after this run captured it, and no fresh run has re-verified it since.
 outcome: pass
 assertions:
   - id: ac.task.title.required.refuses-empty

@@ -24,6 +24,4 @@ recommendationReason: The brief's own wording - "a per-person quiet window and a
   events become one message" - describes one mechanism, not two. Building the calendar do-not-disturb
   clock without a caller that needs it would be unproven scope with no test behind it.
 chosen: one-rolling-window-per-channel
-targetModule: src/notify/digest.ts, function createDigestGrouper - not yet written; the example is
-  moving to the Nest layout and no lane-owned code exists at this commit.
 defaultWindow: 10 minutes, configurable per pipeline instance via windowMs

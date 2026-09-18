@@ -3,8 +3,10 @@ id: impl.login.todo-app-backend.auth
 title: The auth module
 state: done
 repository: todo-app
-directory: src/auth
-files: [sign-in.service.ts, session.service.ts, session.repository.ts]
+owners:
+  - {role: module, path: src/auth/sign-in.service.ts}
+  - {role: module, path: src/auth/session.service.ts}
+  - {role: module, path: src/auth/session.repository.ts}
 revision: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
 proves: [br.login.password.sign-in, br.login.session.restores, sds.login.session-store]
 verification: [npm run test:unit -- src/auth exited 0]

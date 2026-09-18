@@ -4,6 +4,10 @@
 schema: work/evidence
 record: impl.login.todo-app-backend.auth
 recordDigest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+stale: true
+staleSince: {record: impl.login.todo-app-backend.auth}
+staleReason: The record's index.yaml bytes no longer match recordDigest above; something
+  edited the record after this run captured it, and no fresh run has re-verified it since.
 outcome: pass
 assertions:
   - id: unit-suite-green-at-the-recorded-revision

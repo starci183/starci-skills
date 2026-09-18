@@ -22,6 +22,6 @@ requiresProof:
     required: true
 
 blockedBy:
-  - decision.audit.erasure-method is open; sds.audit.erasure-request's t-request assumes its
-    recommended answer. No implementation is authored against an open decision.
-  - No implementation exists yet under the NestJS layout the example is moving to.
+  - {record: decision.audit.erasure-method, because: "decision.audit.erasure-method is open; sds.audit.erasure-request's t-request assumes its recommended answer. No implementation is authored against an open decision."}
+  - {record: sds.audit.erasure-request, because: "decision.audit.erasure-method is open; sds.audit.erasure-request's t-request assumes its recommended answer. No implementation is authored against an open decision."}
+  - {record: gap.audit.unbuilt-module, because: "No implementation exists yet under the NestJS layout the example is moving to."}

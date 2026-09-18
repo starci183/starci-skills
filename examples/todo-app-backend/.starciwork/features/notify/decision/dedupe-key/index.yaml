@@ -26,5 +26,3 @@ recommendationReason: A payload collision that silently drops a real event is wo
   uphold - a stable per-event id - and not something notify can manufacture on its own; that obligation
   is recorded on the two contract records this feature is missing.
 chosen: producer-event-id
-targetModule: src/notify/dedupe.ts, function dedupeKey - not yet written; the example is moving to the
-  Nest layout and no lane-owned code exists at this commit.

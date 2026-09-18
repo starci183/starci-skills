@@ -23,7 +23,5 @@ requiresProof:
       fakes list.
 
 blockedBy:
-  - No call has been made against the real SePay sandbox yet; there is no module to make one. The example
-    backend is moving to NestJS, and this integration is specified but not implemented against it. Tests
-    written against a fake gateway response would settle sds.plan.subscription-lifecycle and
-    sds.plan.reconciliation's transitions, never this record - a fake proves the guard, not the gateway.
+  - {record: sds.plan.subscription-lifecycle, because: "No call has been made against the real SePay sandbox yet; there is no module to make one. The example backend is moving to NestJS, and this integration is specified but not implemented against it. Tests written against a fake gateway response would settle sds.plan.subscription-lifecycle and sds.plan.reconciliation's transitions, never this record - a fake proves the guard, not the gateway."}
+  - {record: sds.plan.reconciliation, because: "No call has been made against the real SePay sandbox yet; there is no module to make one. The example backend is moving to NestJS, and this integration is specified but not implemented against it. Tests written against a fake gateway response would settle sds.plan.subscription-lifecycle and sds.plan.reconciliation's transitions, never this record - a fake proves the guard, not the gateway."}

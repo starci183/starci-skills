@@ -3,12 +3,15 @@ id: impl.task.todo-app-frontend.task-list
 title: The list screen and the create form
 state: todo
 repository: todo-app-frontend
-directory: app/tasks
-files: [task-list.tsx, create-task-form.tsx]
+owners:
+  - {role: module, path: app/tasks/task-list.tsx}
+  - {role: module, path: app/tasks/create-task-form.tsx}
 revision: 0a3c6f9b24c1f0b9e2d7a5c3f8e1b6d4a9c2f5b8
 proves: [ui.task.list]
 verification: [source inspection only; no fresh focused test run]
 verificationSource: authored-claim
-blockedBy:
-  - The brand revision changed the primary colour token this screen binds; the capture set is not re-taken.
+# The brand revision changed the primary colour token this screen binds; the capture set is not
+# re-taken. Not authored as blockedBy: brand is already done at rev 2, so a blocker citing it would
+# be stale the moment it was written. This is drift against an implicit binding (see the layout's
+# frontend brand-binding rule), tracked here as a plain note until the capture is retaken.
 

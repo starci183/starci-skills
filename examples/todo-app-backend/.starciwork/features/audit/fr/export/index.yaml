@@ -23,4 +23,4 @@ requiresProof:
     required: true
 
 blockedBy:
-  - No implementation exists yet under the NestJS layout the example is moving to.
+  - {record: gap.audit.unbuilt-module, because: "No implementation exists yet under the NestJS layout the example is moving to."}

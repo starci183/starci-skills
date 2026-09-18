@@ -10,5 +10,4 @@ fields:
 invariants:
   - email is unique across every person, compared lowercased.
   - passwordHash is never read back out of the product.
-appliesTo: [br.login.password.sign-in]
-
+refs: [br.login.password.sign-in]

@@ -22,6 +22,3 @@ recommendationReason: This product has no producer that supplies a sequence numb
   Refusing the guarantee and proving the refusal - the digest is order-independent by construction - is
   honest about what the system actually does.
 chosen: refuse-order-read-current-state
-targetModule: src/notify/pipeline.ts, functions enqueue and digestFor - not yet written; the example is
-  moving to the Nest layout and no lane-owned code exists at this commit. The order-independence claim
-  is a test obligation on that module once it is written, not a demonstrated fact yet.

@@ -4,6 +4,10 @@
 schema: work/evidence
 record: nfr.login.sign-in-timing
 recordDigest: 61479fc018139d55d11bbb8cbb461ab882639a895db596dda62f6520e6173f06
+stale: true
+staleSince: {record: nfr.login.sign-in-timing}
+staleReason: The record's index.yaml bytes no longer match recordDigest above; something
+  edited the record after this run captured it, and no fresh run has re-verified it since.
 outcome: pass
 assertions:
   - id: p95-delta-under-10ms

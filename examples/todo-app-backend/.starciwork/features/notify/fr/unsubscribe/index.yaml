@@ -23,6 +23,4 @@ requiresProof:
     required: true
 
 blockedBy:
-  - No implementation exists, and ui.notify.preferences (the only surface a person would use to
-    unsubscribe) is also todo. The example is moving to a NestJS/Next.js layout and neither side has
-    been built against it.
+  - {record: ui.notify.preferences, because: "No implementation exists, and ui.notify.preferences (the only surface a person would use to unsubscribe) is also todo. The example is moving to a NestJS/Next.js layout and neither side has been built against it."}

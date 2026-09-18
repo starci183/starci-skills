@@ -2,7 +2,8 @@ schema: work/policy-decision
 id: decision.recur.generation.backfill
 title: A generator that missed a window backfills everything, one, or nothing
 state: done
-outcome: backfill-everything
+outcome: decided
+chosen: backfill-everything
 question: The scheduler tick that runs the generator was down for three days - a deploy, an outage, a
   paused queue. When it runs again, does it materialise every occurrence that fell due while it was down,
   only the most recent one, or none of them?

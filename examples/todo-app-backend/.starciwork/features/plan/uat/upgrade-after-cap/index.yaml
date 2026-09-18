@@ -10,5 +10,6 @@ steps:
   - Return to the app once the gateway acknowledges and see the usage screen show no cap.
   - Create the 21st task and see it appear.
 blockedBy:
-  - Nothing to walk yet - fr.plan.upgrade, ui.plan.usage and the cap guard itself are all todo, and the cap
-    guard is not wired into task creation at all (contract.plan.create-precondition).
+  - {record: fr.plan.upgrade, because: "Nothing to walk yet - fr.plan.upgrade, ui.plan.usage and the cap guard itself are all todo, and the cap guard is not wired into task creation at all (contract.plan.create-precondition)."}
+  - {record: ui.plan.usage, because: "Nothing to walk yet - fr.plan.upgrade, ui.plan.usage and the cap guard itself are all todo, and the cap guard is not wired into task creation at all (contract.plan.create-precondition)."}
+  - {record: contract.plan.create-precondition, because: "Nothing to walk yet - fr.plan.upgrade, ui.plan.usage and the cap guard itself are all todo, and the cap guard is not wired into task creation at all (contract.plan.create-precondition)."}

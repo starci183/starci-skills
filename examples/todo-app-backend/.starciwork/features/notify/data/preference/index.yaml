@@ -10,7 +10,6 @@ fields:
 invariants:
   - At most one row exists per (personId, channel) pair.
   - unsubscribed true suppresses every future notification on that channel until it is set back to false.
-appliesTo: [br.notify.unsubscribe.honored]
+refs: [br.notify.unsubscribe.honored]
 blockedBy:
-  - No entity or table exists yet. The example is moving to a NestJS/TypeORM backend and this shape has
-    not been created against that layout.
+  - {record: gap.notify.unbuilt-module, because: "No entity or table exists yet. The example is moving to a NestJS/TypeORM backend and this shape has not been created against that layout."}

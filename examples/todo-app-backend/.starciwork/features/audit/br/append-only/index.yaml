@@ -10,6 +10,6 @@ authorityRefs:
 acceptanceCriteria: [chain-detects-tamper]
 module: src/audit/log
 blockedBy:
-  - The example's backend is moving to NestJS; src/audit/log does not exist yet. No evidence is
-    authored until a real Nest module and test prove the chain, not a description of one.
+  - {record: gap.audit.unbuilt-module, because: "The example's backend is moving to NestJS; src/audit/log does not exist yet. No evidence is authored until a real Nest module and test prove the chain, not a description of one."}
+
 change: {rev: 1, kind: initial, at: 2026-09-18T06:00:00.000Z}

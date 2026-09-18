@@ -6,4 +6,4 @@ states: [no-rule, active, ended, refused]
 brand: {rev: 2}
 refs: [fr.recur.make-recurring, fr.recur.see-upcoming, fr.recur.end-rule]
 blockedBy:
-  - No implementation yet. The frontend target moved to Next.js and this screen has not been built there.
+  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The frontend target moved to Next.js and this screen has not been built there."}

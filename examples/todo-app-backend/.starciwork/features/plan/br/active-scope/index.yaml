@@ -18,5 +18,4 @@ module: src/plan/cap-guard
 change: {rev: 1, kind: initial, at: 2026-09-18T07:00:30.000Z}
 refs: [br.task.list.owned, br.task.delete.final]
 blockedBy:
-  - No module exists yet at src/plan/cap-guard. This is a counting definition ready to implement against
-    the NestJS layout, but nothing has been built or run against it.
+  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/cap-guard. This is a counting definition ready to implement against the NestJS layout, but nothing has been built or run against it."}

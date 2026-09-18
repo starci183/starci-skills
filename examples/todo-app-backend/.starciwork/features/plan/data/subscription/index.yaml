@@ -14,5 +14,5 @@ invariants:
   - Exactly one subscription row exists per personId; a person's plan is looked up, never listed.
   - periodEnd is set if and only if status is active or past-due.
   - status is authored by sds.plan.subscription-lifecycle's transitions only; nothing writes it directly.
-appliesTo: [br.plan.caps.limit, br.plan.downgrade.freeze, br.plan.lapse.reverts-on-read]
-refs: [data.plan.plan]
+
+refs: [data.plan.plan, br.plan.caps.limit, br.plan.downgrade.freeze, br.plan.lapse.reverts-on-read]

@@ -18,5 +18,4 @@ module: src/plan/subscription
 change: {rev: 1, kind: initial, at: 2026-09-18T07:03:00.000Z}
 refs: [sds.login.session-store, sds.plan.subscription-lifecycle]
 blockedBy:
-  - No module exists yet at src/plan/subscription. The example backend is moving to NestJS; this rule is
-    specified but not built or run against that layout.
+  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/subscription. The example backend is moving to NestJS; this rule is specified but not built or run against that layout."}

@@ -4,6 +4,10 @@
 schema: work/evidence
 record: uat.login.sign-in
 recordDigest: 0180b30576090e73de581f4acd361c1e3edab8d08dd03aad652f1b206af13f8c
+stale: true
+staleSince: {record: uat.login.sign-in}
+staleReason: The record's index.yaml bytes no longer match recordDigest above; something
+  edited the record after this run captured it, and no fresh run has re-verified it since.
 outcome: pass
 assertions:
   - id: signed-in-and-restored

@@ -12,8 +12,9 @@ steps:
       collaborator tries fails, immediately, with no delay."}
 requirements: [fr.task.create, fr.share.invite, fr.share.accept, fr.share.revoke]
 blockedBy:
-  - fr.share.invite, fr.share.accept and fr.share.revoke are all todo; there is no running product yet for
-    this journey to be walked against.
+  - {record: fr.share.invite, because: "fr.share.invite, fr.share.accept and fr.share.revoke are all todo; there is no running product yet for this journey to be walked against."}
+  - {record: fr.share.accept, because: "fr.share.invite, fr.share.accept and fr.share.revoke are all todo; there is no running product yet for this journey to be walked against."}
+  - {record: fr.share.revoke, because: "fr.share.invite, fr.share.accept and fr.share.revoke are all todo; there is no running product yet for this journey to be walked against."}
 
 requiresProof:
   uat:

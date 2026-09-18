@@ -1,0 +1,11 @@
+schema: work/gap
+id: gap.audit.emitted-events
+title: login and task expose no emitted-event contract for audit to subscribe to
+state: todo
+statement: A task being created, completed or deleted, and a person signing in or out, are the events
+  fr.audit.log.append needs to seal a line for. login and task expose request/response contracts
+  (contract.login.identity-for-task, contract.task.list-for-dashboard) but, at this commit, neither
+  feature's implementation actually raises any of event.task.created, event.task.completed,
+  event.task.deleted, event.login.signed-in or event.login.signed-out - the event records specify the
+  shape each will have once emitted, not a signal that fires today.
+change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}

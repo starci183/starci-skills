@@ -20,6 +20,8 @@ shape:
     rolled-back ledger is refused instead of resumed
   kernelCustody: .starciwork/{kernel-evidence,kernel-strays,kernel-headless,kernel-approvals}/** - kernel-owned
     working state with a real lifetime, untracked, excluded from Work validation, never canonical Work
+  gapRecord: features/<feature>/gap/<name>/index.yaml with schema work/gap
+  eventRecord: features/<feature>/event/<name>/index.yaml with schema work/event
   moduleUI: features/<feature>/ui/**/{index.yaml,assets/**}
   implementation: features/<feature>/implementation/{index.yaml,frontend/**/index.yaml,backend/**/index.yaml}
   frontendCaptures: features/<feature>/implementation/frontend/assets/<running-page-screenshot>
@@ -191,6 +193,97 @@ rules:
   - All current canonical SRS and SDS content is English, including natural-language prose,
     YAML/schema keys, stable IDs/refs, enum literals, protocol identifiers, API fields, variables,
     types, operation names and source symbols. Conversation locale never translates specifications.
+  - "Blocker edges. `blockedBy` is a list of edges, not sentences: each entry is
+    `{record: <id>, rev?: <n>, because: <sentence>}`. `record` names an id some record in the tree
+    actually owns; `rev` is the blocking record's `change.rev` at the moment the blocker was authored,
+    and is omitted only when the blocker does not depend on a particular revision holding. A blocker
+    whose target has since reached `state: done` at a `change.rev` greater than or equal to the cited
+    `rev` (or at any rev, when none was cited) is stale: the thing that was supposed to unblock it has
+    happened, and citing it further would go silently out of date. The gate refuses a stale blocker and
+    refuses a `record` that does not resolve. Prose that is not really about a record - an absence with
+    no owner - is not authored as `blockedBy` prose; it is a `gap` record (below), and `blockedBy` points
+    at its id like any other."
+  - "Known absences are records, not restated prose. `work/gap` lives at
+    `features/<feature>/gap/<name>/index.yaml`, id `gap.<feature>.<name>`, and carries `state: todo|done`
+    and a plain `statement` of the fact that is missing - an event nobody emits yet, a field no data
+    record declares, a module that has not been written under the stack the project is moving to. An
+    optional `closedBy: <record id>` names the record whose completion actually closes the gap, so a
+    reader can tell an open absence from one already scheduled to close. `blockedBy` and `conflictsWith`
+    point at a gap's id exactly as they would at any other record, so the same absence is named once and
+    every dependent points at that one name instead of restating it."
+  - "Pairwise conflicts, and the sibling for sets. `conflictsWith` stays a list of
+    `{record: <id>, rev?: <n>, because: <sentence>}` for two records that currently cannot both be true.
+    The gate resolves `record` and, when `rev` is cited, refuses a mismatch against the target's current
+    `change.rev`. Three or more records that are each individually true and jointly unsatisfiable are not
+    a chain of pairwise conflicts; they are a set only the settling decision can resolve, so `tension:
+    {records: [<id>, <id>, ...], statement: <sentence>}` is authored on the `work/policy-decision` record
+    that owns settling them, and refused anywhere else. The gate requires every id in `records` to resolve
+    and at least two of them."
+  - "A decision's vocabulary is closed. `work/policy-decision` authors `outcome: open | decided`,
+    `options: [{id, consequence, summary?}]`, `chosen?: <option id>` (required exactly when
+    `outcome: decided`, and refused unless it names an id present in `options`), and an optional
+    `blocks: [<record id>]` naming what the decision's settling unblocks. A decision does not invent its
+    own outcome vocabulary by writing the chosen option's id (or any other free-form word) directly into
+    `outcome`, and it does not carry a `targetModule` or similar ad hoc pointer to where the decision will
+    eventually be implemented - that belongs to the `implementation` record that later proves it, not the
+    decision."
+  - "Change is authored, staleness is derived, and neither is folklore. `change: {rev, kind:
+    initial|editorial|clarifying|breaking, at, withdraws?: [<exact statement>], retains?: [<exact
+    statement>], reason?}` records one authored edit; `withdraws` names statements this rev removes
+    verbatim and `retains` names statements an editorial pass keeps verbatim, so a change that removes
+    half a sentence is not forced to withdraw the whole thing to be honest about what moved. On
+    `work/evidence`, `stale?: true`, `staleSince?: {record: <id>, rev?: <n>}` and `staleReason?` say a
+    passed run no longer speaks for the record beside it. The digest that decides this is the kernel's
+    own: sha256 of the record's `index.yaml` file bytes, exactly as `kernel/reconciliation.mjs`'s
+    `recordDigests`/`nodeFileOf` compute it for reconciliation. An `evidence.yaml` whose `recordDigest`
+    does not equal that digest, computed now, must carry `stale: true`; the gate refuses one that does
+    not. Staleness is never cleared by editing `recordDigest` to match - only a fresh run, which is a
+    kernel act, retires it."
+  - "Done means proven or says so. A record with `state: done` needs a sibling `evidence.yaml`, or an
+    authored `verificationSource: authored-claim` with a `because:` sentence saying why no run proves it.
+    `work/data`, `work/brand` and `work/policy-decision` are authored claims by nature - a data shape, a
+    brand token or a settled decision is true because it was written down and agreed, not because a test
+    ran - so the gate treats every `done` record of those three schemas as satisfying this rule without
+    the declaration being repeated on each one. Every other schema needs the evidence file or the explicit
+    declaration; the gate refuses a `done` record of any other schema that has neither."
+  - "A rule may constrain a record it does not own. `work/business-rule` and `work/sds-component` may
+    carry `appliesTo: [<record id>]`, an outbound edge naming a record - owned by any feature - that the
+    rule's or component's requirement reaches even though the rule does not own it and does not edit it.
+    The gate only resolves the ids; it does not require the target to acknowledge the edge back. The
+    derived consequence is one sentence: a `done` record that acquires an `appliesTo` edge newer than its
+    proof reads as `effectiveState: suspended` until it is re-proven against the new constraint, the same
+    way a changed input suspends a record that read it. `appliesTo` is refused on any other schema -
+    `work/data` in particular does not carry it, because a data record's relationship to the rules it
+    embodies is `refs`, an inbound reading, not an outbound constraint on a record it does not own."
+  - "Events are a family; data may extend data; time may trigger. `work/event` lives at
+    `features/<feature>/event/<name>/index.yaml`, id `event.<feature>.<name>`, and authors `producer: <record
+    id>` (the record whose flow raises it), `payload: [{name, type, note?}]` and `delivery: {guarantee:
+    at-least-once|at-most-once|exactly-once, ordering: none|per-key|total}`. A consumer declares
+    `subscribes: [<event id>]`, each id resolving to a `work/event` record; `work/contract` remains for a
+    synchronous request/response surface and is not overloaded to describe a fire-and-forget signal. On
+    `work/data`, `extends?: <data id>` names a base data record this one specializes, with `adds: [<field
+    definition>, ...]` listing only the fields the base does not already declare - the shared fields are
+    inherited, not repeated as a fresh disagreement about the base's shape. On `stateMachine.transitions[]`,
+    `on` may be the plain string it always was, or `{timer: <duration or plain-language description>}` when
+    what actually fires the transition is a clock, not an event - a digest window closing, a scheduled
+    tick - and the gate accepts either shape."
+  - "Implementation names owners, plural. `work/implementation` authors `owners: [{role, path}]` - each
+    entry the path of one real or intended artifact and the role it plays (`module`, `route`, `entry`,
+    `block`, or another short word naming the kind of unit) - because one screen or one flow can span more
+    than one owned artifact (a route adapter, a feature entry, a connected block and its pure twin) and a
+    single `directory`/`files` pair cannot name more than one shape at a time. `work/business-rule.module`
+    may be a plain string, for the ordinary one-module case, or a list of strings when the rule's module
+    genuinely spans more than one path. The gate refuses `directory`/`files` on `work/implementation`; that
+    shape is retired in favor of `owners`, and the gate refuses an `owners` entry missing either `role` or
+    `path`."
+  - "Two topologies host the same record tree. In a multi-repository product, `.starciwork` lives in the
+    bound backend repository and `.workspaces/projects/<project>/{be,fe}.json` at the host routes each side
+    to its repository and its `architecture.json` roots (`examples/todo-app-backend` paired with
+    `examples/todo-app-frontend` demonstrates this shape). In a monorepo, `.starciwork` lives at the
+    repository root and `architecture.json` names `apps/*`/`packages/*` as its roots instead of a second
+    repository. Both host the identical `features/<feature>/{business,architecture,ui,implementation,uat}`
+    tree; only where `.starciwork` sits and how its roots are declared differ, and a project does not run
+    both shapes for the same product at once."
 example:
   brand/:
     - index.yaml

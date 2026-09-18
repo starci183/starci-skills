@@ -9,6 +9,7 @@ interfaces:
     itself.
 refs: [br.audit.append-only, br.audit.retention]
 dependsOn: [contract.login.identity-for-task]
+subscribes: [event.task.created, event.task.completed, event.task.deleted, event.login.signed-in, event.login.signed-out]
 
 stateMachine:
   states: [open, appended]
@@ -36,15 +37,6 @@ requiresProof:
     forEach: stateMachine.transitions
 
 blockedBy:
-  - "No implementation exists: the example is moving to a NestJS backend and this module has not been
-    written under that layout yet. This record stays todo, and no provenBy or evidence is authored
-    for it, until impl.audit.todo-app-backend.log names a real Nest module and a real test proves
-    t-append and the tamper check in ac.audit.append-only.chain-detects-tamper."
-  - "Separately, dependsOn names contract.login.identity-for-task because that is the only stable,
-    existing surface that gives this module a personId to seal. Nothing equivalent is exposed for the
-    events this log actually needs to capture - a task being created, completed or deleted, or a
-    person signing in or out. login and task expose request/response contracts (actorOf, and task's
-    own todo contract.task.list-for-dashboard) but no emitted-event contract a subscriber can bind to.
-    There is no existing record id this can honestly point at with conflictsWith, because
-    conflictsWith needs a record that exists and this is an absence, not a contradiction - see the
-    critique in the audit lane's report."
+  - {record: impl.audit.todo-app-backend.log, because: "No implementation exists: the example is moving to a NestJS backend and this module has not been written under that layout yet. This record stays todo, and no provenBy or evidence is authored for it, until impl.audit.todo-app-backend.log names a real Nest module and a real test proves t-append and the tamper check in ac.audit.append-only.chain-detects-tamper."}
+  - {record: ac.audit.append-only.chain-detects-tamper, because: "No implementation exists: the example is moving to a NestJS backend and this module has not been written under that layout yet. This record stays todo, and no provenBy or evidence is authored for it, until impl.audit.todo-app-backend.log names a real Nest module and a real test proves t-append and the tamper check in ac.audit.append-only.chain-detects-tamper."}
+  - {record: gap.audit.emitted-events, because: "dependsOn names contract.login.identity-for-task because that is the only stable, existing surface that gives this module a personId to seal; login and task expose request/response contracts (actorOf, contract.task.list-for-dashboard) but, at this commit, neither feature's implementation actually raises the five events subscribes now names. Earlier this had no record to point at with conflictsWith, because conflictsWith needs a record that exists and this was an absence, not a contradiction; it is gap.audit.emitted-events now."}

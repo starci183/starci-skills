@@ -4,6 +4,10 @@
 schema: work/evidence
 record: uat.task.create
 recordDigest: 140158647ba83671cf4f5a27afdc20ce01f8ed9236c31ca1e9c576c13ffd48f7
+stale: true
+staleSince: {record: uat.task.create}
+staleReason: The record's index.yaml bytes no longer match recordDigest above; something
+  edited the record after this run captured it, and no fresh run has re-verified it since.
 outcome: pass
 assertions:
   - id: main-flow-creates-one-task

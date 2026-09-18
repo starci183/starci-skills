@@ -17,4 +17,4 @@ invariants:
   - acceptedAt is set if and only if status has ever been accepted.
   - Once status is expired or revoked, it never returns to pending or accepted.
   - Exactly one row exists per (taskId, email) pair at a time.
-appliesTo: [br.share.invite.expiry, br.share.revoke.on-read, br.share.role.permissions]
+refs: [br.share.invite.expiry, br.share.revoke.on-read, br.share.role.permissions]

@@ -14,6 +14,7 @@ postconditions:
 composes:
   - {rule: br.audit.append-only, module: src/audit/log}
   - {rule: br.audit.retention, module: src/audit/log}
+subscribes: [event.task.created, event.task.completed, event.task.deleted, event.login.signed-in, event.login.signed-out]
 
 requiresProof:
   unit:
@@ -24,10 +25,5 @@ requiresProof:
     required: true
 
 blockedBy:
-  - "No caller wires this trigger today. login and task expose no emitted-event contract (sign-in,
-    sign-out, task.created, task.completed, task.deleted) for this feature to subscribe to - see
-    sds.audit.log-chain's blockedBy for the full account. Until that gap is closed by a contract owned
-    by login or task, or a decision routes around it, this FR can only be wired by calling directly
-    into login's and task's implementation modules, which is not a trigger this record can honestly
-    call done."
-  - No implementation exists yet under the NestJS layout the example is moving to.
+  - {record: gap.audit.emitted-events, because: "subscribes now names the five events this FR needs, but none of them is actually raised by login's or task's implementation yet, so there is nothing live to wire this trigger to."}
+  - {record: gap.audit.unbuilt-module, because: "No implementation exists yet under the NestJS layout the example is moving to."}

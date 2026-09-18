@@ -25,8 +25,4 @@ requiresProof:
       list.
 
 blockedBy:
-  - "No code reaches Redis: nothing under this feature exists yet (the example is moving to a NestJS
-    backend and no lane-owned module has been written against it), and a probe from this worktree found
-    no Redis listening on 6379 (connection refused), so even a manual smoke check has no live boundary
-    to run against right now. Marking this done on the strength of Redis existing elsewhere in the stack
-    for a different purpose would be exactly the invented evidence the common brief refuses."
+  - {record: gap.notify.unbuilt-module, because: "No code reaches Redis: nothing under this feature exists yet (the example is moving to a NestJS backend and no lane-owned module has been written against it), and a probe from this worktree found no Redis listening on 6379 (connection refused), so even a manual smoke check has no live boundary to run against right now. Marking this done on the strength of Redis existing elsewhere in the stack for a different purpose would be exactly the invented evidence the common brief refuses."}

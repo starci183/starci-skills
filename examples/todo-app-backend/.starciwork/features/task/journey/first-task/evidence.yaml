@@ -4,6 +4,10 @@
 schema: work/evidence
 record: journey.task.first-task
 recordDigest: 3635d82a2df91c136fdf14327769588616400ca4f64824a3cbaa4d9390c42783
+stale: true
+staleSince: {record: journey.task.first-task}
+staleReason: The record's index.yaml bytes no longer match recordDigest above; something
+  edited the record after this run captured it, and no fresh run has re-verified it since.
 outcome: pass
 assertions:
   - id: empty-state-explains-itself

@@ -22,6 +22,6 @@ change:
     longer describes the product. Delete stays owner-only exactly as before; only the complete half moved,
     and it moved into a contract this record now names instead of re-describing.
 blockedBy:
-  - The withdrawn clause was what ac.task.single-owner.refuses-stranger and sds.task.ownership-guard were
-    proven against. Both need a live re-check against the split statements above, through
-    contract.share.completion-guard-for-task, before this rule is done again.
+  - {record: ac.task.single-owner.refuses-stranger, because: "The withdrawn clause was what ac.task.single-owner.refuses-stranger and sds.task.ownership-guard were proven against. Both need a live re-check against the split statements above, through contract.share.completion-guard-for-task, before this rule is done again."}
+  - {record: sds.task.ownership-guard, because: "The withdrawn clause was what ac.task.single-owner.refuses-stranger and sds.task.ownership-guard were proven against. Both need a live re-check against the split statements above, through contract.share.completion-guard-for-task, before this rule is done again."}
+  - {record: contract.share.completion-guard-for-task, because: "The withdrawn clause was what ac.task.single-owner.refuses-stranger and sds.task.ownership-guard were proven against. Both need a live re-check against the split statements above, through contract.share.completion-guard-for-task, before this rule is done again."}

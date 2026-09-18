@@ -1,0 +1,7 @@
+schema: work/gap
+id: gap.audit.operator-role
+title: No operator/admin role exists to authorize reading the log
+state: todo
+statement: The example has no operator/admin role today. data.login.person has no role field, and no
+  existing record establishes who, besides the log's owner, is authorized to read it.
+change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}

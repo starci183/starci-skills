@@ -3,10 +3,8 @@ id: impl.share.todo-app-backend.access
 title: The completion and deletion guards sharing adds
 state: todo
 repository: todo-app
-directory: src/share
+owners:
+  - {role: module, path: src/share}
 proves: [br.share.role.permissions, br.share.editor.no-delete]
 blockedBy:
-  - Not written yet. The example backend is moving to NestJS with its own architecture checks
-    (checks/architecture.mjs, checks/code-patterns/nest*.mjs); this module will live at
-    src/share/access.service.ts once that scaffold lands, and no prior .mjs draft is being carried
-    forward into it.
+  - {record: gap.share.unbuilt-module, because: "Not written yet. The example backend is moving to NestJS with its own architecture checks (checks/architecture.mjs, checks/code-patterns/nest*.mjs); this module will live at src/share/access.service.ts once that scaffold lands, and no prior .mjs draft is being carried forward into it."}

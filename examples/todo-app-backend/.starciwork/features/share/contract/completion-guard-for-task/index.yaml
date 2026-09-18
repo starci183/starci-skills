@@ -38,5 +38,5 @@ requiresProof:
     note: task proves fr.task.complete calls mayComplete instead of its own single-owner-only check.
 
 blockedBy:
-  - "Neither side exists yet: share's guard (this lane) and task's call site (fr.task.complete, blocked on
-    br.task.single-owner rev 2) are both todo. This contract records the shape they must meet once built."
+  - {record: fr.task.complete, rev: 2, because: "Neither side exists yet: share's guard (this lane) and task's call site (fr.task.complete, blocked on br.task.single-owner rev 2) are both todo. This contract records the shape they must meet once built."}
+  - {record: br.task.single-owner, rev: 2, because: "Neither side exists yet: share's guard (this lane) and task's call site (fr.task.complete, blocked on br.task.single-owner rev 2) are both todo. This contract records the shape they must meet once built."}

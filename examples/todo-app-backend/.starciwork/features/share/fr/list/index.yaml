@@ -15,8 +15,8 @@ composes:
   - {rule: br.share.revoke.on-read, module: src/share/invitation.service.ts}
   - {rule: br.share.invite.expiry, module: src/share/invitation.service.ts}
 blockedBy:
-  - br.share.revoke.on-read and br.share.invite.expiry are both todo; the NestJS module they compose does
-    not exist yet.
+  - {record: br.share.revoke.on-read, because: "br.share.revoke.on-read and br.share.invite.expiry are both todo; the NestJS module they compose does not exist yet."}
+  - {record: br.share.invite.expiry, because: "br.share.revoke.on-read and br.share.invite.expiry are both todo; the NestJS module they compose does not exist yet."}
 
 requiresProof:
   unit:

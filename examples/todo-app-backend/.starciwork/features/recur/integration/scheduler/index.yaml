@@ -21,5 +21,4 @@ requiresProof:
       not a manually invoked function call standing in for the tick.
 
 blockedBy:
-  - Not implemented. There is no NestJS scheduler module for this feature yet, so there is no tick to run
-    against.
+  - {record: gap.recur.unbuilt-module, because: "Not implemented. There is no NestJS scheduler module for this feature yet, so there is no tick to run against."}

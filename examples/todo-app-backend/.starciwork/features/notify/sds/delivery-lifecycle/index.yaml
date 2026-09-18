@@ -68,5 +68,4 @@ requiresProof:
     forEach: stateMachine.transitions
 
 blockedBy:
-  - No implementation exists. The example is moving to a NestJS backend and this component has not been
-    built against that layout, so every transition is unproven design rather than demonstrated behavior.
+  - {record: gap.notify.unbuilt-module, because: "No implementation exists. The example is moving to a NestJS backend and this component has not been built against that layout, so every transition is unproven design rather than demonstrated behavior."}

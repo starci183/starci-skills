@@ -29,5 +29,4 @@ requiresProof:
     required: true
 
 blockedBy:
-  - No module exists yet at src/plan/reconcile; the example backend is moving to NestJS and this flow is
-    specified but not built.
+  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/reconcile; the example backend is moving to NestJS and this flow is specified but not built."}

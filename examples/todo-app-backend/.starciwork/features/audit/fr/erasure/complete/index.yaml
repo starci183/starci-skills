@@ -27,5 +27,6 @@ requiresProof:
     required: true
 
 blockedBy:
-  - decision.audit.erasure-method is open; the same gap fr.audit.erasure.request records.
-  - No implementation exists yet under the NestJS layout the example is moving to.
+  - {record: decision.audit.erasure-method, because: "decision.audit.erasure-method is open; the same gap fr.audit.erasure.request records."}
+  - {record: fr.audit.erasure.request, because: "decision.audit.erasure-method is open; the same gap fr.audit.erasure.request records."}
+  - {record: gap.audit.unbuilt-module, because: "No implementation exists yet under the NestJS layout the example is moving to."}
