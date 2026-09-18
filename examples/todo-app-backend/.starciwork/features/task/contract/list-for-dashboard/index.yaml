@@ -17,13 +17,18 @@ consumerObligations:
   - The dashboard renders counts and never derives a task list from them.
 refs: [br.task.list.owned]
 
-# decision.task.list.scope is now decided (owner-only: this product has no organization concept, so a
-# list is unconditionally the reader's own tasks), which is exactly br.task.list.owned's own statement.
-# This contract's guarantee that counts obey that rule still cannot honestly move to done ahead of it -
-# br.task.list.owned itself is todo and unproven - but br.task.list.owned is an ordinary record with no
-# gap or open decision of its own to name as the reason, so no blockedBy edge is authored onto it here
-# (a dead-end edge is a warned, not refused, shape, but this lane's own scope is to bring the tree's
-# BLOCKER_UNROOTED count down, not add to it for a record no gap has been written against yet).
+# decision.task.list.scope is decided (owner-only), and br.task.list.owned - the rule this contract's
+# single guarantee rests on - is now done, so the reason this record's earlier comment gave for
+# holding back is gone. The provider half is built and proven: TaskCountsQuery/TaskCountsHandler
+# (src/modules/bussiness/task) implement the countsFor shape, exposed on the one door a dashboard can
+# reach - the GraphQL taskCounts query (src/features/todo/graphql/queries/task/task-counts), which
+# takes no person argument and counts for the session actor only; two named contract.task.list-for-
+# dashboard.* unit tests plus a live signed-in probe (counts moved 0/0 -> 1/0 -> 0/1 across a real
+# completion, unauthenticated reads refused with SESSION_NOT_FOUND) run against an API built from
+# this source tree; the provider assertions are carried in impl.task.todo-app-backend.list's
+# evidence.yaml. What keeps this record todo is the consumer half: `requiresProof.consumer` names the
+# dashboard, and no dashboard record, module or screen exists in any lane of this tree to do the
+# reading. requiresProof is untouched acceptance data - this lane cannot invent the consumer.
 requiresProof:
   provider: {required: true}
   consumer: {required: true}

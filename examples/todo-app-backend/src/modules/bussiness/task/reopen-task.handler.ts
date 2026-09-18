@@ -4,8 +4,8 @@ import { TaskService } from './task.service';
 import { ReopenTaskCommand, ReopenTaskCommandResult } from './reopen-task.command';
 
 /**
- * br.task.complete.once (rev 2, still todo): "the owner may reopen a task they completed" is the
- * reversible statement this record is waiting on proof for. This handler is that reopen path: the task
+ * br.task.complete.once (rev 2, done): "the owner may reopen a task they completed" is the
+ * reversible statement that record now carries proof for. This handler is that reopen path: the task
  * reads incomplete again and its completion timestamp is cleared.
  *
  * No event is published here: unlike created/completed/deleted, the work tree declares no

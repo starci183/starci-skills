@@ -1,5 +1,6 @@
 import { DynamicModule } from '@nestjs/common';
 import { ListTasksSingleQueryModule } from './task/list-tasks/list-tasks.module';
+import { TaskCountsSingleQueryModule } from './task/task-counts/task-counts.module';
 import { CollaboratorsSingleQueryModule } from './share/collaborators/collaborators.module';
 import { UpcomingOccurrencesSingleQueryModule } from './recur/upcoming-occurrences/upcoming-occurrences.module';
 import { NotificationPreferencesSingleQueryModule } from './notify/notification-preferences/notification-preferences.module';
@@ -11,6 +12,7 @@ import { PlanUsageSingleQueryModule } from './plan/plan-usage/plan-usage.module'
  * `queries/index.ts` gathers `QUERY_MODULES`. */
 export const QUERY_MODULES: Array<DynamicModule | (new () => unknown)> = [
   ListTasksSingleQueryModule.register({}),
+  TaskCountsSingleQueryModule.register({}),
   CollaboratorsSingleQueryModule.register({}),
   UpcomingOccurrencesSingleQueryModule.register({}),
   NotificationPreferencesSingleQueryModule.register({}),

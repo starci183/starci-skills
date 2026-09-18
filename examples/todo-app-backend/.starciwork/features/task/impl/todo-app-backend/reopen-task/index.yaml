@@ -1,13 +1,16 @@
 schema: work/implementation
 id: impl.task.todo-app-backend.reopen-task
 title: The reopen-task feature
-state: todo
+state: done
 repository: todo-app
 owners:
   - {role: feature, path: src/modules/bussiness/task}
 revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
-# Not proven done: br.task.complete.once is todo at rev 2 (the reversible statement this code implements
-# has no evidence of its own yet), and there is no fr.task.reopen or equivalent functional-requirement
-# record this feature could point to as proven. The code is real and unit-tested (see the sibling test file under src/modules/bussiness/task), but
-# nothing this record could name as "proves" is itself done.
-proves: []
+# Done: this handler is the implementation of br.task.complete.once's reversible statement (owner
+# reopens, task reads incomplete, completedAt cleared - ac.task.complete.once.is-reversible in
+# reopen-task.handler.spec.ts, plus the live scripts/live-proof.sh reopenTask step against an API
+# built from this source tree) and of sds.task.completion-state's t-reopen transition (named test in
+# task.service.spec.ts, plus the widened-authority reopen case in completion-authority.spec.ts). The
+# old comment claiming "there is no fr.task.reopen ... record" was stale - fr.task.reopen exists and
+# stays todo on its own requiresProof (e2e script absent from this repository, no uat flow yet).
+proves: [br.task.complete.once, sds.task.completion-state]

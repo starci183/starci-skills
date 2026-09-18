@@ -15,13 +15,20 @@ composes:
   - {rule: br.share.role.permissions, module: src/share/access.service.ts}
 refs: [contract.share.completion-guard-for-task]
 blockedBy:
-  - {record: br.task.complete.once, rev: 2, because: "br.task.complete.once is todo at rev 2; its reversible statement has no evidence yet."}
-  - {record: br.task.single-owner, rev: 2, because: "br.task.single-owner is todo at rev 2; the split it made between complete and delete is not proven."}
+  - {record: br.task.single-owner, rev: 2, because: "br.task.single-owner is still todo at rev 2: its proof is captured and passing (see its evidence.yaml and gap.task.share-edge-hold), but the record's done flag is held by that mechanical out-of-lane edge, and a composed flow does not outrun a rule that is not yet done."}
   # gap.task.collaborator-completion closed (lane be-share): share's guard now exists and is tested
   # (impl.share.todo-app-backend.access, contract.share.completion-guard-for-task's provider half). This
   # flow's own call into it - through task's CompletionAuthorityRegistry seam - still needs its
   # composed proof re-run by lane login-impl/task (br.task.single-owner rev 2 above already covers why),
   # so this record stays blocked on the two entries above rather than a third, now-resolved one.
+# The blockedBy onto br.task.complete.once rev 2 is dropped: that rule is now done at rev 2, its
+# reversible statement is proven (that was the edge's whole text), and the layout refuses an edge
+# onto a done record. What still keeps this flow todo is br.task.single-owner's held flag above,
+# requiresProof.e2e (the named `npm run test:e2e -- tasks/complete` script does not exist in this
+# repository; the live boundary steps of scripts/live-proof.sh cover the same behavior against an
+# API built from this tree, but requiresProof is acceptance data and is left untouched per this op's
+# rules), and requiresProof.uat (no uat.flow for completing a task exists under features/task/uat/**
+# - uat.task.create is the only one, and it is itself blocked by gap.task.live-proof).
 
 requiresProof:
   unit:

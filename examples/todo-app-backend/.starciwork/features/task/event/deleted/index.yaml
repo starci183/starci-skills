@@ -1,7 +1,7 @@
 schema: work/event
 id: event.task.deleted
 title: A task was deleted
-state: todo
+state: done
 producer: br.task.delete.final
 payload:
   - {name: taskId, type: text}
@@ -19,3 +19,9 @@ change:
     to this exact event on the platform event bus and turns it into an appended log line
     (fr.audit.log.append), proven in that module's own audit-event.subscriber.spec.ts. This record's
     own state is left for task's lane to advance."
+# State advanced by task's lane: DeleteTaskHandler publishes this exact payload only after the row is
+# gone (the named event.task.deleted test in delete-task.handler.spec.ts asserts taskId, ownerId, a
+# Date deletedAt and a non-empty sourceEventId, with the read-back refusal asserted by the same
+# file's stays-gone test - the sibling evidence.yaml carries the fresh capture). The producer,
+# br.task.delete.final, is done; the subscriber named by rev 2 (audit) is done. delivery is scoped to
+# the live process, per event-bus.providers.ts's own comment, same as event.task.created's note says.
