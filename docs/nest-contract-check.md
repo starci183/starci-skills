@@ -5,7 +5,9 @@
 - `BE_PUBLIC_CONTRACT_FORM` checks callable capability APIs resolved from explicit
 owner public entries and exported domain-first `*.use-case.ts` classes. Public
 functions, methods, callable properties and getters are included. Parameters
-and results must be explicit. Positional primitives remain valid;
+and results must be explicit. Positional primitives remain valid, including
+`boolean`, whose `true | false` internal representation is not treated as an
+authored inline union;
   object, union and intersection boundaries use named declarations. The checker
   unwraps standard `Promise`, `Awaited`, `Readonly`, array and readonly-array
   containers and applies concrete generic arguments to inherited `execute`

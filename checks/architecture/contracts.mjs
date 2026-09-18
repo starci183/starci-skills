@@ -299,6 +299,7 @@ function contractTypeStatusFromType(ts, checker, type, seen = new Set(), depth =
   if (type.aliasSymbol) return 'named';
   if (type.symbol?.getDeclarations?.().some(declaration => ts.isEnumDeclaration(declaration))) return 'named';
   if (type.flags & ts.TypeFlags.TypeParameter) return 'named';
+  if (type.flags & ts.TypeFlags.Boolean) return 'scalar';
   if (type.flags & (ts.TypeFlags.Union | ts.TypeFlags.Intersection)) return 'inline';
   if (type.flags & ts.TypeFlags.Object) {
     if (checker.isTupleType?.(type)) return 'inline';

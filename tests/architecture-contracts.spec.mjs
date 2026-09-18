@@ -320,3 +320,20 @@ export class LeakyException extends AbstractException {
   assert.equal(result.coverage.publicContracts.status, 'unavailable', JSON.stringify(result, null, 2));
   assert.ok((result.coverage.publicContracts.details ?? []).some(item => /LeakyException\.leak/.test(item)), JSON.stringify(result, null, 2));
 });
+
+test('classifies a boolean return as a primitive rather than an inline union', t => {
+  const root = fixture(t, {
+    'src/features/orders/index.ts': `
+export { PingCapability } from './application/ping.service';
+`,
+    'src/features/orders/application/ping.service.ts': `
+export class PingCapability {
+  ping():boolean{return true}
+  isReady(flag:boolean):boolean{return flag}
+}
+`,
+  });
+  const result = check(root);
+  assert.deepEqual(result.violations, [], JSON.stringify(result, null, 2));
+  assert.equal(result.coverage.publicContracts.status, 'checked', JSON.stringify(result, null, 2));
+});
