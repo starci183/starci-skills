@@ -30,6 +30,38 @@ exceptions:
       Rendered vps environment for the todo-app-backend application stack;
       starci/rendered-environment output of application-stacks.yaml, JSON by
       the rendering contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T061141Z-af3dfbbc/cleanup.json
+    reason: >
+      starci/uat-cleanup@1 output written by the Playwright uat harness
+      (examples/todo-app-frontend/uat/lib/run-writer.ts) for the real
+      uat.login.sign-in run; a captured run receipt, JSON by the harness's
+      own writer contract, the same shape as the docs/examples/v4-live-proof
+      receipts above.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T061141Z-af3dfbbc/flows.json
+    reason: >
+      starci/uat-flows@1 output written by the Playwright uat harness for the
+      real uat.login.sign-in run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T061141Z-af3dfbbc/readback.json
+    reason: >
+      starci/uat-readback@1 output written by the Playwright uat harness for
+      the real uat.login.sign-in run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T061141Z-af3dfbbc/run-ledger.json
+    reason: >
+      starci/uat-run-ledger@1 output written by the Playwright uat harness for
+      the real uat.login.sign-in run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T061141Z-af3dfbbc/ux-checks.json
+    reason: >
+      starci/uat-ux-checks@1 output written by the Playwright uat harness for
+      the real uat.login.sign-in run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T061141Z-af3dfbbc/walk.json
+    reason: >
+      starci/uat-walk@1 output written by the Playwright uat harness for the
+      real uat.login.sign-in run; a captured run receipt, JSON by the
+      harness's own writer contract.
   - path: examples/todo-app-backend/.starciwork/ledger-anchor.json
     reason: >
       Illustrative runtime ledger anchor for the example Work tree; the real
@@ -55,6 +87,8 @@ exceptions:
     reason: npm package manifest for the frontend's grammar workspace package; Node/npm require JSON filename and syntax.
   - path: examples/todo-app-frontend/tsconfig.json
     reason: TypeScript project config for the real todo-app-frontend example; tsc expects a JSON tsconfig file.
+  - path: examples/todo-app-frontend/uat/tsconfig.json
+    reason: TypeScript project config for the Playwright uat harness; tsc expects a JSON tsconfig file.
   - path: knowledge/ui/proof/calibration/calibration.json
     reason: >
       Explicit calibration dataset exception enforced by
