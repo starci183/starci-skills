@@ -49,6 +49,8 @@ export class AppConfigService {
    * live-proof run can observe a real tick without a 5-minute wait; production never sets this. */
   getRecurTickCron(): string {
     return process.env.RECUR_TICK_CRON ?? DEFAULT_RECUR_TICK_CRON;
+  }
+
   /** integration.notify.smtp: the SMTP submission host. No dev host is declared in
    * application-stacks.yaml at this commit (see that record's `sandbox` note), so this default names
    * nothing real - a live run only proceeds if SMTP_HOST is actually set to a reachable host. */
@@ -68,6 +70,8 @@ export class AppConfigService {
   /** integration.notify.queue: the dev stack's own Redis (component `redis`, port 6379). */
   getRedisUrl(): string {
     return process.env.REDIS_URL ?? DEFAULT_REDIS_URL;
+  }
+
   getSepayBaseUrl(): string {
     return process.env.SEPAY_BASE_URL ?? DEFAULT_SEPAY_BASE_URL;
   }

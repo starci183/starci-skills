@@ -5,21 +5,22 @@ import { AppConfigService, ConfigModule } from '../../../config';
 import { ConfigurableModuleClass, OPTIONS_TYPE } from './primary.module-definition';
 import { POSTGRESQL_PRIMARY } from './constants/connection';
 import { PostgresPrimaryClient } from './primary.client';
-<<<<<<< HEAD
-import { SessionEntity, TaskEntity, ShareInvitationEntity } from './entities';
-import { OccurrenceEntity, RuleEntity, SessionEntity, TaskEntity } from './entities';
 import {
-  NotifyDeliveryAttemptEntity,
-  NotifyDigestWindowEntity,
-  NotifyNotificationEntity,
-  NotifyPreferenceEntity,
   SessionEntity,
   TaskEntity,
+  ShareInvitationEntity,
+  RuleEntity,
+  OccurrenceEntity,
+  NotifyNotificationEntity,
+  NotifyDeliveryAttemptEntity,
+  NotifyPreferenceEntity,
+  NotifyDigestWindowEntity,
+  AuditLogLineEntity,
+  AuditKeyEntity,
+  AuditErasureRequestEntity,
+  SubscriptionEntity,
+  PaymentIntentEntity,
 } from './entities';
-import { SessionEntity, TaskEntity, AuditLogLineEntity, AuditKeyEntity, AuditErasureRequestEntity } from './entities';
-=======
-import { SessionEntity, TaskEntity, SubscriptionEntity, PaymentIntentEntity } from './entities';
->>>>>>> ex-be-plan
 
 /**
  * integration.login.postgres / data.task.task: this is the one platform database module, under nivo's
@@ -43,21 +44,22 @@ export class PostgresqlPrimaryModule extends ConfigurableModuleClass {
           useFactory: (config: AppConfigService) => ({
             type: 'postgres' as const,
             url: config.getDatabaseUrl(),
-<<<<<<< HEAD
-            entities: [SessionEntity, TaskEntity, ShareInvitationEntity],
-            entities: [SessionEntity, TaskEntity, RuleEntity, OccurrenceEntity],
             entities: [
               SessionEntity,
               TaskEntity,
+              ShareInvitationEntity,
+              RuleEntity,
+              OccurrenceEntity,
               NotifyNotificationEntity,
               NotifyDeliveryAttemptEntity,
               NotifyPreferenceEntity,
               NotifyDigestWindowEntity,
+              AuditLogLineEntity,
+              AuditKeyEntity,
+              AuditErasureRequestEntity,
+              SubscriptionEntity,
+              PaymentIntentEntity,
             ],
-            entities: [SessionEntity, TaskEntity, AuditLogLineEntity, AuditKeyEntity, AuditErasureRequestEntity],
-=======
-            entities: [SessionEntity, TaskEntity, SubscriptionEntity, PaymentIntentEntity],
->>>>>>> ex-be-plan
             migrations: [join(__dirname, 'migrations', '*.{js,ts}')],
             migrationsRun: true,
             synchronize: false,
