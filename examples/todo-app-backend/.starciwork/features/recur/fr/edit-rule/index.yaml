@@ -1,0 +1,29 @@
+schema: work/functional-requirement
+id: fr.recur.edit-rule
+title: Edit a recurring rule
+state: todo
+actors: [owner]
+trigger: The owner changes a rule's frequency, time of day or time zone.
+mainFlow:
+  - The owner submits the changed fields.
+  - The rule is updated; every occurrence already materialised is left as it is.
+  - Occurrences not yet materialised are generated from the new rule the next time the generator runs.
+exceptionFlows:
+  - Someone who is not the rule's owner may not edit it.
+postconditions:
+  - The rule reflects the new schedule, and no already-materialised occurrence is rewritten to match it.
+composes:
+  - {rule: br.recur.occurrence.owned-by-rule-owner, module: src/recur/occurrence}
+refs: [data.recur.rule]
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- recur/edit-rule
+  uat:
+    required: true
+
+blockedBy:
+  - No implementation yet. The example's backend target moved to NestJS and this feature has not been
+    built there.

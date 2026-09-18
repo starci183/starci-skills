@@ -1,0 +1,9 @@
+schema: work/ui-screen
+id: ui.recur.schedule
+title: A recurring task's schedule
+state: todo
+states: [no-rule, active, ended, refused]
+brand: {rev: 2}
+refs: [fr.recur.make-recurring, fr.recur.see-upcoming, fr.recur.end-rule]
+blockedBy:
+  - No implementation yet. The frontend target moved to Next.js and this screen has not been built there.

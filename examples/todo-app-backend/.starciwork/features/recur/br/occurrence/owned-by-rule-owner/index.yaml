@@ -1,0 +1,15 @@
+schema: work/business-rule
+id: br.recur.occurrence.owned-by-rule-owner
+title: An occurrence belongs to the rule's owner
+state: todo
+statements:
+  - Every occurrence a rule materialises carries the owner of that rule, bound at materialisation and
+    never rewritten.
+  - Only that owner may complete or skip the occurrence; anyone else's attempt is refused and the
+    occurrence is unchanged.
+acceptanceCriteria: [refuses-non-owner]
+module: src/recur/occurrence
+change: {rev: 1, kind: initial, at: 2026-09-18T05:12:00.000Z}
+blockedBy:
+  - No implementation yet. The example's backend target moved to NestJS and this feature has not been
+    built there; there is no occurrence store to guard.

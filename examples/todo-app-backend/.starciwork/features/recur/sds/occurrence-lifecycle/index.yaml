@@ -1,0 +1,66 @@
+schema: work/sds-component
+id: sds.recur.occurrence-lifecycle
+title: How an occurrence is born, finished, and outlives its rule
+state: todo
+responsibility: "Holds one row per materialised occurrence, its owner, its due instant and its status.
+  \"scheduled\" is not a row: an occurrence a rule will fire on next week is a date the generator has not
+  reached yet, computed live from the rule (see sds.recur.generation-engine), not a pending record someone
+  could act on early."
+interfaces:
+  - The recur module is the only writer of an occurrence row; every other reader goes through it.
+refs: [br.recur.generation.once, br.recur.occurrence.owned-by-rule-owner, br.recur.ending.preserves-history]
+dependsOn: [integration.recur.scheduler, integration.login.postgres]
+
+stateMachine:
+  states: [scheduled, materialised, completed, skipped, orphaned]
+  initial: scheduled
+  terminal: [completed, skipped, orphaned]
+  transitions:
+    - id: t-materialise
+      from: scheduled
+      to: materialised
+      on: generation-run
+      guard: The rule fires on this local date and no row exists yet for this rule's windowKey on it.
+      effect: One row is written with its dueAtUtc resolved from the rule's zone and local time
+        (decision.recur.timezone.anchor), and its windowKey (decision.recur.occurrence.identity). A second
+        call with the same rule and local date changes nothing (br.recur.generation.once).
+    - id: t-complete
+      from: materialised
+      to: completed
+      on: owner-completes
+      guard: The actor is the rule's owner (br.recur.occurrence.owned-by-rule-owner).
+      effect: complete becomes true and completedAt is set.
+    - id: t-skip
+      from: materialised
+      to: skipped
+      on: owner-skips
+      guard: The actor is the rule's owner.
+      effect: The occurrence is marked skipped without being marked complete.
+    - id: t-orphan
+      from: materialised
+      to: orphaned
+      on: rule-ended
+      guard: The owning rule's endedAt local date is on or before this occurrence's localDate, and the
+        occurrence is still materialised (br.recur.ending.preserves-history).
+      effect: The row is kept, only its status changes; nothing is deleted.
+
+sequence:
+  participants: [scheduler, generator, store, owner]
+  steps:
+    - {from: scheduler, to: generator, message: "tick fires at the configured interval, observable: timer"}
+    - {from: generator, to: store, message: "materialise every date the rule fires on since the last run through now, observable: write"}
+    - {from: owner, to: store, message: "PATCH the occurrence complete or skip, observable: http"}
+    - {from: store, to: owner, message: "the occurrence's new status, or a refusal naming why, observable: http"}
+  note: Only interactions an end-to-end run can observe are bound here, the same convention
+    sds.login.session-store uses. How the generator walks dates internally (rule.mjs's calendar walk) is
+    the implementation's business, not a sequence step.
+
+requiresProof:
+  implementation:
+    required: true
+  transitions:
+    forEach: stateMachine.transitions
+
+blockedBy:
+  - No implementation yet. The example's backend target moved to NestJS and this feature has not been
+    built there; none of these five transitions has a function behind it.

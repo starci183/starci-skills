@@ -1,0 +1,23 @@
+schema: work/non-functional-requirement
+id: nfr.recur.generation.timeliness
+title: A due occurrence is materialised close to its due instant
+quality: timeliness
+state: todo
+observableCriterion: A rule's occurrence is materialised within 5 minutes of its dueAtUtc for at least 95%
+  of occurrences over a rolling 7-day window, measured on the dev server's own scheduler tick, excluding
+  occurrences produced by a backfill run after a scheduler outage (those are measured separately, against
+  decision.recur.generation.backfill, not against this window).
+measurement:
+  how: Compare each occurrence's dueAtUtc to the createdAt of the row the generator wrote for it, over
+    every occurrence materialised by the live integration.recur.scheduler tick in the window.
+  threshold: p95 lag < 5 minutes
+  environment: dev
+appliesTo: [br.recur.generation.once]
+refs: [integration.recur.scheduler]
+
+requiresProof:
+  measurement:
+    required: true
+
+blockedBy:
+  - No implementation yet; there is no scheduler tick or generator to measure against.

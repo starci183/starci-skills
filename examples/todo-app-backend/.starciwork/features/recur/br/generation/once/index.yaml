@@ -1,0 +1,17 @@
+schema: work/business-rule
+id: br.recur.generation.once
+title: A rule never produces two occurrences for one window
+state: todo
+statements:
+  - Running the generator twice for a window that overlaps a previous run creates no second occurrence
+    for any date that run already covered.
+  - "What makes two runs agree on \"the same occurrence\" is decision.recur.occurrence.identity: the rule
+    id plus the occurrence's local calendar date."
+authorityRefs:
+  - "product-intent: A generator that can be safely re-run is the only kind that can also be safely retried after a crash."
+acceptanceCriteria: [is-idempotent-on-rerun]
+module: src/recur/generator
+change: {rev: 1, kind: initial, at: 2026-09-18T05:10:00.000Z}
+blockedBy:
+  - No implementation yet. The example's backend target moved to NestJS and this feature has not been
+    built there; there is no generator module to run twice.

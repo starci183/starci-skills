@@ -8,4 +8,7 @@ features:
   - id: task
     directory: features/task
     description: A task a person creates, completes and deletes.
+  - id: recur
+    directory: features/recur
+    description: A task that comes back on a schedule the owner set.
 
