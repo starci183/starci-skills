@@ -1,6 +1,7 @@
 Screen: The notification preferences screen (notify.preferences), route /notify/preferences, actor: owner
 State: refused - save fails, for example a stale link
-Behavior to depict: a GrammarMessage(tone: danger) appears above the toggle; the toggle keeps its pre-save value
+Behavior to depict: an assertive-live line of copy appears above the digest control stating the save
+failed; the control keeps its pre-save value
 
 Business grounding (accepted, do not invent beyond these):
   - fr.notify.unsubscribe
@@ -14,18 +15,33 @@ Brand (brand/index.yaml rev 2, read do not restate elsewhere):
 Relevant UI knowledge:
   - knowledge/ui/proof/brand.yaml (BRAND-1, BRAND-2, BRAND-3)
 
-Actual installed Grammar anatomy (@todo-app/grammar (examples/todo-app-frontend/packages/grammar/src/index.tsx)) - depict exactly these components, no invented ones:
-  - GrammarButton (toggle proxy: on/off submit)
-  - GrammarButton (save)
-  - GrammarMessage (tone: danger, refused only)
-  - GrammarButton {type, isDisabled?, onClick?, children: string}
-  - GrammarTextField {id, label, kind?, value, onChange}
-  - GrammarMessage {tone: 'danger', children: string | null} (role=alert on danger)
+Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
+examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
+9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components, no
+invented ones. No implementation exists for this screen yet (gap.notify has no frontend impl record at
+all), so this binding is drawn directly from the real export list: Common ships no switch/toggle
+renderer, so the digest control is an ordinary Button whose variant carries on/off, the same pattern the
+two proven blocks (sign-in-form, task-list) use for every stateful action:
+  - SurfaceCard {ariaLabel: "Notification preferences", measure: "formCompact"} - one bounded surface,
+    one setting per row inside it (`composition: "single"`), never a card per row
+  - Text {size: "sm"}, the row's own label copy, e.g. "Weekly digest emails"
+  - Button {type: "button", variant: subscribed ? "primary" : "secondary", isSkeleton (loading only)} - the
+    on/off action itself; Common has no dedicated Switch/Toggle export, so the row's toggle is this Button
+    reading its current value from its variant and its accessible label
+  - Button {type: "submit", variant: "primary", isPending} - the save action
+  - Text {live: "assertive"}, plain body copy carrying the refusal sentence - Common ships no Message/Alert
+    renderer and Text has no `tone: "danger"` value; severity is carried by the sentence and by
+    `aria-live="assertive"` alone
 
-Layout note: One setting per row, no card wrapper; the unsubscribe control must remain reachable without an active session per fr.notify.unsubscribe.
+Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
+GrammarButton/GrammarMessage anatomy, no HeroUI Switch component reached directly, no invented
+Alert/Toast/Banner or toggle switch Common does not ship.
+
+Layout note: One setting per row, no card wrapper; the unsubscribe control must remain reachable without
+an active session per fr.notify.unsubscribe.
 
 Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
 4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
-beyond brand/assets/**.
+beyond brand/assets/**; no switch/toggle control shape Common does not export.
 
 Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).

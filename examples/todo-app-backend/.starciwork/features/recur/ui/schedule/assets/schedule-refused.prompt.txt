@@ -1,6 +1,9 @@
 Screen: A recurring task's schedule (recur.schedule), route /tasks/:taskId/schedule, actor: owner
 State: refused - the submitted schedule is invalid, for example a weekend-only rule with no matching weekday
-Behavior to depict: a GrammarMessage(tone: danger) names the invalid field; the form retains the entered values
+Behavior to depict: an assertive-live line of copy names the invalid field beside the make-recurring form;
+the form retains the entered values. This state is reached only from no-rule (a rule has never been
+saved), so the upcoming-occurrences section and the end-rule action are not on screen - they only exist
+once a rule is active.
 
 Business grounding (accepted, do not invent beyond these):
   - fr.recur.make-recurring
@@ -16,18 +19,37 @@ Brand (brand/index.yaml rev 2, read do not restate elsewhere):
 Relevant UI knowledge:
   - knowledge/ui/composition/collection.yaml (COLLECTION-1, COLLECTION-2)
 
-Actual installed Grammar anatomy (@todo-app/grammar (examples/todo-app-frontend/packages/grammar/src/index.tsx)) - depict exactly these components, no invented ones:
-  - GrammarTextField (rule expression / time / timezone)
-  - GrammarButton (save rule / end rule)
-  - GrammarMessage (tone: danger, refused only)
-  - GrammarButton {type, isDisabled?, onClick?, children: string}
-  - GrammarTextField {id, label, kind?, value, onChange}
-  - GrammarMessage {tone: 'danger', children: string | null} (role=alert on danger)
+Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
+examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
+9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components, no
+invented ones. impl.recur.todo-app-frontend.schedule is still unbuilt (blockedBy gap.recur.unbuilt-module),
+so this binding is drawn directly from the real export list. This state shows only the make-recurring
+form:
+  - SurfaceCard {ariaLabel: "Schedule", measure: "formCompact"}
+  - Input {id: "recur-rule", name: "rule", label: "Repeat", kind: "text"}, the rule-expression field
+  - PressableField {label: "Time of day", placeholder: "Choose a time"}, the time-of-day picker trigger -
+    Common ships no time/select input, so a value the person opens a picker to choose is real
+    PressableField anatomy ("input ANATOMY, not a button variant... it never accepts text"), not an
+    invented `<select>` or dropdown Common does not export
+  - Text {live: "assertive"}, plain body copy carrying the invalid-field sentence - Common ships no
+    Message/Alert renderer and Text has no `tone: "danger"` value; severity is carried by the sentence and
+    by `aria-live="assertive"` alone
+  - Button {type: "submit", variant: "primary"}, the save-rule action
 
-Layout note: The upcoming-occurrences list is a page section with its own heading, never a card, per COLLECTION-1.
+Not depicted in this state (they belong to the active state, once a rule exists, not to a refused
+make-recurring submission): SectionHeader/SurfaceListCard's own `label` for the "Upcoming occurrences"
+list, StaticStateRow occurrence rows, and the end-rule Button.
+
+Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
+GrammarButton/GrammarTextField/GrammarMessage anatomy, no HeroUI component reached directly, no invented
+Alert/Toast/Banner, dropdown or date-select control Common does not ship.
+
+Layout note: The upcoming-occurrences list, when a rule is active, is its own page section named by
+SurfaceListCard's own `label` prop - the real published collection container per COLLECTION-1 case-5 - and
+never sits inside the make-recurring SurfaceCard.
 
 Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
 4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
-beyond brand/assets/**.
+beyond brand/assets/**; no dropdown/select control Common does not export.
 
 Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).

@@ -1,6 +1,7 @@
 Screen: The privacy screen - request erasure, export data (audit.privacy), route /privacy, actor: person
 State: erasure-refused - the erasure request is rejected, for example a hold applies
-Behavior to depict: a GrammarMessage(tone: danger) states the refusal reason; the request action remains available to retry once the hold clears
+Behavior to depict: an assertive-live line of copy states the refusal reason beside the two independent
+actions; the request action remains available to retry once the hold clears
 
 Business grounding (accepted, do not invent beyond these):
   - fr.audit.erasure.request
@@ -15,18 +16,34 @@ Brand (brand/index.yaml rev 2, read do not restate elsewhere):
 Relevant UI knowledge:
   - knowledge/ui/proof/brand.yaml (BRAND-1, BRAND-2, BRAND-3)
 
-Actual installed Grammar anatomy (@todo-app/grammar (examples/todo-app-frontend/packages/grammar/src/index.tsx)) - depict exactly these components, no invented ones:
-  - GrammarButton (export)
-  - GrammarButton (request erasure / confirm / cancel)
-  - GrammarMessage (tone: danger, erasure-refused; non-danger for pending/complete)
-  - GrammarButton {type, isDisabled?, onClick?, children: string}
-  - GrammarTextField {id, label, kind?, value, onChange}
-  - GrammarMessage {tone: 'danger', children: string | null} (role=alert on danger)
+Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
+examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
+9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components, no
+invented ones. No implementation block exists yet for this screen (impl.audit is backend-only so far), so
+this binding is drawn directly from the real export list and the two independent actions fr.audit.erasure.request
+and fr.audit.export name, following the same SurfaceCard/Button/Text composition the two proven blocks
+(sign-in-form, task-list) actually use:
+  - SurfaceCard {ariaLabel: "Privacy", measure: "formCompact"} - one bounded surface holding both
+    independent actions, `composition: "joined"` so export and erasure read as two divided bands of the
+    one subject, per COLLECTION-2 (a card presents one subject, in bands, not nested cards)
+  - Button {type: "button", variant: "secondary", isPending} - the export action
+  - Button {type: "button", variant: "outline"} - the request-erasure action; on press it is replaced in
+    place by a confirm/cancel pair, both still `Button` (variant: "primary" confirm, variant: "ghost"
+    cancel) - ButtonVariant has no destructive/danger option, so the confirm action is drawn as
+    `variant: "primary"`, not a red button Common does not ship
+  - Text {live: "assertive"}, plain body copy carrying the erasure-refused sentence - Common ships no
+    Message/Alert renderer and Text has no `tone: "danger"` value; severity is carried by the sentence
+    and by `aria-live="assertive"` alone
 
-Layout note: Two independent actions on one screen; never merge export and erasure into one control since they have separate acceptance criteria.
+Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
+GrammarButton/GrammarMessage anatomy, no HeroUI component reached directly, no invented Alert/Toast/Banner,
+no destructive-red button variant.
+
+Layout note: Two independent actions on one screen; never merge export and erasure into one control since
+they have separate acceptance criteria.
 
 Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
 4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
-beyond brand/assets/**.
+beyond brand/assets/**; no red/destructive button paint Common's ButtonVariant does not define.
 
 Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).

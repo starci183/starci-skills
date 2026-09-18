@@ -1,6 +1,7 @@
 Screen: The sign-in screen (login.sign-in), route /login, actor: person
 State: refused - server rejects the credentials or the account is unknown
-Behavior to depict: a single uniform GrammarMessage(tone: danger) appears above the form; the password field clears, the email is retained
+Behavior to depict: a single line of assertive-live copy appears above the submit action stating the
+credentials were refused; the password field clears, the email is retained
 
 Business grounding (accepted, do not invent beyond these):
   - fr.login.sign-in
@@ -14,19 +15,36 @@ Brand (brand/index.yaml rev 2, read do not restate elsewhere):
 Relevant UI knowledge:
   - knowledge/ui/proof/brand.yaml (BRAND-1, BRAND-2, BRAND-3)
 
-Actual installed Grammar anatomy (@todo-app/grammar (examples/todo-app-frontend/packages/grammar/src/index.tsx)) - depict exactly these components, no invented ones:
-  - GrammarTextField (email)
-  - GrammarTextField (password, kind: password)
-  - GrammarButton (type: submit)
-  - GrammarMessage (tone: danger, refused only)
-  - GrammarButton {type, isDisabled?, onClick?, children: string}
-  - GrammarTextField {id, label, kind?, value, onChange}
-  - GrammarMessage {tone: 'danger', children: string | null} (role=alert on danger)
+Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
+examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
+9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components,
+verified against the real consuming block at examples/todo-app-frontend/src/components/blocks/sign-in-form/component.tsx,
+no invented ones:
+  - SurfaceCard {ariaLabel: "Sign in", measure: "formCompact"} - the one bounded surface for the whole form,
+    a `depth: "top"` card with no nested card inside it
+  - Input {id: "sign-in-email", name: "email", label: "Email", kind: "email", value, isDisabled, onValueChange}
+  - Input {id: "sign-in-password", name: "password", label: "Password", kind: "password", value, isDisabled,
+    onValueChange}
+  - Text {live: "assertive"}, plain body copy carrying the refusal sentence - Common ships no separate
+    Message/Alert renderer and Text has no `tone: "danger"` value (TextTone is default | muted | accent
+    only); severity is carried by the sentence itself and by `aria-live="assertive"`, not by colour or a
+    `role="alert"` that this package does not set
+  - Button {type: "submit", variant: "primary", width: "fill", isDisabled, isPending} - label reads
+    "Signing in..." while isPending, "Sign in" otherwise; no separate spinner primitive, the pending
+    affordance is the button's own state
 
-Layout note: A single centred form, no page chrome besides the product wordmark; this is the only unauthenticated screen.
+Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
+GrammarButton/GrammarTextField/GrammarMessage anatomy, no HeroUI component reached directly, no invented
+Alert/Toast/Banner.
+
+Layout note: A single centred form, no page chrome besides the product wordmark; this is the only
+unauthenticated screen. The mounting page wraps the card in GrammarRoot > main > Heading(level: 1,
+"Sign in") per examples/todo-app-frontend/src/features/pages/sign-in/index.tsx - draw that heading above
+the card, not a logotype lockup the package does not ship.
 
 Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
 4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
-beyond brand/assets/**.
+beyond brand/assets/**; no role="alert" badge or icon bolted onto the Text line - Common's own refusal
+anatomy is a plain assertive-live sentence, nothing more.
 
 Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).

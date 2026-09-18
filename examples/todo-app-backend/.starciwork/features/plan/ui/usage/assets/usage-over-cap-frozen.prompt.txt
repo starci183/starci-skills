@@ -1,6 +1,7 @@
 Screen: The usage screen and its upgrade action (plan.usage), route /plan/usage, actor: owner
 State: over-cap-frozen - a create was attempted at the cap and refused
-Behavior to depict: a GrammarMessage(tone: danger) names the cap and the upgrade path; the upgrade GrammarButton is the primary action
+Behavior to depict: an assertive-live line of copy names the cap and the upgrade path beside a prominent
+usage figure; the upgrade action is the primary action on the screen
 
 Business grounding (accepted, do not invent beyond these):
   - fr.plan.usage.view
@@ -15,14 +16,29 @@ Brand (brand/index.yaml rev 2, read do not restate elsewhere):
 Relevant UI knowledge:
   - knowledge/ui/proof/brand.yaml (BRAND-1, BRAND-2, BRAND-3)
 
-Actual installed Grammar anatomy (@todo-app/grammar (examples/todo-app-frontend/packages/grammar/src/index.tsx)) - depict exactly these components, no invented ones:
-  - GrammarButton (upgrade)
-  - GrammarMessage (tone: danger, over-cap-frozen only)
-  - GrammarButton {type, isDisabled?, onClick?, children: string}
-  - GrammarTextField {id, label, kind?, value, onChange}
-  - GrammarMessage {tone: 'danger', children: string | null} (role=alert on danger)
+Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
+examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
+9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components, no
+invented ones. impl.plan.todo-app-frontend.usage is still unbuilt (blockedBy gap.plan.unbuilt-module), so
+this binding is drawn directly from the real export list rather than an existing block:
+  - SurfaceCard {ariaLabel: "Usage", measure: "formCompact"}
+  - Text {size: "metric-lead"}, the resolved usage-count figure (TextSize includes "metric-lead"
+    specifically for a prominent metric; this is the correct real primitive for the highest-conversion
+    figure on the screen, not a heading)
+  - Progress {label: "Tasks used against your free plan cap", value}, the full-width completion bar
+    showing consumed cap; Progress is the real accessible measurement primitive, not an invented gauge
+  - Text {live: "assertive"}, plain body copy carrying the cap-and-upgrade sentence - Common ships no
+    Message/Alert renderer and Text has no `tone: "danger"` value; severity is carried by the sentence and
+    by `aria-live="assertive"` alone
+  - Button {type: "button", variant: "primary"}, the upgrade action - the primary-emphasis action on the
+    screen, sitting beside the Text line per the layout note, not below the fold
 
-Layout note: This is the highest-conversion moment in the product; the upgrade GrammarButton must sit beside the danger message, not below the fold.
+Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
+GrammarButton/GrammarMessage anatomy, no HeroUI component reached directly, no invented Alert/Toast/Banner
+or a custom progress ring Common does not ship.
+
+Layout note: This is the highest-conversion moment in the product; the upgrade Button must sit beside the
+Text refusal line, not below the fold.
 
 Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
 4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
