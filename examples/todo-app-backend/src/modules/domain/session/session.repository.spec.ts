@@ -1,26 +1,34 @@
+import { Repository } from 'typeorm';
 import { AppConfigService } from '../../platform/config';
-import { SessionRow, SessionRowStore } from './session-row-store';
+import { SessionEntity } from '../../integrations/postgres';
 import { SessionRepository } from './session.repository';
 
-class FakeSessionStore implements SessionRowStore {
-  private readonly byToken = new Map<string, SessionRow>();
+/**
+ * A minimal in-memory stand-in for Repository<SessionEntity>: only the three methods SessionRepository
+ * actually calls. It is not a real TypeORM repository, so it is cast through `unknown` at the injection
+ * site rather than claimed to satisfy the full Repository surface.
+ */
+class FakeSessionRepository {
+  private readonly byToken = new Map<string, SessionEntity>();
 
-  async findOneBy(where: { token: string }): Promise<SessionRow | null> {
+  async findOneBy(where: { token: string }): Promise<SessionEntity | null> {
     return this.byToken.get(where.token) ?? null;
   }
 
-  async save(row: SessionRow): Promise<SessionRow> {
-    this.byToken.set(row.token, row);
-    return row;
+  async save(row: Partial<SessionEntity>): Promise<SessionEntity> {
+    const entity = row as SessionEntity;
+    this.byToken.set(entity.token, entity);
+    return entity;
   }
 
-  async delete(token: string): Promise<unknown> {
-    return this.byToken.delete(token);
+  async delete(token: string): Promise<void> {
+    this.byToken.delete(token);
   }
 }
 
 describe('SessionRepository', () => {
-  const buildRepository = () => new SessionRepository(new FakeSessionStore(), new AppConfigService());
+  const buildRepository = () =>
+    new SessionRepository(new FakeSessionRepository() as unknown as Repository<SessionEntity>, new AppConfigService());
 
   it('sds.login.session-store: expiry is enforced on read, and the row is deleted on the way out', async () => {
     const repository = buildRepository();

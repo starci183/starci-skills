@@ -1,8 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
+import { Repository } from 'typeorm';
 import { AppConfigService } from '../../platform/config';
-import { SESSION_STORE } from '../../integrations/postgres';
-import { SessionRow, SessionRowStore } from './session-row-store';
+import { SessionEntity } from '../../integrations/postgres';
 import { SessionRecord } from './session-record.types';
 import { InvalidCredentialsException, SessionExpiredException, SessionNotFoundException } from './session.exception';
 
@@ -13,12 +14,12 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * sds.login.session-store: one row per live session, expiry enforced on read rather than by a sweep, so
  * a stopped sweeper can never leave a session alive past its time. Method names mirror the record's five
  * transitions (t-begin, t-accept, t-refuse, t-expire, t-revoke) so the record and the code read together.
- * The row itself lives wherever SESSION_STORE points - Postgres in production, a fake in a test.
+ * The row lives in Postgres, through the platform database module's SessionEntity.
  */
 @Injectable()
 export class SessionRepository {
   constructor(
-    @Inject(SESSION_STORE) private readonly rows: SessionRowStore,
+    @InjectRepository(SessionEntity) private readonly rows: Repository<SessionEntity>,
     private readonly config: AppConfigService,
   ) {}
 
@@ -31,8 +32,7 @@ export class SessionRepository {
   async tAccept(personId: string): Promise<SessionRecord> {
     const issuedAt = new Date();
     const expiresAt = new Date(issuedAt.getTime() + this.config.getSessionTtlDays() * MILLISECONDS_PER_DAY);
-    const row: SessionRow = { token: randomUUID(), personId, issuedAt, expiresAt };
-    const saved = await this.rows.save(row);
+    const saved = await this.rows.save({ token: randomUUID(), personId, issuedAt, expiresAt });
     return toRecord(saved);
   }
 
@@ -61,6 +61,6 @@ export class SessionRepository {
   }
 }
 
-function toRecord(row: SessionRow): SessionRecord {
+function toRecord(row: SessionEntity): SessionRecord {
   return new SessionRecord(row.token, row.personId, row.issuedAt, row.expiresAt);
 }

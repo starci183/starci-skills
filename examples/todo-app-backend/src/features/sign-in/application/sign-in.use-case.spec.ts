@@ -1,23 +1,25 @@
+import { Repository } from 'typeorm';
 import { AppConfigService } from '../../../modules/platform/config';
 import { SessionRepository } from '../../../modules/domain/session';
-import { SessionRow, SessionRowStore } from '../../../modules/domain/session/session-row-store';
+import { SessionEntity } from '../../../modules/integrations/postgres';
 import { KeycloakClient, KeycloakInvalidCredentialsException, KeycloakSignInResult } from '../../../modules/integrations/keycloak';
 import { SignInUseCase } from './sign-in.use-case';
 
-class FakeSessionStore implements SessionRowStore {
-  private readonly byToken = new Map<string, SessionRow>();
+class FakeSessionRepository {
+  private readonly byToken = new Map<string, SessionEntity>();
 
-  async findOneBy(where: { token: string }): Promise<SessionRow | null> {
+  async findOneBy(where: { token: string }): Promise<SessionEntity | null> {
     return this.byToken.get(where.token) ?? null;
   }
 
-  async save(row: SessionRow): Promise<SessionRow> {
-    this.byToken.set(row.token, row);
-    return row;
+  async save(row: Partial<SessionEntity>): Promise<SessionEntity> {
+    const entity = row as SessionEntity;
+    this.byToken.set(entity.token, entity);
+    return entity;
   }
 
-  async delete(token: string): Promise<unknown> {
-    return this.byToken.delete(token);
+  async delete(token: string): Promise<void> {
+    this.byToken.delete(token);
   }
 }
 
@@ -44,7 +46,7 @@ describe('SignInUseCase', () => {
   let useCase: SignInUseCase;
 
   beforeEach(() => {
-    sessionRepository = new SessionRepository(new FakeSessionStore(), new AppConfigService());
+    sessionRepository = new SessionRepository(new FakeSessionRepository() as unknown as Repository<SessionEntity>, new AppConfigService());
     const keycloakClient = new FakeKeycloakClient({ 'person@example.com': 'correct-horse' });
     useCase = new SignInUseCase(keycloakClient, sessionRepository);
   });

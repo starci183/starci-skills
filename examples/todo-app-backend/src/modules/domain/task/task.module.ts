@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
-import { PostgresModule } from '../../integrations/postgres';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { PostgresModule, TaskEntity } from '../../integrations/postgres';
 import { TaskRepository } from './task.repository';
 
 @Module({
-  imports: [PostgresModule],
+  imports: [PostgresModule, TypeOrmModule.forFeature([TaskEntity])],
   providers: [TaskRepository],
   exports: [TaskRepository],
 })
