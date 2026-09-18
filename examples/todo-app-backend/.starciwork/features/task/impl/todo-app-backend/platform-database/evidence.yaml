@@ -3,17 +3,49 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: impl.task.todo-app-backend.platform-database
-recordDigest: fcd9ca892e13ef67add2224ec2c5411cd4c19446754a214cd31a8660071597a7
+recordDigest: e1d1b624f2ce9e7552d4446de36430a4b4adb2409da86415a01cded1edcf6d8b
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/modules/platform/databases/postgresql/primary/constants/connection.ts
+      sha256: 81561ed7cd39e4b03a60013cb1957f424893da2b7bc8e154f130c74aa3800649
+    - path: src/modules/platform/databases/postgresql/primary/entities/index.ts
+      sha256: 60c68cd28b5534f3d5076b88e1f9d6c9a6c2141c0e0447d996fc85c852541b49
+    - path: src/modules/platform/databases/postgresql/primary/entities/session.entity.ts
+      sha256: 7b328d456587f02055f9f1d6d05ab60db28e34a31d730d95105a444cfc243ddc
+    - path: src/modules/platform/databases/postgresql/primary/entities/task.entity.ts
+      sha256: da57a361a2f74e555d18426d4c029a94c02df68fb9ba195d1aac729368c0cf3e
+    - path: src/modules/platform/databases/postgresql/primary/index.ts
+      sha256: 073db554e289c23e581f0cdc287aa7f04d6f6b2d50561c46bfb23b4ae23e785f
+    - path: src/modules/platform/databases/postgresql/primary/migrations/1758160000000-create-sessions-table.ts
+      sha256: 278feb6ccb5c538c55a61eff5f65437e62f84230c63ccb52ca9da7255d9d4331
+    - path: src/modules/platform/databases/postgresql/primary/migrations/1758160000001-create-tasks-table.ts
+      sha256: dcfba1c8b509e7617ac4013c8860e04c922ad1e7c29dd1007c3e92ab8381e960
+    - path: src/modules/platform/databases/postgresql/primary/primary.client.ts
+      sha256: a6e157912eda44125c6c7386c7656d85559052dc7948b8da34c5721f7216eab2
+    - path: src/modules/platform/databases/postgresql/primary/primary.decorators.ts
+      sha256: ed2c645d79ecaa89de8482853a0fcb8e9508fd28554b0ab242f033c462bd0368
+    - path: src/modules/platform/databases/postgresql/primary/primary.module-definition.ts
+      sha256: d6e539e83592705a78a77c4dee437e9a0ccd258f176216dafc59fd89e43b5a97
+    - path: src/modules/platform/databases/postgresql/primary/primary.module.ts
+      sha256: 4fae221d68d6aca18501f065b050215ad76e4e544d7907d0ff22c004c5deec17
+    - path: src/modules/platform/databases/postgresql/primary/testing/fake-entity-manager.ts
+      sha256: f07588abb29e3d0f6344c771c0d3e537a8720dad18e5e4e0e817725a58ce7a5e
+  digest: d3cb079b772b78edee99b97cfcf9095fa94b08c106e286b2c89eb66d3b5b4f68
 outcome: pass
 assertions:
   - id: data.task.task
+    command: npx jest src/modules/bussiness/task
+    exit: 0
     outcome: pass
-    observation: npx jest src/modules/domain/task/task.repository.spec.ts exited 0
+    observation: npx jest src/modules/bussiness/task exited 0
   - id: session-store
+    command: npx jest src/modules/bussiness/session
+    exit: 0
     outcome: pass
-    observation: npx jest src/modules/domain/session/session.repository.spec.ts exited 0
+    observation: npx jest src/modules/bussiness/session exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T05:28:31.205Z
+  capturedAt: 2026-09-18T07:52:36.156Z

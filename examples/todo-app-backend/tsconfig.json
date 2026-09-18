@@ -19,7 +19,11 @@
     "strictNullChecks": true,
     "noImplicitAny": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["node", "jest"]
+    "types": ["node", "jest"],
+    "paths": {
+      "@modules/*": ["./src/modules/*"],
+      "@features/*": ["./src/features/*"]
+    }
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]

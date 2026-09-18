@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AppConfigService } from '../../platform/config';
-import { KeycloakInvalidCredentialsException, KeycloakUnavailableException } from './keycloak.exception';
+import { KeycloakInvalidCredentialsException, KeycloakUnavailableException } from '@modules/shared/exceptions';
 
 export interface KeycloakSignInResult {
   readonly subject: string;
@@ -37,7 +37,7 @@ export class KeycloakClient {
         body: body.toString(),
       });
     } catch (error) {
-      throw new KeycloakUnavailableException(String(error));
+      throw new KeycloakUnavailableException({ detail: String(error) });
     }
     if (!response.ok) {
       // Keycloak's direct access grant answers an unknown username and a wrong password with the same
@@ -60,7 +60,7 @@ export class KeycloakClient {
         body: JSON.stringify({ action: 'sign-out', personId }),
       });
     } catch (error) {
-      throw new KeycloakUnavailableException(String(error));
+      throw new KeycloakUnavailableException({ detail: String(error) });
     }
   }
 }

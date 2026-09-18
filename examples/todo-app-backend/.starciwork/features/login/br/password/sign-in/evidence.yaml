@@ -3,18 +3,57 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: br.login.password.sign-in
-recordDigest: 8fc1726487263e7ed7cc9d5a8658bdf44b773c38a969b67c3509adda9049d987
+recordDigest: 14bf9d77064ef3961193c54857e5baec30c744661cbd9648f6a0aadb37c6b28e
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/modules/bussiness/session/index.ts
+      sha256: 98a6c860795008ed0aaea1657fbecf7e8a73afbb9393b7efdc3f0c3946251c5f
+    - path: src/modules/bussiness/session/session.module-definition.ts
+      sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
+    - path: src/modules/bussiness/session/session.module.ts
+      sha256: 2d14aaadfe1d0d9d1f6d6960f8c445f79fcc5ae66657fd4edecca4b244d03984
+    - path: src/modules/bussiness/session/session.service.spec.ts
+      sha256: f72c048aa67ca08fa9fcd2892b901061caa9c37463ca2354727946f312d7b83f
+    - path: src/modules/bussiness/session/session.service.ts
+      sha256: b1182944ea37491f55859069c12036097159f2df5a0dc459818de11d3967f6f6
+    - path: src/modules/bussiness/session/sign-in.command.ts
+      sha256: 6de433b280b1358369e98cbf31025ee05fb799f58c9540bbc74b98b22cbd2d5a
+    - path: src/modules/bussiness/session/sign-in.handler.spec.ts
+      sha256: 37ab10b3096952f9c8a43f5b5f410aadb856825d3f379ccb9ea57eb9dd6ccf58
+    - path: src/modules/bussiness/session/sign-in.handler.ts
+      sha256: 6f412dc4be7a273ea860ea5914f24ad60fc5498b965733dac60759b651a69ef2
+    - path: src/modules/bussiness/session/sign-out.command.ts
+      sha256: df6ef31df63b6eaf5f9e103c9c117429342a4535dd80962396292f8b076b6f0b
+    - path: src/modules/bussiness/session/sign-out.handler.spec.ts
+      sha256: 03eb016c94862eb3bf029654d9a533237f896c79c946a528aef7d22743a75f74
+    - path: src/modules/bussiness/session/sign-out.handler.ts
+      sha256: 401ced0572a611bb29b9667dccacb7b9e2a086a8bc2654e5fda4daaebcbd9673
+    - path: src/modules/bussiness/session/types/session-record.ts
+      sha256: 9f77414952e6b2c9559e9dcddf88e11d456ed18be4bb5fd93c78cc747ffca85c
+    - path: src/modules/integrations/keycloak/index.ts
+      sha256: e9d59d88d446ed2b1a1a4fbddc81b15b5f434a7b10632b3fdf90706304acbc74
+    - path: src/modules/integrations/keycloak/keycloak.client.ts
+      sha256: 0a971ff5721dfda2c0ad43af60ea373215c18fa675f653f29d73aef2f64c1c67
+    - path: src/modules/integrations/keycloak/keycloak.module-definition.ts
+      sha256: b68cba5705e7c44730af03602e3233926e63fa5ed74cade5059536eee0ae974f
+    - path: src/modules/integrations/keycloak/keycloak.module.ts
+      sha256: f3b4eaebfb757c6fc2cd82cd5a6aa95114f3dc1a85a256c8b2ac79ec85caaaf2
+  digest: 504de892f093cebd8007e4a20c0cd8a612ed94fa99b7a99147a5638a979f3621
 outcome: pass
 assertions:
   - id: ac.login.password.sign-in.wrong-pair-is-refused
+    command: npx jest -t "ac.login.password.sign-in.wrong-pair-is-refused"
+    exit: 0
     outcome: pass
-    observation: npx jest src/features/sign-in -t ac.login.password.sign-in.wrong-pair-is-refused exited 0
+    observation: npx jest -t "ac.login.password.sign-in.wrong-pair-is-refused" exited 0
   - id: ac.login.password.sign-in.refusal-does-not-name-the-half
+    command: npx jest -t "ac.login.password.sign-in.refusal-does-not-name-the-half"
+    exit: 0
     outcome: pass
-    observation: npx jest src/features/sign-in -t
-      ac.login.password.sign-in.refusal-does-not-name-the-half exited 0
+    observation: npx jest -t "ac.login.password.sign-in.refusal-does-not-name-the-half" exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T05:28:52.366Z
+  capturedAt: 2026-09-18T07:51:03.718Z

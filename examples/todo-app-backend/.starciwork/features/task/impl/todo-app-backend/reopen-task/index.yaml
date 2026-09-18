@@ -4,12 +4,10 @@ title: The reopen-task feature
 state: todo
 repository: todo-app
 owners:
-  - {role: feature, path: src/features/reopen-task/**}
+  - {role: feature, path: src/modules/bussiness/task}
 revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
 # Not proven done: br.task.complete.once is todo at rev 2 (the reversible statement this code implements
 # has no evidence of its own yet), and there is no fr.task.reopen or equivalent functional-requirement
-# record this feature could point to as proven. The code is real and unit-tested (see verification), but
+# record this feature could point to as proven. The code is real and unit-tested (see the sibling test file under src/modules/bussiness/task), but
 # nothing this record could name as "proves" is itself done.
 proves: []
-verification: [npx jest src/features/reopen-task exited 0]
-verificationSource: kernel-observed

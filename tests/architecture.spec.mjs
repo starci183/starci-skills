@@ -592,6 +592,52 @@ test('Nest registration derives exported class-token ownership and selected CQRS
   assert.ok(result.coverage.checkedRuleIds.includes('BE_MODULE_HANDLER_REGISTRATION'));
 });
 
+test('Nest registration credits a handler assembled inside a ConfigurableModuleClass-style static register() return, not only a literal @Module decorator argument', t => {
+  const root = fixture(t, 'backend', {
+    // Mirrors nivo's own agent-workspace-operations.module.ts shape: an empty @Module({}) decorator plus
+    // a static register() that spreads a super.register(options)-shaped base and appends the handler.
+    // Before this fix, checkModuleRegistration only ever read the decorator's own object literal, saw an
+    // empty {} there, and reported CreateOrderHandler as unregistered anywhere - a false positive on
+    // exactly this adopted pattern.
+    'src/features/orders/application/create.command.ts': 'export class CreateOrderCommand {}\n',
+    'src/features/orders/application/create.handler.ts': 'import { CommandHandler } from "@nestjs/cqrs"; import { CreateOrderCommand } from "./create.command"; @CommandHandler(CreateOrderCommand) export class CreateOrderHandler {}\n',
+    'src/features/orders/orders.module.ts': 'import { Module } from "@nestjs/common"; import { CreateOrderHandler } from "./application/create.handler"; @Module({}) export class OrdersModule { static register(options = {}) { const base = { providers: [], exports: [] }; return { ...base, providers: [...(base.providers ?? []), CreateOrderHandler], exports: [] }; } }\n',
+  });
+  installNestTypes(root);
+  const configFile = path.join(root, 'architecture.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.backend = { moduleRegistration: { providerIdentity: 'exported-class-token', handlerDecorators: ['CommandHandler', 'QueryHandler'] } };
+  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const result = check(root);
+  assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+  // The false positive this fixture guards against: CreateOrderHandler must never be reported as
+  // unregistered just because the decorator argument is `{}` and the real providers live in register().
+  assert.equal(result.violations.some(item => item.ruleId === 'BE_MODULE_HANDLER_REGISTRATION'), false, JSON.stringify(result, null, 2));
+  // Coverage still lands on 'unavailable' rather than 'checked': `...(base.providers ?? [])` is a spread
+  // INSIDE the providers array itself (a different, pre-existing conservatism this fix does not touch -
+  // an array spread's other elements are never enumerable), so the module's full provider set genuinely
+  // cannot be proved, even though CreateOrderHandler's own registration now can be.
+  assert.equal(result.coverage.moduleRegistration.status, 'unavailable', JSON.stringify(result, null, 2));
+});
+
+test('Nest registration still refuses a register() handler shadowed by a spread written after it', t => {
+  const root = fixture(t, 'backend', {
+    'src/features/orders/application/create.command.ts': 'export class CreateOrderCommand {}\n',
+    'src/features/orders/application/create.handler.ts': 'import { CommandHandler } from "@nestjs/cqrs"; import { CreateOrderCommand } from "./create.command"; @CommandHandler(CreateOrderCommand) export class CreateOrderHandler {}\n',
+    // The spread comes AFTER the explicit `providers:` here, so it could silently override it - unlike
+    // the fixture above, this must stay unavailable rather than being credited as registered.
+    'src/features/orders/orders.module.ts': 'import { Module } from "@nestjs/common"; import { CreateOrderHandler } from "./application/create.handler"; const overrides = { providers: [] }; @Module({}) export class OrdersModule { static register() { return { providers: [CreateOrderHandler], ...overrides }; } }\n',
+  });
+  installNestTypes(root);
+  const configFile = path.join(root, 'architecture.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.backend = { moduleRegistration: { providerIdentity: 'exported-class-token', handlerDecorators: ['CommandHandler', 'QueryHandler'] } };
+  fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+  const result = check(root);
+  assert.equal(result.coverage.moduleRegistration.status, 'unavailable', JSON.stringify(result, null, 2));
+  assert.ok(result.coverage.moduleRegistration.details.some(item => /dynamic or unresolvable/.test(item)));
+});
+
 test('Nest registration rejects same class-token provider duplication and missing handler registration', t => {
   const root = fixture(t, 'backend', {
     'src/modules/catalog/catalog.service.ts': 'export class CatalogService {}\n',
@@ -660,7 +706,7 @@ test('backend source shape accepts adopted application, transport, persistence, 
     'src/features/orders/application/create-order.contracts.ts': 'export interface CreateOrderParams { readonly itemId:string } export interface CreateOrderResult { readonly id:string }\n',
     'src/features/orders/application/create-order.use-case.ts': 'import type { CreateOrderParams,CreateOrderResult } from "./create-order.contracts"; export class CreateOrderUseCase { execute(input:CreateOrderParams):CreateOrderResult{return {id:input.itemId}} }\n',
     'src/features/orders/transport/graphql/dto/create-order.request.ts': 'import { GqlInput } from "../../../../../framework"; @GqlInput() export class CreateOrderRequest { itemId!:string }\n',
-    'src/features/orders/transport/graphql/create-order.resolver.ts': 'import { GqlArgs,GqlMutation } from "../../../../framework"; import { CreateOrderRequest } from "./dto/create-order.request"; export class CreateOrderResolver { @GqlMutation(()=>String,{name:"createOrder"}) create(@GqlArgs("request") request:CreateOrderRequest){return request.itemId} }\n',
+    'src/features/orders/transport/graphql/create-order.resolver.ts': 'import { GqlArgs,GqlMutation } from "../../../../framework"; import { CreateOrderRequest } from "./dto/create-order.request"; export class CreateOrderResolver { @GqlMutation(()=>String,{name:"createOrder"}) create(@GqlArgs("input") input:CreateOrderRequest){return input.itemId} }\n',
     'src/modules/platform/database/entities/order.entity.ts': 'import { DatabaseEntity } from "../../../../framework"; @DatabaseEntity() export class OrderEntity {}\n',
     'src/modules/catalog/enums/order-status.ts': 'import { registerGraphQlEnum } from "../../../framework"; export enum OrderStatus { Pending="pending", Complete="complete" } registerGraphQlEnum(OrderStatus,{name:"OrderStatus"});\n',
     'src/modules/catalog/errors/challenge-not-found.ts': 'export class ChallengeNotFoundException extends Error {}\n',
@@ -689,7 +735,7 @@ test('backend source shape locates layer, class, enum, contract, and GraphQL nam
     'src/features/orders/transport/graphql/order-view.mapper.ts': 'import { ViewEntity } from "typeorm"; @ViewEntity() export class OrderViewMapper {}\n',
     'src/features/orders/application/order-schema.use-case.ts': 'import { EntitySchema } from "typeorm"; const make=()=>new EntitySchema({name:"order"}); export const schema=make();\n',
     'src/features/orders/transport/graphql/create-order.input.ts': 'import { InputType } from "@nestjs/graphql"; @InputType() export class CreateOrderInput {}\n',
-    'src/features/orders/transport/graphql/create-order.resolver.ts': 'import { Args,Mutation } from "@nestjs/graphql"; export class CreateOrderResolver { @Mutation(()=>String,{name:"Create_Order"}) create(@Args("itemId") itemId:string){return itemId} }\n',
+    'src/features/orders/transport/graphql/create-order.resolver.ts': 'import { Args,Mutation } from "@nestjs/graphql"; export class CreateOrderResolver { @Mutation(()=>String,{name:"Create_Order"}) create(@Args("item_id") itemId:string){return itemId} }\n',
     'src/modules/catalog/enums/order-status.ts': 'export const enum orderStatus { pending=1 }\n',
   });
   installSourceShapeTypes(root);
@@ -712,7 +758,7 @@ test('backend source shape locates layer, class, enum, contract, and GraphQL nam
   assert.equal(result.violations.some(item => /Scalar/.test(item.message)), false, JSON.stringify(result, null, 2));
   assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /Enums must/.test(item.message)), JSON.stringify(result, null, 2));
   assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /GraphQL field name/.test(item.message)), JSON.stringify(result, null, 2));
-  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /literal name request/.test(item.message)), JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_SOURCE_NAME_INVALID' && /GraphQL argument name item_id must be camelCase/.test(item.message)), JSON.stringify(result, null, 2));
 });
 
 test('backend source shape exposes legacy and dynamic naming as unavailable coverage', t => {

@@ -360,8 +360,8 @@ function graphqlArgument(config, context, sourceFile, node, decorator, namingRea
   const selected = unwrapExpression(context.ts, call.arguments[0]);
   if (!context.ts.isStringLiteralLike(selected)) {
     namingReasons.push(`${relativePath(config.root, sourceFile.fileName)} has a dynamic @Args request name`);
-  } else if (selected.text !== 'request') violations.push(violation(config, sourceFile, selected, SOURCE_NAME_RULE_ID,
-    'GraphQL request arguments use the literal name request.'));
+  } else if (!camelCase(selected.text)) violations.push(violation(config, sourceFile, selected, SOURCE_NAME_RULE_ID,
+    `GraphQL argument name ${selected.text} must be camelCase.`));
 }
 
 function graphqlEnumRegistration(config, context, sourceFile, call, namingReasons, violations) {
@@ -412,6 +412,30 @@ export function checkBackendSourceShape(config, context) {
   const legacyFiles = [];
   let checkedFiles = 0;
 
+  /**
+   * A feature root is "transport-first" when no file anywhere under it sits inside an `application/`
+   * directory - the whole root is a protocol adapter with no use-case layer of its own to keep out of
+   * it, matching this doc's own already-adopted exception ("The Academy transport-first
+   * `src/features/api/core/graphql/...` tree remains a mapped existing layout"). Nivo's own GraphQL
+   * action-module folders (`mutations/<domain>/<action>/<action>.resolver.ts`,
+   * `graphql-types/{input,response}.ts`, no nested `transport/<protocol>/` segment either, because the
+   * use case they call lives in a *module*, not in this *feature*) are exactly this shape. Deciding this
+   * from the presence of an `application/` DIRECTORY (rather than from whether any file's role name
+   * happens to be one of the recognized application roles) keeps a domain-first feature that places an
+   * unrecognized-role file inside `application/` on the strict split below, so that file still earns its
+   * existing "is not a selected application-layer role" coverage note instead of silently escaping it.
+   * This is computed from the root's actual contents, not declared, so the moment any file under a
+   * feature root sits inside `application/`, that root stops being transport-first.
+   */
+  const applicationLayerRoots = new Set();
+  for (const sourceFile of context.files) {
+    const fileName = canonical(sourceFile.fileName);
+    const featureRoot = locatedRoot(featureRoots, fileName);
+    if (!featureRoot) continue;
+    const directories = relativePath(featureRoot, fileName).split('/').slice(0, -1).map(part => part.toLowerCase());
+    if (directories.includes('application')) applicationLayerRoots.add(featureRoot);
+  }
+
   for (const sourceFile of context.files) {
     const fileName = canonical(sourceFile.fileName);
     const featureRoot = locatedRoot(featureRoots, fileName);
@@ -436,15 +460,21 @@ export function checkBackendSourceShape(config, context) {
     const relative = relativePath(config.root, fileName);
     const migrationName = /^\d{10,}-[A-Z][A-Za-z0-9]*$/.test(role.base);
     const persistencePath = !role.spec && (migrationName || directories.includes('migrations'));
+    // 'types' joins the pre-existing declarative-folder exemption: nivo's own capability modules keep
+    // plain, un-suffixed data-shape files under a `types/` folder (e.g. `types/operation.ts`,
+    // `types/payload.ts`) - the folder name is the role signal there, exactly like `constants/enums/
+    // errors/migrations` already are, so a file inside it is not required to also carry a role suffix.
     const special = SPECIAL_BASENAMES.has(role.base.toLowerCase()) || migrationName
-      || ['constants', 'enums', 'errors', 'migrations'].some(folder => directories.includes(folder));
+      || ['constants', 'enums', 'errors', 'migrations', 'types'].some(folder => directories.includes(folder));
     const publicDeclarations = exportedDeclarations(ts, checker, sourceFile);
 
     if (!migrationName && !kebabSourceBase(role.base)) violations.push(violation(config, sourceFile, sourceFile, SOURCE_NAME_RULE_ID,
       `Source basename ${role.base} must use kebab-case segments plus an explicit role suffix.`));
     if (!role.role && !special) namingReasons.push(`${relative} has no statically identifiable source role`);
 
-    if (featureRoot) {
+    const transportFirst = Boolean(featureRoot) && !applicationLayerRoots.has(featureRoot);
+
+    if (featureRoot && !transportFirst) {
       if (inApplication && inTransport) violations.push(violation(config, sourceFile, sourceFile, SOURCE_LAYOUT_RULE_ID,
         'A feature source cannot belong to both application and transport layers.'));
       if (role.role && APPLICATION_ROLES.has(role.role) && !inApplication) violations.push(violation(config, sourceFile, sourceFile,
@@ -473,6 +503,8 @@ export function checkBackendSourceShape(config, context) {
       if (!inApplication && !inTransport && !topLevelFeatureFile && !role.role && !persistencePath) {
         layoutReasons.push(`${relative} has no statically selected feature layer`);
       }
+    }
+    if (featureRoot) {
       if (persistencePath) violations.push(violation(config, sourceFile, sourceFile, SOURCE_LAYOUT_RULE_ID,
         'Migration source cannot be owned by a feature; place it under the declared persistence module.'));
       if (role.role === 'entity') violations.push(violation(config, sourceFile, sourceFile, SOURCE_LAYOUT_RULE_ID,
@@ -484,7 +516,7 @@ export function checkBackendSourceShape(config, context) {
       const declarationDecorators = decorators(ts, declaration);
       const kinds = declarationDecorators.map(decorator => decoratorKind(ts, checker, decorator, framework.bySymbol)).filter(Boolean);
       const graphQlDto = kinds.some(kind => kind === 'ArgsType' || kind === 'InputType' || kind === 'ObjectType');
-      if (graphQlDto && (!featureRoot || !inTransport || directories[transportIndex + 1] !== 'graphql')) {
+      if (graphQlDto && (!featureRoot || (!transportFirst && (!inTransport || directories[transportIndex + 1] !== 'graphql')))) {
         violations.push(violation(config, sourceFile, declaration.name ?? declaration, SOURCE_LAYOUT_RULE_ID,
           'GraphQL DTO classes belong under a feature transport/graphql/ boundary.'));
       }
