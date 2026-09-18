@@ -44,5 +44,15 @@ assets:
   - path: assets/privacy-erasure-refused.prompt.txt
     role: prompt
     provenance: authored-prompt-awaiting-interface.draw
+  - path: assets/privacy-erasure-refused.png
+    role: direction
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/privacy-erasure-refused.prompt.txt
+      inputRefs: [ui.audit.privacy, fr.audit.erasure.request, fr.audit.export, brand]
+    provenance:
+      actor: codex
+      profile: gpt-5.6-sol
+      capturedAt: "2026-09-18T06:09:49.2258660Z"
 blockedBy:
   - {record: gap.audit.direction-not-drawn, because: "interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has produced the erasure-refused representative direction or its sibling prompt bytes yet, only the prompt this record's assets entry names."}
