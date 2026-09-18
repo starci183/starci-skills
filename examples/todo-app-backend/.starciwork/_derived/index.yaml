@@ -2699,6 +2699,11 @@ records:
         because: uat.verify has not run this flow against the running product yet; no run folder under
           uat/sign-in/runs/** exists with screens, video and a passing result.md, only this designed
           flow shape.
+  uat.login.sign-in.runs.20260918T061141Z-af3dfbbc:
+    schema: starci/uat-run-manifest@1
+    feature: login
+    state: null
+    effectiveState: null
   uat.notify.digest-and-unsubscribe:
     schema: work/uat-flow
     feature: notify
@@ -3601,6 +3606,18 @@ unclassifiedEdges:
   - from: uat.login.sign-in
     field: proves
     target: fr.login.sign-in
+  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
+    field: assertions.id
+    target: br.login.password.sign-in
+  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
+    field: assertions.id
+    target: br.login.session.restores
+  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
+    field: assertions.id
+    target: fr.login.sign-in
+  - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
+    field: nodeId
+    target: uat.login.sign-in
   - from: uat.notify.digest-and-unsubscribe
     field: proves
     target: br.notify.digest.window
