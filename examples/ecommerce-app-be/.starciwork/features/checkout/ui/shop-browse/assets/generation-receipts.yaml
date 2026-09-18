@@ -1,0 +1,31 @@
+tool: image_gen.imagegen
+recordedAt: '2026-09-18T16:38:48.982865+00:00'
+calls:
+- stage: initial
+  tool: image_gen.imagegen
+  toolOutputBasename: exec-d3e4b497-444a-4573-b683-ac564da2e1b6.png
+  modelDisclosure: The tool did not expose a model identifier; none is claimed.
+  artifact: assets/shop-browse.initial.png
+  sha256: cd340aa2dd84bc32e0e1bf644f3080e302f9a66eafd1a16e2ecedb3c5efe8918
+  prompt: assets/shop-browse.initial.prompt.txt
+  promptSha256: e7f1f90c9a8a66c766210f2e7deb821e0504d586caab2e217b2886feaca49ab3
+  referencedImages:
+  - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+    sha256: e9ea01cbbecb7a5b6f19328184fa5a0eca7e37f4a411351e8582491dde5024d5
+  - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+    sha256: 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
+- stage: final
+  tool: image_gen.imagegen
+  toolOutputBasename: exec-2c60812f-3bfe-4133-8319-1472a28c41c3.png
+  modelDisclosure: The tool did not expose a model identifier; none is claimed.
+  artifact: assets/shop-browse.png
+  sha256: 3fb9b09d5ef7f69c28a5dba22a3fa69e3809751a40f110cc6331523dc1e8a7f8
+  prompt: assets/shop-browse.prompt.txt
+  promptSha256: 2b3359e0daa6b902812203cf3fa339ea3827661892d9cb696d2d8bca05687799
+  referencedImages:
+  - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+    sha256: e9ea01cbbecb7a5b6f19328184fa5a0eca7e37f4a411351e8582491dde5024d5
+  - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+    sha256: 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
+  - path: examples/ecommerce-app-be/.starciwork/features/checkout/ui/shop-browse/assets/shop-browse.initial.png
+    sha256: cd340aa2dd84bc32e0e1bf644f3080e302f9a66eafd1a16e2ecedb3c5efe8918

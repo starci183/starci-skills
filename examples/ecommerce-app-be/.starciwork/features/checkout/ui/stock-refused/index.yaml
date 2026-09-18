@@ -1,0 +1,269 @@
+schema: work/ui-screen
+id: ui.checkout.stock-refused
+title: Checkout stock-refusal direction
+state: uninvestigate
+brand:
+  rev: 1
+refs:
+- fr.checkout.place-order
+- ac.checkout.place-order.stock-is-checked-at-confirmation
+ui:
+  status: generated-and-agent-reviewed-proposed-direction
+  intent: Explain a named-product stock refusal, retain the original cart lines, and return the person
+    to the cart to correct quantity.
+  surfaces:
+  - name: stock-refused
+    route: http://localhost:4069/checkout
+    purpose: Explain a named-product stock refusal, retain the original cart lines, and return the person
+      to the cart to correct quantity.
+    actors:
+    - visitor
+    - person
+  states:
+  - name: stock-refused
+    trigger: Representative state selected by OP-BRIEF.md
+    behavior: Explain a named-product stock refusal, retain the original cart lines, and return the person
+      to the cart to correct quantity.
+  coverage:
+    scale: bounded
+    representativeScreens:
+    - stock-refused
+    map:
+    - screen: stock-refused
+      state: stock-refused
+      viewport: desktop-1536x1024
+      components:
+      - SurfaceCard with internal label
+      - SurfaceListCard with external label/fact/footer
+      - Button primary
+      - TextAction
+      directionAsset: assets/stock-refused.png
+      derivation: Real rendered grammar anatomy + brand rev 1 surface + declared app-owned composition.
+        Five-screen draw scope only; no runtime evidence.
+  accessibility:
+  - Use visible input labels and keyboard-operable semantic controls in implementation. No accessibility
+    pass is claimed by a raster.
+  - 'Brand #0D9488 with black #000000 button ink has calculated contrast 5.6086:1; white ink has only
+    3.7443:1. Keep the primary token unchanged.'
+  - Decorative duck and product artwork should have empty alt text when adjacent text conveys the same
+    information.
+  - Announce stock refusal in text and an appropriate live region; do not rely only on colour.
+  responsive:
+  - Only desktop 1536x1024 is drawn. Mobile and intermediate layouts are not verified or claimed.
+  artworkSlots: []
+  mascotPolicy: No duck or other mascot anywhere in this refusal frame, including header, thumbnails and
+    corners.
+  appOwnedRegions:
+  - name: stock-refusal
+    anatomy: Text-only refusal inside a SurfaceCard. Product name, requested quantity, available stock
+      and unchanged-cart copy all inside.
+  - name: retained-cart
+    anatomy: Your saved cart and 3 items outside above one two-row list shell; two rows inside, full-width
+      divider; subtotal, caption and recovery links outside below.
+  - name: review-caption
+    anatomy: DIRECTION - NOT IMPLEMENTATION at bottom-right outside product regions. Artifact metadata
+      only; omit from production UI.
+  controls:
+  - label: Northwind Supply
+    destination: http://localhost:4069/browse
+    status: Wordmark link to /browse exists in the shop layout. Northwind Supply is the proposed unified
+      label; current source says Northwind Shop. Runtime unverified.
+  - label: Browse
+    destination: http://localhost:4069/browse
+    status: Route exists in frontend source; runtime behavior was not tested in this draw task.
+  - label: Cart
+    destination: http://localhost:4069/cart
+    status: Route exists in frontend source; runtime behavior was not tested in this draw task.
+  - label: Checkout
+    destination: http://localhost:4069/checkout
+    status: Route exists in frontend source; runtime behavior was not tested in this draw task.
+  - label: Account
+    destination: http://localhost:4069/account
+    status: Route exists in frontend source; runtime behavior was not tested in this draw task.
+  - label: Return to cart
+    destination: http://localhost:4069/cart
+    status: Destination route exists; recovery control in this refusal state is proposed.
+  - label: Continue browsing
+    destination: http://localhost:4069/browse
+    status: Destination route exists; this refusal-state link is proposed.
+  assets:
+  - path: assets/stock-refused.anatomy.prompt.txt
+    role: prompt
+    sha256: 33317f2ef1a7278bb0d10a9927eaec4e28e558f0d089af4cc5a9147709b1ce11
+    provenance: Exact UTF-8 prompt sent to image_gen.imagegen, including the edit instructions.
+  - path: assets/stock-refused.anatomy.png
+    role: generation-history
+    selected: false
+    sha256: 0869e6a45706eca3938b107cd4d7ccd7229c4eca3847877603e9e45655223d9b
+    width: 1536
+    height: 1024
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/stock-refused.anatomy.prompt.txt
+      inputRefs:
+      - examples/ecommerce-app-be/.starciwork/brand/index.yaml
+      - knowledge/ui/proof/anatomy-source.yaml
+      - examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
+      - examples/ecommerce-app-be/.starciwork/features/checkout/fr/place-order/index.yaml
+      - examples/ecommerce-app-be/.starciwork/features/checkout/br/place-order/ac/stock-is-checked-at-confirmation/index.yaml
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app-be/.starciwork/features/checkout/ui/stock-refused/assets/stock-refused.initial.png
+      referencedImages:
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app-be/.starciwork/features/checkout/ui/stock-refused/assets/stock-refused.initial.png
+      mode: edit-with-anatomy-references
+    provenance:
+      stage: anatomy
+      tool: image_gen.imagegen
+      toolOutputBasename: exec-d1e3074c-463f-44ea-b936-27bc54789280.png
+      modelDisclosure: The tool did not expose a model identifier; none is claimed.
+      kind: non-selected-generation-history
+      postProcessing: None. Generated PNG bytes were copied without raster modification.
+  - path: assets/stock-refused.initial.prompt.txt
+    role: prompt
+    sha256: 36dfb5165ff6f5c0b25f3eca41763c8a62bab086bdbac070e1506210c3b99f95
+    provenance: Exact UTF-8 prompt sent to image_gen.imagegen, including the edit instructions.
+  - path: assets/stock-refused.initial.png
+    role: generation-history
+    selected: false
+    sha256: ab0dbe8f41f534374e22e34decdd4ed32b43a73d67ea2d3e98c33ee822b68d53
+    width: 1536
+    height: 1024
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/stock-refused.initial.prompt.txt
+      inputRefs:
+      - examples/ecommerce-app-be/.starciwork/brand/index.yaml
+      - knowledge/ui/proof/anatomy-source.yaml
+      - examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
+      - examples/ecommerce-app-be/.starciwork/features/checkout/fr/place-order/index.yaml
+      - examples/ecommerce-app-be/.starciwork/features/checkout/br/place-order/ac/stock-is-checked-at-confirmation/index.yaml
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      referencedImages:
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      mode: generate-with-anatomy-references
+    provenance:
+      stage: initial
+      tool: image_gen.imagegen
+      toolOutputBasename: exec-e9a8ffcc-3e34-4722-8106-60b964ae9300.png
+      modelDisclosure: The tool did not expose a model identifier; none is claimed.
+      kind: non-selected-generation-history
+      postProcessing: None. Generated PNG bytes were copied without raster modification.
+  - path: assets/stock-refused.prompt.txt
+    role: prompt
+    sha256: 4935ed007d05176b8b2e907841676b77ebd9a55e027ab0fc9cac48258fc1643e
+    provenance: Exact UTF-8 prompt sent to image_gen.imagegen, including the edit instructions.
+  - path: assets/stock-refused.png
+    role: direction
+    selected: true
+    sha256: fe00b0470e01cbb71f81e6e8ae7b9ec8b91cb5cea4926062185e2eb02c2a3374
+    width: 1536
+    height: 1024
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/stock-refused.prompt.txt
+      inputRefs:
+      - examples/ecommerce-app-be/.starciwork/brand/index.yaml
+      - knowledge/ui/proof/anatomy-source.yaml
+      - examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
+      - examples/ecommerce-app-be/.starciwork/features/checkout/fr/place-order/index.yaml
+      - examples/ecommerce-app-be/.starciwork/features/checkout/br/place-order/ac/stock-is-checked-at-confirmation/index.yaml
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app-be/.starciwork/features/checkout/ui/stock-refused/assets/stock-refused.anatomy.png
+      referencedImages:
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app-be/.starciwork/features/checkout/ui/stock-refused/assets/stock-refused.anatomy.png
+      mode: edit-with-anatomy-references
+    provenance:
+      stage: final
+      tool: image_gen.imagegen
+      toolOutputBasename: exec-5b3e519d-a323-40b3-ad1c-5ba265e5b33b.png
+      modelDisclosure: The tool did not expose a model identifier; none is claimed.
+      kind: generated-proposed-direction
+      postProcessing: None. Generated PNG bytes were copied without raster modification.
+  provenance:
+    sourceCommit: e901ebac48087d4585434c2d7959f6d980187516
+    brand:
+      path: examples/ecommerce-app-be/.starciwork/brand/index.yaml
+      sha256: c1d62c610275497bb7d334ec31218a12644d886672355c8b4c118640c70160cb
+      rev: 1
+    anatomyReferences:
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      sha256: e9ea01cbbecb7a5b6f19328184fa5a0eca7e37f4a411351e8582491dde5024d5
+      role: actual-installed-grammar-render; read-only reuse
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      sha256: 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
+      role: actual-installed-grammar-render; read-only reuse
+    grammarVersion: '@starci/grammar@0.4.13 as recorded by the existing Todo reference provenance; not
+      reinstalled or recaptured here.'
+    knowledge:
+      path: knowledge/ui/proof/anatomy-source.yaml
+      sha256: 60242ce2f09da22bbd84e6a1486daa5d37b709f837482b40f091ffd3778220c8
+      rules:
+      - ANATOMY-1
+      - ANATOMY-2
+      - ANATOMY-3
+      - ANATOMY-4
+      - ANATOMY-5
+      - prompt-shape-b2
+      - list-separator-bleed
+      - direction-scale-drift
+    promptExample:
+      path: examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
+      sha256: f77c0f9fc0715599d4ee2985ae04fe6ca514321c62c6dcc32f389880ca1c109d
+      originalLocation: ../ex-draw-v4/gen-lab/out/B3-final.txt
+      note: The brief named gen-lab/prompts/B3-final.txt; inspection found the proven prompt under gen-lab/out
+        instead. Retained byte-for-byte.
+    business:
+    - path: examples/ecommerce-app-be/.starciwork/features/checkout/fr/place-order/index.yaml
+      sha256: 652c16c914e566da909b400864f7e769c24702c18c204283026691cfddd4c632
+    - path: examples/ecommerce-app-be/.starciwork/features/checkout/br/place-order/ac/stock-is-checked-at-confirmation/index.yaml
+      sha256: 49c6613f6fa298b3b83b075ca49ee410e81fd2af85d146e89b165e5f7638ca1a
+    frontendContext:
+    - path: examples/ecommerce-app-fe/apps/shop/src/app/checkout/page.tsx
+      sha256: 2d96f2c4a42f521845e763c8a4b0c52421e9ada0bb559201502741e8183ff52f
+    - path: examples/ecommerce-app-fe/apps/shop/src/app/cart/page.tsx
+      sha256: de4734951c338d3c832ed6b65350c272b6aae7b93ed349a029f9eb90ceb12475
+    - path: examples/ecommerce-app-fe/apps/shop/src/components/AppNav.tsx
+      sha256: ac7d46b5f513b087ee36baeb25bb69475218430fc48173161eb81671e8781917
+    - path: examples/ecommerce-app-fe/apps/shop/src/app/layout.tsx
+      sha256: 5c4d20f851083a183b0fe9eee2481b2834f89254ecffd6e1da29a3abcb417f0d
+  review:
+    status: agent-reviewed-proposal; owner acceptance not claimed
+    reviewedAt: '2026-09-18T16:38:48.982865+00:00'
+    method: Visual inspection of references and each generated image, then targeted imagegen edits and
+      reinspection.
+    passed:
+    - 'Whole-frame review: zero duck, turtle, animal mark or mascot.'
+    - Refusal names Aurelis Desk Lamp, requested 2 versus available 1; cart remains unchanged.
+    - External list label/count and below-card caption remain outside; separator reaches both outer shell
+      edges after targeted edit.
+    - Two retained lines represent three units; 178 + 24 = 202. No place-order/retry control or success
+      claim.
+    - Visible DIRECTION - NOT IMPLEMENTATION label.
+    - Saved PNG and exact sibling prompt with hashed brand/reference provenance.
+    limits:
+    - 'Raster teal is approximate even after a colour-only imagegen correction; exact #0D9488 remains
+      the sole implementation primary token. Do not sample the PNG as token truth.'
+    - Generated typography/control sizes and some radii are enlarged or approximate; the installed grammar
+      CSS remains size/shape truth (direction-scale-drift).
+    - Generated product render style and duck poses vary between screens; these are composition references,
+      not a final production artwork pack.
+    - Owner acceptance, live-browser fidelity, accessibility and API behavior are not asserted.
+  observations:
+  - SurfaceCard labels are inside; SurfaceListCard labels/counts are outside above and captions outside
+    below.
+  - The B3 example includes edge-to-edge static-row dividers; the reference task capture itself has plain
+    rows. Separator intent comes from the explicit list-separator-bleed observation.
+  - Source Todo brand and turtle placement are not authority for ecommerce brand rules.
+  - Generation is complete for this bounded draw request. State remains uninvestigate for proposed design
+    review, rather than asserting owner acceptance.
+  gaps:
+  - The checkout route currently renders a blocked scaffold. This refusal visual derives from the existing
+    acceptance criterion; it does not prove runtime stock handling.

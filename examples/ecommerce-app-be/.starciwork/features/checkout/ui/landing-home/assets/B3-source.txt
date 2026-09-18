@@ -1,0 +1,26 @@
+Generate a beautiful product UI screenshot of a real web app (flat screenshot, 1536x1024, light theme) — the kind of polished screen a design team would put in a launch post. Aim for genuinely refined composition: confident whitespace, clear hierarchy, one delightful accent.
+
+SUBJECT: the "All tasks" screen of a friendly todo web app called "Todo app".
+
+FIXED ANATOMY (must not change — this is the design system's truth):
+- Top nav bar, white: "Todo app" wordmark left; "Tasks", "Notifications", "Plan", "Privacy"; right: avatar "A" + "Alex" + "Sign out".
+- Page heading "Your tasks" + muted subtitle.
+- White rounded composer card (soft shadow): the label "New task" sits INSIDE this card at its top, then one row holding a grey filled input "What needs doing?" and a solid blue "Add task" button.
+- THE COLLECTION — read this carefully, it is the part people get wrong:
+  - The section header sits ON THE PAGE BACKGROUND, OUTSIDE the card: bold label "All tasks" on the left, muted "4 tasks" on the right, same line.
+  - Below that header, a white rounded card (soft shadow) contains ONLY the task rows — nothing else is inside this card.
+  - Inside the card, four rows stacked. Between rows, a thin hairline divider that runs the FULL WIDTH of the card, touching the left and right edges of the card — the card itself has no side padding; the row content (checkbox, title, actions) is inset, but the divider is edge-to-edge.
+  - Each row: empty checkbox, task title, right-aligned actions "Share", "Schedule", and a small outlined "Delete" pill. Tasks: "Plan the week", "Send the project update", "Book the bike repair", "Water the plants" (completed: blue checked checkbox, strikethrough grey title).
+  - Below the card, back on the page background, a muted caption: "Completed tasks stay here until you delete them."
+- Footer: "Privacy policy   Terms".
+
+BRAND + TOKENS (non-negotiable):
+- Background #F7F7F5, cards pure white, 12px radius, single soft diffuse shadow.
+- Primary #2F6BFF only on primary button, checked checkbox, selected states. Text links and secondary actions are dark/neutral, never blue.
+- Inputs inside cards: light grey fill, borderless (secondary variant).
+- Inter typography, every label spelled exactly as written. No lorem, no garbled text.
+
+CREATIVE LICENSE (this is where you make it beautiful):
+- You MAY add a small, charming flat-style turtle illustration — the app's mascot — sitting subtly at the right end of the page header near the subtitle. Small, tasteful, blue shell (#2F6BFF), flat vector style. Only ONE appearance.
+- You MAY refine: a subtle progress hint near the heading ("3 of 4 to go"), richer row metadata (small muted due-date tags like "Fri", "Mon"), a gentle highlighted-state look on one row, an active-state underline on the current nav item.
+- You MAY NOT: put the section header or caption inside the card, move rows outside the card, inset the row dividers away from the card edges, add gradients/heavy shadows, invent new navigation, change the blue, add photos or dark sections.

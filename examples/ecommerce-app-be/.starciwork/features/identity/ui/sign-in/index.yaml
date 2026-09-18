@@ -1,0 +1,213 @@
+schema: work/ui-screen
+id: ui.identity.sign-in
+title: Account sign-in direction
+state: uninvestigate
+brand:
+  rev: 1
+refs:
+- fr.identity.sign-in
+ui:
+  status: generated-and-agent-reviewed-proposed-direction
+  intent: Welcome the person with a duck on the left and a ready-to-submit email/password form on the
+    right.
+  surfaces:
+  - name: sign-in
+    route: http://localhost:4069/account
+    purpose: Welcome the person with a duck on the left and a ready-to-submit email/password form on the
+      right.
+    actors:
+    - visitor
+    - person
+  states:
+  - name: filled-welcome
+    trigger: Representative state selected by OP-BRIEF.md
+    behavior: Welcome the person with a duck on the left and a ready-to-submit email/password form on
+      the right.
+  coverage:
+    scale: bounded
+    representativeScreens:
+    - sign-in
+    map:
+    - screen: sign-in
+      state: filled-welcome
+      viewport: desktop-1536x1024
+      components:
+      - Input secondary
+      - Button primary full width
+      - TextAction
+      directionAsset: assets/sign-in.png
+      derivation: Real rendered grammar anatomy + brand rev 1 surface + declared app-owned composition.
+        Five-screen draw scope only; no runtime evidence.
+  accessibility:
+  - Use visible input labels and keyboard-operable semantic controls in implementation. No accessibility
+    pass is claimed by a raster.
+  - 'Brand #0D9488 with black #000000 button ink has calculated contrast 5.6086:1; white ink has only
+    3.7443:1. Keep the primary token unchanged.'
+  - Decorative duck and product artwork should have empty alt text when adjacent text conveys the same
+    information.
+  responsive:
+  - Only desktop 1536x1024 is drawn. Mobile and intermediate layouts are not verified or claimed.
+  artworkSlots:
+  - id: duck-auth
+    kind: generated decorative duck illustration within direction
+    placement: Exactly one duck in the left auth illustration. This state has no error/refusal.
+  mascotPolicy: Exactly one duck in the left auth illustration. This state has no error/refusal.
+  appOwnedRegions:
+  - name: auth-split
+    anatomy: Desktop left illustration panel and right form region; never reversed. One cream duck stays
+      wholly within the left panel.
+  - name: frameless-auth-form
+    anatomy: Right-side heading, two grey secondary inputs with external labels, submit pill and Back
+      to browse on page background; no enclosing raised card.
+  - name: review-caption
+    anatomy: DIRECTION - NOT IMPLEMENTATION at bottom-right outside product regions. Artifact metadata
+      only; omit from production UI.
+  controls:
+  - label: Email
+    destination: Email field in proposed sign-in form
+    status: Proposed control; not wired in the current frontend.
+  - label: Password
+    destination: Password field with masked input
+    status: Proposed control; not wired in the current frontend.
+  - label: Sign in
+    destination: Submit credentials under fr.identity.sign-in
+    status: Proposed control; not wired in the current frontend.
+  - label: Back to browse
+    destination: http://localhost:4069/browse
+    status: Destination route exists; this link is proposed in the new form.
+  assets:
+  - path: assets/sign-in.initial.prompt.txt
+    role: prompt
+    sha256: b50820e7d8c271f56edda8e60627963206a9347f29f04ee6c4be1efdfbc05b95
+    provenance: Exact UTF-8 prompt sent to image_gen.imagegen, including the edit instructions.
+  - path: assets/sign-in.initial.png
+    role: generation-history
+    selected: false
+    sha256: f3d1882feca79afea0f9bfd656bf6e6aebc1cf71997afd09868a95eb1b447878
+    width: 1536
+    height: 1024
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/sign-in.initial.prompt.txt
+      inputRefs:
+      - examples/ecommerce-app-be/.starciwork/brand/index.yaml
+      - knowledge/ui/proof/anatomy-source.yaml
+      - examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
+      - examples/ecommerce-app-be/.starciwork/features/identity/fr/sign-in/index.yaml
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-screen.png
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      referencedImages:
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-screen.png
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      mode: generate-with-anatomy-references
+    provenance:
+      stage: initial
+      tool: image_gen.imagegen
+      toolOutputBasename: exec-20a1a25f-5d0d-46d1-99b2-e2bb1f232565.png
+      modelDisclosure: The tool did not expose a model identifier; none is claimed.
+      kind: non-selected-generation-history
+      postProcessing: None. Generated PNG bytes were copied without raster modification.
+  - path: assets/sign-in.prompt.txt
+    role: prompt
+    sha256: 72936e04ef91df2140b0b984030cd9b927054c30b3cb7ad548fd4cd1949ff15a
+    provenance: Exact UTF-8 prompt sent to image_gen.imagegen, including the edit instructions.
+  - path: assets/sign-in.png
+    role: direction
+    selected: true
+    sha256: adfc13b7efcb48bd97e27f449db8fdefe115b213cfb66d2e50c2f299d5b2c3a4
+    width: 1536
+    height: 1024
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/sign-in.prompt.txt
+      inputRefs:
+      - examples/ecommerce-app-be/.starciwork/brand/index.yaml
+      - knowledge/ui/proof/anatomy-source.yaml
+      - examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
+      - examples/ecommerce-app-be/.starciwork/features/identity/fr/sign-in/index.yaml
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-screen.png
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app-be/.starciwork/features/identity/ui/sign-in/assets/sign-in.initial.png
+      referencedImages:
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-screen.png
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app-be/.starciwork/features/identity/ui/sign-in/assets/sign-in.initial.png
+      mode: edit-with-anatomy-references
+    provenance:
+      stage: final
+      tool: image_gen.imagegen
+      toolOutputBasename: exec-d6894c09-5514-4d01-b960-155c10d722c3.png
+      modelDisclosure: The tool did not expose a model identifier; none is claimed.
+      kind: generated-proposed-direction
+      postProcessing: None. Generated PNG bytes were copied without raster modification.
+  provenance:
+    sourceCommit: e901ebac48087d4585434c2d7959f6d980187516
+    brand:
+      path: examples/ecommerce-app-be/.starciwork/brand/index.yaml
+      sha256: c1d62c610275497bb7d334ec31218a12644d886672355c8b4c118640c70160cb
+      rev: 1
+    anatomyReferences:
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-screen.png
+      sha256: 0619dec4572f8d5931b39075d21aaf089963eaeab4e7bb883a35fb4cd28d5d2e
+      role: actual-installed-grammar-render; read-only reuse
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      sha256: 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
+      role: actual-installed-grammar-render; read-only reuse
+    grammarVersion: '@starci/grammar@0.4.13 as recorded by the existing Todo reference provenance; not
+      reinstalled or recaptured here.'
+    knowledge:
+      path: knowledge/ui/proof/anatomy-source.yaml
+      sha256: 60242ce2f09da22bbd84e6a1486daa5d37b709f837482b40f091ffd3778220c8
+      rules:
+      - ANATOMY-1
+      - ANATOMY-2
+      - ANATOMY-3
+      - ANATOMY-4
+      - ANATOMY-5
+      - prompt-shape-b2
+      - list-separator-bleed
+      - direction-scale-drift
+    promptExample:
+      path: examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
+      sha256: f77c0f9fc0715599d4ee2985ae04fe6ca514321c62c6dcc32f389880ca1c109d
+      originalLocation: ../ex-draw-v4/gen-lab/out/B3-final.txt
+      note: The brief named gen-lab/prompts/B3-final.txt; inspection found the proven prompt under gen-lab/out
+        instead. Retained byte-for-byte.
+    business:
+    - path: examples/ecommerce-app-be/.starciwork/features/identity/fr/sign-in/index.yaml
+      sha256: cb492ff86b46656ceae8ef6d7ef7c1e3a1f1ebe736a497f830b57bc93ddf3359
+    frontendContext:
+    - path: examples/ecommerce-app-fe/apps/shop/src/app/account/page.tsx
+      sha256: da279b02425e9b7b32094f28143f553b4b9521396b90b104ce89440970cea044
+    - path: examples/ecommerce-app-fe/apps/shop/src/modules/api/identity.ts
+      sha256: 0d4963111d808be1bfa91f6c7ebd4731e6c12e759dc23f604f5cc82e035b6f15
+  review:
+    status: agent-reviewed-proposal; owner acceptance not claimed
+    reviewedAt: '2026-09-18T16:38:48.982865+00:00'
+    method: Visual inspection of references and each generated image, then targeted imagegen edits and
+      reinspection.
+    passed:
+    - Duck entirely left; form entirely right with no outer card.
+    - Email and Password labels above visible grey controls; black label on teal submit.
+    - No refusal message, invented account links or social sign-in.
+    - Visible DIRECTION - NOT IMPLEMENTATION label.
+    - Saved PNG and exact sibling prompt with hashed brand/reference provenance.
+    limits:
+    - 'Raster teal is approximate even after a colour-only imagegen correction; exact #0D9488 remains
+      the sole implementation primary token. Do not sample the PNG as token truth.'
+    - Generated typography/control sizes and some radii are enlarged or approximate; the installed grammar
+      CSS remains size/shape truth (direction-scale-drift).
+    - Generated product render style and duck poses vary between screens; these are composition references,
+      not a final production artwork pack.
+    - Owner acceptance, live-browser fidelity, accessibility and API behavior are not asserted.
+  observations:
+  - SurfaceCard labels are inside; SurfaceListCard labels/counts are outside above and captions outside
+    below.
+  - The B3 example includes edge-to-edge static-row dividers; the reference task capture itself has plain
+    rows. Separator intent comes from the explicit list-separator-bleed observation.
+  - Source Todo brand and turtle placement are not authority for ecommerce brand rules.
+  - Generation is complete for this bounded draw request. State remains uninvestigate for proposed design
+    review, rather than asserting owner acceptance.
+  gaps:
+  - /account exists, but the current page has account/order readouts and no sign-in form. No new /sign-in
+    route is claimed; the session handoff is still deferred.

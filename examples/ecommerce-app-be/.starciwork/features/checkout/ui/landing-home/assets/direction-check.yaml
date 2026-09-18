@@ -1,0 +1,68 @@
+kind: direction-artifact-verification
+checkedAt: '2026-09-18T16:44:11.112855+00:00'
+result: pass
+scope: Artifact integrity and provenance only; not pixel-exact brand, browser, API, accessibility or owner-acceptance
+  proof.
+selectedDirections: 5
+totalPngsIncludingHistory: 12
+siblingPrompts: 12
+exactToolPromptComparison: 'Five original generation prompts and five selected final edit prompts compared
+  to the in-session tool argument strings: identical. Two anatomy edit prompts were read directly from
+  their saved files for the tool calls.'
+checks:
+- record: ui.checkout.cart
+  result: pass
+  checks:
+  - YAML parse, refs and state coverage
+  - PNG signature, chunk CRC, zlib payload and 1536x1024 dimensions
+  - Asset and prompt SHA-256 hashes
+  - B3 section order, literal containment, anti-pattern callout, explicit license
+  - Brand rev 1 and source/reference hashes
+  - Referenced image inputs exist and are named in exact sibling prompts
+  - Generation history is distinct from the single selected direction
+- record: ui.checkout.landing-home
+  result: pass
+  checks:
+  - YAML parse, refs and state coverage
+  - PNG signature, chunk CRC, zlib payload and 1536x1024 dimensions
+  - Asset and prompt SHA-256 hashes
+  - B3 section order, literal containment, anti-pattern callout, explicit license
+  - Brand rev 1 and source/reference hashes
+  - Referenced image inputs exist and are named in exact sibling prompts
+  - Generation history is distinct from the single selected direction
+- record: ui.checkout.shop-browse
+  result: pass
+  checks:
+  - YAML parse, refs and state coverage
+  - PNG signature, chunk CRC, zlib payload and 1536x1024 dimensions
+  - Asset and prompt SHA-256 hashes
+  - B3 section order, literal containment, anti-pattern callout, explicit license
+  - Brand rev 1 and source/reference hashes
+  - Referenced image inputs exist and are named in exact sibling prompts
+  - Generation history is distinct from the single selected direction
+- record: ui.checkout.stock-refused
+  result: pass
+  checks:
+  - YAML parse, refs and state coverage
+  - PNG signature, chunk CRC, zlib payload and 1536x1024 dimensions
+  - Asset and prompt SHA-256 hashes
+  - B3 section order, literal containment, anti-pattern callout, explicit license
+  - Brand rev 1 and source/reference hashes
+  - Referenced image inputs exist and are named in exact sibling prompts
+  - Generation history is distinct from the single selected direction
+- record: ui.identity.sign-in
+  result: pass
+  checks:
+  - YAML parse, refs and state coverage
+  - PNG signature, chunk CRC, zlib payload and 1536x1024 dimensions
+  - Asset and prompt SHA-256 hashes
+  - B3 section order, literal containment, anti-pattern callout, explicit license
+  - Brand rev 1 and source/reference hashes
+  - Referenced image inputs exist and are named in exact sibling prompts
+  - Generation history is distinct from the single selected direction
+visualReview: See each UI record and DIRECTIONS.md for observed containment/mascot checks and explicit
+  raster limitations.
+pixelTokenMatch: 'not exact; final sampled pixels are recorded in DIRECTIONS.md; #0D9488 remains unchanged
+  brand authority'
+lineEndings: All newly authored text uses LF per .gitattributes. Prompt hashes bind the exact UTF-8 LF
+  text sent to imagegen and retained by Git.
