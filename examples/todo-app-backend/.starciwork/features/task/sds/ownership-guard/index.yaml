@@ -31,5 +31,5 @@ requiresProof:
     forEach: stateMachine.transitions
 
 provenBy:
-  implementation: [impl.task.todo-app.ownership]
+  implementation: [impl.task.todo-app-backend.ownership]
   transitions: [t-owner, t-stranger]

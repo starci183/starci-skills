@@ -6,5 +6,5 @@ repositories:
   - role: be
     name: todo-app
   - role: fe
-    name: todo-app-web
+    name: todo-app-frontend
 

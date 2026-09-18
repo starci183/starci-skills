@@ -26,7 +26,7 @@ requiresProof:
 # provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
 # An agent-authored provenBy is refused: it would be this record speaking for another one.
 provenBy:
-  unit: [impl.task.todo-app.ownership]
+  unit: [impl.task.todo-app-backend.ownership]
   e2e:
     - command: npm run test:e2e -- tasks/create
       exit: 0

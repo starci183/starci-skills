@@ -29,5 +29,5 @@ requiresProof:
 
 # provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
 provenBy:
-  provider: [impl.login.todo-app.auth]
-  consumer: [impl.task.todo-app.ownership]
+  provider: [impl.login.todo-app-backend.auth]
+  consumer: [impl.task.todo-app-backend.ownership]

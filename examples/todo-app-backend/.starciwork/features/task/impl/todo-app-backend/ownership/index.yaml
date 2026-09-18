@@ -1,5 +1,5 @@
 schema: work/implementation
-id: impl.task.todo-app.ownership
+id: impl.task.todo-app-backend.ownership
 title: Ownership binding and its guard
 state: done
 repository: todo-app

@@ -22,4 +22,4 @@ requiresProof:
     note: A run against the real provider. Evidence must carry proof.boundary live and an empty fakes list.
 
 provenBy:
-  live: [impl.login.todo-app.auth]
+  live: [impl.login.todo-app-backend.auth]

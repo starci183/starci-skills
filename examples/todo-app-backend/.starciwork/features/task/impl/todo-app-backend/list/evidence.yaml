@@ -2,7 +2,7 @@
 # re-ran itself, not what the worker reported. It is a file of its own so that the history of a
 # record is the history of the record, and every re-run does not rewrite what the record says.
 schema: work/evidence
-record: impl.task.todo-app.list
+record: impl.task.todo-app-backend.list
 recordDigest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 outcome: pass
 assertions:

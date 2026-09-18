@@ -1,5 +1,5 @@
 schema: work/implementation
-id: impl.task.todo-app.list
+id: impl.task.todo-app-backend.list
 title: The owned-list query
 state: done
 repository: todo-app

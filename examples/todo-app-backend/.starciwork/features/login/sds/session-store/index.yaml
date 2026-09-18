@@ -62,5 +62,5 @@ requiresProof:
 
 # provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
 provenBy:
-  implementation: [impl.login.todo-app.auth]
+  implementation: [impl.login.todo-app-backend.auth]
   transitions: [t-begin, t-accept, t-refuse, t-expire, t-revoke]
