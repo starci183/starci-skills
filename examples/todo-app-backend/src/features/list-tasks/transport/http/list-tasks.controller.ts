@@ -14,7 +14,7 @@ export class ListTasksController {
   @Get()
   async list(@Headers('x-session-token') sessionToken: string): Promise<ListTasksResponse> {
     try {
-      const session = this.sessionRepository.findActive(sessionToken);
+      const session = await this.sessionRepository.findActive(sessionToken);
       const result = await this.listTasksUseCase.execute({ ownerId: session.personId });
       return new ListTasksResponse(
         result.tasks.map(task => new TaskSummaryResponse(task.taskId, task.title, task.complete)),

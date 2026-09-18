@@ -17,7 +17,7 @@ export class ReopenTaskController {
     @Param('id') taskId: string,
   ): Promise<ReopenTaskResponse> {
     try {
-      const session = this.sessionRepository.findActive(sessionToken);
+      const session = await this.sessionRepository.findActive(sessionToken);
       const result = await this.reopenTaskUseCase.execute({ actorId: session.personId, taskId });
       return new ReopenTaskResponse(result.taskId, result.complete);
     } catch (error) {

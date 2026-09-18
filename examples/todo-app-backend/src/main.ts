@@ -1,11 +1,13 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { AppConfigService } from './modules/platform/config';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
-  const port = Number(process.env.PORT ?? '3001');
-  await app.listen(port);
+  const config = app.get(AppConfigService);
+  app.enableCors({ origin: config.getCorsOrigin() });
+  await app.listen(config.getPort());
 }
 
 void bootstrap();

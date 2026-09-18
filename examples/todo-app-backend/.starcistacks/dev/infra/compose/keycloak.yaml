@@ -2,17 +2,20 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     command: start-dev --import-realm
-    depends_on:
-      - postgres
     environment:
-      KC_DB: postgres
-      KC_HTTP_PORT: "8089"
+      # KC_DB was declared as postgres with no KC_DB_URL/USERNAME/PASSWORD, which crashes this image at
+      # boot; start-dev's own embedded dev database is the correct fit here, so no KC_DB is declared.
+      KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD_FILE: /run/secrets/keycloak-admin-password
+      KC_HTTP_PORT: "8089"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HEALTH_ENABLED: "true"
     secrets:
       - keycloak-admin-password
+    volumes:
+      - ./realm-todo.json:/opt/keycloak/data/import/realm-todo.json:ro
     ports:
       - "8089:8089"
 secrets:
   keycloak-admin-password:
     file: ../../runtime/files/keycloak-admin-password.key
-

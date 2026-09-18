@@ -17,7 +17,7 @@ export class CompleteTaskController {
     @Param('id') taskId: string,
   ): Promise<CompleteTaskResponse> {
     try {
-      const session = this.sessionRepository.findActive(sessionToken);
+      const session = await this.sessionRepository.findActive(sessionToken);
       const result = await this.completeTaskUseCase.execute({ actorId: session.personId, taskId });
       return new CompleteTaskResponse(result.taskId, result.complete);
     } catch (error) {

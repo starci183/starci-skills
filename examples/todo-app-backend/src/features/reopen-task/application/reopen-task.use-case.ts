@@ -12,7 +12,7 @@ export class ReopenTaskUseCase {
   constructor(private readonly taskRepository: TaskRepository) {}
 
   async execute(params: ReopenTaskParams): Promise<ReopenTaskResult> {
-    const record = this.taskRepository.reopen(params.taskId, params.actorId);
+    const record = await this.taskRepository.reopen(params.taskId, params.actorId);
     return { taskId: record.id, complete: record.complete };
   }
 }

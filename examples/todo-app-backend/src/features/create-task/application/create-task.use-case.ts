@@ -11,7 +11,7 @@ export class CreateTaskUseCase {
   constructor(private readonly taskRepository: TaskRepository) {}
 
   async execute(params: CreateTaskParams): Promise<CreateTaskResult> {
-    const record = this.taskRepository.create(params.ownerId, params.title);
+    const record = await this.taskRepository.create(params.ownerId, params.title);
     return { taskId: record.id, title: record.title };
   }
 }

@@ -1,15 +1,35 @@
-import { PasswordService, PersonRepository, SessionRepository } from '../../../modules/domain/session';
+import { Repository } from 'typeorm';
+import { SessionRepository } from '../../../modules/domain/session';
+import { SessionEntity } from '../../../modules/integrations/postgres';
 import { KeycloakClient } from '../../../modules/integrations/keycloak';
 import { AppConfigService } from '../../../modules/platform/config';
 import { SignOutUseCase } from './sign-out.use-case';
 
+class FakeSessionRepository {
+  private readonly byToken = new Map<string, SessionEntity>();
+
+  async findOneBy(where: { token: string }): Promise<SessionEntity | null> {
+    return this.byToken.get(where.token) ?? null;
+  }
+
+  async save(row: Partial<SessionEntity>): Promise<SessionEntity> {
+    const entity = row as SessionEntity;
+    this.byToken.set(entity.token, entity);
+    return entity;
+  }
+
+  async delete(token: string): Promise<void> {
+    this.byToken.delete(token);
+  }
+}
+
 describe('SignOutUseCase', () => {
   it('br.login.session.restores: the session ends and the next request against that token is unauthenticated', async () => {
-    const sessionRepository = new SessionRepository();
-    const personRepository = new PersonRepository();
-    const passwordService = new PasswordService();
-    const person = personRepository.register('person@example.com', passwordService.hash('correct-horse'));
-    const session = sessionRepository.tAccept(person.id);
+    const sessionRepository = new SessionRepository(
+      new FakeSessionRepository() as unknown as Repository<SessionEntity>,
+      new AppConfigService(),
+    );
+    const session = await sessionRepository.tAccept('person-1');
     const keycloakClient = new KeycloakClient(new AppConfigService());
     jest.spyOn(keycloakClient, 'notifySignOut').mockResolvedValue(undefined);
 
@@ -17,6 +37,6 @@ describe('SignOutUseCase', () => {
     const result = await useCase.execute({ sessionToken: session.token });
 
     expect(result.signedOut).toBe(true);
-    expect(() => sessionRepository.findActive(session.token)).toThrow();
+    await expect(sessionRepository.findActive(session.token)).rejects.toThrow();
   });
 });
