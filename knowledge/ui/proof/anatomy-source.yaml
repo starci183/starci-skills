@@ -149,3 +149,21 @@ observations:
       Control runs: the same prompt without section 3's literal containment drew the section
       label inside the card (wrong vs the real render); the same prompt with unbounded freedom
       produced a beautiful screen for a different product.
+  - id: surface-label-placement
+    lane: ui
+    kind: anatomy-detail
+    summary: |-
+      The two card components place their labels differently, and a prompt that treats them
+      alike invents one of them. `SurfaceCard` paints one material box around label AND
+      content — its label ("New task") sits inside the card at the top. `SurfaceListCard`
+      renders its label and fact as siblings on the page background ABOVE the list shell —
+      the card bounds only the rows, the footer sits below it.
+  - id: list-separator-bleed
+    lane: ui
+    kind: anatomy-detail
+    summary: |-
+      List separators are edge-to-edge, not inset. The list shell ships `PADDING-0`; the
+      divider is a `border-top` on the row element itself, so it spans the card's full width
+      and touches both edges. Only the row's content is inset by the row's own padding.
+      Rows opt into this shipped geometry via `starci-core-static-row` — an app-owned row
+      without the class renders no separator at all.
