@@ -16,6 +16,39 @@ exceptions:
     reason: Verbatim Orca 1.4.188 settlement receipt captured as runtime 4.0 live proof.
   - path: docs/examples/v4-live-proof/verify.json
     reason: Verbatim Orca 1.4.188 receipt captured as runtime 4.0 live proof; JSON is the receipt format.
+  - path: examples/todo-app-backend/.starcistacks/dev/environment.json
+    reason: >
+      Rendered dev environment for the todo-app-backend application stack;
+      starci/rendered-environment output of application-stacks.yaml, JSON by
+      the rendering contract.
+  - path: examples/todo-app-backend/.starcistacks/vps/environment.json
+    reason: >
+      Rendered vps environment for the todo-app-backend application stack;
+      starci/rendered-environment output of application-stacks.yaml, JSON by
+      the rendering contract.
+  - path: examples/todo-app-backend/.starciwork/ledger-anchor.json
+    reason: >
+      Illustrative runtime ledger anchor for the example Work tree; the real
+      file is kernel-owned runtime custody (core/index.mjs ROOT_LOCAL_DIRS),
+      committed here only as example output, and JSON is its own format.
+  - path: examples/todo-app-backend/architecture.json
+    reason: NestJS architecture config for the real todo-app-backend example; the architecture checker reads starci/architecture-config@1 as JSON.
+  - path: examples/todo-app-backend/package-lock.json
+    reason: npm lockfile for the real todo-app-backend example; package managers require JSON filename and syntax.
+  - path: examples/todo-app-backend/package.json
+    reason: npm package manifest for the real todo-app-backend example; Node/npm require JSON filename and syntax.
+  - path: examples/todo-app-backend/tsconfig.json
+    reason: TypeScript project config for the real todo-app-backend example; tsc expects a JSON tsconfig file.
+  - path: examples/todo-app-frontend/architecture.json
+    reason: Next.js architecture config for the real todo-app-frontend example; the architecture checker reads starci/architecture-config@1 as JSON.
+  - path: examples/todo-app-frontend/package-lock.json
+    reason: npm lockfile for the real todo-app-frontend example; package managers require JSON filename and syntax.
+  - path: examples/todo-app-frontend/package.json
+    reason: npm package manifest for the real todo-app-frontend example; Node/npm require JSON filename and syntax.
+  - path: examples/todo-app-frontend/packages/grammar/package.json
+    reason: npm package manifest for the frontend's grammar workspace package; Node/npm require JSON filename and syntax.
+  - path: examples/todo-app-frontend/tsconfig.json
+    reason: TypeScript project config for the real todo-app-frontend example; tsc expects a JSON tsconfig file.
   - path: knowledge/ui/proof/calibration/calibration.json
     reason: >
       Explicit calibration dataset exception enforced by
