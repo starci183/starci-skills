@@ -20,6 +20,9 @@ records:
     feature: checkout
     state: null
     effectiveState: null
+    usedBy:
+      refs:
+        - ui.checkout.stock-refused
   ac.identity.sign-in.known-pair-issues-a-session-token:
     schema: work/acceptance-criterion
     feature: identity
@@ -84,11 +87,18 @@ records:
       refs:
         - contract.checkout.order-for-identity
         - sds.checkout.order-flow
+        - ui.checkout.cart
+        - ui.checkout.landing-home
+        - ui.checkout.shop-browse
+        - ui.checkout.stock-refused
   fr.identity.sign-in:
     schema: work/functional-requirement
     feature: identity
     state: done
     effectiveState: done
+    usedBy:
+      refs:
+        - ui.identity.sign-in
   gap.checkout.second-example-gates:
     schema: work/gap
     feature: checkout
@@ -131,6 +141,31 @@ records:
       refs:
         - integration.checkout.postgres
         - integration.checkout.redis
+  ui.checkout.cart:
+    schema: work/ui-screen
+    feature: checkout
+    state: uninvestigate
+    effectiveState: uninvestigate
+  ui.checkout.landing-home:
+    schema: work/ui-screen
+    feature: checkout
+    state: uninvestigate
+    effectiveState: uninvestigate
+  ui.checkout.shop-browse:
+    schema: work/ui-screen
+    feature: checkout
+    state: uninvestigate
+    effectiveState: uninvestigate
+  ui.checkout.stock-refused:
+    schema: work/ui-screen
+    feature: checkout
+    state: uninvestigate
+    effectiveState: uninvestigate
+  ui.identity.sign-in:
+    schema: work/ui-screen
+    feature: identity
+    state: uninvestigate
+    effectiveState: uninvestigate
 tally:
   overall:
     done: 8
