@@ -5,7 +5,7 @@ state: todo
 statement: integration.login.keycloak's and integration.login.postgres's requiresProof.live both need a run
   against the real provider (a real Keycloak token exchange, a real Postgres migration and round-trip),
   not against FakeKeycloakClient or an in-memory Repository stand-in, and uat.login.sign-in - which would
-  exercise exactly that pair - has never been executed by uat.verify against the running product either:
+  exercise exactly that pair - has never been executed by uat.verify against the running product either -
   there is no uat/sign-in/runs/<runId>/ folder with real screenshots, a playable video and a passing
   result.md, only the designed flow this record and its accounts.yaml/fixtures ref describe. This host
   cannot start the docker-compose dev stack (Keycloak on 8089, Postgres on 5432) that a live run needs, so
