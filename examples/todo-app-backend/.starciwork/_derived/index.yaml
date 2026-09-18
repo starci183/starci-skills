@@ -1532,6 +1532,11 @@ records:
     feature: notify
     state: done
     effectiveState: done
+  impl.notify.todo-app-frontend.preferences:
+    schema: work/implementation
+    feature: notify
+    state: done
+    effectiveState: done
   impl.plan.todo-app-backend.plan:
     schema: work/implementation
     feature: plan
@@ -2207,11 +2212,11 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 132
+    done: 133
     todo: 32
     stale: 2
     blocked: 36
-    total: 202
+    total: 203
   byFeature:
     audit:
       done: 20
@@ -2226,11 +2231,11 @@ tally:
       blocked: 3
       total: 24
     notify:
-      done: 19
+      done: 20
       todo: 6
       stale: 0
       blocked: 6
-      total: 31
+      total: 32
     plan:
       done: 17
       todo: 4
@@ -2831,6 +2836,9 @@ unclassifiedEdges:
   - from: impl.notify.todo-app-backend.pipeline
     field: proves
     target: sds.notify.delivery-lifecycle
+  - from: impl.notify.todo-app-frontend.preferences
+    field: proves
+    target: ui.notify.preferences
   - from: impl.plan.todo-app-backend.plan
     field: proves
     target: br.plan.active-scope

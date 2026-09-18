@@ -1,0 +1,87 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: impl.notify.todo-app-frontend.preferences
+recordDigest: 8c148684482ff1af16ac8e7677f36ae313021db4aab2dea3a0bd28b1b8b5f789
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/app/notify/preferences/page.tsx
+      sha256: 3d6ee705bc0372d705655e9a966134b419590a4aece104478574d70b0c868e49
+    - path: src/app/notify/unsubscribe/page.tsx
+      sha256: 187403618975388803947c64d125fe837e75018f8e8c171b5340f3ff5de0d961
+    - path: src/components/notify/api.ts
+      sha256: b1a24dac6938756edb963d428f9289f5f0a229cffede7041e25eb7c6034a2092
+    - path: src/components/notify/preferences/classNames.ts
+      sha256: e1f5bff220c4dd3afe642f741925e1699adcac323b59382db557b31b3bcb7cce
+    - path: src/components/notify/preferences/component.spec.tsx
+      sha256: e594fc260a145842e5ab931983635b3e118f50d417c2f198a5b2088a69bdda88
+    - path: src/components/notify/preferences/component.tsx
+      sha256: a4be4786dd974371a802562a533256567716fb622e25525834a6b27bfe634779
+    - path: src/components/notify/preferences/index.tsx
+      sha256: 65340959b07d38ee5a72a595fcfc7f962f936db38a9cc00230f82237047c9f44
+    - path: src/components/notify/unsubscribe/classNames.ts
+      sha256: d77c5c477cebc7ad2fd84d1f1cfe51b2d2bd41e62ae5ac913493e37d32333a15
+    - path: src/components/notify/unsubscribe/component.tsx
+      sha256: 0165b79875edebf237ceef0464912e9b1b5bc8564f40872ea9fd3feb48cfdea4
+    - path: src/components/notify/unsubscribe/index.tsx
+      sha256: 64425425a8ffe889151fac04637e5e6fdf4be1aab6c91c64d89aa684cb93030a
+  digest: d5d4f367e8ab407b349bacad96010ac3bee215076904ce815a4e10c876483f7d
+outcome: fail
+assertions:
+  - id: typecheck
+    command: npx tsc --noEmit
+    exit: 0
+    outcome: pass
+    observation: npx tsc --noEmit exited 0
+  - id: unit-tests
+    command: npx vitest run
+    exit: 0
+    outcome: pass
+    observation: npx vitest run exited 0
+  - id: lint
+    command: npx eslint src/
+    exit: 0
+    outcome: pass
+    observation: npx eslint src/ exited 0
+  - id: build
+    command: npm run build
+    exit: 0
+    outcome: pass
+    observation: npm run build exited 0
+  - id: architecture
+    command: node ../../cli/main.mjs architecture check . --config architecture.json
+    exit: 1
+    outcome: fail
+    observation: node ../../cli/main.mjs architecture check . --config architecture.json exited 1
+  - id: rendered-captures
+    command: node -e "const
+      fs=require('fs'),p='../todo-app-backend/.starciwork/features/notify/impl/todo-app-frontend/preferences/assets/';const
+      states=['subscribed','loading','unsubscribed','refused','saving'];const
+      vps=['desktop-1280','mobile-390'];let ok=true;for(const s of states)for(const v of
+      vps){for(const ext of ['png','html']){const
+      f=p+'preferences-'+s+'-'+v+'.'+ext;if(!fs.existsSync(f)||fs.statSync(f).size<1000){ok=false;console.log('missing/small',f);}}}for(const
+      v of vps){for(const ext of ['png','html']){const
+      f=p+'unsubscribe-link-unsubscribed-'+v+'.'+ext;if(!fs.existsSync(f)||fs.statSync(f).size<1000){ok=false;console.log('missing/small',f);}}}const
+      refused=fs.readFileSync(p+'preferences-refused-desktop-1280.html','utf8');if(!refused.includes('We
+      could')){ok=false;console.log('refused markup lacks refusal
+      sentence');}if(!ok)process.exit(1);console.log('12 state captures verified');"
+    exit: 0
+    outcome: pass
+    observation: node -e "const
+      fs=require('fs'),p='../todo-app-backend/.starciwork/features/notify/impl/todo-app-frontend/preferences/assets/';const
+      states=['subscribed','loading','unsubscribed','refused','saving'];const
+      vps=['desktop-1280','mobile-390'];let ok=true;for(const s of states)for(const v of
+      vps){for(const ext of ['png','html']){const
+      f=p+'preferences-'+s+'-'+v+'.'+ext;if(!fs.existsSync(f)||fs.statSync(f).size<1000){ok=false;console.log('missing/small',f);}}}for(const
+      v of vps){for(const ext of ['png','html']){const
+      f=p+'unsubscribe-link-unsubscribed-'+v+'.'+ext;if(!fs.existsSync(f)||fs.statSync(f).size<1000){ok=false;console.log('missing/small',f);}}}const
+      refused=fs.readFileSync(p+'preferences-refused-desktop-1280.html','utf8');if(!refused.includes('We
+      could')){ok=false;console.log('refused markup lacks refusal
+      sentence');}if(!ok)process.exit(1);console.log('12 state captures verified');" exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T14:37:54.102Z

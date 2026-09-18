@@ -1,0 +1,44 @@
+schema: work/implementation
+id: impl.notify.todo-app-frontend.preferences
+title: The notification preferences screen - email digest control and unsubscribe link
+state: done
+repository: todo-app-frontend
+owners:
+  - {role: route, path: src/app/notify}
+  - {role: block, path: src/components/notify}
+proves: [ui.notify.preferences]
+
+change:
+  rev: 1
+  kind: initial
+  at: 2026-09-18T22:30:00.000Z
+  reason: "Implements ui.notify.preferences against its settled direction
+    (features/notify/ui/preferences, the refused representative state). Route
+    adapters src/app/notify/{preferences,unsubscribe}/page.tsx mount the
+    connected blocks src/components/notify/{preferences,unsubscribe}/index.tsx;
+    each pure view component.tsx renders Grammar WorkspaceShell + PageContainer +
+    SurfaceCard + Heading + Text + TextAction + Button for all five mapped
+    preferences states and the signed-out unsubscribe-link projection at
+    desktop-1280 and mobile-390, and api.ts adapts the real GraphQL operations
+    notificationPreferences / updateNotificationPreferences / unsubscribe plus
+    signOut through src/modules/api transport. The unsubscribe-link projection is
+    honest about the backend contract: the unsubscribe mutation is session-bound,
+    so the served link carries the session token and the screen never claims a
+    tokenless email-link flow the API does not expose. Rendered proof: the 12
+    PNG+HTML captures in ./assets were produced by ./assets/capture.mjs from this
+    worktree's own `next build` + `next start` at localhost:3210 driving the live
+    dev API at localhost:3901 (started with CORS_ORIGIN for the served origin);
+    the refused state was triggered by answering the real
+    updateNotificationPreferences request with a GraphQL error, and loading and
+    saving were captured while the real requests were held in flight - no state
+    is staged in the DOM. Known open conflicts kept visible: `node
+    ../../cli/main.mjs architecture check . --config architecture.json` reports
+    13 violations that are all direct consequences of the lane write ceiling -
+    the frontend canon wants src/features/, src/components/{blocks,...}/ and
+    src/hooks/ homes plus an architecture.json owner entry, none of which this
+    lane may create (FE_SOURCE_LAYOUT_INVALID x7,
+    FE_COMPONENT_IMPORTS_TRANSPORT x2, FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES
+    x2, FE_ROUTE_ONE_PAGE x2); and the direction's own
+    THEME_IMPLEMENTATION_REQUIRED gap stands - installed token wiring ships only
+    the accent override, so primary Button labels render white-on-primary until a
+    separately authorized theme implementation supplies black label ink."
