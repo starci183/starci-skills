@@ -1853,6 +1853,14 @@ records:
         - impl.share.todo-app-frontend.invite-screen
         - nfr.share.revoke.read-latency
         - sds.share.invitation-lifecycle
+  gap.task.direction-not-drawn:
+    schema: work/gap
+    feature: task
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - ui.task.list
   gap.task.live-proof:
     schema: work/gap
     feature: task
@@ -2704,6 +2712,11 @@ records:
     feature: login
     state: null
     effectiveState: null
+  uat.login.sign-in.runs.20260918T070052Z-b037b5fe:
+    schema: starci/uat-run-manifest@1
+    feature: login
+    state: null
+    effectiveState: null
   uat.notify.digest-and-unsubscribe:
     schema: work/uat-flow
     feature: notify
@@ -2893,14 +2906,21 @@ records:
     schema: work/ui-screen
     feature: task
     state: todo
-    effectiveState: todo
+    effectiveState: blocked
+    blockers:
+      - id: gap.task.direction-not-drawn
+        rootKind: gap
+        cyclic: false
+        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
+          produced the many-tasks representative direction or its sibling prompt bytes yet, only the
+          prompt this record's assets entry names.
 tally:
   overall:
     done: 33
     todo: 38
     stale: 11
-    blocked: 106
-    total: 188
+    blocked: 107
+    total: 189
   byFeature:
     audit:
       done: 0
@@ -2942,8 +2962,8 @@ tally:
       done: 8
       todo: 9
       stale: 6
-      blocked: 6
-      total: 29
+      blocked: 7
+      total: 30
   gaps:
     - id: gap.audit.direction-not-drawn
       feature: audit
@@ -3037,6 +3057,10 @@ tally:
       feature: share
       state: todo
       closedBy: impl.share.todo-app-backend.access
+    - id: gap.task.direction-not-drawn
+      feature: task
+      state: todo
+      closedBy: ui.task.list
     - id: gap.task.live-proof
       feature: task
       state: todo
@@ -3143,6 +3167,9 @@ frontier:
   - id: decision.task.list.scope
     feature: task
     title: Does an organization owner see the tasks of its members
+  - id: gap.task.direction-not-drawn
+    feature: task
+    title: No interface.draw run has produced a direction for task.list
   - id: gap.task.live-proof
     feature: task
     title: No uat.verify run has produced a live run for task.create
@@ -3158,9 +3185,6 @@ frontier:
   - id: impl.task.todo-app-frontend.task-list
     feature: task
     title: The list screen and the create form
-  - id: ui.task.list
-    feature: task
-    title: The task list and its create form
 unclassifiedEdges:
   - from: ac.audit.append-only.chain-detects-tamper
     field: rule
@@ -3378,6 +3402,9 @@ unclassifiedEdges:
   - from: gap.share.unbuilt-module
     field: closedBy
     target: impl.share.todo-app-backend.access
+  - from: gap.task.direction-not-drawn
+    field: closedBy
+    target: ui.task.list
   - from: gap.task.live-proof
     field: closedBy
     target: uat.task.create
@@ -3616,6 +3643,18 @@ unclassifiedEdges:
     field: assertions.id
     target: fr.login.sign-in
   - from: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
+    field: nodeId
+    target: uat.login.sign-in
+  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
+    field: assertions.id
+    target: br.login.password.sign-in
+  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
+    field: assertions.id
+    target: br.login.session.restores
+  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
+    field: assertions.id
+    target: fr.login.sign-in
+  - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
     field: nodeId
     target: uat.login.sign-in
   - from: uat.notify.digest-and-unsubscribe
