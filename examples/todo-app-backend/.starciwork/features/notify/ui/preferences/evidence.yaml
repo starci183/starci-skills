@@ -1,0 +1,44 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: ui.notify.preferences
+recordDigest: 33c3dc6bd7031323abf6ddb299ede9d4fa5a3098bb43cbdb564d5ee6211fcdbd
+outcome: pass
+assertions:
+  - id: direction-asset-present
+    command: node -e "const fs=require('fs');const
+      b=fs.readFileSync('examples/todo-app-backend/.starciwork/features/notify/ui/preferences/assets/preferences-refused.png');if(b.length<20000||b.readUInt32BE(0)!==0x89504e47)process.exit(1)"
+    exit: 0
+    outcome: pass
+    observation: node -e "const fs=require('fs');const
+      b=fs.readFileSync('examples/todo-app-backend/.starciwork/features/notify/ui/preferences/assets/preferences-refused.png');if(b.length<20000||b.readUInt32BE(0)!==0x89504e47)process.exit(1)"
+      exited 0
+  - id: prompt-present
+    command: node -e
+      "if(!require('fs').existsSync('examples/todo-app-backend/.starciwork/features/notify/ui/preferences/assets/preferences-refused.prompt.txt'))process.exit(1)"
+    exit: 0
+    outcome: pass
+    observation: node -e
+      "if(!require('fs').existsSync('examples/todo-app-backend/.starciwork/features/notify/ui/preferences/assets/preferences-refused.prompt.txt'))process.exit(1)"
+      exited 0
+  - id: coverage-complete
+    command: node -e "(async()=>{const {parseYaml}=await import('./core/yaml.mjs');const
+      fs=require('fs');const
+      y=parseYaml(fs.readFileSync('examples/todo-app-backend/.starciwork/features/notify/ui/preferences/index.yaml','utf8'));const
+      states=(y.ui.states||[]).map(s=>s.name);const covered=new
+      Set((y.ui.coverage.map||[]).map(m=>m.state));const
+      missing=states.filter(s=>!covered.has(s));if(missing.length)process.exit(1)})()"
+    exit: 0
+    outcome: pass
+    observation: node -e "(async()=>{const {parseYaml}=await import('./core/yaml.mjs');const
+      fs=require('fs');const
+      y=parseYaml(fs.readFileSync('examples/todo-app-backend/.starciwork/features/notify/ui/preferences/index.yaml','utf8'));const
+      states=(y.ui.states||[]).map(s=>s.name);const covered=new
+      Set((y.ui.coverage.map||[]).map(m=>m.state));const
+      missing=states.filter(s=>!covered.has(s));if(missing.length)process.exit(1)})()" exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T06:50:41.314Z

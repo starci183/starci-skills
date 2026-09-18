@@ -1,7 +1,7 @@
 schema: work/ui-screen
 id: ui.notify.preferences
 title: The notification preferences screen
-state: todo
+state: done
 brand: {rev: 2}
 refs: [fr.notify.unsubscribe]
 ui:
@@ -52,5 +52,3 @@ assets:
       actor: codex
       profile: gpt-5.6-sol
       capturedAt: "2026-09-18T06:05:50.5142422Z"
-blockedBy:
-  - {record: gap.notify.direction-not-drawn, because: "interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has produced the refused representative direction or its sibling prompt bytes yet, only the prompt this record's assets entry names."}
