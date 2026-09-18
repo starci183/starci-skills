@@ -5,8 +5,13 @@ import { SessionService } from '@modules/bussiness/session';
 import { actorIdFromRequest, GraphqlRequestLike } from '../../../session-actor.adapter';
 import { AuditLogLineResponse } from './graphql-types/response';
 
-/** gap.audit.operator-role stays todo: this returns the caller's own lines only, never anyone else's -
- * see audit-log.query.ts's comment for why this is narrower than fr.audit.log.read's own mainFlow. */
+/** fr.audit.log.read's GraphQL entry point. It hands the authenticated subject to the read and lets
+ * AuditLogHandler decide the branch from the verified operator claim (AuditOperatorService, per
+ * decision.audit.operator-role): a session actor the operator roster does not name - which is every actor
+ * until a deployment configures one - reads only their own lines, exactly as before. The caller's role is
+ * never threaded through here, so a request cannot ask for a broader read than its subject is verified for.
+ * The action/target filter args remain the transport's to expose when the operator-facing UI lands; the
+ * handler already applies them. */
 @Resolver()
 export class AuditLogResolver {
   constructor(

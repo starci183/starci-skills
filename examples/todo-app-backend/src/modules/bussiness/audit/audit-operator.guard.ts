@@ -9,18 +9,18 @@ export { AuditOperatorRoleNotAuthorizedException } from './audit-operator-role.g
 export { AUDIT_SEALED_ACTIONS } from './audit-operator-read';
 export type { OperatorFilter } from './audit-operator-read';
 /**
- * gap.audit.operator-role, coded against how `session` resolves the actor today: SessionRecord is
- * {token, personId, issuedAt, expiresAt} and SessionService.findActive hands back exactly that - no
- * role claim exists anywhere in the session or person shape (data.login.person has no role field), so
- * an operator authorization cannot be checked without inventing one.
+ * decision.audit.operator-role (decided), coded against how the actor is resolved today. The check is a
+ * pure function pair (audit-operator-read.ts) that the read handlers call directly - it guards CQRS use
+ * cases, not just HTTP resolvers, which is why this class carries no Nest CanActivate requirement: the
+ * refusal must fire before a handler touches a line no matter what transport reached it.
  *
- * The check is a pure, unit-tested function pair (audit-operator-read.ts) that the read handlers call
- * directly - it guards CQRS use cases, not just HTTP resolvers, which is why this class carries no
- * Nest CanActivate: the refusal must fire before a handler touches a line no matter what transport
- * reached it. Call sites pass the claims they actually resolved from the live session (every audit
- * call site passes `role: undefined` today, read straight off the SessionRecord shape); if
- * sds.login.session-store later grows a role claim, the only change is which value the call sites
- * pass in - the check already honors operator/operator:* and denies everything else, fail-closed.
+ * What the decision settled is *who may hold an operator claim and where it comes from*: a caller-supplied
+ * `role` is never trusted (the session shape carries no role - SessionRecord is {token, personId, issuedAt,
+ * expiresAt} and data.login.person has no role field), so a role that rode in on the request would be an
+ * unverifiable claim. AuditOperatorService resolves the authenticated subject against a trusted server-side
+ * operator roster instead, and only a claim it mints reaches this check. The check honors operator and
+ * operator:* and denies everything else, fail-closed: no claim, or a subject the roster does not name,
+ * refuses and reads the caller's own lines - never a silently broader read.
  */
 @Injectable()
 export class AuditOperatorGuard {

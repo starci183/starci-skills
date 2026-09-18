@@ -2,8 +2,8 @@
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
-record: sds.audit.erasure-request
-recordDigest: ade73cc12ecbd2a8f19f0a24d97229178507b46bde2c5976df6d9e74de9fe75c
+record: fr.audit.log.read
+recordDigest: 7692e4ca2d08703a3e3249fad6888a25ebc1aa385e44ea29457604b4e152904b
 codeDigest:
   algorithm: sha256
   files:
@@ -82,35 +82,18 @@ codeDigest:
   digest: ebeb6f53654221ad23134ea294ad51b27bfda6cea0db9624ba5eb0760fa2c44e
 outcome: pass
 assertions:
-  - id: t-request
-    command: npx jest src/modules/bussiness/audit --runInBand -t "sds.audit.erasure-request t-request"
+  - id: fr.audit.log.read
+    command: npx jest src/modules/bussiness/audit/audit-log.handler.spec.ts --runInBand
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/audit --runInBand -t "sds.audit.erasure-request
-      t-request" exited 0
-  - id: t-verify
-    command: npx jest src/modules/bussiness/audit --runInBand -t "sds.audit.erasure-request t-verify"
+    observation: npx jest src/modules/bussiness/audit/audit-log.handler.spec.ts --runInBand exited 0
+  - id: operator-check-and-refusal
+    command: npx jest src/modules/bussiness/audit/audit-operator.guard.spec.ts --runInBand
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/audit --runInBand -t "sds.audit.erasure-request
-      t-verify" exited 0
-  - id: t-refuse
-    command: npx jest src/modules/bussiness/audit --runInBand -t "t-refuse"
-    exit: 0
-    outcome: pass
-    observation: npx jest src/modules/bussiness/audit --runInBand -t "t-refuse" exited 0
-  - id: t-execute
-    command: npx jest src/modules/bussiness/audit/audit-erasure.service.spec.ts --runInBand
-    exit: 0
-    outcome: pass
-    observation: npx jest src/modules/bussiness/audit/audit-erasure.service.spec.ts --runInBand exited 0
-  - id: t-complete
-    command: npx jest src/modules/bussiness/audit --runInBand -t "personId is dropped"
-    exit: 0
-    outcome: pass
-    observation: npx jest src/modules/bussiness/audit --runInBand -t "personId is dropped" exited 0
+    observation: npx jest src/modules/bussiness/audit/audit-operator.guard.spec.ts --runInBand exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T18:28:10.564Z
+  capturedAt: 2026-09-18T18:29:32.940Z

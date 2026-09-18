@@ -2,17 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { AbstractException } from '../../shared/exceptions/errors/abstract';
 
 /**
- * gap.audit.operator-role names this gap precisely: the example has no operator/admin role -
- * data.login.person has no role field and the session seam (contract.login.identity-for-task,
- * sds.login.session-store) resolves only personId, never a role claim. This exception is the honest
- * half of that gap: the wider, filtered operator read of fr.audit.log.read is refused with a stable
- * code rather than implemented by inventing a role no accepted record authorizes, or by silently
- * granting every caller operator powers.
+ * The fail-closed refusal behind decision.audit.operator-role. assertOperatorRead throws this when a
+ * reader's *verified* claim (AuditOperatorService resolves it from the authenticated subject against the
+ * trusted operator roster - the session shape itself carries no role) does not authorize the operator
+ * read of fr.audit.log.read: no claim, or a subject the roster does not name, is refused with a stable
+ * code before any line is touched, rather than silently widening to a read the caller cannot verify.
  */
 export class AuditOperatorRoleNotAuthorizedException extends AbstractException {
   constructor(metadata: Record<string, unknown> = {}) {
     super(
-      'This example has no operator role: the audit log can only be read as one\'s own lines.',
+      'Not authorized to read the operator audit view: this actor has no verified operator claim.',
       'AUDIT_OPERATOR_ROLE_NOT_AUTHORIZED',
       metadata,
     );

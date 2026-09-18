@@ -26,27 +26,31 @@ codeDigest:
     - path: src/modules/bussiness/audit/audit-keystore.service.ts
       sha256: f2cc333ed1d11b029d428be373452949508864125986d0c5b1473e083f041267
     - path: src/modules/bussiness/audit/audit-log.handler.spec.ts
-      sha256: 8104ce6cb40fa50b7e10a0b41ea4224c534306cc81d550f20887b5aa38ff6dcd
+      sha256: f60ff43de8e53a4beb81b70d485bbb8e8de6001c6d3e3f48a0f29fe6352edd24
     - path: src/modules/bussiness/audit/audit-log.handler.ts
-      sha256: d4af11a0b44d7daaf395fa163ed2aa180a2efc0ad011aff38cd9d4bd10774acb
+      sha256: 5d4962d78d6cef1451e755fcc9883f893d0fe5d9baa193c613b7655f7dbb8142
     - path: src/modules/bussiness/audit/audit-log.query.ts
-      sha256: dbd8ef80fc79235c7f19456800436812e1e26ee132087cb83a1fb32f77b1a70e
+      sha256: 87e5a2dda13c22ce799d5bf06713340497914e496bbf3e53fb0c07b073da45a9
     - path: src/modules/bussiness/audit/audit-log.service.spec.ts
       sha256: cefa03c5c1412d51166345b836771f4fc19d18d0dfbab897a183d7b2be99f3fc
     - path: src/modules/bussiness/audit/audit-log.service.ts
       sha256: 4b5e27e36546320d4f6247c04358bb0bf2a8f88cfe5e77cd60f8a8ecdb867cbd
     - path: src/modules/bussiness/audit/audit-operator-read.ts
-      sha256: 41dfc4e703529c15ce70a5705c833aa9423cb5c3f8697f93aa6d45de8823adb8
+      sha256: 7d6dc38c66e2410649167422ca2c0bf4db5b950fdeabdfda2a5bb0cfb79ad45f
     - path: src/modules/bussiness/audit/audit-operator-role.guard.ts
-      sha256: 48fa5e7d32eda75bb19cd12745fb4ce19f3c38f0f05cb8bde9dcc92fcdc07820
+      sha256: d3e2a8ff939acf5f3d06c00e1fbcb3ca3b75452b2a7438f91a4285a60c834fbb
     - path: src/modules/bussiness/audit/audit-operator.guard.spec.ts
       sha256: d24e68a69649fc27478cbae18777901fa6bb578c0d8e2cd2cec40c67bcb640a1
     - path: src/modules/bussiness/audit/audit-operator.guard.ts
-      sha256: 83cbc03a1ca12920c8a2b28516144ebda3f06018c731f2f37da0db298ddc8b19
+      sha256: cb20ecf154f0e16c93b64dddb26f2f7f717c433004b244db1570c581fc4ca25e
+    - path: src/modules/bussiness/audit/audit-operator.service.spec.ts
+      sha256: 2b27bb6978b7896d5f21bd0c9a8a89e97c9a5004fd5cbb7701ed8cb507a43836
+    - path: src/modules/bussiness/audit/audit-operator.service.ts
+      sha256: 31f5bf40a3e2c77680c6f8de058c627ff6a066d2b8325b062b4ffd99235a34de
     - path: src/modules/bussiness/audit/audit.module-definition.ts
       sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
     - path: src/modules/bussiness/audit/audit.module.ts
-      sha256: b6e8ea6911982e70bcc85956a9818f0b775ee34cef33efc29832cddb7f0c5e87
+      sha256: 64ef8c04e90d018c8622235d263d016c5cfa0055c23b987217df801703fe6378
     - path: src/modules/bussiness/audit/complete-erasure.command.ts
       sha256: 66f601bb3412b09cd047ba5ed3ae58a6a4e003dc458d2b7f7c965af1d71aba82
     - path: src/modules/bussiness/audit/complete-erasure.handler.spec.ts
@@ -60,7 +64,7 @@ codeDigest:
     - path: src/modules/bussiness/audit/export-my-data.query.ts
       sha256: 1e7756a93e84c771e87fa5fa5f18d687f273ddb966872df5a6860db56113ea6b
     - path: src/modules/bussiness/audit/index.ts
-      sha256: 1d197bf73ac2a43122c54faf98ab569872c3105cdc33e4ca1cdab0f439f91faf
+      sha256: a964371c73ac0c9c9d344b6c2860935e49d6c6a0493affcb32edce6233a302e3
     - path: src/modules/bussiness/audit/request-erasure.command.ts
       sha256: 34258bccb4ef9a8e4a01a1ff8437b234353992ad30cd52be11bb712d51674598
     - path: src/modules/bussiness/audit/request-erasure.handler.spec.ts
@@ -75,16 +79,17 @@ codeDigest:
       sha256: 6da1043d230a77172dffd07ab554c547f49eedf70181dcc9aeb1c50c8cdd9e1e
     - path: src/modules/bussiness/audit/types/resolved-audit-line.ts
       sha256: 6d217fbf835ab1f7b25c820c796876ae60f3acdaa7713efed415ba06c8ca8971
-  digest: eba24a24a77d94bd7ce91fc1f94c0d58c111e7ea7654583abd68ff3c00ab5162
+  digest: ebeb6f53654221ad23134ea294ad51b27bfda6cea0db9624ba5eb0760fa2c44e
 outcome: pass
 assertions:
   - id: ac.audit.append-only.chain-detects-tamper
-    command: npx jest -t "ac.audit.append-only.chain-detects-tamper"
+    command: npx jest src/modules/bussiness/audit --runInBand -t "ac.audit.append-only.chain-detects-tamper"
     exit: 0
     outcome: pass
-    observation: npx jest -t "ac.audit.append-only.chain-detects-tamper" exited 0
+    observation: npx jest src/modules/bussiness/audit --runInBand -t
+      "ac.audit.append-only.chain-detects-tamper" exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T12:11:07.668Z
+  capturedAt: 2026-09-18T18:27:04.233Z

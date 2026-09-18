@@ -5,6 +5,7 @@ export { AuditErasureService } from './audit-erasure.service';
 export { AuditKeystoreService, SYSTEM_ACTOR_ID } from './audit-keystore.service';
 export { AuditEventSubscriber } from './audit-event.subscriber';
 export { AuditOperatorGuard, AUDIT_SEALED_ACTIONS } from './audit-operator.guard';
+export { AuditOperatorService } from './audit-operator.service';
 export type { OperatorFilter } from './audit-operator.guard';
 export { ActorClaims } from './audit-operator-read';
 export {

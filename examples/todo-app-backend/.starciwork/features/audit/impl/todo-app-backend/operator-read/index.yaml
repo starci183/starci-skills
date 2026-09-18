@@ -2,7 +2,24 @@ schema: work/implementation
 id: impl.audit.todo-app-backend.operator-read
 title: The fail-closed operator check and the filtered whole-chain read
 repository: todo-app
-state: todo
+state: done
 owners:
   - {role: module, path: src/modules/bussiness/audit}
 proves: [fr.audit.log.read]
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-19T12:00:00.000Z
+  reason: "decision.audit.operator-role is decided (audit-verified-roster), so the operator read is built
+    and reachable end to end inside src/modules/bussiness/audit. audit-operator.service.ts mints a
+    verifiable operator claim from the authenticated subject against a trusted server-side roster;
+    AuditLogHandler dispatches on isOperatorRead of that claim - an operator reads the whole chain
+    (AuditLogService.readAllLines) filtered by action/target (matchOperatorFilter) and summarized without
+    leaking a sealed actor blob or keyId (toAuditLineSummary); any other actor, and every actor while the
+    roster is empty, reads exactly their own lines; an empty actor is refused before any line is touched
+    (assertReadableActor -> AuditOperatorRoleNotAuthorizedException, stable code). AuditLogQueryParams no
+    longer carries a caller-supplied role, so the claim cannot be forged from the request. Proven by fresh
+    jest runs bound in evidence.yaml: refusal and fail-closed narrowing in audit-log.handler.spec.ts and
+    audit-operator.guard.spec.ts, the whole-chain filtered read dispatched through the handler in
+    audit-log.handler.spec.ts, the trusted claim source and its DI resolution in
+    audit-operator.service.spec.ts."
