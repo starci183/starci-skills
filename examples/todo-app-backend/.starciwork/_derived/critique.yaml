@@ -512,6 +512,30 @@ findings:
       src/audit/erasure.service.ts, src/audit/keystore.service.ts, src/audit/log,
       src/audit/log.repository.ts, src/audit/log.service.ts) - this is the number a reviewer wants
       before approving the change.
+  - id: blast-radius:br.notify.digest.window
+    kind: blast-radius
+    severity: critical
+    records:
+      - br.notify.digest.window
+      - contract.notify.new-device-signal
+      - contract.notify.task-completion-feed
+      - data.notify.notification
+      - fr.notify.digest
+      - fr.notify.on-completion
+      - fr.notify.on-new-device
+      - impl.notify.todo-app-backend.pipeline
+      - integration.notify.queue
+      - nfr.notify.delivery.latency
+      - sds.notify.delivery-lifecycle
+      - uat.notify.digest-and-unsubscribe
+    because: A breaking change to br.notify.digest.window sends 11 other record(s) back to todo, would
+      stale 5 evidence file(s), and touches 7 code path(s)
+      (src/features/todo/graphql/mutations/notify, src/features/todo/graphql/queries/notify,
+      src/modules/bussiness/notify, src/modules/integrations/notify-queue,
+      src/modules/integrations/notify-smtp,
+      src/modules/platform/databases/postgresql/primary/entities/notification.entity.ts,
+      src/modules/shared/exceptions/errors/notify) - this is the number a reviewer wants before
+      approving the change.
   - id: blast-radius:br.recur.ending.preserves-history
     kind: blast-radius
     severity: critical
@@ -556,24 +580,29 @@ findings:
       src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments.ts,
       src/plan/reconcile.ts, src/plan/subscription.ts) - this is the number a reviewer wants before
       approving the change.
-  - id: blast-radius:br.notify.digest.window
+  - id: blast-radius:br.notify.delivery.once
     kind: blast-radius
     severity: critical
     records:
-      - br.notify.digest.window
+      - br.notify.delivery.once
       - contract.notify.new-device-signal
       - contract.notify.task-completion-feed
       - data.notify.notification
-      - fr.notify.digest
       - fr.notify.on-completion
       - fr.notify.on-new-device
+      - impl.notify.todo-app-backend.pipeline
       - integration.notify.queue
-      - nfr.notify.delivery.latency
+      - integration.notify.smtp
+      - nfr.notify.delivery.guarantee
       - sds.notify.delivery-lifecycle
-      - uat.notify.digest-and-unsubscribe
-    because: A breaking change to br.notify.digest.window sends 10 other record(s) back to todo, would
-      stale 0 evidence file(s), and touches 1 code path(s) (src/notify/digest) - this is the number
-      a reviewer wants before approving the change.
+    because: A breaking change to br.notify.delivery.once sends 10 other record(s) back to todo, would
+      stale 4 evidence file(s), and touches 7 code path(s)
+      (src/features/todo/graphql/mutations/notify, src/features/todo/graphql/queries/notify,
+      src/modules/bussiness/notify, src/modules/integrations/notify-queue,
+      src/modules/integrations/notify-smtp,
+      src/modules/platform/databases/postgresql/primary/entities/notification.entity.ts,
+      src/modules/shared/exceptions/errors/notify) - this is the number a reviewer wants before
+      approving the change.
   - id: blast-radius:br.share.invite.expiry
     kind: blast-radius
     severity: critical
@@ -613,23 +642,6 @@ findings:
       app/plan/usage-screen.tsx, src/modules/bussiness/task, src/plan/cap-guard,
       src/plan/cap-guard.ts, src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription.ts)
       - this is the number a reviewer wants before approving the change.
-  - id: blast-radius:br.notify.delivery.once
-    kind: blast-radius
-    severity: warn
-    records:
-      - br.notify.delivery.once
-      - contract.notify.new-device-signal
-      - contract.notify.task-completion-feed
-      - data.notify.notification
-      - fr.notify.on-completion
-      - fr.notify.on-new-device
-      - integration.notify.queue
-      - integration.notify.smtp
-      - nfr.notify.delivery.guarantee
-      - sds.notify.delivery-lifecycle
-    because: A breaking change to br.notify.delivery.once sends 9 other record(s) back to todo, would
-      stale 0 evidence file(s), and touches 1 code path(s) (src/notify/dedupe) - this is the number
-      a reviewer wants before approving the change.
   - id: blast-radius:br.task.delete.final
     kind: blast-radius
     severity: warn
@@ -666,6 +678,28 @@ findings:
       stale 1 evidence file(s), and touches 3 code path(s) (src/audit/erasure,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts) - this is the number a
       reviewer wants before approving the change.
+  - id: blast-radius:br.notify.unsubscribe.honored
+    kind: blast-radius
+    severity: warn
+    records:
+      - br.notify.unsubscribe.honored
+      - data.notify.delivery-attempt
+      - data.notify.preference
+      - fr.notify.unsubscribe
+      - impl.notify.todo-app-backend.pipeline
+      - integration.notify.queue
+      - sds.notify.delivery-lifecycle
+      - uat.notify.digest-and-unsubscribe
+      - ui.notify.preferences
+    because: A breaking change to br.notify.unsubscribe.honored sends 8 other record(s) back to todo,
+      would stale 5 evidence file(s), and touches 8 code path(s)
+      (src/features/todo/graphql/mutations/notify, src/features/todo/graphql/queries/notify,
+      src/modules/bussiness/notify, src/modules/integrations/notify-queue,
+      src/modules/integrations/notify-smtp,
+      src/modules/platform/databases/postgresql/primary/entities/notify-delivery-attempt.entity.ts,
+      src/modules/platform/databases/postgresql/primary/entities/notify-preference.entity.ts,
+      src/modules/shared/exceptions/errors/notify) - this is the number a reviewer wants before
+      approving the change.
   - id: blast-radius:br.recur.generation.once
     kind: blast-radius
     severity: warn
@@ -736,21 +770,6 @@ findings:
       src/audit/erasure.service.ts, src/audit/keystore.service.ts, src/audit/log,
       src/audit/log.repository.ts, src/audit/log.service.ts) - this is the number a reviewer wants
       before approving the change.
-  - id: blast-radius:br.notify.unsubscribe.honored
-    kind: blast-radius
-    severity: warn
-    records:
-      - br.notify.unsubscribe.honored
-      - data.notify.delivery-attempt
-      - data.notify.preference
-      - fr.notify.unsubscribe
-      - integration.notify.queue
-      - sds.notify.delivery-lifecycle
-      - uat.notify.digest-and-unsubscribe
-      - ui.notify.preferences
-    because: A breaking change to br.notify.unsubscribe.honored sends 7 other record(s) back to todo,
-      would stale 1 evidence file(s), and touches 1 code path(s) (src/notify/preferences) - this is
-      the number a reviewer wants before approving the change.
   - id: blast-radius:br.task.complete.once
     kind: blast-radius
     severity: warn
@@ -789,20 +808,18 @@ findings:
     records:
       - br.notify.failure.classified
       - data.notify.delivery-attempt
+      - impl.notify.todo-app-backend.pipeline
       - integration.notify.queue
       - integration.notify.smtp
       - sds.notify.delivery-lifecycle
-    because: A breaking change to br.notify.failure.classified sends 4 other record(s) back to todo,
-      would stale 0 evidence file(s), and touches 1 code path(s) (src/notify/delivery) - this is the
-      number a reviewer wants before approving the change.
-  - id: fan-in-hotspot:gap.notify.unbuilt-module
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - gap.notify.unbuilt-module
-    because: gap.notify.unbuilt-module is used 18 time(s) (top decile of fan-in); it is owned by notify
-      and read by 1 other feature(s) (task), so a change here is cross-feature coupling, not a local
-      edit.
+    because: A breaking change to br.notify.failure.classified sends 5 other record(s) back to todo,
+      would stale 3 evidence file(s), and touches 7 code path(s)
+      (src/features/todo/graphql/mutations/notify, src/features/todo/graphql/queries/notify,
+      src/modules/bussiness/notify, src/modules/integrations/notify-queue,
+      src/modules/integrations/notify-smtp,
+      src/modules/platform/databases/postgresql/primary/entities/notify-delivery-attempt.entity.ts,
+      src/modules/shared/exceptions/errors/notify) - this is the number a reviewer wants before
+      approving the change.
   - id: fan-in-hotspot:gap.audit.unbuilt-module
     kind: fan-in-hotspot
     severity: info
@@ -859,14 +876,6 @@ findings:
     because: br.share.role.permissions is used 9 time(s) (top decile of fan-in); it is owned by share
       and read by 1 other feature(s) (task), so a change here is cross-feature coupling, not a local
       edit.
-  - id: fan-in-hotspot:br.task.complete.once
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - br.task.complete.once
-    because: br.task.complete.once is used 9 time(s) (top decile of fan-in); it is owned by task and
-      read by 1 other feature(s) (notify), so a change here is cross-feature coupling, not a local
-      edit.
   - id: fan-in-hotspot:gap.share.unbuilt-module
     kind: fan-in-hotspot
     severity: info
@@ -883,6 +892,22 @@ findings:
     because: sds.plan.subscription-lifecycle is used 9 time(s) (top decile of fan-in); it is owned by
       plan and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a
       change here is cross-feature coupling, not a local edit.
+  - id: fan-in-hotspot:br.plan.caps.limit
+    kind: fan-in-hotspot
+    severity: info
+    records:
+      - br.plan.caps.limit
+    because: br.plan.caps.limit is used 8 time(s) (top decile of fan-in); it is owned by plan and read
+      by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change here is
+      cross-feature coupling, not a local edit.
+  - id: fan-in-hotspot:br.task.single-owner
+    kind: fan-in-hotspot
+    severity: info
+    records:
+      - br.task.single-owner
+    because: br.task.single-owner is used 8 time(s) (top decile of fan-in); it is owned by task and read
+      by 2 other feature(s) (login, share), so a change here is cross-feature coupling, not a local
+      edit.
   - id: unbound-sds:sds.audit.erasure-request
     kind: unbound-sds
     severity: warn
@@ -899,14 +924,6 @@ findings:
     because: sds.audit.log-chain authors no owners entry, so it has no bound module and no read-scope
       boundary - anything could claim to implement it, and nothing narrows what a reviewer must open
       to check.
-  - id: unbound-sds:sds.notify.delivery-lifecycle
-    kind: unbound-sds
-    severity: warn
-    records:
-      - sds.notify.delivery-lifecycle
-    because: sds.notify.delivery-lifecycle authors no owners entry, so it has no bound module and no
-      read-scope boundary - anything could claim to implement it, and nothing narrows what a
-      reviewer must open to check.
   - id: unbound-sds:sds.plan.cap-guard
     kind: unbound-sds
     severity: warn
@@ -1043,6 +1060,14 @@ findings:
       - gap.login.live-proof
     because: integration.login.postgres is todo, blocked on gap.login.live-proof - a real product
       question, not missing code; it moves once that is settled.
+  - id: designed-todo:integration.notify.smtp
+    kind: designed-todo
+    severity: info
+    records:
+      - integration.notify.smtp
+      - gap.notify.smtp-host-unreachable
+    because: integration.notify.smtp is todo, blocked on gap.notify.smtp-host-unreachable - a real
+      product question, not missing code; it moves once that is settled.
   - id: designed-todo:journey.login.first-sign-in
     kind: designed-todo
     severity: info
@@ -1159,38 +1184,6 @@ findings:
       - gap.audit.unbuilt-module
     because: br.audit.retention is todo, blocked on gap.audit.unbuilt-module - code that simply has not
       been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.notify.delivery.once
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.notify.delivery.once
-      - gap.notify.unbuilt-module
-    because: br.notify.delivery.once is todo, blocked on gap.notify.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.notify.digest.window
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.notify.digest.window
-      - gap.notify.unbuilt-module
-    because: br.notify.digest.window is todo, blocked on gap.notify.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.notify.failure.classified
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.notify.failure.classified
-      - gap.notify.unbuilt-module
-    because: br.notify.failure.classified is todo, blocked on gap.notify.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.notify.unsubscribe.honored
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.notify.unsubscribe.honored
-      - gap.notify.unbuilt-module
-    because: br.notify.unsubscribe.honored is todo, blocked on gap.notify.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:br.plan.active-scope
     kind: leftover-todo
     severity: info
@@ -1327,14 +1320,6 @@ findings:
       - gap.task.collaborator-completion
     because: contract.login.identity-for-task is todo, blocked on gap.task.collaborator-completion -
       code that simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:contract.notify.task-completion-feed
-    kind: leftover-todo
-    severity: info
-    records:
-      - contract.notify.task-completion-feed
-      - gap.notify.unbuilt-module
-    because: contract.notify.task-completion-feed is todo, blocked on gap.notify.unbuilt-module - code
-      that simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:contract.share.completion-guard-for-task
     kind: leftover-todo
     severity: info
@@ -1352,30 +1337,6 @@ findings:
       - gap.audit.unbuilt-module
     because: data.audit.erasure-request is todo, blocked on gap.audit.unbuilt-module - code that simply
       has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:data.notify.delivery-attempt
-    kind: leftover-todo
-    severity: info
-    records:
-      - data.notify.delivery-attempt
-      - gap.notify.unbuilt-module
-    because: data.notify.delivery-attempt is todo, blocked on gap.notify.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:data.notify.notification
-    kind: leftover-todo
-    severity: info
-    records:
-      - data.notify.notification
-      - gap.notify.unbuilt-module
-    because: data.notify.notification is todo, blocked on gap.notify.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:data.notify.preference
-    kind: leftover-todo
-    severity: info
-    records:
-      - data.notify.preference
-      - gap.notify.unbuilt-module
-    because: data.notify.preference is todo, blocked on gap.notify.unbuilt-module - code that simply has
-      not been written yet; the owner wants this count at zero.
   - id: leftover-todo:event.login.signed-in
     kind: leftover-todo
     severity: info
@@ -1391,14 +1352,6 @@ findings:
       - event.login.signed-out
       - gap.audit.unbuilt-module
     because: event.login.signed-out is todo, blocked on gap.audit.unbuilt-module - code that simply has
-      not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:event.task.completed
-    kind: leftover-todo
-    severity: info
-    records:
-      - event.task.completed
-      - gap.notify.unbuilt-module
-    because: event.task.completed is todo, blocked on gap.notify.unbuilt-module - code that simply has
       not been written yet; the owner wants this count at zero.
   - id: leftover-todo:event.task.created
     kind: leftover-todo
@@ -1448,30 +1401,6 @@ findings:
       - gap.audit.unbuilt-module
     because: fr.audit.log.append is todo, blocked on gap.audit.unbuilt-module - code that simply has not
       been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.notify.digest
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.notify.digest
-      - gap.notify.unbuilt-module
-    because: fr.notify.digest is todo, blocked on gap.notify.unbuilt-module - code that simply has not
-      been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.notify.on-completion
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.notify.on-completion
-      - gap.notify.unbuilt-module
-    because: fr.notify.on-completion is todo, blocked on gap.notify.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.notify.unsubscribe
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.notify.unsubscribe
-      - gap.notify.unbuilt-module
-    because: fr.notify.unsubscribe is todo, blocked on gap.notify.unbuilt-module - code that simply has
-      not been written yet; the owner wants this count at zero.
   - id: leftover-todo:fr.plan.downgrade
     kind: leftover-todo
     severity: info
@@ -1600,14 +1529,6 @@ findings:
       - gap.audit.unbuilt-module
     because: impl.audit.todo-app-backend.log is todo, blocked on gap.audit.unbuilt-module - code that
       simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:impl.notify.todo-app-backend.pipeline
-    kind: leftover-todo
-    severity: info
-    records:
-      - impl.notify.todo-app-backend.pipeline
-      - gap.notify.unbuilt-module
-    because: impl.notify.todo-app-backend.pipeline is todo, blocked on gap.notify.unbuilt-module - code
-      that simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:impl.plan.todo-app-backend.plan
     kind: leftover-todo
     severity: info
@@ -1672,22 +1593,6 @@ findings:
       - gap.task.collaborator-completion
     because: impl.task.todo-app-backend.ownership is todo, blocked on gap.task.collaborator-completion -
       code that simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:integration.notify.queue
-    kind: leftover-todo
-    severity: info
-    records:
-      - integration.notify.queue
-      - gap.notify.unbuilt-module
-    because: integration.notify.queue is todo, blocked on gap.notify.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:integration.notify.smtp
-    kind: leftover-todo
-    severity: info
-    records:
-      - integration.notify.smtp
-      - gap.notify.unbuilt-module
-    because: integration.notify.smtp is todo, blocked on gap.notify.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:integration.plan.sepay
     kind: leftover-todo
     severity: info
@@ -1719,9 +1624,9 @@ findings:
     severity: info
     records:
       - journey.notify.told-about-completion
-      - gap.notify.unbuilt-module
-    because: journey.notify.told-about-completion is todo, blocked on gap.notify.unbuilt-module - code
-      that simply has not been written yet; the owner wants this count at zero.
+      - gap.task.collaborator-completion
+    because: journey.notify.told-about-completion is todo, blocked on gap.task.collaborator-completion -
+      code that simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:journey.recur.first-recurring-task
     kind: leftover-todo
     severity: info
@@ -1754,14 +1659,6 @@ findings:
       - gap.audit.unbuilt-module
     because: nfr.audit.tamper-evidence is todo, blocked on gap.audit.unbuilt-module - code that simply
       has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:nfr.notify.delivery.latency
-    kind: leftover-todo
-    severity: info
-    records:
-      - nfr.notify.delivery.latency
-      - gap.notify.unbuilt-module
-    because: nfr.notify.delivery.latency is todo, blocked on gap.notify.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:nfr.plan.cap-check.latency
     kind: leftover-todo
     severity: info
@@ -1802,14 +1699,6 @@ findings:
       - gap.audit.unbuilt-module
     because: sds.audit.log-chain is todo, blocked on gap.audit.unbuilt-module - code that simply has not
       been written yet; the owner wants this count at zero.
-  - id: leftover-todo:sds.notify.delivery-lifecycle
-    kind: leftover-todo
-    severity: info
-    records:
-      - sds.notify.delivery-lifecycle
-      - gap.notify.unbuilt-module
-    because: sds.notify.delivery-lifecycle is todo, blocked on gap.notify.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:sds.plan.reconciliation
     kind: leftover-todo
     severity: info

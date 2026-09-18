@@ -327,8 +327,8 @@ records:
   br.notify.delivery.once:
     schema: work/business-rule
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - contract.notify.new-device-signal
@@ -341,19 +341,11 @@ records:
       composes:
         - fr.notify.on-completion
         - fr.notify.on-new-device
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No code exists yet at src/notify/dedupe. The example is moving to a NestJS backend and this
-          module has not been written against that layout; the statement is agreed but not
-          implementable-and-proven until it is, so it stays todo rather than done on the strength of
-          a design alone.
   br.notify.digest.window:
     schema: work/business-rule
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.notify.notification
@@ -363,35 +355,21 @@ records:
         - fr.notify.digest
         - fr.notify.on-completion
         - fr.notify.on-new-device
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No code exists yet at src/notify/digest. The example is moving to a NestJS backend and this
-          module has not been written against that layout, so the rule stays todo rather than
-          claiming proof it does not have.
   br.notify.failure.classified:
     schema: work/business-rule
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.notify.delivery-attempt
         - integration.notify.smtp
         - sds.notify.delivery-lifecycle
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No code exists yet at src/notify/delivery. The example is moving to a NestJS backend and
-          this module has not been written against that layout, so the classification stays a
-          design, not a demonstrated fact.
   br.notify.unsubscribe.honored:
     schema: work/business-rule
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.notify.delivery-attempt
@@ -399,12 +377,6 @@ records:
         - sds.notify.delivery-lifecycle
       composes:
         - fr.notify.unsubscribe
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No code exists yet at src/notify/preferences. The example is moving to a NestJS backend and
-          this module has not been written against that layout, so the rule stays todo.
   br.plan.active-scope:
     schema: work/business-rule
     feature: plan
@@ -678,9 +650,6 @@ records:
       composes:
         - fr.task.complete
         - fr.task.reopen
-      conflictsWith:
-        - contract.notify.task-completion-feed
-        - fr.notify.on-completion
       blockedBy:
         - fr.task.complete
         - fr.task.reopen
@@ -796,18 +765,10 @@ records:
     schema: work/contract
     feature: notify
     state: todo
-    effectiveState: blocked
+    effectiveState: todo
     usedBy:
       refs:
         - fr.notify.on-completion
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: "Owned entirely by the notify side of an interface that task has now built: complete-task's
-          use case publishes event.task.completed on the platform event bus. What remains is that no
-          notify module exists yet under the NestJS/Next.js layout to host onTaskComplete and call
-          it."
   contract.plan.create-precondition:
     schema: work/contract
     feature: plan
@@ -890,36 +851,18 @@ records:
   data.notify.delivery-attempt:
     schema: work/data
     feature: notify
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No entity or table exists yet. The example is moving to a NestJS/TypeORM backend and this
-          shape has not been created against that layout.
+    state: done
+    effectiveState: done
   data.notify.notification:
     schema: work/data
     feature: notify
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No entity or table exists yet. The example is moving to a NestJS/TypeORM backend and this
-          shape has not been created against that layout.
+    state: done
+    effectiveState: done
   data.notify.preference:
     schema: work/data
     feature: notify
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No entity or table exists yet. The example is moving to a NestJS/TypeORM backend and this
-          shape has not been created against that layout.
+    state: done
+    effectiveState: done
   data.plan.payment-intent:
     schema: work/data
     feature: plan
@@ -1108,19 +1051,12 @@ records:
     schema: work/event
     feature: task
     state: todo
-    effectiveState: blocked
+    effectiveState: todo
     usedBy:
       subscribes:
         - fr.audit.log.append
         - fr.notify.on-completion
         - sds.audit.log-chain
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: complete-task's use case now raises this event on the platform event bus after the write
-          succeeds; notify still has nothing to subscribe to it with, because no notify module
-          exists yet under the NestJS/Next.js layout.
   event.task.created:
     schema: work/event
     feature: task
@@ -1261,34 +1197,16 @@ records:
   fr.notify.digest:
     schema: work/functional-requirement
     feature: notify
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation exists. The example is moving to a NestJS backend and this module has not
-          been built against that layout.
+    state: done
+    effectiveState: done
   fr.notify.on-completion:
     schema: work/functional-requirement
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - contract.notify.task-completion-feed
-      blockedBy:
-        - journey.notify.told-about-completion
-        - nfr.notify.delivery.guarantee
-        - uat.notify.digest-and-unsubscribe
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: event.task.completed is now actually raised by complete-task's use case, which subscribes
-          names as the trigger instead of overloading contract.notify.task-completion-feed for it;
-          this record stays todo because no notify module exists yet under the NestJS/Next.js layout
-          to subscribe to it.
   fr.notify.on-new-device:
     schema: work/functional-requirement
     feature: notify
@@ -1310,19 +1228,11 @@ records:
   fr.notify.unsubscribe:
     schema: work/functional-requirement
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - ui.notify.preferences
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation exists at src/notify/preferences or app/notify under the NestJS/Next.js
-          layout the example is moving to; ui.notify.preferences (the only surface a person would
-          use to unsubscribe) now has its interface.draw direction and reached done, but nothing on
-          either side has been built against it yet.
   fr.plan.downgrade:
     schema: work/functional-requirement
     feature: plan
@@ -1508,6 +1418,7 @@ records:
         - event.task.completed
       blockedBy:
         - contract.share.completion-guard-for-task
+        - journey.notify.told-about-completion
     blockers:
       - id: gap.task.collaborator-completion
         rootKind: gap
@@ -1648,6 +1559,14 @@ records:
     usedBy:
       blockedBy:
         - fr.notify.on-new-device
+  gap.notify.smtp-host-unreachable:
+    schema: work/gap
+    feature: notify
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - integration.notify.smtp
   gap.notify.task-completion-event:
     schema: work/gap
     feature: notify
@@ -1656,28 +1575,8 @@ records:
   gap.notify.unbuilt-module:
     schema: work/gap
     feature: notify
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - br.notify.delivery.once
-        - br.notify.digest.window
-        - br.notify.failure.classified
-        - br.notify.unsubscribe.honored
-        - contract.notify.task-completion-feed
-        - data.notify.delivery-attempt
-        - data.notify.notification
-        - data.notify.preference
-        - event.task.completed
-        - fr.notify.digest
-        - fr.notify.on-completion
-        - fr.notify.unsubscribe
-        - impl.notify.todo-app-backend.pipeline
-        - integration.notify.queue
-        - integration.notify.smtp
-        - nfr.notify.delivery.latency
-        - sds.notify.delivery-lifecycle
-        - uat.notify.digest-and-unsubscribe
+    state: done
+    effectiveState: done
   gap.plan.cap-guard-not-wired:
     schema: work/gap
     feature: plan
@@ -1882,20 +1781,8 @@ records:
   impl.notify.todo-app-backend.pipeline:
     schema: work/implementation
     feature: notify
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: "No file listed above exists. An earlier version of this lane's work wrote a plain .mjs
-          prototype of this module directly under app/src/notify and it has been removed: the owner
-          set the stack to a real NestJS backend that must pass this runtime's own architecture
-          checks (checks/architecture.mjs, checks/code-patterns/nest*.mjs) driven by an
-          architecture.json this repository does not yet have, and five lanes each inventing an
-          incompatible Nest scaffold was judged worse than one lane leaving this todo. This record
-          names the target shape and defers the actual module, its files and its tests to whoever
-          builds the shared Nest scaffold."
+    state: done
+    effectiveState: done
   impl.plan.todo-app-backend.plan:
     schema: work/implementation
     feature: plan
@@ -2086,21 +1973,11 @@ records:
   integration.notify.queue:
     schema: work/integration
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       dependsOn:
         - sds.notify.delivery-lifecycle
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: "No code reaches Redis: nothing under this feature exists yet (the example is moving to a
-          NestJS backend and no lane-owned module has been written against it), and a probe from
-          this worktree found no Redis listening on 6379 (connection refused), so even a manual
-          smoke check has no live boundary to run against right now. Marking this done on the
-          strength of Redis existing elsewhere in the stack for a different purpose would be exactly
-          the invented evidence the common brief refuses."
   integration.notify.smtp:
     schema: work/integration
     feature: notify
@@ -2110,15 +1987,13 @@ records:
       dependsOn:
         - sds.notify.delivery-lifecycle
     blockers:
-      - id: gap.notify.unbuilt-module
+      - id: gap.notify.smtp-host-unreachable
         rootKind: gap
         cyclic: false
-        because: "No live SMTP boundary is reachable from this worktree: no server is declared or running,
-          and this lane owns no infrastructure to add one honestly without also owning the shared
-          stacks file other lanes touch. Nothing in src/notify (none of which exists yet either) has
-          ever spoken to a real SMTP host, so this record cannot claim done, and no fake run counts
-          as this integration's proof - a run against a fake would only prove it against the fake,
-          per the common brief's own rule."
+        because: No dev SMTP host is declared in application-stacks.yaml or reachable from this worktree;
+          scripts/live-proof-notify.sh's dispatch attempt against the configured host fails
+          transiently for exactly that reason. No fake run counts as this integration's proof - a
+          run against a fake would only prove it against the fake, per the common brief's own rule.
   integration.plan.sepay:
     schema: work/integration
     feature: plan
@@ -2197,13 +2072,14 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.notify.unbuilt-module
+      - id: gap.task.collaborator-completion
         rootKind: gap
         cyclic: false
-        because: event.task.completed is now actually raised by complete-task's use case, which subscribes
-          names as the trigger instead of overloading contract.notify.task-completion-feed for it;
-          this record stays todo because no notify module exists yet under the NestJS/Next.js layout
-          to subscribe to it.
+        because: This rule's evidence must be regenerated for both statements now that rev 2 withdrew the
+          old one - a kernel/uat lane's job, not this record's own authoring. That regeneration is
+          bound up with fr.task.complete's own composed proof, which spans both actors this rule's
+          module serves; the collaborator half of that proof has no implementation yet, which is the
+          one absence gap.task.collaborator-completion names.
   journey.plan.hits-the-cap:
     schema: work/customer-journey
     feature: plan
@@ -2309,26 +2185,11 @@ records:
         because: login exposes no device field on a session today; this record stays todo until
           event.login.new-device-signin is actually raised, which subscribes now names as the
           trigger instead of overloading contract.notify.new-device-signal for it.
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: event.task.completed is now actually raised by complete-task's use case, which subscribes
-          names as the trigger instead of overloading contract.notify.task-completion-feed for it;
-          this record stays todo because no notify module exists yet under the NestJS/Next.js layout
-          to subscribe to it.
   nfr.notify.delivery.latency:
     schema: work/non-functional-requirement
     feature: notify
     state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation exists to measure. The example is moving to a NestJS backend and neither
-          the pipeline nor a scheduler that closes windows on a clock (rather than on the next
-          enqueue call) has been built; today closing a window requires another admit call to
-          observe it, which the measurement above cannot honestly claim meets a wall-clock bound.
+    effectiveState: todo
   nfr.plan.cap-check.latency:
     schema: work/non-functional-requirement
     feature: plan
@@ -2431,18 +2292,11 @@ records:
   sds.notify.delivery-lifecycle:
     schema: work/sds-component
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - integration.notify.queue
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation exists. The example is moving to a NestJS backend and this component has
-          not been built against that layout, so every transition is unproven design rather than
-          demonstrated behavior.
   sds.plan.cap-guard:
     schema: work/sds-component
     feature: plan
@@ -2661,24 +2515,16 @@ records:
         cyclic: false
         because: uat.verify has not run this flow against the running product yet; no run folder under
           uat/digest-and-unsubscribe/runs/** exists with screens, video and a passing result.md,
-          only this designed flow shape.
+          only this designed flow shape. The backend half this flow depends on (notify pipeline,
+          GraphQL preferences/unsubscribe surface) is now real and end-to-end live-proven at the API
+          level by scripts/live-proof-notify.sh; what remains is a real browser walk through
+          ui.notify.preferences, which is outside this backend lane's scope.
       - id: gap.notify.new-device-event
         rootKind: gap
         cyclic: false
         because: login exposes no device field on a session today; this record stays todo until
           event.login.new-device-signin is actually raised, which subscribes now names as the
           trigger instead of overloading contract.notify.new-device-signal for it.
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: Cannot be walked. ui.notify.preferences (step 4's surface) has its interface.draw direction
-          and reached done, but no real implementation exists at src/notify/preferences or
-          app/notify yet for a person to actually sign in and use, and there is no real product
-          action that triggers a "notify-worthy event" (steps 2 and 5) because
-          fr.notify.on-completion and fr.notify.on-new-device - the only two things a real person
-          could do to produce one - are both todo, each conflictsWith a foreign gap. A synthetic
-          event injected outside the product would not be a UAT walk of the product surface; it
-          would be a call into internals wearing a UAT record's shape.
   uat.plan.upgrade-after-cap:
     schema: work/uat-flow
     feature: plan
@@ -2792,11 +2638,11 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 48
-    todo: 35
+    done: 62
+    todo: 38
     stale: 0
-    blocked: 111
-    total: 194
+    blocked: 95
+    total: 195
   byFeature:
     audit:
       done: 3
@@ -2811,11 +2657,11 @@ tally:
       blocked: 10
       total: 24
     notify:
-      done: 5
-      todo: 4
+      done: 19
+      todo: 6
       stale: 0
-      blocked: 21
-      total: 30
+      blocked: 6
+      total: 31
     plan:
       done: 6
       todo: 4
@@ -2836,9 +2682,9 @@ tally:
       total: 24
     task:
       done: 9
-      todo: 12
+      todo: 13
       stale: 0
-      blocked: 12
+      blocked: 11
       total: 33
   gaps:
     - id: gap.audit.direction-not-drawn
@@ -2899,6 +2745,11 @@ tally:
       state: todo
       closedBy:
         - event.login.new-device-signin
+    - id: gap.notify.smtp-host-unreachable
+      feature: notify
+      state: todo
+      closedBy:
+        - integration.notify.smtp
     - id: gap.notify.task-completion-event
       feature: notify
       state: todo
@@ -2906,7 +2757,7 @@ tally:
         - impl.task.todo-app-backend.platform-events
     - id: gap.notify.unbuilt-module
       feature: notify
-      state: todo
+      state: done
       closedBy:
         - impl.notify.todo-app-backend.pipeline
     - id: gap.plan.cap-guard-not-wired
@@ -2983,7 +2834,7 @@ tally:
       feature: task
       state: done
       closedBy: null
-  unbuiltModuleGaps: 5
+  unbuiltModuleGaps: 4
 frontier:
   - id: br.audit.erasure.logged
     feature: audit
@@ -3016,18 +2867,24 @@ frontier:
   - id: impl.login.todo-app-frontend.sign-in
     feature: login
     title: The sign-in route, feature and block
+  - id: contract.notify.task-completion-feed
+    feature: notify
+    title: What notify needs from task to notify on completion
   - id: gap.notify.live-proof
     feature: notify
     title: No uat.verify run has produced a live run for notify.digest-and-unsubscribe
   - id: gap.notify.new-device-event
     feature: notify
     title: login never emits a new-device sign-in signal today
+  - id: gap.notify.smtp-host-unreachable
+    feature: notify
+    title: No dev SMTP host is declared or reachable for a live send
   - id: gap.notify.task-completion-event
     feature: notify
     title: task never emits a completion event today
-  - id: gap.notify.unbuilt-module
+  - id: nfr.notify.delivery.latency
     feature: notify
-    title: No notify module exists under the NestJS/Next.js layout yet
+    title: A digested message goes out promptly after its window closes
   - id: gap.plan.cap-guard-not-wired
     feature: plan
     title: Nothing on the create path calls the cap guard yet
@@ -3064,6 +2921,9 @@ frontier:
   - id: contract.task.list-for-dashboard
     feature: task
     title: What a dashboard may read about a person's tasks
+  - id: event.task.completed
+    feature: task
+    title: A task was completed
   - id: gap.task.collaborator-completion
     feature: task
     title: The collaborator completion path is not implemented
@@ -3260,6 +3120,9 @@ unclassifiedEdges:
   - from: gap.notify.new-device-event
     field: closedBy
     target: event.login.new-device-signin
+  - from: gap.notify.smtp-host-unreachable
+    field: closedBy
+    target: integration.notify.smtp
   - from: gap.notify.task-completion-event
     field: closedBy
     target: impl.task.todo-app-backend.platform-events
@@ -3339,19 +3202,19 @@ unclassifiedEdges:
     field: proves
     target: ui.login.sign-in
   - from: impl.notify.todo-app-backend.pipeline
-    field: willProve
+    field: proves
     target: br.notify.delivery.once
   - from: impl.notify.todo-app-backend.pipeline
-    field: willProve
+    field: proves
     target: br.notify.digest.window
   - from: impl.notify.todo-app-backend.pipeline
-    field: willProve
+    field: proves
     target: br.notify.failure.classified
   - from: impl.notify.todo-app-backend.pipeline
-    field: willProve
+    field: proves
     target: br.notify.unsubscribe.honored
   - from: impl.notify.todo-app-backend.pipeline
-    field: willProve
+    field: proves
     target: sds.notify.delivery-lifecycle
   - from: impl.plan.todo-app-backend.plan
     field: proves
