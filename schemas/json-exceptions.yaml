@@ -21,6 +21,10 @@ exceptions:
       Rendered dev environment for the todo-app-backend application stack;
       starci/rendered-environment output of application-stacks.yaml, JSON by
       the rendering contract.
+  - path: examples/todo-app-backend/.starcistacks/dev/infra/compose/realm-todo.json
+    reason: >
+      Keycloak realm import for the dev todo-app-backend Compose stack; the
+      Keycloak container's realm-import feature requires a JSON realm file.
   - path: examples/todo-app-backend/.starcistacks/vps/environment.json
     reason: >
       Rendered vps environment for the todo-app-backend application stack;
@@ -37,6 +41,8 @@ exceptions:
     reason: npm lockfile for the real todo-app-backend example; package managers require JSON filename and syntax.
   - path: examples/todo-app-backend/package.json
     reason: npm package manifest for the real todo-app-backend example; Node/npm require JSON filename and syntax.
+  - path: examples/todo-app-backend/tsconfig.build.json
+    reason: TypeScript build project config for the real todo-app-backend example; tsc expects a JSON tsconfig file.
   - path: examples/todo-app-backend/tsconfig.json
     reason: TypeScript project config for the real todo-app-backend example; tsc expects a JSON tsconfig file.
   - path: examples/todo-app-frontend/architecture.json
