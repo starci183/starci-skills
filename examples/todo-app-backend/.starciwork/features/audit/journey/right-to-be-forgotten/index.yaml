@@ -19,3 +19,4 @@ requiresProof:
 
 blockedBy:
   - {record: gap.audit.live-proof, because: "Every fr in requirements (fr.audit.erasure.request, fr.audit.erasure.complete, fr.audit.export) is now done, closing the former gap.audit.unbuilt-module blocker. What remains is requiresProof.uat: no uat.verify run has walked this journey against the running product yet - the same absence gap.audit.live-proof names."}
+  - {record: decision.audit.operator-role, because: "The journey's fourth step is an operator read - it cannot be walked while no accepted record establishes who an operator is or how their claim is resolved (gap.audit.operator-role rev 2: the session seam resolves only {token, personId, issuedAt, expiresAt}). Audit's fail-closed check stands built for whatever the decision settles; the step itself is unwalkable until then, so the journey names this decision as a root, not the gap that only describes the absence."}

@@ -1,0 +1,45 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: br.identity.sign-in
+recordDigest: f6e0cc0dcab855717ebb560ac22e3a2ca39a60ed9283bba012092391f650f1fa
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: apps/identity/src/modules/bussiness/account/account.module.ts
+      sha256: 7a2dc489d0de0076a9867a9105f7647aa2687cf15ecf3a811b12ead671f59dbc
+    - path: apps/identity/src/modules/bussiness/account/account.service.ts
+      sha256: 29ce183f0ea6c41bb6f3afec426f7ea8413892384280b41871f880bed4f2cb89
+    - path: apps/identity/src/modules/bussiness/account/index.ts
+      sha256: b22f859efa914a5fd0109a92859af4e39dcf8f1018cf387a2ca8bcc3363c2010
+    - path: apps/identity/src/modules/bussiness/account/password.policy.spec.ts
+      sha256: 87aadbb7115ef48a196bc4612a3369361ad2e0167aea7497d35d5afd3a313a55
+    - path: apps/identity/src/modules/bussiness/account/password.policy.ts
+      sha256: 763a14383ee979d60ec35961497dc270bc6da31e699c325bd4479c116db4fe15
+    - path: apps/identity/src/modules/bussiness/session/index.ts
+      sha256: 3d28358fafc1786ad9d9f7cee42d882bfd38aad3379886536d120e31ee1c1cfd
+    - path: apps/identity/src/modules/bussiness/session/session.module.ts
+      sha256: f19f3da7b632f3a064c0ca16806608208a876dd25ed3ff23d64628d4c1af43d7
+    - path: apps/identity/src/modules/bussiness/session/session.repository.ts
+      sha256: 6cf4e80851882712f4b1e5ba6e19967307ea83da8f9dbea072155bb39ea20d2e
+    - path: apps/identity/src/modules/bussiness/session/session.service.ts
+      sha256: 702ef0c334f032b91a06b6fcb9df94c836b886f4e2e7ab336c3f31579c3c6da5
+  digest: f1ea489d96c0e3fffbb46fcfc9796eda603b374c55649b98db69bd80b0df6a38
+outcome: pass
+assertions:
+  - id: ac.identity.sign-in.known-pair-issues-a-session-token
+    command: npx jest -t ac.identity.sign-in.known-pair-issues-a-session-token
+    exit: 0
+    outcome: pass
+    observation: npx jest -t ac.identity.sign-in.known-pair-issues-a-session-token exited 0
+  - id: ac.identity.sign-in.wrong-pair-is-refused-alike
+    command: npx jest -t ac.identity.sign-in.wrong-pair-is-refused-alike
+    exit: 0
+    outcome: pass
+    observation: npx jest -t ac.identity.sign-in.wrong-pair-is-refused-alike exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T12:15:59.132Z

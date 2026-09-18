@@ -1,10 +1,13 @@
 schema: work/sds-component
 id: sds.task.completion-state
 title: How completion is stored and undone
-state: todo
+state: done
 responsibility: A boolean column and a timestamp, both cleared when the owner reopens the task.
 refs: [br.task.complete.once]
 dependsOn: [integration.login.postgres]
+
+owners:
+  - {role: module, path: src/modules/bussiness/task}
 
 stateMachine:
   states: [open, complete]
@@ -20,5 +23,9 @@ requiresProof:
   transitions:
     forEach: stateMachine.transitions
 
-blockedBy:
-  - {record: br.task.complete.once, rev: 2, because: "br.task.complete.once is todo at rev 2; t-reopen has no implementation and no test."}
+# The old blockedBy onto br.task.complete.once rev 2 is dropped twice over: that rule is now done, and
+# the edge's text ("t-reopen has no implementation and no test") is false against the current tree -
+# TaskService.tReopen exists, and all three transitions now have tests named after them in
+# task.service.spec.ts (sds.task.completion-state.t-complete, .t-complete-again, .t-reopen), captured
+# fresh in the sibling evidence.yaml. The persistence itself (the boolean column, the timestamp
+# column, the row living in Postgres) is what impl.task.todo-app-backend.platform-database proves done.

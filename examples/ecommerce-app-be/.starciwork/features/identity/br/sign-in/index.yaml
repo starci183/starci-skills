@@ -1,0 +1,17 @@
+schema: work/business-rule
+id: br.identity.sign-in
+title: A person signs in with an email and a password
+state: done
+statements:
+  - A sign-in succeeds only when the email is known and the password matches its stored hash.
+  - A failed sign-in says only that the pair is wrong, never which half.
+  - A session is an opaque token held in the identity service's Redis with a TTL; other services verify it over HTTP and never read the store.
+authorityRefs:
+  - "owner-intent: The second service has to keep its own credential surface honest before the cross-service contract means anything."
+acceptanceCriteria:
+  - known-pair-issues-a-session-token
+  - wrong-pair-is-refused-alike
+module:
+  - apps/identity/src/modules/bussiness/account
+  - apps/identity/src/modules/bussiness/session
+change: {rev: 1, kind: initial, at: 2026-09-18T00:00:00.000Z}

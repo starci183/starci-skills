@@ -1,0 +1,23 @@
+schema: work/gap
+id: gap.checkout.second-example-gates
+title: No CI job or host port-registry entry exists for this second example yet
+state: todo
+statement: >-
+  The repository's example workflow (.github/workflows/todo-app-example.yml) builds and live-proves
+  the todo example only - its records job walks every .starciwork tree under examples/, so this
+  tree is gate-checked, but no job compiles or boots apps/identity and apps/order yet. Wiring a
+  second example into that workflow edits shared files, which this lane's boundary forbids. The
+  host port registry (.workspaces/ports/ on the orchestrating machine) also has no ecommerce-app
+  entry at this writing: offset 69 is the orchestrating plan's assignment and this repository's
+  metadata.json carries its resolved projection, but the registry file itself is a host action
+  outside every lane's boundary. Third, and new to this topology: scripts/build-workflows.mjs
+  refuses the whole build mirror as soon as this example's dependencies are installed, because its
+  examples/ walk throws on npm's workspace symlinks and skips node_modules only under the
+  .starcistacks/scripts/gateway prefixes. The authored tree mirrors clean (ok:true, stale:[]), so
+  the blocker is the install this example's own runbook requires - a monorepo with linked
+  workspaces is exactly what todo-app-backend never had. Fourth: schemas/json-exceptions.yaml
+  allowlists authored JSON by exact todo-app path, so none of this example's nine JSON files is
+  visible to it (metadata.json and the two per-workspace package.json files have no analogue at
+  all); the gate cannot report that today because it throws on its own path-ordering rule first.
+  Measured counts, the isolation test and both attributions:
+  docs/examples/grit/second-example-gates.md §5, §6 and §7.

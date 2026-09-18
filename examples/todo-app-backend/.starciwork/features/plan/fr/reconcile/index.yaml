@@ -29,13 +29,16 @@ requiresProof:
     required: true
 
 change:
-  rev: 2
-  kind: editorial
-  at: 2026-09-18T16:00:00.000Z
-  reason: The unit half is satisfied - br.plan.payment.idempotent is done, and
-    reconcile-payment.handler.spec.ts unit-proves this flow's mainFlow/exceptionFlows against a fake
-    SepayClient. The remaining blocker is the uat half alone, narrowed to the real absences below.
+  rev: 3
+  kind: clarifying
+  at: 2026-09-18T11:32:43.321Z
+  reason: Rev 2 narrowed this to the uat half; the unit half still holds and the blocker wording has been
+    corrected against a measurement rather than a guess. integration.plan.sepay's gateway leg has been
+    called for real from this machine since that rev, and its replayable outcomes (401 with this
+    checkout's placeholder credential, 404 on the create-intent route) now sit in that record's own
+    evidence.yaml - the poll has never *completed*, which is the same thing this flow's uat proof still
+    waits on.
 
 blockedBy:
-  - {record: integration.plan.sepay, because: "The mainFlow's gateway poll has never reached the real SePay sandbox; a unit test against a fake proves this flow's logic, not the live integration."}
+  - {record: integration.plan.sepay, because: "The mainFlow's gateway poll has been sent for real from this machine but has never completed (see integration.plan.sepay's evidence.yaml, 2026-09-18); a unit test against a fake proves this flow's logic, not the live integration."}
   - {record: gap.plan.live-proof, because: "uat.verify has not run this flow, or the journey it belongs to, against the running product yet."}

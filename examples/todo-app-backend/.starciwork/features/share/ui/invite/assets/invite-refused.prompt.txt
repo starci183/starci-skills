@@ -1,52 +1,16 @@
-Screen: The invitation screen and the collaborator list (share.invite), route /tasks/:taskId/share, actor: owner
-State: refused - the invite is rejected, for example inviting an existing collaborator twice
-Behavior to depict: an assertive-live line of copy appears beside the invite form stating the invite was
-refused; the existing collaborator list, when one exists, is unchanged beside it
+Use case: ui-mockup. Generate one complete desktop Todo app direction, 1536 x 1024, guided closely by the actual rendered screenshots supplied. This is a straight-on browser-content view, no device or browser frame, no captions or source paths in the image.
+1. BRAND AUTHORITY: examples/todo-app-backend/.starciwork/brand/index.yaml rev 3 remains unchanged for brand surface, primary #2F6BFF, neutral canvas, white cards, Inter, turtle identity and permitted placement. User ADDENDUM 2 explicitly supersedes prior derived black-button-label and custom component treatments: PRIMARY BUTTON LABELS ARE WHITE, matching the actual installed component. Do not follow previous generated directions or recolour real component internals to satisfy an older interpretation. No mascot in controls or destructive contexts.
+2. ACTUAL GRAMMAR ANATOMY: @starci/grammar@0.4.13. Reference PNGs named below are the ONLY component appearance authority. Match their small, ordinary web UI type scale, controls, spacing, surface radius, depth, shadows and ink. Never redesign their shapes. Headings roughly 20px medium, body 16px, labels 14px; not giant bold display type. Header roughly 64px. Controls about 36px high, full-width auth submit about 44px. The supplied full screen is 1440x900; preserve that restrained native density in this 1536x1024 composition rather than zooming it.
+SurfaceCard: WHITE, modest rounded corners, soft subtle shadow, inset content. SurfaceListCard: external label at left, count at far right ABOVE a single WHITE raised shell containing all rows; footer OUTSIDE BELOW. No cards per row.
+Input variant secondary: visibly LIGHT GREY filled control inside the white card or auth panel, label above, optional hint above, error below. NO white-on-white nested fields. No extra shadow or border on ordinary secondary inputs; actual invalid field keeps grey fill with thin grammar danger edge and orange-red label/error as shown in primitives.png.
+Button primary: exact #2F6BFF blue pill, WHITE label. Button secondary: light neutral fill, BLUE label as in primitives.png. Button outline: white/clear fill, thin NEUTRAL GREY outline, DARK label; do not invent a danger button outline. Disabled primary uses the stock subdued blue fill and WHITE label in primitives.png. TextAction is the simple dark text link in the captures; no coloured decorative underline. Normal text is dark; secondary copy is muted.
+3. KNOWLEDGE: knowledge/ui/proof/anatomy-source.yaml ANATOMY-1/2/3/4, read from C:/Users/Hi/orca/workspaces/.claude/ex-lint/knowledge/ui/proof/anatomy-source.yaml because this checkout lacks that file. Formula: direction = real-render(anatomy) + brand(surface) + composition(intent). Layout, state and content may change; component shape may not. Also BRAND-1/2/3, LAYOUT-1/2/3, COLLECTION-1/2, CTA-1/2/3/4, RESPONSIVE-1/3 and CONTRAST-1/COLOR-5. Any legacy contrast/collection rule disagreement is documented in records, never repaired by painting invented controls. These are generated direction pixels, not implementation or API proof.
 
-Business grounding (accepted, do not invent beyond these):
-  - fr.share.invite
-  - fr.share.list
+ACTUAL IMAGE INPUTS:
+Image 1: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png — ANATOMY SOURCE (actual installed render).
+Image 2: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png — ANATOMY SOURCE (actual installed render).
 
-Brand (brand/index.yaml rev 2, read do not restate elsewhere):
-  - primary: #2F6BFF
-  - surface: #FFFFFF
-  - typography: Inter, sans-serif
-  - don't: Never place text on the primary colour below a 4.5:1 contrast ratio.
+SCREEN CONTENT AND COMPOSITION:
+Use the exact workspace header of tasks-screen.png: small Todo app identity at far left, Tasks / Notifications / Plan / Privacy in one horizontal navigation row, A Alex Sign out at far right. Fine neutral bottom separator. No avatar circle, no oversized header, no decorative blue tab bars. Name the current feature with its page heading and semibold current nav text. Main content starts about 112px from the left, ends about 112px from the right; calm reading measure. Footer Privacy policy and Terms appears beneath main content at the same left edge, with generous space below. Tasks is the current destination. Breadcrumb Tasks / Plan the week / Sharing. Heading Share this task, context Plan the week and Back to task text link. One white raised SurfaceCard for Invite a collaborator, Choose who can view or edit this task. Email address label above a visibly LIGHT GREY SECONDARY invalid field retaining jamie@; use actual danger field edge, coloured label and error Enter a valid email address. as primitives.png, with grey interior. App-owned native radio group Role: Viewer selected, Editor unselected. Help Viewers can read. Editors can complete the task. Blue primary Send invitation pill with WHITE label. Below, separate SurfaceListCard, external Collaborators / 2 people header. Inside its ONE white raised body, app-owned plain aligned rows: Person / Access / Status columns; sam@example.test / Editor / Accepted / Revoke; lee@example.test / Viewer / Pending / Revoke. Status labels use the modest neutral Badge style from primitives.png, not oversized chips. Revoke uses actual NEUTRAL-outline Button. Expiry footer outside below: Pending invitations expire after 14 days. Use actual component scale, not giant typography. No mascot.
 
-Relevant UI knowledge:
-  - knowledge/ui/composition/collection.yaml (COLLECTION-1, COLLECTION-2)
-
-Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
-examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
-9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components, no
-invented ones. impl.share.todo-app-frontend.invite-screen is still unbuilt (blockedBy
-gap.share.unbuilt-module), so this binding is drawn directly from the real export list:
-  - SurfaceCard {ariaLabel: "Invite collaborators", measure: "formCompact"} - the invite form's own
-    bounded surface, holding only the form, never the list
-  - Input {id: "invite-email", name: "email", label: "Invite by email", kind: "email"}
-  - Text {live: "assertive"}, plain body copy carrying the refusal sentence beside the form - Common
-    ships no Message/Alert renderer and Text has no `tone: "danger"` value; severity is carried by the
-    sentence and by `aria-live="assertive"` alone
-  - Button {type: "submit", variant: "primary", isPending}, the invite action
-  - SurfaceListCard {label: "Collaborators", isVerdict: false}, the collaborator list's own container -
-    the real published collection container per COLLECTION-1 case-5, a distinct component from
-    SurfaceCard and not a second card wrapped around the same list
-  - one application-owned row per collaborator inside SurfaceListCard's children, each carrying:
-    Text (the collaborator's email), Badge {tone: "neutral" (pending) | "success" (accepted)}, and
-    Button {type: "button", variant: "ghost"} (revoke) - StaticStateRow cannot hold this row because it
-    is documented non-interactive and a revoke action is required, so the row is application-owned markup
-    exactly as SurfaceListCard's own doc describes ("an application-owned row spells the attribute itself
-    and gets exactly the same shipped edge")
-
-Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
-GrammarTextField/GrammarButton/GrammarMessage anatomy, no HeroUI component reached directly, no invented
-Alert/Toast/Banner, and no second SurfaceCard wrapped around the collaborator rows.
-
-Layout note: The collaborator list is a page section named by SurfaceListCard's own `label`, never a
-card; one collaborator is one plain row inside it, per COLLECTION-1.
-
-Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
-4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
-beyond brand/assets/**; no second card nested around the collaborator rows (COLLECTION-2 case-4).
-
-Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).
+Final fidelity check: match referenced component silhouettes and native text scale. Grey nested inputs. White primary labels. Actual secondary/outline variants. Product-specific invention only in the declared layout and state/content. Entire screen visible; no annotations.

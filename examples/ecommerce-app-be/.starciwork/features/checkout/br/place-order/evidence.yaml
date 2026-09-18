@@ -1,0 +1,60 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: br.checkout.place-order
+recordDigest: d5779d79045fbe472e9c13b12953d6c1b7d749f44d6f3c8bd16ec3af5dbdeb22
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: apps/identity/src/modules/integrations/order/index.ts
+      sha256: 5e7c29e6a5c694e3f2f399c05bf4a68614568934086995ad0b48e21de7ddea7c
+    - path: apps/identity/src/modules/integrations/order/order.client.spec.ts
+      sha256: 93dabe79e29f02f614912e2b4bef84d62ac88f192ed10bdea7aee8727dbc41c3
+    - path: apps/identity/src/modules/integrations/order/order.client.ts
+      sha256: c0a1fd68517e1090444007d9db448c246ae38d6332e3bf09dde4f0df77067424
+    - path: apps/identity/src/modules/integrations/order/order.module.ts
+      sha256: 8af8dfa8d323a2384e5eaf014f72ef21866e4922dd1faf4ee6c74a30ae05ce42
+    - path: apps/order/src/modules/bussiness/order/checkout-refusal.exception.ts
+      sha256: dfab5a41689a2f20808d5b39c368fe77171c5e03a7ffc94405577049311543a1
+    - path: apps/order/src/modules/bussiness/order/checkout.policy.spec.ts
+      sha256: 46da47af8e30765ab43ff30afdbd0a62d517333e44c2a771f819f0dea9740cba
+    - path: apps/order/src/modules/bussiness/order/checkout.policy.ts
+      sha256: e4cc2ec943f2ba2f930cd180e6012cf8287ba3809299cd4d4d2dcca5d6b5690f
+    - path: apps/order/src/modules/bussiness/order/index.ts
+      sha256: d0510a9ba711a6c4de28cbf640c6a1a879cd16d5a58fd8626f16a0f344db23e9
+    - path: apps/order/src/modules/bussiness/order/order.module.ts
+      sha256: df44c32a5d302f9dd93c555ed3a99d51ca0c58d6ecdea3e8fe8fe2244ee3cb27
+    - path: apps/order/src/modules/bussiness/order/order.service.ts
+      sha256: f6df7a7ff70a37766f153c05f90452c28b5303bdef1483a6241dfe6d6548a285
+    - path: apps/order/src/modules/integrations/identity/identity.client.spec.ts
+      sha256: f80098bf4dca6a3d03f80ef8eb9b54da31365713a8f7a1e14371ab134785ad89
+    - path: apps/order/src/modules/integrations/identity/identity.client.ts
+      sha256: 1482b741b73cd1381e42b60b31bb8d481b36eb34f6f5b07914ca97f089dacf1a
+    - path: apps/order/src/modules/integrations/identity/identity.module.ts
+      sha256: f1e6786db20af94b43caa344357284aa7e528a6eca0abc51c56a843844583619
+    - path: apps/order/src/modules/integrations/identity/index.ts
+      sha256: 2e0029921de62b4fe6e6f4fa44b49f8db8fb757998e09f0d808df414d5a4447a
+  digest: 42e3f4282a727a6890f7ac53e32a1fc70612ffbf71415ebc71ee6c29cf3bbce4
+outcome: pass
+assertions:
+  - id: ac.checkout.place-order.becomes-a-buyer
+    command: node scripts/live-proof.mjs
+    exit: 0
+    outcome: pass
+    observation: node scripts/live-proof.mjs exited 0
+  - id: ac.checkout.place-order.empty-cart-is-refused
+    command: npx jest -t ac.checkout.place-order.empty-cart-is-refused
+    exit: 0
+    outcome: pass
+    observation: npx jest -t ac.checkout.place-order.empty-cart-is-refused exited 0
+  - id: ac.checkout.place-order.stock-is-checked-at-confirmation
+    command: npx jest -t ac.checkout.place-order.stock-is-checked-at-confirmation
+    exit: 0
+    outcome: pass
+    observation: npx jest -t ac.checkout.place-order.stock-is-checked-at-confirmation exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T12:15:02.386Z

@@ -10,6 +10,13 @@
  */
 @source "../../node_modules/@starci/grammar/dist";
 
+/* todo-app brand rev 3: the product primary overrides Grammar's default accent. */
+:root,
+.grammar-common-root {
+  --starci-core-accent: #2F6BFF;
+  --accent: var(--starci-core-accent);
+}
+
 body {
   margin: 0;
   background: var(--background);

@@ -1,0 +1,13 @@
+schema: work/workspace
+id: ecommerce-app
+project: ecommerce-app
+description: >-
+  The second example product: a small real shop backend, deployed as two services
+  (identity, order) from one nivo-shaped npm-workspaces monorepo, paired with the
+  ecommerce-app-fe repository. One canonical Work tree - this file's repository owns it;
+  the sibling repository binds into it rather than starting its own.
+repositories:
+  - role: be
+    name: ecommerce-app-be
+  - role: fe
+    name: ecommerce-app-fe

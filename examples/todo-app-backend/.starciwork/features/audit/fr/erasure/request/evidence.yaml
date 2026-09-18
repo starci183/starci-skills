@@ -7,22 +7,24 @@ recordDigest: 86cf9050feac74382e735dfa7ba5161924b3c9a9fa30078b49e4c437ae09863b
 outcome: pass
 assertions:
   - id: br.audit.erasure.right
-    command: npx jest -t "ac.audit.erasure.right.identifying-fields-unreadable"
+    command: npx jest -t ac.audit.erasure.right.identifying-fields-unreadable
     exit: 0
     outcome: pass
-    observation: npx jest -t "ac.audit.erasure.right.identifying-fields-unreadable" exited 0
+    observation: npx jest -t ac.audit.erasure.right.identifying-fields-unreadable exited 0
   - id: br.audit.erasure.logged
-    command: npx jest -t "ac.audit.erasure.logged.request-and-completion-are-lines"
+    command: npx jest -t ac.audit.erasure.logged.request-and-completion-are-lines
     exit: 0
     outcome: pass
-    observation: npx jest -t "ac.audit.erasure.logged.request-and-completion-are-lines" exited 0
+    observation: npx jest -t ac.audit.erasure.logged.request-and-completion-are-lines exited 0
   - id: handler
     command: npx jest src/modules/bussiness/audit/request-erasure.handler.spec.ts
+      src/modules/bussiness/audit/audit-erasure.service.spec.ts
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/audit/request-erasure.handler.spec.ts exited 0
+    observation: npx jest src/modules/bussiness/audit/request-erasure.handler.spec.ts
+      src/modules/bussiness/audit/audit-erasure.service.spec.ts exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T09:20:49.602Z
+  capturedAt: 2026-09-18T11:51:52.969Z

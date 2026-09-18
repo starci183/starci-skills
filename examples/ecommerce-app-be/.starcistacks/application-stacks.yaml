@@ -1,0 +1,44 @@
+schema: starci/application-stacks
+sources:
+  - repository: ecommerce-app-be
+components:
+  postgres:
+    image: postgres:16
+    role: stateful
+    compose: infra/compose/postgres.yaml
+  redis:
+    image: redis:7
+    role: stateful
+    compose: infra/compose/redis.yaml
+  identity:
+    image: ecommerce-app-be/identity
+    role: service
+    compose: infra/compose/identity.yaml
+  order:
+    image: ecommerce-app-be/order
+    role: service
+    compose: infra/compose/order.yaml
+environments:
+  dev:
+    status: supported
+    runtime: docker-compose
+    composeFiles:
+      - infra/compose/compose.yaml
+    components:
+      postgres:
+        port: 5501
+      redis:
+        port: 6448
+      identity:
+        port: 5070
+      order:
+        port: 6070
+    runbook: README.md
+    # The dev stack carries no secret material (the local Postgres runs with trust auth), so there is
+    # nothing to custody yet - a real environment adopts the SOPS+age pattern the todo-app example
+    # demonstrates before it holds anything worth encrypting.
+    secrets: []
+k8s:
+  status: deferred
+  reason: >-
+    No Kubernetes deployment is declared for the dev-only second example.

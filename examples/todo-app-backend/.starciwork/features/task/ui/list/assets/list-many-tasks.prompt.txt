@@ -1,49 +1,18 @@
-Screen: The task list and its create form (task.list), route /tasks, actor: owner
-State: many-tasks - the owner has multiple tasks in their list
-Behavior to depict: the create-task form sits above a list of rows, each with a completion checkbox, its
-title, and a delete action; several rows are shown, at least one complete and one incomplete
+Use case: ui-mockup. Generate one complete desktop Todo app direction, 1536 x 1024, guided closely by the actual rendered screenshots supplied. This is a straight-on browser-content view, no device or browser frame, no captions or source paths in the image.
+1. BRAND AUTHORITY: examples/todo-app-backend/.starciwork/brand/index.yaml rev 3 remains unchanged for brand surface, primary #2F6BFF, neutral canvas, white cards, Inter, turtle identity and permitted placement. User ADDENDUM 2 explicitly supersedes prior derived black-button-label and custom component treatments: PRIMARY BUTTON LABELS ARE WHITE, matching the actual installed component. Do not follow previous generated directions or recolour real component internals to satisfy an older interpretation. No mascot in controls or destructive contexts.
+2. ACTUAL GRAMMAR ANATOMY: @starci/grammar@0.4.13. Reference PNGs named below are the ONLY component appearance authority. Match their small, ordinary web UI type scale, controls, spacing, surface radius, depth, shadows and ink. Never redesign their shapes. Headings roughly 20px medium, body 16px, labels 14px; not giant bold display type. Header roughly 64px. Controls about 36px high, full-width auth submit about 44px. The supplied full screen is 1440x900; preserve that restrained native density in this 1536x1024 composition rather than zooming it.
+SurfaceCard: WHITE, modest rounded corners, soft subtle shadow, inset content. SurfaceListCard: external label at left, count at far right ABOVE a single WHITE raised shell containing all rows; footer OUTSIDE BELOW. No cards per row.
+Input variant secondary: visibly LIGHT GREY filled control inside the white card or auth panel, label above, optional hint above, error below. NO white-on-white nested fields. No extra shadow or border on ordinary secondary inputs; actual invalid field keeps grey fill with thin grammar danger edge and orange-red label/error as shown in primitives.png.
+Button primary: exact #2F6BFF blue pill, WHITE label. Button secondary: light neutral fill, BLUE label as in primitives.png. Button outline: white/clear fill, thin NEUTRAL GREY outline, DARK label; do not invent a danger button outline. Disabled primary uses the stock subdued blue fill and WHITE label in primitives.png. TextAction is the simple dark text link in the captures; no coloured decorative underline. Normal text is dark; secondary copy is muted.
+3. KNOWLEDGE: knowledge/ui/proof/anatomy-source.yaml ANATOMY-1/2/3/4, read from C:/Users/Hi/orca/workspaces/.claude/ex-lint/knowledge/ui/proof/anatomy-source.yaml because this checkout lacks that file. Formula: direction = real-render(anatomy) + brand(surface) + composition(intent). Layout, state and content may change; component shape may not. Also BRAND-1/2/3, LAYOUT-1/2/3, COLLECTION-1/2, CTA-1/2/3/4, RESPONSIVE-1/3 and CONTRAST-1/COLOR-5. Any legacy contrast/collection rule disagreement is documented in records, never repaired by painting invented controls. These are generated direction pixels, not implementation or API proof.
 
-Business grounding (accepted, do not invent beyond these):
-  - fr.task.create
+ACTUAL IMAGE INPUTS:
+Image 1: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png — ANATOMY SOURCE (actual installed render).
+Image 2: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png — ANATOMY SOURCE (actual installed render).
 
-Brand (brand/index.yaml rev 2, read do not restate elsewhere):
-  - primary: #2F6BFF
-  - surface: #FFFFFF
-  - typography: Inter, sans-serif
-  - don't: Never place text on the primary colour below a 4.5:1 contrast ratio.
+SCREEN CONTENT AND COMPOSITION:
+Reproduce tasks-screen.png closely as the complete task screen, native small typography and identical hierarchy. Heading Your tasks and A little progress, every day. White raised composer SurfaceCard with New task label and LIGHT GREY SECONDARY Input What needs doing? plus compact blue Add task pill with WHITE label. External All tasks label LEFT and 4 tasks FAR RIGHT. One white raised SurfaceListCard encloses four equal rows: unchecked Plan the week; unchecked Send the project update; unchecked Book the bike repair; checked, struck-through Water the plants. Every row has Share, Schedule and neutral-outline Delete, copying actual row button shapes from tasks-screen.png (no orange Delete outlines). No extra separators between rows. External footer Completed tasks stay here until you delete them. No turtle in this populated view. Use the exact shell and footer from the screen reference.
 
-Relevant UI knowledge:
-  - knowledge/ui/composition/collection.yaml (COLLECTION-1, COLLECTION-2)
-  - knowledge/ui/proof/brand.yaml (BRAND-1, BRAND-2, BRAND-3)
+Final fidelity check: match referenced component silhouettes and native text scale. Grey nested inputs. White primary labels. Actual secondary/outline variants. Product-specific invention only in the declared layout and state/content. Entire screen visible; no annotations.
 
-Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
-examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
-9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components,
-verified against the real consuming block at examples/todo-app-frontend/src/components/blocks/task-list/component.tsx,
-no invented ones. many-tasks, not refused, is the representative state: the real block's `refused` branch
-renders ONLY a Text line and hides the form and the list entirely
-(`state === 'refused' ? <Text live="assertive">...</Text> : <>form + list</>`), so refused is the
-LOWEST-anatomy state on this screen, not the densest one, and is not chosen here.
-  - SurfaceCard {ariaLabel: "Tasks", measure: "formCompact"} - the one bounded surface for the whole
-    screen; the task rows are peers inside it, not their own nested card (COLLECTION-2)
-  - Input {id: "new-task-title", name: "title", label: "New task", value, onValueChange}
-  - Button {type: "submit", variant: "primary", isDisabled} - the create action
-  - a plain `<ul>`/`<li>` row per task (native list markup, not a Grammar composite - the block renders
-    these by hand rather than through SurfaceListCard/StaticStateRow), each row carrying: a native
-    checkbox input bound to the task's `complete` boolean, the task's title text beside it, and
-    Button {type: "button", variant: "ghost", onPress} for delete
-
-Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
-GrammarButton/GrammarTextField/GrammarMessage anatomy, no SurfaceListCard/StaticStateRow (the real block
-does not use them here), no HeroUI component reached directly, no invented Alert/Toast/Banner.
-
-Layout note: The mounting page wraps the card in GrammarRoot > main > Heading(level: 1, "Your tasks") per
-examples/todo-app-frontend/src/features/pages/tasks/index.tsx - draw that heading above the card. The
-create form sits above the row list inside the one SurfaceCard; rows are plain list items, never
-individually carded (COLLECTION-2).
-
-Forbidden treatments: no card wrapper around the list of tasks; no text on the primary colour below 4.5:1
-contrast; no invented component outside the Grammar set named above; no fabricated brand mark beyond
-brand/assets/**; no SurfaceListCard/StaticStateRow substitution for the real block's native list markup.
-
-Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).
+CORRECTIVE EDIT INPUT: Image 3 is the edit target examples/todo-app-backend/.starciwork/features/task/ui/list/assets/list-many-tasks.full-screen-initial.png. The first two images remain actual ANATOMY SOURCES. Preserve the edit target's geometry, sizes, layout, all text/data, white primary labels, grey controls and surfaces. Change ONLY the top-right account letter A: remove its circular avatar boundary and fill so A is plain text directly on the header, exactly like tasks-screen.png. No circle behind A. No other changes.

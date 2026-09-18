@@ -6,23 +6,15 @@ record: fr.audit.log.append
 recordDigest: 1ed6662288f937eab7875a30622e7c9ee64a6579bd21a03d20ffee1c86e8d285
 outcome: pass
 assertions:
-  - id: br.audit.append-only
-    command: npx jest src/modules/bussiness/audit/audit-log.service.spec.ts
-    exit: 0
-    outcome: pass
-    observation: npx jest src/modules/bussiness/audit/audit-log.service.spec.ts exited 0
-  - id: br.audit.retention
-    command: npx jest -t "nfr.audit.retention"
-    exit: 0
-    outcome: pass
-    observation: npx jest -t "nfr.audit.retention" exited 0
-  - id: subscriber-routing
+  - id: fr.audit.log.append
     command: npx jest src/modules/bussiness/audit/audit-event.subscriber.spec.ts
+      src/modules/bussiness/audit/append-log-line.handler.spec.ts
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/audit/audit-event.subscriber.spec.ts exited 0
+    observation: npx jest src/modules/bussiness/audit/audit-event.subscriber.spec.ts
+      src/modules/bussiness/audit/append-log-line.handler.spec.ts exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T09:19:56.383Z
+  capturedAt: 2026-09-18T11:51:08.295Z

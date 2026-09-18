@@ -9,6 +9,7 @@ import { CompleteTaskHandler } from './complete-task.handler';
 import { ReopenTaskHandler } from './reopen-task.handler';
 import { DeleteTaskHandler } from './delete-task.handler';
 import { ListTasksHandler } from './list-tasks.handler';
+import { TaskCountsHandler } from './task-counts.handler';
 
 /**
  * The `task` capability module, under nivo's `modules/bussiness/<capability>` shape (renamed from the
@@ -43,6 +44,7 @@ export class TaskModule extends ConfigurableModuleClass {
         ReopenTaskHandler,
         DeleteTaskHandler,
         ListTasksHandler,
+        TaskCountsHandler,
       ],
       exports: [TaskService, TaskCreationPolicyRegistry, CompletionAuthorityRegistry],
     };

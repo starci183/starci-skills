@@ -1,0 +1,20 @@
+schema: work/integration
+id: integration.checkout.redis
+title: Redis is the identity service's session store
+state: todo
+provider: redis
+boundary: The key space identity:session:* belongs to the identity service alone; nothing else
+  reads or writes it, and verification crosses the wire instead.
+endpoints:
+  - {name: sessions, method: TCP, path: redis://localhost:6448/0}
+credential:
+  name: IDENTITY_REDIS_URL
+  providedBy: owner
+  where: .starcistacks/dev - the local dev container is open on loopback (demo-only), so there is no secret to custody yet
+sandbox: The dev environment runs Redis 7 in Compose on 6448.
+refs: [br.checkout.place-order, sds.checkout.order-flow]
+
+requiresProof:
+  live:
+    required: true
+    note: A token stored, read back and expired against the real server, not against a fake.

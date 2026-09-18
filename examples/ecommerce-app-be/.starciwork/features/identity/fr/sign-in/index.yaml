@@ -1,0 +1,26 @@
+schema: work/functional-requirement
+id: fr.identity.sign-in
+title: Sign in
+state: done
+actors: [person]
+trigger: The person submits an email and a password, or registers a new pair.
+mainFlow:
+  - The pair is checked against the stored hash.
+  - A live session is issued and returned as an opaque bearer token.
+exceptionFlows:
+  - A wrong pair is refused without naming which half was wrong.
+  - A request missing a half is refused before any credential check.
+  - A registration with a taken email is refused as a conflict.
+postconditions:
+  - The token verifies over HTTP for as long as its TTL lives, and only the identity service reads the store.
+composes:
+  - rule: br.identity.sign-in
+    module: apps/identity/src/modules/bussiness/session
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: node scripts/live-proof.mjs
+
+change: {rev: 1, kind: initial, at: 2026-09-18T00:00:00.000Z}

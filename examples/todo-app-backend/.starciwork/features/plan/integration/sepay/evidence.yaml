@@ -1,0 +1,53 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: integration.plan.sepay
+recordDigest: b4c7d97bdd0b340d52c8a088fa718d6e8be0316e765e3cda9344bc7fe24e54b2
+outcome: fail
+assertions:
+  - id: integration.plan.sepay
+    command: curl.exe -s -o NUL -w %{http_code} -X POST https://my.sepay.vn/userapi/transactions/qr |
+      findstr 200
+    exit: 1
+    outcome: fail
+    observation: curl.exe -s -o NUL -w %{http_code} -X POST https://my.sepay.vn/userapi/transactions/qr
+      | findstr 200 exited 1
+  - id: probe.create-intent-route
+    command: curl.exe -s -o NUL -w %{http_code} -X POST https://my.sepay.vn/userapi/transactions/qr |
+      findstr 404
+    exit: 0
+    outcome: pass
+    observation: curl.exe -s -o NUL -w %{http_code} -X POST https://my.sepay.vn/userapi/transactions/qr
+      | findstr 404 exited 0
+  - id: probe.get-transaction-route
+    command: curl.exe -s -o NUL -w %{http_code} https://my.sepay.vn/userapi/transactions/details/1 |
+      findstr 401
+    exit: 0
+    outcome: pass
+    observation: curl.exe -s -o NUL -w %{http_code} https://my.sepay.vn/userapi/transactions/details/1 |
+      findstr 401 exited 0
+  - id: probe.invented-route-control
+    command: curl.exe -s -o NUL -w %{http_code} -X POST
+      https://my.sepay.vn/userapi/transactions/definitely-not-a-route | findstr 404
+    exit: 0
+    outcome: pass
+    observation: curl.exe -s -o NUL -w %{http_code} -X POST
+      https://my.sepay.vn/userapi/transactions/definitely-not-a-route | findstr 404 exited 0
+  - id: probe.v2-sandbox-host
+    command: curl.exe -s -o NUL -w %{http_code} https://userapi-sandbox.sepay.vn/v2/transactions |
+      findstr 401
+    exit: 0
+    outcome: pass
+    observation: curl.exe -s -o NUL -w %{http_code} https://userapi-sandbox.sepay.vn/v2/transactions |
+      findstr 401 exited 0
+  - id: client-makes-the-real-call
+    command: npx jest src/modules/integrations/sepay
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/integrations/sepay exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T11:40:42.747Z

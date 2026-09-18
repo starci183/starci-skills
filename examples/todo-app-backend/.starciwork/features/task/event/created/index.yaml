@@ -1,7 +1,7 @@
 schema: work/event
 id: event.task.created
 title: A task was created
-state: todo
+state: done
 producer: fr.task.create
 payload:
   - {name: taskId, type: text, note: "The created task's id."}
@@ -19,3 +19,10 @@ change:
     to this exact event on the platform event bus and turns it into an appended log line
     (fr.audit.log.append), proven in that module's own audit-event.subscriber.spec.ts. This record's
     own state is left for task's lane to advance."
+# This record's state is advanced by task's lane, as the rev-2 note above left it to: CreateTaskHandler
+# publishes this exact payload on PlatformEventBus after the write succeeds, asserted by the named
+# event.task.created test in create-task.handler.spec.ts (taskId, ownerId, sourceEventId captured fresh
+# in the sibling evidence.yaml). The producer (fr.task.create) is done; the subscriber the rev-2 note
+# names (audit) is itself done. delivery is honest as scoped by the bus's own comment in
+# src/modules/platform/events/event-bus.providers.ts: synchronous in-process dispatch - at-least-once
+# per-key within a live process, explicitly not a durable log across restarts.

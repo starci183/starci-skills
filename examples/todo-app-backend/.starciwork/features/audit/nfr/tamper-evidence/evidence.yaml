@@ -15,4 +15,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T09:04:51.857Z
+  capturedAt: 2026-09-18T11:56:22.530Z

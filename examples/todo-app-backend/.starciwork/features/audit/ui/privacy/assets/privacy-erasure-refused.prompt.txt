@@ -1,49 +1,17 @@
-Screen: The privacy screen - request erasure, export data (audit.privacy), route /privacy, actor: person
-State: erasure-refused - the erasure request is rejected, for example a hold applies
-Behavior to depict: an assertive-live line of copy states the refusal reason beside the two independent
-actions; the request action remains available to retry once the hold clears
+Use case: ui-mockup. Generate one complete desktop Todo app direction, 1536 x 1024, guided closely by the actual rendered screenshots supplied. This is a straight-on browser-content view, no device or browser frame, no captions or source paths in the image.
+1. BRAND AUTHORITY: examples/todo-app-backend/.starciwork/brand/index.yaml rev 3 remains unchanged for brand surface, primary #2F6BFF, neutral canvas, white cards, Inter, turtle identity and permitted placement. User ADDENDUM 2 explicitly supersedes prior derived black-button-label and custom component treatments: PRIMARY BUTTON LABELS ARE WHITE, matching the actual installed component. Do not follow previous generated directions or recolour real component internals to satisfy an older interpretation. No mascot in controls or destructive contexts.
+2. ACTUAL GRAMMAR ANATOMY: @starci/grammar@0.4.13. Reference PNGs named below are the ONLY component appearance authority. Match their small, ordinary web UI type scale, controls, spacing, surface radius, depth, shadows and ink. Never redesign their shapes. Headings roughly 20px medium, body 16px, labels 14px; not giant bold display type. Header roughly 64px. Controls about 36px high, full-width auth submit about 44px. The supplied full screen is 1440x900; preserve that restrained native density in this 1536x1024 composition rather than zooming it.
+SurfaceCard: WHITE, modest rounded corners, soft subtle shadow, inset content. SurfaceListCard: external label at left, count at far right ABOVE a single WHITE raised shell containing all rows; footer OUTSIDE BELOW. No cards per row.
+Input variant secondary: visibly LIGHT GREY filled control inside the white card or auth panel, label above, optional hint above, error below. NO white-on-white nested fields. No extra shadow or border on ordinary secondary inputs; actual invalid field keeps grey fill with thin grammar danger edge and orange-red label/error as shown in primitives.png.
+Button primary: exact #2F6BFF blue pill, WHITE label. Button secondary: light neutral fill, BLUE label as in primitives.png. Button outline: white/clear fill, thin NEUTRAL GREY outline, DARK label; do not invent a danger button outline. Disabled primary uses the stock subdued blue fill and WHITE label in primitives.png. TextAction is the simple dark text link in the captures; no coloured decorative underline. Normal text is dark; secondary copy is muted.
+3. KNOWLEDGE: knowledge/ui/proof/anatomy-source.yaml ANATOMY-1/2/3/4, read from C:/Users/Hi/orca/workspaces/.claude/ex-lint/knowledge/ui/proof/anatomy-source.yaml because this checkout lacks that file. Formula: direction = real-render(anatomy) + brand(surface) + composition(intent). Layout, state and content may change; component shape may not. Also BRAND-1/2/3, LAYOUT-1/2/3, COLLECTION-1/2, CTA-1/2/3/4, RESPONSIVE-1/3 and CONTRAST-1/COLOR-5. Any legacy contrast/collection rule disagreement is documented in records, never repaired by painting invented controls. These are generated direction pixels, not implementation or API proof.
 
-Business grounding (accepted, do not invent beyond these):
-  - fr.audit.erasure.request
-  - fr.audit.export
+ACTUAL IMAGE INPUTS:
+Image 1: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png — ANATOMY SOURCE (actual installed render).
+Image 2: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png — ANATOMY SOURCE (actual installed render).
 
-Brand (brand/index.yaml rev 2, read do not restate elsewhere):
-  - primary: #2F6BFF
-  - surface: #FFFFFF
-  - typography: Inter, sans-serif
-  - don't: Never place text on the primary colour below a 4.5:1 contrast ratio.
+SCREEN CONTENT AND COMPOSITION:
+Use the exact workspace header of tasks-screen.png: small Todo app identity at far left, Tasks / Notifications / Plan / Privacy in one horizontal navigation row, A Alex Sign out at far right. Fine neutral bottom separator. No avatar circle, no oversized header, no decorative blue tab bars. Name the current feature with its page heading and semibold current nav text. Main content starts about 112px from the left, ends about 112px from the right; calm reading measure. Footer Privacy policy and Terms appears beneath main content at the same left edge, with generous space below. Privacy is current. Heading Privacy and your data, supporting Manage the data linked to your account. One WHITE raised SurfaceCard matching the task composer material. Inside it, two application-owned content groups separated by the simple thin neutral rule seen in primitives.png. First Export your data; Get a copy of your personal activity records.; stock SECONDARY Export my data pill with LIGHT GREY fill and BLUE label (actual Secondary in primitives). Second Request erasure; Remove information that identifies you from the activity log. This cannot be undone once completed.; plain refusal We couldn't submit your erasure request. Try again.; stock NEUTRAL outline Request erasure button with dark ink; Back to tasks text link. Do not invent orange outline buttons or a danger card. Keep actions and consequence wording clear; no mascot anywhere.
 
-Relevant UI knowledge:
-  - knowledge/ui/proof/brand.yaml (BRAND-1, BRAND-2, BRAND-3)
-
-Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
-examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
-9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components, no
-invented ones. No implementation block exists yet for this screen (impl.audit is backend-only so far), so
-this binding is drawn directly from the real export list and the two independent actions fr.audit.erasure.request
-and fr.audit.export name, following the same SurfaceCard/Button/Text composition the two proven blocks
-(sign-in-form, task-list) actually use:
-  - SurfaceCard {ariaLabel: "Privacy", measure: "formCompact"} - one bounded surface holding both
-    independent actions, `composition: "joined"` so export and erasure read as two divided bands of the
-    one subject, per COLLECTION-2 (a card presents one subject, in bands, not nested cards)
-  - Button {type: "button", variant: "secondary", isPending} - the export action
-  - Button {type: "button", variant: "outline"} - the request-erasure action; on press it is replaced in
-    place by a confirm/cancel pair, both still `Button` (variant: "primary" confirm, variant: "ghost"
-    cancel) - ButtonVariant has no destructive/danger option, so the confirm action is drawn as
-    `variant: "primary"`, not a red button Common does not ship
-  - Text {live: "assertive"}, plain body copy carrying the erasure-refused sentence - Common ships no
-    Message/Alert renderer and Text has no `tone: "danger"` value; severity is carried by the sentence
-    and by `aria-live="assertive"` alone
-
-Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
-GrammarButton/GrammarMessage anatomy, no HeroUI component reached directly, no invented Alert/Toast/Banner,
-no destructive-red button variant.
-
-Layout note: Two independent actions on one screen; never merge export and erasure into one control since
-they have separate acceptance criteria.
-
-Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
-4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
-beyond brand/assets/**; no red/destructive button paint Common's ButtonVariant does not define.
-
-Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).
+Final fidelity check: match referenced component silhouettes and native text scale. Grey nested inputs. White primary labels. Actual secondary/outline variants. Product-specific invention only in the declared layout and state/content. Entire screen visible; no annotations.
+IMPORTANT TEXT OWNERSHIP: Only Input(isError, errorMessage) colours its own field label and error sentence in danger ink. Ordinary Text(live: assertive) refusal messages elsewhere stay DARK, exactly as the refusal in sign-in-screen.png. No invented danger Text tone. The account letter A is plain text without any avatar circle; no added pictographic icons.

@@ -3,14 +3,14 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: br.task.single-owner
-recordDigest: d37e4e20281703521c1c912b40fdccc676122637487f48f13bd488624cde311f
+recordDigest: 36ce286450761a02b3fcfe79a109e7c687e59bdc977752b596460e6c1b8738af
 codeDigest:
   algorithm: sha256
   files:
     - path: src/modules/bussiness/task/complete-task.command.ts
       sha256: 905ccd97b11edf7080657db67d6a2ebf6286d952cef3dcf5153e3830292cbf85
     - path: src/modules/bussiness/task/complete-task.handler.spec.ts
-      sha256: a15175122d07e024d93cbb21dfc0306cdf1402f8731c21b660ed9b20356c3132
+      sha256: df1fb684331875a2eb065e7f1dc0da214c551138f2ffa4a3ba6e062d5cf8262b
     - path: src/modules/bussiness/task/complete-task.handler.ts
       sha256: 19ce75996a8d7ab44f87918c61fe3426e7df1b950e47a336664b90ab4cbb04e9
     - path: src/modules/bussiness/task/completion-authority.contracts.ts
@@ -18,7 +18,7 @@ codeDigest:
     - path: src/modules/bussiness/task/completion-authority.providers.ts
       sha256: fc3433001812710f106200d01d429ea95032cb8d09b3e435cbb645ec38c19497
     - path: src/modules/bussiness/task/completion-authority.spec.ts
-      sha256: 815845f0231a7b1a720a67a601c9a8713d4b50893c034328c61c89d6538e3d0d
+      sha256: e1299d613bd6f626f5366f46e7a991d36ab5f57e1a127498e84c28f9554e101f
     - path: src/modules/bussiness/task/create-task.command.ts
       sha256: 022b9c0ebb8c36a392cc3902b45c4c8f93ab00d85295fac0af76563ae4bb6d60
     - path: src/modules/bussiness/task/create-task.handler.spec.ts
@@ -32,11 +32,11 @@ codeDigest:
     - path: src/modules/bussiness/task/delete-task.command.ts
       sha256: 6b7b17d0d57d78ae47af31a1ac11ca554748da0bd0a23825839413f38e9bf88b
     - path: src/modules/bussiness/task/delete-task.handler.spec.ts
-      sha256: 59f4d2f8185c41016cc3852be6437ea02428211d0a0cb24a7a48b4592598ae9a
+      sha256: 321105cb4c549a76824a9888f64c86742cbf4035e9057bac3bd499ac585a25d3
     - path: src/modules/bussiness/task/delete-task.handler.ts
       sha256: b88c4fe59b1b054cf433ef64139e33251aba97b0b7858dd4fc51d862cd937eae
     - path: src/modules/bussiness/task/index.ts
-      sha256: 38f18c079658a8e7b3f475dc1f682735e9f7550a58ed8493d3807031e5577a10
+      sha256: 9e747025a10b43563821e97af0c8cc9cbeee4ab391b33ad7bb48d54f31ea1498
     - path: src/modules/bussiness/task/list-tasks.handler.spec.ts
       sha256: 14f3ee8aea88e6fd159861217ee294f9d0dfe1d682fd2b866c73bcf1f935e637
     - path: src/modules/bussiness/task/list-tasks.handler.ts
@@ -50,44 +50,54 @@ codeDigest:
     - path: src/modules/bussiness/task/reopen-task.handler.spec.ts
       sha256: 0078cc8ae11670c294514fd32373286cc95c68522c9fca9d2c1d4c2e87750f89
     - path: src/modules/bussiness/task/reopen-task.handler.ts
-      sha256: 726c0144dd70d97c6083120d1d40c853b6b1f076b320f878fd18d203ae6bb292
+      sha256: 6a4fe512aa67d17b68b77fb3714fedc8660a2f6a4a1e22f94c5ada99d091540b
+    - path: src/modules/bussiness/task/task-counts.handler.spec.ts
+      sha256: 6d84ee7f14c2c28c7644b700b36df42946b79dbf7a5a93e049f107a1d9c85004
+    - path: src/modules/bussiness/task/task-counts.handler.ts
+      sha256: efaef5579ac50cbbc86bc50fb065ca3027d08e83ad15f8e69e39cedaa63111a4
+    - path: src/modules/bussiness/task/task-counts.query.ts
+      sha256: 56b9d947359a0444fd8b6b01a8486674e4f3acbd176724f0a5cbe81bb9457163
     - path: src/modules/bussiness/task/task.module-definition.ts
       sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
     - path: src/modules/bussiness/task/task.module.ts
-      sha256: 796149653d7e8183fe3bdbe5896af6b070d6c9c815b76b7d67801c8e4446a58a
+      sha256: c40a1c3e1518ce3c868c420a0fcec138b9a96a71f664d66a5b01c9400e5abb51
     - path: src/modules/bussiness/task/task.service.spec.ts
-      sha256: 96aeda988ab0acb0764dca58fae86711b59bb391ce3cdb8a726746c108312c0d
+      sha256: fd2ba88f06d2e3d99c360b79afa9978023ea2333b041b6eb6ef5da86f0d2a2c2
     - path: src/modules/bussiness/task/task.service.ts
       sha256: 1c12d8742e7de339f9a86bde5e40797187070414326b7c9d9ad619470d281d4c
     - path: src/modules/bussiness/task/types/task-record.ts
       sha256: 2dd6e270d672bf9d8eed0da0a67de448873e3f0e106f071350d5ff32fb2ea541
-  digest: e316c2dd01ff768a908cde2c9005f4d2bd80dcf1a81e7c0eeb8737066ee91ea8
+  digest: 20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea
 outcome: pass
-stale: true
-staleSince: {record: br.task.single-owner, rev: 2}
-staleReason: >-
-  This run's own command (ac.task.single-owner.refuses-stranger) exits 0 today and codeDigest matches
-  the code on disk, so the recordDigest/codeDigest pair is honestly fresh - not a stand-in for a check
-  that no longer applies. What it proves is narrower than what rev 2 now states. rev 2 withdrew "A task
-  belongs to exactly one person, and only that person may complete or delete it" and split it in two:
-  delete stays owner-only (unchanged, and this is exactly what the delete-task.handler.spec.ts and
-  reopen-task.handler.spec.ts halves of this run prove: a stranger is refused). The complete half moved
-  to "the owner may always complete; an accepted editor collaborator may also complete it, per
-  contract.share.completion-guard-for-task" - a new capability this run's complete-task.handler.spec.ts
-  half never exercises: it only proves a stranger is refused, which is necessary but not sufficient for
-  rev 2's complete statement, and cannot prove the editor-may-complete half at all, because that guard
-  (contract.share.completion-guard-for-task) and its call from fr.task.complete do not exist yet
-  (gap.task.collaborator-completion). The honest position: keep this evidence for the delete/reopen
-  half and the stranger-negative half of complete, which it actually re-proves today, while flagging
-  that it does not speak for rev 2's complete statement in full.
 assertions:
   - id: ac.task.single-owner.refuses-stranger
     command: npx jest -t "ac.task.single-owner.refuses-stranger"
     exit: 0
     outcome: pass
     observation: npx jest -t "ac.task.single-owner.refuses-stranger" exited 0
+  - id: br.task.single-owner.owner-passes-both
+    command: npx jest src/modules/bussiness/task/completion-authority.spec.ts -t
+      "sds.task.ownership-guard.t-owner:"
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/task/completion-authority.spec.ts -t
+      "sds.task.ownership-guard.t-owner:" exited 0
+  - id: br.task.single-owner.editor-completes
+    command: npx jest src/modules/bussiness/share/completion-authority.spec.ts -t
+      "ac.share.role.permissions.editor-can-complete"
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/share/completion-authority.spec.ts -t
+      "ac.share.role.permissions.editor-can-complete" exited 0
+  - id: br.task.single-owner.editor-cannot-delete
+    command: npx jest src/modules/bussiness/share/completion-authority.spec.ts -t
+      "ac.share.editor.no-delete.delete-refused-for-editor"
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/share/completion-authority.spec.ts -t
+      "ac.share.editor.no-delete.delete-refused-for-editor" exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T09:06:39.024Z
+  capturedAt: 2026-09-18T11:57:32.942Z

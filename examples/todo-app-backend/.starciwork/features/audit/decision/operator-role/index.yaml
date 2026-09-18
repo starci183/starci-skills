@@ -1,0 +1,38 @@
+schema: work/policy-decision
+id: decision.audit.operator-role
+title: Who is an operator, and where does their role claim come from
+state: todo
+outcome: open
+question: gap.audit.operator-role rev 2 states the absence precisely - SessionRecord resolves to
+  {token, personId, issuedAt, expiresAt} and data.login.person has no role field, so no call site can
+  present a role claim to check. Audit's fail-closed check (src/modules/bussiness/audit
+  /audit-operator-read.ts) already honors operator and operator:*; this decision must settle who may
+  hold such a claim and where it comes from before fr.audit.log.read's operator read or
+  journey.audit.right-to-be-forgotten's fourth step can honestly run.
+options:
+  - id: session-role-claim
+    state: proposed
+    summary: sds.login.session-store's SessionRecord grows a role field; the resolver passes claims.role
+      into audit-operator-read.ts, which already honors operator and operator:*.
+    consequence: Keeps audit's fail-closed check as built and makes it live, but changes the session
+      shape another feature owns and every consumer of contract.login.identity-for-task with it.
+  - id: keycloak-realm-role
+    state: proposed
+    summary: The person's Keycloak subject carries a realm role; session resolves it into the actor
+      claims at sign-in.
+    consequence: Roles come from the identity provider that already owns identity - but this example's
+      Keycloak stub returns only {subject}, so it needs real provider behavior, outside any single
+      feature's scope.
+  - id: no-operator-ever
+    state: proposed
+    summary: The product has no operators; the own-lines read is the whole of fr.audit.log.read.
+    consequence: fr.audit.log.read's mainFlow (an operator, filtered, whole-chain read) would be
+      retired, and nfr-claims about operator monitoring of the log with it.
+openQuestions:
+  - Which actor grants an operator claim, and can one person hold two roles in one session?
+change: {rev: 1, kind: initial, at: 2026-09-18T20:10:00.000Z}
+
+# This record is a *proposal* named by the implementation lane - naming the options is not deciding
+# one, and deciding is a business.author call, not this lane's. Until it is decided (outcome: decided,
+# chosen set), every session-only actor reads exactly their own lines and the operator branch stays
+# unreachable in production by design; gap.audit.operator-role names this record as its closer.

@@ -1,15 +1,19 @@
 schema: work/implementation
 id: impl.task.todo-app-backend.ownership
 title: Ownership binding and its guard
-state: todo
+state: done
 repository: todo-app
 owners:
   - {role: module, path: src/modules/bussiness/task}
-proves: [br.task.single-owner, sds.task.ownership-guard]
+proves: [sds.task.ownership-guard]
 
-# gap.task.collaborator-completion closed (lane be-share): CompletionAuthorityRegistry's seam already
-# supported t-collaborator before this lane started (see bussiness/task/completion-authority.spec.ts's
-# pre-existing "a registered widened authority" test), and ShareCompletionAuthority now really
-# registers into it. Re-proving this record against br.task.single-owner/sds.task.ownership-guard's
-# rev 2 is lane login-impl/task's own call to make, not something this lane can verify from outside
-# task's module, so it stays todo with no blockedBy of its own rather than citing a resolved gap.
+# gap.task.collaborator-completion closed (lane be-share), and this lane - the task lane those notes
+# deferred to as "lane login-impl/task" - has now done the re-proving: CompletionAuthorityRegistry
+# really carries ShareCompletionAuthority at boot (share.module.ts), all three guard transitions have
+# named tests (completion-authority.spec.ts's sds.task.ownership-guard.t-owner/.t-collaborator/
+# .t-stranger), the real share-authority-over-unmodified-TaskService wiring is captured as an
+# assertion running the share lane's own spec, and the transport-level refusals passed live in
+# scripts/live-proof.sh against an API built from this source tree. br.task.single-owner is dropped
+# from proves - not because this code doesn't implement it, but because that record is still todo
+# (its done flag is held by gap.task.share-edge-hold, a mechanical out-of-lane edge), and a done
+# record may not prove a todo one. That hold is evidentially about the record graph, not this code.

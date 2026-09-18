@@ -22,4 +22,16 @@ change:
     longer describes the product. Delete stays owner-only exactly as before; only the complete half moved,
     and it moved into a contract this record now names instead of re-describing.
 blockedBy:
-  - {record: gap.task.collaborator-completion, because: "The withdrawn clause was what ac.task.single-owner.refuses-stranger and sds.task.ownership-guard were proven against; both need a live re-check against the split statements above, through contract.share.completion-guard-for-task, before this rule is done again. sds.task.ownership-guard and contract.share.completion-guard-for-task were each separately cited here for the same reason: the collaborator-completion path this rule now describes has no implementation yet. gap.task.collaborator-completion names that one absence instead of restating it as record-to-record edges (onto the acceptance criterion the old clause was proven against, and onto records that themselves blocked back on this one)."}
+  - {record: gap.task.share-edge-hold, because: "The proof of the rev-2 split now exists and this record's
+    evidence.yaml carries it (stranger refused on complete/reopen/delete; owner passes both guards; an
+    accepted editor completes via the real ShareCompletionAuthority and is still refused delete -
+    share/completion-authority.spec.ts). What still holds the state at todo is mechanical, not evidential:
+    contract.share.completion-guard-for-task's own blockedBy still cites this record at rev 2, so marking
+    this rule done would refuse that (out-of-lane) record as carrying a stale blocker. gap.task.share-edge-hold
+    names that absence; the share lane retiring its edge unblocks this record with no further task-lane work."}
+# The old edge onto gap.task.collaborator-completion is dropped: the gap is done (lane be-share), the
+# layout refuses a blockedBy citing a done record, and the edge's own text ("no implementation yet") is
+# false against the current tree - ShareCompletionAuthority registers into task's
+# CompletionAuthorityRegistry at boot (share.module.ts, ShareCompletionAuthoritySetup.onModuleInit).
+# The task-side tests this rule's AC names are green; the residual hold is recorded on
+# gap.task.share-edge-hold instead of restated here.

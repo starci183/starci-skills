@@ -21,3 +21,6 @@ export { DeleteTaskHandler } from './delete-task.handler';
 export { ListTasksQuery } from './list-tasks.query';
 export type { ListTasksQueryParams, ListTasksQueryResult, TaskSummaryResult } from './list-tasks.query';
 export { ListTasksHandler } from './list-tasks.handler';
+export { TaskCountsQuery } from './task-counts.query';
+export type { TaskCountsQueryParams, TaskCountsQueryResult } from './task-counts.query';
+export { TaskCountsHandler } from './task-counts.handler';

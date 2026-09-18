@@ -48,4 +48,41 @@ describe('CompletionAuthorityRegistry', () => {
 
     await expect(service.delete(record.id, 'collaborator-1')).rejects.toMatchObject({ code: 'TASK_FORBIDDEN' });
   });
+
+  it('sds.task.ownership-guard.t-owner: with the default authority the owner passes the completion authority and the delete guard', async () => {
+    const registry = new CompletionAuthorityRegistry();
+    const service = new TaskService(createFakeEntityManager<TaskEntity>('id') as never, registry);
+    const record = await service.create('owner-1', 'Ship it');
+
+    const completed = await service.complete(record.id, 'owner-1');
+    expect(completed.complete).toBe(true);
+    const deleted = await service.delete(record.id, 'owner-1');
+    expect(deleted.id).toBe(record.id);
+  });
+
+  it('sds.task.ownership-guard.t-collaborator: a widened authority proceeds with complete and reopen, while delete is still refused', async () => {
+    const registry = new CompletionAuthorityRegistry();
+    const service = new TaskService(createFakeEntityManager<TaskEntity>('id') as never, registry);
+    const record = await service.create('owner-1', 'Ship it');
+    registry.register(new WidenedCompletionAuthority(new Set(['collaborator-1'])));
+
+    const completed = await service.complete(record.id, 'collaborator-1');
+    expect(completed.complete).toBe(true);
+    const reopened = await service.reopen(record.id, 'collaborator-1');
+    expect(reopened.complete).toBe(false);
+    await expect(service.delete(record.id, 'collaborator-1')).rejects.toMatchObject({ code: 'TASK_FORBIDDEN' });
+    await expect(service.findById(record.id)).resolves.toMatchObject({ id: record.id });
+  });
+
+  it('sds.task.ownership-guard.t-stranger: a stranger is refused on both paths before anything is written', async () => {
+    const registry = new CompletionAuthorityRegistry();
+    const service = new TaskService(createFakeEntityManager<TaskEntity>('id') as never, registry);
+    const record = await service.create('owner-1', 'Ship it');
+
+    await expect(service.complete(record.id, 'actor-2')).rejects.toMatchObject({ code: 'TASK_FORBIDDEN' });
+    await expect(service.delete(record.id, 'actor-2')).rejects.toMatchObject({ code: 'TASK_FORBIDDEN' });
+    const stored = await service.findById(record.id);
+    expect(stored.complete).toBe(false);
+    expect(stored.title).toBe('Ship it');
+  });
 });

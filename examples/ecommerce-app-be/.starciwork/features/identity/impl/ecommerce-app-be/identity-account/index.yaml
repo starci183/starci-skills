@@ -1,0 +1,11 @@
+schema: work/implementation
+id: impl.identity.ecommerce-app-be.identity-account
+title: The account and session modules of apps/identity
+state: done
+repository: ecommerce-app-be
+owners:
+  - {role: module, path: apps/identity/src/modules/bussiness/account}
+  - {role: module, path: apps/identity/src/modules/bussiness/session}
+  - {role: module, path: apps/identity/src/modules/integrations/order}
+  - {role: feature, path: apps/identity/src/features/identity}
+proves: [br.identity.sign-in, fr.identity.sign-in]

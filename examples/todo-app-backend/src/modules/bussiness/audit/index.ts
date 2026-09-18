@@ -4,7 +4,18 @@ export type { Clock, VerifyChainResult } from './audit-log.service';
 export { AuditErasureService } from './audit-erasure.service';
 export { AuditKeystoreService, SYSTEM_ACTOR_ID } from './audit-keystore.service';
 export { AuditEventSubscriber } from './audit-event.subscriber';
+export { AuditOperatorGuard, AUDIT_SEALED_ACTIONS } from './audit-operator.guard';
+export type { OperatorFilter } from './audit-operator.guard';
+export { ActorClaims } from './audit-operator-read';
+export {
+  assertOperatorRead,
+  isOperatorRead,
+  matchOperatorFilter,
+  toAuditLineSummary,
+} from './audit-operator-read';
+export { AuditOperatorRoleNotAuthorizedException } from './audit-operator-role.guard';
 export { AuditLogLineRecord } from './types/audit-log-line-record';
+export type { ResolvedAuditLine } from './types/resolved-audit-line';
 export { AuditErasureRequestRecord } from './types/audit-erasure-request-record';
 export {
   ErasureRequestNotFoundException,

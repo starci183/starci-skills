@@ -72,14 +72,14 @@ codeDigest:
     - path: src/modules/integrations/sepay/index.ts
       sha256: f99dc8ffdfe0a5732a878b01631aac8299c6d0f5f9fad3dff1ff2ff02e9b94d6
     - path: src/modules/integrations/sepay/sepay.client.spec.ts
-      sha256: 1f934f78a835b83f5bee710861b2b7c000cb3913570c1b72e71ae4c00e36aa28
+      sha256: 515a2dd06252a83b975eabb994c45c8a909370a92d49c134b5f769fec729a1dc
     - path: src/modules/integrations/sepay/sepay.client.ts
-      sha256: bf034aeecb2a138ad818b37a25f08a503aef1d85c14ec66c24fcfd8d63a50862
+      sha256: cf5722cb48784ed773e2dd27183cad0b07c1327c523683502f1e9068472d98eb
     - path: src/modules/integrations/sepay/sepay.module-definition.ts
       sha256: b68cba5705e7c44730af03602e3233926e63fa5ed74cade5059536eee0ae974f
     - path: src/modules/integrations/sepay/sepay.module.ts
       sha256: 8ae9ae3d88c3ba5ce658704b5362372775b7d5998da11a3ef46adeeb4899289f
-  digest: f165ca0766813c274cafe618ec0aad9b23b4919d29bdee2e1e1170712a32d4ae
+  digest: 5e5c12b73e053ba761d91ba4e9eecfc363030f7466c98e71e5f83998ea640f9c
 outcome: pass
 assertions:
   - id: br.plan.caps.limit
@@ -128,4 +128,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T09:24:56.373Z
+  capturedAt: 2026-09-18T11:40:22.290Z

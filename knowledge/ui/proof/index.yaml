@@ -27,6 +27,10 @@ topics:
     path: accessibility.yaml
     decides: Whether names, relationships, targets and contrast reach every reader
     rules: A11Y-1 to A11Y-5
+  - title: Anatomy source
+    path: anatomy-source.yaml
+    decides: Whether a direction's region shapes trace to real component renders
+    rules: ANATOMY-1 to ANATOMY-4
   - title: Brand
     path: brand.yaml
     decides: Whether the rendered surface wears the brand the product decided

@@ -17,11 +17,15 @@ describe('CompleteTaskHandler', () => {
   it('ac.task.complete.once.is-idempotent: completing an already-complete task is unchanged and succeeds again', async () => {
     const created = await taskService.create('owner-1', 'Ship it');
     const first = await handler.execute(new CompleteTaskCommand({ actorId: 'owner-1', taskId: created.id }));
+    const afterFirst = await taskService.findById(created.id);
     const second = await handler.execute(new CompleteTaskCommand({ actorId: 'owner-1', taskId: created.id }));
     expect(first.complete).toBe(true);
     expect(second.complete).toBe(true);
     const stored = await taskService.findById(created.id);
     expect(stored.completedAt).not.toBeNull();
+    expect(stored.completedAt).toEqual(afterFirst.completedAt);
+    expect(stored.title).toBe(afterFirst.title);
+    expect(stored.owner).toBe(afterFirst.owner);
   });
 
   it("ac.task.single-owner.refuses-stranger: a stranger cannot complete somebody else's task", async () => {
@@ -46,5 +50,8 @@ describe('CompleteTaskHandler', () => {
     expect(published).toBeInstanceOf(TaskCompletedEvent);
     expect(published.taskId).toBe(created.id);
     expect(published.ownerId).toBe('owner-1');
+    expect(published.completedAt).toBeInstanceOf(Date);
+    expect(published.sourceEventId).toEqual(expect.any(String));
+    expect(published.sourceEventId.length).toBeGreaterThan(0);
   });
 });
