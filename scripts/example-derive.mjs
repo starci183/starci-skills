@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml, stringifyYaml} from '../core/yaml.mjs';
 import {walk as walkAll} from './check-example-work.mjs';
+import {readWorkspace, resolveOwnedDirs, hashOwnedDirs} from './example-ownership.mjs';
 
 /**
  * The layout promises a reader can answer every work question from the tree without opening source
@@ -148,22 +149,33 @@ function buildUsedBy(records) {
 }
 
 /**
- * Whether `record`'s evidence no longer speaks for it, and why. Two independent tests, either one enough:
+ * Whether `record`'s evidence no longer speaks for it, and why. Three independent tests, either one
+ * enough:
  *  - digest staleness: the evidence is explicitly marked `stale: true`, or its `recordDigest` no longer
  *    matches the sha256 of the record's own current bytes (the exact digest kernel/reconciliation.mjs's
  *    `recordDigests`/`nodeFileOf` compute, reproduced here for the same reason check-example-work.mjs
  *    reproduces it: importing recordDigests would require building the `tree` object it expects).
+ *  - code-digest staleness (layout concept 1): the evidence carries a `codeDigest` (scripts/example-
+ *    ownership.mjs's `hashOwnedDirs`, over the record's own owners/module or, when it names none, every
+ *    implementation proving it) that no longer matches what that same computation produces from the code
+ *    on disk right now - a code change stales a proof without anyone touching the record. Not checked
+ *    when the evidence carries no `codeDigest` at all (nothing was ever claimed about the code).
  *  - appliesTo staleness (layout concept 7): some other record's `appliesTo` names this one, and that
  *    record's `change.at` is later than this evidence's own `provenance.capturedAt` - the constraint moved
  *    after this record was last proven. Only checked when evidence exists and both timestamps parse; a
  *    record with no evidence has no proof to invalidate this way.
  */
-function staleness(record, evidenceByDir, appliesToSources, records) {
+function staleness(record, evidenceByDir, appliesToSources, records, workspaceDoc, workRoot) {
   const evidence = evidenceByDir.get(record.dir);
   if (!evidence) return null;
   if (evidence.data.stale === true) return {reason: 'evidence-marked-stale'};
   if (typeof evidence.data.recordDigest === 'string' && evidence.data.recordDigest) {
     if (sha256File(record.file) !== evidence.data.recordDigest) return {reason: 'digest-mismatch'};
+  }
+  if (typeof evidence.data.codeDigest?.digest === 'string') {
+    const dirs = resolveOwnedDirs(record.id, record, records, workspaceDoc, workRoot);
+    const fresh = hashOwnedDirs(dirs);
+    if ((fresh?.digest ?? null) !== evidence.data.codeDigest.digest) return {reason: 'code-digest-mismatch'};
   }
   const capturedAt = isoTime(evidence.data.provenance?.capturedAt);
   if (Number.isFinite(capturedAt)) {
@@ -189,9 +201,9 @@ function unmetBlockers(record, records) {
  * module doc comment for why staleness is checked first. Records with no authored `state` (branches like
  * work/feature, and work/acceptance-criterion leaves, which the layout never gives a lifecycle state) have
  * no effective state either. */
-function effectiveStateOf(record, evidenceByDir, appliesToSources, records) {
+function effectiveStateOf(record, evidenceByDir, appliesToSources, records, workspaceDoc, workRoot) {
   if (record.state === null || record.state === undefined) return {state: null, reason: null};
-  const stale = staleness(record, evidenceByDir, appliesToSources, records);
+  const stale = staleness(record, evidenceByDir, appliesToSources, records, workspaceDoc, workRoot);
   if (stale) return {state: 'suspended', reason: stale.reason};
   if (unmetBlockers(record, records).length) return {state: 'blocked', reason: null};
   return {state: record.state, reason: null};
@@ -246,10 +258,11 @@ export function computeDerived(workRoot) {
   const {usedBy, unclassified} = buildUsedBy(records);
   const appliesToSources = new Map(); // targetId -> Set(sourceId) via the appliesTo edge kind
   for (const [targetId, byKind] of usedBy) if (byKind.has('appliesTo')) appliesToSources.set(targetId, byKind.get('appliesTo'));
+  const workspaceDoc = readWorkspace(workRoot);
 
   const derivedRecords = new Map();
   for (const record of records.values()) {
-    const {state: effectiveState, reason} = effectiveStateOf(record, evidenceByDir, appliesToSources, records);
+    const {state: effectiveState, reason} = effectiveStateOf(record, evidenceByDir, appliesToSources, records, workspaceDoc, workRoot);
     const blockedByEdges = Array.isArray(record.data.blockedBy) ? record.data.blockedBy : [];
     const byKind = usedBy.get(record.id);
     const usedByOut = {};

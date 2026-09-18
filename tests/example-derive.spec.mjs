@@ -5,6 +5,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {computeDerived, buildYamlDocument, runDerive} from '../scripts/example-derive.mjs';
 import {checkExampleDerived} from '../scripts/check-example-derived.mjs';
+import {resolveOwnedDirs, hashOwnedDirs} from '../scripts/example-ownership.mjs';
+import {parseYaml} from '../core/yaml.mjs';
 
 /**
  * One fixture tree per derived field this lane was asked to prove, plus the two refusal gates
@@ -83,6 +85,31 @@ test('effectiveState: a matching digest and no blockers leaves the authored stat
   write(workRoot, 'features/f/br/a/evidence.yaml', `schema: work/evidence\nrecord: br.f.a\nrecordDigest: ${digest}\noutcome: pass\n`);
   const derived = computeDerived(workRoot);
   assert.equal(derived.records.get('br.f.a').effectiveState, 'done');
+});
+
+test('effectiveState: a code-stale codeDigest suspends a done record even though recordDigest still matches (concept 1)', () => {
+  const recordBody = 'schema: work/implementation\nid: impl.f.a\ntitle: A\nstate: done\nrepository: r\nowners: [{role: module, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n';
+  const workRoot = tree({'features/f/impl/a/index.yaml': recordBody});
+  write(workRoot, '../src/f/thing.ts', 'export const thing = 1;\n');
+  const recordDigest = sha256(fs.readFileSync(path.join(workRoot, 'features/f/impl/a/index.yaml')));
+  write(workRoot, 'features/f/impl/a/evidence.yaml',
+    `schema: work/evidence\nrecord: impl.f.a\nrecordDigest: ${recordDigest}\noutcome: pass\ncodeDigest: {algorithm: sha256, files: [], digest: "deadbeef00000000000000000000000000000000000000000000000000000000"}\n`);
+  const derived = computeDerived(workRoot);
+  const rec = derived.records.get('impl.f.a');
+  assert.equal(rec.effectiveState, 'suspended');
+  assert.equal(rec.suspensionReason, 'code-digest-mismatch');
+});
+
+test('effectiveState: a matching codeDigest leaves a done record\'s effective state alone (concept 1)', () => {
+  const recordBody = 'schema: work/implementation\nid: impl.f.a\ntitle: A\nstate: done\nrepository: r\nowners: [{role: module, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n';
+  const workRoot = tree({'features/f/impl/a/index.yaml': recordBody});
+  write(workRoot, '../src/f/thing.ts', 'export const thing = 1;\n');
+  const recordDigest = sha256(fs.readFileSync(path.join(workRoot, 'features/f/impl/a/index.yaml')));
+  const codeDigest = hashOwnedDirs(resolveOwnedDirs('impl.f.a', {data: parseYaml(recordBody)}, new Map(), null, workRoot));
+  write(workRoot, 'features/f/impl/a/evidence.yaml',
+    `schema: work/evidence\nrecord: impl.f.a\nrecordDigest: ${recordDigest}\noutcome: pass\ncodeDigest: {algorithm: sha256, files: [], digest: "${codeDigest.digest}"}\n`);
+  const derived = computeDerived(workRoot);
+  assert.equal(derived.records.get('impl.f.a').effectiveState, 'done');
 });
 
 test('effectiveState: appliesTo-newer-than-evidence suspends a done record whose digest still matches', () => {
