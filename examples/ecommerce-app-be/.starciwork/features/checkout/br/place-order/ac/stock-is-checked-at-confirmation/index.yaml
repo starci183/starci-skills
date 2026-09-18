@@ -1,0 +1,7 @@
+schema: work/acceptance-criterion
+id: ac.checkout.place-order.stock-is-checked-at-confirmation
+rule: br.checkout.place-order
+given: A cart line whose quantity exceeds what the catalog holds
+when: The person confirms the order
+then:
+  - The confirmation is refused for that product by name, the cart keeps its lines, and no stock moved.

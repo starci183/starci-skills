@@ -1,0 +1,10 @@
+# Explicit project name: without it Compose falls back to the folder holding this file, so the
+# stack this runbook starts (`.../infra/compose/compose.yaml`) would be project "compose" — a
+# second, unnamed stack that collides on the published ports with the named one and leaves the
+# runbook unable to find its own containers with `ps`.
+name: ecommerce-app-be-dev
+include:
+  - postgres.yaml
+  - redis.yaml
+  - identity.yaml
+  - order.yaml

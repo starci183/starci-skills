@@ -1,0 +1,27 @@
+schema: work/functional-requirement
+id: fr.checkout.place-order
+title: Place an order
+state: done
+actors: [visitor, person]
+trigger: The person with a live session asks to confirm what is in their cart.
+mainFlow:
+  - The session is verified against the identity service over HTTP.
+  - The cart lines accumulate per product, and the catalog answers stock and unit prices.
+  - The confirmation writes the order, its lines and the captured payment in one transaction, and clears the cart.
+exceptionFlows:
+  - An empty cart refuses by the reason cart-empty.
+  - A beyond-stock line refuses with the product, the requested quantity and the stock that exists; nothing changes.
+  - A replayed Idempotency-Key returns the first confirmation instead of a second order, scoped to that person's own orders.
+postconditions:
+  - A confirmed person has orders - visible through contract.checkout.order-for-identity.
+composes:
+  - rule: br.checkout.place-order
+    module: apps/order/src/modules/bussiness/order
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: node scripts/live-proof.mjs
+
+change: {rev: 1, kind: initial, at: 2026-09-18T00:00:00.000Z}

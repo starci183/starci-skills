@@ -1,0 +1,33 @@
+schema: work/brand
+id: brand
+state: done
+rev: 1
+colour:
+  primary: "#0D9488"
+  surface: "#FFFFFF"
+typography:
+  sans: Inter
+mascot:
+  kind: duck
+  character: friendly
+  mayAppearIn:
+    - empty states
+    - welcome surfaces
+    - auth illustration
+  neverIn:
+    - danger contexts
+imagery:
+  auth: split-screen - illustration left, form right
+donts:
+  - The duck never appears in a danger context - deletion, refusal and error surfaces carry no mascot.
+  - Never restyle the primary teal outside this record; a surface that wants a different teal needs the brand rev-bumped first, not a local override.
+  - Never pair the mascot with the split-screen rule inverted (form left, illustration right) on auth - the illustration side is the duck's home.
+  - Never ship text on the primary colour below a 4.5 to 1 contrast ratio.
+review:
+  reviewer: brand owner
+  authority: Owner settled rev 1.
+  reviewedAt: 2026-09-18T12:08:00.998Z
+# Machine-check token traces: this record deliberately names no CSS or token file. The colour and
+# type values above are the authored truth; the frontend lane (ecommerce-app-fe) owns the real
+# token files, and when its css exists this record gains the file paths that check against them -
+# naming files before they exist would be a claim no machine check can compare against anything.

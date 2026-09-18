@@ -1,0 +1,13 @@
+schema: work/implementation
+id: impl.checkout.ecommerce-app-be.order-checkout
+title: The checkout modules of apps/order
+state: done
+repository: ecommerce-app-be
+owners:
+  - {role: module, path: apps/order/src/modules/bussiness/order}
+  - {role: module, path: apps/order/src/modules/bussiness/cart}
+  - {role: module, path: apps/order/src/modules/bussiness/catalog}
+  - {role: module, path: apps/order/src/modules/bussiness/payment}
+  - {role: module, path: apps/order/src/modules/integrations/identity}
+  - {role: feature, path: apps/order/src/features/checkout}
+proves: [br.checkout.place-order, fr.checkout.place-order, sds.checkout.order-flow, contract.checkout.order-for-identity]

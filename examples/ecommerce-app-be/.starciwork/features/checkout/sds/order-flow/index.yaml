@@ -1,0 +1,95 @@
+schema: work/sds-component
+id: sds.checkout.order-flow
+title: Cart to confirmed order, across the two services
+state: done
+responsibility: >-
+  Holds the checkout transaction: a verified session, accumulated cart lines, guarded stock, one
+  captured payment, one confirmed order. The session lives in the identity service's Redis, not
+  here - every authenticated call crosses the wire to learn who is calling, and who owns the
+  session's own design is the identity feature's record to write.
+interfaces:
+  - Only the checkout feature's HTTP transport writes these tables; the identity service never touches them.
+  - The buyer answer this component gives (contract.checkout.order-for-identity) is derived - a count over written orders, never a copied flag.
+owners:
+  - {role: module, path: apps/order/src/modules/bussiness/order}
+  - {role: module, path: apps/order/src/modules/bussiness/cart}
+  - {role: module, path: apps/order/src/modules/bussiness/payment}
+  - {role: module, path: apps/order/src/modules/bussiness/catalog}
+refs: [br.checkout.place-order, fr.checkout.place-order, contract.checkout.order-for-identity]
+dependsOn: [integration.checkout.postgres]
+
+extensions:
+  work3:
+    integrations:
+      - id: postgres
+        provider: postgresql
+        credential:
+          name: ORDER_DATABASE_URL
+          providedBy: owner
+          where: .starcistacks/dev - the dev container runs with trust authentication, so the credential is the URL itself
+        sandbox: true
+      - id: redis
+        provider: redis
+        credential:
+          name: IDENTITY_REDIS_URL
+          providedBy: owner
+          where: .starcistacks/dev - same trust posture, this example's session store
+        sandbox: true
+
+stateMachine:
+  states: [anonymous, carting, confirmed, refused]
+  initial: anonymous
+  terminal: [confirmed]
+  transitions:
+    - id: t-verify
+      from: anonymous
+      to: carting
+      on: session-verified-over-http
+      guard: The identity service answered with a person for this bearer token.
+    - id: t-add
+      from: carting
+      to: carting
+      on: cart-line-added
+      guard: The product is in the catalog and the quantity is a positive integer.
+      effect: The line accumulates on (person, product).
+    - id: t-stock
+      from: carting
+      to: refused
+      on: confirmation-requested
+      guard: Some line requests more than the catalog holds, or the cart is empty.
+      effect: A named refusal; nothing is written and no stock moves.
+    - id: t-pay
+      from: carting
+      to: confirmed
+      on: confirmation-requested
+      guard: Every line is in stock and the session still verifies.
+      effect: Stock is consumed, order, lines and the captured payment are written in one transaction.
+    - id: t-confirm
+      from: confirmed
+      to: confirmed
+      on: idempotency-key-replayed
+      guard: The replay carries the key the first confirmation used, for the same person.
+      effect: The first answer is returned with replayed set to true; no second order exists.
+
+sequence:
+  participants: [browser, order, identity, postgres]
+  steps:
+    - {from: browser, to: order, message: "POST /cart/items with the bearer session token, observable: http"}
+    - {from: order, to: identity, message: "POST /sessions/verify with the token, observable: http"}
+    - {from: identity, to: order, message: "the personId, or a 401 the order propagates as its own refusal, observable: http"}
+    - {from: order, to: postgres, message: "INSERT/UPDATE the cart line, observable: write"}
+    - {from: browser, to: order, message: "POST /orders with an Idempotency-Key, observable: http"}
+    - {from: order, to: postgres, message: "guarded stock UPDATE, one order, its lines, one captured payment, cart DELETE - one transaction, observable: write"}
+    - {from: order, to: browser, message: "the confirmed order with its total in minor units, observable: http"}
+  note: >-
+    Only interactions an end-to-end run can observe are bound here, per the layout's rule for
+    `sequence`. Internal call order inside the confirmation transaction is the implementation's
+    business.
+
+requiresProof:
+  implementation:
+    required: true
+  transitions:
+    forEach: stateMachine.transitions
+
+change: {rev: 1, kind: initial, at: 2026-09-18T00:00:00.000Z}
