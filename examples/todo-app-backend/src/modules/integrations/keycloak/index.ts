@@ -1,3 +1,4 @@
 export { KeycloakModule } from './keycloak.module';
 export { KeycloakClient } from './keycloak.client';
-export { KeycloakUnavailableException } from './keycloak.exception';
+export type { KeycloakSignInResult } from './keycloak.client';
+export { KeycloakInvalidCredentialsException, KeycloakUnavailableException } from './keycloak.exception';

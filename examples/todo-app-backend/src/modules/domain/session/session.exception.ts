@@ -1,9 +1,10 @@
 import { AbstractException } from '../../platform/errors';
 
 /**
- * br.login.password.sign-in requires that a refusal never names which half of the pair was wrong. Both
- * the unknown-email and the wrong-password paths throw this exact exception, with the same message and
- * the same code, so a transport mapper cannot leak the difference even by accident.
+ * br.login.password.sign-in requires that a refusal never names which half of the pair was wrong. Every
+ * refusal path - a malformed email caught before Keycloak is asked, or Keycloak's own invalid_grant -
+ * throws this exact exception, with the same message and the same code, so a transport mapper cannot leak
+ * the difference even by accident.
  */
 export class InvalidCredentialsException extends AbstractException {
   constructor() {
@@ -20,11 +21,5 @@ export class SessionNotFoundException extends AbstractException {
 export class SessionExpiredException extends AbstractException {
   constructor() {
     super('The session has expired.', 'SESSION_EXPIRED');
-  }
-}
-
-export class PersonNotFoundException extends AbstractException {
-  constructor() {
-    super('No person owns that email.', 'PERSON_NOT_FOUND');
   }
 }
