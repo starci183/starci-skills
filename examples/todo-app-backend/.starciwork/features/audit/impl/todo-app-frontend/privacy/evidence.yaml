@@ -1,0 +1,79 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: impl.audit.todo-app-frontend.privacy
+recordDigest: b8bd58329cbfcb8b4b866ef2355c423a9f38b866786dca120322d755f47a5f99
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/app/audit/privacy/page.tsx
+      sha256: bf67d23f56d21405051b6c6a0099f1f67cfff4583748e3443fd26307fc64ee51
+    - path: src/components/audit/privacy/api.ts
+      sha256: 51ea43c16e56f5c9bab435c0ae54d903e939d2aedac8cf86757d88618e7e5068
+    - path: src/components/audit/privacy/classNames.ts
+      sha256: b37ad0a8311eeb07293cd6e9db29f8c9c952ca0de12324e3933b861ad9bd51b4
+    - path: src/components/audit/privacy/component.spec.tsx
+      sha256: 8aa3061920b8d227eaf9258a610e0121f049041a282f076e5f88a817c674e005
+    - path: src/components/audit/privacy/component.tsx
+      sha256: 991b1e6afd9deaef8da0510f07fb12f838ed031564019a44f67d4e4a2922f57a
+    - path: src/components/audit/privacy/index.tsx
+      sha256: d82b2cf89fff6f5905472a9e121737deae5f1a320d4a335513a2317afc300a5c
+  digest: be76fa444fad1271f50b30584b99864cf4b04a923da06db74d568934d914d1cf
+outcome: fail
+assertions:
+  - id: typecheck
+    command: npx tsc --noEmit
+    exit: 0
+    outcome: pass
+    observation: npx tsc --noEmit exited 0
+  - id: unit-tests
+    command: npx vitest run
+    exit: 0
+    outcome: pass
+    observation: npx vitest run exited 0
+  - id: lint
+    command: npx eslint src/
+    exit: 0
+    outcome: pass
+    observation: npx eslint src/ exited 0
+  - id: build
+    command: npm run build
+    exit: 0
+    outcome: pass
+    observation: npm run build exited 0
+  - id: architecture
+    command: node ../../cli/main.mjs architecture check . --config architecture.json
+    exit: 1
+    outcome: fail
+    observation: node ../../cli/main.mjs architecture check . --config architecture.json exited 1
+  - id: rendered-captures
+    command: node -e "const
+      fs=require('fs'),p='../todo-app-backend/.starciwork/features/audit/impl/todo-app-frontend/privacy/assets/';const
+      states=['idle','exporting','requesting-erasure','erasure-pending','erasure-complete','erasure-refused'];const
+      vps=['desktop-1280','mobile-390'];let ok=true;for(const s of states)for(const v of
+      vps){for(const ext of ['png','html']){const
+      f=p+'privacy-'+s+'-'+v+'.'+ext;if(!fs.existsSync(f)||fs.statSync(f).size<1000){ok=false;console.log('missing/small',f);}}}const
+      refused=fs.readFileSync(p+'privacy-erasure-refused-desktop-1280.html','utf8');if(!refused.includes('data-state=\"erasure-refused\"')){ok=false;console.log('refused
+      markup lacks data-state');}for(const v of vps){const
+      j=p+'todo-app-export-'+v+'.json';if(!fs.existsSync(j)){ok=false;console.log('missing
+      export',j);}}if(!ok)process.exit(1);console.log('12 state captures + 2 real export downloads
+      verified');"
+    exit: 0
+    outcome: pass
+    observation: node -e "const
+      fs=require('fs'),p='../todo-app-backend/.starciwork/features/audit/impl/todo-app-frontend/privacy/assets/';const
+      states=['idle','exporting','requesting-erasure','erasure-pending','erasure-complete','erasure-refused'];const
+      vps=['desktop-1280','mobile-390'];let ok=true;for(const s of states)for(const v of
+      vps){for(const ext of ['png','html']){const
+      f=p+'privacy-'+s+'-'+v+'.'+ext;if(!fs.existsSync(f)||fs.statSync(f).size<1000){ok=false;console.log('missing/small',f);}}}const
+      refused=fs.readFileSync(p+'privacy-erasure-refused-desktop-1280.html','utf8');if(!refused.includes('data-state=\"erasure-refused\"')){ok=false;console.log('refused
+      markup lacks data-state');}for(const v of vps){const
+      j=p+'todo-app-export-'+v+'.json';if(!fs.existsSync(j)){ok=false;console.log('missing
+      export',j);}}if(!ok)process.exit(1);console.log('12 state captures + 2 real export downloads
+      verified');" exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T14:26:57.024Z

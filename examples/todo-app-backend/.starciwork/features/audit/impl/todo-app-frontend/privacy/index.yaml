@@ -1,0 +1,42 @@
+schema: work/implementation
+id: impl.audit.todo-app-frontend.privacy
+title: The privacy screen - export data, request erasure
+state: done
+repository: todo-app-frontend
+owners:
+  - {role: route, path: src/app/audit}
+  - {role: block, path: src/components/audit}
+proves: [ui.audit.privacy]
+
+change:
+  rev: 1
+  kind: initial
+  at: 2026-09-18T21:30:00.000Z
+  reason: "Implements ui.audit.privacy against its settled direction
+    (features/audit/ui/privacy, rev of the erasure-refused representative state).
+    Route adapter src/app/audit/privacy/page.tsx mounts the connected block
+    src/components/audit/privacy/index.tsx; the pure view component.tsx renders
+    Grammar WorkspaceShell + SurfaceCard + TextAction + Button + Text for all
+    six mapped states at desktop-1280 and mobile-390, and api.ts adapts the real
+    GraphQL operations exportMyData / requestErasure / completeErasure plus
+    endSession through src/modules/api transport. Route deviation: the direction
+    surface names /privacy; the lane write ceiling grants only src/app/audit/**,
+    so the served route is /audit/privacy and the navigation destinations stay
+    expression-driven per the linted routed-navigation rule. Rendered proof:
+    the 12 PNG+HTML captures and the two real todo-app-export JSON downloads in
+    ./assets were captured from this worktree's own `next start` build at
+    localhost:3100 driving the live backend; the erasure-refused state was
+    triggered by aborting the real requestErasure call (recorded in the
+    capture), and the complete run executed verified -> complete against the
+    running API through a same-origin proxy that rewrote only
+    Access-Control-Allow-Origin for the 3100 origin. Known open conflicts kept
+    visible: `starci architecture check` reports 8 violations that are all
+    direct consequences of the lane write ceiling - the frontend canon wants
+    src/features/pages/, src/components/{blocks,...}/ and src/hooks/ homes plus
+    an architecture.json owner entry, none of which this lane may create
+    (FE_SOURCE_LAYOUT_INVALID x4, FE_COMPONENT_IMPORTS_TRANSPORT x2,
+    FE_APP_INTERNAL_IMPORT_OUTSIDE_FEATURES, FE_ROUTE_ONE_PAGE); and the
+    direction's own GRAMMAR_REQUIRED gap stands - installed @starci/grammar
+    0.4.13 has no danger Button variant, so the confirm/request-erasure action
+    uses outline treatment with destructive copy, no invented prop or app-local
+    red."
