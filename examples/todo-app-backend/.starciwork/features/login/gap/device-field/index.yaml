@@ -3,8 +3,8 @@ id: gap.login.device-field
 title: No device field exists on a session or person
 state: todo
 statement: sds.login.session-store's stateMachine and data.login.person's fields carry no device identity.
-  session.mjs's accept()/actorOf() take no device argument. decision.login.session.devices - which is
-  exactly the open question of how many devices a session model allows - is still open, so there is no
+  session.mjs's accept()/actorOf() take no device argument. decision.login.session.devices is now decided
+  (single-device), so the question of how many devices a session model allows is settled, but no
+  implementation has yet added the field the decision needs to be carried out against - there is still no
   deviceId anything downstream could honestly be given.
-closedBy: decision.login.session.devices
 change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}

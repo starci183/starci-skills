@@ -1,8 +1,8 @@
 schema: work/policy-decision
 id: decision.login.session.devices
 title: How many devices may hold a live session
-state: todo
-outcome: open
+state: done
+outcome: decided
 question: A person with a phone and a laptop signs in on both. Does the second sign-in end the first?
 options:
   - id: single-device
@@ -17,5 +17,15 @@ options:
 recommendation: many-devices
 recommendationReason: Single-device is the only option that makes a normal person's normal behaviour look
   like an attack. The revoke path it needs is also what an account-recovery flow will need anyway.
-blocks: [br.login.session.single-device]
+chosen: single-device
+reason: >-
+  The lead chose single-device over the recommended many-devices - one device holds a session, and a
+  new sign-in ends the old one, exactly br.login.session.single-device's own statement. This accepts
+  many-devices' downside (a person signing in from a laptop then a phone reads the same as an attacker's
+  session takeover) as a cost worth paying for a session model with no revoke list, no device name and no
+  second live session to reconcile; the simplicity single-device buys now matters more than the
+  expectation many-devices would satisfy later. What is still missing is not this decision but
+  gap.login.device-field - no device field exists yet on a session or person to actually carry out a
+  single-device eviction against.
+change: {rev: 1, kind: clarifying, at: 2026-09-18T11:00:00.000Z, reason: "The lead decided the open question: single-device, overriding the many-devices recommendation."}
 

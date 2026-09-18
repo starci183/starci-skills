@@ -11,5 +11,5 @@ payload:
 delivery: {guarantee: at-least-once, ordering: per-key}
 refs: [br.task.delete.final]
 blockedBy:
-  - {record: gap.audit.emitted-events, because: "no fr or implementation exists for delete beyond br.task.delete.final's acceptance criterion; nothing emits this event yet."}
+  - {record: gap.audit.unbuilt-module, because: "delete-task's use case now raises this event on the platform event bus after the row is gone; audit's fr.audit.log.append still has nothing to subscribe to it with, because no audit module exists yet under the NestJS layout."}
 change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}

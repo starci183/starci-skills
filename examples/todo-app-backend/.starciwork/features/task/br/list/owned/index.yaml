@@ -4,8 +4,6 @@ title: A list shows only the reader's own tasks
 state: todo
 statements:
   - A task list contains exactly the tasks owned by the person reading it.
-openQuestions:
-  - Whether an organization owner sees the tasks of its members is undecided; decision.task.list.scope owns it.
 acceptanceCriteria: [excludes-others]
 module: src/features/list-tasks/**
 change: {rev: 1, kind: initial, at: 2026-09-18T02:14:00.000Z}

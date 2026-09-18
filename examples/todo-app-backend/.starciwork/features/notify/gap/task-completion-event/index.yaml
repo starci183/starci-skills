@@ -1,10 +1,17 @@
 schema: work/gap
 id: gap.notify.task-completion-event
 title: task never emits a completion event today
-state: todo
-statement: task has no completion event today - ownership.mjs (the only task code that exists at this
-  commit) has no complete transition, fr.task.complete is itself todo, and sds.task.completion-state's
-  transitions have no implementation and no sourceEventId concept anywhere in the task feature's records
-  or code. contract.notify.task-completion-feed's onTaskComplete surface has nothing to call it.
-closedBy: event.task.completed
+state: done
+statement: task now emits a completion event - impl.task.todo-app-backend.platform-events's typed
+  in-process PlatformEventBus is done, and complete-task's use case (src/features/complete-task) publishes
+  event.task.completed on it after the write succeeds, exactly as
+  src/features/complete-task/application/complete-task.use-case.ts and its spec show.
+  contract.notify.task-completion-feed's onTaskComplete surface still has no consumer wired to it - that is
+  a separate, unbuilt-module fact, not this one.
+closedBy: [impl.task.todo-app-backend.platform-events]
+verificationSource: authored-claim
+because: closedBy names an already-done implementation record, so no additional test run proves this
+  specific claim - that complete-task publishes event.task.completed is independently verifiable by
+  reading src/features/complete-task/application/complete-task.use-case.ts and its spec, which
+  impl.task.todo-app-backend.platform-events owns and proves.
 change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}

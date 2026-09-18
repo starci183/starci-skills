@@ -11,5 +11,5 @@ payload:
 delivery: {guarantee: at-least-once, ordering: per-key}
 refs: [fr.task.create]
 blockedBy:
-  - {record: gap.audit.emitted-events, because: "fr.task.create's implementation (impl.task.todo-app-backend.ownership) raises no event today; this record specifies the shape a future emit must have, not a signal that fires yet."}
+  - {record: gap.audit.unbuilt-module, because: "create-task's use case now raises this event on the platform event bus after the write succeeds; audit's fr.audit.log.append still has nothing to subscribe to it with, because no audit module exists yet under the NestJS layout."}
 change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}

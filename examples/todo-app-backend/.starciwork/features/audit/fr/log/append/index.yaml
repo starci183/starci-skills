@@ -25,5 +25,4 @@ requiresProof:
     required: true
 
 blockedBy:
-  - {record: gap.audit.emitted-events, because: "subscribes now names the five events this FR needs, but none of them is actually raised by login's or task's implementation yet, so there is nothing live to wire this trigger to."}
-  - {record: gap.audit.unbuilt-module, because: "No implementation exists yet under the NestJS layout the example is moving to."}
+  - {record: gap.audit.unbuilt-module, because: "subscribes now names the five events this FR needs, and login's and task's implementations actually raise all five today - the remaining absence is that no audit module exists yet under the NestJS layout to host this trigger and wire it to them."}

@@ -1,8 +1,8 @@
 schema: work/policy-decision
 id: decision.task.list.scope
 title: Does an organization owner see the tasks of its members
-state: todo
-outcome: open
+state: done
+outcome: decided
 question: A workspace belongs to an organization and a person owns the organization. Does that person read
   the task lists of the people in it, or is a list private to its owner without exception?
 options:
@@ -16,9 +16,27 @@ options:
   - id: member-grants
     summary: A member may grant read access to the organization owner.
     consequence: Most faithful to consent; adds a grant record, its lifetime and its revocation.
+  - id: owner-only
+    summary: There is no organization concept in this product; a list is unconditionally the reader's own
+      tasks, with no owner/member distinction to decide between.
+    consequence: Matches what the product actually builds and matches br.task.list.owned's statement
+      exactly, with nothing left conditional; a future organization concept would have to reopen this
+      decision rather than read it as already having settled owner-reads-all or member-grants by default.
 recommendation: private-always
 recommendationReason: It is the only option that keeps br.task.list.owned a single unconditional statement.
   The other two can be added later without withdrawing anything; starting with them cannot be undone
   without withdrawing a proven rule.
-blocks: [br.task.list.owned]
+chosen: owner-only
+reason: >-
+  The todo app backend, as built, has no organization entity, no membership record and no role that
+  spans more than one person's own tasks - the question this decision poses presupposes a concept the
+  product does not have. Choosing between owner-reads-all and member-grants would specify behavior for an
+  organization owner who cannot exist yet, and even private-always frames the answer as a defensive choice
+  among organization-aware options rather than naming the actual, simpler fact - a task list contains
+  exactly the tasks owned by the person reading it, with no exception to decide because there is no second
+  party in the model to grant an exception to. This is exactly br.task.list.owned's own statement, so
+  choosing it settles the question without asking the rule to change. If an organization concept is ever
+  added to the product, this decision is reopened rather than silently reinterpreted as having already
+  answered owner-reads-all or member-grants.
+change: {rev: 1, kind: clarifying, at: 2026-09-18T11:00:00.000Z, reason: "The lead decided the open question: the product has no organization concept, so a list is unconditionally the reader's own tasks."}
 

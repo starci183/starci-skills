@@ -1,8 +1,8 @@
 schema: work/policy-decision
 id: decision.audit.erasure-method
 title: How an erasure actually removes identifying data from an append-only, hash-chained log
-state: todo
-outcome: open
+state: done
+outcome: decided
 tension:
   records: [br.audit.append-only, br.audit.retention, br.audit.erasure.right]
   statement: "Each rule is individually true and agreed. Held together they are jointly unsatisfiable
@@ -32,10 +32,21 @@ options:
       both hold across an erasure. The line is never dropped, so retention holds. What 'never lost'
       has to mean is narrowed to the line's existence and chain position, not the permanent
       readability of every field in it - a real change to br.audit.retention's plain-language
-      statement, not just an implementation detail, which is why this decision stays open rather than
-      a settled fact of the design."
+      statement, not just an implementation detail."
 recommendation: crypto-shred
 recommendationReason: It is the only option under which append-only, retention and erasure are
   simultaneously true statements about the same stored bytes. The other two options each resolve the
   conflict by quietly breaking one of the rules they were supposed to satisfy.
-blocks: [br.audit.erasure.right, br.audit.erasure.logged, sds.audit.erasure-request]
+chosen: crypto-shred
+reason: >-
+  Crypto-shredding is the only option under which append-only, retention and erasure are
+  simultaneously true statements about the same stored bytes, exactly as the recommendation argued.
+  Sealing each person's identifying field under a key unique to them, then destroying that key on
+  erasure, means every line's bytes and hash never change - the log stays byte-identical, its
+  hash-chained tamper check keeps working across an erasure, and no line is ever dropped, so retention
+  holds for the full window. What has to give is not any of the three rules but the unstated assumption
+  behind "never lost" - it is narrowed to mean the line's existence and chain position, not the permanent
+  readability of every field in it - a real, accepted change to br.audit.retention's plain-language
+  statement, not just an implementation detail, and now a settled fact of the design rather than an open
+  tension.
+change: {rev: 1, kind: clarifying, at: 2026-09-18T11:00:00.000Z, reason: "The lead decided the open question: crypto-shredding, matching the record's own recommendation."}

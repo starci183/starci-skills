@@ -10,5 +10,5 @@ payload:
 delivery: {guarantee: at-least-once, ordering: per-key}
 refs: [fr.login.sign-out]
 blockedBy:
-  - {record: gap.audit.emitted-events, because: "fr.login.sign-out has no evidence yet (br.login.session.single-device is todo) and raises no event today."}
+  - {record: gap.audit.unbuilt-module, because: "fr.login.sign-out's implementation now raises this event on the platform event bus after the session is revoked; audit's fr.audit.log.append still has nothing to subscribe to it with, because no audit module exists yet under the NestJS layout."}
 change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}

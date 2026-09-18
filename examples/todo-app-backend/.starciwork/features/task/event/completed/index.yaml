@@ -11,5 +11,5 @@ payload:
 delivery: {guarantee: at-least-once, ordering: per-key}
 refs: [fr.task.complete]
 blockedBy:
-  - {record: gap.notify.task-completion-event, because: "task has no completion event today: fr.task.complete is itself todo and nothing in the task feature's code emits one; this record specifies the shape notify (and audit) will subscribe to once it does."}
+  - {record: gap.notify.unbuilt-module, because: "complete-task's use case now raises this event on the platform event bus after the write succeeds; notify still has nothing to subscribe to it with, because no notify module exists yet under the NestJS/Next.js layout."}
 change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}

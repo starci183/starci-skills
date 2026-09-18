@@ -65,5 +65,4 @@ requiresProof:
     forEach: stateMachine.transitions
 
 blockedBy:
-  - {record: decision.audit.erasure-method, because: "decision.audit.erasure-method is open. This state machine assumes its recommended answer (crypto-shred), and t-execute's effect is written against that assumption; if the decision settles on something else, t-execute's effect and requiresProof both change. No implementation is authored against an open decision, so this stays todo even once a Nest module exists to host it."}
-  - {record: gap.audit.unbuilt-module, because: "No implementation exists yet under the NestJS layout the example is moving to."}
+  - {record: gap.audit.unbuilt-module, because: "decision.audit.erasure-method is now decided (crypto-shred), confirming this state machine's t-execute effect was written against the answer that actually settled - no further change to t-execute's effect or requiresProof is expected on that account. What remains is that no implementation exists yet under the NestJS layout the example is moving to."}
