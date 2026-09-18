@@ -35,7 +35,6 @@ Open unbuilt-module gaps: 0.
 
 ## recur
 - gap.recur.live-proof — No uat.verify run has produced a live run for recur.make-recurring
-- impl.recur.todo-app-frontend.schedule — The schedule screen
 - nfr.recur.generation.timeliness — A due occurrence is materialised close to its due instant
 
 ## share
