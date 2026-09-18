@@ -1,7 +1,7 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 import { AppConfigService } from '../../../config';
-import { PostgresPrimaryUnavailableException } from './primary.exception';
+import { PostgresPrimaryUnavailableException } from '@modules/shared/exceptions';
 
 /**
  * integration.login.postgres is still todo: no migration has been applied against a real server yet, so
@@ -23,10 +23,10 @@ export class PostgresPrimaryClient implements OnModuleDestroy {
     try {
       rowCount = (await this.pool.query('SELECT 1')).rowCount;
     } catch (error) {
-      throw new PostgresPrimaryUnavailableException(String(error));
+      throw new PostgresPrimaryUnavailableException({ reason: String(error) });
     }
     if (rowCount !== 1) {
-      throw new PostgresPrimaryUnavailableException('unexpected row count');
+      throw new PostgresPrimaryUnavailableException({ reason: 'unexpected row count' });
     }
   }
 

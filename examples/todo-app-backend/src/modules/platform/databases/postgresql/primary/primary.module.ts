@@ -22,7 +22,6 @@ export class PostgresqlPrimaryModule extends ConfigurableModuleClass {
     return {
       ...base,
       imports: [
-        ConfigModule,
         TypeOrmModule.forRootAsync({
           name: POSTGRESQL_PRIMARY,
           imports: [ConfigModule],

@@ -1,41 +1,19 @@
-import { Repository } from 'typeorm';
-import { AbstractException } from '../../platform/errors';
+import { AbstractException } from '@modules/shared/exceptions';
 import { PlatformEventBus, TaskCreatedEvent } from '../../platform/events';
 import { TaskEntity } from '../../platform/databases/postgresql/primary';
+import { createFakeEntityManager } from '../../platform/databases/postgresql/primary/testing/fake-entity-manager';
 import { TaskCreationPolicy, CreateTaskInputParams, CreateTaskPrincipalParams } from './creation-policy.contracts';
 import { TaskCreationPolicyRegistry } from './creation-policy.providers';
 import { TaskService } from './task.service';
 import { CreateTaskCommand } from './create-task.command';
 import { CreateTaskHandler } from './create-task.handler';
 
-class FakeTaskRepository {
-  private readonly byId = new Map<string, TaskEntity>();
-
-  async findOneBy(where: { id: string }): Promise<TaskEntity | null> {
-    return this.byId.get(where.id) ?? null;
-  }
-
-  async findBy(where: { owner: string }): Promise<TaskEntity[]> {
-    return [...this.byId.values()].filter(row => row.owner === where.owner);
-  }
-
-  async save(row: Partial<TaskEntity>): Promise<TaskEntity> {
-    const entity = row as TaskEntity;
-    this.byId.set(entity.id, entity);
-    return entity;
-  }
-
-  async delete(id: string): Promise<void> {
-    this.byId.delete(id);
-  }
-}
-
 describe('CreateTaskHandler', () => {
   let taskService: TaskService;
   let handler: CreateTaskHandler;
 
   beforeEach(() => {
-    taskService = new TaskService(new FakeTaskRepository() as unknown as Repository<TaskEntity>);
+    taskService = new TaskService(createFakeEntityManager<TaskEntity>('id') as never);
     handler = new CreateTaskHandler(taskService, new TaskCreationPolicyRegistry(), new PlatformEventBus());
   });
 
@@ -85,7 +63,7 @@ class RefusingPolicy extends TaskCreationPolicy {
 
 describe('TaskCreationPolicyRegistry (sds.plan.cap-guard seam)', () => {
   it('sds.plan.cap-guard: a registered policy can refuse creation before the write, and nothing is written', async () => {
-    const taskService = new TaskService(new FakeTaskRepository() as unknown as Repository<TaskEntity>);
+    const taskService = new TaskService(createFakeEntityManager<TaskEntity>('id') as never);
     const registry = new TaskCreationPolicyRegistry();
     registry.register(new RefusingPolicy());
     const handler = new CreateTaskHandler(taskService, registry, new PlatformEventBus());
@@ -97,7 +75,7 @@ describe('TaskCreationPolicyRegistry (sds.plan.cap-guard seam)', () => {
   });
 
   it('an empty registry (the default) blocks nothing', async () => {
-    const taskService = new TaskService(new FakeTaskRepository() as unknown as Repository<TaskEntity>);
+    const taskService = new TaskService(createFakeEntityManager<TaskEntity>('id') as never);
     const registry = new TaskCreationPolicyRegistry();
     const handler = new CreateTaskHandler(taskService, registry, new PlatformEventBus());
 

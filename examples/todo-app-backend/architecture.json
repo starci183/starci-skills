@@ -13,7 +13,7 @@
     {"id": "module-bussiness-session", "root": "src/modules/bussiness/session", "entry": "src/modules/bussiness/session/index.ts"},
     {"id": "module-bussiness-task", "root": "src/modules/bussiness/task", "entry": "src/modules/bussiness/task/index.ts"},
     {"id": "module-platform-config", "root": "src/modules/platform/config", "entry": "src/modules/platform/config/index.ts"},
-    {"id": "module-platform-errors", "root": "src/modules/platform/errors", "entry": "src/modules/platform/errors/index.ts"},
+    {"id": "module-shared-exceptions", "root": "src/modules/shared/exceptions", "entry": "src/modules/shared/exceptions/index.ts"},
     {"id": "module-platform-events", "root": "src/modules/platform/events", "entry": "src/modules/platform/events/index.ts"},
     {"id": "module-platform-databases-postgresql-primary", "root": "src/modules/platform/databases/postgresql/primary", "entry": "src/modules/platform/databases/postgresql/primary/index.ts"},
     {"id": "module-integrations-keycloak", "root": "src/modules/integrations/keycloak", "entry": "src/modules/integrations/keycloak/index.ts"}

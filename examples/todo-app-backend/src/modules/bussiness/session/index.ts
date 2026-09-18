@@ -1,7 +1,7 @@
 export { SessionModule } from './session.module';
 export { SessionService } from './session.service';
 export { SessionRecord } from './types/session-record';
-export { InvalidCredentialsException, SessionExpiredException, SessionNotFoundException } from './session.exception';
+export { InvalidCredentialsException, SessionExpiredException, SessionNotFoundException } from '@modules/shared/exceptions';
 export { SignInCommand } from './sign-in.command';
 export type { SignInCommandParams, SignInCommandResult } from './sign-in.command';
 export { SignInHandler } from './sign-in.handler';

@@ -1,11 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import { Repository } from 'typeorm';
+import type { EntityManager } from 'typeorm';
 import { AppConfigService } from '../../platform/config';
-import { SessionEntity } from '../../platform/databases/postgresql/primary';
+import { InjectPrimaryEntityManager, SessionEntity } from '../../platform/databases/postgresql/primary';
 import { SessionRecord } from './types/session-record';
-import { InvalidCredentialsException, SessionExpiredException, SessionNotFoundException } from './session.exception';
+import { InvalidCredentialsException, SessionExpiredException, SessionNotFoundException } from '@modules/shared/exceptions';
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -14,17 +13,18 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * sds.login.session-store: one row per live session, expiry enforced on read rather than by a sweep, so
  * a stopped sweeper can never leave a session alive past its time. Method names mirror the record's five
  * transitions (t-begin, t-accept, t-refuse, t-expire, t-revoke) so the record and the code read together.
- * The row lives in Postgres, through the platform database module's SessionEntity.
+ * The row lives in Postgres, through the platform database module's SessionEntity, reached the way
+ * nivo's own capability services reach theirs: `@InjectPrimaryEntityManager()` and
+ * `entityManager.findOneBy(SessionEntity, ...)` - this capability has no repository file of its own.
  *
  * Renamed from the former `SessionRepository` (under `modules/domain/session`) to `SessionService` under
- * `modules/bussiness/session`: nivo's capability modules own persistence and business rules together in
- * one `*.service.ts` (see `agent-workspace-operation.service.ts`), rather than a separate
- * `*.repository.ts` layer.
+ * `modules/bussiness/session` - nivo's capability modules own persistence and business rules together in
+ * one `*.service.ts`, rather than a separate `*.repository.ts` layer.
  */
 @Injectable()
 export class SessionService {
   constructor(
-    @InjectRepository(SessionEntity) private readonly rows: Repository<SessionEntity>,
+    @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
     private readonly config: AppConfigService,
   ) {}
 
@@ -37,7 +37,7 @@ export class SessionService {
   async tAccept(personId: string): Promise<SessionRecord> {
     const issuedAt = new Date();
     const expiresAt = new Date(issuedAt.getTime() + this.config.getSessionTtlDays() * MILLISECONDS_PER_DAY);
-    const saved = await this.rows.save({ token: randomUUID(), personId, issuedAt, expiresAt });
+    const saved = await this.entityManager.save(SessionEntity, { token: randomUUID(), personId, issuedAt, expiresAt });
     return toRecord(saved);
   }
 
@@ -46,15 +46,15 @@ export class SessionService {
   }
 
   async tExpire(token: string): Promise<void> {
-    await this.rows.delete(token);
+    await this.entityManager.delete(SessionEntity, token);
   }
 
   async tRevoke(token: string): Promise<void> {
-    await this.rows.delete(token);
+    await this.entityManager.delete(SessionEntity, token);
   }
 
   async findActive(token: string): Promise<SessionRecord> {
-    const row = await this.rows.findOneBy({ token });
+    const row = await this.entityManager.findOneBy(SessionEntity, { token });
     if (!row) {
       throw new SessionNotFoundException();
     }

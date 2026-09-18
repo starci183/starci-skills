@@ -3,7 +3,7 @@ import { ApolloDriver } from '@nestjs/apollo';
 import type { ApolloDriverConfig } from '@nestjs/apollo';
 import { GraphQLModule as NestGraphQLModule } from '@nestjs/graphql';
 import { GraphQLFormattedError } from 'graphql';
-import { AbstractException } from '@modules/platform/errors';
+import { AbstractException } from '@modules/shared/exceptions';
 import { QUERY_MODULES } from './queries';
 import { MUTATION_MODULES } from './mutations';
 

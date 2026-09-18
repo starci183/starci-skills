@@ -1,7 +1,7 @@
 export { TaskModule } from './task.module';
 export { TaskService } from './task.service';
 export { TaskRecord } from './types/task-record';
-export { TaskNotFoundException, TaskForbiddenException, TaskTitleRequiredException } from './task.exception';
+export { TaskNotFoundException, TaskForbiddenException, TaskTitleRequiredException } from '@modules/shared/exceptions';
 export { TaskCreationPolicyRegistry } from './creation-policy.providers';
 export { TaskCreationPolicy } from './creation-policy.contracts';
 export { CompletionAuthorityRegistry } from './completion-authority.providers';

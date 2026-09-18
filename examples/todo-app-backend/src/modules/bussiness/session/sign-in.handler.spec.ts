@@ -1,29 +1,11 @@
-import { Repository } from 'typeorm';
 import { AppConfigService } from '../../platform/config';
 import { SessionService } from './session.service';
 import { SessionEntity } from '../../platform/databases/postgresql/primary';
+import { createFakeEntityManager } from '../../platform/databases/postgresql/primary/testing/fake-entity-manager';
 import { KeycloakClient, KeycloakInvalidCredentialsException, KeycloakSignInResult } from '../../integrations/keycloak';
 import { PlatformEventBus, SignedInEvent } from '../../platform/events';
 import { SignInCommand } from './sign-in.command';
 import { SignInHandler } from './sign-in.handler';
-
-class FakeSessionRepository {
-  private readonly byToken = new Map<string, SessionEntity>();
-
-  async findOneBy(where: { token: string }): Promise<SessionEntity | null> {
-    return this.byToken.get(where.token) ?? null;
-  }
-
-  async save(row: Partial<SessionEntity>): Promise<SessionEntity> {
-    const entity = row as SessionEntity;
-    this.byToken.set(entity.token, entity);
-    return entity;
-  }
-
-  async delete(token: string): Promise<void> {
-    this.byToken.delete(token);
-  }
-}
 
 /**
  * The sign-in handler now exercises only the Keycloak client boundary: this fake stands in for the real
@@ -48,7 +30,7 @@ describe('SignInHandler', () => {
   let handler: SignInHandler;
 
   beforeEach(() => {
-    sessionService = new SessionService(new FakeSessionRepository() as unknown as Repository<SessionEntity>, new AppConfigService());
+    sessionService = new SessionService(createFakeEntityManager<SessionEntity>('token') as never, new AppConfigService());
     const keycloakClient = new FakeKeycloakClient({ 'person@example.com': 'correct-horse' });
     handler = new SignInHandler(keycloakClient, sessionService, new PlatformEventBus());
   });

@@ -1,34 +1,11 @@
-import { Repository } from 'typeorm';
 import { AppConfigService } from '../../platform/config';
 import { SessionEntity } from '../../platform/databases/postgresql/primary';
+import { createFakeEntityManager } from '../../platform/databases/postgresql/primary/testing/fake-entity-manager';
 import { SessionService } from './session.service';
-
-/**
- * A minimal in-memory stand-in for Repository<SessionEntity>: only the three methods SessionService
- * actually calls. It is not a real TypeORM repository, so it is cast through `unknown` at the injection
- * site rather than claimed to satisfy the full Repository surface.
- */
-class FakeSessionRepository {
-  private readonly byToken = new Map<string, SessionEntity>();
-
-  async findOneBy(where: { token: string }): Promise<SessionEntity | null> {
-    return this.byToken.get(where.token) ?? null;
-  }
-
-  async save(row: Partial<SessionEntity>): Promise<SessionEntity> {
-    const entity = row as SessionEntity;
-    this.byToken.set(entity.token, entity);
-    return entity;
-  }
-
-  async delete(token: string): Promise<void> {
-    this.byToken.delete(token);
-  }
-}
 
 describe('SessionService', () => {
   const buildService = () =>
-    new SessionService(new FakeSessionRepository() as unknown as Repository<SessionEntity>, new AppConfigService());
+    new SessionService(createFakeEntityManager<SessionEntity>('token') as never, new AppConfigService());
 
   it('t-begin: a malformed email is refused before any write, and a well-formed one passes through', () => {
     const service = buildService();

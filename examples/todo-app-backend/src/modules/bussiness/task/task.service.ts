@@ -1,32 +1,35 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
-import { Repository } from 'typeorm';
-import { TaskEntity } from '../../platform/databases/postgresql/primary';
+import type { EntityManager } from 'typeorm';
+import { InjectPrimaryEntityManager, TaskEntity } from '../../platform/databases/postgresql/primary';
 import { OwnershipGuard } from './ownership.guard';
 import { CompletionAuthorityRegistry } from './completion-authority.providers';
 import { TaskRecord } from './types/task-record';
-import { TaskNotFoundException, TaskTitleRequiredException } from './task.exception';
+import { TaskNotFoundException, TaskTitleRequiredException } from '@modules/shared/exceptions';
 
 /**
  * data.task.task: owner is bound at creation and never rewritten; completedAt is set if and only if
  * complete is true. Completion method names mirror sds.task.completion-state's transitions
  * (t-complete, t-complete-again, t-reopen) so a reader can hold the record beside the code. The row lives
- * in Postgres, through the platform database module's TaskEntity.
+ * in Postgres, through the platform database module's TaskEntity, reached the way nivo's own capability
+ * services reach theirs: `@InjectPrimaryEntityManager()` and `entityManager.findOneBy(TaskEntity, ...)`,
+ * never a per-entity `@InjectRepository` - the databases module owns persistence, this service owns
+ * behaviour.
  *
  * br.task.single-owner rev 2: delete is checked against OwnershipGuard, unconditionally and always; who
  * may complete/reopen is checked against the CompletionAuthorityRegistry's current authority instead, so
  * a future `share` feature can widen that half alone without touching delete's guard.
  *
  * Renamed from the former `TaskRepository` (under `modules/domain/task`) to `TaskService` under
- * `modules/bussiness/task` - same rationale as SessionService beside it.
+ * `modules/bussiness/task` - nivo's capability modules own persistence and business rules together in
+ * one service, not a separate repository layer.
  */
 @Injectable()
 export class TaskService {
   private readonly guard = new OwnershipGuard();
 
   constructor(
-    @InjectRepository(TaskEntity) private readonly rows: Repository<TaskEntity>,
+    @InjectPrimaryEntityManager() private readonly entityManager: EntityManager,
     private readonly completionAuthorityRegistry: CompletionAuthorityRegistry = new CompletionAuthorityRegistry(),
   ) {}
 
@@ -35,20 +38,26 @@ export class TaskService {
     if (!trimmed) {
       throw new TaskTitleRequiredException();
     }
-    const saved = await this.rows.save({ id: randomUUID(), owner, title: trimmed, complete: false, completedAt: null });
+    const saved = await this.entityManager.save(TaskEntity, {
+      id: randomUUID(),
+      owner,
+      title: trimmed,
+      complete: false,
+      completedAt: null,
+    });
     return toRecord(saved);
   }
 
   async findById(id: string): Promise<TaskRecord> {
-    const row = await this.rows.findOneBy({ id });
+    const row = await this.entityManager.findOneBy(TaskEntity, { id });
     if (!row) {
-      throw new TaskNotFoundException();
+      throw new TaskNotFoundException({ taskId: id });
     }
     return toRecord(row);
   }
 
   async listOwnedBy(owner: string): Promise<TaskRecord[]> {
-    const rows = await this.rows.findBy({ owner });
+    const rows = await this.entityManager.findBy(TaskEntity, { owner });
     return rows.map(toRecord);
   }
 
@@ -64,15 +73,15 @@ export class TaskService {
 
   async delete(id: string, actorId: string): Promise<TaskRecord> {
     const row = await this.findOwnedRow(id, actorId);
-    await this.rows.delete(row.id);
+    await this.entityManager.delete(TaskEntity, row.id);
     return toRecord(row);
   }
 
   /** Delete's sole, unconditional authority: OwnershipGuard, never the replaceable CompletionAuthority. */
   private async findOwnedRow(id: string, actorId: string): Promise<TaskEntity> {
-    const row = await this.rows.findOneBy({ id });
+    const row = await this.entityManager.findOneBy(TaskEntity, { id });
     if (!row) {
-      throw new TaskNotFoundException();
+      throw new TaskNotFoundException({ taskId: id });
     }
     this.guard.assert(toRecord(row), actorId);
     return row;
@@ -80,9 +89,9 @@ export class TaskService {
 
   /** Complete/reopen's authority: whichever CompletionAuthority is currently registered. */
   private async findRowForCompletion(id: string, actorId: string, action: 'complete' | 'reopen'): Promise<TaskEntity> {
-    const row = await this.rows.findOneBy({ id });
+    const row = await this.entityManager.findOneBy(TaskEntity, { id });
     if (!row) {
-      throw new TaskNotFoundException();
+      throw new TaskNotFoundException({ taskId: id });
     }
     this.completionAuthorityRegistry.current().assertMayTransition(toRecord(row), actorId, action);
     return row;
@@ -94,7 +103,7 @@ export class TaskService {
     }
     row.complete = true;
     row.completedAt = new Date();
-    const saved = await this.rows.save(row);
+    const saved = await this.entityManager.save(TaskEntity, row);
     return toRecord(saved);
   }
 
@@ -105,7 +114,7 @@ export class TaskService {
   private async tReopen(row: TaskEntity): Promise<TaskRecord> {
     row.complete = false;
     row.completedAt = null;
-    const saved = await this.rows.save(row);
+    const saved = await this.entityManager.save(TaskEntity, row);
     return toRecord(saved);
   }
 }

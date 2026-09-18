@@ -1,8 +1,5 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { POSTGRESQL_PRIMARY, TaskEntity } from '../../platform/databases/postgresql/primary';
-import { PlatformEventsModule } from '../../platform/events';
 import { ConfigurableModuleClass, OPTIONS_TYPE } from './task.module-definition';
 import { TaskService } from './task.service';
 import { TaskCreationPolicyRegistry } from './creation-policy.providers';
@@ -21,6 +18,13 @@ import { ListTasksHandler } from './list-tasks.handler';
  * commands), and every task CQRS command/query handler. The GraphQL transport
  * (`features/todo/graphql/{mutations,queries}/task/**`) depends only on `@nestjs/cqrs`'s CommandBus/
  * QueryBus, never on this module's providers directly.
+ *
+ * No `TypeOrmModule.forFeature(...)` here: `TaskService` reaches `TaskEntity` through
+ * `@InjectPrimaryEntityManager()` (the databases module's own decorator over the named
+ * `POSTGRESQL_PRIMARY` connection), not a per-entity repository token, so this capability declares no
+ * persistence wiring of its own - nivo's own convention, `@InjectRepository` appears nowhere outside
+ * `modules/platform/databases/**`. `PlatformEventsModule` is not imported here either: it is registered
+ * globally from `app.module.ts`.
  */
 @Module({})
 export class TaskModule extends ConfigurableModuleClass {
@@ -28,11 +32,7 @@ export class TaskModule extends ConfigurableModuleClass {
     const base = super.register(options);
     return {
       ...base,
-      imports: [
-        CqrsModule,
-        PlatformEventsModule,
-        TypeOrmModule.forFeature([TaskEntity], POSTGRESQL_PRIMARY),
-      ],
+      imports: [CqrsModule],
       providers: [
         ...(base.providers ?? []),
         TaskService,

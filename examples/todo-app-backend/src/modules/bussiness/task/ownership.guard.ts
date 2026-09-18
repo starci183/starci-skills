@@ -1,5 +1,5 @@
 import { TaskRecord } from './types/task-record';
-import { TaskForbiddenException } from './task.exception';
+import { TaskForbiddenException } from '@modules/shared/exceptions';
 
 /**
  * sds.task.ownership-guard: every mutation names the actor and compares it with the row's owner before

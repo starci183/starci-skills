@@ -16,20 +16,22 @@ codeDigest:
     - path: src/modules/platform/databases/postgresql/primary/entities/task.entity.ts
       sha256: da57a361a2f74e555d18426d4c029a94c02df68fb9ba195d1aac729368c0cf3e
     - path: src/modules/platform/databases/postgresql/primary/index.ts
-      sha256: d5c902d4e926f043f7f9bc2e8f32b5b31323af5864b149fabb483d3f4380db0d
+      sha256: 073db554e289c23e581f0cdc287aa7f04d6f6b2d50561c46bfb23b4ae23e785f
     - path: src/modules/platform/databases/postgresql/primary/migrations/1758160000000-create-sessions-table.ts
       sha256: 278feb6ccb5c538c55a61eff5f65437e62f84230c63ccb52ca9da7255d9d4331
     - path: src/modules/platform/databases/postgresql/primary/migrations/1758160000001-create-tasks-table.ts
       sha256: dcfba1c8b509e7617ac4013c8860e04c922ad1e7c29dd1007c3e92ab8381e960
     - path: src/modules/platform/databases/postgresql/primary/primary.client.ts
-      sha256: 828ccecb3e330af11050142ba84ba8755431568f9964f9b2241aec9fe204f170
-    - path: src/modules/platform/databases/postgresql/primary/primary.exception.ts
-      sha256: 26bd57f6ac11b5cdbc6d2e6ca3e27b3322c5c1dff58d32c6f639afd4eec4e7ba
+      sha256: a6e157912eda44125c6c7386c7656d85559052dc7948b8da34c5721f7216eab2
+    - path: src/modules/platform/databases/postgresql/primary/primary.decorators.ts
+      sha256: ed2c645d79ecaa89de8482853a0fcb8e9508fd28554b0ab242f033c462bd0368
     - path: src/modules/platform/databases/postgresql/primary/primary.module-definition.ts
       sha256: d6e539e83592705a78a77c4dee437e9a0ccd258f176216dafc59fd89e43b5a97
     - path: src/modules/platform/databases/postgresql/primary/primary.module.ts
-      sha256: f84ca09802d5f9d6beb3eca95b066116a0848806c72a502c4eeab573e11f8286
-  digest: 59c29f597d516354290c602cee710d00f1837fdb0eb440e4623007f6541be452
+      sha256: 4fae221d68d6aca18501f065b050215ad76e4e544d7907d0ff22c004c5deec17
+    - path: src/modules/platform/databases/postgresql/primary/testing/fake-entity-manager.ts
+      sha256: f07588abb29e3d0f6344c771c0d3e537a8720dad18e5e4e0e817725a58ce7a5e
+  digest: d3cb079b772b78edee99b97cfcf9095fa94b08c106e286b2c89eb66d3b5b4f68
 outcome: pass
 assertions:
   - id: data.task.task
@@ -46,4 +48,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T07:24:15.064Z
+  capturedAt: 2026-09-18T07:52:36.156Z

@@ -164,7 +164,7 @@ class FakeTaskService {
  */
 @Global()
 @Module({
-  imports: [CqrsModule, PlatformEventsModule],
+  imports: [CqrsModule, PlatformEventsModule.register()],
   providers: [
     { provide: SessionService, useClass: FakeSessionService },
     { provide: KeycloakClient, useClass: FakeKeycloakClient },
@@ -176,7 +176,7 @@ class FakeTaskService {
 class FakeSessionModule {}
 
 @Module({
-  imports: [CqrsModule, PlatformEventsModule],
+  imports: [CqrsModule, PlatformEventsModule.register()],
   providers: [
     { provide: TaskService, useClass: FakeTaskService },
     TaskCreationPolicyRegistry,

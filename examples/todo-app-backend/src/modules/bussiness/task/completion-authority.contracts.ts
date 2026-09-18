@@ -1,5 +1,5 @@
 import { TaskRecord } from './types/task-record';
-import { TaskForbiddenException } from './task.exception';
+import { TaskForbiddenException } from '@modules/shared/exceptions';
 
 export type CompletionAction = 'complete' | 'reopen';
 

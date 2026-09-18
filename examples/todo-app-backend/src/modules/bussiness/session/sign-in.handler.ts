@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { KeycloakClient, KeycloakInvalidCredentialsException } from '../../integrations/keycloak';
 import { PlatformEventBus, SignedInEvent } from '../../platform/events';
 import { SessionService } from './session.service';
-import { InvalidCredentialsException } from './session.exception';
+import { InvalidCredentialsException } from '@modules/shared/exceptions';
 import { SignInCommand, SignInCommandResult } from './sign-in.command';
 
 /**

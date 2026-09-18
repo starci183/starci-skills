@@ -1,35 +1,13 @@
-import { Repository } from 'typeorm';
 import { TaskService } from './task.service';
 import { TaskEntity } from '../../platform/databases/postgresql/primary';
+import { createFakeEntityManager } from '../../platform/databases/postgresql/primary/testing/fake-entity-manager';
 import { PlatformEventBus, TaskDeletedEvent } from '../../platform/events';
 import { DeleteTaskCommand } from './delete-task.command';
 import { DeleteTaskHandler } from './delete-task.handler';
 
-class FakeTaskRepository {
-  private readonly byId = new Map<string, TaskEntity>();
-
-  async findOneBy(where: { id: string }): Promise<TaskEntity | null> {
-    return this.byId.get(where.id) ?? null;
-  }
-
-  async findBy(where: { owner: string }): Promise<TaskEntity[]> {
-    return [...this.byId.values()].filter(row => row.owner === where.owner);
-  }
-
-  async save(row: Partial<TaskEntity>): Promise<TaskEntity> {
-    const entity = row as TaskEntity;
-    this.byId.set(entity.id, entity);
-    return entity;
-  }
-
-  async delete(id: string): Promise<void> {
-    this.byId.delete(id);
-  }
-}
-
 describe('DeleteTaskHandler', () => {
   it('ac.task.delete.final.stays-gone: the identifier resolves to nothing after deletion', async () => {
-    const taskService = new TaskService(new FakeTaskRepository() as unknown as Repository<TaskEntity>);
+    const taskService = new TaskService(createFakeEntityManager<TaskEntity>('id') as never);
     const handler = new DeleteTaskHandler(taskService, new PlatformEventBus());
     const created = await taskService.create('owner-1', 'Ship it');
 
@@ -40,7 +18,7 @@ describe('DeleteTaskHandler', () => {
   });
 
   it("ac.task.single-owner.refuses-stranger: a stranger cannot delete somebody else's task", async () => {
-    const taskService = new TaskService(new FakeTaskRepository() as unknown as Repository<TaskEntity>);
+    const taskService = new TaskService(createFakeEntityManager<TaskEntity>('id') as never);
     const handler = new DeleteTaskHandler(taskService, new PlatformEventBus());
     const created = await taskService.create('owner-1', 'Ship it');
 
@@ -51,7 +29,7 @@ describe('DeleteTaskHandler', () => {
   });
 
   it('event.task.deleted: publishes on the PlatformEventBus after the row is gone', async () => {
-    const taskService = new TaskService(new FakeTaskRepository() as unknown as Repository<TaskEntity>);
+    const taskService = new TaskService(createFakeEntityManager<TaskEntity>('id') as never);
     const created = await taskService.create('owner-1', 'Ship it');
     const events = new PlatformEventBus();
     const received: unknown[] = [];
