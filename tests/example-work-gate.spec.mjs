@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { checkWorkTree } from '../scripts/check-example-work.mjs';
+import { checkWorkTree, checkFamiliesDrift, FAMILIES } from '../scripts/check-example-work.mjs';
 
 /**
  * One fixture tree per new-concept rule in scripts/check-example-work.mjs, proving each rule refuses the
@@ -315,6 +315,33 @@ test('concept 12: a done uat-flow needs a sibling evidence.yaml naming a run wit
   const passing = [];
   checkWorkTree(workRoot, passing);
   assert.equal(passing.length, 0, passing.join('\n'));
+});
+
+test('concept 6: schemas/work-layout.yaml\'s shape.families must equal check-example-work.mjs\'s own FAMILIES set (FAMILIES_DRIFT)', () => {
+  const dir = freshDir();
+
+  const missingFile = path.join(dir, 'missing-work-layout.yaml');
+  const problemsMissingFile = [];
+  checkFamiliesDrift(problemsMissingFile, missingFile);
+  assert.ok(problemsMissingFile.some(p => p.includes('FAMILIES_DRIFT')), problemsMissingFile.join('\n'));
+
+  const noFamilies = path.join(dir, 'no-families.yaml');
+  write(dir, 'no-families.yaml', 'shape:\n  workspace: workspace.yaml\n');
+  const problemsNoFamilies = [];
+  checkFamiliesDrift(problemsNoFamilies, noFamilies);
+  assert.ok(problemsNoFamilies.some(p => p.includes('shape.families is missing')), problemsNoFamilies.join('\n'));
+
+  const wrongFamilies = path.join(dir, 'wrong-families.yaml');
+  write(dir, 'wrong-families.yaml', 'shape:\n  families: [business, architecture]\n');
+  const problemsWrong = [];
+  checkFamiliesDrift(problemsWrong, wrongFamilies);
+  assert.ok(problemsWrong.some(p => p.includes('FAMILIES_DRIFT') && p.includes('missing') && p.includes('extra')), problemsWrong.join('\n'));
+
+  const rightFamilies = path.join(dir, 'right-families.yaml');
+  write(dir, 'right-families.yaml', `shape:\n  families: [${[...FAMILIES].join(', ')}]\n`);
+  const problemsRight = [];
+  checkFamiliesDrift(problemsRight, rightFamilies);
+  assert.equal(problemsRight.length, 0, problemsRight.join('\n'));
 });
 
 test('concept 13: _resources custody is the plain work/resource schema (no @N), and a uat-flow\'s environment/fixtures/accounts refs resolve to the right kind', () => {

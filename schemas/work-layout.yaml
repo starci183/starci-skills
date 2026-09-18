@@ -6,7 +6,68 @@ shape:
   workspace: workspace.yaml
   brand: brand/index.yaml
   brandAssets: brand/assets/**/<file-in-original-format>
-  businessTree: features/<feature>/**/index.yaml
+  families: [br, ac, fr, nfr, data, journey, decision, sds, ui, impl, uat, contract, integration, gap, event]
+  familiesNote: "The array above is the executable form of this shape block: every record lives in a flat
+    family folder directly under its feature - features/<feature>/<family>/<name>/index.yaml - with no
+    business/, architecture/, business/srs/ or architecture/sds/ segment anywhere. This replaced an earlier
+    generation of this schema that documented a business/{overview,srs} plus architecture/{overview,sds}
+    nesting; the real example tree and the gate that checks it (scripts/check-example-work.mjs's own
+    FAMILIES set) never used that nesting, and this file now states the shape both of them actually use.
+    scripts/check-example-work.mjs reads shape.families from this file at gate time and refuses
+    (FAMILIES_DRIFT) the moment its own FAMILIES set and this list disagree, so the two cannot drift apart
+    silently a second time."
+  br: features/<feature>/br/<name>/index.yaml, schema work/business-rule. May carry appliesTo, module
+    (a string or list of module-root directory paths - never individual files, see the owners note under
+    implementation below) and blockedBy.
+  ac: "features/<feature>/br/<rule>/ac/<name>/index.yaml, schema work/acceptance-criterion. Nested one
+    level under the br it accepts rather than living in its own sibling family folder - an acceptance
+    criterion has no identity apart from the rule it accepts. Authors rule (the owning br's id), given,
+    when, then and carries no lifecycle state of its own (see rules, below, on which nodes author state)."
+  fr: features/<feature>/fr/<name>/index.yaml, schema work/functional-requirement
+  nfr: features/<feature>/nfr/<name>/index.yaml, schema work/non-functional-requirement
+  data: features/<feature>/data/<name>/index.yaml, schema work/data
+  journey: features/<feature>/journey/<name>/index.yaml, schema work/customer-journey
+  decision: features/<feature>/decision/<name>/index.yaml, schema work/policy-decision
+  sds: "features/<feature>/sds/<name>/index.yaml, schema work/sds-component - a logical component of the
+    architecture map, tracing SRS paths through entry points, contracts, data, quality controls,
+    deployment and verification. A done sds-component must carry owners: [{role, path}] naming at least
+    one module-root directory that exists on disk (the read-scope boundary a design component describes
+    is a module boundary, not a prose claim); a todo one without owners is warned, not refused, since the
+    module a design targets may not exist yet."
+  ui: features/<feature>/ui/<name>/index.yaml plus <name>/assets/**, schema work/ui-screen
+  impl: "features/<feature>/impl/<repository>/<name>/index.yaml, schema work/implementation, one flat
+    family folder per feature split by the repository the code lives in (<repository> is the exact value
+    the record's own `repository` field names, e.g. impl/todo-app-backend/<name> beside
+    impl/todo-app-frontend/<name> in a two-repository product) - never an `implementation/` singular
+    parent with `frontend/`/`backend/` children, which no example tree or gate ever used. `owners: [{role,
+    path}]` names one or more module-root directories, never individual files: `path` (and
+    `work/business-rule.module`, and `work/sds-component.owners[].path` above) is the directory a reader
+    would call the module's root - `src/modules/domain/task`, not
+    `src/modules/domain/task/ownership.guard.ts` - so a file inside it moving during a refactor is not, by
+    itself, a broken reference. A done implementation's every owner directory must exist on disk
+    (OWNER_PATH_MISSING otherwise refuses it); a todo one is warned, not refused. A done implementation
+    whose `proves` names a record that is not itself `state: done` is refused (PROVES_TARGET_NOT_DONE) -
+    proof cannot outrun what it proves."
+  uat: features/<feature>/uat/<name>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql,
+    assets/,runs/<runId>/**} - see uatFlow/uatRun below for the exact shape.
+  contract: features/<feature>/contract/<name>/index.yaml, schema work/contract - a synchronous
+    request/response surface between a provider feature and a consumer feature; provenBy.provider/consumer
+    each name the implementation(s) that proved their half.
+  integration: features/<feature>/integration/<name>/index.yaml, schema work/integration - the one node a
+    declared extensions.work3.integrations edge owes, proven only against the real external provider.
+  gap: "features/<feature>/gap/<name>/index.yaml, schema work/gap. closedBy is a list of record ids (a
+    bare string is accepted and normalised to a one-element list, for the many gaps that only ever needed
+    one) - a gap reaches done only once every id in closedBy is itself done, because a gap whose statement
+    named two missing things is not honestly closed by building one of them."
+  event: features/<feature>/event/<name>/index.yaml, schema work/event
+  assets: <node>/assets/**/<file-in-original-format> - payload organization beside a record's own
+    index.yaml, never a Work node in its own right and never given an index.yaml.
+  runs: <uat-node>/runs/<runId>/** - append-only UAT evidence; see uatRun below for the exact file set.
+  derived: "_derived/{index.yaml,frontier.md} at the .starciwork root - GENERATED by
+    scripts/example-derive.mjs, never authored by hand. Excluded from every record walk (it is not itself
+    a record, has no id) and refused (scripts/check-example-derived.mjs) the moment it goes stale against
+    what is actually on disk, or the moment any real record authors a top-level usedBy/effectiveState/
+    frontier field of its own."
   nodeAssets: <node>/assets/**/<file-in-original-format>
   uatFlow: "features/<feature>/uat/<flow>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql,assets/}.
     The flow's index.yaml declares entry, actor, an ordered steps[] (each an action, its expected
@@ -22,8 +83,8 @@ shape:
     done only when that run has at least one file under screens/, at least one under videos/ and a
     result.md whose outcome is pass; until then the record stays todo and cites a
     gap.<feature>.live-proof record in blockedBy."
-  designReview: Current Business overview/SRS/SDS use completion.review inside their owning
-    index.yaml, without an evidence folder.
+  designReview: Current br/fr/nfr/data/journey/decision/sds records use completion.review inside their
+    owning index.yaml, without an evidence folder.
   evidence: Profiles using execution proof may retain <node>/evidence/<id>/manifest.yaml; this is not
     a required folder for every layer.
   workflowRunState: one SQLite file, .starciwork/runtime.sqlite (plus its -wal and -shm siblings),
@@ -33,9 +94,6 @@ shape:
     rolled-back ledger is refused instead of resumed
   kernelCustody: .starciwork/{kernel-evidence,kernel-strays,kernel-headless,kernel-approvals}/** - kernel-owned
     working state with a real lifetime, untracked, excluded from Work validation, never canonical Work
-  gapRecord: features/<feature>/gap/<name>/index.yaml with schema work/gap
-  eventRecord: features/<feature>/event/<name>/index.yaml with schema work/event
-  moduleUI: features/<feature>/ui/**/{index.yaml,assets/**}
   uiDirectionAsset: "features/<feature>/ui/<screen>/assets/<name>.png with a sibling
     <name>.prompt.txt under the same assets/. interface.draw writes both - the record's ui block
     (intent, surfaces, states, coverage {scale, representativeScreens, map}, accessibility,
@@ -48,18 +106,11 @@ shape:
     every state the record's states list names. Until interface.draw has run, the record stays todo
     and cites a gap.<feature>.direction-not-drawn record in blockedBy - the image is a designed op
     output, not something an agent types into place."
-  implementation: features/<feature>/implementation/{index.yaml,frontend/**/index.yaml,backend/**/index.yaml}
-  frontendCaptures: "features/<feature>/implementation/frontend/assets/<running-page-screenshot>,
+  frontendCaptures: "features/<feature>/impl/<repository>/<name>/assets/<running-page-screenshot>,
     with a matching markup reference kept beside each capture. These assets never carry a
     generation record - that is what tells a capture and a direction apart regardless of prose
     provenance (see checks/render.mjs's capture-identity rule) - and a generation-bearing asset
     never sits outside a work/ui-screen record's own assets/."
-  businessOverview: features/<feature>/business/overview/index.yaml
-  businessSRS: features/<feature>/business/srs/**/index.yaml
-  architectureOverview: features/<feature>/architecture/overview/index.yaml with one strict
-    extensions.work3.sds starci/sds-overview@1 payload
-  architectureSDS: features/<feature>/architecture/sds/**/index.yaml
-  integration: features/<feature>/integration/<id>/index.yaml
   featureCatalog: features/index.yaml
   feature: features/<feature>/index.yaml
   resources: ".starciwork/_resources/{environments,identities,fixtures}/<name>/resource.yaml, schema
@@ -445,23 +496,19 @@ example:
     - assets/imagery/reference-hero.webp
   features/knowledge/:
     - index.yaml
-    - business/index.yaml
-    - business/overview/index.yaml
-    - business/srs/index.yaml
-    - business/srs/documents/index.yaml
-    - business/srs/documents/update/index.yaml
-    - business/srs/A/index.yaml
-    - business/srs/A/B/index.yaml
-    - architecture/index.yaml
-    - architecture/sds/data/index.yaml
-    - ui/index.yaml
+    - fr/documents/index.yaml
+    - fr/documents/update/index.yaml
+    - br/documents/index.yaml
+    - br/documents/ac/A/index.yaml
+    - sds/data/index.yaml
+    - sds/runtime/update/index.yaml
     - ui/documents/index.yaml
     - ui/documents/edit/index.yaml
     - ui/documents/edit/assets/states/uploading.webp
     - ui/documents/edit/assets/transitions/update.webm
     - ui/documents/edit/assets/states/uploading.prompt.txt
-    - implementation/frontend/documents/index.yaml
-    - implementation/frontend/documents/assets/list-empty.png
+    - impl/knowledge-app/documents/index.yaml
+    - impl/knowledge-app/documents/assets/list-empty.png
     - uat/documents/update/index.yaml
     - uat/documents/update/accounts.yaml
     - uat/documents/update/evidence.yaml
@@ -470,7 +517,4 @@ example:
     - uat/documents/update/runs/20260918-uat-1/result.md
     - gap/direction-not-drawn/index.yaml
     - gap/live-proof/index.yaml
-    - architecture/overview/index.yaml
-    - architecture/sds/index.yaml
-    - architecture/sds/runtime/update/index.yaml
 root: <bound-source-repository>/.starciwork

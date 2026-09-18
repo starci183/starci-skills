@@ -19,7 +19,7 @@ import {parseYaml} from '../core/yaml.mjs';
  * for what they needed. Each gets one rule here, not a field bolted on per complaint.
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event']);
+export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event']);
 const EXEMPT = new Set(['work/catalog', 'work/workspace', 'work/brand', 'work/feature', 'work/disposable-accounts', 'starci/application-stacks']);
 const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event)\.[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
@@ -335,8 +335,37 @@ export function checkWorkTree(workRoot, problems) {
   return {records: records.size, refs: refs.length, evidence: evidenceFiles.length};
 }
 
+/**
+ * Concept 6 (shape truth): schemas/work-layout.yaml's `shape.families` is the schema's own claim about
+ * which family folders exist; this script's `FAMILIES` set is the executable form of the same claim. The
+ * two are two copies of one fact and must never independently drift - `schemaPath` is a parameter (not a
+ * hardcoded read of the real file) purely so a fixture can exercise both a mismatched and a matching
+ * shape.families without touching the real schema file.
+ */
+export function checkFamiliesDrift(problems, schemaPath = path.join(root, 'schemas', 'work-layout.yaml')) {
+  let doc;
+  try {
+    doc = parseYaml(fs.readFileSync(schemaPath, 'utf8'));
+  } catch (error) {
+    problems.push(`${schemaPath}: could not be read as YAML to check shape.families (${error.message}) [FAMILIES_DRIFT]`);
+    return;
+  }
+  const declared = Array.isArray(doc?.shape?.families) ? doc.shape.families : null;
+  if (!declared) {
+    problems.push(`${schemaPath}: shape.families is missing; it must list exactly the families this script's own FAMILIES set recognizes [FAMILIES_DRIFT]`);
+    return;
+  }
+  const declaredSet = new Set(declared);
+  const missing = [...FAMILIES].filter(f => !declaredSet.has(f));
+  const extra = declared.filter(f => !FAMILIES.has(f));
+  if (missing.length || extra.length) {
+    problems.push(`${schemaPath}: shape.families disagrees with this script's FAMILIES set - missing [${missing.join(', ')}], extra [${extra.join(', ')}] [FAMILIES_DRIFT]`);
+  }
+}
+
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const problems = [];
+  checkFamiliesDrift(problems);
   let records = 0, refs = 0, evidence = 0;
   for (const workRoot of walk(path.join(root, 'examples')).filter(file => file.endsWith(`.starciwork${path.sep}index.yaml`)).map(path.dirname)) {
     const counts = checkWorkTree(workRoot, problems);
