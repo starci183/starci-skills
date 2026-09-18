@@ -4,17 +4,16 @@ import { AuditLogLineSummaryResult } from './audit-log.query';
 import type { ResolvedAuditLine } from './types/resolved-audit-line';
 
 /**
- * gap.audit.operator-role, coded against how `session` resolves the actor today: SessionRecord is
- * {token, personId, issuedAt, expiresAt} and SessionService.findActive hands back exactly that - no
- * role claim exists anywhere in the session or person shape (data.login.person has no role field), so
- * an operator authorization cannot be checked without inventing one.
+ * The claim the read path authorizes against (decision.audit.operator-role). personId is the authenticated
+ * subject contract.login.identity-for-task resolves from the live session; `role` is a *verified* claim,
+ * not a caller field: the only thing that populates it is AuditOperatorService, which mints it by matching
+ * personId against a trusted server-side operator roster (the session shape itself carries no role -
+ * SessionRecord is {token, personId, issuedAt, expiresAt}). So an "unverifiable claim" reduces to "a
+ * subject the roster does not name", which is no claim at all.
  *
- * The seam is a pure, unit-tested check rather than a Nest Guard class so it can guard CQRS handlers
- * too, not just HTTP resolvers. Call sites pass the claims they actually resolved from the live
- * session (every audit call site passes `role: undefined` today, read straight off the SessionRecord
- * shape); if sds.login.session-store later grows a role claim, the only change is which value the call
- * sites pass in - this check already honors operator/operator:* and denies everything else,
- * fail-closed.
+ * The seam is a pure, unit-tested check rather than a Nest Guard class so it can guard CQRS handlers too,
+ * not just HTTP resolvers. It honors operator/operator:* and denies everything else, fail-closed: no
+ * claim refuses, and the read falls back to the caller's own lines rather than a broader one.
  */
 export interface ActorClaims {
   readonly personId: string;

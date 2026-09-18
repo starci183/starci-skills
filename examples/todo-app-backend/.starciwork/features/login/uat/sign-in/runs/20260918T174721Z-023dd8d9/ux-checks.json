@@ -1,0 +1,42 @@
+{
+  "schema": "starci/uat-ux-checks@1",
+  "flow": "uat.login.sign-in",
+  "checks": [
+    {
+      "id": "ux.sign-in.validation-feedback",
+      "expected": "yes",
+      "observed": "yes",
+      "note": "The submit button stays disabled while either field is empty (SignInFormView disabled logic)."
+    },
+    {
+      "id": "ux.sign-in.lands-on-task-list",
+      "expected": "yes",
+      "observed": "yes",
+      "note": "Signing in navigates to /tasks on its own (useSignIn calls router.push after setToken); no manual navigation was needed."
+    },
+    {
+      "id": "fr.login.sign-in",
+      "expected": "yes",
+      "observed": "yes",
+      "note": "After landing on /tasks, the browser rendered data-state=\"many-tasks\", matching a correctly-headed API read-back of demo@todo.dev's own 8 task(s)."
+    },
+    {
+      "id": "br.login.session.restores",
+      "expected": "yes",
+      "observed": "yes",
+      "note": "The session token lives in localStorage, read back as an Authorization: Bearer header - never a cookie (the record's own step 3 wording now says this) - so reloading /tasks re-read it without re-authenticating; the list rendered data-state=\"many-tasks\" after reload. This matches a correctly-headed API read-back of demo@todo.dev's own 8 task(s)."
+    },
+    {
+      "id": "ux.sign-in.error-feedback",
+      "expected": "yes",
+      "observed": "yes",
+      "note": "form[data-state=\"refused\"] renders a role=\"alert\" message after the wrong-password submit."
+    },
+    {
+      "id": "br.login.password.sign-in",
+      "expected": "yes",
+      "observed": "yes",
+      "note": "The refusal text is the one normalized SIGN_IN_REFUSAL_MESSAGE regardless of which half of the pair was wrong (src/modules/api/auth.ts) - the same text an unknown email would produce."
+    }
+  ]
+}

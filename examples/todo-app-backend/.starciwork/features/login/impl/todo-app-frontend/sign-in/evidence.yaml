@@ -3,66 +3,34 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: impl.login.todo-app-frontend.sign-in
-recordDigest: b4296c1aea8e231ec249cc9450fff3745f2e5f5696628a5858749c6adfd9202b
+recordDigest: c5bbc20edea0af2485a788c7317a9058edd4010c90152d67fe2d9e89c8c332e3
 codeDigest:
   algorithm: sha256
   files:
     - path: src/app/sign-in/page.tsx
-      sha256: fcc572491557720b725c4e0a2f86b0c5a0e5ba9e5541b6675aba06ca9ec47dfd
-    - path: src/app/sign-in/turtle-master.png/route.ts
-      sha256: 4f8093c275c8a2f634fccd7e147e9e87c822948faa4c4f601460a271b834c7b6
-    - path: src/components/login/sign-in/classNames.ts
-      sha256: 0485eb4a208093bf455bc2df1a028ca73c3f5d5d66499baa5400455fdb70c38e
-    - path: src/components/login/sign-in/component.spec.tsx
-      sha256: 6632fc88dc6d16fb77b582610a7d1949b5ebd1bed5e38ee73ae77e83f8606e49
-    - path: src/components/login/sign-in/component.tsx
-      sha256: 22dc5f022c216c225894d602d83992991026d3f6aa7e4c20ca08dd77fff61af4
-    - path: src/components/login/sign-in/destinations.ts
-      sha256: 41861a2f12e714ff09293114e4a062713d7de1c426d9fd53b4aaa6278ac91818
-    - path: src/components/login/sign-in/index.spec.tsx
-      sha256: 2682499e55198d9431646cb6147410ed9b4106c551449a6aad6d4e3daa082974
-    - path: src/components/login/sign-in/index.tsx
-      sha256: 1ab30360881765df66c35d5c2403d751603a5528a72b134b3a1835b9b5b02fe7
-  digest: 6b6625efaeeb63bea1bdd8c14b9c24032a15c64ef8feb71037cd7565315bed82
+      sha256: f02766573a40171c920a27fad2917197fb2099d4c64df150a45702a47b694a4e
+    - path: src/components/blocks/sign-in-form/classNames.ts
+      sha256: c10ff4de1ed41547e656c02a5a915eb9017818ec2ec9315466a020f1b4529787
+    - path: src/components/blocks/sign-in-form/component.spec.tsx
+      sha256: dfe7cbb6d3bb0fb1507312204c9fc3ff71f74e6f81e6b6b0f4142163119783ae
+    - path: src/components/blocks/sign-in-form/component.tsx
+      sha256: 76fecb6a5643503d9fce934d20d202600c9affeb972680f9912648a97f751512
+    - path: src/components/blocks/sign-in-form/index.tsx
+      sha256: 58a7701352908bc5d49a4cf9396a00677958f82ca075c0f168759167b4fdb172
+    - path: src/features/pages/sign-in/index.tsx
+      sha256: 8d77469dc75c695c1a911bd566f419c13e60785c1c81f24a1a05274af5275450
+  digest: 3b4caf175eb47fd672f73b385b97f61cc05c5b2520c2391c61cf56adf5d362fb
 outcome: pass
 assertions:
-  - id: typecheck-tsc-noEmit
-    command: npx tsc --noEmit
+  - id: vitest-suite-green
+    command: npx vitest run src/components/blocks/sign-in-form src/hooks/auth
+      src/modules/api/auth.spec.ts src/modules/api/graphql.spec.ts
     exit: 0
     outcome: pass
-    observation: npx tsc --noEmit exited 0
-  - id: unit-tests-vitest
-    command: npm run test:unit
-    exit: 0
-    outcome: pass
-    observation: npm run test:unit exited 0
-  - id: lint-eslint-src
-    command: npx eslint src
-    exit: 0
-    outcome: pass
-    observation: npx eslint src exited 0
-  - id: build-next
-    command: npm run build
-    exit: 0
-    outcome: pass
-    observation: npm run build exited 0
-  - id: running-page-captures
-    command: node -e "const fs=require('fs');const
-      d='../todo-app-backend/.starciwork/features/login/impl/todo-app-frontend/sign-in/assets';const
-      m=['empty','filled','working','refused'].flatMap(s=>['desktop-1280','mobile-390'].flatMap(v=>['png','html'].map(e=>'sign-in-'+s+'-'+v+'.'+e)));const
-      bad=m.filter(f=>{try{return!fs.statSync(d+'/'+f).size}catch(x){return
-      true}});if(bad.length){console.error(bad.join(','));process.exit(1)}console.log(m.length+'
-      capture files present')"
-    exit: 0
-    outcome: pass
-    observation: node -e "const fs=require('fs');const
-      d='../todo-app-backend/.starciwork/features/login/impl/todo-app-frontend/sign-in/assets';const
-      m=['empty','filled','working','refused'].flatMap(s=>['desktop-1280','mobile-390'].flatMap(v=>['png','html'].map(e=>'sign-in-'+s+'-'+v+'.'+e)));const
-      bad=m.filter(f=>{try{return!fs.statSync(d+'/'+f).size}catch(x){return
-      true}});if(bad.length){console.error(bad.join(','));process.exit(1)}console.log(m.length+'
-      capture files present')" exited 0
+    observation: npx vitest run src/components/blocks/sign-in-form src/hooks/auth
+      src/modules/api/auth.spec.ts src/modules/api/graphql.spec.ts exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T14:33:46.250Z
+  capturedAt: 2026-09-18T11:18:06.020Z

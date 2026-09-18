@@ -1,0 +1,8 @@
+{
+  "schema": "starci/uat-cleanup@1",
+  "flow": "uat.login.sign-in",
+  "ownedResourcesCreated": [],
+  "ownedResourcesDeleted": [],
+  "verifiedAbsent": [],
+  "note": "This run created no run-owned fixture rows against a database this lane owns; nothing to clean up."
+}

@@ -59,16 +59,15 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.password.sign-in sends 51 other record(s) back to todo, would
-      stale 36 evidence file(s), and touches 20 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
-      src/components/blocks/task-list/**, src/components/login/sign-in, src/features/pages/tasks/**,
-      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/mutations/session,
-      src/features/todo/graphql/queries/recur, src/features/todo/http/webhooks/sepay,
-      src/modules/bussiness/audit, src/modules/bussiness/plan, src/modules/bussiness/recur,
-      src/modules/bussiness/session, src/modules/bussiness/share, src/modules/bussiness/task,
-      src/modules/integrations/keycloak, src/modules/integrations/sepay,
-      src/modules/platform/events) - this is the number a reviewer wants before approving the
-      change.
+      stale 38 evidence file(s), and touches 20 code path(s) (src/app/plan, src/app/sign-in,
+      src/app/tasks, src/components/blocks/task-list, src/components/login/sign-in,
+      src/components/plan, src/features/pages/tasks, src/features/todo/graphql/mutations/recur,
+      src/features/todo/graphql/mutations/session, src/features/todo/graphql/queries/recur,
+      src/features/todo/http/webhooks/sepay, src/modules/bussiness/audit,
+      src/modules/bussiness/plan, src/modules/bussiness/recur, src/modules/bussiness/session,
+      src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/keycloak,
+      src/modules/integrations/sepay, src/modules/platform/events) - this is the number a reviewer
+      wants before approving the change.
   - id: blast-radius:br.login.session.restores
     kind: blast-radius
     severity: critical
@@ -125,16 +124,15 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.restores sends 50 other record(s) back to todo, would
-      stale 34 evidence file(s), and touches 20 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
-      src/components/blocks/task-list/**, src/components/login/sign-in, src/features/pages/tasks/**,
-      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/mutations/session,
-      src/features/todo/graphql/queries/recur, src/features/todo/http/webhooks/sepay,
-      src/modules/bussiness/audit, src/modules/bussiness/plan, src/modules/bussiness/recur,
-      src/modules/bussiness/session, src/modules/bussiness/share, src/modules/bussiness/task,
-      src/modules/integrations/keycloak, src/modules/integrations/sepay,
-      src/modules/platform/events) - this is the number a reviewer wants before approving the
-      change.
+      stale 36 evidence file(s), and touches 20 code path(s) (src/app/plan, src/app/sign-in,
+      src/app/tasks, src/components/blocks/task-list, src/components/login/sign-in,
+      src/components/plan, src/features/pages/tasks, src/features/todo/graphql/mutations/recur,
+      src/features/todo/graphql/mutations/session, src/features/todo/graphql/queries/recur,
+      src/features/todo/http/webhooks/sepay, src/modules/bussiness/audit,
+      src/modules/bussiness/plan, src/modules/bussiness/recur, src/modules/bussiness/session,
+      src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/keycloak,
+      src/modules/integrations/sepay, src/modules/platform/events) - this is the number a reviewer
+      wants before approving the change.
   - id: blast-radius:br.login.session.single-device
     kind: blast-radius
     severity: critical
@@ -191,16 +189,15 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.single-device sends 50 other record(s) back to todo,
-      would stale 34 evidence file(s), and touches 20 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
-      src/components/blocks/task-list/**, src/components/login/sign-in, src/features/pages/tasks/**,
-      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/mutations/session,
-      src/features/todo/graphql/queries/recur, src/features/todo/http/webhooks/sepay,
-      src/modules/bussiness/audit, src/modules/bussiness/plan, src/modules/bussiness/recur,
-      src/modules/bussiness/session, src/modules/bussiness/share, src/modules/bussiness/task,
-      src/modules/integrations/keycloak, src/modules/integrations/sepay,
-      src/modules/platform/events) - this is the number a reviewer wants before approving the
-      change.
+      would stale 36 evidence file(s), and touches 20 code path(s) (src/app/plan, src/app/sign-in,
+      src/app/tasks, src/components/blocks/task-list, src/components/login/sign-in,
+      src/components/plan, src/features/pages/tasks, src/features/todo/graphql/mutations/recur,
+      src/features/todo/graphql/mutations/session, src/features/todo/graphql/queries/recur,
+      src/features/todo/http/webhooks/sepay, src/modules/bussiness/audit,
+      src/modules/bussiness/plan, src/modules/bussiness/recur, src/modules/bussiness/session,
+      src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/keycloak,
+      src/modules/integrations/sepay, src/modules/platform/events) - this is the number a reviewer
+      wants before approving the change.
   - id: blast-radius:br.share.revoke.on-read
     kind: blast-radius
     severity: critical
@@ -234,12 +231,13 @@ findings:
       - ui.share.invite
       - ui.task.list
     because: A breaking change to br.share.revoke.on-read sends 27 other record(s) back to todo, would
-      stale 17 evidence file(s), and touches 10 code path(s) (app/share, src/app/tasks/**,
-      src/components/blocks/task-list/**, src/features/pages/tasks/**,
-      src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
-      src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/sepay,
-      src/modules/platform/events) - this is the number a reviewer wants before approving the
-      change.
+      stale 19 evidence file(s), and touches 16 code path(s) (src/app/tasks,
+      src/app/tasks/[taskId]/share, src/components/blocks/share-invite,
+      src/components/blocks/task-list, src/components/leaves/Link, src/features/pages/share,
+      src/features/pages/tasks, src/features/todo/http/webhooks/sepay, src/hooks/auth,
+      src/hooks/share, src/modules/api, src/modules/bussiness/plan, src/modules/bussiness/share,
+      src/modules/bussiness/task, src/modules/integrations/sepay, src/modules/platform/events) -
+      this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.share.role.permissions
     kind: blast-radius
     severity: critical
@@ -273,12 +271,13 @@ findings:
       - ui.share.invite
       - ui.task.list
     because: A breaking change to br.share.role.permissions sends 27 other record(s) back to todo, would
-      stale 18 evidence file(s), and touches 10 code path(s) (app/share, src/app/tasks/**,
-      src/components/blocks/task-list/**, src/features/pages/tasks/**,
-      src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
-      src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/sepay,
-      src/modules/platform/events) - this is the number a reviewer wants before approving the
-      change.
+      stale 20 evidence file(s), and touches 16 code path(s) (src/app/tasks,
+      src/app/tasks/[taskId]/share, src/components/blocks/share-invite,
+      src/components/blocks/task-list, src/components/leaves/Link, src/features/pages/share,
+      src/features/pages/tasks, src/features/todo/http/webhooks/sepay, src/hooks/auth,
+      src/hooks/share, src/modules/api, src/modules/bussiness/plan, src/modules/bussiness/share,
+      src/modules/bussiness/task, src/modules/integrations/sepay, src/modules/platform/events) -
+      this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.task.single-owner
     kind: blast-radius
     severity: critical
@@ -309,8 +308,8 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.task.single-owner sends 24 other record(s) back to todo, would
-      stale 17 evidence file(s), and touches 10 code path(s) (src/app/tasks/**,
-      src/components/blocks/task-list/**, src/features/pages/tasks/**,
+      stale 18 evidence file(s), and touches 10 code path(s) (src/app/tasks,
+      src/components/blocks/task-list, src/features/pages/tasks,
       src/features/todo/http/webhooks/sepay, src/modules/bussiness/audit,
       src/modules/bussiness/plan, src/modules/bussiness/task, src/modules/integrations/sepay,
       src/modules/platform/databases/postgresql/primary, src/modules/platform/events) - this is the
@@ -340,8 +339,8 @@ findings:
       - sds.plan.subscription-lifecycle
       - ui.plan.usage
     because: A breaking change to br.plan.caps.limit sends 19 other record(s) back to todo, would stale
-      9 evidence file(s), and touches 5 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
+      10 evidence file(s), and touches 5 code path(s) (src/app/plan, src/components/plan,
+      src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/integrations/sepay) - this is the number a reviewer wants before approving the
       change.
   - id: blast-radius:br.share.editor.no-delete
@@ -368,8 +367,8 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.share.editor.no-delete sends 18 other record(s) back to todo, would
-      stale 13 evidence file(s), and touches 9 code path(s) (src/app/tasks/**,
-      src/components/blocks/task-list/**, src/features/pages/tasks/**,
+      stale 14 evidence file(s), and touches 9 code path(s) (src/app/tasks,
+      src/components/blocks/task-list, src/features/pages/tasks,
       src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/sepay,
       src/modules/platform/events) - this is the number a reviewer wants before approving the
@@ -396,8 +395,8 @@ findings:
       - sds.plan.subscription-lifecycle
       - ui.plan.usage
     because: A breaking change to br.plan.downgrade.freeze sends 16 other record(s) back to todo, would
-      stale 8 evidence file(s), and touches 5 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
+      stale 9 evidence file(s), and touches 5 code path(s) (src/app/plan, src/components/plan,
+      src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/integrations/sepay) - this is the number a reviewer wants before approving the
       change.
   - id: blast-radius:br.plan.lapse.reverts-on-read
@@ -421,8 +420,8 @@ findings:
       - sds.plan.subscription-lifecycle
       - ui.plan.usage
     because: A breaking change to br.plan.lapse.reverts-on-read sends 15 other record(s) back to todo,
-      would stale 7 evidence file(s), and touches 5 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
+      would stale 8 evidence file(s), and touches 5 code path(s) (src/app/plan, src/components/plan,
+      src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/integrations/sepay) - this is the number a reviewer wants before approving the
       change.
   - id: blast-radius:br.plan.payment.idempotent
@@ -446,9 +445,31 @@ findings:
       - sds.plan.subscription-lifecycle
       - ui.plan.usage
     because: A breaking change to br.plan.payment.idempotent sends 15 other record(s) back to todo,
-      would stale 7 evidence file(s), and touches 5 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
+      would stale 8 evidence file(s), and touches 5 code path(s) (src/app/plan, src/components/plan,
+      src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/integrations/sepay) - this is the number a reviewer wants before approving the
+      change.
+  - id: blast-radius:br.audit.append-only
+    kind: blast-radius
+    severity: critical
+    records:
+      - br.audit.append-only
+      - data.audit.log-line
+      - fr.audit.export
+      - fr.audit.log.append
+      - fr.audit.log.read
+      - impl.audit.todo-app-backend.erasure
+      - impl.audit.todo-app-backend.log
+      - impl.audit.todo-app-backend.operator-read
+      - impl.audit.todo-app-frontend.privacy
+      - nfr.audit.tamper-evidence
+      - sds.audit.erasure-request
+      - sds.audit.log-chain
+      - uat.audit.right-to-be-forgotten
+      - ui.audit.privacy
+    because: A breaking change to br.audit.append-only sends 13 other record(s) back to todo, would
+      stale 12 evidence file(s), and touches 3 code path(s) (src/app/audit, src/components/audit,
+      src/modules/bussiness/audit) - this is the number a reviewer wants before approving the
       change.
   - id: blast-radius:br.recur.impossible-date.skips
     kind: blast-radius
@@ -469,11 +490,10 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.impossible-date.skips sends 13 other record(s) back to todo,
-      would stale 5 evidence file(s), and touches 6 code path(s) (app/recur/end-rule-dialog.tsx,
-      app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx,
-      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/queries/recur,
-      src/modules/bussiness/recur) - this is the number a reviewer wants before approving the
-      change.
+      would stale 6 evidence file(s), and touches 5 code path(s) (src/app/recur,
+      src/components/recur, src/features/todo/graphql/mutations/recur,
+      src/features/todo/graphql/queries/recur, src/modules/bussiness/recur) - this is the number a
+      reviewer wants before approving the change.
   - id: blast-radius:br.recur.timezone.owner-local-time
     kind: blast-radius
     severity: critical
@@ -493,31 +513,10 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.timezone.owner-local-time sends 13 other record(s) back to
-      todo, would stale 5 evidence file(s), and touches 6 code path(s)
-      (app/recur/end-rule-dialog.tsx, app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx,
-      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/queries/recur,
-      src/modules/bussiness/recur) - this is the number a reviewer wants before approving the
-      change.
-  - id: blast-radius:br.audit.append-only
-    kind: blast-radius
-    severity: critical
-    records:
-      - br.audit.append-only
-      - data.audit.log-line
-      - fr.audit.export
-      - fr.audit.log.append
-      - fr.audit.log.read
-      - impl.audit.todo-app-backend.erasure
-      - impl.audit.todo-app-backend.log
-      - impl.audit.todo-app-backend.operator-read
-      - nfr.audit.tamper-evidence
-      - sds.audit.erasure-request
-      - sds.audit.log-chain
-      - uat.audit.right-to-be-forgotten
-      - ui.audit.privacy
-    because: A breaking change to br.audit.append-only sends 12 other record(s) back to todo, would
-      stale 10 evidence file(s), and touches 1 code path(s) (src/modules/bussiness/audit) - this is
-      the number a reviewer wants before approving the change.
+      todo, would stale 6 evidence file(s), and touches 5 code path(s) (src/app/recur,
+      src/components/recur, src/features/todo/graphql/mutations/recur,
+      src/features/todo/graphql/queries/recur, src/modules/bussiness/recur) - this is the number a
+      reviewer wants before approving the change.
   - id: blast-radius:br.notify.digest.window
     kind: blast-radius
     severity: critical
@@ -559,11 +558,10 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.ending.preserves-history sends 11 other record(s) back to
-      todo, would stale 3 evidence file(s), and touches 6 code path(s)
-      (app/recur/end-rule-dialog.tsx, app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx,
-      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/queries/recur,
-      src/modules/bussiness/recur) - this is the number a reviewer wants before approving the
-      change.
+      todo, would stale 4 evidence file(s), and touches 5 code path(s) (src/app/recur,
+      src/components/recur, src/features/todo/graphql/mutations/recur,
+      src/features/todo/graphql/queries/recur, src/modules/bussiness/recur) - this is the number a
+      reviewer wants before approving the change.
   - id: blast-radius:br.task.title.required
     kind: blast-radius
     severity: critical
@@ -581,8 +579,8 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.task.title.required sends 11 other record(s) back to todo, would
-      stale 8 evidence file(s), and touches 8 code path(s) (src/app/tasks/**,
-      src/components/blocks/task-list/**, src/features/pages/tasks/**,
+      stale 9 evidence file(s), and touches 8 code path(s) (src/app/tasks,
+      src/components/blocks/task-list, src/features/pages/tasks,
       src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan, src/modules/bussiness/task,
       src/modules/integrations/sepay, src/modules/platform/events) - this is the number a reviewer
       wants before approving the change.
@@ -625,8 +623,10 @@ findings:
       - uat.share.invite-and-collaborate
       - ui.share.invite
     because: A breaking change to br.share.invite.expiry sends 10 other record(s) back to todo, would
-      stale 6 evidence file(s), and touches 2 code path(s) (app/share, src/modules/bussiness/share)
-      - this is the number a reviewer wants before approving the change.
+      stale 7 evidence file(s), and touches 8 code path(s) (src/app/tasks/[taskId]/share,
+      src/components/blocks/share-invite, src/components/leaves/Link, src/features/pages/share,
+      src/hooks/auth, src/hooks/share, src/modules/api, src/modules/bussiness/share) - this is the
+      number a reviewer wants before approving the change.
   - id: blast-radius:br.task.delete.final
     kind: blast-radius
     severity: critical
@@ -643,10 +643,10 @@ findings:
       - sds.plan.cap-guard
       - ui.plan.usage
     because: A breaking change to br.task.delete.final sends 10 other record(s) back to todo, would
-      stale 8 evidence file(s), and touches 7 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
-      src/modules/bussiness/task, src/modules/integrations/sepay, src/modules/platform/events) -
-      this is the number a reviewer wants before approving the change.
+      stale 9 evidence file(s), and touches 7 code path(s) (src/app/plan, src/components/plan,
+      src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan, src/modules/bussiness/task,
+      src/modules/integrations/sepay, src/modules/platform/events) - this is the number a reviewer
+      wants before approving the change.
   - id: blast-radius:br.task.list.owned
     kind: blast-radius
     severity: critical
@@ -663,10 +663,51 @@ findings:
       - sds.plan.cap-guard
       - ui.plan.usage
     because: A breaking change to br.task.list.owned sends 10 other record(s) back to todo, would stale
-      6 evidence file(s), and touches 6 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
-      src/modules/bussiness/task, src/modules/integrations/sepay) - this is the number a reviewer
-      wants before approving the change.
+      7 evidence file(s), and touches 6 code path(s) (src/app/plan, src/components/plan,
+      src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan, src/modules/bussiness/task,
+      src/modules/integrations/sepay) - this is the number a reviewer wants before approving the
+      change.
+  - id: blast-radius:br.audit.erasure.right
+    kind: blast-radius
+    severity: warn
+    records:
+      - br.audit.erasure.right
+      - data.audit.erasure-request
+      - data.audit.log-line
+      - fr.audit.erasure.complete
+      - fr.audit.erasure.request
+      - impl.audit.todo-app-backend.erasure
+      - impl.audit.todo-app-frontend.privacy
+      - sds.audit.erasure-request
+      - uat.audit.right-to-be-forgotten
+      - ui.audit.privacy
+    because: A breaking change to br.audit.erasure.right sends 9 other record(s) back to todo, would
+      stale 7 evidence file(s), and touches 3 code path(s) (src/app/audit, src/components/audit,
+      src/modules/bussiness/audit) - this is the number a reviewer wants before approving the
+      change.
+  - id: blast-radius:br.notify.unsubscribe.honored
+    kind: blast-radius
+    severity: warn
+    records:
+      - br.notify.unsubscribe.honored
+      - data.notify.delivery-attempt
+      - data.notify.preference
+      - fr.notify.unsubscribe
+      - impl.notify.todo-app-backend.pipeline
+      - impl.notify.todo-app-frontend.preferences
+      - integration.notify.queue
+      - sds.notify.delivery-lifecycle
+      - uat.notify.digest-and-unsubscribe
+      - ui.notify.preferences
+    because: A breaking change to br.notify.unsubscribe.honored sends 9 other record(s) back to todo,
+      would stale 6 evidence file(s), and touches 10 code path(s) (src/app/notify,
+      src/components/notify, src/features/todo/graphql/mutations/notify,
+      src/features/todo/graphql/queries/notify, src/modules/bussiness/notify,
+      src/modules/integrations/notify-queue, src/modules/integrations/notify-smtp,
+      src/modules/platform/databases/postgresql/primary/entities/notify-delivery-attempt.entity.ts,
+      src/modules/platform/databases/postgresql/primary/entities/notify-preference.entity.ts,
+      src/modules/shared/exceptions/errors/notify) - this is the number a reviewer wants before
+      approving the change.
   - id: blast-radius:br.task.complete.once
     kind: blast-radius
     severity: warn
@@ -685,44 +726,23 @@ findings:
       stale 6 evidence file(s), and touches 3 code path(s) (src/modules/bussiness/task,
       src/modules/platform/databases/postgresql/primary, src/modules/platform/events) - this is the
       number a reviewer wants before approving the change.
-  - id: blast-radius:br.audit.erasure.right
+  - id: blast-radius:br.audit.erasure.logged
     kind: blast-radius
     severity: warn
     records:
-      - br.audit.erasure.right
+      - br.audit.erasure.logged
       - data.audit.erasure-request
-      - data.audit.log-line
       - fr.audit.erasure.complete
       - fr.audit.erasure.request
       - impl.audit.todo-app-backend.erasure
+      - impl.audit.todo-app-frontend.privacy
       - sds.audit.erasure-request
       - uat.audit.right-to-be-forgotten
       - ui.audit.privacy
-    because: A breaking change to br.audit.erasure.right sends 8 other record(s) back to todo, would
-      stale 6 evidence file(s), and touches 1 code path(s) (src/modules/bussiness/audit) - this is
-      the number a reviewer wants before approving the change.
-  - id: blast-radius:br.notify.unsubscribe.honored
-    kind: blast-radius
-    severity: warn
-    records:
-      - br.notify.unsubscribe.honored
-      - data.notify.delivery-attempt
-      - data.notify.preference
-      - fr.notify.unsubscribe
-      - impl.notify.todo-app-backend.pipeline
-      - integration.notify.queue
-      - sds.notify.delivery-lifecycle
-      - uat.notify.digest-and-unsubscribe
-      - ui.notify.preferences
-    because: A breaking change to br.notify.unsubscribe.honored sends 8 other record(s) back to todo,
-      would stale 5 evidence file(s), and touches 8 code path(s)
-      (src/features/todo/graphql/mutations/notify, src/features/todo/graphql/queries/notify,
-      src/modules/bussiness/notify, src/modules/integrations/notify-queue,
-      src/modules/integrations/notify-smtp,
-      src/modules/platform/databases/postgresql/primary/entities/notify-delivery-attempt.entity.ts,
-      src/modules/platform/databases/postgresql/primary/entities/notify-preference.entity.ts,
-      src/modules/shared/exceptions/errors/notify) - this is the number a reviewer wants before
-      approving the change.
+    because: A breaking change to br.audit.erasure.logged sends 8 other record(s) back to todo, would
+      stale 6 evidence file(s), and touches 3 code path(s) (src/app/audit, src/components/audit,
+      src/modules/bussiness/audit) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.recur.generation.once
     kind: blast-radius
     severity: warn
@@ -737,8 +757,7 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.generation.once sends 8 other record(s) back to todo, would
-      stale 3 evidence file(s), and touches 6 code path(s) (app/recur/end-rule-dialog.tsx,
-      app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx,
+      stale 4 evidence file(s), and touches 5 code path(s) (src/app/recur, src/components/recur,
       src/features/todo/graphql/mutations/recur, src/features/todo/graphql/queries/recur,
       src/modules/bussiness/recur) - this is the number a reviewer wants before approving the
       change.
@@ -756,26 +775,10 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.occurrence.owned-by-rule-owner sends 8 other record(s) back
-      to todo, would stale 3 evidence file(s), and touches 6 code path(s)
-      (app/recur/end-rule-dialog.tsx, app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx,
-      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/queries/recur,
-      src/modules/bussiness/recur) - this is the number a reviewer wants before approving the
-      change.
-  - id: blast-radius:br.audit.erasure.logged
-    kind: blast-radius
-    severity: warn
-    records:
-      - br.audit.erasure.logged
-      - data.audit.erasure-request
-      - fr.audit.erasure.complete
-      - fr.audit.erasure.request
-      - impl.audit.todo-app-backend.erasure
-      - sds.audit.erasure-request
-      - uat.audit.right-to-be-forgotten
-      - ui.audit.privacy
-    because: A breaking change to br.audit.erasure.logged sends 7 other record(s) back to todo, would
-      stale 5 evidence file(s), and touches 1 code path(s) (src/modules/bussiness/audit) - this is
-      the number a reviewer wants before approving the change.
+      to todo, would stale 4 evidence file(s), and touches 5 code path(s) (src/app/recur,
+      src/components/recur, src/features/todo/graphql/mutations/recur,
+      src/features/todo/graphql/queries/recur, src/modules/bussiness/recur) - this is the number a
+      reviewer wants before approving the change.
   - id: blast-radius:br.audit.retention
     kind: blast-radius
     severity: warn
@@ -803,8 +806,8 @@ findings:
       - sds.plan.cap-guard
       - ui.plan.usage
     because: A breaking change to br.plan.active-scope sends 6 other record(s) back to todo, would stale
-      4 evidence file(s), and touches 5 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
+      5 evidence file(s), and touches 5 code path(s) (src/app/plan, src/components/plan,
+      src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/integrations/sepay) - this is the number a reviewer wants before approving the
       change.
   - id: blast-radius:br.notify.failure.classified
@@ -937,15 +940,6 @@ findings:
     because: integration.login.postgres is used 6 time(s) (top decile of fan-in); it is owned by login
       and read by 4 other feature(s) (plan, recur, share, task), so a change here is cross-feature
       coupling, not a local edit.
-  - id: open-decision:decision.audit.operator-role
-    kind: open-decision
-    severity: info
-    records:
-      - decision.audit.operator-role
-      - fr.audit.log.read
-      - journey.audit.right-to-be-forgotten
-    because: decision.audit.operator-role is still open and holds 2 record(s) (fr.audit.log.read,
-      journey.audit.right-to-be-forgotten) - none of them can move until this is decided.
   - id: designed-todo:br.login.session.single-device
     kind: designed-todo
     severity: info
@@ -986,14 +980,6 @@ findings:
       - gap.login.device-field
     because: event.login.new-device-signin is todo, blocked on gap.login.device-field - a real product
       question, not missing code; it moves once that is settled.
-  - id: designed-todo:fr.audit.log.read
-    kind: designed-todo
-    severity: info
-    records:
-      - fr.audit.log.read
-      - decision.audit.operator-role
-    because: fr.audit.log.read is todo, blocked on decision.audit.operator-role - a real product
-      question, not missing code; it moves once that is settled.
   - id: designed-todo:fr.login.sign-out
     kind: designed-todo
     severity: info
@@ -1010,6 +996,14 @@ findings:
       - gap.notify.new-device-event
     because: fr.notify.on-new-device is todo, blocked on gap.notify.new-device-event - a real product
       question, not missing code; it moves once that is settled.
+  - id: designed-todo:fr.plan.downgrade
+    kind: designed-todo
+    severity: info
+    records:
+      - fr.plan.downgrade
+      - gap.plan.live-proof
+    because: fr.plan.downgrade is todo, blocked on gap.plan.live-proof - a real product question, not
+      missing code; it moves once that is settled.
   - id: designed-todo:fr.plan.reconcile
     kind: designed-todo
     severity: info
@@ -1026,6 +1020,14 @@ findings:
       - fr.plan.upgrade
       - gap.plan.live-proof
     because: fr.plan.upgrade is todo, blocked on gap.plan.live-proof - a real product question, not
+      missing code; it moves once that is settled.
+  - id: designed-todo:fr.plan.usage.view
+    kind: designed-todo
+    severity: info
+    records:
+      - fr.plan.usage.view
+      - gap.plan.live-proof
+    because: fr.plan.usage.view is todo, blocked on gap.plan.live-proof - a real product question, not
       missing code; it moves once that is settled.
   - id: designed-todo:fr.recur.edit-rule
     kind: designed-todo
@@ -1088,11 +1090,9 @@ findings:
     severity: info
     records:
       - journey.audit.right-to-be-forgotten
-      - decision.audit.operator-role
       - gap.audit.live-proof
-    because: journey.audit.right-to-be-forgotten is todo, blocked on decision.audit.operator-role,
-      gap.audit.live-proof - a real product question, not missing code; it moves once that is
-      settled.
+    because: journey.audit.right-to-be-forgotten is todo, blocked on gap.audit.live-proof - a real
+      product question, not missing code; it moves once that is settled.
   - id: designed-todo:journey.notify.told-about-completion
     kind: designed-todo
     severity: info
@@ -1215,11 +1215,11 @@ findings:
       - gap.task.live-proof
     because: uat.task.create is todo, blocked on gap.task.live-proof - a real product question, not
       missing code; it moves once that is settled.
-  - id: leftover-todo:impl.share.todo-app-frontend.invite-screen
-    kind: leftover-todo
-    severity: info
+  - id: stale-evidence-bulk-edit:ui.task.list
+    kind: stale-evidence-bulk-edit
+    severity: warn
     records:
-      - impl.share.todo-app-frontend.invite-screen
-      - gap.share.frontend-unbuilt
-    because: impl.share.todo-app-frontend.invite-screen is todo, blocked on gap.share.frontend-unbuilt -
-      code that simply has not been written yet; the owner wants this count at zero.
+      - ui.task.list
+    because: ui.task.list's evidence is stale with no staleSince at all - a bare digest mismatch with
+      nothing recorded about why, even where the record's own staleReason prose describes a real
+      revision (bulk-edit-after-capture territory either way).

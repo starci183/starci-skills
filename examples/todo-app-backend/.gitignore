@@ -12,7 +12,10 @@ dist/
 .starcistacks/*/secrets/*
 !.starcistacks/*/secrets/*.enc
 
-# UAT run videos are real bytes, not canonical Work: the run's manifest.yaml already carries their
-# sha256 as the tracked reference, and a CI job uploads the actual .webm as a build artifact instead of
-# committing it. Screens (PNG) stay tracked, same as every other frontend capture in this tree.
-.starciwork/**/runs/**/videos/*
+# UAT run videos ARE tracked, by owner ruling (2026-09-18): the recording is acceptance evidence an
+# outsourcer has to be able to open from a fresh clone, and
+# scripts/check-example-work.mjs's concept 12 refuses a `done` uat-flow whose settled run has no
+# `videos/` with at least one playable recording in it — so a rule that keeps the .webm out of Git makes
+# the gate unsatisfiable by construction on any clone. The run's manifest.yaml carries each video's
+# sha256, which is now an integrity check on a file that is actually present rather than a pointer to a
+# byte nobody can retrieve. Screens (PNG) stay tracked, same as every other capture in this tree.

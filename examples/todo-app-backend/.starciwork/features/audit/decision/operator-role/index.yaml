@@ -1,38 +1,62 @@
 schema: work/policy-decision
 id: decision.audit.operator-role
 title: Who is an operator, and where does their role claim come from
-state: todo
-outcome: open
+state: done
+outcome: decided
+chosen: audit-verified-roster
 question: gap.audit.operator-role rev 2 states the absence precisely - SessionRecord resolves to
   {token, personId, issuedAt, expiresAt} and data.login.person has no role field, so no call site can
   present a role claim to check. Audit's fail-closed check (src/modules/bussiness/audit
-  /audit-operator-read.ts) already honors operator and operator:*; this decision must settle who may
-  hold such a claim and where it comes from before fr.audit.log.read's operator read or
-  journey.audit.right-to-be-forgotten's fourth step can honestly run.
+  /audit-operator-read.ts) already honors operator and operator:*; this decision settles who may hold
+  such a claim and where it comes from, so fr.audit.log.read's operator read can honestly run.
 options:
+  - id: audit-verified-roster
+    state: chosen
+    summary: Audit owns the claim. AuditOperatorService (src/modules/bussiness/audit
+      /audit-operator.service.ts) resolves the authenticated subject - the personId
+      contract.login.identity-for-task hands the resolver - against a trusted, server-side operator
+      roster and mints the operator claim itself; audit-operator-read.ts then checks that verified
+      claim, fail-closed. A request never carries a role, so the only lever to the operator read is
+      which subjects the deployment lists (AUDIT_OPERATOR_SUBJECTS).
+    consequence: Makes fr.audit.log.read's whole-chain filtered read reachable without touching the
+      session shape or the identity contract another feature owns, and it is what satisfies the rule
+      that an unverifiable claim must refuse - an unset, empty or malformed roster (the production
+      default) resolves nobody to operator, so every actor keeps reading exactly their own lines until a
+      subject is deliberately allowlisted - the branch is live, not dead, and it never widens on an
+      unverified ask. It deliberately does NOT authorize operator-initiated erasure - the roster grants a
+      read, not the power to act as another person (br.audit.erasure.right is unchanged).
   - id: session-role-claim
-    state: proposed
+    state: rejected
     summary: sds.login.session-store's SessionRecord grows a role field; the resolver passes claims.role
       into audit-operator-read.ts, which already honors operator and operator:*.
-    consequence: Keeps audit's fail-closed check as built and makes it live, but changes the session
-      shape another feature owns and every consumer of contract.login.identity-for-task with it.
+    consequence: Rejected. A `role` threaded through from the request is an unverifiable claim - whoever
+      sets it becomes an operator - and growing SessionRecord rewrites the session shape plus every
+      consumer of contract.login.identity-for-task, a cross-feature change far larger than this bounded
+      lane owns and one the implementation was right to refuse to smuggle in as a comment.
   - id: keycloak-realm-role
-    state: proposed
+    state: rejected
     summary: The person's Keycloak subject carries a realm role; session resolves it into the actor
       claims at sign-in.
-    consequence: Roles come from the identity provider that already owns identity - but this example's
-      Keycloak stub returns only {subject}, so it needs real provider behavior, outside any single
-      feature's scope.
+    consequence: Rejected for this lane. Roles would come from the identity provider that already owns
+      identity, but this example's Keycloak stub returns only {subject}, so it needs real provider
+      behavior outside any single feature's scope - and it would still have to be verified at audit's
+      boundary, which audit-verified-roster already does.
   - id: no-operator-ever
-    state: proposed
+    state: rejected
     summary: The product has no operators; the own-lines read is the whole of fr.audit.log.read.
-    consequence: fr.audit.log.read's mainFlow (an operator, filtered, whole-chain read) would be
-      retired, and nfr-claims about operator monitoring of the log with it.
-openQuestions:
-  - Which actor grants an operator claim, and can one person hold two roles in one session?
-change: {rev: 1, kind: initial, at: 2026-09-18T20:10:00.000Z}
-
-# This record is a *proposal* named by the implementation lane - naming the options is not deciding
-# one, and deciding is a business.author call, not this lane's. Until it is decided (outcome: decided,
-# chosen set), every session-only actor reads exactly their own lines and the operator branch stays
-# unreachable in production by design; gap.audit.operator-role names this record as its closer.
+    consequence: Rejected - it retires fr.audit.log.read's mainFlow (an operator, filtered, whole-chain
+      read) and the nfr-claims about operator monitoring with it. Leaving the branch permanently
+      unreachable is the gap this decision exists to close, not an answer to it.
+change:
+  rev: 2
+  kind: breaking
+  at: 2026-09-19T12:00:00.000Z
+  reason: "Decided as audit-verified-roster. The rule that settled it: an operator claim must be
+    verifiable, so it is minted from the already-authenticated subject against a server-side roster the
+    deployment controls, never read off the request. audit-verified-roster keeps audit's fail-closed
+    check as built, makes the whole-chain read live, and stays inside the capability that owns the
+    decision instead of rewriting login's session contract - the reason session-role-claim and
+    keycloak-realm-role were rejected - and unlike no-operator-ever it does not retire the requirement.
+    Implemented in src/modules/bussiness/audit: audit-operator.service.ts mints the claim, AuditLogHandler
+    dispatches on isOperatorRead of that verified claim, and AuditLogQueryParams no longer carries a
+    caller role. Closes gap.audit.operator-role; unblocks fr.audit.log.read's operator read."
