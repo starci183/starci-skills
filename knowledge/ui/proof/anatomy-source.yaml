@@ -179,6 +179,17 @@ observations:
       measure="form"/"formCompact"` is the owned width contract for compact forms: a
       direction drawing a form card full-width and filling the dead space is answering
       a question `measure` already answers better.
+  - id: joined-band-treatment
+    lane: ui
+    kind: anatomy-detail
+    summary: |-
+      Emphasis inside a joined card is a flush band, not an inset panel. The academy
+      dashboard's settled vocabulary: children stack full-bleed inside the bounded
+      surface (`joined` sets the content to gap:0/padding:0), adjacent bands separate
+      with an edge-to-edge `border-t` hairline, and a band that needs emphasis carries
+      `bg-surface-secondary` (neutral) or `bg-accent-soft` (accent tint) across the
+      card's full width with its own padding (px-4/pt-4/pb-3 top, p-3 middle). A
+      nested rounded box floating inside the card is not the pattern.
   - id: direction-scale-drift
     lane: ui
     kind: known-drift
