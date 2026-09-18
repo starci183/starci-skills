@@ -10,3 +10,7 @@
 .starcistacks/*/runtime/env/*.env
 !.starcistacks/*/runtime/env/*.env.enc
 
+node_modules/
+dist/
+*.tsbuildinfo
+
