@@ -5,6 +5,11 @@ PASS asset hash assets/preferences-refused.png
 PASS PNG header and dimensions assets/preferences-refused.png
 PASS real tool, no invented model assets/preferences-refused.png
 PASS retained exact prompt assets/preferences-refused.png
+PASS asset hash assets/preferences-refused.full-screen-initial.prompt.txt
+PASS asset hash assets/preferences-refused.full-screen-initial.png
+PASS PNG header and dimensions assets/preferences-refused.full-screen-initial.png
+PASS real tool, no invented model assets/preferences-refused.full-screen-initial.png
+PASS retained exact prompt assets/preferences-refused.full-screen-initial.png
 PASS one selected representative direction
 PASS coverage loading desktop-1280
 PASS coverage loading mobile-390
@@ -25,9 +30,27 @@ PASS accepted input knowledge/ui/composition/layout.yaml
 PASS accepted input knowledge/ui/composition/collection.yaml
 PASS accepted input knowledge/ui/composition/cta.yaml
 PASS accepted input knowledge/ui/composition/responsive.yaml
+PASS accepted input examples/todo-app-backend/.starciwork/features/task/ui/list/assets/anatomy-source.accepted.yaml.txt
 PASS brand/Grammar/knowledge prompt provenance order assets/preferences-refused.prompt.txt
+PASS brand/Grammar/knowledge prompt provenance order assets/preferences-refused.full-screen-initial.prompt.txt
 PASS retained visual review
 PASS product shell, feature navigation, account presence
+PASS current four full-screen anatomy references bound
+PASS actual reference bytes examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-screen.png
+PASS actual reference bytes examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+PASS actual reference bytes examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/empty-state.png
+PASS actual reference bytes examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+PASS retained actual anatomy image inputs
+PASS generation image retained examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+PASS generation image cited in exact prompt examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+PASS generation image retained examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+PASS generation image cited in exact prompt examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+PASS generation image retained examples/todo-app-backend/.starciwork/features/notify/ui/preferences/assets/preferences-refused.full-screen-initial.png
+PASS generation image cited in exact prompt examples/todo-app-backend/.starciwork/features/notify/ui/preferences/assets/preferences-refused.full-screen-initial.png
+PASS final prompt identifies actual anatomy source
+PASS workspace maps actual navigation composition
+PASS anatomy formula bound per screen
+PASS current anatomy rules and white primary ink cited
+PASS all mapped nested Inputs use secondary variant
+PASS application-owned composition regions declared
 INFO structural/hash checks complement manual visual review; no browser/render/API proof.
-
-exit: 0

@@ -1,39 +1,56 @@
+# Assertion commands were actually run by scripts/example-evidence.mjs.
+# Asset bindings and visual review augment that receipt; no kernel or browser proof is claimed.
 schema: work/evidence
 record: ui.share.invite
-recordDigest: da56eecd0edf17f91e6647dbb8febb1decde47b7e1874105fa313e10c6383959
+recordDigest: 23f1c47c63ecc1705358bd8de52c467ae4dfac5b97c479eb011b349bcd712800
 outcome: pass
 assertions:
   - id: direction-assets-inputs-coverage
-    command: node examples/todo-app-backend/.starciwork/features/share/ui/invite/assets/verify-direction.mjs
+    command: node
+      examples/todo-app-backend/.starciwork/features/share/ui/invite/assets/verify-direction.mjs >
+      examples/todo-app-backend/.starciwork/features/share/ui/invite/assets/direction-check.txt
     exit: 0
     outcome: pass
     observation: node
-      examples/todo-app-backend/.starciwork/features/share/ui/invite/assets/verify-direction.mjs
+      examples/todo-app-backend/.starciwork/features/share/ui/invite/assets/verify-direction.mjs >
+      examples/todo-app-backend/.starciwork/features/share/ui/invite/assets/direction-check.txt
       exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T12:40:55.010Z
+  capturedAt: 2026-09-18T14:51:22.284Z
 assets:
   - path: assets/invite-refused.prompt.txt
-    sha256: 6033834c00bceffb22af88a9f2dbae3a59a079725a19725c8ec9d8624c668638
+    sha256: 81f800c2a28b76143dc8c1870ded6c6c5f676943bc8bd1a8a5d36c65cfe6efee
   - path: assets/invite-refused.png
-    sha256: 3e3040354d9ae1e9d874f7a04f0731166def52e465bfb739c7b630daf1f321b7
-  - path: assets/invite-refused.initial.prompt.txt
-    sha256: 61b27e3b5d27c2586bc8e801518cde0fc38e753520ceff427bd93bf55294fa8a
-  - path: assets/invite-refused.initial.png
-    sha256: 7145d9b3874714ba361ed34dabcfa113405d0c7a70a2ee9605199cde1568cc20
+    sha256: 7340a96a89d848e9b33f639433a823eeb7994ce7a4dd6a80de0f69bb54343ef0
   - path: assets/visual-review.md
-    sha256: 23a673535b96166fb1c3747582803b7a6ca7763bc820aaf29d4859ac297c9030
+    sha256: 5f48ccf32a8baec2762f2db7494944d0ffbac35eac369433c1ed38ac4070b39d
   - path: assets/direction-check.txt
-    sha256: 81108a14bbb680e52805f61a2a33b112e82c413e88bd51dd57a6677816c08825
+    sha256: 3a9cb9227c653e9ccf82ca3b46e4fa07232948bb2f8818b56b76dcdabc7bf545
   - path: assets/verify-direction.mjs
-    sha256: 8cf91ea1bf0e5a6ef9685f03d636260387ade471082ec3472fc7437567b1ba8a
+    sha256: afa871ea60c7a2bf647da059cbe50a0201a4218f820cf3957fa24614c68a4317
 directionReview:
   reviewer: codex
   outcome: accepted-proposed-direction
   reviewPath: assets/visual-review.md
   imageTool: image_gen.imagegen
   brandRev: 3
-  limitations: No exact render, API, browser UAT or model identity claimed; implementation gaps live in ui.gaps.
+  addendum: 2
+  anatomySources:
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-screen.png
+      sha256: 0619dec4572f8d5931b39075d21aaf089963eaeab4e7bb883a35fb4cd28d5d2e
+      role: actual-full-screen-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      sha256: e9ea01cbbecb7a5b6f19328184fa5a0eca7e37f4a411351e8582491dde5024d5
+      role: actual-full-screen-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/empty-state.png
+      sha256: 09ba45e64e7d0e7167c2572df6ae33406b842859d8528aeb9fd2f756a4b48c26
+      role: actual-full-screen-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      sha256: 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
+      role: actual-full-screen-render-anatomy-source
+  limitations: Generated direction compared with real full-screen references; not exact component
+    pixels, accessibility contrast, browser or API proof. App-owned regions and uncaptured state
+    limits are explicit.
