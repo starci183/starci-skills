@@ -1,0 +1,41 @@
+schema: work/contract
+id: contract.checkout.order-for-identity
+title: How identity learns a person has orders
+state: done
+between:
+  provider: checkout
+  consumer: identity
+owner: checkout
+surface:
+  - name: buyerStatus
+    shape: GET /buyers/:personId -> {personId, hasOrders}
+    transport: >-
+      Plain HTTP/JSON between the two services on the ports metadata.json resolves (order on
+      orderApi). The consumer is the identity service's account view: GET /accounts/:personId
+      composes its own person row with this call's answer and nothing else. There is no shared
+      table and no shared cache behind the answer - the call is the only way identity learns it.
+    guarantee: >-
+      The provider always answers 200 with {personId, hasOrders} for any personId, known or not;
+      no orders is the honest answer, never a 404. A network failure or a non-200 answer is a
+      typed 503 with a stable code on the consumer side (ORDER_SERVICE_UNAVAILABLE), never a
+      silently implied false.
+    stability: >-
+      Changing the route, the body shape, or the always-200 rule is breaking for identity;
+      adding fields is not.
+guarantees:
+  - hasOrders reports what the order service holds at the moment of the call, not a copied flag that can drift.
+  - An unreachable provider is surfaced as a refusal the consumer propagates; the account view never falls back to a guess.
+consumerObligations:
+  - identity asks this surface once per account read and caches nothing.
+  - identity turns a failed call into its own typed 503 and never renders hasOrders false for it.
+refs: [br.checkout.place-order, fr.checkout.place-order, br.identity.sign-in]
+
+requiresProof:
+  provider:
+    required: true
+    note: The provider proves it honours the surface.
+  consumer:
+    required: true
+    note: The consumer proves it honours its obligations.
+
+change: {rev: 1, kind: initial, at: 2026-09-18T00:00:00.000Z}

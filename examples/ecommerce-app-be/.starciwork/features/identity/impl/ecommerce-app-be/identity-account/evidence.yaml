@@ -1,0 +1,65 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: impl.identity.ecommerce-app-be.identity-account
+recordDigest: f4e66c31041d6316f2408e0f5cf6e3546c5271790c55004691caf2d2182f9b69
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: apps/identity/src/features/identity/identity.module.ts
+      sha256: 9f270cf43c7d40a273bdb02fd5b5137de88c9e89df9e1d0d82b2ffeebb3d0587
+    - path: apps/identity/src/features/identity/transport/http/account.controller.ts
+      sha256: dd2f90623357ac4e1b9cd17d3f01e1f001c09ce43eeb2ddb876c8e38febde022
+    - path: apps/identity/src/features/identity/transport/http/health.controller.ts
+      sha256: a47c3d9a729b50eb6f3b2ed8ddd9fe2d5e1a1de6b8bf7ef71aac2258e4506a43
+    - path: apps/identity/src/features/identity/transport/http/session.controller.ts
+      sha256: ea10b432ba66479d9e22f6b9598bf3951493e3e1c945342409eca4d5c71bacb6
+    - path: apps/identity/src/features/identity/transport/http/sign-in.controller.spec.ts
+      sha256: 37abe77913b3e347bc854612dbf30e9cb2ebe2e9f9ec727ea37e78b522d42fb2
+    - path: apps/identity/src/features/identity/transport/http/sign-in.controller.ts
+      sha256: f9e6acdec82c84aca2ef85edaaba7b5ae8f75ae9f061df954259a631b79d8e29
+    - path: apps/identity/src/modules/bussiness/account/account.module.ts
+      sha256: 7a2dc489d0de0076a9867a9105f7647aa2687cf15ecf3a811b12ead671f59dbc
+    - path: apps/identity/src/modules/bussiness/account/account.service.ts
+      sha256: 29ce183f0ea6c41bb6f3afec426f7ea8413892384280b41871f880bed4f2cb89
+    - path: apps/identity/src/modules/bussiness/account/index.ts
+      sha256: b22f859efa914a5fd0109a92859af4e39dcf8f1018cf387a2ca8bcc3363c2010
+    - path: apps/identity/src/modules/bussiness/account/password.policy.spec.ts
+      sha256: 87aadbb7115ef48a196bc4612a3369361ad2e0167aea7497d35d5afd3a313a55
+    - path: apps/identity/src/modules/bussiness/account/password.policy.ts
+      sha256: 763a14383ee979d60ec35961497dc270bc6da31e699c325bd4479c116db4fe15
+    - path: apps/identity/src/modules/bussiness/session/index.ts
+      sha256: 3d28358fafc1786ad9d9f7cee42d882bfd38aad3379886536d120e31ee1c1cfd
+    - path: apps/identity/src/modules/bussiness/session/session.module.ts
+      sha256: f19f3da7b632f3a064c0ca16806608208a876dd25ed3ff23d64628d4c1af43d7
+    - path: apps/identity/src/modules/bussiness/session/session.repository.ts
+      sha256: 6cf4e80851882712f4b1e5ba6e19967307ea83da8f9dbea072155bb39ea20d2e
+    - path: apps/identity/src/modules/bussiness/session/session.service.ts
+      sha256: 702ef0c334f032b91a06b6fcb9df94c836b886f4e2e7ab336c3f31579c3c6da5
+    - path: apps/identity/src/modules/integrations/order/index.ts
+      sha256: 5e7c29e6a5c694e3f2f399c05bf4a68614568934086995ad0b48e21de7ddea7c
+    - path: apps/identity/src/modules/integrations/order/order.client.spec.ts
+      sha256: 93dabe79e29f02f614912e2b4bef84d62ac88f192ed10bdea7aee8727dbc41c3
+    - path: apps/identity/src/modules/integrations/order/order.client.ts
+      sha256: c0a1fd68517e1090444007d9db448c246ae38d6332e3bf09dde4f0df77067424
+    - path: apps/identity/src/modules/integrations/order/order.module.ts
+      sha256: 8af8dfa8d323a2384e5eaf014f72ef21866e4922dd1faf4ee6c74a30ae05ce42
+  digest: fb34f821daaef06fda52f9e1ec91fa548f14a2bbdb4ae8c33b85598564044fee
+outcome: pass
+assertions:
+  - id: unit
+    command: npx jest apps/identity
+    exit: 0
+    outcome: pass
+    observation: npx jest apps/identity exited 0
+  - id: e2e
+    command: node scripts/live-proof.mjs
+    exit: 0
+    outcome: pass
+    observation: node scripts/live-proof.mjs exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T12:16:08.416Z

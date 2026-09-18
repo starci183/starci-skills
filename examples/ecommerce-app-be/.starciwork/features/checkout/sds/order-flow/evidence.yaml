@@ -1,0 +1,62 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: sds.checkout.order-flow
+recordDigest: fafd00e04a3ad98d5736b088e011d00079fba83107b9163408360fd7679cf995
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: apps/order/src/modules/bussiness/cart/cart.module.ts
+      sha256: 87f897f8a0af95ec9b91d027959d18ff3e02cfdc5ef52aa586d2805cbd551929
+    - path: apps/order/src/modules/bussiness/cart/cart.service.ts
+      sha256: 52476dcc02e7d226c68c3fb5462b61b8526fa629b006055a995bd91f3bab2dd2
+    - path: apps/order/src/modules/bussiness/cart/index.ts
+      sha256: ee3c3436deccc377d22765222a1b6e4591eeddbdef6c97d168d543beed8d4489
+    - path: apps/order/src/modules/bussiness/catalog/catalog.module.ts
+      sha256: fa8c94caae99dd32a2334155d11f95a3df47ecaa4c3671985f870b4c3f168297
+    - path: apps/order/src/modules/bussiness/catalog/catalog.service.ts
+      sha256: dff751ceec6906764b344526a6b9ce6c80f42233c15dff5c8a611ef317753b81
+    - path: apps/order/src/modules/bussiness/catalog/index.ts
+      sha256: 3aec6415a923dd2eb73fd39e1fe65f04700e5416721c8305270a6d8012f8cf6f
+    - path: apps/order/src/modules/bussiness/order/checkout-refusal.exception.ts
+      sha256: dfab5a41689a2f20808d5b39c368fe77171c5e03a7ffc94405577049311543a1
+    - path: apps/order/src/modules/bussiness/order/checkout.policy.spec.ts
+      sha256: 46da47af8e30765ab43ff30afdbd0a62d517333e44c2a771f819f0dea9740cba
+    - path: apps/order/src/modules/bussiness/order/checkout.policy.ts
+      sha256: e4cc2ec943f2ba2f930cd180e6012cf8287ba3809299cd4d4d2dcca5d6b5690f
+    - path: apps/order/src/modules/bussiness/order/index.ts
+      sha256: d0510a9ba711a6c4de28cbf640c6a1a879cd16d5a58fd8626f16a0f344db23e9
+    - path: apps/order/src/modules/bussiness/order/order.module.ts
+      sha256: df44c32a5d302f9dd93c555ed3a99d51ca0c58d6ecdea3e8fe8fe2244ee3cb27
+    - path: apps/order/src/modules/bussiness/order/order.service.ts
+      sha256: f6df7a7ff70a37766f153c05f90452c28b5303bdef1483a6241dfe6d6548a285
+    - path: apps/order/src/modules/bussiness/payment/index.ts
+      sha256: 4b5e2dce2a0796a9a9897787c8b3566d8586f25a58c96d8397168da898881d3b
+    - path: apps/order/src/modules/bussiness/payment/payment.module.ts
+      sha256: 067258a9d135a191e2adbea62d851b20727a1eda4cb1bb316c2ebe748fa0fc8c
+    - path: apps/order/src/modules/bussiness/payment/payment.service.ts
+      sha256: 22c146d0a2a8e436ca2f6a9deb60ec30e51aec861eaa3d8bb796b4b632395445
+  digest: 54f3a9ca67758724378bf04304cfa107186f70e23637debafb96e19a2ee2b2f4
+outcome: pass
+assertions:
+  - id: implementation
+    command: npx jest -t sds.checkout.order-flow
+    exit: 0
+    outcome: pass
+    observation: npx jest -t sds.checkout.order-flow exited 0
+  - id: transitions
+    command: npx jest -t t-refuse
+    exit: 0
+    outcome: pass
+    observation: npx jest -t t-refuse exited 0
+  - id: live-sequence
+    command: node scripts/live-proof.mjs
+    exit: 0
+    outcome: pass
+    observation: node scripts/live-proof.mjs exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T12:15:27.721Z
