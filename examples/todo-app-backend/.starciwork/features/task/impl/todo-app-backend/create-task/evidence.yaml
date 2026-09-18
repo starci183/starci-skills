@@ -1,0 +1,19 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: impl.task.todo-app-backend.create-task
+recordDigest: 2c0101f3866d06edf5d4da1f6cb5fb020de7153873bfffab8e6d5f18aa29ddf3
+outcome: pass
+assertions:
+  - id: fr.task.create
+    outcome: pass
+    observation: npx jest src/features/create-task exited 0
+  - id: ac.task.title.required.refuses-empty
+    outcome: pass
+    observation: npx jest src/features/create-task -t ac.task.title.required.refuses-empty exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T05:28:17.398Z

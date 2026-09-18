@@ -1,24 +1,17 @@
-# Written by starci-kernel when it settles the operation: the assertions below are the checks it
-# re-ran itself, not what the worker reported. It is a file of its own so that the history of a
-# record is the history of the record, and every re-run does not rewrite what the record says.
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: br.login.session.restores
-recordDigest: 99f9bc3ab4c704e7f3a000ed53f6661716e0561664f761e0b0a3279ccca53ed8
-stale: true
-staleSince: {record: br.login.session.restores}
-staleReason: The record's index.yaml bytes no longer match recordDigest above; something
-  edited the record after this run captured it, and no fresh run has re-verified it since.
+recordDigest: 23db5af2dd38a7cbfd715dba84c9e5dfbadbdcbbc20aaf7590a593e1f3397312
 outcome: pass
 assertions:
   - id: ac.login.session.restores.returning-within-the-window-stays-signed-in
     outcome: pass
-    observation: npm run test:e2e -- auth/session exited 0
+    observation: npx jest src/modules/domain/session -t
+      ac.login.session.restores.returning-within-the-window-stays-signed-in exited 0
 provenance:
-  actor: starci-kernel
-  tool: starci-kernel
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
   environment: local
-  servedVersions:
-    - repository: todo-app
-      commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
-      artifact: worktree
-  capturedAt: 2026-09-18T04:38:00.000Z
+  capturedAt: 2026-09-18T05:29:02.539Z

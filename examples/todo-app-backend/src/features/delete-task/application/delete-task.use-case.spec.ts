@@ -1,6 +1,7 @@
 import { Repository } from 'typeorm';
 import { TaskRepository } from '../../../modules/domain/task';
 import { TaskEntity } from '../../../modules/integrations/postgres';
+import { PlatformEventBus, TaskDeletedEvent } from '../../../modules/platform/events';
 import { DeleteTaskUseCase } from './delete-task.use-case';
 
 class FakeTaskRepository {
@@ -46,5 +47,22 @@ describe('DeleteTaskUseCase', () => {
       code: 'TASK_FORBIDDEN',
     });
     expect(await taskRepository.findById(created.id)).toBeDefined();
+  });
+
+  it('event.task.deleted: publishes on the PlatformEventBus after the row is gone', async () => {
+    const taskRepository = new TaskRepository(new FakeTaskRepository() as unknown as Repository<TaskEntity>);
+    const created = await taskRepository.create('owner-1', 'Ship it');
+    const events = new PlatformEventBus();
+    const received: unknown[] = [];
+    events.subscribe(event => received.push(event));
+    const useCase = new DeleteTaskUseCase(taskRepository, events);
+
+    await useCase.execute({ actorId: 'owner-1', taskId: created.id });
+
+    expect(received).toHaveLength(1);
+    const [published] = received as [TaskDeletedEvent];
+    expect(published).toBeInstanceOf(TaskDeletedEvent);
+    expect(published.taskId).toBe(created.id);
+    expect(published.ownerId).toBe('owner-1');
   });
 });

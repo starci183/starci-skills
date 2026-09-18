@@ -3,6 +3,7 @@ import { AppConfigService } from '../../../modules/platform/config';
 import { SessionRepository } from '../../../modules/domain/session';
 import { SessionEntity } from '../../../modules/integrations/postgres';
 import { KeycloakClient, KeycloakInvalidCredentialsException, KeycloakSignInResult } from '../../../modules/integrations/keycloak';
+import { PlatformEventBus, SignedInEvent } from '../../../modules/platform/events';
 import { SignInUseCase } from './sign-in.use-case';
 
 class FakeSessionRepository {
@@ -84,5 +85,33 @@ describe('SignInUseCase', () => {
     const result = await useCase.execute({ email: 'person@example.com', password: 'correct-horse' });
     const session = await sessionRepository.findActive(result.sessionToken);
     expect(session.personId).toBe(result.personId);
+  });
+
+  it('event.login.signed-in: publishes on the PlatformEventBus after a successful sign-in', async () => {
+    const events = new PlatformEventBus();
+    const received: unknown[] = [];
+    events.subscribe(event => received.push(event));
+    const keycloakClient = new FakeKeycloakClient({ 'person@example.com': 'correct-horse' });
+    const withEvents = new SignInUseCase(keycloakClient, sessionRepository, events);
+
+    const result = await withEvents.execute({ email: 'person@example.com', password: 'correct-horse' });
+
+    expect(received).toHaveLength(1);
+    const [published] = received as [SignedInEvent];
+    expect(published).toBeInstanceOf(SignedInEvent);
+    expect(published.personId).toBe(result.personId);
+  });
+
+  it('a refused sign-in publishes nothing', async () => {
+    const events = new PlatformEventBus();
+    const received: unknown[] = [];
+    events.subscribe(event => received.push(event));
+    const keycloakClient = new FakeKeycloakClient({ 'person@example.com': 'correct-horse' });
+    const withEvents = new SignInUseCase(keycloakClient, sessionRepository, events);
+
+    await expect(withEvents.execute({ email: 'person@example.com', password: 'wrong' })).rejects.toMatchObject({
+      code: 'INVALID_CREDENTIALS',
+    });
+    expect(received).toHaveLength(0);
   });
 });

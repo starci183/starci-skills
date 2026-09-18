@@ -1,24 +1,16 @@
-# Written by starci-kernel when it settles the operation: the assertions below are the checks it
-# re-ran itself, not what the worker reported. It is a file of its own so that the history of a
-# record is the history of the record, and every re-run does not rewrite what the record says.
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: impl.task.todo-app-backend.ownership
-recordDigest: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-stale: true
-staleSince: {record: impl.task.todo-app-backend.ownership}
-staleReason: The record's index.yaml bytes no longer match recordDigest above; something
-  edited the record after this run captured it, and no fresh run has re-verified it since.
+recordDigest: 3076620405540b0ffcc450353b564bf5be8efe7dd47866f9697fe3c7eaeab04f
 outcome: pass
 assertions:
-  - id: unit-suite-green-at-the-recorded-revision
+  - id: unit-suite-green
     outcome: pass
-    observation: npm run test:unit -- src/task/ownership exited 0
+    observation: npx jest src/modules/domain/task exited 0
 provenance:
-  actor: starci-kernel
-  tool: starci-kernel
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
   environment: local
-  servedVersions:
-    - repository: todo-app
-      commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
-      artifact: worktree
-  capturedAt: 2026-09-18T04:38:00.000Z
+  capturedAt: 2026-09-18T05:50:28.056Z

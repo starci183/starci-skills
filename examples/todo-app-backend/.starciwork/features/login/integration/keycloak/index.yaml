@@ -1,7 +1,7 @@
 schema: work/integration
 id: integration.login.keycloak
 title: Keycloak issues and validates the person's identity
-state: done
+state: todo
 provider: keycloak
 boundary: The product never stores a password. Keycloak owns the credential; this product owns the session
   row that follows a successful token exchange.
@@ -21,5 +21,5 @@ requiresProof:
     required: true
     note: A run against the real provider. Evidence must carry proof.boundary live and an empty fakes list.
 
-provenBy:
-  live: [impl.login.todo-app-backend.auth]
+blockedBy:
+  - {record: gap.login.live-proof, because: "live proof needs the docker-compose dev stack (Keycloak on 8089) up, and this host cannot start it."}

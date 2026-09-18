@@ -1,6 +1,7 @@
 import { Repository } from 'typeorm';
 import { TaskRepository } from '../../../modules/domain/task';
 import { TaskEntity } from '../../../modules/integrations/postgres';
+import { PlatformEventBus, TaskCompletedEvent } from '../../../modules/platform/events';
 import { CompleteTaskUseCase } from './complete-task.use-case';
 
 class FakeTaskRepository {
@@ -50,5 +51,21 @@ describe('CompleteTaskUseCase', () => {
       code: 'TASK_FORBIDDEN',
     });
     expect((await taskRepository.findById(created.id)).complete).toBe(false);
+  });
+
+  it('event.task.completed: publishes on the PlatformEventBus after the write succeeds', async () => {
+    const created = await taskRepository.create('owner-1', 'Ship it');
+    const events = new PlatformEventBus();
+    const received: unknown[] = [];
+    events.subscribe(event => received.push(event));
+    const withEvents = new CompleteTaskUseCase(taskRepository, events);
+
+    await withEvents.execute({ actorId: 'owner-1', taskId: created.id });
+
+    expect(received).toHaveLength(1);
+    const [published] = received as [TaskCompletedEvent];
+    expect(published).toBeInstanceOf(TaskCompletedEvent);
+    expect(published.taskId).toBe(created.id);
+    expect(published.ownerId).toBe('owner-1');
   });
 });

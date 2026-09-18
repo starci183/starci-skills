@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { InvalidCredentialsException, SessionRepository } from '../../../modules/domain/session';
 import { KeycloakClient, KeycloakInvalidCredentialsException } from '../../../modules/integrations/keycloak';
+import { PlatformEventBus, SignedInEvent } from '../../../modules/platform/events';
 import { SignInParams, SignInResult } from './sign-in.contracts';
 
 /**
@@ -15,6 +17,7 @@ export class SignInUseCase {
   constructor(
     private readonly keycloakClient: KeycloakClient,
     private readonly sessionRepository: SessionRepository,
+    private readonly events: PlatformEventBus = new PlatformEventBus(),
   ) {}
 
   async execute(params: SignInParams): Promise<SignInResult> {
@@ -31,6 +34,7 @@ export class SignInUseCase {
       throw error;
     }
     const session = await this.sessionRepository.tAccept(personId);
+    this.events.publish(new SignedInEvent(personId, session.issuedAt, randomUUID()));
     return { sessionToken: session.token, personId };
   }
 }

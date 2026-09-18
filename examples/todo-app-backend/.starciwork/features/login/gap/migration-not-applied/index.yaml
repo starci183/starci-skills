@@ -1,7 +1,18 @@
 schema: work/gap
 id: gap.login.migration-not-applied
 title: No migration has been applied against the dev server
-state: todo
-statement: No migration has been applied against the dev Postgres server yet; the schema exists only in
-  data.login.person, not as real tables integration.login.postgres can be proven live against.
-change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}
+state: done
+statement: This gap originally said the schema existed only in data.login.person, with no migration file at
+  all. That is no longer true - real TypeORM migrations now exist at
+  src/modules/integrations/postgres/migrations/1758160000000-create-sessions-table.ts and
+  1758160000001-create-tasks-table.ts. What remains true - that nobody has run those migrations against a
+  live dev Postgres server from this host, because this host cannot start the docker-compose stack - is
+  exactly the fact gap.login.live-proof now names. This gap is closed by folding into that one rather than
+  restating the same absence under two names.
+closedBy: gap.login.live-proof
+verificationSource: authored-claim
+because: Closing a gap by folding it into another gap is an editorial fact about the tree's own bookkeeping
+  (the absence this record named is now the same absence gap.login.live-proof names), not something a test
+  run proves. The migration files' existence is independently verifiable by reading
+  src/modules/integrations/postgres/migrations/**.
+

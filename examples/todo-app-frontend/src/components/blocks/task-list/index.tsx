@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useTasks, useCreateTask, useSetTaskComplete, useDeleteTask } from '@/hooks';
+import { useTasks, useCreateTask, useSetTaskComplete, useDeleteTask } from '@/hooks/task';
 import { TaskListView } from './component';
 
 const READ_REFUSAL_MESSAGE = 'Your session has ended. Sign in again to see your tasks.';

@@ -8,6 +8,6 @@ openQuestions:
   - Whether this is right for a person with a phone and a laptop is undecided; decision.login.session.devices owns it.
 acceptanceCriteria:
   - second-sign-in-ends-the-first
-module: src/auth/session
+module: src/modules/domain/session/**
 change: {rev: 1, kind: initial, at: 2026-09-18T01:04:00.000Z}
 

@@ -6,6 +6,10 @@ import { ReopenTaskParams, ReopenTaskResult } from './reopen-task.contracts';
  * br.task.complete.once (rev 2, still todo): "the owner may reopen a task they completed" is the
  * reversible statement this record is waiting on proof for. This use case is that reopen path: the task
  * reads incomplete again and its completion timestamp is cleared.
+ *
+ * No event is published here: unlike created/completed/deleted, the work tree declares no
+ * event.task.reopened (or equivalent) record under features/task/event/**, so there is no declared
+ * payload to emit against. See the seam report's "unimplementable as written" section.
  */
 @Injectable()
 export class ReopenTaskUseCase {

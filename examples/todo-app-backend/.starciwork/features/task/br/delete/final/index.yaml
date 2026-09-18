@@ -5,6 +5,6 @@ state: todo
 statements:
   - Deleting a task removes it; there is no recovery path in this product.
 acceptanceCriteria: [stays-gone]
-module: src/task/delete
+module: [src/features/delete-task/**, src/modules/domain/task/task.repository.ts]
 change: {rev: 1, kind: initial, at: 2026-09-18T02:13:00.000Z}
 

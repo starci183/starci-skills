@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useSignIn } from '@/hooks';
+import { useSignIn } from '@/hooks/auth';
 import { SignInFormView } from './component';
 
 /** SignInFormBlock takes no external props; the session and field state are entirely its own. */

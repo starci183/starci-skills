@@ -12,6 +12,7 @@ import {
   SessionRepository,
 } from './modules/domain/session';
 import {
+  TaskCreationPolicyRegistry,
   TaskForbiddenException,
   TaskModule,
   TaskNotFoundException,
@@ -126,10 +127,11 @@ class FakeTaskRepository {
     return record;
   }
 
-  async delete(id: string, actorId: string): Promise<void> {
+  async delete(id: string, actorId: string): Promise<TaskRecord> {
     const record = await this.findById(id);
     this.assertOwner(record, actorId);
     this.byId.delete(id);
+    return record;
   }
 }
 
@@ -139,7 +141,10 @@ class FakeKeycloakModule {}
 @Module({ providers: [{ provide: SessionRepository, useClass: FakeSessionRepository }], exports: [SessionRepository] })
 class FakeSessionModule {}
 
-@Module({ providers: [{ provide: TaskRepository, useClass: FakeTaskRepository }], exports: [TaskRepository] })
+@Module({
+  providers: [{ provide: TaskRepository, useClass: FakeTaskRepository }, TaskCreationPolicyRegistry],
+  exports: [TaskRepository, TaskCreationPolicyRegistry],
+})
 class FakeTaskModule {}
 
 @Module({})

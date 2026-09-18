@@ -1,0 +1,16 @@
+schema: work/implementation
+id: impl.task.todo-app-backend.platform-database
+title: The platform database module (shared Postgres integration)
+state: done
+repository: todo-app
+owners:
+  - {role: module, path: src/modules/integrations/postgres/**}
+revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
+# This module is shared: it owns both TaskEntity (task) and SessionEntity (login), and both features'
+# repositories depend on it. It is recorded once, here under task, because Part C's brief scopes this
+# pass to the login and task feature trees and a shared infrastructure module needs exactly one owner
+# record, not one per consuming feature. impl.login.todo-app-backend.auth's session-store proof and this
+# record's task-repository proof both rest on the same TaskEntity/SessionEntity shapes this module owns.
+proves: [data.task.task]
+verification: [npx jest src/modules/domain/task src/modules/domain/session exited 0]
+verificationSource: kernel-observed

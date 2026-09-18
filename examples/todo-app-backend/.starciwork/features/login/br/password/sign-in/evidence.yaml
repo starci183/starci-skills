@@ -1,27 +1,20 @@
-# Written by starci-kernel when it settles the operation: the assertions below are the checks it
-# re-ran itself, not what the worker reported. It is a file of its own so that the history of a
-# record is the history of the record, and every re-run does not rewrite what the record says.
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: br.login.password.sign-in
-recordDigest: b76d94eb8bd9a9b9f9df7b87487bf3dc4b382eea4a62714b586c7439158a8ff1
-stale: true
-staleSince: {record: br.login.password.sign-in}
-staleReason: The record's index.yaml bytes no longer match recordDigest above; something
-  edited the record after this run captured it, and no fresh run has re-verified it since.
+recordDigest: 8fc1726487263e7ed7cc9d5a8658bdf44b773c38a969b67c3509adda9049d987
 outcome: pass
 assertions:
   - id: ac.login.password.sign-in.wrong-pair-is-refused
     outcome: pass
-    observation: npm run test:unit -- src/auth/sign-in exited 0
+    observation: npx jest src/features/sign-in -t ac.login.password.sign-in.wrong-pair-is-refused exited 0
   - id: ac.login.password.sign-in.refusal-does-not-name-the-half
     outcome: pass
-    observation: npm run test:unit -- src/auth/sign-in/timing exited 0
+    observation: npx jest src/features/sign-in -t
+      ac.login.password.sign-in.refusal-does-not-name-the-half exited 0
 provenance:
-  actor: starci-kernel
-  tool: starci-kernel
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
   environment: local
-  servedVersions:
-    - repository: todo-app
-      commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
-      artifact: worktree
-  capturedAt: 2026-09-18T04:38:00.000Z
+  capturedAt: 2026-09-18T05:28:52.366Z

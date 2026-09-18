@@ -1,0 +1,19 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: impl.task.todo-app-backend.platform-database
+recordDigest: fcd9ca892e13ef67add2224ec2c5411cd4c19446754a214cd31a8660071597a7
+outcome: pass
+assertions:
+  - id: data.task.task
+    outcome: pass
+    observation: npx jest src/modules/domain/task/task.repository.spec.ts exited 0
+  - id: session-store
+    outcome: pass
+    observation: npx jest src/modules/domain/session/session.repository.spec.ts exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T05:28:31.205Z

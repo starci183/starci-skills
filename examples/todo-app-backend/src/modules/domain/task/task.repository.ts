@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
 import { TaskEntity } from '../../integrations/postgres';
 import { OwnershipGuard } from './ownership.guard';
+import { CompletionAuthorityRegistry } from './completion-authority.providers';
 import { TaskRecord } from './task-record.types';
 import { TaskNotFoundException, TaskTitleRequiredException } from './task.exception';
 
@@ -12,12 +13,19 @@ import { TaskNotFoundException, TaskTitleRequiredException } from './task.except
  * complete is true. Completion method names mirror sds.task.completion-state's transitions
  * (t-complete, t-complete-again, t-reopen) so a reader can hold the record beside the code. The row lives
  * in Postgres, through the platform database module's TaskEntity.
+ *
+ * br.task.single-owner rev 2: delete is checked against OwnershipGuard, unconditionally and always; who
+ * may complete/reopen is checked against the CompletionAuthorityRegistry's current authority instead, so
+ * a future `share` feature can widen that half alone without touching delete's guard.
  */
 @Injectable()
 export class TaskRepository {
   private readonly guard = new OwnershipGuard();
 
-  constructor(@InjectRepository(TaskEntity) private readonly rows: Repository<TaskEntity>) {}
+  constructor(
+    @InjectRepository(TaskEntity) private readonly rows: Repository<TaskEntity>,
+    private readonly completionAuthorityRegistry: CompletionAuthorityRegistry = new CompletionAuthorityRegistry(),
+  ) {}
 
   async create(owner: string, title: string): Promise<TaskRecord> {
     const trimmed = title.trim();
@@ -42,26 +50,38 @@ export class TaskRepository {
   }
 
   async complete(id: string, actorId: string): Promise<TaskRecord> {
-    const row = await this.findOwnedRow(id, actorId);
+    const row = await this.findRowForCompletion(id, actorId, 'complete');
     return this.tComplete(row);
   }
 
   async reopen(id: string, actorId: string): Promise<TaskRecord> {
-    const row = await this.findOwnedRow(id, actorId);
+    const row = await this.findRowForCompletion(id, actorId, 'reopen');
     return this.tReopen(row);
   }
 
-  async delete(id: string, actorId: string): Promise<void> {
+  async delete(id: string, actorId: string): Promise<TaskRecord> {
     const row = await this.findOwnedRow(id, actorId);
     await this.rows.delete(row.id);
+    return toRecord(row);
   }
 
+  /** Delete's sole, unconditional authority: OwnershipGuard, never the replaceable CompletionAuthority. */
   private async findOwnedRow(id: string, actorId: string): Promise<TaskEntity> {
     const row = await this.rows.findOneBy({ id });
     if (!row) {
       throw new TaskNotFoundException();
     }
     this.guard.assert(toRecord(row), actorId);
+    return row;
+  }
+
+  /** Complete/reopen's authority: whichever CompletionAuthority is currently registered. */
+  private async findRowForCompletion(id: string, actorId: string, action: 'complete' | 'reopen'): Promise<TaskEntity> {
+    const row = await this.rows.findOneBy({ id });
+    if (!row) {
+      throw new TaskNotFoundException();
+    }
+    this.completionAuthorityRegistry.current().assertMayTransition(toRecord(row), actorId, action);
     return row;
   }
 

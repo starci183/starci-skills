@@ -4,8 +4,8 @@ title: The owned-list query
 state: done
 repository: todo-app
 owners:
-  - {role: module, path: src/task/list/list.service.ts}
-revision: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
+  - {role: feature, path: src/features/list-tasks/**}
+revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
 proves: [nfr.task.list.latency]
-verification: [npm run test:unit -- src/task/list exited 0]
+verification: [npx jest src/features/list-tasks exited 0]
 verificationSource: kernel-observed
