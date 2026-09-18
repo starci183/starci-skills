@@ -5,8 +5,8 @@ state: done
 repository: todo-app
 owners:
   - {role: module, path: src/modules/domain/task/ownership.guard.ts}
-  - {role: module, path: src/modules/domain/task/completion-authority.ts}
-  - {role: module, path: src/modules/domain/task/completion-authority.registry.ts}
+  - {role: module, path: src/modules/domain/task/completion-authority.contracts.ts}
+  - {role: module, path: src/modules/domain/task/completion-authority.providers.ts}
   - {role: module, path: src/modules/domain/task/task.repository.ts}
 revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
 proves: [br.task.single-owner, sds.task.ownership-guard]

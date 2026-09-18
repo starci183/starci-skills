@@ -10,7 +10,7 @@ statements:
 authorityRefs:
   - "owner-intent: One person's list is private to them; sharing is a later product, not a default."
 acceptanceCriteria: [refuses-stranger]
-module: [src/modules/domain/task/ownership.guard.ts, src/modules/domain/task/completion-authority.ts, src/modules/domain/task/completion-authority.registry.ts, src/modules/domain/task/task.repository.ts]
+module: [src/modules/domain/task/ownership.guard.ts, src/modules/domain/task/completion-authority.contracts.ts, src/modules/domain/task/completion-authority.providers.ts, src/modules/domain/task/task.repository.ts]
 change:
   rev: 2
   kind: breaking

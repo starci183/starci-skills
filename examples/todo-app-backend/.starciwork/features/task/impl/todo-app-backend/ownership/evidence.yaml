@@ -3,7 +3,7 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: impl.task.todo-app-backend.ownership
-recordDigest: e7cb16c3ff3c407dd9a655534455c8dc2168dd60fda53ebf315963e6d482ae11
+recordDigest: 3076620405540b0ffcc450353b564bf5be8efe7dd47866f9697fe3c7eaeab04f
 outcome: pass
 assertions:
   - id: unit-suite-green
@@ -13,4 +13,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T05:30:11.141Z
+  capturedAt: 2026-09-18T05:50:28.056Z
