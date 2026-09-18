@@ -57,7 +57,7 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.password.sign-in sends 49 other record(s) back to todo, would
-      stale 6 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      stale 9 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
@@ -123,7 +123,7 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.restores sends 48 other record(s) back to todo, would
-      stale 5 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      stale 8 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
@@ -189,7 +189,7 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.single-device sends 48 other record(s) back to todo,
-      would stale 5 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      would stale 8 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
@@ -233,7 +233,7 @@ findings:
       - ui.share.invite
       - ui.task.list
     because: A breaking change to br.share.revoke.on-read sends 26 other record(s) back to todo, would
-      stale 2 evidence file(s), and touches 12 code path(s) (app/share, src/app/tasks/**,
+      stale 4 evidence file(s), and touches 12 code path(s) (app/share, src/app/tasks/**,
       src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
       src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments.ts,
       src/plan/reconcile.ts, src/plan/subscription.ts, src/share, src/share/invitation.service.ts) -
@@ -270,7 +270,7 @@ findings:
       - ui.share.invite
       - ui.task.list
     because: A breaking change to br.share.role.permissions sends 26 other record(s) back to todo, would
-      stale 2 evidence file(s), and touches 12 code path(s) (app/share, src/app/tasks/**,
+      stale 4 evidence file(s), and touches 12 code path(s) (app/share, src/app/tasks/**,
       src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
       src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments.ts,
       src/plan/reconcile.ts, src/plan/subscription.ts, src/share, src/share/access.service.ts) -
@@ -304,7 +304,7 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.task.single-owner sends 23 other record(s) back to todo, would
-      stale 3 evidence file(s), and touches 15 code path(s) (src/app/tasks/**,
+      stale 4 evidence file(s), and touches 15 code path(s) (src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
@@ -336,7 +336,7 @@ findings:
       - sds.plan.subscription-lifecycle
       - ui.plan.usage
     because: A breaking change to br.plan.caps.limit sends 19 other record(s) back to todo, would stale
-      0 evidence file(s), and touches 9 code path(s) (app/plan/upgrade-button.tsx,
+      1 evidence file(s), and touches 9 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/plan/cap-guard, src/plan/cap-guard.ts, src/plan/payments,
       src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription, src/plan/subscription.ts)
       - this is the number a reviewer wants before approving the change.
@@ -363,7 +363,7 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.share.editor.no-delete sends 17 other record(s) back to todo, would
-      stale 2 evidence file(s), and touches 11 code path(s) (src/app/tasks/**,
+      stale 3 evidence file(s), and touches 11 code path(s) (src/app/tasks/**,
       src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
       src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments.ts,
       src/plan/reconcile.ts, src/plan/subscription.ts, src/share, src/share/access.service.ts) -
@@ -390,7 +390,7 @@ findings:
       - sds.plan.subscription-lifecycle
       - ui.plan.usage
     because: A breaking change to br.plan.downgrade.freeze sends 16 other record(s) back to todo, would
-      stale 0 evidence file(s), and touches 8 code path(s) (app/plan/upgrade-button.tsx,
+      stale 1 evidence file(s), and touches 8 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts,
       src/plan/reconcile.ts, src/plan/subscription, src/plan/subscription.ts) - this is the number a
       reviewer wants before approving the change.
@@ -415,7 +415,7 @@ findings:
       - sds.plan.subscription-lifecycle
       - ui.plan.usage
     because: A breaking change to br.plan.lapse.reverts-on-read sends 15 other record(s) back to todo,
-      would stale 0 evidence file(s), and touches 8 code path(s) (app/plan/upgrade-button.tsx,
+      would stale 1 evidence file(s), and touches 8 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts,
       src/plan/reconcile.ts, src/plan/subscription, src/plan/subscription.ts) - this is the number a
       reviewer wants before approving the change.
@@ -440,7 +440,7 @@ findings:
       - sds.plan.subscription-lifecycle
       - ui.plan.usage
     because: A breaking change to br.plan.payment.idempotent sends 15 other record(s) back to todo,
-      would stale 0 evidence file(s), and touches 8 code path(s) (app/plan/upgrade-button.tsx,
+      would stale 1 evidence file(s), and touches 8 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts,
       src/plan/reconcile.ts, src/plan/subscription, src/plan/subscription.ts) - this is the number a
       reviewer wants before approving the change.
@@ -463,7 +463,7 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.impossible-date.skips sends 13 other record(s) back to todo,
-      would stale 0 evidence file(s), and touches 8 code path(s) (app/recur/end-rule-dialog.tsx,
+      would stale 1 evidence file(s), and touches 8 code path(s) (app/recur/end-rule-dialog.tsx,
       app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx, src/recur/generator.service.ts,
       src/recur/occurrence.service.ts, src/recur/rule, src/recur/rule.service.ts,
       src/recur/zone.util.ts) - this is the number a reviewer wants before approving the change.
@@ -486,7 +486,7 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.timezone.owner-local-time sends 13 other record(s) back to
-      todo, would stale 0 evidence file(s), and touches 8 code path(s)
+      todo, would stale 1 evidence file(s), and touches 8 code path(s)
       (app/recur/end-rule-dialog.tsx, app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx,
       src/recur/generator.service.ts, src/recur/occurrence.service.ts, src/recur/rule.service.ts,
       src/recur/zone, src/recur/zone.util.ts) - this is the number a reviewer wants before approving
@@ -508,7 +508,7 @@ findings:
       - uat.audit.right-to-be-forgotten
       - ui.audit.privacy
     because: A breaking change to br.audit.append-only sends 11 other record(s) back to todo, would
-      stale 0 evidence file(s), and touches 6 code path(s) (src/audit/erasure-request.repository.ts,
+      stale 1 evidence file(s), and touches 6 code path(s) (src/audit/erasure-request.repository.ts,
       src/audit/erasure.service.ts, src/audit/keystore.service.ts, src/audit/log,
       src/audit/log.repository.ts, src/audit/log.service.ts) - this is the number a reviewer wants
       before approving the change.
@@ -529,7 +529,7 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.ending.preserves-history sends 11 other record(s) back to
-      todo, would stale 0 evidence file(s), and touches 8 code path(s)
+      todo, would stale 1 evidence file(s), and touches 8 code path(s)
       (app/recur/end-rule-dialog.tsx, app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx,
       src/recur/generator.service.ts, src/recur/occurrence, src/recur/occurrence.service.ts,
       src/recur/rule.service.ts, src/recur/zone.util.ts) - this is the number a reviewer wants
@@ -551,7 +551,7 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.task.title.required sends 11 other record(s) back to todo, would
-      stale 2 evidence file(s), and touches 9 code path(s) (src/app/tasks/**,
+      stale 3 evidence file(s), and touches 9 code path(s) (src/app/tasks/**,
       src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
       src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments.ts,
       src/plan/reconcile.ts, src/plan/subscription.ts) - this is the number a reviewer wants before
@@ -590,7 +590,7 @@ findings:
       - uat.share.invite-and-collaborate
       - ui.share.invite
     because: A breaking change to br.share.invite.expiry sends 10 other record(s) back to todo, would
-      stale 0 evidence file(s), and touches 3 code path(s) (app/share, src/share,
+      stale 1 evidence file(s), and touches 3 code path(s) (app/share, src/share,
       src/share/invitation.service.ts) - this is the number a reviewer wants before approving the
       change.
   - id: blast-radius:br.task.list.owned
@@ -609,7 +609,7 @@ findings:
       - sds.plan.cap-guard
       - ui.plan.usage
     because: A breaking change to br.task.list.owned sends 10 other record(s) back to todo, would stale
-      0 evidence file(s), and touches 8 code path(s) (app/plan/upgrade-button.tsx,
+      1 evidence file(s), and touches 8 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/modules/bussiness/task, src/plan/cap-guard,
       src/plan/cap-guard.ts, src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription.ts)
       - this is the number a reviewer wants before approving the change.
@@ -645,7 +645,7 @@ findings:
       - sds.plan.cap-guard
       - ui.plan.usage
     because: A breaking change to br.task.delete.final sends 9 other record(s) back to todo, would stale
-      0 evidence file(s), and touches 9 code path(s) (app/plan/upgrade-button.tsx,
+      1 evidence file(s), and touches 9 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/modules/bussiness/task, src/modules/platform/events,
       src/plan/cap-guard, src/plan/cap-guard.ts, src/plan/payments.ts, src/plan/reconcile.ts,
       src/plan/subscription.ts) - this is the number a reviewer wants before approving the change.
@@ -663,7 +663,7 @@ findings:
       - uat.audit.right-to-be-forgotten
       - ui.audit.privacy
     because: A breaking change to br.audit.erasure.right sends 8 other record(s) back to todo, would
-      stale 0 evidence file(s), and touches 3 code path(s) (src/audit/erasure,
+      stale 1 evidence file(s), and touches 3 code path(s) (src/audit/erasure,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts) - this is the number a
       reviewer wants before approving the change.
   - id: blast-radius:br.recur.generation.once
@@ -680,7 +680,7 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.generation.once sends 8 other record(s) back to todo, would
-      stale 0 evidence file(s), and touches 8 code path(s) (app/recur/end-rule-dialog.tsx,
+      stale 1 evidence file(s), and touches 8 code path(s) (app/recur/end-rule-dialog.tsx,
       app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx, src/recur/generator,
       src/recur/generator.service.ts, src/recur/occurrence.service.ts, src/recur/rule.service.ts,
       src/recur/zone.util.ts) - this is the number a reviewer wants before approving the change.
@@ -698,7 +698,7 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.occurrence.owned-by-rule-owner sends 8 other record(s) back
-      to todo, would stale 0 evidence file(s), and touches 8 code path(s)
+      to todo, would stale 1 evidence file(s), and touches 8 code path(s)
       (app/recur/end-rule-dialog.tsx, app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx,
       src/recur/generator.service.ts, src/recur/occurrence, src/recur/occurrence.service.ts,
       src/recur/rule.service.ts, src/recur/zone.util.ts) - this is the number a reviewer wants
@@ -716,7 +716,7 @@ findings:
       - uat.audit.right-to-be-forgotten
       - ui.audit.privacy
     because: A breaking change to br.audit.erasure.logged sends 7 other record(s) back to todo, would
-      stale 0 evidence file(s), and touches 3 code path(s) (src/audit/erasure,
+      stale 1 evidence file(s), and touches 3 code path(s) (src/audit/erasure,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts) - this is the number a
       reviewer wants before approving the change.
   - id: blast-radius:br.audit.retention
@@ -749,7 +749,7 @@ findings:
       - uat.notify.digest-and-unsubscribe
       - ui.notify.preferences
     because: A breaking change to br.notify.unsubscribe.honored sends 7 other record(s) back to todo,
-      would stale 0 evidence file(s), and touches 1 code path(s) (src/notify/preferences) - this is
+      would stale 1 evidence file(s), and touches 1 code path(s) (src/notify/preferences) - this is
       the number a reviewer wants before approving the change.
   - id: blast-radius:br.plan.active-scope
     kind: blast-radius
@@ -763,7 +763,7 @@ findings:
       - sds.plan.cap-guard
       - ui.plan.usage
     because: A breaking change to br.plan.active-scope sends 6 other record(s) back to todo, would stale
-      0 evidence file(s), and touches 7 code path(s) (app/plan/upgrade-button.tsx,
+      1 evidence file(s), and touches 7 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/plan/cap-guard, src/plan/cap-guard.ts, src/plan/payments.ts,
       src/plan/reconcile.ts, src/plan/subscription.ts) - this is the number a reviewer wants before
       approving the change.
@@ -799,8 +799,16 @@ findings:
     severity: info
     records:
       - gap.plan.unbuilt-module
-    because: gap.plan.unbuilt-module is used 15 time(s) (top decile of fan-in); it is owned by plan and
+    because: gap.plan.unbuilt-module is used 16 time(s) (top decile of fan-in); it is owned by plan and
       read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
+      here is cross-feature coupling, not a local edit.
+  - id: fan-in-hotspot:gap.notify.unbuilt-module
+    kind: fan-in-hotspot
+    severity: info
+    records:
+      - gap.notify.unbuilt-module
+    because: gap.notify.unbuilt-module is used 15 time(s) (top decile of fan-in); it is owned by notify
+      and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
       here is cross-feature coupling, not a local edit.
   - id: fan-in-hotspot:gap.recur.unbuilt-module
     kind: fan-in-hotspot
@@ -808,14 +816,6 @@ findings:
     records:
       - gap.recur.unbuilt-module
     because: gap.recur.unbuilt-module is used 15 time(s) (top decile of fan-in); it is owned by recur
-      and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
-      here is cross-feature coupling, not a local edit.
-  - id: fan-in-hotspot:gap.notify.unbuilt-module
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - gap.notify.unbuilt-module
-    because: gap.notify.unbuilt-module is used 13 time(s) (top decile of fan-in); it is owned by notify
       and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
       here is cross-feature coupling, not a local edit.
   - id: fan-in-hotspot:gap.audit.unbuilt-module
@@ -1182,14 +1182,6 @@ findings:
       - gap.notify.new-device-event
     because: fr.notify.on-new-device is todo, blocked on gap.notify.new-device-event - a real product
       question, not missing code; it moves once that is settled.
-  - id: designed-todo:fr.notify.unsubscribe
-    kind: designed-todo
-    severity: info
-    records:
-      - fr.notify.unsubscribe
-      - gap.notify.direction-not-drawn
-    because: fr.notify.unsubscribe is todo, blocked on gap.notify.direction-not-drawn - a real product
-      question, not missing code; it moves once that is settled.
   - id: designed-todo:fr.task.complete
     kind: designed-todo
     severity: info
@@ -1205,14 +1197,6 @@ findings:
       - impl.audit.todo-app-backend.erasure
       - decision.audit.erasure-method
     because: impl.audit.todo-app-backend.erasure is todo, blocked on decision.audit.erasure-method - a
-      real product question, not missing code; it moves once that is settled.
-  - id: designed-todo:impl.login.todo-app-frontend.sign-in
-    kind: designed-todo
-    severity: info
-    records:
-      - impl.login.todo-app-frontend.sign-in
-      - gap.login.direction-not-drawn
-    because: impl.login.todo-app-frontend.sign-in is todo, blocked on gap.login.direction-not-drawn - a
       real product question, not missing code; it moves once that is settled.
   - id: designed-todo:impl.task.todo-app-backend.list
     kind: designed-todo
@@ -1333,24 +1317,22 @@ findings:
     severity: info
     records:
       - uat.notify.digest-and-unsubscribe
-      - gap.notify.direction-not-drawn
       - gap.notify.live-proof
       - gap.notify.new-device-event
       - gap.notify.task-completion-event
-    because: uat.notify.digest-and-unsubscribe is todo, blocked on gap.notify.direction-not-drawn,
-      gap.notify.live-proof, gap.notify.new-device-event, gap.notify.task-completion-event - a real
-      product question, not missing code; it moves once that is settled.
+    because: uat.notify.digest-and-unsubscribe is todo, blocked on gap.notify.live-proof,
+      gap.notify.new-device-event, gap.notify.task-completion-event - a real product question, not
+      missing code; it moves once that is settled.
   - id: designed-todo:uat.plan.upgrade-after-cap
     kind: designed-todo
     severity: info
     records:
       - uat.plan.upgrade-after-cap
       - gap.plan.cap-guard-not-wired
-      - gap.plan.direction-not-drawn
       - gap.plan.live-proof
     because: uat.plan.upgrade-after-cap is todo, blocked on gap.plan.cap-guard-not-wired,
-      gap.plan.direction-not-drawn, gap.plan.live-proof - a real product question, not missing code;
-      it moves once that is settled.
+      gap.plan.live-proof - a real product question, not missing code; it moves once that is
+      settled.
   - id: designed-todo:uat.recur.make-recurring
     kind: designed-todo
     severity: info
@@ -1375,62 +1357,6 @@ findings:
       - gap.task.live-proof
     because: uat.task.create is todo, blocked on gap.task.live-proof - a real product question, not
       missing code; it moves once that is settled.
-  - id: designed-todo:ui.audit.privacy
-    kind: designed-todo
-    severity: info
-    records:
-      - ui.audit.privacy
-      - gap.audit.direction-not-drawn
-    because: ui.audit.privacy is todo, blocked on gap.audit.direction-not-drawn - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:ui.login.sign-in
-    kind: designed-todo
-    severity: info
-    records:
-      - ui.login.sign-in
-      - gap.login.direction-not-drawn
-    because: ui.login.sign-in is todo, blocked on gap.login.direction-not-drawn - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:ui.notify.preferences
-    kind: designed-todo
-    severity: info
-    records:
-      - ui.notify.preferences
-      - gap.notify.direction-not-drawn
-    because: ui.notify.preferences is todo, blocked on gap.notify.direction-not-drawn - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:ui.plan.usage
-    kind: designed-todo
-    severity: info
-    records:
-      - ui.plan.usage
-      - gap.plan.direction-not-drawn
-    because: ui.plan.usage is todo, blocked on gap.plan.direction-not-drawn - a real product question,
-      not missing code; it moves once that is settled.
-  - id: designed-todo:ui.recur.schedule
-    kind: designed-todo
-    severity: info
-    records:
-      - ui.recur.schedule
-      - gap.recur.direction-not-drawn
-    because: ui.recur.schedule is todo, blocked on gap.recur.direction-not-drawn - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:ui.share.invite
-    kind: designed-todo
-    severity: info
-    records:
-      - ui.share.invite
-      - gap.share.direction-not-drawn
-    because: ui.share.invite is todo, blocked on gap.share.direction-not-drawn - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:ui.task.list
-    kind: designed-todo
-    severity: info
-    records:
-      - ui.task.list
-      - gap.task.direction-not-drawn
-    because: ui.task.list is todo, blocked on gap.task.direction-not-drawn - a real product question,
-      not missing code; it moves once that is settled.
   - id: leftover-todo:br.audit.append-only
     kind: leftover-todo
     severity: info
@@ -1647,6 +1573,14 @@ findings:
       - gap.notify.unbuilt-module
     because: fr.notify.digest is todo, blocked on gap.notify.unbuilt-module - code that simply has not
       been written yet; the owner wants this count at zero.
+  - id: leftover-todo:fr.notify.unsubscribe
+    kind: leftover-todo
+    severity: info
+    records:
+      - fr.notify.unsubscribe
+      - gap.notify.unbuilt-module
+    because: fr.notify.unsubscribe is todo, blocked on gap.notify.unbuilt-module - code that simply has
+      not been written yet; the owner wants this count at zero.
   - id: leftover-todo:fr.plan.downgrade
     kind: leftover-todo
     severity: info
