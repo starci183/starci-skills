@@ -611,11 +611,6 @@ records:
     feature: null
     state: done
     effectiveState: done
-  contract.audit.emitted-events:
-    schema: work/contract
-    feature: audit
-    state: todo
-    effectiveState: todo
   contract.login.identity-for-task:
     schema: work/contract
     feature: login
@@ -786,15 +781,6 @@ records:
     feature: audit
     state: done
     effectiveState: done
-  decision.audit.operator-role:
-    schema: work/policy-decision
-    feature: audit
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - fr.audit.log.read
-        - journey.audit.right-to-be-forgotten
   decision.login.session.devices:
     schema: work/policy-decision
     feature: login
@@ -967,15 +953,13 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: decision.audit.operator-role
-        rootKind: decision
+      - id: gap.audit.operator-role
+        rootKind: gap
         cyclic: false
-        because: "The operator authorization this FR's mainFlow step 1 names has no accepted source: the
-          example's session seam resolves only {token, personId, issuedAt, expiresAt} and
-          data.login.person has no role field (gap.audit.operator-role rev 2).
-          audit-operator-read.ts's fail-closed check stands built and unit-proven waiting for that
-          decision; until it is decided, only the caller's-own-lines read is reachable, which is not
-          this record's whole mainFlow, so it stays todo."
+        because: The example has no operator/admin role today - data.login.person has no role field and no
+          existing record establishes who is authorized to read the log. This FR cannot be
+          implemented honestly until that authorization boundary is defined, by this feature or by
+          login.
   fr.login.sign-in:
     schema: work/functional-requirement
     feature: login
@@ -1072,11 +1056,17 @@ records:
       - id: gap.plan.sepay-not-reachable
         rootKind: gap
         cyclic: false
-        because: No call has been made against the real SePay sandbox yet. SepayClient
-          (src/modules/integrations/sepay/sepay.client.ts) makes the real HTTP calls this record's
-          endpoints name, and is unit-tested against an in-process fake override, but a fake proves
-          the guard (sds.plan.cap-guard, sds.plan.subscription-lifecycle, sds.plan.reconciliation),
-          never this integration itself.
+        because: Two measured absences, both replayable from this record's own evidence.yaml (2026-09-18) -
+          this checkout holds no real SePay credential (SEPAY_API_KEY_FILE is the DEMO-ONLY
+          placeholder .starcistacks/dev/runtime/env/KEYS.md says is never a real credential), so the
+          get-transaction route answers 401; and the create-intent route named above answers 404 on
+          the live host the way an unrouted path does, so a credential alone would not complete a
+          checkout either. A fake gateway proves sds.plan.cap-guard, sds.plan.subscription-lifecycle
+          and sds.plan.reconciliation's transitions, never this integration. SepayClient
+          (src/modules/integrations/sepay/sepay.client.ts) does make the real call every time - it
+          now reports the gateway's own HTTP status instead of masking it behind a JSON parse error,
+          and refuses any transaction status outside pending|paid|failed rather than casting one
+          into a subscription activation.
   fr.plan.upgrade:
     schema: work/functional-requirement
     feature: plan
@@ -1308,6 +1298,9 @@ records:
     feature: audit
     state: todo
     effectiveState: todo
+    usedBy:
+      blockedBy:
+        - fr.audit.log.read
   gap.audit.unbuilt-module:
     schema: work/gap
     feature: audit
@@ -1517,11 +1510,6 @@ records:
     feature: audit
     state: done
     effectiveState: done
-  impl.audit.todo-app-backend.operator-read:
-    schema: work/implementation
-    feature: audit
-    state: todo
-    effectiveState: todo
   impl.login.todo-app-backend.auth:
     schema: work/implementation
     feature: login
@@ -1709,11 +1697,17 @@ records:
       - id: gap.plan.sepay-not-reachable
         rootKind: gap
         cyclic: false
-        because: No call has been made against the real SePay sandbox yet. SepayClient
-          (src/modules/integrations/sepay/sepay.client.ts) makes the real HTTP calls this record's
-          endpoints name, and is unit-tested against an in-process fake override, but a fake proves
-          the guard (sds.plan.cap-guard, sds.plan.subscription-lifecycle, sds.plan.reconciliation),
-          never this integration itself.
+        because: Two measured absences, both replayable from this record's own evidence.yaml (2026-09-18) -
+          this checkout holds no real SePay credential (SEPAY_API_KEY_FILE is the DEMO-ONLY
+          placeholder .starcistacks/dev/runtime/env/KEYS.md says is never a real credential), so the
+          get-transaction route answers 401; and the create-intent route named above answers 404 on
+          the live host the way an unrouted path does, so a credential alone would not complete a
+          checkout either. A fake gateway proves sds.plan.cap-guard, sds.plan.subscription-lifecycle
+          and sds.plan.reconciliation's transitions, never this integration. SepayClient
+          (src/modules/integrations/sepay/sepay.client.ts) does make the real call every time - it
+          now reports the gateway's own HTTP status instead of masking it behind a JSON parse error,
+          and refuses any transaction status outside pending|paid|failed rather than casting one
+          into a subscription activation.
   integration.recur.scheduler:
     schema: work/integration
     feature: recur
@@ -1731,15 +1725,6 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: decision.audit.operator-role
-        rootKind: decision
-        cyclic: false
-        because: "The journey's fourth step is an operator read - it cannot be walked while no accepted
-          record establishes who an operator is or how their claim is resolved
-          (gap.audit.operator-role rev 2: the session seam resolves only {token, personId, issuedAt,
-          expiresAt}). Audit's fail-closed check stands built for whatever the decision settles; the
-          step itself is unwalkable until then, so the journey names this decision as a root, not
-          the gap that only describes the absence."
       - id: gap.audit.live-proof
         rootKind: gap
         cyclic: false
@@ -1973,11 +1958,17 @@ records:
       - id: gap.plan.sepay-not-reachable
         rootKind: gap
         cyclic: false
-        because: No call has been made against the real SePay sandbox yet. SepayClient
-          (src/modules/integrations/sepay/sepay.client.ts) makes the real HTTP calls this record's
-          endpoints name, and is unit-tested against an in-process fake override, but a fake proves
-          the guard (sds.plan.cap-guard, sds.plan.subscription-lifecycle, sds.plan.reconciliation),
-          never this integration itself.
+        because: Two measured absences, both replayable from this record's own evidence.yaml (2026-09-18) -
+          this checkout holds no real SePay credential (SEPAY_API_KEY_FILE is the DEMO-ONLY
+          placeholder .starcistacks/dev/runtime/env/KEYS.md says is never a real credential), so the
+          get-transaction route answers 401; and the create-intent route named above answers 404 on
+          the live host the way an unrouted path does, so a credential alone would not complete a
+          checkout either. A fake gateway proves sds.plan.cap-guard, sds.plan.subscription-lifecycle
+          and sds.plan.reconciliation's transitions, never this integration. SepayClient
+          (src/modules/integrations/sepay/sepay.client.ts) does make the real call every time - it
+          now reports the gateway's own HTTP status instead of masking it behind a JSON parse error,
+          and refuses any transaction status outside pending|paid|failed rather than casting one
+          into a subscription activation.
   sds.plan.subscription-lifecycle:
     schema: work/sds-component
     feature: plan
@@ -2219,17 +2210,17 @@ records:
 tally:
   overall:
     done: 117
-    todo: 43
+    todo: 40
     stale: 4
     blocked: 37
-    total: 201
+    total: 198
   byFeature:
     audit:
       done: 20
-      todo: 6
+      todo: 3
       stale: 0
       blocked: 3
-      total: 29
+      total: 26
     login:
       done: 16
       todo: 4
@@ -2285,8 +2276,7 @@ tally:
     - id: gap.audit.operator-role
       feature: audit
       state: todo
-      closedBy:
-        - decision.audit.operator-role
+      closedBy: null
     - id: gap.audit.unbuilt-module
       feature: audit
       state: done
@@ -2434,12 +2424,6 @@ tally:
       closedBy: null
   unbuiltModuleGaps: 0
 frontier:
-  - id: contract.audit.emitted-events
-    feature: audit
-    title: The emitted-event contract audit subscribes to
-  - id: decision.audit.operator-role
-    feature: audit
-    title: Who is an operator, and where does their role claim come from
   - id: gap.audit.emitted-events
     feature: audit
     title: login and task expose no emitted-event contract for audit to subscribe to
@@ -2449,9 +2433,6 @@ frontier:
   - id: gap.audit.operator-role
     feature: audit
     title: No operator/admin role exists to authorize reading the log
-  - id: impl.audit.todo-app-backend.operator-read
-    feature: audit
-    title: The fail-closed operator check and the filtered whole-chain read
   - id: contract.login.identity-for-task
     feature: login
     title: How task learns who the actor is
@@ -2493,7 +2474,7 @@ frontier:
     title: No k6 load-test harness exists to measure the cap check's latency
   - id: gap.plan.sepay-not-reachable
     feature: plan
-    title: No call has ever been made against the real SePay sandbox
+    title: No live run has completed a checkout against the real SePay sandbox
   - id: impl.plan.todo-app-frontend.usage
     feature: plan
     title: The usage screen and its upgrade action
@@ -2687,21 +2668,6 @@ unclassifiedEdges:
   - from: ac.task.title.required.refuses-empty
     field: rule
     target: br.task.title.required
-  - from: contract.audit.emitted-events
-    field: surface.name
-    target: event.login.signed-in
-  - from: contract.audit.emitted-events
-    field: surface.name
-    target: event.login.signed-out
-  - from: contract.audit.emitted-events
-    field: surface.name
-    target: event.task.completed
-  - from: contract.audit.emitted-events
-    field: surface.name
-    target: event.task.created
-  - from: contract.audit.emitted-events
-    field: surface.name
-    target: event.task.deleted
   - from: decision.plan.downgrade.policy
     field: blocks
     target: br.plan.downgrade.freeze
@@ -2732,9 +2698,6 @@ unclassifiedEdges:
   - from: gap.audit.live-proof
     field: closedBy
     target: uat.audit.right-to-be-forgotten
-  - from: gap.audit.operator-role
-    field: closedBy
-    target: decision.audit.operator-role
   - from: gap.audit.unbuilt-module
     field: closedBy
     target: impl.audit.todo-app-backend.erasure
@@ -2840,9 +2803,6 @@ unclassifiedEdges:
   - from: impl.audit.todo-app-backend.log
     field: proves
     target: sds.audit.log-chain
-  - from: impl.audit.todo-app-backend.operator-read
-    field: proves
-    target: fr.audit.log.read
   - from: impl.login.todo-app-backend.auth
     field: proves
     target: br.login.password.sign-in

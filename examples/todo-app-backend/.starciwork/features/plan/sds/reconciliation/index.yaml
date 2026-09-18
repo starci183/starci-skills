@@ -29,14 +29,23 @@ requiresProof:
     required: true
 
 change:
-  rev: 2
-  kind: editorial
-  at: 2026-09-18T16:00:00.000Z
-  reason: Built at src/modules/bussiness/plan (reconcile-payment.handler.ts) and unit-tested against
-    SepayClient's real class with an in-process fake override (reconcile-payment.handler.spec.ts) -
-    gap.plan.unbuilt-module's reconcile half is closed. The remaining blocker is narrowed to
-    integration.plan.sepay alone, unchanged - a poll against a gateway that has never been called for
-    real still cannot itself be proven live.
+  rev: 3
+  kind: clarifying
+  at: 2026-09-18T11:32:43.321Z
+  reason: The blocker's wording was stale, not its direction. integration.plan.sepay has now been called
+    for real from this machine and its measured outcomes sit in that record's own evidence.yaml, so the
+    honest statement is that the gateway leg has never completed, not that it was never attempted. One more
+    absence this rev names instead of leaving to a reader's inference. This record's first interface is a
+    scheduled sweep over pending intents, and no scheduler exists in the plan module -
+    ReconcilePaymentHandler is dispatchable and unit-proven, but nothing dispatches it on a timer (the
+    recur feature's scheduler.service.ts is the precedent for how that gets wired here). This op builds
+    what an accepted record requires and reports what it does not; it does not add an unrequested scheduler
+    ahead of the live proof that has to land first.
 
 blockedBy:
-  - {record: integration.plan.sepay, because: "integration.plan.sepay is todo; a poll against a gateway that has never been called for real cannot itself be proven live yet - it is unit-tested against a fake now that the module exists (reconcile-payment.handler.spec.ts), which proves this component's own transitions but not the live integration itself."}
+  - {record: integration.plan.sepay, because: "integration.plan.sepay is todo. Its gateway leg has been
+      called for real since this rev but has never completed - this checkout holds no real SePay credential
+      and the create-intent route it names answers 404 on the live host (measured in that record's
+      evidence.yaml) - so this component's poll is still only unit-tested against an in-process fake
+      override (reconcile-payment.handler.spec.ts), which proves this component's own transitions and never
+      the live integration."}
