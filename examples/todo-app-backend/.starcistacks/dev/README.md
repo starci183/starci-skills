@@ -21,15 +21,22 @@ this brings up.
 
 ## Ports
 
-| component | port |
-|---|---|
-| web | 3000 (host: `npx next dev -p 3000`) |
-| api | 3001 (host: `npm run start`, `PORT` env, default 3001) |
-| postgres | 5432 |
-| redis | 6379 |
-| keycloak | 8089 |
-| minio | 9000 |
-| prometheus | 9090 |
+Host-side ports only; container-internal ports are unchanged. Declared defaults collided with other
+Docker Desktop containers already running on this machine (`starci-postgres` on 5432, `starci-redis` on
+6379, `starci-minio` on 9000, `starci-prometheus` on 9090 - checked with `docker ps` and
+`netstat -ano | findstr LISTENING` before this stack ever started) rather than with anything this
+example itself owns twice, so the fix is a host-side port change here, never stopping a container this
+lane did not start.
+
+| component | declared port | host port used here | why |
+|---|---|---|---|
+| web | 3000 | 3000 (host: `npx next dev -p 3000`) | free |
+| api | 3001 | 3001 (host: `npm run start`, `PORT` env) | free |
+| postgres | 5432 | 5440 | 5432 held by `starci-postgres` |
+| redis | 6379 | 6389 | 6379 held by `starci-redis` |
+| keycloak | 8089 | 8089 | free |
+| minio | 9000 | 9030 | 9000 held by `starci-minio` |
+| prometheus | 9090 | 9091 | 9090 held by `starci-prometheus` |
 
 ## Secrets
 

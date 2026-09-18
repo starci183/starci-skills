@@ -3,7 +3,10 @@ import { Injectable } from '@nestjs/common';
 const DEFAULT_SESSION_TTL_DAYS = 30;
 const DEFAULT_KEYCLOAK_TOKEN_URL = 'http://localhost:8089/realms/todo/protocol/openid-connect/token';
 const DEFAULT_KEYCLOAK_CLIENT_ID = 'todo-api';
-const DEFAULT_DATABASE_URL = 'postgres://postgres:postgres@localhost:5432/todo';
+// Host port 5440, not the container's internal 5432: this machine already runs starci-postgres on
+// host 5432 (see .starcistacks/dev/infra/compose/postgres.yaml and application-stacks.yaml), and the
+// api process that reads this default runs on the host, not inside the compose network.
+const DEFAULT_DATABASE_URL = 'postgres://postgres:postgres@localhost:5440/todo';
 const DEFAULT_CORS_ORIGIN = 'http://localhost:3000';
 
 @Injectable()

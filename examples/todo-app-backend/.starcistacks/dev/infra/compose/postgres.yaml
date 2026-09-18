@@ -12,7 +12,9 @@ services:
     env_file:
       - ../../runtime/env/app.env
     ports:
-      - "5432:5432"
+      # Host 5432 collides with an already-running starci-postgres container on this
+      # machine; only the host side moves, the container still listens on 5432 inside.
+      - "5440:5432"
     volumes:
       - ../../seeds:/docker-entrypoint-initdb.d:ro
       - todo-postgres:/var/lib/postgresql/data

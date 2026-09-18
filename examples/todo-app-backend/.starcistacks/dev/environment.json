@@ -2,7 +2,7 @@
   "schema": "starci/rendered-environment",
   "environment": "dev",
   "renderedFrom": "application-stacks.yaml",
-  "renderedAt": "2026-09-18T06:00:00.000Z",
+  "renderedAt": "2026-09-18T12:00:00.000Z",
   "note": "Rendered from the declaration. Never edited by hand; regenerate instead."
 }
 
