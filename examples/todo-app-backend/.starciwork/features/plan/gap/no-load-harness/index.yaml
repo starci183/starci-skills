@@ -1,0 +1,11 @@
+schema: work/gap
+id: gap.plan.no-load-harness
+title: No k6 load-test harness exists to measure the cap check's latency
+state: todo
+statement: nfr.plan.cap-check.latency's own measurement names "k6 run scripts/load/create.js twice", but
+  no scripts/load directory or k6 script exists anywhere in this repository, and no k6 binary was
+  installed by this lane's setup - the cap guard itself is built and wired (contract.plan.create-precondition,
+  sds.plan.cap-guard are both done), so what is missing is the harness to measure it against, not the
+  guard.
+closedBy: nfr.plan.cap-check.latency
+change: {rev: 1, kind: initial, at: 2026-09-18T16:00:00.000Z}

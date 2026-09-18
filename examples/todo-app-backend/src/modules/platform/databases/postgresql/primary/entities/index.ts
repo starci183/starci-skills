@@ -10,3 +10,5 @@ export { NotifyDigestWindowEntity } from './notify-digest-window.entity';
 export { AuditLogLineEntity } from './audit-log-line.entity';
 export { AuditKeyEntity } from './audit-key.entity';
 export { AuditErasureRequestEntity } from './audit-erasure-request.entity';
+export { SubscriptionEntity } from './subscription.entity';
+export { PaymentIntentEntity } from './payment-intent.entity';

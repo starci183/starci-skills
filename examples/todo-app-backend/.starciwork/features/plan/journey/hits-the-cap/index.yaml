@@ -16,7 +16,16 @@ requiresProof:
   requirements:
     forEach: requirements
 
+change:
+  rev: 2
+  kind: editorial
+  at: 2026-09-18T16:00:00.000Z
+  reason: "The cap guard is now wired into the real create path (contract.plan.create-precondition is
+    done) - a walk of this journey today would genuinely be refused at the 21st task and would genuinely
+    need to upgrade to proceed, per create-precondition.contract.spec.ts. The stale \"not wired\" reason
+    is dropped; the remaining blockers are fr.plan.upgrade and fr.plan.usage.view themselves, still todo
+    on their own uat requirement (no usage screen exists yet)."
+
 blockedBy:
-  - {record: fr.plan.upgrade, because: "fr.plan.upgrade and fr.plan.usage.view are todo, and the cap guard they depend on is not wired into fr.task.create at all (see contract.plan.create-precondition); a walk of this journey today would create a 21st task on the free plan without ever being asked to pay."}
-  - {record: fr.plan.usage.view, because: "fr.plan.upgrade and fr.plan.usage.view are todo, and the cap guard they depend on is not wired into fr.task.create at all (see contract.plan.create-precondition); a walk of this journey today would create a 21st task on the free plan without ever being asked to pay."}
-  - {record: contract.plan.create-precondition, because: "fr.plan.upgrade and fr.plan.usage.view are todo, and the cap guard they depend on is not wired into fr.task.create at all (see contract.plan.create-precondition); a walk of this journey today would create a 21st task on the free plan without ever being asked to pay."}
+  - {record: fr.plan.upgrade, because: "fr.plan.upgrade is todo: no usage screen exists yet for the owner to upgrade from, and the live SePay leg is unproven."}
+  - {record: fr.plan.usage.view, because: "fr.plan.usage.view is todo: no usage screen exists yet for the owner to see their count against the cap."}

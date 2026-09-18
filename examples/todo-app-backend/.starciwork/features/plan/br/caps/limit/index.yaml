@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.plan.caps.limit
 title: A free plan holds at most 20 active tasks
-state: todo
+state: done
 statements:
   - A person on the free plan may hold at most 20 active tasks, counted per br.plan.active-scope.
   - The create that would exceed the cap is refused before anything is written, and the refusal names both
@@ -10,7 +10,12 @@ authorityRefs:
   - "product-intent: The free tier is a real product, not a trial that quietly stops working; the refusal
     must say why and what to do next, never fail silently or degrade some other way."
 acceptanceCriteria: [refuses-over-cap]
-module: src/plan/cap-guard
-change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}
-blockedBy:
-  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/cap-guard. The example backend is moving to NestJS (checks/architecture.mjs, checks/code-patterns/nest*.mjs); the guard is specified here but not built against that layout, so there is nothing to run and nothing to prove."}
+module: src/modules/bussiness/plan
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: PlanCapGuardPolicy throws PlanCapExceededException (naming the cap and the upgrade path) before
+    anything is written, registered into TaskCreationPolicyRegistry by PlanModule.onModuleInit per
+    contract.plan.create-precondition; proven by cap-guard.policy.spec.ts's
+    ac.plan.caps.limit.refuses-over-cap case.

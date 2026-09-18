@@ -5,6 +5,7 @@ import { UpcomingOccurrencesSingleQueryModule } from './recur/upcoming-occurrenc
 import { NotificationPreferencesSingleQueryModule } from './notify/notification-preferences/notification-preferences.module';
 import { AuditLogSingleQueryModule } from './audit/audit-log/audit-log.module';
 import { ExportMyDataSingleQueryModule } from './audit/export-my-data/export-my-data.module';
+import { PlanUsageSingleQueryModule } from './plan/plan-usage/plan-usage.module';
 
 /** Every GraphQL query module the todo API exposes, gathered exactly like nivo's own
  * `queries/index.ts` gathers `QUERY_MODULES`. */
@@ -15,4 +16,5 @@ export const QUERY_MODULES: Array<DynamicModule | (new () => unknown)> = [
   NotificationPreferencesSingleQueryModule.register({}),
   AuditLogSingleQueryModule.register({}),
   ExportMyDataSingleQueryModule.register({}),
+  PlanUsageSingleQueryModule.register({}),
 ];

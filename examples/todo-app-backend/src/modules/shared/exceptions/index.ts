@@ -29,3 +29,8 @@ export { ErasureRequestNotFoundException } from './errors/audit/erasure-request-
 export { ErasureRequestForbiddenException } from './errors/audit/erasure-request-forbidden';
 export { ErasureRequestInvalidStateException } from './errors/audit/erasure-request-invalid-state';
 export { ErasureNotConfirmedException } from './errors/audit/erasure-not-confirmed';
+export { PlanCapExceededException } from './errors/plan/plan-cap-exceeded';
+export { PlanSubscriptionNotFoundException } from './errors/plan/plan-subscription-not-found';
+export { PlanPaymentIntentNotFoundException } from './errors/plan/plan-payment-intent-not-found';
+export { PlanForbiddenException } from './errors/plan/plan-forbidden';
+export { PlanWebhookUnauthorizedException } from './errors/plan/plan-webhook-unauthorized';

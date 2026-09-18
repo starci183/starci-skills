@@ -15,5 +15,14 @@ requiresProof:
   measurement:
     required: true
 
+change:
+  rev: 2
+  kind: editorial
+  at: 2026-09-18T16:00:00.000Z
+  reason: The cap guard now exists and is wired into the real create path (gap.plan.unbuilt-module and
+    gap.plan.cap-guard-not-wired are both done), so this record's own blocker is narrowed to the one
+    thing genuinely still missing - a k6 harness to measure against - named by the fresh
+    gap.plan.no-load-harness rather than the now-closed "nothing exists yet" reason.
+
 blockedBy:
-  - {record: gap.plan.unbuilt-module, because: "No create path or cap guard exists yet to measure; the example backend is moving to NestJS and no load-test harness has been pointed at it."}
+  - {record: gap.plan.no-load-harness, because: "No scripts/load/create.js or k6 installation exists in this repository to run the measurement this record specifies."}

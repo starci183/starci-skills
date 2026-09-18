@@ -20,8 +20,15 @@ cleanup:
   - "delete the 21 run-owned task rows by recorded id"
   - "revert the plan to free through the gateway sandbox test API"
 blockedBy:
-  - {record: fr.plan.upgrade, because: "Nothing to walk yet - fr.plan.upgrade and the cap guard itself are both todo, and the cap guard is not wired into task creation at all (contract.plan.create-precondition). ui.plan.usage now has its interface.draw direction and reached done, but no real implementation exists yet for a person to actually reach the usage screen."}
-  - {record: gap.plan.unbuilt-module, because: "Nothing to walk yet - no implementation exists at app/plan/usage-screen.tsx or app/plan/upgrade-button.tsx yet, so there is no real usage screen or upgrade action for an owner to reach even though ui.plan.usage itself reached done."}
-  - {record: contract.plan.create-precondition, because: "Nothing to walk yet - fr.plan.upgrade and the cap guard itself are both todo, and the cap guard is not wired into task creation at all (contract.plan.create-precondition)."}
+  - {record: fr.plan.upgrade, because: "Nothing to walk yet - fr.plan.upgrade is todo. The backend cap guard is built and wired (contract.plan.create-precondition is done), but no usage screen or upgrade action exists yet at app/plan for a person to actually reach."}
+  - {record: impl.plan.todo-app-frontend.usage, because: "No implementation exists at app/plan/usage-screen.tsx or app/plan/upgrade-button.tsx yet, so there is no real usage screen or upgrade action for an owner to reach even though ui.plan.usage itself reached done."}
   - {record: gap.plan.live-proof, because: "uat.verify has not run this flow against the running product yet; no run folder under uat/upgrade-after-cap/runs/** exists with screens, video and a passing result.md, only this designed flow shape."}
-change: {rev: 1, kind: editorial, at: 2026-09-18T10:00:00.000Z, reason: "Replaced the blockedBy edge on ui.plan.usage (stale: that record reached done once interface.draw ran) with gap.plan.unbuilt-module, and dropped the now-false \"ui.plan.usage ... todo\" clause from the other entries' because text, keeping the real remaining reasons this flow cannot be walked."}
+change:
+  rev: 2
+  kind: editorial
+  at: 2026-09-18T16:00:00.000Z
+  reason: "contract.plan.create-precondition reached done (the cap guard is built and really wired into
+    task creation, proven by create-precondition.contract.spec.ts) and gap.plan.unbuilt-module's backend
+    half closed, so both are dropped as blockers. The remaining, real reason this flow cannot be walked
+    is the frontend: no usage screen exists yet (impl.plan.todo-app-frontend.usage) and no uat.verify run
+    has ever executed it (gap.plan.live-proof) - this backend-only lane closes neither."

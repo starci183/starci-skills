@@ -22,6 +22,15 @@ requiresProof:
     note: A run against the real SePay sandbox API. Evidence must carry proof.boundary live and an empty
       fakes list.
 
+change:
+  rev: 2
+  kind: editorial
+  at: 2026-09-18T16:00:00.000Z
+  reason: sds.plan.subscription-lifecycle reached done (built and unit-proven at
+    src/modules/bussiness/plan), so citing it as a blocker is stale; that edge is dropped. A real
+    SepayClient now exists (src/modules/integrations/sepay/sepay.client.ts) modelled on these exact
+    endpoints, with an in-process fake override for tests - but no call from it has reached SePay's
+    sandbox for real, which is exactly what gap.plan.sepay-not-reachable still names.
+
 blockedBy:
-  - {record: sds.plan.subscription-lifecycle, because: "No call has been made against the real SePay sandbox yet; there is no module to make one. The example backend is moving to NestJS, and this integration is specified but not implemented against it. Tests written against a fake gateway response would settle sds.plan.subscription-lifecycle and sds.plan.reconciliation's transitions, never this record - a fake proves the guard, not the gateway."}
-  - {record: gap.plan.sepay-not-reachable, because: "No call has been made against the real SePay sandbox yet; there is no module to make one. Tests written against a fake gateway response would settle sds.plan.subscription-lifecycle and sds.plan.reconciliation's transitions, never this record - a fake proves the guard, not the gateway. gap.plan.sepay-not-reachable names that absence instead of citing sds.plan.reconciliation directly, which itself waits on this record - the two are not both allowed to cite each other over the same fact."}
+  - {record: gap.plan.sepay-not-reachable, because: "No call has been made against the real SePay sandbox yet. SepayClient (src/modules/integrations/sepay/sepay.client.ts) makes the real HTTP calls this record's endpoints name, and is unit-tested against an in-process fake override, but a fake proves the guard (sds.plan.cap-guard, sds.plan.subscription-lifecycle, sds.plan.reconciliation), never this integration itself."}

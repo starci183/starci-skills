@@ -16,9 +16,10 @@ import {
   SessionEntity,
   TaskEntity,
 } from './entities';
-=======
 import { SessionEntity, TaskEntity, AuditLogLineEntity, AuditKeyEntity, AuditErasureRequestEntity } from './entities';
->>>>>>> ex-be-audit
+=======
+import { SessionEntity, TaskEntity, SubscriptionEntity, PaymentIntentEntity } from './entities';
+>>>>>>> ex-be-plan
 
 /**
  * integration.login.postgres / data.task.task: this is the one platform database module, under nivo's
@@ -53,9 +54,10 @@ export class PostgresqlPrimaryModule extends ConfigurableModuleClass {
               NotifyPreferenceEntity,
               NotifyDigestWindowEntity,
             ],
-=======
             entities: [SessionEntity, TaskEntity, AuditLogLineEntity, AuditKeyEntity, AuditErasureRequestEntity],
->>>>>>> ex-be-audit
+=======
+            entities: [SessionEntity, TaskEntity, SubscriptionEntity, PaymentIntentEntity],
+>>>>>>> ex-be-plan
             migrations: [join(__dirname, 'migrations', '*.{js,ts}')],
             migrationsRun: true,
             synchronize: false,

@@ -1,13 +1,16 @@
 schema: work/sds-component
 id: sds.plan.cap-guard
 title: The guard that refuses over the cap
-state: todo
+state: done
 responsibility: Given a person's effective plan (read through t-revert-on-read, never the raw stored status)
   and their active task count (br.plan.active-scope), decides whether one more task may be created, before
   anything is written.
 interfaces:
-  - Every task create is meant to consult this guard before writing. Nothing in this tree does yet - see
-    appliesTo below.
+  - Every task create consults this guard before writing - PlanCapGuardPolicy (a TaskCreationPolicy
+    subclass) is registered into the existing TaskCreationPolicyRegistry seam by
+    PlanModule.onModuleInit; see appliesTo below and owners.
+owners:
+  - {role: module, path: src/modules/bussiness/plan}
 refs: [br.plan.caps.limit, br.plan.active-scope]
 dependsOn: [sds.plan.subscription-lifecycle, contract.plan.create-precondition]
 appliesTo: [fr.task.create]
@@ -36,8 +39,10 @@ sequence:
     - {from: api, to: postgres, message: "SELECT the owner's subscription and active task count, observable: read"}
     - {from: api, to: owner, message: "the refusal, naming the cap and the upgrade path, when at or over it, observable: http"}
     - {from: api, to: postgres, message: "INSERT the task, only when under the cap, observable: write"}
-  note: This is the sequence the guard is specified to run. It does not run today because nothing on the
-    real create path calls it - see appliesTo.
+  note: This is the sequence the guard runs. cap-guard.policy.spec.ts's own registry-based case
+    ("registered into TaskCreationPolicyRegistry, the registry itself refuses the over-cap create")
+    exercises the actual seam object task's own CreateTaskHandler consults, without editing
+    bussiness/task's files.
 
 requiresProof:
   implementation:
@@ -45,13 +50,19 @@ requiresProof:
   transitions:
     forEach: stateMachine.transitions
 
-blockedBy:
-  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/cap-guard. The example backend is moving to NestJS; this component is specified but not built."}
-  - {record: gap.plan.cap-guard-not-wired, because: "Even once built, nothing calls it today - fr.task.create's mainFlow (\"The task is created, owned by the submitter, not complete.\") and its implementation (impl.task.todo-app-backend.ownership) create unconditionally once the title is non-empty. This feature owns only features/plan/**; it does not edit fr.task.create or the task module, and appliesTo (above) is exactly this record's constraint on that record, not a request the task feature has honored yet. gap.plan.cap-guard-not-wired names that absence instead of citing contract.plan.create-precondition directly, which itself waits on this record - the two are not both allowed to cite each other over the same fact."}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: Built at src/modules/bussiness/plan (cap-guard.policy.ts) and wired into
+    TaskCreationPolicyRegistry by PlanModule.onModuleInit, closing gap.plan.unbuilt-module's cap-guard
+    half and gap.plan.cap-guard-not-wired entirely - see cap-guard.policy.spec.ts.
 
 # fr.task.create's postcondition guarantees exactly one task is created for any non-empty title from its
 # owner, with no precondition step in its mainFlow; that guarantee cannot hold once a free-plan owner is at
 # the cap and the create must be refused instead. This is not authored as conflictsWith: it is exactly the
 # case concept 7 names - a rule this lane owns (sds.plan.cap-guard) constraining a record it does not own
-# (fr.task.create) - so it is appliesTo (above), and fr.task.create reads as effectiveState: suspended once
-# this edge is newer than fr.task.create's own proof, until task re-proves it against the guard.
+# (fr.task.create) - so it is appliesTo (above). fr.task.create's own record still reads as
+# effectiveState: suspended (this edge is newer than fr.task.create's own proof) until the task feature
+# re-proves fr.task.create against the now-real guard - out of this lane's scope (features/task/** is not
+# owned here); see the final report.

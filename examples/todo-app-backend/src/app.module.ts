@@ -8,8 +8,10 @@ import { ShareModule } from './modules/bussiness/share';
 import { RecurModule } from './modules/bussiness/recur';
 import { NotifyModule } from './modules/bussiness/notify';
 import { AuditModule } from './modules/bussiness/audit';
+import { PlanModule } from './modules/bussiness/plan';
 import { TodoGraphqlModule } from './features/todo/graphql/graphql.module';
 import { HealthModule } from './features/todo/http/health/health.module';
+import { SepayWebhookModule } from './features/todo/http/webhooks/sepay/sepay-webhook.module';
 
 /**
  * Composition only, under nivo's shape: capability modules (`bussiness/session`, `bussiness/task`) and
@@ -35,8 +37,10 @@ import { HealthModule } from './features/todo/http/health/health.module';
     RecurModule.register(),
     NotifyModule.register(),
     AuditModule.register(),
+    PlanModule.register(),
     TodoGraphqlModule,
     HealthModule.register(),
+    SepayWebhookModule.register(),
   ],
 })
 export class AppModule {}

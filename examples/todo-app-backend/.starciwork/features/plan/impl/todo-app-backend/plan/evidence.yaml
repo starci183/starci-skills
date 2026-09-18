@@ -1,0 +1,131 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: impl.plan.todo-app-backend.plan
+recordDigest: 287a9afa79819ac1022cf32e944a300adddd97d5330bdd8d8ebcf3ff2a8441a1
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/features/todo/http/webhooks/sepay/sepay-webhook.controller.ts
+      sha256: e07dc791fe39e7bf0c63a3c53e5ff9002b4bd2614eac69bc275f2603367abc69
+    - path: src/features/todo/http/webhooks/sepay/sepay-webhook.module-definition.ts
+      sha256: 553421dc5426ca2794762235b8749e59c155be7832a602da9b40845f1e6e912b
+    - path: src/features/todo/http/webhooks/sepay/sepay-webhook.module.ts
+      sha256: c479ad1ff1bfd0370ee44bcb9082c7f291db45d5a7ec4e4662afd7b3337289aa
+    - path: src/modules/bussiness/plan/cap-guard.policy.spec.ts
+      sha256: a682ef3eb49cafb15af6d75fa2e5a6291605a3d2a0de1acbc5c7b08e6621eb28
+    - path: src/modules/bussiness/plan/cap-guard.policy.ts
+      sha256: e7f459d9a3c64f9c140632eb5fe8259a608bce8f4dda845b6a05ca699963f2e7
+    - path: src/modules/bussiness/plan/confirm-payment.command.ts
+      sha256: 44b655807bc24c621540b3911b67939868908f7d4d248a2b45cd21aa43157923
+    - path: src/modules/bussiness/plan/confirm-payment.handler.spec.ts
+      sha256: e29f6d4ab955fb72da6e95b73d19920326d5a909f652338423e8ceba7ba243ee
+    - path: src/modules/bussiness/plan/confirm-payment.handler.ts
+      sha256: c7d63e56532feb6911ed0cc175f59daf6f279c15bf3a7d55cb312337a7b78901
+    - path: src/modules/bussiness/plan/create-precondition.contract.spec.ts
+      sha256: 1d5ca2cd215e1f94446c5d279fa56d5116f6c215c6a5e0dc0568c0d3cfa1fbe4
+    - path: src/modules/bussiness/plan/downgrade-plan.command.ts
+      sha256: c15cb0d1a187efadc12b5fe408fde9ace7d4258a16049a26b1c5267965770f09
+    - path: src/modules/bussiness/plan/downgrade-plan.handler.spec.ts
+      sha256: 31e6199f12d0a6558f5c1677a37d36ed860716c674840c4ee7442ae05976bd7c
+    - path: src/modules/bussiness/plan/downgrade-plan.handler.ts
+      sha256: 46e1d095fdd1acc9600b73e33c401e8f76f9eedf2887a4ca635738eb7bc9408d
+    - path: src/modules/bussiness/plan/index.ts
+      sha256: 8cf6eb5811f45da981acee98172abc91aba264d59c270b928606001d4f39a799
+    - path: src/modules/bussiness/plan/payment.service.spec.ts
+      sha256: 53e8ffea6bc3a3f082c21608241797cc1c6882827d2b8220d198bc36c3dc9c5a
+    - path: src/modules/bussiness/plan/payment.service.ts
+      sha256: e4c2c64fe08f9007e6cd7642d2e38458c8e639770f2457eb1ac0083c325b2e4c
+    - path: src/modules/bussiness/plan/plan-usage.handler.spec.ts
+      sha256: 1638bc8cde84773937c0035d83091bb68ce83069889e60c2f8d297557f3914cc
+    - path: src/modules/bussiness/plan/plan-usage.handler.ts
+      sha256: a173db48216cc804700c729057a480530a3a8888849a9cf7c9a2fc5aa33e3216
+    - path: src/modules/bussiness/plan/plan-usage.query.ts
+      sha256: 84bb62d0e5d18ef09b3557dc89446329786b4cf09a5a890a525363d59b01eef6
+    - path: src/modules/bussiness/plan/plan.module-definition.ts
+      sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
+    - path: src/modules/bussiness/plan/plan.module.ts
+      sha256: 80ae9c9bb9593938023f11924b3e73b745c6071ca0e1e08f4992bce62172f8c1
+    - path: src/modules/bussiness/plan/reconcile-payment.command.ts
+      sha256: 871b50a56665844a6335b0d179543e9f806f923a5617ba75cc3b89f7e4797e29
+    - path: src/modules/bussiness/plan/reconcile-payment.handler.spec.ts
+      sha256: 18c49aeff6043135c0ca504e54d2b4cb499a0cd60506a9d24cfe625ab95a641d
+    - path: src/modules/bussiness/plan/reconcile-payment.handler.ts
+      sha256: ba58ae7c5cf1123fe92197f599c520f18739623f82255112b19ea41adcb7d1a4
+    - path: src/modules/bussiness/plan/subscription.service.spec.ts
+      sha256: 422ba87a69ea993b9db58df3658723031f536035ae9b2783de65867c1d3d71e6
+    - path: src/modules/bussiness/plan/subscription.service.ts
+      sha256: 332bae262a16171e748defed3c61f13cfcee8a74d59d14c2535485eb42539e05
+    - path: src/modules/bussiness/plan/types/payment-intent-record.ts
+      sha256: 053c02c6b775341b77df6b8bd2f4520630faf9208f5273afc9cb3289b7d5bae0
+    - path: src/modules/bussiness/plan/types/plan-catalog.ts
+      sha256: c22cfc6dbf0b670184a6ea7e852315b2a34c7e5b807971fb5bcbadd0e7a706e6
+    - path: src/modules/bussiness/plan/types/subscription-record.ts
+      sha256: 8e1e645361f4ed1090c68487e8ac099880e8673fa171f5b8d420d7046e2d0e6a
+    - path: src/modules/bussiness/plan/upgrade-plan.command.ts
+      sha256: 6318d432f4a80e4289b721b8b60f7778aa4145f1cdeb7cf661574f19b22ff522
+    - path: src/modules/bussiness/plan/upgrade-plan.handler.spec.ts
+      sha256: b16e5138190de14f4bb8b8717a19282af26383207bb99e660e3290218d408dd5
+    - path: src/modules/bussiness/plan/upgrade-plan.handler.ts
+      sha256: a383c90f2799cc7ae0ab1b03a0603ad2a15bc27bd8b9c71e1492ca4398dbb28d
+    - path: src/modules/integrations/sepay/index.ts
+      sha256: f99dc8ffdfe0a5732a878b01631aac8299c6d0f5f9fad3dff1ff2ff02e9b94d6
+    - path: src/modules/integrations/sepay/sepay.client.spec.ts
+      sha256: 1f934f78a835b83f5bee710861b2b7c000cb3913570c1b72e71ae4c00e36aa28
+    - path: src/modules/integrations/sepay/sepay.client.ts
+      sha256: bf034aeecb2a138ad818b37a25f08a503aef1d85c14ec66c24fcfd8d63a50862
+    - path: src/modules/integrations/sepay/sepay.module-definition.ts
+      sha256: b68cba5705e7c44730af03602e3233926e63fa5ed74cade5059536eee0ae974f
+    - path: src/modules/integrations/sepay/sepay.module.ts
+      sha256: 8ae9ae3d88c3ba5ce658704b5362372775b7d5998da11a3ef46adeeb4899289f
+  digest: f165ca0766813c274cafe618ec0aad9b23b4919d29bdee2e1e1170712a32d4ae
+outcome: pass
+assertions:
+  - id: br.plan.caps.limit
+    command: npx jest src/modules/bussiness/plan
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/plan exited 0
+  - id: br.plan.active-scope
+    command: npx jest src/modules/bussiness/plan/cap-guard.policy.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/plan/cap-guard.policy.spec.ts exited 0
+  - id: br.plan.downgrade.freeze
+    command: npx jest src/modules/bussiness/plan/downgrade-plan.handler.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/plan/downgrade-plan.handler.spec.ts exited 0
+  - id: br.plan.payment.idempotent
+    command: npx jest src/modules/bussiness/plan/payment.service.spec.ts
+      src/modules/bussiness/plan/confirm-payment.handler.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/plan/payment.service.spec.ts
+      src/modules/bussiness/plan/confirm-payment.handler.spec.ts exited 0
+  - id: br.plan.lapse.reverts-on-read
+    command: npx jest src/modules/bussiness/plan/subscription.service.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/plan/subscription.service.spec.ts exited 0
+  - id: sds.plan.subscription-lifecycle
+    command: npx jest src/modules/bussiness/plan/subscription.service.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/plan/subscription.service.spec.ts exited 0
+  - id: sds.plan.cap-guard
+    command: npx jest src/modules/bussiness/plan/cap-guard.policy.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/plan/cap-guard.policy.spec.ts exited 0
+  - id: contract.plan.create-precondition
+    command: npx jest src/modules/bussiness/plan/create-precondition.contract.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/plan/create-precondition.contract.spec.ts exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T09:24:56.373Z
