@@ -86,6 +86,41 @@ test('concept 2: gap records need a valid state, a statement, and a resolving cl
   assert.ok(badClosedBy.some(p => p.includes('closedBy names br.f.ghost')), badClosedBy.join('\n'));
 });
 
+test('trust concept 1: a stale codeDigest is refused unless the evidence carries stale: true (CODE_DIGEST_STALE)', () => {
+  const workRoot = tree({
+    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',
+  });
+  write(workRoot, 'features/f/impl/x/evidence.yaml',
+    'schema: work/evidence\nrecord: impl.f.x\noutcome: pass\ncodeDigest: {algorithm: sha256, files: [], digest: "deadbeef00000000000000000000000000000000000000000000000000000000"}\n');
+  write(path.dirname(workRoot), 'src/f/a.ts', 'export const a = 1;\n');
+  const stale = [];
+  checkWorkTree(workRoot, stale);
+  assert.ok(stale.some(p => p.includes('CODE_DIGEST_STALE')), stale.join('\n'));
+
+  fs.writeFileSync(path.join(workRoot, 'features/f/impl/x/evidence.yaml'),
+    'schema: work/evidence\nrecord: impl.f.x\noutcome: pass\nstale: true\ncodeDigest: {algorithm: sha256, files: [], digest: "deadbeef00000000000000000000000000000000000000000000000000000000"}\n', 'utf8');
+  const markedStale = [];
+  checkWorkTree(workRoot, markedStale);
+  assert.equal(markedStale.filter(p => p.includes('CODE_DIGEST_STALE')).length, 0, markedStale.join('\n'));
+});
+
+test('trust concept 2: an evidence assertion without a command is refused as not replayable (PROOF_NOT_REPLAYABLE)', () => {
+  const workRoot = tree({
+    'features/f/fr/x/index.yaml': 'schema: work/functional-requirement\nid: fr.f.x\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n',
+  });
+  write(workRoot, 'features/f/fr/x/evidence.yaml',
+    'schema: work/evidence\nrecord: fr.f.x\noutcome: pass\nassertions:\n  - {id: ac.f.x.a, outcome: pass, observation: "it passed, trust me"}\n');
+  const problems = [];
+  checkWorkTree(workRoot, problems);
+  assert.ok(problems.some(p => p.includes('PROOF_NOT_REPLAYABLE')), problems.join('\n'));
+
+  fs.writeFileSync(path.join(workRoot, 'features/f/fr/x/evidence.yaml'),
+    'schema: work/evidence\nrecord: fr.f.x\noutcome: pass\nassertions:\n  - {id: ac.f.x.a, command: "npm test", exit: 0, outcome: pass, observation: "npm test exited 0"}\n', 'utf8');
+  const withCommand = [];
+  checkWorkTree(workRoot, withCommand);
+  assert.equal(withCommand.filter(p => p.includes('PROOF_NOT_REPLAYABLE')).length, 0, withCommand.join('\n'));
+});
+
 test('trust concept 3: a done record\'s proves target must itself be done (PROVES_TARGET_NOT_DONE)', () => {
   const workRoot = tree({
     'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/f}]\nproves: [br.f.a]\nverificationSource: authored-claim\nbecause: c\n',

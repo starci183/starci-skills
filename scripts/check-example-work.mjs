@@ -3,7 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../core/yaml.mjs';
-import {readWorkspace, resolveOwnedDirs, missingOwnedDirs, declaresOwnPaths} from './example-ownership.mjs';
+import {readWorkspace, resolveOwnedDirs, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs} from './example-ownership.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -100,6 +100,33 @@ export function checkWorkTree(workRoot, problems, warnings = []) {
       const current = sha256File(siblingFile);
       if (current !== record.recordDigest && record.stale !== true) {
         problems.push(`${shown}: recordDigest ${record.recordDigest} no longer matches ${sibling.id}'s current digest ${current}; refused unless it carries stale: true`);
+      }
+    }
+
+    // ---- trust concept 1: codeDigest freshness ----
+    // A code change should be able to stale a proof without anyone editing the record. If capture-time
+    // codeDigest no longer matches what resolveOwnedDirs/hashOwnedDirs compute from the code on disk
+    // right now, the evidence is refused unless it already carries stale: true (the same escape valve
+    // recordDigest staleness above uses).
+    if (record.codeDigest?.digest) {
+      const recEntry = records.get(record.record);
+      if (recEntry) {
+        const dirs = resolveOwnedDirs(record.record, recEntry, records, workspaceDoc, workRoot);
+        const fresh = hashOwnedDirs(dirs);
+        const freshDigest = fresh?.digest ?? null;
+        if (freshDigest !== record.codeDigest.digest && record.stale !== true) {
+          problems.push(`${shown}: codeDigest ${record.codeDigest.digest} no longer matches the code currently under ${sibling.id}'s owners/module (now ${freshDigest ?? '(no files found)'}); refused unless it carries stale: true [CODE_DIGEST_STALE]`);
+        }
+      }
+    }
+
+    // ---- trust concept 2: replayable evidence ----
+    // Every assertion must carry the exact `command` that was run, not only a prose `observation`, so
+    // scripts/example-verify.mjs can re-run it later and compare outcomes. An assertion missing `command`
+    // is refused as not replayable.
+    for (const assertion of Array.isArray(record.assertions) ? record.assertions : []) {
+      if (!assertion || typeof assertion.command !== 'string' || !assertion.command.trim()) {
+        problems.push(`${shown}: assertion ${assertion?.id ?? '(unnamed)'} carries no command - evidence without a replayable command is refused [PROOF_NOT_REPLAYABLE]`);
       }
     }
   }

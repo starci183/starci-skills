@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml, stringifyYaml} from '../core/yaml.mjs';
+import {loadRecords, readWorkspace, resolveOwnedDirs, hashOwnedDirs} from './example-ownership.mjs';
 
 /**
  * Generates an evidence.yaml for one example .starciwork record by actually running the given assertion
@@ -17,13 +18,25 @@ import {parseYaml, stringifyYaml} from '../core/yaml.mjs';
  *     --assert <ac-id>=<command> [--assert <ac-id>=<command> ...]
  *
  * Every `--assert` runs its command (via the system shell, resolved against --cwd) and is recorded with
- * its exit code and a one-line observation quoting the command and its exit status. The record's own
- * index.yaml is located under --work by its `id`, its recordDigest is computed exactly as the kernel's
- * own `kernel/reconciliation.mjs` `recordDigests` function computes it (sha256 of the record file's raw
- * bytes - see the digest note below), and the sibling evidence.yaml is written in the same shape already
- * used elsewhere in the tree. Any assertion whose command exits non-zero is written with
- * `outcome: fail`, and in that case this script itself exits 1. This script only ever writes
- * evidence.yaml; it never edits a record's own index.yaml or its `state` field.
+ * both the exact `command` and its numeric `exit` code (replayable evidence - concept 2: a later
+ * `scripts/example-verify.mjs` re-runs the same command and compares outcomes, so the assertion needs the
+ * command itself on record, not only a human `observation` string, which is kept alongside it for
+ * readability). The record's own index.yaml is located under --work by its `id`, its recordDigest is
+ * computed exactly as the kernel's own `kernel/reconciliation.mjs` `recordDigests` function computes it
+ * (sha256 of the record file's raw bytes - see the digest note below), and the sibling evidence.yaml is
+ * written in the same shape already used elsewhere in the tree. Any assertion whose command exits
+ * non-zero is written with `outcome: fail`, and in that case this script itself exits 1. This script only
+ * ever writes evidence.yaml; it never edits a record's own index.yaml or its `state` field.
+ *
+ * codeDigest (concept 1): alongside recordDigest, this script also hashes the actual source the record's
+ * `owners[].path`/`module` name (resolved via scripts/example-ownership.mjs - the record's own repository,
+ * or, when it names no owners/module itself, every work/implementation whose `proves` names this record)
+ * and writes `codeDigest: {algorithm, files: [{path, sha256}], digest}`. This is what lets a later code
+ * change stale a proof without anyone touching the record: scripts/check-example-work.mjs refuses an
+ * evidence.yaml whose codeDigest no longer matches the code on disk unless it carries `stale: true`.
+ * `codeDigest` is omitted entirely when the record owns no resolvable directory at all (a specification
+ * with nothing yet built against it, and no implementation proving it either) - there is nothing to
+ * digest, which is a different fact from an empty digest of nothing.
  *
  * Provenance: this script cannot literally act as `starci-kernel`. That actor is written by
  * `ctx.work.api.markDone` deep inside `kernel/sync.mjs`, which needs a whole live kernel workflow
@@ -85,15 +98,18 @@ function sha256File(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
-/** Runs one assertion command; never throws - failure is reported as an outcome, not a script crash. */
+/** Runs one assertion command; never throws - failure is reported as an outcome, not a script crash.
+ * Always returns both `command` (the exact string run) and `exit` (its numeric exit code), so the written
+ * evidence is replayable (concept 2) and not just a prose claim that something passed. */
 function runAssertion({id, command}, cwd) {
+  let exit = 0;
   try {
     execFileSync(command, {cwd, shell: true, stdio: 'pipe'});
-    return {id, outcome: 'pass', observation: `${command} exited 0`};
   } catch (error) {
-    const status = typeof error?.status === 'number' ? error.status : 1;
-    return {id, outcome: 'fail', observation: `${command} exited ${status}`};
+    exit = typeof error?.status === 'number' ? error.status : 1;
   }
+  const outcome = exit === 0 ? 'pass' : 'fail';
+  return {id, command, exit, outcome, observation: `${command} exited ${exit}`};
 }
 
 export function generateEvidence({workRoot, recordId, cwd, assertions, now = () => new Date()}) {
@@ -103,12 +119,20 @@ export function generateEvidence({workRoot, recordId, cwd, assertions, now = () 
   const results = assertions.map(assertion => runAssertion(assertion, cwd));
   const outcome = results.every(result => result.outcome === 'pass') ? 'pass' : 'fail';
 
+  const recordsById = loadRecords(workRoot, walk);
+  const recordEntry = recordsById.get(recordId);
+  const workspaceDoc = readWorkspace(workRoot);
+  const codeDigest = recordEntry
+    ? hashOwnedDirs(resolveOwnedDirs(recordId, recordEntry, recordsById, workspaceDoc, workRoot))
+    : null;
+
   const evidence = {
     schema: 'work/evidence',
     record: recordId,
     recordDigest: sha256File(recordFile),
+    ...(codeDigest ? {codeDigest} : {}),
     outcome,
-    assertions: results.map(({id, outcome: assertionOutcome, observation}) => ({id, outcome: assertionOutcome, observation})),
+    assertions: results.map(({id, command, exit, outcome: assertionOutcome, observation}) => ({id, command, exit, outcome: assertionOutcome, observation})),
     provenance: {
       actor: 'example-evidence',
       tool: 'scripts/example-evidence.mjs',
