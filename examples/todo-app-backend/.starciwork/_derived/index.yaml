@@ -1039,11 +1039,11 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: impl.plan.todo-app-frontend.usage
-        rootKind: record
+      - id: gap.plan.live-proof
+        rootKind: gap
         cyclic: false
-        because: No usage screen or downgrade action exists yet at app/plan for an owner to actually reach;
-          this backend-only lane does not build the frontend.
+        because: The screen exists and is render-proven, but this record requires live uat proof and
+          uat.verify has not run the downgrade surface against the running product yet.
   fr.plan.reconcile:
     schema: work/functional-requirement
     feature: plan
@@ -1090,11 +1090,6 @@ records:
         because: uat.verify has not run this flow against the running product yet, and
           integration.plan.sepay (the live gateway leg the mainFlow's checkout step depends on) is
           still todo.
-      - id: impl.plan.todo-app-frontend.usage
-        rootKind: record
-        cyclic: false
-        because: No usage screen or upgrade action exists yet at app/plan for an owner to actually reach;
-          this backend-only lane does not build the frontend.
   fr.plan.usage.view:
     schema: work/functional-requirement
     feature: plan
@@ -1106,11 +1101,11 @@ records:
       blockedBy:
         - journey.plan.hits-the-cap
     blockers:
-      - id: impl.plan.todo-app-frontend.usage
-        rootKind: record
+      - id: gap.plan.live-proof
+        rootKind: gap
         cyclic: false
-        because: No usage screen exists yet at app/plan/usage-screen.tsx for an owner to actually open; this
-          backend-only lane does not build the frontend.
+        because: The screen exists and is render-proven, but this record requires live uat proof and
+          uat.verify has not run the usage surface against the running product yet.
   fr.recur.edit-rule:
     schema: work/functional-requirement
     feature: recur
@@ -1377,8 +1372,10 @@ records:
     effectiveState: todo
     usedBy:
       blockedBy:
+        - fr.plan.downgrade
         - fr.plan.reconcile
         - fr.plan.upgrade
+        - fr.plan.usage.view
         - uat.plan.upgrade-after-cap
   gap.plan.no-load-harness:
     schema: work/gap
@@ -1510,12 +1507,6 @@ records:
     feature: audit
     state: todo
     effectiveState: todo
-  impl.audit.todo-app-frontend.privacy:
-    schema: work/implementation
-    feature: audit
-    state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
   impl.login.todo-app-backend.auth:
     schema: work/implementation
     feature: login
@@ -1538,12 +1529,6 @@ records:
     feature: notify
     state: done
     effectiveState: done
-  impl.notify.todo-app-frontend.preferences:
-    schema: work/implementation
-    feature: notify
-    state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
   impl.plan.todo-app-backend.plan:
     schema: work/implementation
     feature: plan
@@ -1552,14 +1537,8 @@ records:
   impl.plan.todo-app-frontend.usage:
     schema: work/implementation
     feature: plan
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - fr.plan.downgrade
-        - fr.plan.upgrade
-        - fr.plan.usage.view
-        - uat.plan.upgrade-after-cap
+    state: done
+    effectiveState: done
   impl.recur.todo-app-backend.engine:
     schema: work/implementation
     feature: recur
@@ -1786,11 +1765,6 @@ records:
         because: uat.verify has not run this flow against the running product yet, and
           integration.plan.sepay (the live gateway leg the mainFlow's checkout step depends on) is
           still todo.
-      - id: impl.plan.todo-app-frontend.usage
-        rootKind: record
-        cyclic: false
-        because: No usage screen or upgrade action exists yet at app/plan for an owner to actually reach;
-          this backend-only lane does not build the frontend.
   journey.recur.first-recurring-task:
     schema: work/customer-journey
     feature: recur
@@ -2125,11 +2099,6 @@ records:
         because: uat.verify has not run this flow against the running product yet, and
           integration.plan.sepay (the live gateway leg the mainFlow's checkout step depends on) is
           still todo.
-      - id: impl.plan.todo-app-frontend.usage
-        rootKind: record
-        cyclic: false
-        because: No usage screen or upgrade action exists yet at app/plan for an owner to actually reach;
-          this backend-only lane does not build the frontend.
   uat.recur.make-recurring:
     schema: work/uat-flow
     feature: recur
@@ -2188,8 +2157,7 @@ records:
     schema: work/ui-screen
     feature: login
     state: done
-    effectiveState: suspended
-    suspensionReason: code-digest-mismatch
+    effectiveState: done
   ui.notify.preferences:
     schema: work/ui-screen
     feature: notify
@@ -2220,33 +2188,33 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 131
-    todo: 32
-    stale: 5
+    done: 133
+    todo: 31
+    stale: 2
     blocked: 36
-    total: 204
+    total: 202
   byFeature:
     audit:
       done: 20
       todo: 6
-      stale: 1
+      stale: 0
       blocked: 3
-      total: 30
+      total: 29
     login:
-      done: 15
+      done: 16
       todo: 4
-      stale: 2
+      stale: 1
       blocked: 3
       total: 24
     notify:
       done: 19
       todo: 6
-      stale: 1
+      stale: 0
       blocked: 6
-      total: 32
+      total: 31
     plan:
-      done: 17
-      todo: 4
+      done: 18
+      todo: 3
       stale: 0
       blocked: 9
       total: 30
@@ -2501,9 +2469,6 @@ frontier:
   - id: gap.plan.sepay-not-reachable
     feature: plan
     title: No live run has completed a checkout against the real SePay sandbox
-  - id: impl.plan.todo-app-frontend.usage
-    feature: plan
-    title: The usage screen and its upgrade action
   - id: gap.recur.live-proof
     feature: recur
     title: No uat.verify run has produced a live run for recur.make-recurring
@@ -2817,9 +2782,6 @@ unclassifiedEdges:
   - from: impl.audit.todo-app-backend.operator-read
     field: proves
     target: fr.audit.log.read
-  - from: impl.audit.todo-app-frontend.privacy
-    field: proves
-    target: ui.audit.privacy
   - from: impl.login.todo-app-backend.auth
     field: proves
     target: br.login.password.sign-in
@@ -2847,9 +2809,6 @@ unclassifiedEdges:
   - from: impl.notify.todo-app-backend.pipeline
     field: proves
     target: sds.notify.delivery-lifecycle
-  - from: impl.notify.todo-app-frontend.preferences
-    field: proves
-    target: ui.notify.preferences
   - from: impl.plan.todo-app-backend.plan
     field: proves
     target: br.plan.active-scope

@@ -105,3 +105,47 @@ rules:
         observe: |-
           Reference renders are re-captured, and directions whose anatomy depended on the old
           render are flagged stale — never silently treated as still current
+  - id: ANATOMY-5
+    title: The prompt spells containment literally, license explicitly
+    governs: Governs how an interface.draw prompt is written once the reference render exists.
+    cases:
+      - id: case-1
+        when: The anatomy section of a prompt is written
+        observe: |-
+          It describes the region's literal layout as the renderer shows it — which elements are
+          siblings outside the surface and which are bounded inside it — not the component's
+          name. `SurfaceListCard` must be spelled as "label and fact on the page background
+          above the card; the card contains only the rows; the caption below it", because a
+          hand-typed summary like "a card with a header row" re-invents the anatomy it cites
+      - id: case-2
+        when: A region is one image models are known to flatten
+        observe: |-
+          The prompt names the expected failure ("this is the part people get wrong") and
+          states the correct structure, the same way it states the correct colour
+      - id: case-3
+        when: Creative freedom is granted
+        observe: |-
+          It is granted as two explicit lists — "You MAY" (the small set of sanctioned
+          embellishments: one mascot placement, metadata hints, one state highlight) and
+          "You MAY NOT" (containment changes, palette changes, invented navigation or
+          regions). Unbounded freedom produces a beautiful picture of a different product;
+          no freedom produces a correct but lifeless one — the bounded list is what makes a
+          direction both faithful and worth aiming code at
+observations:
+  - id: prompt-shape-b2
+    lane: ui
+    kind: proven-template
+    summary: |-
+      Verified in the draw lab against the real SurfaceListCard render — the prompt shape that
+      produced a direction both faithful and beautiful:
+      1. Frame: flat product UI screenshot, size, light theme.
+      2. SUBJECT: screen name + product name.
+      3. FIXED ANATOMY: literal layout top-to-bottom; containment spelled as inside/outside the
+         surface; known-confusion regions get the anti-pattern callout plus the correct structure.
+      4. BRAND + TOKENS: background, surface, radius, shadow, exact hex for primary and where it
+         may appear; nested controls use the secondary variant.
+      5. CREATIVE LICENSE: an explicit "You MAY" list and an explicit "You MAY NOT" list.
+      6. Text rule: every label spelled exactly, no lorem ipsum.
+      Control runs: the same prompt without section 3's literal containment drew the section
+      label inside the card (wrong vs the real render); the same prompt with unbounded freedom
+      produced a beautiful screen for a different product.
