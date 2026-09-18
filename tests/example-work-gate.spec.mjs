@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { checkWorkTree } from '../scripts/check-example-work.mjs';
+import { checkWorkTree, checkFamiliesDrift, FAMILIES } from '../scripts/check-example-work.mjs';
 
 /**
  * One fixture tree per new-concept rule in scripts/check-example-work.mjs, proving each rule refuses the
@@ -84,6 +84,206 @@ test('concept 2: gap records need a valid state, a statement, and a resolving cl
     'features/f/gap/absence/index.yaml': 'schema: work/gap\nid: gap.f.absence\ntitle: t\nstate: todo\nstatement: s\nclosedBy: br.f.ghost\n',
   });
   assert.ok(badClosedBy.some(p => p.includes('closedBy names br.f.ghost')), badClosedBy.join('\n'));
+});
+
+test('trust concept 8: a done implementation is refused when its ui direction is not done yet (IMPL_BEFORE_DIRECTION)', () => {
+  // proves a ui-screen directly, by id, that is not done
+  const provesTodoUi = refusalsFor({
+    'workspace.yaml': 'schema: work/workspace\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: app-frontend}]\n',
+    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: done\nrepository: app-frontend\nowners: [{role: block, path: src/f}]\nproves: [ui.f.screen]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/ui/screen/index.yaml': 'schema: work/ui-screen\nid: ui.f.screen\ntitle: t\nstate: todo\n',
+  });
+  assert.ok(provesTodoUi.some(p => p.includes('IMPL_BEFORE_DIRECTION') && p.includes('ui.f.screen')), provesTodoUi.join('\n'));
+
+  // frontend repository, proves nothing by id - falls back to every ui-screen the feature owns
+  const frontendNoProves = refusalsFor({
+    'workspace.yaml': 'schema: work/workspace\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: app-frontend}]\n',
+    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: done\nrepository: app-frontend\nowners: [{role: block, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/ui/screen/index.yaml': 'schema: work/ui-screen\nid: ui.f.screen\ntitle: t\nstate: todo\n',
+  });
+  assert.ok(frontendNoProves.some(p => p.includes('IMPL_BEFORE_DIRECTION') && p.includes('ui.f.screen')), frontendNoProves.join('\n'));
+
+  // the ui-screen is done - accepted
+  const uiDone = refusalsFor({
+    'workspace.yaml': 'schema: work/workspace\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: app-frontend}]\n',
+    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: done\nrepository: app-frontend\nowners: [{role: block, path: src/f}]\nproves: [ui.f.screen]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/ui/screen/index.yaml': 'schema: work/ui-screen\nid: ui.f.screen\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n',
+  });
+  assert.equal(uiDone.filter(p => p.includes('IMPL_BEFORE_DIRECTION')).length, 0, uiDone.join('\n'));
+
+  // a backend implementation with no ui in its proves is untouched by this rule
+  const backendUntouched = refusalsFor({
+    'workspace.yaml': 'schema: work/workspace\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: app-frontend}]\n',
+    'features/f/impl/y/index.yaml': 'schema: work/implementation\nid: impl.f.y\ntitle: t\nstate: done\nrepository: app\nowners: [{role: module, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/ui/screen/index.yaml': 'schema: work/ui-screen\nid: ui.f.screen\ntitle: t\nstate: todo\n',
+  });
+  assert.equal(backendUntouched.filter(p => p.includes('IMPL_BEFORE_DIRECTION')).length, 0, backendUntouched.join('\n'));
+});
+
+test('trust concept 5: a blockedBy cycle is refused (BLOCKER_CYCLE), and a chain rooted in a gap or an open decision is accepted', () => {
+  const cyclic = refusalsFor({
+    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\nblockedBy:\n  - {record: br.f.b, because: "waiting on b"}\n',
+    'features/f/br/b/index.yaml': 'schema: work/business-rule\nid: br.f.b\ntitle: t\nstate: todo\nblockedBy:\n  - {record: br.f.a, because: "waiting on a"}\n',
+  });
+  assert.ok(cyclic.some(p => p.includes('BLOCKER_CYCLE') && p.includes('br.f.a') && p.includes('br.f.b')), cyclic.join('\n'));
+
+  const rootedInGap = refusalsFor({
+    'features/f/gap/absence/index.yaml': 'schema: work/gap\nid: gap.f.absence\ntitle: t\nstate: todo\nstatement: s\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\nblockedBy:\n  - {record: gap.f.absence, because: "waiting on the gap"}\n',
+  });
+  assert.equal(rootedInGap.filter(p => p.includes('BLOCKER')).length, 0, rootedInGap.join('\n'));
+
+  const rootedInOpenDecision = refusalsFor({
+    'features/f/decision/d/index.yaml': 'schema: work/policy-decision\nid: decision.f.d\ntitle: t\nstate: todo\noutcome: open\noptions: [{id: a, consequence: c}]\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\nblockedBy:\n  - {record: decision.f.d, because: "waiting on the decision"}\n',
+  });
+  assert.equal(rootedInOpenDecision.filter(p => p.includes('BLOCKER')).length, 0, rootedInOpenDecision.join('\n'));
+});
+
+test('trust concept 5: a blockedBy chain that dead-ends at an ordinary record (neither cyclic nor gap/open-decision rooted) is warned, not refused (BLOCKER_UNROOTED)', () => {
+  const workRoot = tree({
+    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\nblockedBy:\n  - {record: br.f.b, because: "waiting on b, which is itself unblocked and unfinished"}\n',
+    'features/f/br/b/index.yaml': 'schema: work/business-rule\nid: br.f.b\ntitle: t\nstate: todo\n',
+  });
+  const problems = [];
+  const warnings = [];
+  checkWorkTree(workRoot, problems, warnings);
+  assert.equal(problems.filter(p => p.includes('BLOCKER')).length, 0, problems.join('\n'));
+  assert.ok(warnings.some(w => w.includes('BLOCKER_UNROOTED') && w.includes('br.f.b')), warnings.join('\n'));
+
+  // A decided (not open) decision is not a valid root either.
+  const workRoot2 = tree({
+    'features/f/decision/d/index.yaml': 'schema: work/policy-decision\nid: decision.f.d\ntitle: t\nstate: done\noutcome: decided\nchosen: a\noptions: [{id: a, consequence: c}]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\nblockedBy:\n  - {record: decision.f.d, because: "waiting on the (now settled) decision"}\n',
+  });
+  const warnings2 = [];
+  checkWorkTree(workRoot2, [], warnings2);
+  assert.ok(warnings2.some(w => w.includes('BLOCKER_UNROOTED') && w.includes('decision.f.d')), warnings2.join('\n'));
+});
+
+test('trust concept 1: a stale codeDigest is refused unless the evidence carries stale: true (CODE_DIGEST_STALE)', () => {
+  const workRoot = tree({
+    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',
+  });
+  write(workRoot, 'features/f/impl/x/evidence.yaml',
+    'schema: work/evidence\nrecord: impl.f.x\noutcome: pass\ncodeDigest: {algorithm: sha256, files: [], digest: "deadbeef00000000000000000000000000000000000000000000000000000000"}\n');
+  write(path.dirname(workRoot), 'src/f/a.ts', 'export const a = 1;\n');
+  const stale = [];
+  checkWorkTree(workRoot, stale);
+  assert.ok(stale.some(p => p.includes('CODE_DIGEST_STALE')), stale.join('\n'));
+
+  fs.writeFileSync(path.join(workRoot, 'features/f/impl/x/evidence.yaml'),
+    'schema: work/evidence\nrecord: impl.f.x\noutcome: pass\nstale: true\ncodeDigest: {algorithm: sha256, files: [], digest: "deadbeef00000000000000000000000000000000000000000000000000000000"}\n', 'utf8');
+  const markedStale = [];
+  checkWorkTree(workRoot, markedStale);
+  assert.equal(markedStale.filter(p => p.includes('CODE_DIGEST_STALE')).length, 0, markedStale.join('\n'));
+});
+
+test('trust concept 2: an evidence assertion without a command is refused as not replayable (PROOF_NOT_REPLAYABLE)', () => {
+  const workRoot = tree({
+    'features/f/fr/x/index.yaml': 'schema: work/functional-requirement\nid: fr.f.x\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n',
+  });
+  write(workRoot, 'features/f/fr/x/evidence.yaml',
+    'schema: work/evidence\nrecord: fr.f.x\noutcome: pass\nassertions:\n  - {id: ac.f.x.a, outcome: pass, observation: "it passed, trust me"}\n');
+  const problems = [];
+  checkWorkTree(workRoot, problems);
+  assert.ok(problems.some(p => p.includes('PROOF_NOT_REPLAYABLE')), problems.join('\n'));
+
+  fs.writeFileSync(path.join(workRoot, 'features/f/fr/x/evidence.yaml'),
+    'schema: work/evidence\nrecord: fr.f.x\noutcome: pass\nassertions:\n  - {id: ac.f.x.a, command: "npm test", exit: 0, outcome: pass, observation: "npm test exited 0"}\n', 'utf8');
+  const withCommand = [];
+  checkWorkTree(workRoot, withCommand);
+  assert.equal(withCommand.filter(p => p.includes('PROOF_NOT_REPLAYABLE')).length, 0, withCommand.join('\n'));
+});
+
+test('trust concept 3: a done record\'s proves target must itself be done (PROVES_TARGET_NOT_DONE)', () => {
+  const workRoot = tree({
+    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/f}]\nproves: [br.f.a]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\n',
+  });
+  fs.mkdirSync(path.join(path.dirname(workRoot), 'src', 'f'), {recursive: true});
+  const notDone = [];
+  checkWorkTree(workRoot, notDone);
+  assert.ok(notDone.some(p => p.includes('proves br.f.a, which is todo, not done [PROVES_TARGET_NOT_DONE]')), notDone.join('\n'));
+
+  fs.writeFileSync(path.join(workRoot, 'features/f/br/a/index.yaml'), 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n', 'utf8');
+  const done = [];
+  checkWorkTree(workRoot, done);
+  assert.equal(done.filter(p => p.includes('PROVES_TARGET_NOT_DONE')).length, 0, done.join('\n'));
+});
+
+test('trust concept 3: owners[]/module paths that do not exist on disk are refused for done records and warned for todo ones (OWNER_PATH_MISSING)', () => {
+  const workRoot = tree({
+    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/ghost}]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/impl/y/index.yaml': 'schema: work/implementation\nid: impl.f.y\ntitle: t\nstate: todo\nrepository: r\nowners: [{role: module, path: src/ghost}]\n',
+  });
+  const problems = [];
+  const warnings = [];
+  checkWorkTree(workRoot, problems, warnings);
+  assert.ok(problems.some(p => p.includes('impl/x') && p.includes('OWNER_PATH_MISSING')), problems.join('\n'));
+  assert.ok(!problems.some(p => p.includes('impl/y')), problems.join('\n'));
+  assert.ok(warnings.some(w => w.includes('impl/y') && w.includes('OWNER_PATH_MISSING')), warnings.join('\n'));
+
+  // a file path (not a bare directory) normalises to its dirname (moduleRootOf) - and an existing dir,
+  // named with a trailing /** glob, resolves clean with no problem or warning at all.
+  const workRoot2 = tree({
+    'features/f/impl/z/index.yaml': 'schema: work/implementation\nid: impl.f.z\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/real/**}]\nverificationSource: authored-claim\nbecause: c\n',
+  });
+  fs.mkdirSync(path.join(path.dirname(workRoot2), 'src', 'real'), {recursive: true});
+  const problems2 = [];
+  const warnings2 = [];
+  checkWorkTree(workRoot2, problems2, warnings2);
+  assert.equal(problems2.length, 0, problems2.join('\n'));
+  assert.equal(warnings2.length, 0, warnings2.join('\n'));
+});
+
+test('trust concept 4: a done sds-component needs owners naming an existing module directory; a todo one without owners is only warned', () => {
+  const workRoot = tree({
+    'features/f/sds/a/index.yaml': 'schema: work/sds-component\nid: sds.f.a\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/sds/b/index.yaml': 'schema: work/sds-component\nid: sds.f.b\ntitle: t\nstate: todo\n',
+  });
+  const problems = [];
+  const warnings = [];
+  checkWorkTree(workRoot, problems, warnings);
+  assert.ok(problems.some(p => p.includes('sds/a') && p.includes('no owners naming a module directory')), problems.join('\n'));
+  assert.ok(!problems.some(p => p.includes('sds/b')), problems.join('\n'));
+  assert.ok(warnings.some(w => w.includes('sds/b') && w.includes('no owners naming a module directory')), warnings.join('\n'));
+
+  const workRoot2 = tree({
+    'features/f/sds/c/index.yaml': 'schema: work/sds-component\nid: sds.f.c\ntitle: t\nstate: done\nowners: [{role: module, path: src/real}]\nverificationSource: authored-claim\nbecause: c\n',
+  });
+  fs.mkdirSync(path.join(path.dirname(workRoot2), 'src', 'real'), {recursive: true});
+  const problems2 = [];
+  checkWorkTree(workRoot2, problems2);
+  assert.equal(problems2.filter(p => p.includes('sds-component')).length, 0, problems2.join('\n'));
+});
+
+test('concept 7: gap.closedBy accepts a bare id (normalised to one entry) or a list, every entry must resolve, and a done gap needs every closer done', () => {
+  const bareStringOk = refusalsFor({
+    'features/f/gap/absence/index.yaml': 'schema: work/gap\nid: gap.f.absence\ntitle: t\nstate: todo\nstatement: s\nclosedBy: impl.f.thing\n',
+    'features/f/impl/thing/index.yaml': 'schema: work/implementation\nid: impl.f.thing\ntitle: t\nstate: todo\nrepository: r\nowners: [{role: module, path: src/f}]\n',
+  });
+  assert.equal(bareStringOk.length, 0, bareStringOk.join('\n'));
+
+  const listOneMissing = refusalsFor({
+    'features/f/gap/absence/index.yaml': 'schema: work/gap\nid: gap.f.absence\ntitle: t\nstate: todo\nstatement: s\nclosedBy: [impl.f.thing, impl.f.ghost]\n',
+    'features/f/impl/thing/index.yaml': 'schema: work/implementation\nid: impl.f.thing\ntitle: t\nstate: todo\nrepository: r\nowners: [{role: module, path: src/f}]\n',
+  });
+  assert.ok(listOneMissing.some(p => p.includes('closedBy names impl.f.ghost, which no record owns')), listOneMissing.join('\n'));
+
+  const doneButOneCloserNotDone = refusalsFor({
+    'features/f/gap/absence/index.yaml': 'schema: work/gap\nid: gap.f.absence\ntitle: t\nstate: done\nstatement: s\nclosedBy: [impl.f.a, impl.f.b]\n',
+    'features/f/impl/a/index.yaml': 'schema: work/implementation\nid: impl.f.a\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/impl/b/index.yaml': 'schema: work/implementation\nid: impl.f.b\ntitle: t\nstate: todo\nrepository: r\nowners: [{role: module, path: src/f}]\n',
+  });
+  assert.ok(doneButOneCloserNotDone.some(p => p.includes("closedBy's impl.f.b is todo, not done")), doneButOneCloserNotDone.join('\n'));
+
+  const doneWithBothClosersDone = refusalsFor({
+    'features/f/gap/absence/index.yaml': 'schema: work/gap\nid: gap.f.absence\ntitle: t\nstate: done\nstatement: s\nclosedBy: [impl.f.a, impl.f.b]\nverificationSource: authored-claim\nbecause: closed\n',
+    'features/f/impl/a/index.yaml': 'schema: work/implementation\nid: impl.f.a\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/impl/b/index.yaml': 'schema: work/implementation\nid: impl.f.b\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',
+  });
+  assert.equal(doneWithBothClosersDone.filter(p => p.includes('gap')).length, 0, doneWithBothClosersDone.join('\n'));
 });
 
 test('concept 3: conflictsWith rev must match; tension is refused off policy-decision and needs 2+ ids', () => {
@@ -315,6 +515,33 @@ test('concept 12: a done uat-flow needs a sibling evidence.yaml naming a run wit
   const passing = [];
   checkWorkTree(workRoot, passing);
   assert.equal(passing.length, 0, passing.join('\n'));
+});
+
+test('concept 6: schemas/work-layout.yaml\'s shape.families must equal check-example-work.mjs\'s own FAMILIES set (FAMILIES_DRIFT)', () => {
+  const dir = freshDir();
+
+  const missingFile = path.join(dir, 'missing-work-layout.yaml');
+  const problemsMissingFile = [];
+  checkFamiliesDrift(problemsMissingFile, missingFile);
+  assert.ok(problemsMissingFile.some(p => p.includes('FAMILIES_DRIFT')), problemsMissingFile.join('\n'));
+
+  const noFamilies = path.join(dir, 'no-families.yaml');
+  write(dir, 'no-families.yaml', 'shape:\n  workspace: workspace.yaml\n');
+  const problemsNoFamilies = [];
+  checkFamiliesDrift(problemsNoFamilies, noFamilies);
+  assert.ok(problemsNoFamilies.some(p => p.includes('shape.families is missing')), problemsNoFamilies.join('\n'));
+
+  const wrongFamilies = path.join(dir, 'wrong-families.yaml');
+  write(dir, 'wrong-families.yaml', 'shape:\n  families: [business, architecture]\n');
+  const problemsWrong = [];
+  checkFamiliesDrift(problemsWrong, wrongFamilies);
+  assert.ok(problemsWrong.some(p => p.includes('FAMILIES_DRIFT') && p.includes('missing') && p.includes('extra')), problemsWrong.join('\n'));
+
+  const rightFamilies = path.join(dir, 'right-families.yaml');
+  write(dir, 'right-families.yaml', `shape:\n  families: [${[...FAMILIES].join(', ')}]\n`);
+  const problemsRight = [];
+  checkFamiliesDrift(problemsRight, rightFamilies);
+  assert.equal(problemsRight.length, 0, problemsRight.join('\n'));
 });
 
 test('concept 13: _resources custody is the plain work/resource schema (no @N), and a uat-flow\'s environment/fixtures/accounts refs resolve to the right kind', () => {

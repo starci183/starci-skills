@@ -17,7 +17,7 @@ refs: [contract.share.completion-guard-for-task]
 blockedBy:
   - {record: br.task.complete.once, rev: 2, because: "br.task.complete.once is todo at rev 2; its reversible statement has no evidence yet."}
   - {record: br.task.single-owner, rev: 2, because: "br.task.single-owner is todo at rev 2; the split it made between complete and delete is not proven."}
-  - {record: contract.share.completion-guard-for-task, because: "contract.share.completion-guard-for-task is todo: neither its provider (share) nor its consumer call from this flow exists, so an editor completing a shared task is a specified path with no implementation."}
+  - {record: gap.task.collaborator-completion, because: "Neither share's guard nor this flow's call into it exists, so an editor completing a shared task is a specified path with no implementation - the same absence gap.task.collaborator-completion names, rather than pointing at contract.share.completion-guard-for-task directly (which itself waits on this very record, br.task.single-owner and fr.task.complete forming a cycle contract.share.completion-guard-for-task and this record are not both allowed to cite each other over)."}
 
 requiresProof:
   unit:

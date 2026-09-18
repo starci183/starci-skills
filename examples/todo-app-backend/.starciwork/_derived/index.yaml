@@ -732,7 +732,6 @@ records:
       blockedBy:
         - contract.share.completion-guard-for-task
         - fr.task.complete
-        - sds.task.ownership-guard
     blockers:
       - id: ac.task.single-owner.refuses-stranger
         rootKind: record
@@ -741,24 +740,13 @@ records:
           sds.task.ownership-guard were proven against. Both need a live re-check against the split
           statements above, through contract.share.completion-guard-for-task, before this rule is
           done again.
-      - id: br.task.complete.once
-        rootKind: record
+      - id: gap.task.collaborator-completion
+        rootKind: gap
         cyclic: false
-        because: br.task.complete.once is todo at rev 2; its reversible statement has no evidence yet.
-      - id: br.task.single-owner
-        rootKind: record
-        cyclic: true
-        because: br.task.single-owner is todo at rev 2. Its t-owner/t-stranger transitions below described
-          an owner-or-nobody guard for every mutation; that is still true for delete but no longer
-          for complete, and this component has not been rebuilt to call
-          contract.share.completion-guard-for-task. Its previous proof stood for the withdrawn rev 1
-          statement, not for this one.
-      - id: contract.share.completion-guard-for-task
-        rootKind: record
-        cyclic: true
-        because: "contract.share.completion-guard-for-task is todo: neither its provider (share) nor its
-          consumer call from this flow exists, so an editor completing a shared task is a specified
-          path with no implementation."
+        because: "sds.task.ownership-guard and contract.share.completion-guard-for-task were each separately
+          cited here for the same reason: the collaborator-completion path this rule now describes
+          has no implementation yet. gap.task.collaborator-completion names that one absence instead
+          of restating it as two record-to-record edges that blocked each other back."
   br.task.title.required:
     schema: work/business-rule
     feature: task
@@ -847,10 +835,6 @@ records:
         - fr.task.complete
       dependsOn:
         - sds.task.ownership-guard
-      blockedBy:
-        - br.task.single-owner
-        - fr.task.complete
-        - sds.task.ownership-guard
     blockers:
       - id: ac.task.single-owner.refuses-stranger
         rootKind: record
@@ -863,22 +847,13 @@ records:
         rootKind: record
         cyclic: false
         because: br.task.complete.once is todo at rev 2; its reversible statement has no evidence yet.
-      - id: br.task.single-owner
-        rootKind: record
-        cyclic: true
-        because: br.task.single-owner is todo at rev 2. Its t-owner/t-stranger transitions below described
-          an owner-or-nobody guard for every mutation; that is still true for delete but no longer
-          for complete, and this component has not been rebuilt to call
-          contract.share.completion-guard-for-task. Its previous proof stood for the withdrawn rev 1
-          statement, not for this one.
-      - id: contract.share.completion-guard-for-task
-        rootKind: record
-        cyclic: true
-        because: br.task.single-owner is todo at rev 2. Its t-owner/t-stranger transitions below described
-          an owner-or-nobody guard for every mutation; that is still true for delete but no longer
-          for complete, and this component has not been rebuilt to call
-          contract.share.completion-guard-for-task. Its previous proof stood for the withdrawn rev 1
-          statement, not for this one.
+      - id: gap.task.collaborator-completion
+        rootKind: gap
+        cyclic: false
+        because: "sds.task.ownership-guard and contract.share.completion-guard-for-task were each separately
+          cited here for the same reason: the collaborator-completion path this rule now describes
+          has no implementation yet. gap.task.collaborator-completion names that one absence instead
+          of restating it as two record-to-record edges that blocked each other back."
   contract.task.list-for-dashboard:
     schema: work/contract
     feature: task
@@ -1569,28 +1544,13 @@ records:
         rootKind: record
         cyclic: false
         because: br.task.complete.once is todo at rev 2; its reversible statement has no evidence yet.
-      - id: br.task.single-owner
-        rootKind: record
-        cyclic: true
-        because: br.task.single-owner is todo at rev 2. Its t-owner/t-stranger transitions below described
-          an owner-or-nobody guard for every mutation; that is still true for delete but no longer
-          for complete, and this component has not been rebuilt to call
-          contract.share.completion-guard-for-task. Its previous proof stood for the withdrawn rev 1
-          statement, not for this one.
-      - id: contract.share.completion-guard-for-task
-        rootKind: record
-        cyclic: true
-        because: br.task.single-owner is todo at rev 2. Its t-owner/t-stranger transitions below described
-          an owner-or-nobody guard for every mutation; that is still true for delete but no longer
-          for complete, and this component has not been rebuilt to call
-          contract.share.completion-guard-for-task. Its previous proof stood for the withdrawn rev 1
-          statement, not for this one.
-      - id: fr.task.complete
-        rootKind: record
-        cyclic: true
-        because: "Neither side exists yet: share's guard (this lane) and task's call site (fr.task.complete,
-          blocked on br.task.single-owner rev 2) are both todo. This contract records the shape they
-          must meet once built."
+      - id: gap.task.collaborator-completion
+        rootKind: gap
+        cyclic: false
+        because: "sds.task.ownership-guard and contract.share.completion-guard-for-task were each separately
+          cited here for the same reason: the collaborator-completion path this rule now describes
+          has no implementation yet. gap.task.collaborator-completion names that one absence instead
+          of restating it as two record-to-record edges that blocked each other back."
   fr.task.create:
     schema: work/functional-requirement
     feature: task
@@ -1853,6 +1813,16 @@ records:
         - impl.share.todo-app-frontend.invite-screen
         - nfr.share.revoke.read-latency
         - sds.share.invitation-lifecycle
+  gap.task.collaborator-completion:
+    schema: work/gap
+    feature: task
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - br.task.single-owner
+        - fr.task.complete
+        - sds.task.ownership-guard
   gap.task.live-proof:
     schema: work/gap
     feature: task
@@ -2616,39 +2586,16 @@ records:
     state: todo
     effectiveState: suspended
     suspensionReason: evidence-marked-stale
-    usedBy:
-      blockedBy:
-        - br.task.single-owner
     blockers:
-      - id: ac.task.single-owner.refuses-stranger
-        rootKind: record
+      - id: gap.task.collaborator-completion
+        rootKind: gap
         cyclic: false
-        because: The withdrawn clause was what ac.task.single-owner.refuses-stranger and
-          sds.task.ownership-guard were proven against. Both need a live re-check against the split
-          statements above, through contract.share.completion-guard-for-task, before this rule is
-          done again.
-      - id: br.task.complete.once
-        rootKind: record
-        cyclic: false
-        because: br.task.complete.once is todo at rev 2; its reversible statement has no evidence yet.
-      - id: br.task.single-owner
-        rootKind: record
-        cyclic: true
-        because: br.task.single-owner is todo at rev 2; the split it made between complete and delete is not
-          proven.
-      - id: contract.share.completion-guard-for-task
-        rootKind: record
-        cyclic: true
-        because: "contract.share.completion-guard-for-task is todo: neither its provider (share) nor its
-          consumer call from this flow exists, so an editor completing a shared task is a specified
-          path with no implementation."
-      - id: sds.task.ownership-guard
-        rootKind: record
-        cyclic: true
-        because: The withdrawn clause was what ac.task.single-owner.refuses-stranger and
-          sds.task.ownership-guard were proven against. Both need a live re-check against the split
-          statements above, through contract.share.completion-guard-for-task, before this rule is
-          done again.
+        because: This component's t-owner/t-stranger transitions below described an owner-or-nobody guard
+          for every mutation; that is still true for delete but no longer for complete, and this
+          component has not been rebuilt to call contract.share.completion-guard-for-task. Its
+          previous proof stood for br.task.single-owner's withdrawn rev 1 statement, not the current
+          one - and the reason it cannot be rebuilt yet is exactly the absence
+          gap.task.collaborator-completion names.
   share:
     schema: work/feature
     feature: share
@@ -2897,10 +2844,10 @@ records:
 tally:
   overall:
     done: 33
-    todo: 38
+    todo: 39
     stale: 11
     blocked: 106
-    total: 188
+    total: 189
   byFeature:
     audit:
       done: 0
@@ -2940,15 +2887,16 @@ tally:
       total: 24
     task:
       done: 8
-      todo: 9
+      todo: 10
       stale: 6
       blocked: 6
-      total: 29
+      total: 30
   gaps:
     - id: gap.audit.direction-not-drawn
       feature: audit
       state: todo
-      closedBy: ui.audit.privacy
+      closedBy:
+        - ui.audit.privacy
     - id: gap.audit.emitted-events
       feature: audit
       state: todo
@@ -2956,7 +2904,8 @@ tally:
     - id: gap.audit.live-proof
       feature: audit
       state: todo
-      closedBy: uat.audit.right-to-be-forgotten
+      closedBy:
+        - uat.audit.right-to-be-forgotten
     - id: gap.audit.operator-role
       feature: audit
       state: todo
@@ -2964,83 +2913,108 @@ tally:
     - id: gap.audit.unbuilt-module
       feature: audit
       state: todo
-      closedBy: impl.audit.todo-app-backend.log
+      closedBy:
+        - impl.audit.todo-app-backend.log
     - id: gap.login.device-field
       feature: login
       state: todo
-      closedBy: decision.login.session.devices
+      closedBy:
+        - decision.login.session.devices
     - id: gap.login.direction-not-drawn
       feature: login
       state: todo
-      closedBy: ui.login.sign-in
+      closedBy:
+        - ui.login.sign-in
     - id: gap.login.live-proof
       feature: login
       state: todo
-      closedBy: uat.login.sign-in
+      closedBy:
+        - uat.login.sign-in
     - id: gap.login.migration-not-applied
       feature: login
       state: done
-      closedBy: gap.login.live-proof
+      closedBy:
+        - gap.login.live-proof
     - id: gap.notify.direction-not-drawn
       feature: notify
       state: todo
-      closedBy: ui.notify.preferences
+      closedBy:
+        - ui.notify.preferences
     - id: gap.notify.live-proof
       feature: notify
       state: todo
-      closedBy: uat.notify.digest-and-unsubscribe
+      closedBy:
+        - uat.notify.digest-and-unsubscribe
     - id: gap.notify.new-device-event
       feature: notify
       state: todo
-      closedBy: event.login.new-device-signin
+      closedBy:
+        - event.login.new-device-signin
     - id: gap.notify.task-completion-event
       feature: notify
       state: todo
-      closedBy: event.task.completed
+      closedBy:
+        - event.task.completed
     - id: gap.notify.unbuilt-module
       feature: notify
       state: todo
-      closedBy: impl.notify.todo-app-backend.pipeline
+      closedBy:
+        - impl.notify.todo-app-backend.pipeline
     - id: gap.plan.direction-not-drawn
       feature: plan
       state: todo
-      closedBy: ui.plan.usage
+      closedBy:
+        - ui.plan.usage
     - id: gap.plan.live-proof
       feature: plan
       state: todo
-      closedBy: uat.plan.upgrade-after-cap
+      closedBy:
+        - uat.plan.upgrade-after-cap
     - id: gap.plan.unbuilt-module
       feature: plan
       state: todo
-      closedBy: impl.plan.todo-app-backend.plan
+      closedBy:
+        - impl.plan.todo-app-backend.plan
     - id: gap.recur.direction-not-drawn
       feature: recur
       state: todo
-      closedBy: ui.recur.schedule
+      closedBy:
+        - ui.recur.schedule
     - id: gap.recur.live-proof
       feature: recur
       state: todo
-      closedBy: uat.recur.make-recurring
+      closedBy:
+        - uat.recur.make-recurring
     - id: gap.recur.unbuilt-module
       feature: recur
       state: todo
-      closedBy: impl.recur.todo-app-backend.engine
+      closedBy:
+        - impl.recur.todo-app-backend.engine
     - id: gap.share.direction-not-drawn
       feature: share
       state: todo
-      closedBy: ui.share.invite
+      closedBy:
+        - ui.share.invite
     - id: gap.share.live-proof
       feature: share
       state: todo
-      closedBy: uat.share.invite-and-collaborate
+      closedBy:
+        - uat.share.invite-and-collaborate
     - id: gap.share.unbuilt-module
       feature: share
       state: todo
-      closedBy: impl.share.todo-app-backend.access
+      closedBy:
+        - impl.share.todo-app-backend.access
+    - id: gap.task.collaborator-completion
+      feature: task
+      state: todo
+      closedBy:
+        - impl.share.todo-app-backend.access
     - id: gap.task.live-proof
       feature: task
       state: todo
-      closedBy: uat.task.create
+      closedBy:
+        - uat.task.create
   unbuiltModuleGaps: 5
 frontier:
   - id: br.audit.erasure.logged
@@ -3143,6 +3117,9 @@ frontier:
   - id: decision.task.list.scope
     feature: task
     title: Does an organization owner see the tasks of its members
+  - id: gap.task.collaborator-completion
+    feature: task
+    title: The collaborator completion path is not implemented
   - id: gap.task.live-proof
     feature: task
     title: No uat.verify run has produced a live run for task.create
@@ -3376,6 +3353,9 @@ unclassifiedEdges:
     field: closedBy
     target: uat.share.invite-and-collaborate
   - from: gap.share.unbuilt-module
+    field: closedBy
+    target: impl.share.todo-app-backend.access
+  - from: gap.task.collaborator-completion
     field: closedBy
     target: impl.share.todo-app-backend.access
   - from: gap.task.live-proof
