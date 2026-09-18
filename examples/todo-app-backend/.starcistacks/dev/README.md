@@ -31,6 +31,24 @@ this brings up.
 | minio | 9000 |
 | prometheus | 9090 |
 
+The four stateful ports (postgres 5432, redis 6379, minio 9000, prometheus 9090) run on their declared
+host ports, by owner ruling: this machine also runs other Docker Desktop containers on those same ports
+(`starci-postgres`, `starci-redis`, `starci-minio`, `starci-prometheus`), so bringing this stack up on the
+declared ports means stopping those four first.
+
+```sh
+docker stop starci-postgres starci-redis starci-minio starci-prometheus
+```
+
+They are stopped, never removed, so their data and configuration are untouched. Restore them when this
+example's stack is done with the ports:
+
+```sh
+docker start starci-postgres starci-redis starci-minio starci-prometheus
+```
+
+`starci-sonarqube` and anything else not sitting on one of this example's declared ports is left running.
+
 ## Secrets
 
 Every decrypted file under `runtime/` is produced from its `.enc` member and is never committed.

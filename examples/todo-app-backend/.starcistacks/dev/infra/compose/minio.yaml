@@ -3,6 +3,10 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
+      # The image boots only when both the root user and root password are set; only the password was
+      # declared as a secret file. The user name is not a secret (paired with the real secret password),
+      # so it is a literal here, the same pattern postgres.yaml already uses for POSTGRES_USER. DEMO-ONLY.
+      MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio-root-password
     secrets:
       - minio-root-password
