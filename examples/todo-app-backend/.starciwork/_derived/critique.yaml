@@ -777,7 +777,7 @@ findings:
       - impl.task.todo-app-backend.platform-events
       - sds.task.completion-state
     because: A breaking change to br.task.complete.once sends 7 other record(s) back to todo, would
-      stale 1 evidence file(s), and touches 3 code path(s) (src/modules/bussiness/task,
+      stale 2 evidence file(s), and touches 3 code path(s) (src/modules/bussiness/task,
       src/modules/platform/databases/postgresql/primary, src/modules/platform/events) - this is the
       number a reviewer wants before approving the change.
   - id: blast-radius:br.plan.active-scope
