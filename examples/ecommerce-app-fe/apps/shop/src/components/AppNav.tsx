@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { TextAction } from '@starci/grammar/common';
 
 const LINKS: ReadonlyArray<{ readonly href: string; readonly label: string }> = [
   { href: '/browse', label: 'Browse' },
@@ -11,22 +11,24 @@ const LINKS: ReadonlyArray<{ readonly href: string; readonly label: string }> = 
 ];
 
 /**
- * The primary navigation of the shop shell. Client so it can mark the active route from the current path —
- * the only interactivity the skeleton needs; every page beneath it stays a Server Component.
+ * The primary navigation of the shop shell. Client so it can mark the active route from the current
+ * path (`isCurrent` is TextAction's real current-marker) - the only interactivity the shell needs;
+ * every page beneath it stays a Server Component until it mounts a grammar view.
  */
 export const AppNav = () => {
   const pathname = usePathname();
 
   return (
-    <nav className="nav" aria-label="Shop">
+    <nav className="flex items-center gap-1 overflow-x-auto text-sm" aria-label="Shop">
       {LINKS.map(({ href, label }) => (
-        <Link
+        <TextAction
           key={href}
           href={href}
-          className={pathname === href || pathname.startsWith(`${href}/`) ? 'active' : undefined}
+          appearance="route"
+          isCurrent={pathname === href || pathname.startsWith(`${href}/`)}
         >
           {label}
-        </Link>
+        </TextAction>
       ))}
     </nav>
   );
