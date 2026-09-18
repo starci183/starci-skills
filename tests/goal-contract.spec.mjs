@@ -7,9 +7,9 @@ import {parseYaml} from '../core/yaml.mjs';
 import {KINDS,FAMILIES,ROLES,BLOCKERS,OUTCOMES,CAPABILITIES,kindRecord,loadKinds} from '../kernel/graph.mjs';
 import {RECORD_KINDS} from '../kernel/io.mjs';
 import {resolveExecutionChain} from '../kernel/chains.mjs';
-import {createAllocator} from '../kernel/schedule.mjs';
+import {createAllocator,LEAST_LOADED,PREFER_THEN_OVERFLOW} from '../kernel/schedule.mjs';
 import {goalApprovalBlocks,approve,reviseGoal} from '../kernel/goal.mjs';
-import {GOAL_RECORD} from '../kernel/common.mjs';
+import {GOAL_RECORD,parseQuota} from '../kernel/common.mjs';
 import {createWorkflowState,runLoop} from '../kernel/kernel.mjs';
 import {goalPhase} from '../kernel/kernel.mjs';
 import {createStore} from '../kernel/store.mjs';
@@ -279,6 +279,84 @@ test('goal.revise produces goal v(n+1), bumps the rev and stales derived work',(
 // scopes with no contested lease, respecting fanOut.maxPerGroup and verifyAvoidsImplementRuntime.
 // The executable contract lives in tests/dispatcher.spec.mjs.
 test('the dispatcher launches every parallel op whose write scopes do not overlap',{skip:'covered by tests/dispatcher.spec.mjs'},()=>{});
+
+// goal.md §5: "parallel ASAP" saturates ALL granted provider pools concurrently up to the
+// global ceiling - e.g. 10 devin-agent + 5 codex-agent + 4 claude-agent + 1 qwen-agent = 20,
+// never 20 of one runtime. The kernel-level guards (disjoint file allowlists, contested
+// leases, resource locks, fanOut.maxPerGroup, seam-first cuts) are exercised by the
+// workflow-kernel specs; these pin the capacity contract the dispatcher runs under.
+// The fixture is keyed by goal §3 pool names because a synthetic profile needs no alias map.
+const saturatingProfile=()=>({
+  maxParallelOps:GOAL_MAX_PARALLEL_OPS,
+  roleOfKind:{'x.implement':'implement','x.verify':'verify'},
+  allocation:{policy:LEAST_LOADED},
+  runtimes:{
+    'devin-agent':{provider:'devin',roles:['implement','verify'],maxParallel:0,capacityAuthority:'explicit-workflow-quota',quotaTelemetry:'launch-status'},
+    'codex-agent':{provider:'codex',roles:['implement','verify'],maxParallel:5},
+    'claude-agent':{provider:'claude',roles:['implement','verify'],maxParallel:4},
+    'qwen-agent':{provider:'qwen',roles:['implement','verify'],maxParallel:1}}});
+
+test('parallel ASAP saturates every granted pool to the global ceiling, capped per pool - never 20 of one runtime',()=>{
+  // The addendum example: the owner grants devin-agent 10 slots; 10+5+4+1 fills the 20 ceiling.
+  const allocator=createAllocator({runtimes:saturatingProfile(),quota:parseQuota('devin-agent=10'),now:()=>Date.UTC(2026,8,12,9)});
+  const picked=[];
+  for(let index=0;index<GOAL_MAX_PARALLEL_OPS;index+=1){
+    const allocation=allocator.allocate('x.implement');
+    assert.equal(allocation.ok,true,`allocation ${index+1}: ${allocation.reason}`);
+    assert.ok(allocation.load<=allocation.slots,`${allocation.runtime} must never exceed its own maxParallel cap`);
+    picked.push(allocation.runtime);
+  }
+  const tally=id=>picked.filter(runtime=>runtime===id).length;
+  assert.deepEqual(Object.fromEntries(['devin-agent','codex-agent','claude-agent','qwen-agent'].map(id=>[id,tally(id)])),
+    {'devin-agent':10,'codex-agent':5,'claude-agent':4,'qwen-agent':1},
+    'every pool fills to its own maxParallel concurrently and the shares sum to the global ceiling');
+  const over=allocator.allocate('x.implement');
+  assert.equal(over.ok,false);
+  assert.match(over.reason,/maxParallelOps 20 is already in flight/);
+  assert.ok(over.blocked.length&&over.blocked.every(item=>item.reason),'every saturated pool names why it cannot take the operation');
+});
+
+test('owner weights are both the quota grant and the target share; the named order leads capacity heuristics',()=>{
+  const weighted={...saturatingProfile(),allocation:{policy:PREFER_THEN_OVERFLOW}};
+  const allocator=createAllocator({runtimes:weighted,quota:parseQuota('qwen-agent=1,codex-agent=5,claude-agent=4,devin-agent=10'),now:()=>Date.UTC(2026,8,12,9)});
+  const first=allocator.allocate('x.implement');
+  assert.equal(first.runtime,'qwen-agent','the owner-named order leads the fill, not the largest pool');
+  const second=allocator.allocate('x.implement');
+  assert.equal(second.runtime,'codex-agent','a full preferred pool overflows down the owner order, not to the biggest free pool');
+  assert.equal(second.overflowed,true,'overflow past the first owner choice is named on the receipt');
+  const review=allocator.review('x.implement');
+  assert.equal(review.ready.find(item=>item.runtime==='devin-agent')?.slots,10,'the owner weight is also the grant that opened the gated pool');
+});
+
+test('a degraded pool surrenders its share to the remaining pools; the run never stalls on a refused window',()=>{
+  const now=()=>Date.UTC(2026,8,12,9);
+  const allocator=createAllocator({runtimes:saturatingProfile(),quota:parseQuota('devin-agent=10'),now,
+    state:{cooling:{'codex-agent':{kind:'quota',until:now()+3_600_000,reason:'provider window refused'}}}});
+  const review=allocator.review('x.implement');
+  const degraded=review.blocked.find(item=>item.runtime==='codex-agent');
+  assert.match(degraded?.reason??'',/cooling after quota/,'the refused window parks the pool with its named reason');
+  const picked=new Set();
+  for(let index=0;index<15;index+=1){
+    const allocation=allocator.allocate('x.implement');
+    assert.equal(allocation.ok,true,allocation.reason);
+    assert.notEqual(allocation.runtime,'codex-agent','a cooling pool takes nothing');
+    picked.add(allocation.runtime);
+  }
+  assert.deepEqual([...picked].sort(),['claude-agent','devin-agent','qwen-agent'],
+    'the freed share rebalances over every remaining pool, not wholly onto the largest one');
+  const exhausted=allocator.allocate('x.implement');
+  assert.equal(exhausted.ok,false);
+  assert.match(exhausted.reason,/no runtime with the implement role, a free slot/,'with codex-agent parked, the other pools are the whole remaining capacity');
+});
+
+test('verifyAvoidsImplementRuntime: a verify op never runs on the runtime that implemented the slice',()=>{
+  const allocator=createAllocator({runtimes:saturatingProfile(),quota:parseQuota('devin-agent=10'),now:()=>Date.UTC(2026,8,12,9)});
+  const verify=allocator.allocateVerify('x.verify',{implementRuntime:'devin-agent'});
+  assert.equal(verify.ok,true,verify.reason);
+  assert.notEqual(verify.runtime,'devin-agent','the implementing runtime is excluded even while it has free granted slots');
+  const blocked=verify.blocked.find(item=>item.runtime==='devin-agent');
+  assert.match(blocked?.reason??'',/avoided/,'the exclusion is named on the receipt, never silent');
+});
 
 // goal.md §6: blocked ops emit {questionId, digest, goalRev, fields:[select|multi|text|confirm]}.
 test('a blocker emits a typed question record with fields and goalRev',{skip:'covered by tests/ask-report.spec.mjs and the workflow-kernel ask flow'},()=>{});
