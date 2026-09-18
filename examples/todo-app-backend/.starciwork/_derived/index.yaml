@@ -1336,17 +1336,17 @@ records:
     schema: work/functional-requirement
     feature: notify
     state: todo
-    effectiveState: blocked
+    effectiveState: todo
     usedBy:
       refs:
         - ui.notify.preferences
     blockers:
-      - id: gap.notify.direction-not-drawn
-        rootKind: gap
+      - id: ui.notify.preferences
+        rootKind: record
         cyclic: false
-        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
-          produced the refused representative direction or its sibling prompt bytes yet, only the
-          prompt this record's assets entry names.
+        because: No implementation exists, and ui.notify.preferences (the only surface a person would use to
+          unsubscribe) is also todo. The example is moving to a NestJS/Next.js layout and neither
+          side has been built against it.
   fr.plan.downgrade:
     schema: work/functional-requirement
     feature: plan
@@ -1569,11 +1569,8 @@ records:
   gap.audit.direction-not-drawn:
     schema: work/gap
     feature: audit
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - ui.audit.privacy
+    state: done
+    effectiveState: done
   gap.audit.emitted-events:
     schema: work/gap
     feature: audit
@@ -1632,11 +1629,8 @@ records:
   gap.login.direction-not-drawn:
     schema: work/gap
     feature: login
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - ui.login.sign-in
+    state: done
+    effectiveState: done
   gap.login.live-proof:
     schema: work/gap
     feature: login
@@ -1655,11 +1649,8 @@ records:
   gap.notify.direction-not-drawn:
     schema: work/gap
     feature: notify
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - ui.notify.preferences
+    state: done
+    effectiveState: done
   gap.notify.live-proof:
     schema: work/gap
     feature: notify
@@ -1709,11 +1700,8 @@ records:
   gap.plan.direction-not-drawn:
     schema: work/gap
     feature: plan
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - ui.plan.usage
+    state: done
+    effectiveState: done
   gap.plan.live-proof:
     schema: work/gap
     feature: plan
@@ -1747,11 +1735,8 @@ records:
   gap.recur.direction-not-drawn:
     schema: work/gap
     feature: recur
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - ui.recur.schedule
+    state: done
+    effectiveState: done
   gap.recur.live-proof:
     schema: work/gap
     feature: recur
@@ -1784,11 +1769,8 @@ records:
   gap.share.direction-not-drawn:
     schema: work/gap
     feature: share
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - ui.share.invite
+    state: done
+    effectiveState: done
   gap.share.live-proof:
     schema: work/gap
     feature: share
@@ -2657,12 +2639,6 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.notify.direction-not-drawn
-        rootKind: gap
-        cyclic: false
-        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
-          produced the refused representative direction or its sibling prompt bytes yet, only the
-          prompt this record's assets entry names.
       - id: gap.notify.live-proof
         rootKind: gap
         cyclic: false
@@ -2681,6 +2657,15 @@ records:
         because: task exposes no completion event today; this record stays todo until event.task.completed
           is actually raised, which subscribes now names as the trigger instead of overloading
           contract.notify.task-completion-feed for it.
+      - id: ui.notify.preferences
+        rootKind: record
+        cyclic: false
+        because: Cannot be walked. ui.notify.preferences (step 4's surface) is todo, and there is no real
+          product action that triggers a "notify-worthy event" (steps 2 and 5) because
+          fr.notify.on-completion and fr.notify.on-new-device - the only two things a real person
+          could do to produce one - are both todo, each conflictsWith a foreign gap. A synthetic
+          event injected outside the product would not be a UAT walk of the product surface; it
+          would be a call into internals wearing a UAT record's shape.
   uat.plan.upgrade-after-cap:
     schema: work/uat-flow
     feature: plan
@@ -2696,12 +2681,6 @@ records:
           This feature owns only features/plan/**; it does not edit fr.task.create or the task
           module, and appliesTo (above) is exactly this record's constraint on that record, not a
           request the task feature has honored yet.
-      - id: gap.plan.direction-not-drawn
-        rootKind: gap
-        cyclic: false
-        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
-          produced the over-cap-frozen representative direction or its sibling prompt bytes yet,
-          only the prompt this record's assets entry names.
       - id: gap.plan.live-proof
         rootKind: gap
         cyclic: false
@@ -2714,6 +2693,12 @@ records:
         because: No module exists yet at src/plan/subscription; the example backend is moving to NestJS and
           this flow is specified but not built, so there is no unit suite and no UAT walk to point
           to yet.
+      - id: ui.plan.usage
+        rootKind: record
+        cyclic: false
+        because: Nothing to walk yet - fr.plan.upgrade, ui.plan.usage and the cap guard itself are all todo,
+          and the cap guard is not wired into task creation at all
+          (contract.plan.create-precondition).
   uat.recur.make-recurring:
     schema: work/uat-flow
     feature: recur
@@ -2758,143 +2743,101 @@ records:
   ui.audit.privacy:
     schema: work/ui-screen
     feature: audit
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.audit.direction-not-drawn
-        rootKind: gap
-        cyclic: false
-        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
-          produced the erasure-refused representative direction or its sibling prompt bytes yet,
-          only the prompt this record's assets entry names.
+    state: done
+    effectiveState: done
   ui.login.sign-in:
     schema: work/ui-screen
     feature: login
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.login.direction-not-drawn
-        rootKind: gap
-        cyclic: false
-        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
-          produced the refused representative direction or its sibling prompt bytes yet, only the
-          prompt this record's assets entry names.
+    state: done
+    effectiveState: done
   ui.notify.preferences:
     schema: work/ui-screen
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       blockedBy:
         - fr.notify.unsubscribe
         - uat.notify.digest-and-unsubscribe
-    blockers:
-      - id: gap.notify.direction-not-drawn
-        rootKind: gap
-        cyclic: false
-        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
-          produced the refused representative direction or its sibling prompt bytes yet, only the
-          prompt this record's assets entry names.
   ui.plan.usage:
     schema: work/ui-screen
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - fr.plan.usage.view
       blockedBy:
         - uat.plan.upgrade-after-cap
-    blockers:
-      - id: gap.plan.direction-not-drawn
-        rootKind: gap
-        cyclic: false
-        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
-          produced the over-cap-frozen representative direction or its sibling prompt bytes yet,
-          only the prompt this record's assets entry names.
   ui.recur.schedule:
     schema: work/ui-screen
     feature: recur
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.recur.direction-not-drawn
-        rootKind: gap
-        cyclic: false
-        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
-          produced the refused representative direction or its sibling prompt bytes yet, only the
-          prompt this record's assets entry names.
+    state: done
+    effectiveState: done
   ui.share.invite:
     schema: work/ui-screen
     feature: share
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.share.direction-not-drawn
-        rootKind: gap
-        cyclic: false
-        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
-          produced the refused representative direction or its sibling prompt bytes yet, only the
-          prompt this record's assets entry names.
+    state: done
+    effectiveState: done
   ui.task.list:
     schema: work/ui-screen
     feature: task
-    state: todo
-    effectiveState: todo
+    state: done
+    effectiveState: done
 tally:
   overall:
-    done: 33
-    todo: 39
+    done: 46
+    todo: 33
     stale: 11
-    blocked: 106
+    blocked: 99
     total: 189
   byFeature:
     audit:
-      done: 0
-      todo: 9
+      done: 2
+      todo: 8
       stale: 0
-      blocked: 17
+      blocked: 16
       total: 26
     login:
-      done: 8
-      todo: 5
+      done: 10
+      todo: 4
       stale: 5
-      blocked: 6
+      blocked: 5
       total: 24
     notify:
-      done: 3
+      done: 5
       todo: 5
       stale: 0
-      blocked: 22
+      blocked: 20
       total: 30
     plan:
-      done: 4
-      todo: 3
+      done: 6
+      todo: 2
       stale: 0
-      blocked: 20
+      blocked: 19
       total: 27
     recur:
-      done: 6
-      todo: 4
-      stale: 0
-      blocked: 18
-      total: 28
-    share:
-      done: 4
+      done: 8
       todo: 3
       stale: 0
       blocked: 17
+      total: 28
+    share:
+      done: 6
+      todo: 2
+      stale: 0
+      blocked: 16
       total: 24
     task:
-      done: 8
-      todo: 10
+      done: 9
+      todo: 9
       stale: 6
       blocked: 6
       total: 30
   gaps:
     - id: gap.audit.direction-not-drawn
       feature: audit
-      state: todo
+      state: done
       closedBy:
         - ui.audit.privacy
     - id: gap.audit.emitted-events
@@ -2922,7 +2865,7 @@ tally:
         - decision.login.session.devices
     - id: gap.login.direction-not-drawn
       feature: login
-      state: todo
+      state: done
       closedBy:
         - ui.login.sign-in
     - id: gap.login.live-proof
@@ -2937,7 +2880,7 @@ tally:
         - gap.login.live-proof
     - id: gap.notify.direction-not-drawn
       feature: notify
-      state: todo
+      state: done
       closedBy:
         - ui.notify.preferences
     - id: gap.notify.live-proof
@@ -2962,7 +2905,7 @@ tally:
         - impl.notify.todo-app-backend.pipeline
     - id: gap.plan.direction-not-drawn
       feature: plan
-      state: todo
+      state: done
       closedBy:
         - ui.plan.usage
     - id: gap.plan.live-proof
@@ -2977,7 +2920,7 @@ tally:
         - impl.plan.todo-app-backend.plan
     - id: gap.recur.direction-not-drawn
       feature: recur
-      state: todo
+      state: done
       closedBy:
         - ui.recur.schedule
     - id: gap.recur.live-proof
@@ -2992,7 +2935,7 @@ tally:
         - impl.recur.todo-app-backend.engine
     - id: gap.share.direction-not-drawn
       feature: share
-      state: todo
+      state: done
       closedBy:
         - ui.share.invite
     - id: gap.share.live-proof
@@ -3029,9 +2972,6 @@ frontier:
   - id: decision.audit.erasure-method
     feature: audit
     title: How an erasure actually removes identifying data from an append-only, hash-chained log
-  - id: gap.audit.direction-not-drawn
-    feature: audit
-    title: No interface.draw run has produced a direction for audit.privacy
   - id: gap.audit.emitted-events
     feature: audit
     title: login and task expose no emitted-event contract for audit to subscribe to
@@ -3053,16 +2993,13 @@ frontier:
   - id: gap.login.device-field
     feature: login
     title: No device field exists on a session or person
-  - id: gap.login.direction-not-drawn
-    feature: login
-    title: No interface.draw run has produced a direction for login.sign-in
   - id: gap.login.live-proof
     feature: login
     title: No live proof exists against the real Keycloak/Postgres stack, and no uat.verify run has
       executed login.sign-in against it
-  - id: gap.notify.direction-not-drawn
+  - id: fr.notify.unsubscribe
     feature: notify
-    title: No interface.draw run has produced a direction for notify.preferences
+    title: Stop receiving notifications on a channel
   - id: gap.notify.live-proof
     feature: notify
     title: No uat.verify run has produced a live run for notify.digest-and-unsubscribe
@@ -3075,9 +3012,6 @@ frontier:
   - id: gap.notify.unbuilt-module
     feature: notify
     title: No notify module exists under the NestJS/Next.js layout yet
-  - id: gap.plan.direction-not-drawn
-    feature: plan
-    title: No interface.draw run has produced a direction for plan.usage
   - id: gap.plan.live-proof
     feature: plan
     title: No uat.verify run has produced a live run for plan.upgrade-after-cap
@@ -3087,18 +3021,12 @@ frontier:
   - id: data.recur.occurrence
     feature: recur
     title: Occurrence
-  - id: gap.recur.direction-not-drawn
-    feature: recur
-    title: No interface.draw run has produced a direction for recur.schedule
   - id: gap.recur.live-proof
     feature: recur
     title: No uat.verify run has produced a live run for recur.make-recurring
   - id: gap.recur.unbuilt-module
     feature: recur
     title: No recur module exists under the NestJS/Next.js layout yet
-  - id: gap.share.direction-not-drawn
-    feature: share
-    title: No interface.draw run has produced a direction for share.invite
   - id: gap.share.live-proof
     feature: share
     title: No uat.verify run has produced a live run for share.invite-and-collaborate
@@ -3135,9 +3063,6 @@ frontier:
   - id: impl.task.todo-app-frontend.task-list
     feature: task
     title: The list screen and the create form
-  - id: ui.task.list
-    feature: task
-    title: The task list and its create form
 unclassifiedEdges:
   - from: ac.audit.append-only.chain-detects-tamper
     field: rule
