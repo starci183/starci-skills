@@ -57,7 +57,7 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.password.sign-in sends 49 other record(s) back to todo, would
-      stale 6 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      stale 11 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
@@ -123,7 +123,7 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.restores sends 48 other record(s) back to todo, would
-      stale 5 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      stale 9 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
@@ -189,7 +189,7 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.single-device sends 48 other record(s) back to todo,
-      would stale 5 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      would stale 9 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
@@ -1222,30 +1222,6 @@ findings:
       - decision.task.list.scope
     because: impl.task.todo-app-backend.list is todo, blocked on decision.task.list.scope - a real
       product question, not missing code; it moves once that is settled.
-  - id: designed-todo:integration.login.keycloak
-    kind: designed-todo
-    severity: info
-    records:
-      - integration.login.keycloak
-      - gap.login.live-proof
-    because: integration.login.keycloak is todo, blocked on gap.login.live-proof - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:integration.login.postgres
-    kind: designed-todo
-    severity: info
-    records:
-      - integration.login.postgres
-      - gap.login.live-proof
-    because: integration.login.postgres is todo, blocked on gap.login.live-proof - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:journey.login.first-sign-in
-    kind: designed-todo
-    severity: info
-    records:
-      - journey.login.first-sign-in
-      - gap.login.live-proof
-    because: journey.login.first-sign-in is todo, blocked on gap.login.live-proof - a real product
-      question, not missing code; it moves once that is settled.
   - id: designed-todo:journey.notify.told-about-completion
     kind: designed-todo
     severity: info
@@ -1320,14 +1296,6 @@ findings:
       - gap.audit.live-proof
     because: uat.audit.right-to-be-forgotten is todo, blocked on gap.audit.live-proof - a real product
       question, not missing code; it moves once that is settled.
-  - id: designed-todo:uat.login.sign-in
-    kind: designed-todo
-    severity: info
-    records:
-      - uat.login.sign-in
-      - gap.login.live-proof
-    because: uat.login.sign-in is todo, blocked on gap.login.live-proof - a real product question, not
-      missing code; it moves once that is settled.
   - id: designed-todo:uat.notify.digest-and-unsubscribe
     kind: designed-todo
     severity: info
@@ -1987,3 +1955,11 @@ findings:
       - gap.task.collaborator-completion
     because: sds.task.ownership-guard is todo, blocked on gap.task.collaborator-completion - code that
       simply has not been written yet; the owner wants this count at zero.
+  - id: stale-evidence-bulk-edit:br.task.single-owner
+    kind: stale-evidence-bulk-edit
+    severity: warn
+    records:
+      - br.task.single-owner
+    because: br.task.single-owner's evidence is stale with staleSince naming only itself - a bare digest
+      mismatch (the record's own bytes moved after capture), not a change in some other record it
+      depends on.
