@@ -6,60 +6,66 @@ brand: {rev: 2}
 refs: [fr.recur.make-recurring, fr.recur.see-upcoming, fr.recur.end-rule]
 ui:
   intent: >-
-    The upcoming-occurrences list is its own page section, named by SurfaceListCard's own `label` (the
-    real published collection container per COLLECTION-1 case-5), never nested inside the make-recurring
-    SurfaceCard. The representative direction is drawn for the refused state because a submitted-but-invalid
-    schedule is the densest single-surface state the make-recurring form itself reaches, and, where the
-    state is an error/refusal, the accessibility-critical assertive-live Text carrying the refusal and the
-    brand's contrast don't (Never place text on the primary colour below a 4.5:1 contrast ratio.) both
-    apply. Refused is reached only from no-rule, so it does not carry the upcoming-occurrences section or
-    the end-rule Button - those exist only once active names a saved rule; the coverage map below marks
-    that difference explicitly rather than repeating one component list across every state.
-    @starci/grammar/common ships no Message/Alert renderer and no dropdown/select input; the refusal is a
-    plain Text line and the time-of-day value is chosen through PressableField, not a `<select>`.
+    A focused recurrence form uses text-only pressable fields for frequency, time and time zone, with a
+    numeric interval Input owning its correction. The representative refused state preserves zero so the
+    person can correct it and does not imply an invalid rule created upcoming tasks.
   surfaces:
-    - {name: schedule, route: /tasks/:taskId/schedule, purpose: "turn a task into a recurring rule and see upcoming occurrences", actors: [owner]}
+    - name: schedule
+      route: "/tasks/:taskId/schedule"
+      purpose: set recurrence and review upcoming occurrences
+      actors: [owner]
   states:
-    - {name: no-rule, trigger: "the task has no recurrence rule yet", behavior: "only the make-recurring form is shown, no upcoming-occurrences list"}
-    - {name: active, trigger: "a rule is set and has not ended", behavior: "the upcoming-occurrences list renders below the rule summary and an end-rule GrammarButton"}
-    - {name: ended, trigger: "the rule has been ended", behavior: "the upcoming list is empty going forward; past occurrences remain listed with their original status, unchanged"}
-    - {name: refused, trigger: "the submitted schedule is invalid, for example a weekend-only rule with no matching weekday", behavior: "a GrammarMessage(tone: danger) names the invalid field; the form retains the entered values"}
+    - {name: no-rule, trigger: "the task has no accepted recurrence rule", behavior: "the recurrence form is shown and no upcoming collection is present"}
+    - {name: active, trigger: "an accepted rule has not ended", behavior: "rule summary and upcoming occurrences appear in one collection with a named End recurrence action"}
+    - {name: ended, trigger: "the rule has ended", behavior: "no future occurrence is added and historical occurrences retain their original status"}
+    - {name: refused, trigger: "the submitted schedule is invalid such as interval zero", behavior: "the Repeat every Input retains zero and owns the correction message; no rule is accepted"}
   coverage:
     scale: bounded
     representativeScreens: [schedule]
     map:
-      - {screen: schedule, state: no-rule, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Schedule)", "Input (id: recur-rule, label: Repeat)", "PressableField (label: Time of day)", "Button (save rule, type: submit, variant: primary)"], derivation: "Derives from the refused representative direction: same SurfaceCard, Input (rule), PressableField (time), Button (save rule) anatomy, minus the refusal Text; only the make-recurring form is shown, no upcoming-occurrences section and no end-rule Button since no rule is saved yet."}
-      - {screen: schedule, state: active, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Schedule)", "Text (rule summary sentence)", "Button (end rule, variant: outline)", "SurfaceListCard (label: Upcoming occurrences)", "StaticStateRow (one per occurrence)"], derivation: "Once a rule is saved, the editable Input/PressableField form is replaced by a Text rule summary and an end-rule Button (variant: outline) inside the same SurfaceCard; the upcoming-occurrences SurfaceListCard renders below it with one StaticStateRow per occurrence - anatomy the refused state, reached only from no-rule, never shows."}
-      - {screen: schedule, state: ended, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Schedule)", "Text (rule summary sentence, ended)", "SurfaceListCard (label: Upcoming occurrences)", "StaticStateRow (past occurrences, unchanged state)", "EmptyNotice (nothing upcoming)"], derivation: "Derives from the active state: same SurfaceCard, Text (rule summary), SurfaceListCard anatomy, minus the end-rule Button (the rule is already ended); the list's StaticStateRow entries for past occurrences keep their original `state` unchanged, and an EmptyNotice marks that nothing new is upcoming."}
-      - {screen: schedule, state: refused, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Schedule)", "Input (id: recur-rule, label: Repeat)", "PressableField (label: Time of day)", "Text (live: assertive, the invalid-field sentence)", "Button (save rule, type: submit, variant: primary)"], derivation: "Representative direction; generated by interface.draw once gap.recur.direction-not-drawn closes.", directionAsset: assets/schedule-refused.png}
+      - {screen: schedule, state: no-rule, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard, PressableField, Input, Button], derivation: "Use the representative form without the interval error and with valid initial values."}
+      - {screen: schedule, state: active, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard, SurfaceListCard, Button], derivation: "Replace the create form with a rule summary followed by one upcoming-occurrence collection."}
+      - {screen: schedule, state: ended, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard, SurfaceListCard, StaticStateRow], derivation: "Mark the rule ended, omit future generation and retain historical rows without interactive affordance."}
+      - {screen: schedule, state: refused, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard, PressableField, Input, Button], derivation: "Representative generated direction; mobile keeps all fields and the local error in the same order.", directionAsset: assets/schedule-refused.png}
   accessibility:
-    - Every interactive control is reachable by keyboard alone in visual order.
-    - "The refusal Text carries `live: \"assertive\"` and is announced without requiring focus; Common
-      sets no `role=\"alert\"` and Text has no danger tone, so severity is carried by the sentence and
-      the live region alone."
-    - Text on the primary colour (#2F6BFF) keeps at least a 4.5:1 contrast ratio.
+    - Every field has a persistent visible label and the interval error is associated with Repeat every.
+    - PressableField controls expose their label and current value without relying on a decorative icon.
+    - Keyboard order follows frequency, interval, time, time zone and save.
   responsive:
-    - desktop-1280 is the representative viewport; mobile-390 keeps the same single-column order with no
-      hidden controls, derived rather than separately generated.
+    - desktop-1280 uses a reading-width single-column form; mobile-390 keeps the same order in a fluid card.
+    - Local error text and long time-zone values wrap without clipping or hiding Save schedule.
   artworkSlots: []
-  observations: []
-  gaps: []
+  observations:
+    - "Installed Common proves PressableField for input-like choices, Input error ownership and a primary Button; it does not prove a select or calendar."
+    - "The corrected generation removed unproven chevrons and keeps one clear top-to-bottom form rhythm."
+    - "The image is proposed direction only and does not prove recurrence generation, time-zone computation or persistence."
+  gaps:
+    - "Common has no select or date-time picker; application behavior behind each text-only PressableField needs separate interaction specification."
+  assets:
+    - path: assets/schedule-refused.prompt.txt
+      role: prompt
+    - path: assets/schedule-refused.png
+      role: direction
+      generation:
+        tool: image_gen.imagegen
+        promptPath: assets/schedule-refused.prompt.txt
+        inputRefs: [ui.recur.schedule, fr.recur.make-recurring, fr.recur.see-upcoming, fr.recur.end-rule, sds.recur.generation-engine, brand, knowledge/ui/composition/index.yaml, knowledge/ui/presentation/index.yaml, knowledge/ui/proof/index.yaml, "@starci/grammar@0.4.13/common"]
 assets:
   - path: assets/schedule-refused.prompt.txt
     role: prompt
-    provenance: authored-prompt-awaiting-interface.draw
+    provenance: exact prompt retained from the image generation run
   - path: assets/schedule-refused.png
     role: direction
     generation:
       tool: image_gen.imagegen
       promptPath: assets/schedule-refused.prompt.txt
-      inputRefs: [ui.recur.schedule, fr.recur.make-recurring, fr.recur.see-upcoming, fr.recur.end-rule, brand]
+      inputRefs: [ui.recur.schedule, fr.recur.make-recurring, fr.recur.see-upcoming, fr.recur.end-rule, sds.recur.generation-engine, brand, knowledge/ui/composition/index.yaml, knowledge/ui/presentation/index.yaml, knowledge/ui/proof/index.yaml, "@starci/grammar@0.4.13/common"]
     provenance:
       actor: codex
       profile: gpt-5.6-sol
-      capturedAt: 2026-09-18T07:42:00.301Z
+      capturedAt: 2026-09-18T10:07:36.391Z
 change:
-  rev: 3
+  rev: 4
   kind: editorial
-  at: 2026-09-18T10:00:00.000Z
-  reason: interface.draw ran and produced the refused representative direction image and its sibling prompt with a real image_gen.imagegen invocation; gap.recur.direction-not-drawn is closed, its blockedBy edge is removed, and this record reaches done on the strength of the evidence.yaml this same run wrote.
+  at: 2026-09-18T10:07:36.391Z
+  reason: Re-authored the schedule direction from accepted recurrence rules and regenerated it to match proven PressableField anatomy.

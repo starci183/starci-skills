@@ -1,7 +1,7 @@
 # Visual review
 
-The direction shows the refused sign-in state at desktop-1280: the retained email, cleared password, refusal sentence, and full-width sign-in action sit in one compact centred form beneath the page heading.
+The saved PNG opens correctly at 1536 x 1024. A compact centered surface makes **Sign in** the immediate focal point; heading, support copy, labelled email and password fields, uniform refusal, and retry action follow a clear vertical rhythm. Visible strings match the retained prompt, the email is retained, and the password is empty.
 
-Real `@starci/grammar/common` anatomy depicted: `Heading`, `SurfaceCard`, two `Input` fields, `Text`, and `Button`. The representative refused direction derives empty, filled, and working by changing field values, removing the refusal `Text`, and applying the documented disabled or pending states to the same controls.
+The direction depicts the intended Common anatomy: `PageContainer`, one `SurfaceCard`, `Heading`, `Text`, two `Input` fields, and one primary `Button`. At mobile-390 the same single column can become fluid without hiding or reordering a control.
 
-This is a visual direction generated from the retained prompt. It is not a render or screenshot of the running product, and it does not prove exact Grammar rendering, component props, semantic DOM, accessibility behavior, interaction behavior, or API behavior.
+ImageGen rendered the refusal in conventional semantic red. That is not an approved brand token and must not be treated as color-system proof; implementation should use the installed component state or a separately approved semantic token. The asset remains a proposed direction, not a screenshot or proof of exact components, DOM, accessibility, behavior, or API results.

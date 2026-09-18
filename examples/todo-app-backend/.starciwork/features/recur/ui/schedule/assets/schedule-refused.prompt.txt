@@ -1,55 +1,30 @@
-Screen: A recurring task's schedule (recur.schedule), route /tasks/:taskId/schedule, actor: owner
-State: refused - the submitted schedule is invalid, for example a weekend-only rule with no matching weekday
-Behavior to depict: an assertive-live line of copy names the invalid field beside the make-recurring form;
-the form retains the entered values. This state is reached only from no-rule (a rule has never been
-saved), so the upcoming-occurrences section and the end-rule action are not on screen - they only exist
-once a rule is active.
+Create a polished product UI mockup as a proposed visual direction, not a screenshot and not implementation proof. Show the Todo recurrence-schedule refused state caused by an invalid interval of zero, on a 1280 x 960 desktop canvas.
 
-Business grounding (accepted, do not invent beyond these):
-  - fr.recur.make-recurring
-  - fr.recur.see-upcoming
-  - fr.recur.end-rule
+Composition: Use a quiet light-gray canvas and a centered reading-width PageContainer with generous whitespace. Begin with a strong "Schedule" heading and one short supporting sentence. Below, place one white SurfaceCard labeled "Recurrence rule" as the only focal surface. Arrange a single vertical form with clear labels and ample row spacing: a PressableField for Frequency showing "Every N days"; an Input for Repeat every showing value "0" with its field-level error directly beneath; a PressableField for Time of day showing "09:00"; a PressableField for Time zone showing "Asia/Bangkok"; then one full-width primary "Save schedule" Button. The rejected value and correction path should be visible in one glance.
 
-Brand (brand/index.yaml rev 2, read do not restate elsewhere):
-  - primary: #2F6BFF
-  - surface: #FFFFFF
-  - typography: Inter, sans-serif
-  - don't: Never place text on the primary colour below a 4.5:1 contrast ratio.
+Aesthetic: Focused, calm scheduling software. Inter typeface; white surface; charcoal labels; muted gray supporting text; soft gray borders; small-radius corners; minimal elevation; disciplined 8-pixel vertical rhythm; one saturated accent only, brand blue #2F6BFF, reserved for focus and the primary save action. The invalid interval border and message must remain neutral gray and dark charcoal, never red. Make field values comfortably readable and preserve a clear top-to-bottom focus order.
 
-Relevant UI knowledge:
-  - knowledge/ui/composition/collection.yaml (COLLECTION-1, COLLECTION-2)
+Grammar anatomy to depict: PageContainer in reading measure; Heading; Text; one SurfaceCard with label "Recurrence rule" and negative presentation state; three text-only PressableField controls for frequency, time, and time zone; one Input with label "Repeat every", value "0", isError true, and errorMessage "Enter a number greater than 0."; one primary Button. The PressableField controls are plain input-like buttons with their value text only: absolutely no chevron, caret, dropdown arrow, calendar icon, clock icon, globe icon, or other trailing adornment. Do not invent a select, date picker, calendar, or custom message primitive.
 
-Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
-examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
-9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components, no
-invented ones. impl.recur.todo-app-frontend.schedule is still unbuilt (blockedBy gap.recur.unbuilt-module),
-so this binding is drawn directly from the real export list. This state shows only the make-recurring
-form:
-  - SurfaceCard {ariaLabel: "Schedule", measure: "formCompact"}
-  - Input {id: "recur-rule", name: "rule", label: "Repeat", kind: "text"}, the rule-expression field
-  - PressableField {label: "Time of day", placeholder: "Choose a time"}, the time-of-day picker trigger -
-    Common ships no time/select input, so a value the person opens a picker to choose is real
-    PressableField anatomy ("input ANATOMY, not a button variant... it never accepts text"), not an
-    invented `<select>` or dropdown Common does not export
-  - Text {live: "assertive"}, plain body copy carrying the invalid-field sentence - Common ships no
-    Message/Alert renderer and Text has no `tone: "danger"` value; severity is carried by the sentence and
-    by `aria-live="assertive"` alone
-  - Button {type: "submit", variant: "primary"}, the save-rule action
+State behavior: This is a refused save with a correctable field error. Preserve the entered value 0 so the person can correct it. Frequency remains Every N days, time remains 09:00, and time zone remains Asia/Bangkok. The save action remains available for retry. Do not show an active recurrence or upcoming generated tasks because the invalid rule was not accepted.
 
-Not depicted in this state (they belong to the active state, once a rule exists, not to a refused
-make-recurring submission): SectionHeader/SurfaceListCard's own `label` for the "Upcoming occurrences"
-list, StaticStateRow occurrence rows, and the end-rule Button.
+Render these exact visible strings, with correct spelling and no additional copy:
+- "Schedule"
+- "Choose when this task should repeat."
+- "Recurrence rule"
+- "Frequency"
+- "Every N days"
+- "Repeat every"
+- "0"
+- "Enter a number greater than 0."
+- "Time of day"
+- "09:00"
+- "Time zone"
+- "Asia/Bangkok"
+- "Save schedule"
 
-Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
-GrammarButton/GrammarTextField/GrammarMessage anatomy, no HeroUI component reached directly, no invented
-Alert/Toast/Banner, dropdown or date-select control Common does not ship.
+Knowledge constraints: Apply LAYOUT-1, HIERARCHY-1 through HIERARCHY-3, CTA-1/CTA-2/CTA-3, ACTION-1, STATE-1/STATE-2, FEEDBACK-1/FEEDBACK-2, ACCENT-1, RESPONSIVE-1, COVERAGE-1, GAP-3/GAP-4/GAP-5, PADDING-4, MEASURE-1/MEASURE-4, SURFACE-2, BOUNDARY-6, FONT-1 through FONT-4, TONE-1/TONE-2, FLOW-1/FLOW-2, A11Y-1/A11Y-2/A11Y-4, BRAND-1/BRAND-3, COLOR-5, TRUTH-1/TRUTH-4, and TASTE-1 through TASTE-7/TASTE-9/TASTE-10.
 
-Layout note: The upcoming-occurrences list, when a rule is active, is its own page section named by
-SurfaceListCard's own `label` prop - the real published collection container per COLLECTION-1 case-5 - and
-never sits inside the make-recurring SurfaceCard.
+Responsive intent: At mobile-390 keep all fields in the same order, make the card fluid within the page inset, keep labels above values, allow the local error to wrap, and keep Save schedule full-width and reachable.
 
-Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
-4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
-beyond brand/assets/**; no dropdown/select control Common does not export.
-
-Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).
+Avoid: no existing frontend implementation as a source, no upcoming-task list, no ended-history panel, no monthly calendar, no weekday chips, no end-date control, no chevrons or dropdown arrows, no red error border or text, no custom alert banner, no icon-only controls, no extra frequency choices, no decorative illustration, no gradients, no glassmorphism, no excessive shadows, no watermark, no extra copy, no misspelled text.

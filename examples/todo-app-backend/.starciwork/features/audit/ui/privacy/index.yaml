@@ -6,60 +6,71 @@ brand: {rev: 2}
 refs: [fr.audit.erasure.request, fr.audit.export]
 ui:
   intent: >-
-    Two independent actions on one screen; never merge export and erasure into one control since they have separate acceptance criteria. The representative direction is drawn for the erasure-refused state because it
-    combines the densest actual Grammar anatomy this screen uses (SurfaceCard, both Button actions and
-    the refusal line) and, where the state is an error/refusal, the accessibility-critical assertive-live
-    Text carrying the refusal and the brand's contrast don't (Never place text on the primary colour below
-    a 4.5:1 contrast ratio.). @starci/grammar/common ships no Message/Alert renderer, no danger tone on
-    Text, and no destructive button variant; the refusal is a plain Text line and the erasure action stays
-    an ordinary Button.
+    One joined privacy surface separates safe export from deliberate erasure without inventing a red
+    danger style. The representative refusal state states that identity verification failed and nothing
+    changed, while preserving the architecture truth that identifying content becomes unreadable but
+    audit history remains.
   surfaces:
-    - {name: privacy, route: /privacy, purpose: "export personal data and request erasure", actors: [person]}
+    - name: privacy
+      route: /privacy
+      purpose: export personal data and request erasure
+      actors: [person]
   states:
-    - {name: idle, trigger: "first paint", behavior: "export and request-erasure actions are both available, no message shown"}
-    - {name: exporting, trigger: "export clicked, response pending", behavior: "the export GrammarButton is disabled and shows a busy label"}
-    - {name: requesting-erasure, trigger: "request-erasure clicked, a confirmation is pending", behavior: "a confirm/cancel pair of GrammarButton replaces the single request action"}
-    - {name: erasure-pending, trigger: "erasure confirmed, not yet complete", behavior: "both actions are disabled with a pending status message (non-danger)"}
-    - {name: erasure-complete, trigger: "erasure has completed", behavior: "a non-danger GrammarMessage confirms completion; both actions are removed"}
-    - {name: erasure-refused, trigger: "the erasure request is rejected, for example a hold applies", behavior: "a GrammarMessage(tone: danger) states the refusal reason; the request action remains available to retry once the hold clears"}
+    - {name: idle, trigger: "first paint", behavior: "export and request-erasure actions are available and no status is shown"}
+    - {name: exporting, trigger: "export is awaiting a response", behavior: "Export my data owns pending while the erasure region remains stable"}
+    - {name: requesting-erasure, trigger: "the person begins an erasure request", behavior: "a clear confirm and cancel decision replaces the single request action"}
+    - {name: erasure-pending, trigger: "a verified erasure request was accepted", behavior: "pending status is shown and duplicate privacy actions are unavailable"}
+    - {name: erasure-complete, trigger: "identifying content has been crypto-shredded", behavior: "completion says identifying content is unreadable and audit history remains"}
+    - {name: erasure-refused, trigger: "identity for the erasure request cannot be verified", behavior: "assertive status says nothing changed and Request erasure remains available for a new verified attempt"}
   coverage:
     scale: bounded
     representativeScreens: [privacy]
     map:
-      - {screen: privacy, state: idle, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Privacy, composition: joined)", "Button (export, variant: secondary)", "Button (request erasure, variant: outline)"], derivation: "Derives from the erasure-refused representative direction: same SurfaceCard, Button (export), Button (request erasure) anatomy, minus the refusal Text; export and request-erasure actions are both available, no message shown."}
-      - {screen: privacy, state: exporting, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Privacy, composition: joined)", "Button (export, variant: secondary, isPending)", "Button (request erasure, variant: outline)"], derivation: "Derives from the erasure-refused representative direction: same SurfaceCard, Button (export), Button (request erasure) anatomy, minus the refusal Text; the export Button is isPending and shows its busy label."}
-      - {screen: privacy, state: requesting-erasure, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Privacy, composition: joined)", "Button (export, variant: secondary)", "Button (confirm, variant: primary)", "Button (cancel, variant: ghost)"], derivation: "Derives from the erasure-refused representative direction: same SurfaceCard, Button (export) anatomy; a confirm (variant: primary)/cancel (variant: ghost) Button pair replaces the single request-erasure Button."}
-      - {screen: privacy, state: erasure-pending, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Privacy, composition: joined)", "Button (export, variant: secondary, isDisabled)", "Button (request erasure, variant: outline, isDisabled)", "Text (live: polite, non-danger pending status)"], derivation: "Derives from the erasure-refused representative direction: same SurfaceCard, Button (export), Button (request erasure) anatomy, with both isDisabled and a `live: polite` Text pending line in place of the refusal Text."}
-      - {screen: privacy, state: erasure-complete, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Privacy, composition: joined)", "Text (live: polite, non-danger completion status)"], derivation: "Derives from the erasure-refused representative direction: same SurfaceCard anatomy; both action Buttons are removed and a `live: polite` Text confirms completion in place of the refusal Text."}
-      - {screen: privacy, state: erasure-refused, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Privacy, composition: joined)", "Button (export, variant: secondary)", "Button (request erasure, variant: outline)", "Text (live: assertive, the refusal sentence)"], derivation: "Representative direction; generated by interface.draw once gap.audit.direction-not-drawn closes.", directionAsset: assets/privacy-erasure-refused.png}
+      - {screen: privacy, state: idle, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard, Button], derivation: "Use the two joined bands without status text; mobile stacks copy before each action."}
+      - {screen: privacy, state: exporting, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard, Button], derivation: "Apply pending only to Export my data and preserve the erasure band."}
+      - {screen: privacy, state: requesting-erasure, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard, Button], derivation: "Replace Request erasure with named confirm and cancel actions in the same band."}
+      - {screen: privacy, state: erasure-pending, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard, Button], derivation: "Show one pending status and make duplicate actions unavailable without changing the truth explanation."}
+      - {screen: privacy, state: erasure-complete, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard], derivation: "Replace request controls with settled completion Text that preserves retained audit history."}
+      - {screen: privacy, state: erasure-refused, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard, Button], derivation: "Representative generated direction; mobile preserves export before erasure and wraps the refusal.", directionAsset: assets/privacy-erasure-refused.png}
   accessibility:
-    - Every interactive control is reachable by keyboard alone in visual order.
-    - "The refusal Text carries `live: \"assertive\"` and is announced without requiring focus; Common
-      sets no `role=\"alert\"` and Text has no danger tone, so severity is carried by the sentence and
-      the live region alone. Pending/complete status uses `live: \"polite\"` since it is not an error."
-    - Text on the primary colour (#2F6BFF) keeps at least a 4.5:1 contrast ratio.
+    - Both actions have explicit text labels and keyboard order follows export then erasure.
+    - Refusal uses assertive live Text and identifies the failed request without claiming a destructive result.
+    - Confirmation must move focus to the decision and return it to Request erasure on cancel.
   responsive:
-    - desktop-1280 is the representative viewport; mobile-390 keeps the same single-column order with no
-      hidden controls, derived rather than separately generated.
+    - desktop-1280 presents two joined bands; mobile-390 stacks each band's copy and action without changing their order.
+    - Privacy explanations wrap at readable measure and no action becomes icon-only.
   artworkSlots: []
-  observations: []
-  gaps: []
+  observations:
+    - "Installed Common proves joined SurfaceCard composition, Text and Buttons but no destructive Button variant or modal."
+    - "Export owns the single primary accent; erasure remains a deliberate outline action."
+    - "The image is proposed direction only and does not prove identity verification, export or crypto-shredding."
+  gaps:
+    - "Common has no destructive Button variant; Request erasure remains a labelled outline action until a semantic treatment is specified."
+  assets:
+    - path: assets/privacy-erasure-refused.prompt.txt
+      role: prompt
+    - path: assets/privacy-erasure-refused.png
+      role: direction
+      generation:
+        tool: image_gen.imagegen
+        promptPath: assets/privacy-erasure-refused.prompt.txt
+        inputRefs: [ui.audit.privacy, fr.audit.erasure.request, fr.audit.export, decision.audit.erasure-method, sds.audit.erasure-request, brand, knowledge/ui/composition/index.yaml, knowledge/ui/presentation/index.yaml, knowledge/ui/proof/index.yaml, "@starci/grammar@0.4.13/common"]
 assets:
   - path: assets/privacy-erasure-refused.prompt.txt
     role: prompt
-    provenance: authored-prompt-awaiting-interface.draw
+    provenance: exact prompt retained from the image generation run
   - path: assets/privacy-erasure-refused.png
     role: direction
     generation:
       tool: image_gen.imagegen
       promptPath: assets/privacy-erasure-refused.prompt.txt
-      inputRefs: [ui.audit.privacy, fr.audit.erasure.request, fr.audit.export, brand]
+      inputRefs: [ui.audit.privacy, fr.audit.erasure.request, fr.audit.export, decision.audit.erasure-method, sds.audit.erasure-request, brand, knowledge/ui/composition/index.yaml, knowledge/ui/presentation/index.yaml, knowledge/ui/proof/index.yaml, "@starci/grammar@0.4.13/common"]
     provenance:
       actor: codex
       profile: gpt-5.6-sol
-      capturedAt: 2026-09-18T07:42:00.301Z
+      capturedAt: 2026-09-18T10:07:36.391Z
 change:
-  rev: 3
+  rev: 4
   kind: editorial
-  at: 2026-09-18T10:00:00.000Z
-  reason: interface.draw ran and produced the erasure-refused representative direction image and its sibling prompt with a real image_gen.imagegen invocation; gap.audit.direction-not-drawn is closed, its blockedBy edge is removed, and this record reaches done on the strength of the evidence.yaml this same run wrote.
+  at: 2026-09-18T10:07:36.391Z
+  reason: Re-authored the privacy direction from identity-verification and crypto-shredding truth, removing the invented legal-hold refusal.

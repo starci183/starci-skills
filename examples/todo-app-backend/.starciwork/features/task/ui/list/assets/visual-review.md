@@ -1,7 +1,7 @@
 # Visual review
 
-The direction shows the many-tasks state at desktop-1280: a create-task field and primary action sit above several plain list rows, with both completed and incomplete native checkboxes, task titles, and per-row delete actions inside one compact surface.
+The saved PNG opens correctly at 1536 x 1024. **My tasks** is the page focal point, followed by a distinct create surface and a single collection surface. Three task rows share alignment and separators rather than becoming individual cards. All requested copy is legible and each row has a native-looking checkbox plus a named Delete action.
 
-Real `@starci/grammar/common` anatomy depicted: `Heading`, `SurfaceCard`, `Input`, and `Button`; the collection rows remain application-owned native `ul`/`li` and checkbox markup, not `SurfaceListCard` or `StaticStateRow`. The representative many-tasks direction derives empty and one-task by changing row count, and refused by retaining only the `SurfaceCard` with an assertive-live `Text` while hiding the form and rows.
+The direction depicts `PageContainer`, headings and text, one create `SurfaceCard`, `Input`, primary `Button`, and one `SurfaceListCard` with application-owned rows. The generous region gap is larger than row spacing, and mobile can stack the create controls while allowing row titles and actions to wrap.
 
-This is a visual direction generated from the retained prompt. It is not a render or screenshot of the running product, and it does not prove exact Grammar rendering, component props, native markup, semantic DOM, accessibility behavior, interaction behavior, or API behavior.
+Delete has deliberately weak styling because Common exposes no destructive Button variant. This is proposed direction only and does not prove exact components, checkbox labels, deletion behavior, persistence, accessibility, or API results.

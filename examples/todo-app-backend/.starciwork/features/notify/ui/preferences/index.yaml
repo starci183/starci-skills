@@ -6,59 +6,68 @@ brand: {rev: 2}
 refs: [fr.notify.unsubscribe]
 ui:
   intent: >-
-    One setting per row, no card wrapper; the unsubscribe control must remain reachable without an active session per fr.notify.unsubscribe. The representative direction is drawn for the refused state because it
-    combines the densest actual Grammar anatomy this screen uses (SurfaceCard, the toggle Button, the save
-    Button and the refusal line) and, where the state is an error/refusal, the accessibility-critical
-    assertive-live Text carrying the refusal and the brand's contrast don't (Never place text on the
-    primary colour below a 4.5:1 contrast ratio.). @starci/grammar/common ships no switch/toggle renderer
-    and no Message/Alert renderer; the digest control is an ordinary Button and the refusal is a plain
-    Text line.
+    A small settings page with one email-notification decision and one save action. Because installed
+    Common has no switch, the preference is a fully labelled state button. The representative refused
+    state preserves the previous value and keeps correction and retry close to the setting.
   surfaces:
-    - {name: preferences, route: /notify/preferences, purpose: "control digest and unsubscribe settings", actors: [owner]}
+    - name: preferences
+      route: /notify/preferences
+      purpose: control whether Todo sends updates by email
+      actors: [owner]
   states:
-    - {name: loading, trigger: "first paint, preferences not yet fetched", behavior: "the toggle renders in a disabled/skeleton state, no message shown"}
-    - {name: subscribed, trigger: "the owner currently receives the digest", behavior: "the toggle is on, save is available"}
-    - {name: unsubscribed, trigger: "the owner has unsubscribed", behavior: "the toggle is off; a non-danger message confirms the change on the next successful save"}
-    - {name: saving, trigger: "save clicked, response pending", behavior: "the save GrammarButton is disabled and shows a busy label"}
-    - {name: refused, trigger: "save fails, for example a stale link", behavior: "a GrammarMessage(tone: danger) appears above the toggle; the toggle keeps its pre-save value"}
+    - {name: loading, trigger: "preferences are being fetched", behavior: "the setting and save action use documented skeleton or unavailable states"}
+    - {name: subscribed, trigger: "email updates are enabled", behavior: "the labelled state control reads On and save is available"}
+    - {name: unsubscribed, trigger: "email updates are disabled", behavior: "the labelled state control reads Off and save is available"}
+    - {name: saving, trigger: "save is awaiting a response", behavior: "Save preference owns pending and repeated submission is unavailable"}
+    - {name: refused, trigger: "the preference update is refused", behavior: "assertive Text states that the previous choice remains and retry stays available"}
   coverage:
     scale: bounded
     representativeScreens: [preferences]
     map:
-      - {screen: preferences, state: loading, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Notification preferences)", "Text (row label)", "Button (toggle, isSkeleton)", "Button (save, isDisabled)"], derivation: "Derives from the refused representative direction: same SurfaceCard, Text (row label), Button (toggle), Button (save) anatomy, minus the refusal Text; the toggle Button renders isSkeleton, no message shown."}
-      - {screen: preferences, state: subscribed, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Notification preferences)", "Text (row label)", "Button (toggle, variant: primary)", "Button (save, variant: primary)"], derivation: "Derives from the refused representative direction: same SurfaceCard, Text (row label), Button (toggle), Button (save) anatomy, minus the refusal Text; the toggle Button reads variant: primary for on, save is available."}
-      - {screen: preferences, state: unsubscribed, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Notification preferences)", "Text (row label)", "Button (toggle, variant: secondary)", "Button (save, variant: primary)", "Text (live: polite, non-danger confirmation)"], derivation: "Derives from the refused representative direction: same SurfaceCard, Text (row label), Button (toggle), Button (save) anatomy; the toggle Button reads variant: secondary for off; a `live: polite` Text confirms the change on the next successful save, in place of the refusal Text."}
-      - {screen: preferences, state: saving, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Notification preferences)", "Text (row label)", "Button (toggle)", "Button (save, isDisabled, isPending)"], derivation: "Derives from the refused representative direction: same SurfaceCard, Text (row label), Button (toggle), Button (save) anatomy, minus the refusal Text; the save Button is isDisabled and isPending, showing its busy label."}
-      - {screen: preferences, state: refused, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Notification preferences)", "Text (row label)", "Button (toggle)", "Button (save, variant: primary)", "Text (live: assertive, the refusal sentence)"], derivation: "Representative direction; generated by interface.draw once gap.notify.direction-not-drawn closes.", directionAsset: assets/preferences-refused.png}
+      - {screen: preferences, state: loading, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard, Button], derivation: "Use documented skeleton or unavailable states without adding another surface."}
+      - {screen: preferences, state: subscribed, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard, Button], derivation: "Show the labelled state control as On and omit status text."}
+      - {screen: preferences, state: unsubscribed, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard, Button], derivation: "Show the labelled state control as Off and omit status text."}
+      - {screen: preferences, state: saving, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard, Button], derivation: "Keep the selected value and apply pending to Save preference."}
+      - {screen: preferences, state: refused, viewport: [desktop-1280, mobile-390], components: [PageContainer, Heading, Text, SurfaceCard, Button], derivation: "Representative generated direction; mobile keeps both labelled controls full width.", directionAsset: assets/preferences-refused.png}
   accessibility:
-    - Every interactive control is reachable by keyboard alone in visual order.
-    - "The refusal Text carries `live: \"assertive\"` and is announced without requiring focus; Common
-      sets no `role=\"alert\"` and Text has no danger tone, so severity is carried by the sentence and
-      the live region alone. The confirmation on unsubscribed uses `live: \"polite\"` since it is not an
-      error."
-    - Text on the primary colour (#2F6BFF) keeps at least a 4.5:1 contrast ratio.
+    - The preference control includes its setting name and current On or Off value in visible text.
+    - Refusal uses assertive live Text and states that the persisted choice did not change.
+    - Keyboard order follows heading, preference control, status and save action.
   responsive:
-    - desktop-1280 is the representative viewport; mobile-390 keeps the same single-column order with no
-      hidden controls, derived rather than separately generated.
+    - desktop-1280 uses a reading-width card; mobile-390 makes the card and both controls fluid without reordering.
+    - Long refusal copy wraps without clipping or hiding retry.
   artworkSlots: []
-  observations: []
-  gaps: []
+  observations:
+    - "Installed Common proves PageContainer, SurfaceCard, Text and Button but no switch or general Message primitive."
+    - "The composition uses one setting, one correction owner and one primary save action."
+    - "The image is proposed direction only and does not prove delivery, persistence or exact semantics."
+  gaps:
+    - "Common exposes no switch primitive; a labelled Button carries the binary setting until a switch is specified."
+  assets:
+    - path: assets/preferences-refused.prompt.txt
+      role: prompt
+    - path: assets/preferences-refused.png
+      role: direction
+      generation:
+        tool: image_gen.imagegen
+        promptPath: assets/preferences-refused.prompt.txt
+        inputRefs: [ui.notify.preferences, fr.notify.unsubscribe, br.notify.unsubscribe.honored, sds.notify.delivery-lifecycle, brand, knowledge/ui/composition/index.yaml, knowledge/ui/presentation/index.yaml, knowledge/ui/proof/index.yaml, "@starci/grammar@0.4.13/common"]
 assets:
   - path: assets/preferences-refused.prompt.txt
     role: prompt
-    provenance: authored-prompt-awaiting-interface.draw
+    provenance: exact prompt retained from the image generation run
   - path: assets/preferences-refused.png
     role: direction
     generation:
       tool: image_gen.imagegen
       promptPath: assets/preferences-refused.prompt.txt
-      inputRefs: [ui.notify.preferences, fr.notify.unsubscribe, brand]
+      inputRefs: [ui.notify.preferences, fr.notify.unsubscribe, br.notify.unsubscribe.honored, sds.notify.delivery-lifecycle, brand, knowledge/ui/composition/index.yaml, knowledge/ui/presentation/index.yaml, knowledge/ui/proof/index.yaml, "@starci/grammar@0.4.13/common"]
     provenance:
       actor: codex
       profile: gpt-5.6-sol
-      capturedAt: 2026-09-18T07:42:00.301Z
+      capturedAt: 2026-09-18T10:07:36.391Z
 change:
-  rev: 3
+  rev: 4
   kind: editorial
-  at: 2026-09-18T10:00:00.000Z
-  reason: interface.draw ran and produced the refused representative direction image and its sibling prompt with a real image_gen.imagegen invocation; gap.notify.direction-not-drawn is closed, its blockedBy edge is removed, and this record reaches done on the strength of the evidence.yaml this same run wrote.
+  at: 2026-09-18T10:07:36.391Z
+  reason: Re-authored the settings direction from unsubscribe truth and the installed Common public surface.

@@ -1,47 +1,24 @@
-Screen: The notification preferences screen (notify.preferences), route /notify/preferences, actor: owner
-State: refused - save fails, for example a stale link
-Behavior to depict: an assertive-live line of copy appears above the digest control stating the save
-failed; the control keeps its pre-save value
+Create a polished product UI mockup as a proposed visual direction, not a screenshot and not implementation proof. Show the notification-preferences save-refused state for the Todo application on a 1280 x 960 desktop canvas.
 
-Business grounding (accepted, do not invent beyond these):
-  - fr.notify.unsubscribe
+Composition: Use a quiet light-gray page canvas with a centered reading-width PageContainer and generous outer whitespace. At the top, place one restrained page header with a strong heading and one short supporting sentence. Below it, place one white SurfaceCard labeled "Email notifications". The card is the only focal surface. Inside, use a calm vertical rhythm: short description, a full-width labeled state control reading "Email notifications: On", a compact refusal message immediately below the control, and a primary Save button. Keep the control visibly button-like and text-labeled; Common has no switch primitive. The refusal belongs to this settings surface and must be easy to find without becoming a large alarm banner.
 
-Brand (brand/index.yaml rev 2, read do not restate elsewhere):
-  - primary: #2F6BFF
-  - surface: #FFFFFF
-  - typography: Inter, sans-serif
-  - don't: Never place text on the primary colour below a 4.5:1 contrast ratio.
+Aesthetic: Deliberate, restrained productivity software. Inter typeface, white surfaces, neutral charcoal text, soft gray borders, small-radius corners, near-flat elevation, disciplined 8-pixel spacing rhythm, and one saturated accent only: brand blue #2F6BFF. Use blue for the primary Save button and the active On state. Do not invent a danger color. Create clear typographic contrast between page title, section title, description, setting label, status copy, and action.
 
-Relevant UI knowledge:
-  - knowledge/ui/proof/brand.yaml (BRAND-1, BRAND-2, BRAND-3)
+Grammar anatomy to depict: PageContainer in reading measure; Heading; Text; one SurfaceCard with label "Email notifications" and negative presentation state; one labeled secondary or outline Button for the current On state; one Text status with assertive live-region intent; one primary Button for saving. Do not depict a switch, checkbox, custom alert component, or icon-only control because those are not proven Common primitives.
 
-Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
-examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
-9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components, no
-invented ones. No implementation exists for this screen yet (gap.notify has no frontend impl record at
-all), so this binding is drawn directly from the real export list: Common ships no switch/toggle
-renderer, so the digest control is an ordinary Button whose variant carries on/off, the same pattern the
-two proven blocks (sign-in-form, task-list) use for every stateful action:
-  - SurfaceCard {ariaLabel: "Notification preferences", measure: "formCompact"} - one bounded surface,
-    one setting per row inside it (`composition: "single"`), never a card per row
-  - Text {size: "sm"}, the row's own label copy, e.g. "Weekly digest emails"
-  - Button {type: "button", variant: subscribed ? "primary" : "secondary", isSkeleton (loading only)} - the
-    on/off action itself; Common has no dedicated Switch/Toggle export, so the row's toggle is this Button
-    reading its current value from its variant and its accessible label
-  - Button {type: "submit", variant: "primary", isPending} - the save action
-  - Text {live: "assertive"}, plain body copy carrying the refusal sentence - Common ships no Message/Alert
-    renderer and Text has no `tone: "danger"` value; severity is carried by the sentence and by
-    `aria-live="assertive"` alone
+State behavior: This is a refused save, not a loading or success state. The current choice remains On. The Save preference control is available for retry. The refusal message stays next to the setting that was not changed. Do not imply that notification delivery is currently broken or that a new value was persisted.
 
-Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
-GrammarButton/GrammarMessage anatomy, no HeroUI Switch component reached directly, no invented
-Alert/Toast/Banner or toggle switch Common does not ship.
+Render these exact visible strings, with correct spelling and no additional copy:
+- "Notification preferences"
+- "Choose whether Todo sends updates by email."
+- "Email notifications"
+- "Receive task updates in a digest."
+- "Email notifications: On"
+- "We couldn't update this setting. Your previous choice is still in place."
+- "Save preference"
 
-Layout note: One setting per row, no card wrapper; the unsubscribe control must remain reachable without
-an active session per fr.notify.unsubscribe.
+Knowledge constraints: Apply LAYOUT-1, HIERARCHY-1 through HIERARCHY-3, CTA-1 through CTA-3, ACTION-1, STATE-1/STATE-2/STATE-3, FEEDBACK-3, ACCENT-1, RESPONSIVE-1, COVERAGE-1, GAP-3/GAP-4/GAP-5, PADDING-4, MEASURE-1/MEASURE-4, SURFACE-2, BOUNDARY-6, FONT-2/FONT-3/FONT-4, TONE-1/TONE-2, FLOW-1/FLOW-2, A11Y-1/A11Y-4, BRAND-1/BRAND-3, COLOR-5, TRUTH-4, and TASTE-1 through TASTE-7/TASTE-9/TASTE-10.
 
-Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
-4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
-beyond brand/assets/**; no switch/toggle control shape Common does not export.
+Responsive intent: At mobile-390 retain the same header, setting, message, and action order. Make the card fluid within the page inset; allow the refusal text to wrap; keep both labeled controls full-width and reachable.
 
-Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).
+Avoid: no existing frontend implementation as a source, no push notifications, no SMS, no quiet-hours controls, no digest-frequency chooser, no toggle switch, no checkbox, no custom alert banner, no icon-only controls, no illustration, no gradients, no glassmorphism, no excessive shadows, no watermark, no extra copy, no misspelled text.

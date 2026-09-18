@@ -1,47 +1,24 @@
-Screen: The usage screen and its upgrade action (plan.usage), route /plan/usage, actor: owner
-State: over-cap-frozen - a create was attempted at the cap and refused
-Behavior to depict: an assertive-live line of copy names the cap and the upgrade path beside a prominent
-usage figure; the upgrade action is the primary action on the screen
+Create a polished product UI mockup as a proposed visual direction, not a screenshot and not implementation proof. Show the Todo plan-usage over-cap-frozen state on a 1280 x 960 desktop canvas.
 
-Business grounding (accepted, do not invent beyond these):
-  - fr.plan.usage.view
-  - fr.plan.upgrade
+Composition: Use a quiet light-gray canvas and a centered reading-width PageContainer with generous negative space. Start with a restrained page header: strong heading, then one supporting sentence. Below, place one white SurfaceCard labeled "Free plan usage" as the only focal surface. Within it, make "24 active tasks" the dominant metric, pair it with a clearly subordinate "Free plan limit: 20" line, then show a full-width Progress indicator filled to its maximum with an explicit accessible label. Follow with the over-cap explanation close to the metric, and end with one primary full-width "Upgrade to paid" action. The hierarchy should explain the frozen creation state at a glance without becoming a dashboard.
 
-Brand (brand/index.yaml rev 2, read do not restate elsewhere):
-  - primary: #2F6BFF
-  - surface: #FFFFFF
-  - typography: Inter, sans-serif
-  - don't: Never place text on the primary colour below a 4.5:1 contrast ratio.
+Aesthetic: Calm, credible productivity software. Inter typeface; white card; charcoal and muted gray typography; soft gray border; small-radius corners; minimal elevation; disciplined 8-pixel rhythm. Use exactly one saturated accent, brand blue #2F6BFF, for the progress fill and primary upgrade button. Do not use warning orange or danger red. Make the large metric numerically clear and keep the explanatory paragraph readable rather than tiny.
 
-Relevant UI knowledge:
-  - knowledge/ui/proof/brand.yaml (BRAND-1, BRAND-2, BRAND-3)
+Grammar anatomy to depict: PageContainer in reading measure; Heading; Text; one SurfaceCard with label "Free plan usage" and negative presentation state; one Progress with value 100 and an accessible plan-usage label; one assertive Text status; one primary Button. The active-task count is 24 while the cap is 20; the bar may visually stop at 100 percent but the adjacent text must preserve the exact overage truth.
 
-Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
-examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
-9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components, no
-invented ones. impl.plan.todo-app-frontend.usage is still unbuilt (blockedBy gap.plan.unbuilt-module), so
-this binding is drawn directly from the real export list rather than an existing block:
-  - SurfaceCard {ariaLabel: "Usage", measure: "formCompact"}
-  - Text {size: "metric-lead"}, the resolved usage-count figure (TextSize includes "metric-lead"
-    specifically for a prominent metric; this is the correct real primitive for the highest-conversion
-    figure on the screen, not a heading)
-  - Progress {label: "Tasks used against your free plan cap", value}, the full-width completion bar
-    showing consumed cap; Progress is the real accessible measurement primitive, not an invented gauge
-  - Text {live: "assertive"}, plain body copy carrying the cap-and-upgrade sentence - Common ships no
-    Message/Alert renderer and Text has no `tone: "danger"` value; severity is carried by the sentence and
-    by `aria-live="assertive"` alone
-  - Button {type: "button", variant: "primary"}, the upgrade action - the primary-emphasis action on the
-    screen, sitting beside the Text line per the layout note, not below the fold
+State behavior: This is an over-cap-frozen state after the plan limit applies. Existing tasks remain. Creating another task is frozen. Completing or deleting active tasks can restore room; upgrading can also restore creation. Do not suggest that any task was deleted, that completed tasks count toward the cap, or that paid plans have a finite task cap.
 
-Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
-GrammarButton/GrammarMessage anatomy, no HeroUI component reached directly, no invented Alert/Toast/Banner
-or a custom progress ring Common does not ship.
+Render these exact visible strings, with correct spelling and no additional copy:
+- "Plan usage"
+- "See what counts toward your current plan."
+- "Free plan usage"
+- "24 active tasks"
+- "Free plan limit: 20"
+- "You're over the free plan limit. Complete or delete tasks, or upgrade to create another."
+- "Upgrade to paid"
 
-Layout note: This is the highest-conversion moment in the product; the upgrade Button must sit beside the
-Text refusal line, not below the fold.
+Knowledge constraints: Apply LAYOUT-1, HIERARCHY-1 through HIERARCHY-3, CTA-1/CTA-2/CTA-3, ACTION-1, STATE-1/STATE-3, FEEDBACK-3, ACCENT-1/ACCENT-3, RESPONSIVE-1, COVERAGE-1, GAP-3/GAP-4/GAP-5, PADDING-4, MEASURE-1/MEASURE-4, SURFACE-2, BOUNDARY-6, FONT-2/FONT-3/FONT-4, TONE-1/TONE-2, FLOW-1/FLOW-2, A11Y-1/A11Y-4, BRAND-1/BRAND-3, COLOR-3/COLOR-5, TRUTH-2/TRUTH-4, and TASTE-1 through TASTE-7/TASTE-9/TASTE-10.
 
-Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
-4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
-beyond brand/assets/**.
+Responsive intent: At mobile-390 preserve title, metric, limit, progress, explanation, then upgrade action. Make the card fluid; let the explanatory text wrap; keep the CTA full-width and do not hide the numeric relationship.
 
-Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).
+Avoid: no existing frontend implementation as a source, no prices, no billing interval, no payment form, no tier-comparison table, no extra analytics, no pie chart, no invented warning color, no deletion confirmation, no decorative illustration, no gradients, no glassmorphism, no excessive shadows, no watermark, no extra copy, no misspelled text.

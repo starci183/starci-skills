@@ -1,50 +1,26 @@
-Screen: The sign-in screen (login.sign-in), route /login, actor: person
-State: refused - server rejects the credentials or the account is unknown
-Behavior to depict: a single line of assertive-live copy appears above the submit action stating the
-credentials were refused; the password field clears, the email is retained
+Use case: ui-mockup
+Asset type: proposed visual direction for the Todo web product; representative sign-in / refused state; desktop-1280
+Primary request: Render a polished, implementation-ready desktop interface direction for a sign-in page after a credential pair has been refused. This is a design direction, not a browser screenshot and not proof of a running product.
 
-Business grounding (accepted, do not invent beyond these):
-  - fr.login.sign-in
+Scene/backdrop: Full-height application canvas in very light neutral grey. No navigation, sidebar, footer, browser chrome, device frame, illustration, photograph, logo, mascot, or decorative art. Centre one compact sign-in surface vertically and horizontally with calm surrounding whitespace.
 
-Brand (brand/index.yaml rev 2, read do not restate elsewhere):
-  - primary: #2F6BFF
-  - surface: #FFFFFF
-  - typography: Inter, sans-serif
-  - don't: Never place text on the primary colour below a 4.5:1 contrast ratio.
+Brand: Use Inter. Use white (#FFFFFF) for the bounded surface and #2F6BFF only for the primary action and restrained focus/accent details. All normal text on white must read at strong contrast; never place low-contrast text on #2F6BFF. No unapproved saturated hues.
 
-Relevant UI knowledge:
-  - knowledge/ui/proof/brand.yaml (BRAND-1, BRAND-2, BRAND-3)
+Grammar anatomy: Follow the installed @starci/grammar 0.4.13 Common family on HeroUI v3, based on its README, dist/common/index.d.ts, renderer types, renderer JavaScript, and dist/common/styles.css. Show the visual anatomy of PageContainer/formPageClassName, one top-level SurfaceCard at compact form measure, Heading level 1, Text, Input(kind email), Input(kind password), and Button(type submit, variant primary, width fill). The refused pair is a surface-level settled negative state; place one Text(live assertive) line near the fields, not a field-specific error and not a coloured custom alert. Preserve visible labels above both inputs. Keep the password empty after refusal and retain the email.
 
-Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
-examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
-9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components,
-verified against the real consuming block at examples/todo-app-frontend/src/components/blocks/sign-in-form/component.tsx,
-no invented ones:
-  - SurfaceCard {ariaLabel: "Sign in", measure: "formCompact"} - the one bounded surface for the whole form,
-    a `depth: "top"` card with no nested card inside it
-  - Input {id: "sign-in-email", name: "email", label: "Email", kind: "email", value, isDisabled, onValueChange}
-  - Input {id: "sign-in-password", name: "password", label: "Password", kind: "password", value, isDisabled,
-    onValueChange}
-  - Text {live: "assertive"}, plain body copy carrying the refusal sentence - Common ships no separate
-    Message/Alert renderer and Text has no `tone: "danger"` value (TextTone is default | muted | accent
-    only); severity is carried by the sentence itself and by `aria-live="assertive"`, not by colour or a
-    `role="alert"` that this package does not set
-  - Button {type: "submit", variant: "primary", width: "fill", isDisabled, isPending} - label reads
-    "Signing in..." while isPending, "Sign in" otherwise; no separate spinner primitive, the pending
-    affordance is the button's own state
+Composition and hierarchy: Surface class is form. One focal point in three seconds: “Sign in”. Inside the card use a clean left-aligned stack with a small heading-to-description gap, a larger gap before the form, consistent field rhythm, then the refusal sentence and the full-width primary button. The card should feel like an unmistakable sign-in page, not a generic card sample. Exactly one filled accent action.
 
-Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
-GrammarButton/GrammarTextField/GrammarMessage anatomy, no HeroUI component reached directly, no invented
-Alert/Toast/Banner.
+Text (verbatim):
+- “Sign in”
+- “Welcome back. Sign in to continue.”
+- “Email”
+- “alex@example.com”
+- “Password”
+- “We couldn’t sign you in with that email and password.”
+- “Sign in”
 
-Layout note: A single centred form, no page chrome besides the product wordmark; this is the only
-unauthenticated screen. The mounting page wraps the card in GrammarRoot > main > Heading(level: 1,
-"Sign in") per examples/todo-app-frontend/src/features/pages/sign-in/index.tsx - draw that heading above
-the card, not a logotype lockup the package does not ship.
+Knowledge constraints: Apply LAYOUT-1, HIERARCHY-1 through HIERARCHY-3, CTA-1 through CTA-3, ACTION-1, STATE-1, STATE-2, FEEDBACK-3, ACCENT-1, RESPONSIVE-1, COVERAGE-1, GAP-3/GAP-4/GAP-5, PADDING-4, MEASURE-1/MEASURE-4, SURFACE-2, BOUNDARY-6, FONT-2/FONT-3/FONT-4, TONE-1/TONE-2, FLOW-1/FLOW-2, A11Y-1/A11Y-4, BRAND-1/BRAND-3, COLOR-5, TRUTH-4, and TASTE-1 through TASTE-7/TASTE-9/TASTE-10.
 
-Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
-4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
-beyond brand/assets/**; no role="alert" badge or icon bolted onto the Text line - Common's own refusal
-anatomy is a plain assertive-live sentence, nothing more.
+Responsive intent: At mobile-390 the same order remains, the card becomes fluid within the page inset, labels wrap naturally, and no control is hidden or reordered.
 
-Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).
+Avoid: no existing frontend implementation as a source, no second card, no split-screen hero, no social sign-in, no forgot-password link, no sign-up link, no extra checkbox, no red banner, no invented icon, no gradients, no glassmorphism, no excessive shadows, no tiny labels, no watermark, no extra copy, no misspelled text.

@@ -1,52 +1,38 @@
-Screen: The invitation screen and the collaborator list (share.invite), route /tasks/:taskId/share, actor: owner
-State: refused - the invite is rejected, for example inviting an existing collaborator twice
-Behavior to depict: an assertive-live line of copy appears beside the invite form stating the invite was
-refused; the existing collaborator list, when one exists, is unchanged beside it
+Use case: ui-mockup
+Asset type: proposed visual direction for the Todo web product; representative invite / invalid-email refused state with existing collaborators; desktop-1280
+Primary request: Render a polished collaborator-management page after the owner entered an invalid invite email, while the existing collaborator list remains unchanged. This is a proposed design direction, not a screenshot and not proof of a running product.
 
-Business grounding (accepted, do not invent beyond these):
-  - fr.share.invite
-  - fr.share.list
+Scene/backdrop: Light neutral application canvas, centred product PageContainer, no browser chrome, device frame, sidebar, illustration, logo, mascot, or decorative art. One page header leads into two regions: an invite SurfaceCard and a separate collaborator collection below it.
 
-Brand (brand/index.yaml rev 2, read do not restate elsewhere):
-  - primary: #2F6BFF
-  - surface: #FFFFFF
-  - typography: Inter, sans-serif
-  - don't: Never place text on the primary colour below a 4.5:1 contrast ratio.
+Brand: Inter, white (#FFFFFF) surfaces, #2F6BFF reserved for the single primary invite action and focus accents, dark readable text, quiet neutral separators. No low-contrast copy on primary and no unapproved saturated hues.
 
-Relevant UI knowledge:
-  - knowledge/ui/composition/collection.yaml (COLLECTION-1, COLLECTION-2)
+Grammar anatomy: Follow installed @starci/grammar 0.4.13 Common family on HeroUI v3 using the README, public declarations, renderer JavaScript, and Common CSS. Use PageContainer, SectionHeader/Heading, SurfaceCard(label Invite collaborator), Input(id invite-email, kind email, isError, errorMessage), an application-owned native radio group labelled “Role” with exactly the peer choices “Viewer” and “Editor”, Button(type submit, variant primary), then SurfaceListCard(label Collaborators, fact 2). Each application-owned collaborator row contains email Text, role Text, a Badge for live status, and a labelled Button(variant outline) for “Revoke”. The collection is a section/container, never a second generic card and never one card per collaborator.
 
-Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
-examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
-9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components, no
-invented ones. impl.share.todo-app-frontend.invite-screen is still unbuilt (blockedBy
-gap.share.unbuilt-module), so this binding is drawn directly from the real export list:
-  - SurfaceCard {ariaLabel: "Invite collaborators", measure: "formCompact"} - the invite form's own
-    bounded surface, holding only the form, never the list
-  - Input {id: "invite-email", name: "email", label: "Invite by email", kind: "email"}
-  - Text {live: "assertive"}, plain body copy carrying the refusal sentence beside the form - Common
-    ships no Message/Alert renderer and Text has no `tone: "danger"` value; severity is carried by the
-    sentence and by `aria-live="assertive"` alone
-  - Button {type: "submit", variant: "primary", isPending}, the invite action
-  - SurfaceListCard {label: "Collaborators", isVerdict: false}, the collaborator list's own container -
-    the real published collection container per COLLECTION-1 case-5, a distinct component from
-    SurfaceCard and not a second card wrapped around the same list
-  - one application-owned row per collaborator inside SurfaceListCard's children, each carrying:
-    Text (the collaborator's email), Badge {tone: "neutral" (pending) | "success" (accepted)}, and
-    Button {type: "button", variant: "ghost"} (revoke) - StaticStateRow cannot hold this row because it
-    is documented non-interactive and a revoke action is required, so the row is application-owned markup
-    exactly as SurfaceListCard's own doc describes ("an application-owned row spells the attribute itself
-    and gets exactly the same shipped edge")
+Composition and hierarchy: Surface class is console. “Share this task” is the page focal point. The invite form is the primary decision region; the invalid-email correction stays on the Email Input per FEEDBACK-1. Existing collaborators remain visible as a stable second region. Exactly one filled accent action: “Send invite”. Row revoke actions are visibly weaker and do not use the primary colour as destructive authority. Align region edges and keep region gap greater than internal form and row gaps.
 
-Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
-GrammarTextField/GrammarButton/GrammarMessage anatomy, no HeroUI component reached directly, no invented
-Alert/Toast/Banner, and no second SurfaceCard wrapped around the collaborator rows.
+Text (verbatim):
+- “Share this task”
+- “Invite people and manage who can access it.”
+- “Invite collaborator”
+- “Email”
+- “alex@”
+- “Enter a valid email address.”
+- “Role”
+- “Viewer”
+- “Editor”
+- “Send invite”
+- “Collaborators”
+- “2”
+- “mia@example.com”
+- “Editor”
+- “Accepted”
+- “sam@example.com”
+- “Viewer”
+- “Pending”
+- “Revoke” (once on each collaborator row)
 
-Layout note: The collaborator list is a page section named by SurfaceListCard's own `label`, never a
-card; one collaborator is one plain row inside it, per COLLECTION-1.
+Knowledge constraints: Apply LAYOUT-1/LAYOUT-3, COLLECTION-1/COLLECTION-2, HIERARCHY-1 through HIERARCHY-3, CTA-1/CTA-4/CTA-5, ACTION-1, STATE-1/STATE-3, FEEDBACK-1, ACCENT-1/ACCENT-5, RESPONSIVE-1/RESPONSIVE-4, COVERAGE-1, GAP-3/GAP-4/GAP-5, PADDING-4, MEASURE-1/MEASURE-2, SURFACE-2, BOUNDARY-3/BOUNDARY-6, FONT-1 through FONT-4, TONE-1/TONE-2, FLOW-1/FLOW-3, A11Y-1/A11Y-4, BRAND-1/BRAND-3, COLOR-3/COLOR-5, TRUTH-2/TRUTH-4, and TASTE-1 through TASTE-7/TASTE-9/TASTE-10.
 
-Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
-4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
-beyond brand/assets/**; no second card nested around the collaborator rows (COLLECTION-2 case-4).
+Responsive intent: At mobile-390 keep header, invite form, then collaborator list in the same reading and focus order. Stack email, role choices, and Send invite; let long email addresses break safely and row actions wrap without clipping.
 
-Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).
+Avoid: no existing frontend implementation as a source, no extra roles, no permissions beyond Viewer and Editor, no avatar photos, no card per collaborator, no nested cards, no icon-only controls, no custom red destructive button, no coloured custom alert banner, no gradients, no glassmorphism, no excessive shadows, no watermark, no extra copy, no misspelled text.

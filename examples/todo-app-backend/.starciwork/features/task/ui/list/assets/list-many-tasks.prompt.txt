@@ -1,49 +1,31 @@
-Screen: The task list and its create form (task.list), route /tasks, actor: owner
-State: many-tasks - the owner has multiple tasks in their list
-Behavior to depict: the create-task form sits above a list of rows, each with a completion checkbox, its
-title, and a delete action; several rows are shown, at least one complete and one incomplete
+Use case: ui-mockup
+Asset type: proposed visual direction for the Todo web product; representative task-list / many-tasks state; desktop-1280
+Primary request: Render a polished desktop product page where an owner can add a task and scan several existing tasks. This is a design direction, not a browser screenshot and not proof of a running product.
 
-Business grounding (accepted, do not invent beyond these):
-  - fr.task.create
+Scene/backdrop: A restrained product-page canvas in very light neutral grey with a centred PageContainer. No browser chrome, device frame, sidebar, illustration, mascot, or decorative art. Use one page heading, then two clearly separated task regions in a single reading column: a compact create surface, followed by the task collection section.
 
-Brand (brand/index.yaml rev 2, read do not restate elsewhere):
-  - primary: #2F6BFF
-  - surface: #FFFFFF
-  - typography: Inter, sans-serif
-  - don't: Never place text on the primary colour below a 4.5:1 contrast ratio.
+Brand: Inter typography; white (#FFFFFF) surfaces; #2F6BFF only for the primary “Add task” action and small interaction accents. Strong dark text, muted supporting text, neutral separators. Never put low-contrast text on the primary colour.
 
-Relevant UI knowledge:
-  - knowledge/ui/composition/collection.yaml (COLLECTION-1, COLLECTION-2)
-  - knowledge/ui/proof/brand.yaml (BRAND-1, BRAND-2, BRAND-3)
+Grammar anatomy: Follow installed @starci/grammar 0.4.13 Common on HeroUI v3 from its README, dist/common declarations, renderer JavaScript, and Common CSS. Use PageContainer(product), SectionHeader/Heading, a top-level SurfaceCard for the single create-task object, Input(id new-task-title, kind text), Button(type submit, variant primary), and a separate SurfaceListCard(label Tasks, fact 3). The repeated tasks are application-owned list rows inside SurfaceListCard, never separate cards and never nested inside the create SurfaceCard. Each row has a native named completion checkbox, task title Text, and a visibly labelled weak “Delete” Button; equal rows share identical separators and spacing.
 
-Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
-examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
-9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components,
-verified against the real consuming block at examples/todo-app-frontend/src/components/blocks/task-list/component.tsx,
-no invented ones. many-tasks, not refused, is the representative state: the real block's `refused` branch
-renders ONLY a Text line and hides the form and the list entirely
-(`state === 'refused' ? <Text live="assertive">...</Text> : <>form + list</>`), so refused is the
-LOWEST-anatomy state on this screen, not the densest one, and is not chosen here.
-  - SurfaceCard {ariaLabel: "Tasks", measure: "formCompact"} - the one bounded surface for the whole
-    screen; the task rows are peers inside it, not their own nested card (COLLECTION-2)
-  - Input {id: "new-task-title", name: "title", label: "New task", value, onValueChange}
-  - Button {type: "submit", variant: "primary", isDisabled} - the create action
-  - a plain `<ul>`/`<li>` row per task (native list markup, not a Grammar composite - the block renders
-    these by hand rather than through SurfaceListCard/StaticStateRow), each row carrying: a native
-    checkbox input bound to the task's `complete` boolean, the task's title text beside it, and
-    Button {type: "button", variant: "ghost", onPress} for delete
+Composition and hierarchy: Surface class is console. The page focal point is “My tasks”. Use the page heading and its one-line description as the anchor, then the “Add a task” card, then the “Tasks” collection. COLLECTION-1 and COLLECTION-2 are critical: the list is a section/container, not one card per task and not a card wrapped inside another card. Keep row actions subordinate; exactly one filled accent action exists in the whole view: “Add task”. Align all left edges and maintain region gap > section gap > row gap.
 
-Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
-GrammarButton/GrammarTextField/GrammarMessage anatomy, no SurfaceListCard/StaticStateRow (the real block
-does not use them here), no HeroUI component reached directly, no invented Alert/Toast/Banner.
+Text (verbatim):
+- “My tasks”
+- “Capture what needs doing and keep the list moving.”
+- “Add a task”
+- “New task”
+- “What needs to be done?”
+- “Add task”
+- “Tasks”
+- “3”
+- “Prepare launch notes”
+- “Book dentist appointment”
+- “Send invoice”
+- “Delete” (once on each task row)
 
-Layout note: The mounting page wraps the card in GrammarRoot > main > Heading(level: 1, "Your tasks") per
-examples/todo-app-frontend/src/features/pages/tasks/index.tsx - draw that heading above the card. The
-create form sits above the row list inside the one SurfaceCard; rows are plain list items, never
-individually carded (COLLECTION-2).
+Knowledge constraints: Apply LAYOUT-1/LAYOUT-3, COLLECTION-1/COLLECTION-2, HIERARCHY-1 through HIERARCHY-3, CTA-1/CTA-5, ACTION-1, STATE-1/STATE-5, ACCENT-1, RESPONSIVE-1/RESPONSIVE-4, COVERAGE-1, GAP-3/GAP-4/GAP-5, PADDING-4, MEASURE-1/MEASURE-2, SURFACE-1/SURFACE-2, BOUNDARY-3/BOUNDARY-6, FONT-2/FONT-3/FONT-4, TONE-1/TONE-2, FLOW-1/FLOW-2, A11Y-1/A11Y-4, BRAND-1/BRAND-3, COLOR-3/COLOR-5, TRUTH-1/TRUTH-4, and TASTE-1 through TASTE-7/TASTE-9/TASTE-11.
 
-Forbidden treatments: no card wrapper around the list of tasks; no text on the primary colour below 4.5:1
-contrast; no invented component outside the Grammar set named above; no fabricated brand mark beyond
-brand/assets/**; no SurfaceListCard/StaticStateRow substitution for the real block's native list markup.
+Responsive intent: At mobile-390 preserve heading, create, then list order. Stack the input and Add task button without reordering; each row wraps title before its actions, never clips, and keeps named controls reachable.
 
-Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).
+Avoid: no existing frontend implementation as a source, no kanban board, no dashboard statistics, no navigation rail, no card per task, no nested cards, no unlabeled icon buttons, no icon-only delete, no custom danger colour, no decorative illustration, no gradients, no glassmorphism, no excessive shadows, no watermark, no extra copy, no misspelled text.

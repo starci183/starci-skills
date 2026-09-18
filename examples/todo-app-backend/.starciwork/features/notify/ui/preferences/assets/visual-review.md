@@ -1,7 +1,7 @@
 # Visual review
 
-The direction shows the refused notification-preferences state at desktop-1280: the refusal sentence sits above a weekly-digest row whose ordinary button remains on, followed by the primary save action.
+The saved PNG opens correctly at 1448 x 1086. **Notification preferences** is followed by one settings card with clear title, support copy, a fully labelled `Email notifications: On` control, a nearby refusal sentence, and a single primary Save preference action. All retained-prompt strings are legible and no unrequested setting appears.
 
-Real `@starci/grammar/common` anatomy depicted: `SurfaceCard`, `Text`, and `Button`; the on/off control is an ordinary `Button`, not an invented switch. The representative refused direction derives loading through skeleton or disabled control treatment, subscribed and unsubscribed through the toggle button variant and confirmation copy, and saving through the save button's pending state.
+The direction stays inside proven Common anatomy: `PageContainer`, heading and text, one `SurfaceCard`, and labelled `Button` controls. It does not pretend Common has a switch or Message primitive. At mobile-390 the card and both actions can become full width in the same order.
 
-This is a visual direction generated from the retained prompt. It is not a render or screenshot of the running product, and it does not prove exact Grammar rendering, component props, semantic DOM, accessibility behavior, interaction behavior, unauthenticated unsubscribe reachability, or API behavior.
+This is proposed direction only. It does not prove exact button semantics, live-region behavior, persistence, email delivery, accessibility, or API results.

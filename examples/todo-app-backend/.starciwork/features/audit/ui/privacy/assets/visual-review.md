@@ -1,7 +1,7 @@
 # Visual review
 
-The direction shows the erasure-refused privacy state at desktop-1280: export and erasure remain independent actions in joined bands of one surface, and an assertive refusal sentence explains that a legal hold prevents erasure while retry remains available.
+The saved PNG opens correctly at 1448 x 1086. **Privacy and data** leads to one joined Privacy actions surface with separate export and erasure bands. Export owns the single filled primary action; erasure is a labelled outline action. The refusal correctly says identity could not be verified and nothing changed, with no invented legal-hold reason.
 
-Real `@starci/grammar/common` anatomy depicted: joined `SurfaceCard`, secondary and outline `Button` actions, and assertive-live `Text`. The representative erasure-refused direction derives idle by removing refusal copy, exporting by applying pending state to export, requesting-erasure by replacing the erasure action with primary confirm and ghost cancel buttons, erasure-pending by disabling actions and using polite status text, and erasure-complete by removing both actions and showing polite completion text.
+The erasure explanation preserves the architecture truth: identifying content stops identifying the person while audit history remains. The direction depicts `PageContainer`, heading and text, joined `SurfaceCard`, primary and outline `Button` treatments, and assertive status copy. Mobile can stack each band without changing export-before-erasure order.
 
-This is a visual direction generated from the retained prompt. It is not a render or screenshot of the running product, and it does not prove exact Grammar rendering, component props, semantic DOM, accessibility behavior, export or erasure effects, policy enforcement, or API behavior.
+This is proposed direction only. It does not prove destructive semantics, confirmation behavior, identity verification, export, crypto-shredding, accessibility, or API results.
