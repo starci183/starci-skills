@@ -57,14 +57,14 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.password.sign-in sends 49 other record(s) back to todo, would
-      stale 16 evidence file(s), and touches 34 code path(s) (app/plan/upgrade-button.tsx,
+      stale 16 evidence file(s), and touches 35 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in/**, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/sign-in-form/**, src/components/blocks/task-list/**,
       src/features/create-task/**, src/features/pages/sign-in/**, src/features/pages/tasks/**,
-      src/features/sign-in/**, src/features/sign-out/**, src/modules/domain/session/**,
-      src/modules/domain/task/completion-authority.contracts.ts,
+      src/features/sign-in/**, src/features/sign-out/**, src/modules/domain/session,
+      src/modules/domain/session/**, src/modules/domain/task/completion-authority.contracts.ts,
       src/modules/domain/task/completion-authority.providers.ts,
       src/modules/domain/task/ownership.guard.ts, src/modules/domain/task/task.repository.ts,
       src/modules/integrations/keycloak/**, src/modules/platform/events/**, src/plan/cap-guard.ts,
@@ -126,14 +126,14 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.restores sends 48 other record(s) back to todo, would
-      stale 14 evidence file(s), and touches 34 code path(s) (app/plan/upgrade-button.tsx,
+      stale 14 evidence file(s), and touches 35 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in/**, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/sign-in-form/**, src/components/blocks/task-list/**,
       src/features/create-task/**, src/features/pages/sign-in/**, src/features/pages/tasks/**,
-      src/features/sign-in/**, src/features/sign-out/**, src/modules/domain/session/**,
-      src/modules/domain/task/completion-authority.contracts.ts,
+      src/features/sign-in/**, src/features/sign-out/**, src/modules/domain/session,
+      src/modules/domain/session/**, src/modules/domain/task/completion-authority.contracts.ts,
       src/modules/domain/task/completion-authority.providers.ts,
       src/modules/domain/task/ownership.guard.ts, src/modules/domain/task/task.repository.ts,
       src/modules/integrations/keycloak/**, src/modules/platform/events/**, src/plan/cap-guard.ts,
@@ -195,14 +195,14 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.single-device sends 48 other record(s) back to todo,
-      would stale 14 evidence file(s), and touches 34 code path(s) (app/plan/upgrade-button.tsx,
+      would stale 14 evidence file(s), and touches 35 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in/**, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/sign-in-form/**, src/components/blocks/task-list/**,
       src/features/create-task/**, src/features/pages/sign-in/**, src/features/pages/tasks/**,
-      src/features/sign-in/**, src/features/sign-out/**, src/modules/domain/session/**,
-      src/modules/domain/task/completion-authority.contracts.ts,
+      src/features/sign-in/**, src/features/sign-out/**, src/modules/domain/session,
+      src/modules/domain/session/**, src/modules/domain/task/completion-authority.contracts.ts,
       src/modules/domain/task/completion-authority.providers.ts,
       src/modules/domain/task/ownership.guard.ts, src/modules/domain/task/task.repository.ts,
       src/modules/integrations/keycloak/**, src/modules/platform/events/**, src/plan/cap-guard.ts,
@@ -902,14 +902,6 @@ findings:
     because: br.share.role.permissions is used 9 time(s) (top decile of fan-in); it is owned by share
       and read by 1 other feature(s) (task), so a change here is cross-feature coupling, not a local
       edit.
-  - id: fan-in-hotspot:br.task.single-owner
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - br.task.single-owner
-    because: br.task.single-owner is used 9 time(s) (top decile of fan-in); it is owned by task and read
-      by 2 other feature(s) (login, share), so a change here is cross-feature coupling, not a local
-      edit.
   - id: fan-in-hotspot:gap.share.unbuilt-module
     kind: fan-in-hotspot
     severity: info
@@ -934,6 +926,14 @@ findings:
     because: br.plan.caps.limit is used 8 time(s) (top decile of fan-in); it is owned by plan and read
       by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change here is
       cross-feature coupling, not a local edit.
+  - id: fan-in-hotspot:br.task.single-owner
+    kind: fan-in-hotspot
+    severity: info
+    records:
+      - br.task.single-owner
+    because: br.task.single-owner is used 8 time(s) (top decile of fan-in); it is owned by task and read
+      by 2 other feature(s) (login, share), so a change here is cross-feature coupling, not a local
+      edit.
   - id: fan-in-hotspot:br.audit.append-only
     kind: fan-in-hotspot
     severity: info
@@ -950,29 +950,6 @@ findings:
     because: br.task.complete.once is used 7 time(s) (top decile of fan-in); it is owned by task and
       read by 1 other feature(s) (notify), so a change here is cross-feature coupling, not a local
       edit.
-  - id: blocker-cycle:br.task.single-owner
-    kind: blocker-cycle
-    severity: critical
-    records:
-      - br.task.single-owner
-      - contract.share.completion-guard-for-task
-      - fr.task.complete
-      - sds.task.ownership-guard
-    because: "A blockedBy ring never reaches a gap or an open decision: br.task.single-owner →
-      sds.task.ownership-guard → contract.share.completion-guard-for-task → fr.task.complete →
-      br.task.single-owner. It never resolves on its own. Candidate anchors already in the tree for
-      the same feature(s) that no ring member currently points at: decision.task.list.scope,
-      gap.share.direction-not-drawn, gap.share.live-proof, gap.share.unbuilt-module,
-      gap.task.live-proof - one of the ring's records should point outward at one of these instead
-      of at another ring member. Edges: br.task.single-owner is blockedBy sds.task.ownership-guard
-      (\"The withdrawn clause was what ac.task.single-owner.refuses-stranger and
-      sds.task.ownership...\"); sds.task.ownership-guard is blockedBy
-      contract.share.completion-guard-for-task (\"br.task.single-owner is todo at rev 2. Its
-      t-owner/t-stranger transitions below described ...\");
-      contract.share.completion-guard-for-task is blockedBy fr.task.complete (\"Neither side exists
-      yet: share's guard (this lane) and task's call site (fr.task.complete,...\"); fr.task.complete
-      is blockedBy br.task.single-owner (\"br.task.single-owner is todo at rev 2; the split it made
-      between complete and delete is no...\")."
   - id: blocker-cycle:contract.plan.create-precondition
     kind: blocker-cycle
     severity: critical
@@ -1124,14 +1101,6 @@ findings:
     because: sds.audit.log-chain authors no owners entry, so it has no bound module and no read-scope
       boundary - anything could claim to implement it, and nothing narrows what a reviewer must open
       to check.
-  - id: unbound-sds:sds.login.session-store
-    kind: unbound-sds
-    severity: warn
-    records:
-      - sds.login.session-store
-    because: sds.login.session-store authors no owners entry, so it has no bound module and no
-      read-scope boundary - anything could claim to implement it, and nothing narrows what a
-      reviewer must open to check.
   - id: unbound-sds:sds.notify.delivery-lifecycle
     kind: unbound-sds
     severity: warn
@@ -1702,6 +1671,14 @@ findings:
       - gap.share.unbuilt-module
     because: br.share.role.permissions is todo, blocked on gap.share.unbuilt-module - code that simply
       has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:br.task.single-owner
+    kind: leftover-todo
+    severity: info
+    records:
+      - br.task.single-owner
+      - gap.task.collaborator-completion
+    because: br.task.single-owner is todo, blocked on gap.task.collaborator-completion - code that
+      simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:contract.plan.create-precondition
     kind: leftover-todo
     severity: info
@@ -1710,6 +1687,15 @@ findings:
       - gap.plan.unbuilt-module
     because: contract.plan.create-precondition is todo, blocked on gap.plan.unbuilt-module - code that
       simply has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:contract.share.completion-guard-for-task
+    kind: leftover-todo
+    severity: info
+    records:
+      - contract.share.completion-guard-for-task
+      - gap.task.collaborator-completion
+    because: contract.share.completion-guard-for-task is todo, blocked on
+      gap.task.collaborator-completion - code that simply has not been written yet; the owner wants
+      this count at zero.
   - id: leftover-todo:data.notify.delivery-attempt
     kind: leftover-todo
     severity: info
@@ -1846,6 +1832,14 @@ findings:
       - gap.share.unbuilt-module
     because: fr.share.revoke is todo, blocked on gap.share.unbuilt-module - code that simply has not
       been written yet; the owner wants this count at zero.
+  - id: leftover-todo:fr.task.complete
+    kind: leftover-todo
+    severity: info
+    records:
+      - fr.task.complete
+      - gap.task.collaborator-completion
+    because: fr.task.complete is todo, blocked on gap.task.collaborator-completion - code that simply
+      has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:impl.audit.todo-app-backend.log
     kind: leftover-todo
     severity: info
@@ -2077,6 +2071,14 @@ findings:
       - sds.share.invitation-lifecycle
       - gap.share.unbuilt-module
     because: sds.share.invitation-lifecycle is todo, blocked on gap.share.unbuilt-module - code that
+      simply has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:sds.task.ownership-guard
+    kind: leftover-todo
+    severity: info
+    records:
+      - sds.task.ownership-guard
+      - gap.task.collaborator-completion
+    because: sds.task.ownership-guard is todo, blocked on gap.task.collaborator-completion - code that
       simply has not been written yet; the owner wants this count at zero.
   - id: stale-evidence-bulk-edit:br.task.complete.once
     kind: stale-evidence-bulk-edit
