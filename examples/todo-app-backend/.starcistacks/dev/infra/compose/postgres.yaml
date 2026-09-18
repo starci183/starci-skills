@@ -1,6 +1,14 @@
 services:
   postgres:
     image: postgres:16
+    environment:
+      # The postgres image refuses to boot without a superuser password (env_file alone declared
+      # DATABASE_URL/REDIS_URL, which this image does not read). These literals match the api's own
+      # default DATABASE_URL (AppConfigService) so the two need no coordination; DEMO-ONLY, never a real
+      # credential.
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: todo
     env_file:
       - ../../runtime/env/app.env
     ports:
@@ -10,4 +18,3 @@ services:
       - todo-postgres:/var/lib/postgresql/data
 volumes:
   todo-postgres: {}
-
