@@ -1,17 +1,15 @@
 schema: work/gap
 id: gap.notify.task-completion-event
 title: task never emits a completion event today
-state: done
+state: todo
 statement: task now emits a completion event - impl.task.todo-app-backend.platform-events's typed
-  in-process PlatformEventBus is done, and complete-task's use case (src/features/complete-task) publishes
-  event.task.completed on it after the write succeeds, exactly as
-  src/features/complete-task/application/complete-task.use-case.ts and its spec show.
-  contract.notify.task-completion-feed's onTaskComplete surface still has no consumer wired to it - that is
-  a separate, unbuilt-module fact, not this one.
+  in-process PlatformEventBus and complete-task's use case (src/features/complete-task) publishing
+  event.task.completed on it after the write succeeds are real and unit-tested, exactly as
+  src/features/complete-task/application/complete-task.use-case.ts and its spec show - but
+  impl.task.todo-app-backend.platform-events itself stays todo rather than done, because its own proves
+  list (event.task.created, event.task.completed, event.task.deleted) is not yet a done product event a
+  subscriber can rely on (PROVES_TARGET_NOT_DONE), and this gap's own closedBy names that same
+  not-yet-done record. contract.notify.task-completion-feed's onTaskComplete surface still has no consumer
+  wired to it - that is a separate, unbuilt-module fact, not this one.
 closedBy: [impl.task.todo-app-backend.platform-events]
-verificationSource: authored-claim
-because: closedBy names an already-done implementation record, so no additional test run proves this
-  specific claim - that complete-task publishes event.task.completed is independently verifiable by
-  reading src/features/complete-task/application/complete-task.use-case.ts and its spec, which
-  impl.task.todo-app-backend.platform-events owns and proves.
-change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}
+change: {rev: 2, kind: clarifying, at: 2026-09-18T09:00:00.000Z, reason: "impl.task.todo-app-backend.platform-events reopened to todo (PROVES_TARGET_NOT_DONE on its own proves list); this gap's done claim and authored-claim evidence were stale against that and are withdrawn - the closedBy target is unchanged, only its own state is not done yet."}

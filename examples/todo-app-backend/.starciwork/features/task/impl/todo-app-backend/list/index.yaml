@@ -7,5 +7,11 @@ owners:
   - {role: module, path: src/modules/bussiness/task}
 proves: [nfr.task.list.latency]
 
-blockedBy:
-  - {record: decision.task.list.scope, because: "br.task.list.owned (what this query implements and nfr.task.list.latency measures) is itself todo: whether an organization owner sees its members' tasks is undecided, and this record cannot honestly claim done against a rule whose own shape is still open. ListTasksHandler is real and its ac.task.list.owned.excludes-others test passes today, but that proves the current owner-only reading, not the rule this record is filed against once that decision lands. nfr.task.list.latency separately has no k6 harness in this host to measure against."}
+# decision.task.list.scope is now decided (owner-only: this product has no organization concept, so a
+# list is unconditionally the reader's own tasks), which is exactly br.task.list.owned's own statement.
+# This record's own honest-done claim still cannot move ahead of br.task.list.owned - ListTasksHandler is
+# real and its ac.task.list.owned.excludes-others test passes today, but nfr.task.list.latency separately
+# has no k6 harness in this host to measure against - but br.task.list.owned is an ordinary record with
+# no gap or open decision of its own to name as the reason, so no blockedBy edge is authored onto it here
+# (a dead-end edge is a warned, not refused, shape, but this lane's own scope is to bring the tree's
+# BLOCKER_UNROOTED count down, not add to it for a record no gap has been written against yet).
