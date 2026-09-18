@@ -6,16 +6,17 @@ import { recordAssertion, walkStep } from '../lib/steps';
 const FEATURE = 'task';
 const FLOW = 'create';
 
-/** No route in this app navigates from /sign-in to /tasks on success (checked: no redirect, no nav link
- *  anywhere in src/app or src/features); a real person's only way there today is the address bar. This
- *  spec goes there the same way, rather than inventing a click target the product does not render. */
+/** grit #36, closed in the login lane: a successful sign-in now navigates to /tasks on its own
+ *  (src/hooks/auth/useSignIn.ts calls router.push('/tasks') after setToken). This waits for that
+ *  navigation instead of driving it by URL, which is what the former "no route navigates" comment here
+ *  used to do before that fix landed. */
 const signInAs = async (page: import('@playwright/test').Page, email: string, password: string) => {
   await page.goto('/sign-in');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForResponse(response => response.url().includes('/auth/sign-in'), { timeout: 10_000 });
-  await page.goto('/tasks');
+  await page.waitForResponse(response => response.url().includes('/graphql'), { timeout: 10_000 });
+  await page.waitForURL('**/tasks', { timeout: 10_000 });
 };
 
 /**

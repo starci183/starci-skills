@@ -48,19 +48,39 @@ stateMachine:
 sequence:
   participants: [browser, api, keycloak, postgres]
   steps:
-    - {from: browser, to: api, message: "POST /auth/sign-in with the pair, observable: http"}
+    - {from: browser, to: api, message: "POST /graphql, signIn mutation with the pair, observable: http"}
     - {from: api, to: keycloak, message: "token request for the pair, observable: http"}
     - {from: keycloak, to: api, message: "subject, or a refusal that names nothing, observable: http"}
     - {from: api, to: postgres, message: "INSERT one session row with its expiry, observable: write"}
-    - {from: api, to: browser, message: "the session cookie and a redirect to the list, observable: http"}
-  note: Only interactions an end-to-end run can observe are bound here. Internal call order is the
-    implementation's business; binding it would make a correct refactor read as a defect.
+    - {from: api, to: browser, message: "the session token in the GraphQL response body (sessionToken),
+        observable: http"}
+    - {from: browser, to: browser, message: "the token is stored in localStorage (not a cookie) and the
+        browser navigates to /tasks, observable: dom"}
+  note: >-
+    Only interactions an end-to-end run can observe are bound here. Internal call order is the
+    implementation's business; binding it would make a correct refactor read as a defect. Renamed from
+    the former REST shape (POST /auth/sign-in, a session cookie, a server-side redirect) on
+    contract.login.identity-for-task rev 3 - the transport moved to GraphQL and the session lives in the
+    browser's localStorage under a bearer token the frontend attaches as "Authorization: Bearer
+    <token>", never a cookie - the state machine above and every transition it names are unchanged.
 
 requiresProof:
   implementation:
     required: true
   transitions:
     forEach: stateMachine.transitions
+
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:40:00.000Z
+  withdraws: ["POST /auth/sign-in with the pair, observable: http", "the session cookie and a redirect
+    to the list, observable: http"]
+  reason: The sequence's browser<->api steps still described the pre-refactor REST/cookie shape
+    (POST /auth/sign-in, a redirect, a session cookie) even though the transport moved to GraphQL and
+    the token has always lived in localStorage, read as a request header (contract.login.identity-for-
+    task). No state, transition or guard changed - only the two steps naming a wire shape the app never
+    actually used since the GraphQL rewrite.
 
 # provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
 provenBy:

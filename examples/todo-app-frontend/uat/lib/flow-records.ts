@@ -65,7 +65,39 @@ export const readFlowRecord = (feature: string, flow: string): UatFlowRecord => 
   };
 };
 
-/** Reads the record's own scoped test-account roster; the password field here is never used at runtime. */
+/**
+ * Every role the shared `identity.todo-app.demo` resource declares (_resources/identities/todo-app-
+ * demo/resource.yaml: person, operator, owner, owner-at-cap, editor, viewer, stranger) resolves to one
+ * of the two demo Keycloak users actually seeded by
+ * .starcistacks/dev/infra/compose/realm-todo.json (DEMO-ONLY, committed for reader round-trip): the
+ * resource lists seven roles but the realm only seeds two concrete accounts, so role -> email is this
+ * fixed, small map rather than something accounts.yaml could name on its own once it moved from
+ * literal `{role, username, password}` entries to `{role, identity}` refs into the shared resource.
+ * 'viewer'/'stranger' get the second seeded user so a flow needing two distinct identities (task's
+ * owner/stranger) gets two distinct real logins; every other role reuses the first.
+ */
+const ROLE_EMAIL: Readonly<Record<string, string>> = {
+  person: 'demo@todo.dev',
+  operator: 'demo@todo.dev',
+  owner: 'demo@todo.dev',
+  'owner-at-cap': 'demo@todo.dev',
+  editor: 'demo@todo.dev',
+  viewer: 'demo2@todo.dev',
+  stranger: 'demo2@todo.dev',
+};
+
+/**
+ * Reads the record's own scoped test-account roster and resolves each `{role, identity}` ref to a real
+ * seeded username via `ROLE_EMAIL` above. The password is never read from this file (see `ROLE_EMAIL`'s
+ * note and `run-context.ts#passwordFor`, which resolves it from the environment instead) - `password`
+ * stays on `DisposableAccount` only for shape compatibility and is always the empty string here.
+ *
+ * Fixed in this lane: this previously read `entry.username`/`entry.password` directly, which matched
+ * an older accounts.yaml shape; every accounts.yaml under examples/todo-app-backend/.starciwork now
+ * authors `{role, identity}` (see work-layout.yaml's uatFlow shape note), so those two fields were
+ * always `String(undefined)` - the literal text "undefined" - and every flow that called this would
+ * have typed that into a real sign-in form instead of a real email.
+ */
 export const readAccounts = (feature: string, flow: string): ReadonlyArray<DisposableAccount> => {
   const file = flowAccountsPath(feature, flow);
   if (!fs.existsSync(file)) return [];
@@ -73,11 +105,12 @@ export const readAccounts = (feature: string, flow: string): ReadonlyArray<Dispo
   if (!raw || raw.schema !== 'work/disposable-accounts' || !Array.isArray(raw.accounts)) {
     throw new Error(`${file} is not a work/disposable-accounts record; refusing to invent one.`);
   }
-  return raw.accounts.map(entry => ({
-    role: String((entry as any).role),
-    username: String((entry as any).username),
-    password: String((entry as any).password),
-  }));
+  return raw.accounts.map(entry => {
+    const role = String((entry as any).role);
+    const email = ROLE_EMAIL[role];
+    if (!email) throw new Error(`${file}: no seeded demo user is known for role "${role}"; add it to ROLE_EMAIL.`);
+    return { role, username: email, password: '' };
+  });
 };
 
 /**
