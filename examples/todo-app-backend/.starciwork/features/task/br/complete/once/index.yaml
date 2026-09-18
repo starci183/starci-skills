@@ -6,7 +6,7 @@ statements:
   - Completing a task that is already complete leaves it unchanged and is not an error.
   - The owner may reopen a task they completed.
 acceptanceCriteria: [is-idempotent, is-reversible]
-module: src/task/complete
+module: [src/features/complete-task/**, src/features/reopen-task/**, src/modules/domain/task/task.repository.ts]
 change:
   rev: 2
   kind: breaking

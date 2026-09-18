@@ -7,5 +7,5 @@ statements:
   - A session that has expired is refused without an error the person must understand.
 acceptanceCriteria:
   - returning-within-the-window-stays-signed-in
-module: src/auth/session
+module: [src/modules/domain/session/**, src/features/sign-out/**]
 change: {rev: 1, kind: initial, at: 2026-09-18T01:02:00.000Z}

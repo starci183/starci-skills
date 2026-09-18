@@ -2,18 +2,19 @@
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
-record: fr.task.create
-recordDigest: 19adec7896719e7b1f8733b7bb3b769690cc27016c52c56ea942f535dfb48507
+record: impl.task.todo-app-backend.platform-events
+recordDigest: da82855f7cfe564f6d66fe62f6fd9a357d27982f902981a6ad9886e803631754
 outcome: pass
 assertions:
-  - id: unit-composed-rules
+  - id: event-bus
     outcome: pass
-    observation: npx jest src/features/create-task exited 0
-  - id: boot-drives-real-create-route
+    observation: npx jest src/modules/platform/events exited 0
+  - id: producers-emit
     outcome: pass
-    observation: npx jest src/app.boot.spec.ts -t "drives sign-in" exited 0
+    observation: npx jest src/features/create-task src/features/complete-task src/features/delete-task
+      src/features/sign-in src/features/sign-out -t event exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T05:29:45.705Z
+  capturedAt: 2026-09-18T05:28:38.093Z

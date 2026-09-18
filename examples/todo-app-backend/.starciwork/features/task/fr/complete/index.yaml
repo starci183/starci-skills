@@ -10,8 +10,8 @@ mainFlow:
 exceptionFlows:
   - A task the actor neither owns nor holds an accepted editor invitation on is refused.
 composes:
-  - {rule: br.task.single-owner, module: src/task/ownership}
-  - {rule: br.task.complete.once, module: src/task/complete}
+  - {rule: br.task.single-owner, module: src/modules/domain/task/**}
+  - {rule: br.task.complete.once, module: src/features/complete-task/**}
   - {rule: br.share.role.permissions, module: src/share/access.service.ts}
 refs: [contract.share.completion-guard-for-task]
 blockedBy:

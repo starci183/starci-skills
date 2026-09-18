@@ -1,0 +1,11 @@
+schema: work/implementation
+id: impl.task.todo-app-backend.create-task
+title: The create-task feature
+state: done
+repository: todo-app
+owners:
+  - {role: feature, path: src/features/create-task/**}
+revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
+proves: [fr.task.create, br.task.title.required]
+verification: [npx jest src/features/create-task exited 0]
+verificationSource: kernel-observed

@@ -12,8 +12,8 @@ exceptionFlows:
 postconditions:
   - Exactly one task exists for that submission.
 composes:
-  - {rule: br.task.single-owner, module: src/task/ownership}
-  - {rule: br.task.title.required, module: src/task/create}
+  - {rule: br.task.single-owner, module: src/modules/domain/task/**}
+  - {rule: br.task.title.required, module: src/features/create-task/**}
 
 requiresProof:
   unit:

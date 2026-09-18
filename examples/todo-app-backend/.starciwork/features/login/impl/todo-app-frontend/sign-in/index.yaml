@@ -1,0 +1,13 @@
+schema: work/implementation
+id: impl.login.todo-app-frontend.sign-in
+title: The sign-in route, feature and block
+state: done
+repository: todo-app-frontend
+owners:
+  - {role: route, path: src/app/sign-in/**}
+  - {role: feature, path: src/features/pages/sign-in/**}
+  - {role: block, path: src/components/blocks/sign-in-form/**}
+revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
+proves: [ui.login.sign-in]
+verification: [npx vitest run src/components/blocks/sign-in-form exited 0]
+verificationSource: kernel-observed

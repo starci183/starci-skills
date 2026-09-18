@@ -1,0 +1,13 @@
+schema: work/gap
+id: gap.login.live-proof
+title: No live proof exists against the real Keycloak or the real Postgres server
+state: todo
+statement: integration.login.keycloak's and integration.login.postgres's requiresProof.live both need a run
+  against the real provider (a real Keycloak token exchange, a real Postgres migration and round-trip),
+  not against FakeKeycloakClient or an in-memory Repository stand-in. This host cannot start the
+  docker-compose dev stack (Keycloak on 8089, Postgres on 5432) that a live run needs, so no such run has
+  happened from here. This is a designed todo, not an oversight - it names exactly the two integrations the
+  owner's own requiresProof.live already curated as needing a real provider, and it stays open until proof
+  is captured on a host that can boot that stack - it is not a stand-in for missing code, missing tests, or
+  an unimplemented feature. No closedBy is named - closing it is a live run captured on a host that can
+  boot the stack, not the completion of some other already-declared record.

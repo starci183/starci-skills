@@ -1,28 +1,19 @@
-# Written by starci-kernel when it settles the operation: the assertions below are the checks it
-# re-ran itself, not what the worker reported. It is a file of its own so that the history of a
-# record is the history of the record, and every re-run does not rewrite what the record says.
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: fr.login.sign-in
-recordDigest: daac990af7cee3df2afebec68bb66574538022629af2ec4db9eacf02fc6d6335
-stale: true
-staleSince: {record: fr.login.sign-in}
-staleReason: The record's index.yaml bytes no longer match recordDigest above; something
-  edited the record after this run captured it, and no fresh run has re-verified it since.
+recordDigest: 4a782d37d90f94db122440d0f47192987e37df9c3ffbe5829c82766325228c47
 outcome: pass
-note: This proves the composed flow, not the rules. Each rule is proven in its own module; what is observed here is that the flow wires them in the right order and passes the right actor.
 assertions:
-  - id: flow-creates-one-session
+  - id: unit-composed-rules
     outcome: pass
-    observation: uat run 20260918-sign-in step 2 captured the list and one session row
-  - id: refusal-path-reaches-the-guard
+    observation: npx jest src/features/sign-in exited 0
+  - id: boot-drives-real-sign-in-route
     outcome: pass
-    observation: npm run test:e2e -- auth/sign-in exited 0
+    observation: npx jest src/app.boot.spec.ts -t "drives sign-in" exited 0
 provenance:
-  actor: starci-kernel
-  tool: starci-kernel
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
   environment: local
-  servedVersions:
-    - repository: todo-app
-      commit: 6f1e4b7d0a9c2e5f8b1d4a7c30f3b6e9d2a5c8f1
-      artifact: worktree
-  capturedAt: 2026-09-18T04:39:00.000Z
+  capturedAt: 2026-09-18T05:29:32.930Z
