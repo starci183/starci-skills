@@ -1,0 +1,55 @@
+schema: starci/uat-run-manifest@1
+id: uat.login.sign-in.runs.20260918T061141Z-af3dfbbc
+nodeId: uat.login.sign-in
+inputDigest: f639fa9ad032595a5119a3d26513e4cb1d70fc53faab3cdac6bb7813efdbc4cb
+outcome: partial-pass
+assertions:
+  - id: ux.sign-in.validation-feedback
+    expected: yes
+    observed: yes
+    note: The submit button stays disabled while either field is empty
+      (SignInFormView disabled logic).
+  - id: fr.login.sign-in
+    expected: yes
+    observed: not-run
+    note: A successful sign-in writes a session row to the shared, other-lane-owned
+      Postgres. This lane is authorized only for the read-only wrong-password
+      check below, so this step is not-run here.
+  - id: br.login.session.restores
+    expected: yes
+    observed: not-run
+    note: Depends on the real signed-in session from fr.login.sign-in above; not-run
+      for the same reason.
+  - id: ux.sign-in.error-feedback
+    expected: yes
+    observed: not-run
+    note: No response observed from /auth/sign-in within the timeout; the API origin
+      did not answer.
+  - id: br.login.password.sign-in
+    expected: yes
+    observed: not-run
+    note: "Same reason: no backend response to compare against a normalized refusal
+      message."
+assets:
+  - path: screens/empty.png
+    sha256: 3f85a512b62e666456201edfe2c3f62e8892fc0ffbe98168a1c3c84bdc5373ff
+    size: 11328
+  - path: screens/filled.png
+    sha256: e0130d9add3d85c64da92f0011d4af852c00cf18adff53ede5209063925c51b1
+    size: 12421
+  - path: screens/working-and-refused.png
+    sha256: aaddcc0e54ea7eebd74895225dfe603fea10d28b0b76bebe06d79c2ced1dfee0
+    size: 14194
+  - path: screens/screenshot.png
+    sha256: 7acdf5402e299a9a58b1674b27f0c677cda0cb595a2c4d1d142404a68cdcfe73
+    size: 14733
+  - path: videos/sign-in.webm
+    sha256: 5911f2b652f8d676d5596f53594e556ac1ced22523972a88ad9b955b3ae02510
+    size: 154839
+provenance:
+  tool: playwright
+  version: 1.63.0
+  browser: chromium
+  baseURL: http://localhost:3000
+  frontendCommit: af3dfbbc
+  backendCommit: af3dfbbc
