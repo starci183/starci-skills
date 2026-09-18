@@ -1,16 +1,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {spawnSync} from 'node:child_process';
 import {parseYaml} from '../core/yaml.mjs';
 
 const RESULT='starci/application-stacks-check@1';
 const STACKS_DIR='.starcistacks';
 const LEGACY_STACKS_DIR='.stacks';
 const MAX_INPUT_BYTES=4*1024*1024;
+const SCHEMA_ID='starci/application-stacks';
+const LEGACY_SCHEMA_ID='starci/application-stacks@1';
+const RUNBOOK_COMMANDS=['prepare','doctor','up','status','logs','down','verification'];
+const PLAINTEXT_SECRET_PATTERN=/\.(key|pem|p12|pfx)$/i;
 const slash=value=>String(value??'').replaceAll('\\','/');
 const inside=(root,target)=>{const rel=path.relative(path.resolve(root),path.resolve(target));return rel===''||(!rel.startsWith('..')&&!path.isAbsolute(rel));};
 const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
 const sensitive=/pass(word)?|secret|token|credential|private[_-]?key|api[_-]?key/i;
+const nonempty=value=>typeof value==='string'&&Boolean(value.trim());
 const moduleDir=path.dirname(fileURLToPath(import.meta.url));
 const compiledSchema=path.resolve(moduleDir,'../schemas/application-stacks.schema.json');
 const sourceSchema=path.resolve(moduleDir,'../schemas/application-stacks.schema.yaml');
@@ -29,8 +35,11 @@ function safeAncestors(root,target){
   while(cursor!==base){if(fs.existsSync(cursor)&&fs.lstatSync(cursor).isSymbolicLink())return false;cursor=path.dirname(cursor);}
   return true;
 }
-const allowed=(value,keys,at,add)=>{if(!object(value)){add('shape-invalid',at,'expected an object');return false;}for(const key of Object.keys(value))if(!keys.includes(key))add('unknown-field',`${at}.${key}`,'field is not defined by starci/application-stacks@1');return true;};
-const nonempty=value=>typeof value==='string'&&Boolean(value.trim());
+function resolvedPath(base,relative){
+  if(!nonempty(relative)||path.isAbsolute(relative)||String(relative).split(/[\\/]/).includes('..'))return null;
+  const target=path.resolve(base,String(relative));return inside(base,target)&&safeAncestors(base,target)?target:null;
+}
+
 function validateSchema(value){
   const errors=[],isObject=value=>value!==null&&typeof value==='object'&&!Array.isArray(value),resolve=ref=>ref.slice(2).split('/').reduce((node,key)=>node?.[key],manifestSchema);
   const check=(node,shape,at)=>{
@@ -68,402 +77,182 @@ function unresolvedCompose(model){
   return Object.values(object(model?.secrets)?model.secrets:{}).some(item=>unresolved(item?.file));
 }
 function sopsEnvelope(file){
-  try{if(fs.statSync(file).size>MAX_INPUT_BYTES)return false;const text=fs.readFileSync(file,'utf8');return /(?:(?:^|\n)sops:|["']sops["']\s*:)/.test(text)&&/ENC\[AES256_GCM,data:/.test(text);}catch{return false;}
+  // Recognizes both the YAML/JSON envelope (a "sops" object) and the flattened dotenv envelope SOPS
+  // emits for a .env member (sops_lastmodified=, sops_mac=, sops_age__list_0__map_enc=, ...).
+  try{if(fs.statSync(file).size>MAX_INPUT_BYTES)return false;const text=fs.readFileSync(file,'utf8');
+    return (/(?:(?:^|\n)sops:|["']sops["']\s*:|(?:^|\n)sops_[a-z0-9_]+=)/.test(text))&&/ENC\[AES256_GCM,data:/.test(text);
+  }catch{return false;}
 }
 
-function validateEnvironmentPolicies(manifest,add){
-  const catalog=new Map((Array.isArray(manifest?.components)?manifest.components:[]).filter(object).map(item=>[item.id,item]));
-  const sourceIds=new Set(),rootRefs=new Set();for(const [index,source] of (Array.isArray(manifest?.sources)?manifest.sources:[]).entries()){
-    const at=`sources[${index}]`;if(!object(source))continue;
-    if(sourceIds.has(source.id))add('schema-policy-invalid',`${at}.id`,'source id must be unique');sourceIds.add(source.id);
-    if(rootRefs.has(source.rootRef))add('schema-policy-invalid',`${at}.rootRef`,'source rootRef must be unique');rootRefs.add(source.rootRef);
-  }
-  for(const name of ['dev','vps']){
-    const spec=manifest?.environments?.[name];if(!object(spec))continue;const bindings=object(spec.components)?spec.components:{};
-    if(spec.runtime!==(name==='dev'?'docker-compose':'docker-swarm'))add('schema-policy-invalid',`environments.${name}.runtime`,`${name} has the wrong container runtime`);
-    for(const id of catalog.keys())if(!Object.hasOwn(bindings,id))add('schema-policy-invalid',`environments.${name}.components.${id}`,'component classification is required');
-    for(const [id,binding] of Object.entries(bindings)){
-      if(!object(binding))continue;const at=`environments.${name}.components.${id}`;
-      if(binding.ownership==='managed'&&((!nonempty(binding.service)&&!object(spec.profiles))||!nonempty(binding.failureDomain)))add('schema-policy-invalid',at,'managed component requires failureDomain and either a service or explicit profiles');
-      if(binding.ownership==='external'&&(!nonempty(binding.owner)||!nonempty(binding.failureDomain)||!nonempty(binding.endpointRef)||binding.service!==undefined))add('schema-policy-invalid',at,'external component requires owner, failureDomain and endpointRef and forbids service');
-      if(binding.ownership==='excluded'&&(!nonempty(binding.reason)||binding.service!==undefined))add('schema-policy-invalid',at,'excluded component requires reason and forbids service');
-      if(binding.ownership==='excluded'&&catalog.get(id)?.required!==false)add('schema-policy-invalid',at,'required component cannot be excluded');
-    }
-    if(name==='dev'&&object(spec.profiles)){
-      const exclusiveGroups=new Set();for(const [profileName,profile] of Object.entries(spec.profiles)){
-      const at=`environments.dev.profiles.${profileName}`,profileBindings=object(profile?.components)?profile.components:{},ports=new Set();
-      if(!nonempty(profile?.exclusiveGroup))add('schema-policy-invalid',`${at}.exclusiveGroup`,'profile requires a mutually exclusive group');
-      else exclusiveGroups.add(profile.exclusiveGroup);
-      for(const id of catalog.keys())if(!Object.hasOwn(profileBindings,id))add('schema-policy-invalid',`${at}.components.${id}`,'every profile must classify every component');
-      for(const [id,binding] of Object.entries(profileBindings)){
-        const bat=`${at}.components.${id}`;
-        if(!catalog.has(id))add('schema-policy-invalid',bat,'profile component must exist in the component inventory');
-        if(binding?.mode==='docker-service'&&!nonempty(binding.service))add('schema-policy-invalid',`${bat}.service`,'docker-service mode requires a service');
-        if(binding?.mode==='host-process'&&(!nonempty(binding.source)||!nonempty(binding.sourceRoot)||!nonempty(binding.command)||!nonempty(binding.envFile)||!object(binding.readiness)))add('schema-policy-invalid',bat,'host-process mode requires source, sourceRoot, command, envFile and readiness');
-        if(binding?.mode==='external'&&(!nonempty(binding.owner)||!nonempty(binding.failureDomain)||!nonempty(binding.endpointRef)))add('schema-policy-invalid',bat,'external mode requires owner, failureDomain and endpointRef');
-        if(binding?.remoteApi!==undefined){
-          if(binding.mode!=='external'||!['frontend','backend','worker'].includes(catalog.get(id)?.role))add('schema-policy-invalid',`${bat}.remoteApi`,'remoteApi is explicit only for an external application API component');
-          const callers=Array.isArray(binding.remoteApi?.callers)?binding.remoteApi.callers:[],seenCallers=new Set();
-          for(const [index,caller] of callers.entries()){
-            const cat=`${bat}.remoteApi.callers[${index}]`,hasSecret=nonempty(caller?.authRef),hasPublic=nonempty(caller?.publicAuthRationale);
-            if(seenCallers.has(caller?.component))add('schema-policy-invalid',`${cat}.component`,'remote API callers must be unique');else seenCallers.add(caller?.component);
-            if(hasSecret===hasPublic)add('schema-policy-invalid',cat,'remote API caller requires exactly one declared-secret authRef or publicAuthRationale');
-          }
-        }
-        if(binding?.mode==='excluded'&&(!nonempty(binding.reason)||catalog.get(id)?.required!==false))add('schema-policy-invalid',bat,'only optional components may be excluded with a reason');
-        for(const [index,port] of (Array.isArray(binding?.ports)?binding.ports:[]).entries())if(object(port)){
-          if(!validPort(port.host)||(binding?.mode==='docker-service'&&!validPort(port.container))||(binding?.mode==='host-process'&&port.container!==undefined))add('schema-policy-invalid',`${bat}.ports[${index}]`,'ports require host integer 1..65535; docker-service also requires container, while host-process forbids it');
-          else {if(ports.has(port.host))add('schema-policy-invalid',`${bat}.ports`,'host ports must be unique within one profile');ports.add(port.host);}
-        }
-      }
-      }if(exclusiveGroups.size>1)add('schema-policy-invalid','environments.dev.profiles','all dev profiles for one closed inventory must share one exact exclusiveGroup');
-    }
-    const names=new Set();for(const [index,secret] of (Array.isArray(spec.secrets)?spec.secrets:[]).entries()){
-      if(!object(secret))continue;const at=`environments.${name}.secrets[${index}]`;
-      if(names.has(secret.name))add('schema-policy-invalid',`${at}.name`,'secret name must be unique');names.add(secret.name);
-      if(secret.source==='generated'&&(!nonempty(secret.generationAlgorithm)||!nonempty(secret.formatPolicy)))add('schema-policy-invalid',at,'generated secret requires generationAlgorithm and formatPolicy');
-      if(secret.source==='provider-issued'&&!nonempty(secret.sourceOwner))add('schema-policy-invalid',at,'provider-issued secret requires sourceOwner');
-      if(name==='dev'&&!nonempty(secret.materializedPath))add('schema-policy-invalid',at,'dev secret requires materializedPath');
-      if(name==='vps'&&(!nonempty(secret.runtimeName)||!nonempty(secret.version)||secret.materializedPath!==undefined||secret.runtimeName===secret.name))add('schema-policy-invalid',at,'VPS secret requires distinct versioned runtimeName and version and forbids materializedPath');
-    }
-    if(name==='vps'){
-      if(spec.profiles!==undefined)add('schema-policy-invalid','environments.vps.profiles','native/Docker application profiles are a development contract');
-      for(const key of ['update','rollback','backup','restore'])if(!nonempty(spec.runbook?.[key]))add('schema-policy-invalid',`environments.vps.runbook.${key}`,'VPS lifecycle command is required');
-      if(!nonempty(spec.platform?.ubuntu)||!Array.isArray(spec.platform?.architectures)||!spec.platform.architectures.length)add('schema-policy-invalid','environments.vps.platform','VPS Ubuntu and architecture bounds are required');
-    }
-  }
+function gitTrackedSet(root){
+  try{
+    const result=spawnSync('git',['-C',root,'ls-files','--',STACKS_DIR],{encoding:'utf8',timeout:5000,windowsHide:true});
+    if(result.error||result.status!==0||typeof result.stdout!=='string')return null;
+    return new Set(result.stdout.split(/\r?\n/).filter(Boolean).map(slash));
+  }catch{return null;}
 }
-
-function resolvedPath(base,relative){
-  if(!nonempty(relative)||path.isAbsolute(relative)||String(relative).split(/[\\/]/).includes('..'))return null;
-  const target=path.resolve(base,String(relative));return inside(base,target)&&safeAncestors(base,target)?target:null;
+function composeLike(file){
+  try{
+    if(fs.statSync(file).size>MAX_INPUT_BYTES)return false;
+    const doc=parseYaml(fs.readFileSync(file,'utf8'));
+    return object(doc)&&(object(doc.services)||Array.isArray(doc.include));
+  }catch{return false;}
 }
-function regularRepoRef(root,value,{stacksOnly=false}={}){
-  const named=slash(value);
-  if(!nonempty(value)||named.includes('#')||named==='.starcistacks/staging'||named.startsWith('.starcistacks/staging/'))return false;
-  if(stacksOnly&&!named.startsWith('.starcistacks/'))return false;
-  const base=stacksOnly?path.join(root,'.starcistacks'):root;
-  const relative=stacksOnly?String(value).replace(/^\.starcistacks[\\/]/,''):String(value);
-  const target=resolvedPath(base,relative);
-  try{return Boolean(target&&regular(target,{root:base})&&fs.statSync(target).size<=MAX_INPUT_BYTES);}catch{return false;}
-}
-const loopback=host=>['localhost','127.0.0.1','::1'].includes(String(host??'').toLowerCase());
-const immutableImage=value=>typeof value==='string'&&/@sha256:[a-f0-9]{64}$/i.test(value);
-const validPort=value=>Number.isInteger(value)&&value>=1&&value<=65535;
-function portMatches(ports,side,value){return (Array.isArray(ports)?ports:[]).some(item=>object(item)&&item[side]===value);}
-function validReadiness(readiness,ports,side){
-  if(!object(readiness)||!['http','https','tcp'].includes(readiness.scheme)||!loopback(readiness.host)||!validPort(readiness.port)||!portMatches(ports,side,readiness.port))return false;
-  return readiness.scheme==='tcp'?readiness.path==='':nonempty(readiness.path)&&readiness.path.startsWith('/');
-}
-function enabledHealthcheck(service){
-  const health=service?.healthcheck;if(!object(health)||health.disable===true)return false;
-  const test=health.test;if(typeof test==='string')return nonempty(test)&&test.trim().toUpperCase()!=='NONE';
-  return Array.isArray(test)&&test.length>0&&String(test[0]).toUpperCase()!=='NONE';
-}
-function serviceHasSecret(service,name){
-  return (Array.isArray(service?.secrets)?service.secrets:[]).some(item=>(typeof item==='string'?item:item?.source)===name);
-}
-
-function validateProfileSources({root,manifest,model,profile,profileName,components,add}){
-  const declarations=new Map(),bindings=object(model?.['x-starci-sources'])?model['x-starci-sources']:{},resolvedRoots=new Map();
-  for(const [index,source] of (Array.isArray(manifest.sources)?manifest.sources:[]).entries()){
-    const at=`sources[${index}]`;if(!object(source))continue;
-    if(declarations.has(source.id))add('source-duplicate',`${at}.id`,'source IDs must be unique');else declarations.set(source.id,source);
-    const binding=bindings[source.id];
-    if(!object(binding)||!nonempty(binding.root)||!nonempty(binding.revision)){add('source-binding-missing',`x-starci-sources.${source.id}`,'selected profile source needs a rendered root and revision binding');continue;}
-    if(binding.revision!==source.revision)add('source-revision-mismatch',`x-starci-sources.${source.id}.revision`,'rendered source revision differs from the immutable manifest revision');
-    const sourceRoot=path.isAbsolute(binding.root)?path.resolve(binding.root):path.resolve(root,binding.root);
-    if(!directory(sourceRoot)||!regular(path.join(sourceRoot,'package.json'),{root:sourceRoot}))add('source-root-unavailable',`x-starci-sources.${source.id}.root`,'source root must be an available regular repository/package root; path value omitted');
-    if(directory(sourceRoot))resolvedRoots.set(source.id,sourceRoot);
+function reachableComposeFiles(envDir,entries){
+  const reachable=new Set(),queue=[...entries];
+  while(queue.length){
+    const relative=queue.shift(),target=resolvedPath(envDir,relative);
+    if(!target||reachable.has(target))continue;
+    reachable.add(target);
+    if(!regular(target,{root:envDir}))continue;
+    let doc=null;try{doc=parseYaml(fs.readFileSync(target,'utf8'));}catch{continue;}
+    for(const include of Array.isArray(doc?.include)?doc.include:[])
+      if(typeof include==='string')queue.push(slash(path.join(path.relative(envDir,path.dirname(target)),include)));
   }
-  for(const id of Object.keys(bindings))if(!declarations.has(id))add('source-binding-unclassified',`x-starci-sources.${id}`,'rendered source binding is absent from the manifest source inventory');
-  for(const [id,binding] of Object.entries(profile.components??{})){
-    if(!object(binding)||!['docker-service','host-process'].includes(binding.mode))continue;
-    const role=components.find(item=>item?.id===id)?.role,source=declarations.get(binding.source),rendered=source?bindings[source.id]:null;
-    const at=`environments.dev.profiles.${profileName}.components.${id}`;
-    if(['frontend','backend','worker','bootstrap'].includes(role)&&(!source||!nonempty(binding.sourceRoot)))add('profile-source-missing',`${at}.source`,'application process needs a declared immutable source and package root binding');
-    const renderedRoot=source?resolvedRoots.get(source.id):null;
-    if(!source||!object(rendered)||!renderedRoot)continue;
-    const packageRoot=resolvedPath(renderedRoot,binding.sourceRoot??'.');
-    if(!packageRoot||!directory(packageRoot)||!regular(path.join(packageRoot,'package.json'),{root:renderedRoot})){
-      add('profile-source-root-invalid',`${at}.sourceRoot`,'component sourceRoot must identify a package below its rendered source root');continue;
-    }
-    if(binding.mode==='host-process'){
-      let pkg={};try{pkg=JSON.parse(fs.readFileSync(path.join(packageRoot,'package.json'),'utf8'));}catch{add('source-package-invalid',`${at}.sourceRoot`,'source package.json must be valid JSON');}
-      if(!nonempty(binding.command)||!nonempty(pkg?.scripts?.[binding.command]))add('native-command-missing',`${at}.command`,'host process command must name an actual package.json script');
-      const envFile=resolvedPath(path.join(root,'.starcistacks'),String(binding.envFile??'').replace(/^\.starcistacks[\\/]/,''));
-      if(!envFile)add('native-env-path-invalid',`${at}.envFile`,'native env file must remain below .starcistacks; contents are not read by the checker');
-      else if(!regular(envFile,{root:path.join(root,'.starcistacks')}))add('native-env-unavailable',`${at}.envFile`,'selected native env file must exist as a regular non-link file; contents are not read by the checker');
-      if(!validReadiness(binding.readiness,binding.ports,'host'))add('native-readiness-invalid',`${at}.readiness`,'host readiness requires loopback, a declared port 1..65535, an HTTP(S) absolute path, or an empty TCP path');
-    }else{
-      if(!object(binding.build))add('docker-build-binding-missing',`${at}.build`,'application Docker service needs exact source build inputs');
-      else{
-        const context=resolvedPath(renderedRoot,binding.build.context),dockerfile=context&&resolvedPath(context,binding.build.dockerfile);
-        if(!context||!directory(context))add('docker-build-context-invalid',`${at}.build.context`,'build context must be an available directory below the bound source root');
-        if(!dockerfile||!regular(dockerfile,{root:rendered.__resolvedRoot}))add('dockerfile-invalid',`${at}.build.dockerfile`,'Dockerfile must be a regular file inside the bound source root');
-        for(const [index,input] of (Array.isArray(binding.build.inputs)?binding.build.inputs:[]).entries()){
-          const target=resolvedPath(renderedRoot,input);
-          if(!target||!fs.existsSync(target))add('docker-build-input-unavailable',`${at}.build.inputs[${index}]`,'declared build input is unavailable below the bound source root');
-        }
-        const service=model.services?.[binding.service],renderedBuild=object(service?.build)?service.build:{context:service?.build};
-        const actualContext=typeof renderedBuild.context==='string'?path.resolve(root,renderedBuild.context):null;
-        if(!actualContext||!context||path.resolve(actualContext)!==path.resolve(context))add('docker-build-context-mismatch',`services.${binding.service}.build.context`,'rendered build context differs from the selected component source binding');
-        const renderedDockerfile=typeof renderedBuild.dockerfile==='string'?renderedBuild.dockerfile:'Dockerfile';
-        if(context&&dockerfile&&path.resolve(context,renderedDockerfile)!==path.resolve(dockerfile))add('dockerfile-mismatch',`services.${binding.service}.build.dockerfile`,'rendered Dockerfile differs from the selected component build binding');
-      }
+  return reachable;
+}
+function scanForUndeclaredCompose(root,envDir,reachable,add,at){
+  const infra=path.join(envDir,'infra');
+  if(!directory(infra))return;
+  const stack=[infra];
+  while(stack.length){
+    const dir=stack.pop();
+    let entries=[];try{entries=fs.readdirSync(dir,{withFileTypes:true});}catch{continue;}
+    for(const entry of entries){
+      const full=path.join(dir,entry.name);
+      if(entry.isSymbolicLink())continue;
+      if(entry.isDirectory()){stack.push(full);continue;}
+      if(!/\.ya?ml$/i.test(entry.name)||reachable.has(full)||!composeLike(full))continue;
+      add('STACKS_UNDECLARED_COMPOSE',at,`${slash(path.relative(root,full))} is a Compose-shaped file under infra/ that is not declared or reachable from composeFiles; the composeFiles list must be the complete list for this environment`);
     }
   }
-  return {declarations,bindings,resolvedRoots};
-}
-
-function renderedPorts(service){
-  const ports=[];for(const item of Array.isArray(service?.ports)?service.ports:[]){
-    if(object(item)){const host=Number(item.published),container=Number(item.target);if(Number.isInteger(host)&&Number.isInteger(container))ports.push({host,container});continue;}
-    const value=String(item),plain=value.split('/')[0],parts=plain.split(':');if(parts.length<2)continue;
-    const host=Number(parts.at(-2)),container=Number(parts.at(-1));if(Number.isInteger(host)&&Number.isInteger(container))ports.push({host,container});
-  }return ports;
-}
-
-function validateRemoteApis({root,spec,model,components,bindings,add}){
-  const secretNames=new Set((Array.isArray(spec.secrets)?spec.secrets:[]).map(item=>item?.name).filter(nonempty));
-  const nativeSecretRefs=new Set();
-  for(const [id,binding] of Object.entries(bindings)){
-    if(!object(binding?.remoteApi))continue;
-    const at=`environments.dev.profiles.${model['x-starci-profile']}.components.${id}`,api=binding.remoteApi;
-    const role=components.find(item=>item?.id===id)?.role;
-    const canonical=spec.components?.[id];
-    if(binding.mode!=='external'||!['frontend','backend','worker'].includes(role))add('remote-api-placement-invalid',`${at}.remoteApi`,'remoteApi is explicit only for an external application API component');
-    if(binding.service!==undefined)add('remote-api-local-service-conflict',`${at}.service`,'a remote application API cannot also name a local Compose service');
-    for(const field of ['owner','failureDomain','endpointRef'])if(!object(canonical)||canonical.ownership!=='external'||binding[field]!==canonical[field])add('remote-api-authority-mismatch',`${at}.${field}`,'selected remote API authority must exactly match the canonical environment component binding');
-    if(!/^[A-Z][A-Z0-9_]*$/.test(String(binding.endpointRef??'')))add('remote-api-endpoint-ref-invalid',`${at}.endpointRef`,'remote API endpointRef must name a caller configuration key');
-    if(!regularRepoRef(root,api.deploymentRef,{stacksOnly:true}))add('remote-api-deployment-ref-unavailable',`${at}.remoteApi.deploymentRef`,'deploymentRef must resolve to a bounded regular non-link file below .starcistacks');
-    if(!regularRepoRef(root,api.contractRef))add('remote-api-contract-ref-unavailable',`${at}.remoteApi.contractRef`,'contractRef must resolve to a bounded regular non-link repository file');
-    if(!object(api.readiness)||!['http','https'].includes(api.readiness.scheme)||!/^\/(?!\/)[^?#]*$/.test(String(api.readiness.path??'')))add('remote-api-readiness-invalid',`${at}.remoteApi.readiness`,'remote API readiness requires HTTP(S) and one absolute path without authority, query, or fragment');
-    if(!regularRepoRef(root,api.readiness?.verificationRef))add('remote-api-verification-ref-unavailable',`${at}.remoteApi.readiness.verificationRef`,'verificationRef must resolve to a bounded regular non-link repository script, test, or runbook');
-    const callers=Array.isArray(api.callers)?api.callers:[],seen=new Set();
-    for(const [index,caller] of callers.entries()){
-      const cat=`${at}.remoteApi.callers[${index}]`,callerBinding=bindings[caller?.component],callerRole=components.find(item=>item?.id===caller?.component)?.role;
-      if(seen.has(caller?.component))add('remote-api-caller-duplicate',`${cat}.component`,'remote API callers must be unique');else seen.add(caller?.component);
-      if(caller?.component===id||!object(callerBinding)||!['docker-service','host-process'].includes(callerBinding.mode)||!['frontend','backend','worker'].includes(callerRole))add('remote-api-caller-invalid',`${cat}.component`,'remote API caller must resolve to a different selected application process component');
-      if(!Number.isInteger(caller?.timeoutMs)||caller.timeoutMs<1||caller.timeoutMs>300000)add('remote-api-timeout-invalid',`${cat}.timeoutMs`,'remote API timeoutMs must be an integer from 1 through 300000');
-      const hasSecret=nonempty(caller?.authRef),hasPublic=nonempty(caller?.publicAuthRationale);
-      if(hasSecret===hasPublic)add('remote-api-auth-invalid',cat,'remote API caller requires exactly one declared-secret authRef or publicAuthRationale');
-      else if(hasSecret&&!secretNames.has(caller.authRef))add('remote-api-auth-ref-unbound',`${cat}.authRef`,'authRef must resolve to this environment secret custody inventory');
-      else if(hasSecret&&callerBinding?.mode==='docker-service'&&!serviceHasSecret(model.services?.[callerBinding.service],caller.authRef))add('remote-api-auth-not-granted',`${cat}.authRef`,'Docker caller must receive the declared remote API secret grant');
-      else if(hasSecret&&callerBinding?.mode==='host-process')nativeSecretRefs.add(caller.authRef);
-      if(callerBinding?.mode==='docker-service'&&!envEntries(model.services?.[callerBinding.service]?.environment).some(([key])=>key===binding.endpointRef))add('remote-api-endpoint-not-bound',`${cat}.component`,'Docker caller environment must declare the exact remote API endpointRef key; value is not returned');
-    }
-  }
-  return nativeSecretRefs;
-}
-
-function validateDevProfile({root,manifest,model,spec,components,ids,requiredComponents,add}){
-  if(!object(spec?.profiles))return null;
-  const profileName=model?.['x-starci-profile'];
-  if(!nonempty(profileName)||!object(spec.profiles[profileName])){add('profile-selection-invalid','x-starci-profile','rendered dev model must select exactly one declared profile');return {name:null,components:{},managed:new Map()};}
-  const profile=spec.profiles[profileName],bindings=object(profile.components)?profile.components:{},managed=new Map(),hostPorts=new Map();
-  if(!nonempty(profile.exclusiveGroup))add('profile-exclusive-group-missing',`environments.dev.profiles.${profileName}.exclusiveGroup`,'profile must bind its mutually exclusive runtime group');
-  for(const id of ids)if(!Object.hasOwn(bindings,id))add('profile-component-unclassified',`environments.dev.profiles.${profileName}.components.${id}`,'selected profile must classify every application component');
-  for(const [id,binding] of Object.entries(bindings)){
-    const at=`environments.dev.profiles.${profileName}.components.${id}`,role=components.find(item=>item?.id===id)?.role;
-    if(!ids.has(id)){add('profile-component-invalid',at,'profile component is absent from the application inventory');continue;}
-    if(!object(binding))continue;
-    if(!['docker-service','host-process','external','excluded'].includes(binding.mode))add('profile-mode-invalid',`${at}.mode`,'profile mode is unsupported');
-    if(binding.mode==='docker-service'){
-      if(!nonempty(binding.service)||managed.has(binding.service))add('profile-service-invalid',`${at}.service`,'docker-service needs one unique Compose service');else managed.set(binding.service,id);
-      if(['stateful','gateway'].includes(role)&&!immutableImage(binding.image))add('profile-image-not-immutable',`${at}.image`,'dependency service image must use an immutable sha256 digest');
-      if(nonempty(binding.image)&&model.services?.[binding.service]?.image!==binding.image)add('profile-image-mismatch',`services.${binding.service}.image`,'rendered dependency image differs from the profile immutable identity');
-      const actualPorts=renderedPorts(model.services?.[binding.service]);
-      for(const [index,port] of (Array.isArray(binding.ports)?binding.ports:[]).entries())if(!actualPorts.some(item=>item.host===port.host&&item.container===port.container))add('profile-port-mismatch',`${at}.ports[${index}]`,'rendered Compose port differs from the selected profile host/container binding');
-      if(['frontend','backend','worker'].includes(role)&&requiredComponents.has(id)
-        &&!validReadiness(binding.readiness,binding.ports,'host')&&!enabledHealthcheck(model.services?.[binding.service])){
-        add('docker-readiness-missing',`${at}.readiness`,'required Docker application needs loopback readiness bound to a declared host port or an enabled Compose healthcheck');
-      }
-    }else if(binding.mode==='host-process'){
-      if(!['frontend','backend','worker'].includes(role))add('profile-host-role-invalid',at,'only application frontend/backend/worker components may run as host processes');
-      if(binding.service!==undefined)add('profile-host-service-present',`${at}.service`,'host process cannot also name a Compose service');
-    }else if(binding.mode==='external'){
-      if(!nonempty(binding.owner)||!nonempty(binding.failureDomain)||!nonempty(binding.endpointRef))add('profile-external-authority-missing',at,'external profile component needs owner, failureDomain, and endpointRef');
-    }else if(binding.mode==='excluded'){
-      if(!nonempty(binding.reason)||requiredComponents.has(id))add('profile-exclusion-invalid',at,'only optional components may be excluded with a reason');
-    }
-    for(const port of Array.isArray(binding.ports)?binding.ports:[]){
-      if(!object(port)||!Number.isInteger(port.host)||port.host<1||port.host>65535)continue;
-      if(hostPorts.has(port.host))add('profile-port-conflict',`${at}.ports`,'selected profile assigns one host port to multiple components');else hostPorts.set(port.host,id);
-    }
-    if(role==='stateful'&&binding.mode==='docker-service'&&(!Array.isArray(binding.storage)||!binding.storage.length))add('stateful-custody-missing',`${at}.storage`,'stateful service needs named storage custody and backup references');
-  }
-  const nativeSecretRefs=validateRemoteApis({root,spec,model,components,bindings,add});
-  const sources=validateProfileSources({root,manifest,model,profile,profileName,components,add});
-  for(const [id,binding] of Object.entries(bindings)){
-    if(!object(binding))continue;const at=`environments.dev.profiles.${profileName}.components.${id}`;
-    for(const [index,connection] of (Array.isArray(binding.connections)?binding.connections:[]).entries()){
-      const target=bindings[connection?.component],cat=`${at}.connections[${index}]`;
-      if(!validPort(connection?.port)){add('profile-connection-port-invalid',`${cat}.port`,'connection port must be an integer from 1 through 65535');continue;}
-      if(!object(target)){add('profile-connection-target-invalid',`${cat}.component`,'connection target must be a component in the selected profile');continue;}
-      if(target.mode==='docker-service'&&binding.mode==='host-process'){
-        if(!loopback(connection.host)||!portMatches(target.ports,'host',connection.port))add('native-connection-invalid',cat,'host process must reach Docker dependency through loopback and its published host port');
-      }else if(target.mode==='host-process'&&binding.mode==='host-process'){
-        if(!loopback(connection.host)||!portMatches(target.ports,'host',connection.port))add('native-connection-invalid',cat,'host process must reach another host process through loopback and its declared host port');
-      }else if(target.mode==='docker-service'&&binding.mode==='docker-service'){
-        if(connection.host!==target.service||!portMatches(target.ports,'container',connection.port))add('docker-connection-invalid',cat,'Docker application must reach dependency through its service DNS name and container port');
-      }else if(target.mode==='host-process'&&binding.mode==='docker-service'){
-        add('profile-connection-mode-unsupported',cat,'Docker-to-host process routing needs an explicit supported gateway contract; container loopback is not the host process');
-      }
-    }
-  }
-  const volumes=object(model.volumes)?model.volumes:{};
-  const volumeOwners=new Map();
-  for(const [id,binding] of Object.entries(bindings))for(const [index,storage] of (Array.isArray(binding?.storage)?binding.storage:[]).entries()){
-    const at=`environments.dev.profiles.${profileName}.components.${id}.storage[${index}]`,service=model.services?.[binding.service];
-    if(volumeOwners.has(storage?.volume)&&volumeOwners.get(storage.volume)!==binding.service)add('profile-volume-owner-conflict',`${at}.volume`,'one custodied state volume cannot have multiple owning services');else if(nonempty(storage?.volume))volumeOwners.set(storage.volume,binding.service);
-    if(!object(volumes[storage?.volume]))add('profile-volume-undeclared',`${at}.volume`,'custodied storage must be a named volume in the rendered model');
-    const mounted=(Array.isArray(service?.volumes)?service.volumes:[]).some(item=>(typeof item==='string'?item.split(':')[0]:item?.source)===storage?.volume);
-    if(!mounted)add('profile-volume-unmounted',`${at}.volume`,'custodied named volume must be mounted by its owning service');
-  }
-  for(const [service,definition] of Object.entries(model.services??{}))for(const [index,mount] of (Array.isArray(definition?.volumes)?definition.volumes:[]).entries()){
-    const source=typeof mount==='string'?(mount.includes(':')?mount.split(':')[0]:null):mount?.source,owner=volumeOwners.get(source);
-    if(owner&&owner!==service)add('profile-volume-owner-mismatch',`services.${service}.volumes[${index}]`,'custodied state volume may be mounted only by its declared owning profile service');
-  }
-  for(const [id,binding] of Object.entries(bindings)){
-    const role=components.find(item=>item?.id===id)?.role;if(role!=='stateful'||binding?.mode!=='docker-service')continue;
-    const custodied=new Set((Array.isArray(binding.storage)?binding.storage:[]).map(item=>item?.volume).filter(nonempty));
-    for(const [index,mount] of (Array.isArray(model.services?.[binding.service]?.volumes)?model.services[binding.service].volumes:[]).entries()){
-      const anonymous=typeof mount==='string'?!mount.includes(':'):((mount?.type??'volume')==='volume'&&!nonempty(mount?.source));
-      if(anonymous)add('stateful-anonymous-volume',`services.${binding.service}.volumes[${index}]`,'stateful storage must not use an anonymous volume');
-      const source=typeof mount==='string'?(mount.includes(':')?mount.split(':')[0]:null):((mount?.type??'volume')==='volume'?mount?.source:null);
-      if(nonempty(source)&&Object.hasOwn(volumes,source)&&!custodied.has(source))add('stateful-volume-uncustodied',`services.${binding.service}.volumes[${index}]`,'every named stateful volume must have an explicit storage custody and backup declaration');
-    }
-  }
-  return {name:profileName,profile,components:bindings,managed,sources,nativeSecretRefs};
 }
 
 export function checkApplicationStacks({repoRoot,environment,deploymentModelFile}={}){
-  const root=path.resolve(String(repoRoot??'')),manifestFile=path.join(root,STACKS_DIR,'application-stacks.yaml'),errors=[];
+  const root=path.resolve(String(repoRoot??'')),stacksRoot=path.join(root,STACKS_DIR),manifestFile=path.join(stacksRoot,'application-stacks.yaml'),errors=[];
   const add=(code,at,message)=>errors.push({code,path:at,message});
-  if(!['dev','vps'].includes(environment))add('environment-invalid','environment','environment must be dev or vps');
-  if(!directory(path.join(root,STACKS_DIR))&&directory(path.join(root,LEGACY_STACKS_DIR)))
+  if(!nonempty(environment))add('environment-invalid','environment','environment must name a declared environment');
+  if(!directory(stacksRoot)&&directory(path.join(root,LEGACY_STACKS_DIR)))
     add('STACKS_LEGACY_DIRECTORY',LEGACY_STACKS_DIR,`the stack directory must be renamed from ${LEGACY_STACKS_DIR} to ${STACKS_DIR}; a legacy ${LEGACY_STACKS_DIR} directory is not read as the contract`);
-  if(!regular(manifestFile,{root:path.join(root,STACKS_DIR)}))add('manifest-unavailable',`${STACKS_DIR}/application-stacks.yaml`,`manifest must be a regular file inside ${STACKS_DIR}`);
+  if(!regular(manifestFile,{root:stacksRoot}))add('manifest-unavailable',`${STACKS_DIR}/application-stacks.yaml`,`manifest must be a regular file inside ${STACKS_DIR}`);
   if(!regular(deploymentModelFile))add('deployment-model-unavailable','deploymentModelFile','rendered deployment evidence must be a regular, non-symlink file');
-  for(const [file,at] of [[manifestFile,`${STACKS_DIR}/application-stacks.yaml`],[deploymentModelFile,'deploymentModelFile']])try{if(fs.statSync(file).size>MAX_INPUT_BYTES)add('input-too-large',at,'input exceeds the 4 MiB static-check limit');}catch{}
+  for(const [file,at] of [[manifestFile,`${STACKS_DIR}/application-stacks.yaml`],[deploymentModelFile,'deploymentModelFile']])
+    try{if(fs.statSync(file).size>MAX_INPUT_BYTES)add('input-too-large',at,'input exceeds the 4 MiB static-check limit');}catch{}
   let manifest={},model={};
-  try{if(!errors.some(item=>['manifest-unavailable','input-too-large'].includes(item.code)&&item.path===`${STACKS_DIR}/application-stacks.yaml`))manifest=parseYaml(fs.readFileSync(manifestFile,'utf8'));}catch{add('manifest-invalid',`${STACKS_DIR}/application-stacks.yaml`,'manifest YAML could not be parsed');}
-  try{if(!errors.some(item=>['deployment-model-unavailable','input-too-large'].includes(item.code)&&item.path==='deploymentModelFile')){const text=fs.readFileSync(deploymentModelFile,'utf8');try{model=JSON.parse(text);}catch{model=parseYaml(text);}}}catch{add('deployment-model-invalid','deploymentModelFile','rendered deployment JSON or YAML could not be parsed');}
+  try{if(!errors.some(item=>['manifest-unavailable','input-too-large'].includes(item.code)&&item.path===`${STACKS_DIR}/application-stacks.yaml`))manifest=parseYaml(fs.readFileSync(manifestFile,'utf8'));}
+  catch{add('manifest-invalid',`${STACKS_DIR}/application-stacks.yaml`,'manifest YAML could not be parsed');}
+  try{if(!errors.some(item=>['deployment-model-unavailable','input-too-large'].includes(item.code)&&item.path==='deploymentModelFile')){
+    const text=fs.readFileSync(deploymentModelFile,'utf8');try{model=JSON.parse(text);}catch{model=parseYaml(text);}
+  }}catch{add('deployment-model-invalid','deploymentModelFile','rendered deployment JSON or YAML could not be parsed');}
   if(!object(manifest))manifest={};if(!object(model))model={};
+
   for(const issue of validateSchema(manifest))add('schema-shape-invalid',issue.path,issue.message);
-  validateEnvironmentPolicies(manifest,add);
-  if(manifest.schema!=='starci/application-stacks@1')add('schema-invalid','schema','expected starci/application-stacks@1');
-  const components=Array.isArray(manifest.components)?manifest.components:[],ids=new Set(),requiredComponents=new Set();
-  if(!components.length)add('components-empty','components','declare at least one applicable application component');
-  for(const [index,item] of components.entries()){
-    allowed(item,['id','role','purpose','required'],`components[${index}]`,add);
-    if(!item?.id||ids.has(item.id))add('component-invalid',`components[${index}].id`,'component IDs must be unique and nonempty');else {ids.add(item.id);if(item.required!==false)requiredComponents.add(item.id);}
-    if(!['frontend','backend','worker','bootstrap','stateful','gateway'].includes(item?.role))add('component-role-invalid',`components[${index}].role`,'component role is unsupported');
+  if(manifest.schema===LEGACY_SCHEMA_ID)add('STACKS_SCHEMA_LEGACY_ID','schema',`schema should be ${SCHEMA_ID} without the @1 suffix; drop it`);
+  else if(manifest.schema!==SCHEMA_ID)add('schema-invalid','schema',`expected ${SCHEMA_ID}`);
+
+  const catalog=object(manifest.components)?manifest.components:{},ids=new Set(Object.keys(catalog));
+  if(!ids.size)add('components-empty','components','declare at least one applicable application component');
+  for(const id of ids)if(!/^[a-z][a-z0-9-]*$/.test(id))add('component-invalid',`components.${id}`,'component ids must be lowercase kebab-case');
+
+  const environments=object(manifest.environments)?manifest.environments:{},environmentNames=new Set(Object.keys(environments));
+  if(!environmentNames.size)add('environments-empty','environments','declare at least one supported environment');
+
+  if(directory(stacksRoot)){
+    let entries=[];try{entries=fs.readdirSync(stacksRoot,{withFileTypes:true});}catch{}
+    for(const entry of entries){
+      if(!entry.isDirectory()||entry.isSymbolicLink())continue;
+      if(entry.name==='tmp'){add('STACKS_SCRATCH_IN_CANONICAL',`${STACKS_DIR}/tmp`,'scratch belongs in the OS temp directory, not a tracked .starcistacks/tmp');continue;}
+      if(entry.name==='k8s')continue;
+      if(!environmentNames.has(entry.name))add('STACKS_UNDECLARED_ENVIRONMENT',`${STACKS_DIR}/${entry.name}`,`${entry.name} is not an environment the declaration admits; either the declaration admits it or it is not an environment`);
+    }
+    for(const name of environmentNames)if(!directory(path.join(stacksRoot,name)))add('environment-directory-missing',`${STACKS_DIR}/${name}`,`declared environment ${name} has no directory`);
+    const k8sDir=path.join(stacksRoot,'k8s'),k8sExists=directory(k8sDir);
+    if(manifest.k8s?.status==='supported'&&!k8sExists)add('k8s-directory-missing',`${STACKS_DIR}/k8s`,'k8s.status is supported but .starcistacks/k8s is missing');
+    if(manifest.k8s?.status==='deferred'&&k8sExists)add('k8s-directory-unexpected',`${STACKS_DIR}/k8s`,'k8s.status is deferred, so a .starcistacks/k8s directory contradicts the declaration');
   }
-  if(!components.some(item=>['frontend','backend','worker'].includes(item?.role)&&item.required!==false))add('required-app-component-missing','components','declare at least one required frontend, backend, or worker component');
-  allowed(manifest.environments,['dev','vps'],'environments',add);allowed(manifest.k8s,['status','reason'],'k8s',add);
-  if(manifest.k8s?.status!=='deferred'||!String(manifest.k8s?.reason??'').trim())add('k8s-status-invalid','k8s','Kubernetes must be explicitly deferred with a reason');
-  const spec=manifest.environments?.[environment];
-  allowed(spec,['status','runtime','composeFiles','components','profiles','runbook','platform','secrets'],`environments.${environment}`,add);
-  if(!object(spec)||spec.status!=='supported')add('environment-unsupported',`environments.${environment}`,'environment must be explicitly supported');
-  const composeFiles=Array.isArray(spec?.composeFiles)?spec.composeFiles:[];
-  if(!composeFiles.length)add('compose-files-empty',`environments.${environment}.composeFiles`,'declare repository-owned Compose source files');
-  for(const [index,relative] of composeFiles.entries()){
-    const target=path.resolve(root,String(relative));
-    if(!slash(relative).startsWith('.starcistacks/')||!inside(path.join(root,'.starcistacks'),target)||!regular(target,{root:path.join(root,'.starcistacks')}))add('compose-path-unsafe',`environments.${environment}.composeFiles[${index}]`,'Compose source must be a regular non-symlink file below .starcistacks');
-  }
-  const environmentComponents=object(spec?.components)?spec.components:{},seen=new Set();let managed=new Map();
-  for(const [id,binding] of Object.entries(environmentComponents)){
-    const at=`environments.${environment}.components.${id}`;
-    allowed(binding,['ownership','service','owner','failureDomain','endpointRef','reason'],at,add);
-    if(!ids.has(id)||seen.has(id))add('binding-invalid',at,'each declared component needs exactly one environment binding');else seen.add(id);
-    if(!['managed','external','excluded'].includes(binding?.ownership))add('ownership-invalid',`${at}.ownership`,'component ownership is invalid');
-    if(binding?.ownership==='managed'){
-      if(!String(binding.service??'').trim()&&!object(spec?.profiles))add('managed-service-missing',`${at}.service`,'managed component needs one Compose service unless dev profiles bind its execution');
-      else if(nonempty(binding.service)&&managed.has(binding.service))add('managed-service-duplicate',`${at}.service`,'one Compose service cannot implement multiple inventory components');else if(nonempty(binding.service))managed.set(binding.service,id);
-      if(!String(binding?.failureDomain??'').trim())add('failure-domain-missing',`${at}.failureDomain`,'managed component needs an explicit failure domain');
-    }else if(binding?.ownership==='external'){
-      if(binding?.service)add('external-service-present',`${at}.service`,'external or excluded component must not name a managed Compose service');
-      if(!nonempty(binding?.owner)||!nonempty(binding?.failureDomain)||!nonempty(binding?.endpointRef))add('external-authority-missing',at,'external component needs explicit owner, failure domain, and endpoint reference');
-    }else if(binding?.ownership==='excluded'){
-      if(binding?.service)add('external-service-present',`${at}.service`,'external or excluded component must not name a managed Compose service');
-      if(!String(binding?.reason??'').trim())add('binding-reason-missing',`${at}.reason`,'excluded component needs an explicit reason');
-      if(requiredComponents.has(id))add('required-component-excluded',at,'a required component cannot be excluded');
+  if(!['deferred','supported'].includes(manifest.k8s?.status)||!String(manifest.k8s?.reason??'').trim())
+    add('k8s-status-invalid','k8s','Kubernetes must be explicitly deferred or supported with a reason');
+
+  if(nonempty(environment)&&!environmentNames.has(String(environment)))
+    add('environment-unknown','environment',`environment must be one the declaration admits: ${[...environmentNames].join(', ')}`);
+  const spec=environments[String(environment)],envDir=path.join(stacksRoot,String(environment??''));
+
+  if(object(spec)){
+    if(spec.status!=='supported')add('environment-unsupported',`environments.${environment}`,'environment must be explicitly supported');
+    if(!['docker-compose','docker-swarm'].includes(spec.runtime))add('runtime-invalid',`environments.${environment}.runtime`,'runtime must be docker-compose or docker-swarm');
+
+    const composeFiles=Array.isArray(spec.composeFiles)?spec.composeFiles:[];
+    if(!composeFiles.length)add('compose-files-empty',`environments.${environment}.composeFiles`,'declare at least one environment-relative Compose source file');
+    const safeComposeFiles=[];
+    for(const [index,relative] of composeFiles.entries()){
+      const target=resolvedPath(envDir,relative);
+      if(!target||!regular(target,{root:envDir}))add('compose-path-unsafe',`environments.${environment}.composeFiles[${index}]`,'Compose source must be a regular non-symlink file below the environment directory');
+      else safeComposeFiles.push(relative);
+    }
+    if(directory(envDir)){
+      const reachable=reachableComposeFiles(envDir,safeComposeFiles);
+      scanForUndeclaredCompose(root,envDir,reachable,add,`environments.${environment}.composeFiles`);
+    }
+
+    const bindings=object(spec.components)?spec.components:{};
+    for(const id of Object.keys(bindings))if(!ids.has(id))
+      add('binding-component-unknown',`environments.${environment}.components.${id}`,'environment binds a component id that is absent from the top-level inventory');
+
+    if(!nonempty(spec.runbook))add('runbook-path-invalid',`environments.${environment}.runbook`,'runbook must name a file inside the environment directory');
+    else{
+      const runbookFile=resolvedPath(envDir,spec.runbook);
+      const oversized=(()=>{try{return fs.statSync(runbookFile).size>MAX_INPUT_BYTES;}catch{return true;}})();
+      if(!runbookFile||!regular(runbookFile,{root:envDir})||oversized)
+        add('runbook-path-invalid',`environments.${environment}.runbook`,'runbook must resolve to an existing regular non-symlink file below the environment directory');
+      else{
+        let text='';try{text=fs.readFileSync(runbookFile,'utf8');}catch{}
+        for(const command of RUNBOOK_COMMANDS){
+          const rowPattern=new RegExp(`^\\s*\\|\\s*${command}\\s*\\|`,'im');
+          if(!rowPattern.test(text))add('runbook-command-missing',`environments.${environment}.runbook#${command}`,`runbook must document the ${command} command`);
+        }
+      }
+    }
+
+    const declaredSecrets=Array.isArray(spec.secrets)?spec.secrets:[],secretNames=new Set();
+    const tracked=directory(envDir)?gitTrackedSet(root):null;
+    for(const [index,secret] of declaredSecrets.entries()){
+      const at=`environments.${environment}.secrets[${index}]`;
+      if(!object(secret))continue;
+      if(secretNames.has(secret.name))add('secret-duplicate',`${at}.name`,'secret names must be unique');else secretNames.add(secret.name);
+      const plain=nonempty(secret.where)?resolvedPath(envDir,secret.where):null;
+      const enc=nonempty(secret.where)?resolvedPath(envDir,`${secret.where}.enc`):null;
+      if(!enc||!regular(enc,{root:envDir})||!sopsEnvelope(enc))
+        add('encrypted-ref-invalid',`${at}.where`,'secret must resolve to <where>.enc as a recognizable SOPS envelope, an existing regular file below the environment directory');
+      if(nonempty(secret.where)&&!plain)
+        add('materialized-path-invalid',`${at}.where`,'secret plaintext path and its existing ancestors must remain below the environment directory without symlinks');
+      if(!String(secret.recipientPolicy??'').trim()||!String(secret.keyCustody??'').trim())
+        add('secret-policy-missing',at,'secret recipient and key custody policies are required');
+      if(tracked&&plain&&tracked.has(slash(path.relative(root,plain))))
+        add('STACKS_PLAINTEXT_SECRET',`${at}.where`,'a decrypted secret member must never be a tracked file; only its .enc member is committed');
+    }
+    if(tracked){
+      const envPrefix=`${slash(path.relative(root,envDir))}/`;
+      for(const relTracked of tracked){
+        if(!relTracked.startsWith(envPrefix))continue;
+        const base=path.basename(relTracked);
+        if(PLAINTEXT_SECRET_PATTERN.test(base)||base==='id_rsa')
+          add('STACKS_PLAINTEXT_SECRET',relTracked,'a tracked file below the environment directory matches a plaintext secret pattern; only <name>.enc may be committed');
+      }
     }
   }
-  for(const id of ids)if(!seen.has(id))add('component-unclassified',`environments.${environment}.components`,'every component must be classified in this environment');
-  const activeProfile=environment==='dev'?validateDevProfile({root,manifest,model,spec,components,ids,requiredComponents,add}):null;
-  if(activeProfile)managed=activeProfile.managed;
+
   const services=object(model.services)?model.services:{};
-  for(const service of managed.keys())if(!services[service])add('managed-service-absent',`services.${service}`,'declared managed service is absent from rendered Compose');
-  for(const service of Object.keys(services))if(!managed.has(service))add('compose-service-unclassified',`services.${service}`,'rendered Compose service is not mapped to a managed inventory component');
-  if(environment==='vps'){
-    const overlay=new Set(Object.entries(object(model.networks)?model.networks:{}).filter(([,definition])=>definition?.driver==='overlay').map(([name])=>name));
-    for(const [service,id] of managed){
-      const definition=services[service],role=components.find(item=>item?.id===id)?.role;if(!definition)continue;
-      if(!nonempty(definition.image))add('swarm-image-missing',`services.${service}.image`,'managed Swarm service needs a nonempty rendered image');
-      if(definition.build!==undefined)add('swarm-build-unrendered',`services.${service}.build`,'rendered Swarm model must not retain a build section');
-      if(definition.depends_on!==undefined)add('swarm-dependency-unrendered',`services.${service}.depends_on`,'rendered Swarm model must not rely on Compose depends_on');
-      if(role==='bootstrap')continue;
-      if(!object(definition.deploy))add('swarm-deploy-policy-missing',`services.${service}.deploy`,'managed Swarm service needs an explicit deploy policy');
-      if(!object(definition.healthcheck)||definition.healthcheck.disable===true)add('swarm-healthcheck-missing',`services.${service}.healthcheck`,'managed Swarm service needs an enabled container health check');
-      const networks=Array.isArray(definition.networks)?definition.networks:Object.keys(object(definition.networks)?definition.networks:{});
-      if(!networks.some(name=>overlay.has(typeof name==='string'?name:name?.target)))add('swarm-overlay-missing',`services.${service}.networks`,'managed Swarm service must join an explicitly rendered overlay network');
-    }
-  }
+  for(const service of Object.keys(services))if(!ids.has(service))
+    add('compose-service-unclassified',`services.${service}`,'rendered service name is not a declared component id');
   if(unresolvedCompose(model))add('compose-placeholder-unresolved','composeModel','rendered Compose still contains an unresolved interpolation placeholder in a host-resolved field');
   for(const [service,definition] of Object.entries(services))for(const [key] of envEntries(definition?.environment))
     if(sensitive.test(key)&&!/_FILE$/i.test(key))add('plaintext-sensitive-environment',`services.${service}.environment.${key}`,'sensitive configuration is present as a direct environment value; value redacted');
-  const runbook=spec?.runbook;allowed(runbook,['prepare','doctor','up','status','logs','down','update','rollback','backup','restore','verification'],`environments.${environment}.runbook`,add);
-  allowed(runbook?.verification,['coldStart','restart','persistence'],`environments.${environment}.runbook.verification`,add);
-  const commands=['prepare','doctor','up','status','logs','down'];
-  for(const key of commands)if(!String(runbook?.[key]??'').trim())add('runbook-command-missing',`environments.${environment}.runbook.${key}`,'required runbook command is missing');
-  for(const key of ['coldStart','restart','persistence'])if(!String(runbook?.verification?.[key]??'').trim())add('verification-missing',`environments.${environment}.runbook.verification.${key}`,'required verification command is missing');
-  if(environment==='vps'){
-    for(const key of ['update','rollback','backup','restore'])if(!String(runbook?.[key]??'').trim())add('vps-command-missing',`environments.vps.runbook.${key}`,'VPS lifecycle command is missing');
-    if(!String(spec?.platform?.ubuntu??'').trim()||!Array.isArray(spec?.platform?.architectures)||!spec.platform.architectures.length)add('vps-platform-missing','environments.vps.platform','declare supported Ubuntu and architecture bounds');
+  if(object(spec)&&spec.runtime==='docker-swarm')for(const [service,definition] of Object.entries(services)){
+    if(!ids.has(service))continue;
+    if(!nonempty(definition?.image))add('swarm-image-missing',`services.${service}.image`,'managed Swarm service needs a nonempty rendered image');
+    if(definition?.build!==undefined)add('swarm-build-unrendered',`services.${service}.build`,'rendered Swarm model must not retain a build section');
   }
-  const declaredSecrets=Array.isArray(spec?.secrets)?spec.secrets:[],modelSecrets=object(model.secrets)?model.secrets:{};
-  const secretNames=new Set();
-  for(const [index,secret] of declaredSecrets.entries()){
-    const at=`environments.${environment}.secrets[${index}]`,enc=path.resolve(root,String(secret?.encryptedRef??'')),plain=path.resolve(root,String(secret?.materializedPath??''));
-    allowed(secret,['name','source','sourceOwner','generationAlgorithm','formatPolicy','encryptedRef','materializedPath','runtimeName','version','recipientPolicy','keyCustody'],at,add);
-    if(secretNames.has(secret?.name))add('secret-duplicate',`${at}.name`,'secret names must be unique');else secretNames.add(secret?.name);
-    const modelName=secret?.name;
-    if(!secret?.name||!object(modelSecrets[modelName]))add('secret-unbound',`${at}.name`,'declared secret is absent from rendered deployment model');
-    if(!['generated','provider-issued'].includes(secret?.source))add('secret-source-invalid',`${at}.source`,'secret source must be generated or provider-issued');
-    if(secret?.source==='generated'&&(!String(secret?.generationAlgorithm??'').trim()||!String(secret?.formatPolicy??'').trim()))add('secret-generation-policy-missing',at,'generated secret needs algorithm and format policy');
-    if(secret?.source==='provider-issued'&&!String(secret?.sourceOwner??'').trim())add('secret-source-owner-missing',`${at}.sourceOwner`,'provider-issued secret needs an owner');
-    if(!slash(secret?.encryptedRef).startsWith('.starcistacks/')||!String(secret?.encryptedRef??'').endsWith('.enc')||!inside(path.join(root,'.starcistacks'),enc)||!regular(enc,{root:path.join(root,'.starcistacks')})||!sopsEnvelope(enc))add('encrypted-ref-invalid',`${at}.encryptedRef`,'encrypted reference must be a recognizable SOPS envelope in an existing regular .enc file below .starcistacks');
-    if(environment==='dev'&&(!slash(secret?.materializedPath).startsWith('.starcistacks/')||String(secret?.materializedPath??'').endsWith('.enc')||!inside(path.join(root,'.starcistacks'),plain)||!safeAncestors(path.join(root,'.starcistacks'),plain)))add('materialized-path-invalid',`${at}.materializedPath`,'materialized secret path and its existing ancestors must remain below .starcistacks without symlinks');
-    if(!String(secret?.recipientPolicy??'').trim()||!String(secret?.keyCustody??'').trim())add('secret-policy-missing',at,'secret recipient and key custody policies are required');
-    const definition=modelSecrets[modelName];
-    if(environment==='dev'){
-      const rendered=definition?.file;if(typeof rendered!=='string'||rendered.endsWith('.enc'))add('encrypted-secret-mounted',`secrets.${modelName}.file`,'Compose must mount materialized plaintext, never the encrypted .enc file');
-      else if(path.resolve(rendered)!==plain)add('secret-materialization-mismatch',`secrets.${modelName}.file`,'rendered secret file does not match its declared materialized path');
-    }else if(definition?.external!==true||definition?.name!==secret.runtimeName||Object.keys(definition??{}).some(key=>!['external','name'].includes(key)))add('swarm-secret-invalid',`secrets.${modelName}`,'VPS secret must be an external Swarm secret with its exact immutable runtime name and no file/content driver');
-  }
-  for(const [name,definition] of Object.entries(modelSecrets)){
-    const declared=secretNames.has(name);
-    if(!declared)add('compose-secret-unclassified',`secrets.${name}`,'rendered deployment secret is absent from the environment manifest');
-    if(environment==='dev'&&(!object(definition)||Object.keys(definition).some(key=>key!=='file')))add('compose-secret-driver-unsafe',`secrets.${name}`,'dev permits only file-backed Compose secrets');
-  }
-  const grantedSecrets=new Set();
-  for(const [service,definition] of Object.entries(services)){
-    const targets=new Set();
-    for(const [index,grant] of (Array.isArray(definition?.secrets)?definition.secrets:[]).entries()){
-      const source=typeof grant==='string'?grant:grant?.source,target=typeof grant==='string'?grant:(grant?.target??source);
-      const declared=secretNames.has(source);
-      if(!source||!object(modelSecrets[source])||!declared)add('service-secret-grant-invalid',`services.${service}.secrets[${index}]`,'service secret grant must reference an exactly declared runtime secret');
-      else {grantedSecrets.add(source);targets.add(String(target).replace(/^\/run\/secrets\//,''));}
-    }
-    for(const [key,value] of envEntries(definition?.environment))if(sensitive.test(key)&&/_FILE$/i.test(key)){
-      const match=typeof value==='string'?value.match(/^\/run\/secrets\/([^/]+)$/):null;
-      if(!match||!targets.has(match[1]))add('service-secret-file-mismatch',`services.${service}.environment.${key}`,'sensitive file pointer must name /run/secrets/<target> granted to this service; value redacted');
-    }
-  }
-  for(const name of Object.keys(modelSecrets))if(!grantedSecrets.has(name)&&!activeProfile?.nativeSecretRefs?.has(name))add('compose-secret-ungranted',`secrets.${name}`,'rendered Compose secret is not granted to a container or declared native remote-API caller');
-  return {schema:RESULT,ok:errors.length===0,environment,profile:activeProfile?.name??null,manifest:manifestFile,deploymentModel:path.resolve(String(deploymentModelFile??'')),errors,
-    limitations:['static conformance only; Docker was not invoked, host application processes were not started, and remote APIs were not called','the deployment model must be rendered by Docker Compose or Docker Stack tooling; provenance is supplied by the caller and is not independently authenticated','legacy manifests without dev profiles are checked against the original single-mode contract and are not claimed dual-mode capable','inventory, source revisions and external ownership declarations are author assertions checked for consistency, not independently discovered Git or provider facts','remote API contract, deployment, and verification references are bounded opaque file bindings; their coverage, authenticity, rollout, cluster state, and live behavior are not proven','SOPS envelope recognition is structural, not cryptographic verification or decryption','readiness syntax, health, migration, mutual-exclusion enforcement, backup and restore commands are declared but not executed']};
+
+  return {schema:RESULT,ok:errors.length===0,environment,manifest:manifestFile,deploymentModel:path.resolve(String(deploymentModelFile??'')),errors,
+    limitations:['static conformance only; Docker was not invoked, host application processes were not started, and remote APIs were not called','the deployment model must be rendered by Docker Compose or Docker Stack tooling; provenance is supplied by the caller and is not independently authenticated','component classification, runbook completeness and secret custody are author assertions checked for consistency and structure, not independently discovered facts','SOPS envelope recognition is structural, not cryptographic verification or decryption','tracked-plaintext detection uses git ls-files when the repository is reachable and is skipped, not assumed clean, when it is not','runbook prepare, doctor and verification commands are declared and documented but not executed']};
 }

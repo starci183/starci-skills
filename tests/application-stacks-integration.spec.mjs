@@ -19,30 +19,20 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
       assert.ok(contract.steps[0].reads.includes('application-stacks'),id);
     }
   }
-  // The old examples/application-stacks/tiny-stateful (owner ruling: deleted, examples/ keeps only the
-  // todo-app repositories) shipped a toy app/Dockerfile + app/server.mjs + gateway/nginx.conf + shell
-  // scripts under the `.stacks/` name; a rename script pointed this list at todo-app-backend without
-  // noticing the shapes differ. todo-app-backend is a real NestJS app: it has no Dockerfile (dev compose
-  // pulls a prebuilt image) and its `.mjs`/`.sh`/`.ps1`/`.conf` files are not in the packaging rule's
-  // shipped-extension set for a non-application-stacks-named example (scripts/build-workflows.mjs, out of
-  // this file's scope to change) - only `.md/.yaml/.yml/.ts/.tsx/.png/.svg` ship. Its real runnable proof
-  // is src/main.ts (a real Nest entrypoint, `.ts` ships) plus the renamed `.starcistacks` contract files.
   for(const file of ['checks/stacks.mjs','schemas/application-stacks.schema.json','knowledge/application-stacks.json',
     'docs/application-stacks.md','docs/application-stacks-vps.md',
-    ...['src/main.ts','.starcistacks/application-stacks.yaml','.starcistacks/dev/infra/compose/compose.yaml','.starcistacks/vps/infra/stack.yaml']
+    ...['gateway/nginx.conf','scripts/prepare.sh','scripts/prepare.ps1','.gitignore',
+      '.starcistacks/application-stacks.yaml','.starcistacks/dev/README.md','.starcistacks/dev/infra/compose/compose.yaml',
+      '.starcistacks/vps/README.md','.starcistacks/vps/infra/stack.yaml']
       .map(name=>'examples/todo-app-backend/'+name)])assert.ok(files.has(file),file);
   assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app-backend/')&&
     (/\/(runtime|generated|\.runtime)\//.test(file)||/\.(enc|agekey)$/.test(file))),false);
+  assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app-backend/')&&file.endsWith('.mjs')),false);
 });
 
 test('stacks CLI refuses missing or malformed evidence without echoing file contents or mutation',t=>{
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-cli-'));
   t.after(()=>{assert.equal(path.dirname(directory),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(directory).startsWith('starci-stacks-cli-'));fs.rmSync(directory,{recursive:true,force:true});});
-  // checks/stacks.mjs hardcodes '.starcistacks/application-stacks.yaml' as the manifest location -
-  // matches docs/application-stacks.md too, since ex-stacks-rename renamed the checker's own hardcoded
-  // directory name from '.stacks' to '.starcistacks' to match what the examples tree already used. Write
-  // to '.starcistacks/...' consistently so the checker exercises the intended malformed-deployment-model
-  // scenario instead of always failing on a missing manifest.
   fs.mkdirSync(path.join(directory,'.starcistacks'));
   fs.writeFileSync(path.join(directory,'.starcistacks/application-stacks.yaml'),'schema: starci/application-stacks@1\n');
   const model=path.join(directory,'rendered.json'),sentinel='synthetic-secret-never-echo';

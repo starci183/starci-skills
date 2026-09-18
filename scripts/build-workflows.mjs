@@ -161,31 +161,31 @@ export function buildFiles(skillRoot = root) {
         const absolute=path.join(directory,entry.name);
         if(entry.isSymbolicLink())throw Error('Runtime reference cannot be a symlink: '+absolute);
         const relative=path.relative(skillRoot,absolute).replaceAll('\\','/');
-        const stackExample=relative.startsWith('examples/application-stacks/');
-        // Any example's own `.starcistacks` stack-kit tree carries the same rendered config,
-        // ciphertext and runtime-materialized secrets shape as the standalone stack-kit demo -
-        // examples/todo-app-backend/.starcistacks is a real, complete stack (dev/vps compose, sealed
-        // SOPS ciphertext, a demo-only committed age identity) after the todo-app-backend rebuild, not
-        // a toy fixture. The "never ship generated/runtime material" guarantee below has to hold for
-        // any example's `.starcistacks` tree, not only literally under examples/application-stacks/.
-        const stacksKitTree=stackExample||/^examples\/[^/]+\/\.starcistacks(\/|$)/.test(relative);
+        // Any examples/<name>/.starcistacks tree (plus its sibling scripts/, gateway/ and .gitignore
+        // kit-support files) may be a stack-kit example: the directory name moved once already
+        // (application-stacks -> todo-app-backend) and must not be hardcoded again. This is scoped to
+        // the kit itself, not the whole example, so an example's own application source (.ts/.tsx, etc.)
+        // keeps shipping through the generic extension allowlist below exactly as before.
+        const stackExample=/^examples\/[^/]+\/(\.starcistacks(\/|$)|scripts\/|gateway\/|\.gitignore$)/.test(relative);
         // Only authored kit inputs ship. Generated config, ciphertext, keys and
-        // materialized runtime files must never enter the installed example.
-        if(stacksKitTree && /\/(runtime|generated|\.runtime|node_modules)(\/|$)/.test(relative))continue;
+        // materialized runtime files must never enter the installed example. A .mjs script is excluded
+        // here rather than added to scripts/runtime-modules.txt: example automation is not part of the
+        // installed skill runtime's own import closure.
+        if(stackExample && /\/(runtime|generated|\.runtime|node_modules)(\/|$)/.test(relative))continue;
         // A decrypted plaintext file sitting beside its own sealed `.enc` counterpart (the
         // .gitignore convention every `.starcistacks` environment uses: secrets/*, runtime/env/*.env,
         // runtime/files/*.key, runtime/config/*.yaml are all gitignored except their `.enc` form) is a
         // local materialization accident, wherever in the tree it lands - the ciphertext is the
         // committed source of truth and the plaintext must never ship.
-        if(stacksKitTree && entry.isFile() && !relative.endsWith('.enc') && fs.existsSync(absolute+'.enc'))continue;
+        if(stackExample && entry.isFile() && !relative.endsWith('.enc') && fs.existsSync(absolute+'.enc'))continue;
         if(stackExample && entry.isFile()){
-          const authored=/\.(md|mjs|sh|ps1|conf)$/.test(entry.name)||['Dockerfile','.gitignore','.dockerignore'].includes(entry.name)||
-            /\/\.starcistacks\/(application-stacks\.yaml|(dev|vps)\/(compose|stack)\.yaml)$/.test(relative);
+          const authored=/\.(md|sh|ps1|conf)$/.test(entry.name)||['Dockerfile','.gitignore','.dockerignore'].includes(entry.name)||
+            /\/\.starcistacks\/(application-stacks\.ya?ml|(dev|vps)\/infra\/.+\.ya?ml)$/.test(relative);
           if(!authored)continue;
         }
         if(entry.isDirectory())visit(absolute);
         else if(entry.isFile() && (/\.(md|yaml|yml|ts|tsx|png|svg)$/.test(entry.name) ||
-          (stackExample && (/\.(mjs|sh|ps1|conf)$/.test(entry.name) || ['Dockerfile','.gitignore','.dockerignore'].includes(entry.name))))) {
+          (stackExample && (/\.(sh|ps1|conf)$/.test(entry.name) || ['Dockerfile','.gitignore','.dockerignore'].includes(entry.name))))) {
           if(folder==='examples' && path.dirname(relative)==='examples' && /\.ya?ml$/.test(entry.name))continue;
           files.set(relative,readRealFile(absolute,skillRoot).bytes);
         }
