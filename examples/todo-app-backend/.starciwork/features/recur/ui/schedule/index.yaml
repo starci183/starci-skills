@@ -2,64 +2,390 @@ schema: work/ui-screen
 id: ui.recur.schedule
 title: A recurring task's schedule
 state: done
-brand: {rev: 2}
-refs: [fr.recur.make-recurring, fr.recur.see-upcoming, fr.recur.end-rule]
+brand:
+  rev: 3
+refs:
+  - fr.recur.make-recurring
+  - fr.recur.see-upcoming
+  - fr.recur.end-rule
 ui:
-  intent: >-
-    The upcoming-occurrences list is its own page section, named by SurfaceListCard's own `label` (the
-    real published collection container per COLLECTION-1 case-5), never nested inside the make-recurring
-    SurfaceCard. The representative direction is drawn for the refused state because a submitted-but-invalid
-    schedule is the densest single-surface state the make-recurring form itself reaches, and, where the
-    state is an error/refusal, the accessibility-critical assertive-live Text carrying the refusal and the
-    brand's contrast don't (Never place text on the primary colour below a 4.5:1 contrast ratio.) both
-    apply. Refused is reached only from no-rule, so it does not carry the upcoming-occurrences section or
-    the end-rule Button - those exist only once active names a saved rule; the coverage map below marks
-    that difference explicitly rather than repeating one component list across every state.
-    @starci/grammar/common ships no Message/Alert renderer and no dropdown/select input; the refusal is a
-    plain Text line and the time-of-day value is chosen through PressableField, not a `<select>`.
+  intent: A real Todo app workspace with top navigation, current feature, synthetic account presence
+    and secondary destinations. A recurring task's schedule. The representative state is refused.
   surfaces:
-    - {name: schedule, route: /tasks/:taskId/schedule, purpose: "turn a task into a recurring rule and see upcoming occurrences", actors: [owner]}
+    - name: schedule
+      route: /tasks/:taskId/schedule
+      purpose: turn a task into a recurring rule and see upcoming occurrences
+      actors:
+        - owner
   states:
-    - {name: no-rule, trigger: "the task has no recurrence rule yet", behavior: "only the make-recurring form is shown, no upcoming-occurrences list"}
-    - {name: active, trigger: "a rule is set and has not ended", behavior: "the upcoming-occurrences list renders below the rule summary and an end-rule GrammarButton"}
-    - {name: ended, trigger: "the rule has been ended", behavior: "the upcoming list is empty going forward; past occurrences remain listed with their original status, unchanged"}
-    - {name: refused, trigger: "the submitted schedule is invalid, for example a weekend-only rule with no matching weekday", behavior: "a GrammarMessage(tone: danger) names the invalid field; the form retains the entered values"}
+    - name: no-rule
+      trigger: the task has no recurrence rule yet
+      behavior: only the make-recurring form is shown, no upcoming-occurrences list
+    - name: active
+      trigger: a rule is set and has not ended
+      behavior: the upcoming-occurrences list renders below the rule summary and an end-rule Button
+    - name: ended
+      trigger: the rule has been ended
+      behavior: Remove future previews and end action; keep materialised history. Completed/skipped
+        statuses stay; outstanding materialised occurrences become orphaned under fr.recur.end-rule.
+    - name: refused
+      trigger: An every-n-days rule is submitted with n=0
+      behavior: Retain frequency, n, local time, IANA time zone and start date; identify n as requiring a
+        positive integer. No rule or upcoming preview exists yet. Monthly day 31 remains valid.
   coverage:
     scale: bounded
-    representativeScreens: [schedule]
+    representativeScreens:
+      - schedule
     map:
-      - {screen: schedule, state: no-rule, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Schedule)", "Input (id: recur-rule, label: Repeat)", "PressableField (label: Time of day)", "Button (save rule, type: submit, variant: primary)"], derivation: "Derives from the refused representative direction: same SurfaceCard, Input (rule), PressableField (time), Button (save rule) anatomy, minus the refusal Text; only the make-recurring form is shown, no upcoming-occurrences section and no end-rule Button since no rule is saved yet."}
-      - {screen: schedule, state: active, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Schedule)", "Text (rule summary sentence)", "Button (end rule, variant: outline)", "SurfaceListCard (label: Upcoming occurrences)", "StaticStateRow (one per occurrence)"], derivation: "Once a rule is saved, the editable Input/PressableField form is replaced by a Text rule summary and an end-rule Button (variant: outline) inside the same SurfaceCard; the upcoming-occurrences SurfaceListCard renders below it with one StaticStateRow per occurrence - anatomy the refused state, reached only from no-rule, never shows."}
-      - {screen: schedule, state: ended, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Schedule)", "Text (rule summary sentence, ended)", "SurfaceListCard (label: Upcoming occurrences)", "StaticStateRow (past occurrences, unchanged state)", "EmptyNotice (nothing upcoming)"], derivation: "Derives from the active state: same SurfaceCard, Text (rule summary), SurfaceListCard anatomy, minus the end-rule Button (the rule is already ended); the list's StaticStateRow entries for past occurrences keep their original `state` unchanged, and an EmptyNotice marks that nothing new is upcoming."}
-      - {screen: schedule, state: refused, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Schedule)", "Input (id: recur-rule, label: Repeat)", "PressableField (label: Time of day)", "Text (live: assertive, the invalid-field sentence)", "Button (save rule, type: submit, variant: primary)"], derivation: "Representative direction; generated by interface.draw once gap.recur.direction-not-drawn closes.", directionAsset: assets/schedule-refused.png}
+      - screen: schedule
+        state: no-rule
+        viewport: desktop-1280
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Schedule)"
+          - "Input (id: recur-rule, label: Repeat)"
+          - "Button (save rule, type: submit, variant: primary)"
+          - native frequency radio group (every-weekday/every-n-days/monthly-day)
+          - "Input (kind: text; conditional n/dayOfMonth)"
+          - "Input (kind: text; time HH:MM)"
+          - "Input (kind: text; timeZone IANA)"
+          - "Input (kind: text; startDate YYYY-MM-DD)"
+        derivation: Derives from refused with the same workspace shell. only the make-recurring form is
+          shown, no upcoming-occurrences list
+        directionAsset: assets/schedule-refused.png
+      - screen: schedule
+        state: no-rule
+        viewport: mobile-390
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Schedule)"
+          - "Input (id: recur-rule, label: Repeat)"
+          - "Button (save rule, type: submit, variant: primary)"
+          - native frequency radio group (every-weekday/every-n-days/monthly-day)
+          - "Input (kind: text; conditional n/dayOfMonth)"
+          - "Input (kind: text; time HH:MM)"
+          - "Input (kind: text; timeZone IANA)"
+          - "Input (kind: text; startDate YYYY-MM-DD)"
+        derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
+          compactNavigation own the compact shell; include all four destinations and account access.
+          Form fields stack and row actions wrap without hiding controls or horizontal page
+          scrolling. only the make-recurring form is shown, no upcoming-occurrences list"
+        directionAsset: assets/schedule-refused.png
+      - screen: schedule
+        state: active
+        viewport: desktop-1280
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Schedule)"
+          - Text (rule summary sentence)
+          - "Button (end rule, variant: outline)"
+          - "SurfaceListCard (label: Upcoming occurrences)"
+          - StaticStateRow (one per occurrence)
+        derivation: Derives from refused with the same workspace shell. the upcoming-occurrences list
+          renders below the rule summary and an end-rule Button
+        directionAsset: assets/schedule-refused.png
+      - screen: schedule
+        state: active
+        viewport: mobile-390
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Schedule)"
+          - Text (rule summary sentence)
+          - "Button (end rule, variant: outline)"
+          - "SurfaceListCard (label: Upcoming occurrences)"
+          - StaticStateRow (one per occurrence)
+        derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
+          compactNavigation own the compact shell; include all four destinations and account access.
+          Form fields stack and row actions wrap without hiding controls or horizontal page
+          scrolling. the upcoming-occurrences list renders below the rule summary and an end-rule
+          Button"
+        directionAsset: assets/schedule-refused.png
+      - screen: schedule
+        state: ended
+        viewport: desktop-1280
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Schedule)"
+          - Text (rule summary sentence, ended)
+          - "SurfaceListCard (label: Upcoming occurrences)"
+          - StaticStateRow (materialised history; completed/skipped retained, outstanding become
+            orphaned)
+          - EmptyNotice (nothing upcoming)
+        derivation: Derives from refused with the same workspace shell. Remove future previews and end
+          action; keep materialised history. Completed/skipped statuses stay; outstanding
+          materialised occurrences become orphaned under fr.recur.end-rule.
+        directionAsset: assets/schedule-refused.png
+      - screen: schedule
+        state: ended
+        viewport: mobile-390
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Schedule)"
+          - Text (rule summary sentence, ended)
+          - "SurfaceListCard (label: Upcoming occurrences)"
+          - StaticStateRow (materialised history; completed/skipped retained, outstanding become
+            orphaned)
+          - EmptyNotice (nothing upcoming)
+        derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
+          compactNavigation own the compact shell; include all four destinations and account access.
+          Form fields stack and row actions wrap without hiding controls or horizontal page
+          scrolling. Remove future previews and end action; keep materialised history.
+          Completed/skipped statuses stay; outstanding materialised occurrences become orphaned
+          under fr.recur.end-rule."
+        directionAsset: assets/schedule-refused.png
+      - screen: schedule
+        state: refused
+        viewport: desktop-1280
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Schedule)"
+          - "Input (id: recur-rule, label: Repeat)"
+          - "Text (live: assertive, the invalid-field sentence)"
+          - "Button (save rule, type: submit, variant: primary)"
+          - native frequency radio group (every-weekday/every-n-days/monthly-day)
+          - "Input (kind: text; conditional n/dayOfMonth)"
+          - "Input (kind: text; time HH:MM)"
+          - "Input (kind: text; timeZone IANA)"
+          - "Input (kind: text; startDate YYYY-MM-DD)"
+        derivation: Representative direction. Retain frequency, n, local time, IANA time zone and start
+          date; identify n as requiring a positive integer. No rule or upcoming preview exists yet.
+          Monthly day 31 remains valid.
+        directionAsset: assets/schedule-refused.png
+      - screen: schedule
+        state: refused
+        viewport: mobile-390
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Schedule)"
+          - "Input (id: recur-rule, label: Repeat)"
+          - "Text (live: assertive, the invalid-field sentence)"
+          - "Button (save rule, type: submit, variant: primary)"
+          - native frequency radio group (every-weekday/every-n-days/monthly-day)
+          - "Input (kind: text; conditional n/dayOfMonth)"
+          - "Input (kind: text; time HH:MM)"
+          - "Input (kind: text; timeZone IANA)"
+          - "Input (kind: text; startDate YYYY-MM-DD)"
+        derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
+          compactNavigation own the compact shell; include all four destinations and account access.
+          Form fields stack and row actions wrap without hiding controls or horizontal page
+          scrolling. Retain frequency, n, local time, IANA time zone and start date; identify n as
+          requiring a positive integer. No rule or upcoming preview exists yet. Monthly day 31
+          remains valid."
+        directionAsset: assets/schedule-refused.png
   accessibility:
-    - Every interactive control is reachable by keyboard alone in visual order.
-    - "The refusal Text carries `live: \"assertive\"` and is announced without requiring focus; Common
-      sets no `role=\"alert\"` and Text has no danger tone, so severity is carried by the sentence and
-      the live region alone."
-    - Text on the primary colour (#2F6BFF) keeps at least a 4.5:1 contrast ratio.
+    - Keyboard order follows visual and DOM order; all control names remain visible.
+    - "Text(live: assertive) announces refusal; plain foreground copy, no invented Message/Alert
+      export."
+    - "Primary labels use installed --color-black on #2F6BFF (unrounded contrast 4.667946:1);
+      white-on-primary is prohibited."
+    - Danger outline/edge communicates destructive consequence alongside a visible action verb; dark
+      labels remain legible.
+    - Exactly one main landmark; navigation has a name; focus remains visible and returns to the
+      action after a dismissed confirmation.
+    - Decorative turtle uses empty alt text; the adjacent copy supplies meaning.
   responsive:
-    - desktop-1280 is the representative viewport; mobile-390 keeps the same single-column order with no
-      hidden controls, derived rather than separately generated.
+    - "desktop-1280: WorkspaceShell header and primary slots; heading, content and footer remain
+      within readable page measure."
+    - "mobile-390: WorkspaceShell compactHeader and compactNavigation own the compact shell; include
+      all four destinations and account access. Form fields stack and row actions wrap without
+      hiding controls or horizontal page scrolling."
   artworkSlots: []
-  observations: []
-  gaps: []
+  observations:
+    - Direction is an ImageGen design input, not a running-product capture, exact Grammar rendering,
+      interaction or API proof.
+    - Read brand/index.yaml rev 3 for palette and master provenance; generated colours and glyphs
+      are approximate until implementation uses the exact CSS tokens.
+    - Task context, frequency radio options, retained n=0 refusal, time, IANA zone and start date
+      are legible. Save schedule, Cancel, shell and policy links are visible.
+    - Invalid positive-integer input replaces the old invented weekend refusal; day 31 remains
+      allowed by the accepted specification.
+    - No upcoming list or end-rule action before a rule exists. Active/ended states separately map
+      previews and materialised history; no mascot in this refusal screen.
+  gaps:
+    - code: THEME_IMPLEMENTATION_REQUIRED
+      detail: Only the accent override is wired here. Activate the accepted Core token vocabulary, load
+        Inter and supply black primary-label ink in a separately authorized implementation.
+    - code: GRAMMAR_REQUIRED
+      detail: Installed ButtonVariant has no danger variant. Delete/revoke/erasure/end-rule danger
+        direction requires a Grammar-owned capability; no invented prop or app-local red is
+        authorized.
+  status: reviewed-proposed-direction
+  shell:
+    kind: workspace
+    owner: WorkspaceShell
+    primaryLabel: A recurring task's schedule
+    header: Todo app, destination navigation, Alex account presence and Sign out
+    navigation:
+      - label: Tasks
+        href: /tasks
+        status: existing route
+      - label: Notifications
+        href: /notify/preferences
+        status: direction route; not implemented here
+      - label: Plan
+        href: /plan/usage
+        status: direction route; not implemented here
+      - label: Privacy
+        href: /privacy
+        status: direction route; not implemented here
+    footer:
+      - label: Privacy policy
+        href: /privacy-policy
+        status: proposed unimplemented policy route
+      - label: Terms
+        href: /terms
+        status: proposed unimplemented policy route
+  links:
+    - label: Tasks
+      href: /tasks
+      status: existing route
+    - label: Notifications
+      href: /notify/preferences
+      status: direction route; not implemented here
+    - label: Plan
+      href: /plan/usage
+      status: direction route; not implemented here
+    - label: Privacy
+      href: /privacy
+      status: direction route; not implemented here
+    - label: Privacy policy
+      href: /privacy-policy
+      status: proposed unimplemented policy route
+    - label: Terms
+      href: /terms
+      status: proposed unimplemented policy route
+  assets:
+    - path: assets/schedule-refused.prompt.txt
+      role: prompt
+      sha256: c95b1b219a08bd6ae604adb46de8b722feb512a7b91157c385380b0e74282c3b
+      provenance: Exact prompt sent to image_gen.imagegen for this final PNG.
+    - path: assets/schedule-refused.png
+      role: direction
+      sha256: 8da30b01000f8f232067d6e440cf9e5ce55a59a9a804504f151539d3aa6f8c4f
+      width: 1536
+      height: 1024
+      generation:
+        tool: image_gen.imagegen
+        promptPath: assets/schedule-refused.prompt.txt
+        inputRefs:
+          - brand
+          - fr.recur.make-recurring
+          - fr.recur.see-upcoming
+          - fr.recur.end-rule
+          - data.recur.rule
+          - sds.recur.generation-engine
+          - sds.recur.occurrence-lifecycle
+          - knowledge/ui/proof/brand.yaml
+          - knowledge/ui/proof/contrast.yaml
+          - knowledge/ui/composition/layout.yaml
+          - knowledge/ui/composition/collection.yaml
+          - knowledge/ui/composition/cta.yaml
+          - knowledge/ui/composition/responsive.yaml
+      provenance:
+        actor: codex
+        tool: image_gen.imagegen
+        capturedAt: 2026-09-18T12:26:24.711Z
+        kind: generated-proposed-direction
+        modelDisclosure: Tool response did not expose a model field; no model claimed.
+  acceptedInputs:
+    brand:
+      record: brand
+      path: examples/todo-app-backend/.starciwork/brand/index.yaml
+      rev: 3
+      sha256: fdb90a1c8a386ecb72ed9a825374f0d365ed3b05886fc2cd605df55511e0e9bd
+    business:
+      - id: fr.recur.make-recurring
+        path: examples/todo-app-backend/.starciwork/features/recur/fr/make-recurring/index.yaml
+        sha256: 5b4e24d421ffb6285c58d208e5d04961cd2d9686e8528eadcf7f0ab33a400ff0
+      - id: fr.recur.see-upcoming
+        path: examples/todo-app-backend/.starciwork/features/recur/fr/see-upcoming/index.yaml
+        sha256: 4d7cced2e62915516f565bcf4e56b18e1c95080c9971b232b96e6b4a04a1794f
+      - id: fr.recur.end-rule
+        path: examples/todo-app-backend/.starciwork/features/recur/fr/end-rule/index.yaml
+        sha256: a2ac991cc93d429434d5ac7405d9d3a2d4733f091eb5daf32e190f52bd07d382
+      - id: data.recur.rule
+        path: examples/todo-app-backend/.starciwork/features/recur/data/rule/index.yaml
+        sha256: cef674ea2c0682306781b94d65c676ce58b0ed35db20696eb83cdbb283ea683e
+      - id: sds.recur.generation-engine
+        path: examples/todo-app-backend/.starciwork/features/recur/sds/generation-engine/index.yaml
+        sha256: 49d4680bec94e65d264b04ea710a0c26cd921d5448b4ac5b69653fb38703105a
+      - id: sds.recur.occurrence-lifecycle
+        path: examples/todo-app-backend/.starciwork/features/recur/sds/occurrence-lifecycle/index.yaml
+        sha256: 2c769a647d3220573df7f260a412acdd34a275fcff287508362371cf05208bb7
+    knowledge:
+      - path: knowledge/ui/proof/brand.yaml
+        sha256: e86445d107aae66407e7c5375b128d96603c8002b170f24d11a206c1bd0088bd
+      - path: knowledge/ui/proof/contrast.yaml
+        sha256: 2d6c753af1d0779b2ba77a1f10382a53913581cf554fbecc8f23f39f213964ba
+      - path: knowledge/ui/composition/layout.yaml
+        sha256: 9b463073664a88f4f05cde693de7b60591d229c118780fddaee6a29023b70033
+      - path: knowledge/ui/composition/collection.yaml
+        sha256: bbf10c4b27f912648f1a1fedf82d8927889eb4890289ad6976ea8a512a70aec8
+      - path: knowledge/ui/composition/cta.yaml
+        sha256: b0591e87db2506884dcff3e2161fcee7436b3c3daa2d4ff27caab98ab4b8ae74
+      - path: knowledge/ui/composition/responsive.yaml
+        sha256: 56ea005ac1466e12a9a7bcb3cef93cd8a29b2dcdb32023b27e14186ea7c719a7
+    grammar:
+      record: brand
+      location: brand.grammar.inspectedFiles
+      version: 0.4.13
+      installation: prior draw checkout with identical frontend lockfile; current node_modules absent
+  interactions:
+    - Frequency controls determine whether n or dayOfMonth appears. Local time, IANA zone and start
+      date remain explicit.
+    - "End rule confirms the consequence: stop future occurrences and retain materialised history."
 assets:
   - path: assets/schedule-refused.prompt.txt
     role: prompt
-    provenance: authored-prompt-awaiting-interface.draw
+    sha256: c95b1b219a08bd6ae604adb46de8b722feb512a7b91157c385380b0e74282c3b
+    provenance: Exact prompt sent to image_gen.imagegen for this final PNG.
   - path: assets/schedule-refused.png
     role: direction
+    sha256: 8da30b01000f8f232067d6e440cf9e5ce55a59a9a804504f151539d3aa6f8c4f
+    width: 1536
+    height: 1024
     generation:
       tool: image_gen.imagegen
       promptPath: assets/schedule-refused.prompt.txt
-      inputRefs: [ui.recur.schedule, fr.recur.make-recurring, fr.recur.see-upcoming, fr.recur.end-rule, brand]
+      inputRefs:
+        - brand
+        - fr.recur.make-recurring
+        - fr.recur.see-upcoming
+        - fr.recur.end-rule
+        - data.recur.rule
+        - sds.recur.generation-engine
+        - sds.recur.occurrence-lifecycle
+        - knowledge/ui/proof/brand.yaml
+        - knowledge/ui/proof/contrast.yaml
+        - knowledge/ui/composition/layout.yaml
+        - knowledge/ui/composition/collection.yaml
+        - knowledge/ui/composition/cta.yaml
+        - knowledge/ui/composition/responsive.yaml
     provenance:
       actor: codex
-      profile: gpt-5.6-sol
-      capturedAt: 2026-09-18T07:42:00.301Z
+      tool: image_gen.imagegen
+      capturedAt: 2026-09-18T12:26:24.711Z
+      kind: generated-proposed-direction
+      modelDisclosure: Tool response did not expose a model field; no model claimed.
 change:
-  rev: 3
-  kind: editorial
-  at: 2026-09-18T10:00:00.000Z
-  reason: interface.draw ran and produced the refused representative direction image and its sibling prompt with a real image_gen.imagegen invocation; gap.recur.direction-not-drawn is closed, its blockedBy edge is removed, and this record reaches done on the strength of the evidence.yaml this same run wrote.
+  rev: 4
+  kind: clarifying
+  at: 2026-09-18T12:20:51.698Z
+  reason: "Owner-directed redraw against brand rev 3: real shell/auth composition, full web UX,
+    explicit mobile/state derivations and honest Grammar/link implementation gaps."

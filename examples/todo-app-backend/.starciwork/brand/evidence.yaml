@@ -1,0 +1,18 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: brand
+recordDigest: fdb90a1c8a386ecb72ed9a825374f0d365ed3b05886fc2cd605df55511e0e9bd
+outcome: pass
+assertions:
+  - id: brand-rev3-trace-contrast-assets
+    command: node examples/todo-app-backend/.starciwork/brand/assets/verify-rev3.mjs
+    exit: 0
+    outcome: pass
+    observation: node examples/todo-app-backend/.starciwork/brand/assets/verify-rev3.mjs exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T12:40:53.813Z

@@ -1,55 +1,18 @@
-Screen: A recurring task's schedule (recur.schedule), route /tasks/:taskId/schedule, actor: owner
-State: refused - the submitted schedule is invalid, for example a weekend-only rule with no matching weekday
-Behavior to depict: an assertive-live line of copy names the invalid field beside the make-recurring form;
-the form retains the entered values. This state is reached only from no-rule (a rule has never been
-saved), so the upcoming-occurrences section and the end-rule action are not on screen - they only exist
-once a rule is active.
+Use case: ui-mockup
+Asset type: proposed desktop interface direction for Todo app. Generate one polished, legible flat web-app design, landscape approximately 1536 x 1024. The entire screen must be visible. No browser frame, device mockup, annotations, source paths or design labels inside the image.
+PROVENANCE INPUT ORDER
+1. BRAND AUTHORITY: examples/todo-app-backend/.starciwork/brand/index.yaml rev 3. Todo app uses @starci/grammar common anatomy with core token vocabulary. Primary #2F6BFF. Primary button label ink is pure black #000000 from installed --color-black, NOT white: black/blue contrast is 4.667946:1 whereas white/blue is only 4.498767:1. Surface #FFFFFF. Neutrals from --starci-core-canvas oklch(97.02% 0.0015 354.13), --starci-core-surface-secondary oklch(95.24% 0.0012 354.13), --starci-core-foreground oklch(21.03% 0.0015 354.13), --starci-core-muted oklch(55.17% 0.003 354.13), --starci-core-border oklch(90% 0.0015 354.13). Danger only --starci-core-danger oklch(65.32% 0.2335 37.78), approximately sRGB #FD4100; never invent another red. Danger action uses a thin danger outline with dark legible label; destructive controls never blue. Body text is dark on neutral. Links have dark labels with blue underlines; selected nav has a blue underline. Inter typography. No photography. No logo symbol: plain text product name "Todo app". No pictographic icon set is approved, so use visible text labels and native checkboxes. Turtle is only allowed on the separate auth illustration panel, non-danger empty states, welcome/marketing, loading idles. Never inside a form control or a danger/destructive region.
+2. ACTUAL GRAMMAR ANATOMY: @starci/grammar@0.4.13; public exports dist/common/index.d.ts -> dist/common/renderers.js, source shapes in dist/core/primitive and dist/core/composition. Inspected in C:/Users/Hi/orca/workspaces/.claude/ex-draw-v3/examples/todo-app-frontend/node_modules/@starci/grammar; its frontend package-lock.json is byte-identical to this worktree. Full hashes and token trace live with brand rev 3. Current app imports common.css only, so this direction is not a claim Core's material theme is already activated.
+Known primitives: Input includes real label and input, hint/errorMessage/isError, email/password/text kinds. Button variants primary/secondary/tertiary/outline/ghost, isPending/isDisabled. Text live assertive/polite and default/muted/accent tones; there is no Alert or Message export and no danger Text tone. TextAction href renders actual anchor. WorkspaceShell owns header and primary/main landmark; Sidebar optional. SurfaceCard bounds one form or single subject; SurfaceListCard is a separately titled collection region; never card each row. Native row/check/radio semantics may carry app data without pretending to be a Grammar export. ButtonVariant has NO danger; the required danger treatment is a declared Grammar implementation gap, not a fabricated prop.
+3. KNOWLEDGE: knowledge/ui/proof/brand.yaml BRAND-1/BRAND-2/BRAND-3; knowledge/ui/proof/contrast.yaml CONTRAST-1/COLOR-3; knowledge/ui/composition/layout.yaml LAYOUT-1/LAYOUT-2/LAYOUT-3; knowledge/ui/composition/collection.yaml COLLECTION-1/COLLECTION-2; knowledge/ui/composition/cta.yaml CTA-1/CTA-2/CTA-3/CTA-4; knowledge/ui/composition/responsive.yaml RESPONSIVE-1/RESPONSIVE-3. This is image-first proposed direction, not a screenshot of a running product, exact component rendering or API evidence.
+VISUAL QUALITY: Calm and useful, generous but purposeful spacing, readable 16px body at desktop, strong 30px heading, 44px-ish action targets, white surfaces on almost-white canvas, restrained 12px corners and subtle separators. Keep body/control text dark and crisp; no pale unreadable copy. No gradients, busy background or gratuitous cards. Distinguish task content from navigation. Full realistic English UX, no lorem ipsum, no invented analytics or prices.
 
-Business grounding (accepted, do not invent beyond these):
-  - fr.recur.make-recurring
-  - fr.recur.see-upcoming
-  - fr.recur.end-rule
+SCREEN: recur.schedule; representative state refused.
+Accepted business/SDS inputs: fr.recur.make-recurring, fr.recur.see-upcoming, fr.recur.end-rule, data.recur.rule, sds.recur.generation-engine, sds.recur.occurrence-lifecycle.
+SHARED APP SHELL: A white top header about 80px high spans the whole frame with a fine neutral bottom divider. Left plain-text "Todo app" in bold; next horizontal text navigation "Tasks", "Notifications", "Plan", "Privacy". At far right a small neutral circular avatar with letter "A", text "Alex" and understated "Sign out" link. No turtle or logo glyph in the header. Selected destination gets a #2F6BFF underline and dark bold text. Below, a spacious main region starts around 80px from left, maximum readable width around 1120px. Breadcrumb sits above the screen heading when task-specific or a settings screen. Footer at bottom of main has "Privacy policy" and "Terms" understated dark links. Visible user data are synthetic fixtures. Header/navigation/links are direction requirements and do not claim those routes are implemented.
+Tasks selected. Breadcrumb "Tasks / Water the plants / Schedule". Heading "Repeat this task". Small context "Water the plants". Secondary "Back to task" link. One form titled "Schedule" has labelled fields: "Frequency" with three simple native radio options "Every weekday", "Every N days" SELECTED, "Day of the month". Under that, Input label "Every (days)" with retained invalid value "0"; immediately below a plain dark refusal sentence "Enter a number of days greater than zero." Then labelled Input "Time of day" populated "09:00", Input "Time zone" populated "Asia/Bangkok", and Input "Start date" populated "2026-09-21". These are actual text Input kinds with hints, not invented selects or calendar widgets. Small help "Uses your selected local time zone." At bottom filled blue BLACK-TEXT "Save schedule" and secondary "Cancel".
+This is refused creation with no saved rule: DO NOT show upcoming occurrences, rule summary, end-rule button or any success. The invalid field is n=0 grounded in data.recur.rule, not an invented rejection of day 31. Once saved, upcoming dates and existing materialised history belong to separately mapped states. No mascot on this refused form. Clear labels, plenty of room, realistic web UX, no ornamental icons.
 
-Brand (brand/index.yaml rev 2, read do not restate elsewhere):
-  - primary: #2F6BFF
-  - surface: #FFFFFF
-  - typography: Inter, sans-serif
-  - don't: Never place text on the primary colour below a 4.5:1 contrast ratio.
+Responsive derivation (not drawn here): at mobile-390 retain all controls and reading order; app shell uses compactHeader/compactNavigation, task rows wrap actions below labels, no sideways page scroll. Screen is proposed visual direction only.
 
-Relevant UI knowledge:
-  - knowledge/ui/composition/collection.yaml (COLLECTION-1, COLLECTION-2)
-
-Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
-examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
-9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components, no
-invented ones. impl.recur.todo-app-frontend.schedule is still unbuilt (blockedBy gap.recur.unbuilt-module),
-so this binding is drawn directly from the real export list. This state shows only the make-recurring
-form:
-  - SurfaceCard {ariaLabel: "Schedule", measure: "formCompact"}
-  - Input {id: "recur-rule", name: "rule", label: "Repeat", kind: "text"}, the rule-expression field
-  - PressableField {label: "Time of day", placeholder: "Choose a time"}, the time-of-day picker trigger -
-    Common ships no time/select input, so a value the person opens a picker to choose is real
-    PressableField anatomy ("input ANATOMY, not a button variant... it never accepts text"), not an
-    invented `<select>` or dropdown Common does not export
-  - Text {live: "assertive"}, plain body copy carrying the invalid-field sentence - Common ships no
-    Message/Alert renderer and Text has no `tone: "danger"` value; severity is carried by the sentence and
-    by `aria-live="assertive"` alone
-  - Button {type: "submit", variant: "primary"}, the save-rule action
-
-Not depicted in this state (they belong to the active state, once a rule exists, not to a refused
-make-recurring submission): SectionHeader/SurfaceListCard's own `label` for the "Upcoming occurrences"
-list, StaticStateRow occurrence rows, and the end-rule Button.
-
-Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
-GrammarButton/GrammarTextField/GrammarMessage anatomy, no HeroUI component reached directly, no invented
-Alert/Toast/Banner, dropdown or date-select control Common does not ship.
-
-Layout note: The upcoming-occurrences list, when a rule is active, is its own page section named by
-SurfaceListCard's own `label` prop - the real published collection container per COLLECTION-1 case-5 - and
-never sits inside the make-recurring SurfaceCard.
-
-Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
-4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
-beyond brand/assets/**; no dropdown/select control Common does not export.
-
-Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).
+FINAL STRICT INK RULE: Every visible text glyph must be dark neutral #191819 or pure black, with muted neutral secondary copy allowed. In particular ALL Revoke/Request erasure/Delete labels must be DARK, never red or orange; ALL links have DARK text, never blue. ONLY borders/underlines/selection indicators/primary button BACKGROUNDS use saturated brand colours. Primary-button labels are BLACK. This rule takes priority over conventional coloured hyperlink or destructive-button text styling.
