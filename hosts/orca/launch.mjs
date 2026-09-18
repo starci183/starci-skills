@@ -311,11 +311,13 @@ const cleanupProof=({releaseState=null,releaseReason=null,processAction=null,clo
     releaseState,processAction,residualTerminal:Boolean(releaseState==='retained'||exitedWorker?.residualTab)};
 };
 
-/** Prove an already-successful worker exited before issuing another native mutation. */
-function completedWorkerProof(orca,dispatchId,{cwd}={}){
-  let shown;try{shown=orca.invoke('worker-show',{dispatch:dispatchId},{cwd});}catch(error){return {proven:false,reason:String(error?.message??error)};}
-  if(shown?.outcome!=='ok')return {proven:false,reason:`worker-show failed: ${shown?.reason??shown?.outcome??'unknown'}`};
-  const result=resultOf(shown.receipt),dispatch=result?.dispatch,worker=result?.worker,observation=result?.observation,terminal=result?.terminal,
+/**
+ * The one reading of a `worker-show` record that says a completed worker is over and its tab is only residue.
+ * Both the settlement below and the kernel's retry boundary judge that shape, and they have to judge it the
+ * same way: a boundary stricter than the settlement it delegates to refuses a retry that would have succeeded.
+ */
+export function completedWorkerResidue(result,dispatchId){
+  const dispatch=result?.dispatch,worker=result?.worker,observation=result?.observation,
     terminalResource=result?.terminalResource,ownershipState=String(terminalResource?.ownershipState??'').toLowerCase();
   const completed=dispatch?.status==='completed'&&Boolean(dispatch?.completed_at)&&Boolean(dispatch?.capability_revoked_at)&&worker?.state==='succeeded'&&worker?.stage==='settled';
   // After an Orca restart the terminal handle is stale: observation reads `missing` and the resource is
@@ -325,6 +327,16 @@ function completedWorkerProof(orca,dispatchId,{cwd}={}){
   const retainedResidue=completed&&terminalResource?.releaseState==='retained'
     &&terminalResource?.originDispatchId===dispatchId&&terminalResource?.ownerDispatchId===dispatchId
     &&(observation?.status==='missing'||ownershipState==='user_owned');
+  return {completed,retainedResidue,ownershipState};
+}
+
+/** Prove an already-successful worker exited before issuing another native mutation. */
+function completedWorkerProof(orca,dispatchId,{cwd}={}){
+  let shown;try{shown=orca.invoke('worker-show',{dispatch:dispatchId},{cwd});}catch(error){return {proven:false,reason:String(error?.message??error)};}
+  if(shown?.outcome!=='ok')return {proven:false,reason:`worker-show failed: ${shown?.reason??shown?.outcome??'unknown'}`};
+  const result=resultOf(shown.receipt),dispatch=result?.dispatch,worker=result?.worker,observation=result?.observation,terminal=result?.terminal,
+    terminalResource=result?.terminalResource;
+  const {completed,retainedResidue,ownershipState}=completedWorkerResidue(result,dispatchId);
   const exact=dispatch?.id===dispatchId&&worker?.dispatch_id===dispatchId&&(observation?.exactWorker===true||retainedResidue);
   const terminalAbsent=!terminal,terminalDisconnected=terminal?.connected===false&&terminal?.writable===false;
   if(ownershipState==='user_owned'&&!retainedResidue)return {proven:false,userOwned:true,ownershipState,reason:'the completed worker terminal is user-owned'};

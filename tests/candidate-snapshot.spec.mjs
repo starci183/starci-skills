@@ -37,6 +37,23 @@ test('sealing inventories actual worker bytes and ignores a dishonest report fil
   assert.equal(verifyCandidateIdentity(f.snapshot,packet).verdict,'pass');
 });
 
+test('replaying a sealed freeze judges the packet it already sealed, not a recomputed allowlist',t=>{
+  const f=fixture(t);
+  fs.writeFileSync(path.join(f.worker,'src','app.mjs'),'export const value=2;\n');
+  const packet=sealCandidate(f.snapshot,{allowedWrites:['src/app.mjs']});
+  // The canonical tree went back to clean after the seal, so the caller observes nothing to allow. The sealed
+  // delta is still the attempt's own, and its replay returns the same immutable packet instead of refusing it.
+  const replayed=sealCandidate(f.snapshot,{allowedWrites:[]});
+  assert.deepEqual(replayed.changes.map(item=>item.path),['src/app.mjs']);
+  assert.equal(replayed.candidateDigest,packet.candidateDigest);
+  // Bytes that drifted from what was sealed are still refused - the packet allows its own paths, never new ones.
+  fs.writeFileSync(path.join(f.worker,'src','app.mjs'),'export const value=3;\n');
+  assert.throws(()=>sealCandidate(f.snapshot,{allowedWrites:[]}),/conflicts with current bytes or identity/);
+  fs.writeFileSync(path.join(f.worker,'src','app.mjs'),'export const value=2;\n');
+  fs.writeFileSync(path.join(f.worker,'src','extra.mjs'),'export const extra=1;\n');
+  assert.throws(()=>sealCandidate(f.snapshot,{allowedWrites:[]}),/outside its allowed writes/);
+});
+
 test('hidden, out-of-scope and linked files are rejected from candidate provenance',t=>{
   const f=fixture(t);
   fs.writeFileSync(path.join(f.worker,'hidden.txt'),'hidden');

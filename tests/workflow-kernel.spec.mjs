@@ -5358,6 +5358,23 @@ test('public retry reconciles only the exact exited native attempt before releas
   assert.match(reconcileStoppedNativeRetryLease(state,{...tabbed,lease:lease},{orca:{invoke:()=>({outcome:'ok',receipt:{result:stillRunning}})},store,createRuntime(){throw Error('must not');},settleHost(){throw Error('must not');}}).reason,/does not prove/);
   const behind={...op,attempt:2,lease:lease,candidate:{identity},launch:{task:'task-native',dispatch:'ctx-native'}};
   assert.match(reconcileStoppedNativeRetryLease(state,behind,{orca,store,createRuntime(){throw Error('must not');},settleHost(){throw Error('must not');}}).reason,/do not bind the current workflow operation attempt/);
+  // A completed, capability-revoked, settled worker whose incarnation is gone reads `missing`, never `exited`:
+  // its retained tab is recorded residue. The boundary proves the stop from that record - the same proof the
+  // typed settlement accepts - instead of waiting forever for an `exactWorker` that can no longer be observed.
+  const gone={dispatch:{id:'ctx-native',task_id:'task-native',run_id:'run-native',status:'completed',completed_at:'2026-09-17 09:54:01',capability_revoked_at:'2026-09-17 09:54:01'},
+    worker:{dispatch_id:'ctx-native',state:'succeeded',stage:'settled'},observation:{status:'missing',exactWorker:false},terminal:null,
+    terminalResource:{ownershipState:'owned',releaseState:'retained',retainedReason:'identity_unproven',originDispatchId:'ctx-native',ownerDispatchId:'ctx-native'}};
+  const residual={...op,attempt:3,lease:{...lease},candidate:{identity:{...identity}},launch:{task:'task-native',dispatch:'ctx-native'}};
+  const residualCloses=[];
+  const reconciledResidue=reconcileStoppedNativeRetryLease(state,residual,{orca:{invoke:()=>({outcome:'ok',receipt:{result:gone}})},store,
+    createRuntime:()=>({settleStoppedOperation(candidate,{settlement}){assert.equal(settlement.effectState,'none');delete candidate.lease;return {ok:true,observedFiles:[],candidateDigest:'residue'};},close(){}}),
+    settleHost:(_host,dispatch,options)=>{residualCloses.push(options.closeTerminal);return {schema:'starci/orca-supervised-settlement@1',dispatchId:dispatch,effectState:'none'};}});
+  assert.equal(reconciledResidue.ok,true,reconciledResidue.reason);
+  assert.deepEqual(residualCloses,[false],'a tab that is already gone is not closed again');
+  // The residue proof is the completed worker's, not any settled record's: an unfinished dispatch still refuses.
+  const unfinished={...gone,dispatch:{...gone.dispatch,status:'dispatched',completed_at:null,capability_revoked_at:null}};
+  assert.match(reconcileStoppedNativeRetryLease(state,{...residual,lease:{...lease},candidate:{identity:{...identity}}},
+    {orca:{invoke:()=>({outcome:'ok',receipt:{result:unfinished}})},store,createRuntime(){throw Error('must not');},settleHost(){throw Error('must not');}}).reason,/does not prove/);
 });
 
 test('public retry settles an answered decision rerun only from exact stopped custody and retains its user-owned tab',()=>{

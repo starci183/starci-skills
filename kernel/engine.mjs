@@ -542,8 +542,16 @@ export function createEngineRuntime({store,state,now=Date.now,eligibility,modelP
       const sealReasons=[...(frozen.reasons??[])],cleanNow=new Set(frozen.cleanNow??[]),baselineTouched=new Set(frozen.baselineTouched??[]),
         unpromotableOnly=sealReasons.length>0&&sealReasons.every(reason=>{const text=String(reason);
           if(/(^|:)canonical-head-drift$/.test(text))return true;
-          const match=text.match(/(^|:)pre-existing-user-work-modified:(.+)$/);return match!==null&&cleanNow.has(match[2]);});
-      if(frozen.status!=='sealed'&&(!unpromotableOnly||acceptedPreparedDecision))
+          const match=text.match(/(^|:)pre-existing-user-work-modified:(.+)$/);return match!==null&&cleanNow.has(match[2]);}),
+        // The third residue of a wiped worktree: this attempt got far enough to seal a packet, and the canonical
+        // tree has since gone back to the accepted bytes, so every path the packet sealed reads `canonical-delta-
+        // missing` and the byte comparison reads `canonical-drift`. The freeze observes no delta of its own, so
+        // there is nothing to promote and nothing attributable to launder - the same verdict the reasons above
+        // already carry, reached from a sealed packet instead of an abandoned one. Requiring an observed delta of
+        // zero is what keeps this narrow: any canonical change still standing is judged by the rules above.
+        sealedDeltaGone=sealReasons.length>0&&(frozen.observedFiles??[]).length===0&&sealReasons.every(reason=>
+          /(^|:)canonical-drift$/.test(String(reason))||/(^|:)canonical-delta-missing:/.test(String(reason)));
+      if(frozen.status!=='sealed'&&(!(unpromotableOnly||sealedDeltaGone)||acceptedPreparedDecision))
         return {ok:false,effectState:'unknown',reason:'candidate effects could not be sealed',pending:frozen};
       if(frozen.status!=='sealed'){
         const observed=[...new Set(frozen.observedFiles??[])].sort(),owned=observed.filter(file=>scopeMatches(file,op.allowlist??[])&&!baselineTouched.has(file));
