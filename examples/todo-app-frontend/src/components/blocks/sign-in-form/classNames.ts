@@ -1,2 +1,4 @@
-/** The one wrapping card class this block's view renders. */
-export const cardClassName = 'grammar-card';
+import { cn } from '@heroui/react';
+
+/** Field and submit stack inside the sign-in form. */
+export const SIGN_IN_FORM_FIELDS_CLASS_NAME = cn('flex', 'flex-col', 'gap-4');

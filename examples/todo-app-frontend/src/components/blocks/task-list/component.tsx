@@ -1,7 +1,7 @@
 import type { FormEvent } from 'react';
-import { GrammarButton, GrammarMessage, GrammarTextField } from '@todo-app/grammar/index';
+import { Button, Input, SurfaceCard, Text } from '@starci/grammar/common';
 import type { Task } from '@/modules/api/tasks';
-import { cardClassName, rowClassName } from './classNames';
+import { TASK_LIST_BODY_CLASS_NAME, TASK_LIST_FORM_CLASS_NAME, TASK_LIST_ROWS_CLASS_NAME, TASK_LIST_ROW_CLASS_NAME } from './classNames';
 
 /**
  * ui.task.list states: empty, one-task, many-tasks, refused. A state this record does not name has no
@@ -36,24 +36,30 @@ export const TaskListView = (props: TaskListViewProps) => {
   };
 
   return (
-    <div className={cardClassName}>
-      <div data-state={state}>
+    <SurfaceCard ariaLabel="Tasks" measure="formCompact">
+      <div data-state={state} className={TASK_LIST_BODY_CLASS_NAME}>
         {state === 'refused' ? (
-          <GrammarMessage tone="danger">{props.refusal}</GrammarMessage>
+          <Text live="assertive">{props.refusal}</Text>
         ) : (
           <>
-            <form onSubmit={onCreate}>
-              <GrammarTextField id="new-task-title" label="New task" value={props.newTitle} onChange={props.onNewTitleChange} />
-              <GrammarButton type="submit" isDisabled={props.isCreating || !props.newTitle.trim()}>
+            <form onSubmit={onCreate} className={TASK_LIST_FORM_CLASS_NAME}>
+              <Input
+                id="new-task-title"
+                name="title"
+                label="New task"
+                value={props.newTitle}
+                onValueChange={props.onNewTitleChange}
+              />
+              <Button type="submit" variant="primary" isDisabled={props.isCreating || !props.newTitle.trim()}>
                 Add task
-              </GrammarButton>
+              </Button>
             </form>
             {state === 'empty' ? (
-              <p>No tasks yet. Add the first one.</p>
+              <Text tone="muted">No tasks yet. Add the first one.</Text>
             ) : (
-              <ul>
+              <ul className={TASK_LIST_ROWS_CLASS_NAME}>
                 {props.tasks.map(task => (
-                  <li key={task.id} className={rowClassName}>
+                  <li key={task.id} className={TASK_LIST_ROW_CLASS_NAME}>
                     <label>
                       <input
                         type="checkbox"
@@ -62,9 +68,9 @@ export const TaskListView = (props: TaskListViewProps) => {
                       />
                       {task.title}
                     </label>
-                    <GrammarButton type="button" onClick={() => props.onDelete(task.id)}>
+                    <Button type="button" variant="ghost" onPress={() => props.onDelete(task.id)}>
                       Delete
-                    </GrammarButton>
+                    </Button>
                   </li>
                 ))}
               </ul>
@@ -72,6 +78,6 @@ export const TaskListView = (props: TaskListViewProps) => {
           </>
         )}
       </div>
-    </div>
+    </SurfaceCard>
   );
 };

@@ -1,10 +1,20 @@
-@import '@todo-app/grammar/styles.css';
+@import 'tailwindcss';
+@import '@heroui/styles/css';
+@import '@starci/grammar/common.css';
+
+/*
+ * Grammar's own Common renderers spell their typography and layout in Tailwind utilities and ship
+ * them inside `node_modules`, which Tailwind never scans by default. Without this line those
+ * utilities are absent from the build and every Common primitive renders unstyled - a failure that
+ * looks like a component bug and is not one.
+ */
+@source "../../node_modules/@starci/grammar/dist";
 
 body {
   margin: 0;
+  background: var(--background);
+  color: var(--foreground);
   font-family: system-ui, sans-serif;
-  background: var(--grammar-color-surface);
-  color: var(--grammar-color-ink);
 }
 
 main {
