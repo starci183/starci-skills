@@ -9,3 +9,7 @@ export { TaskTitleRequiredException } from './errors/task/task-title-required';
 export { KeycloakInvalidCredentialsException } from './errors/keycloak/keycloak-invalid-credentials';
 export { KeycloakUnavailableException } from './errors/keycloak/keycloak-unavailable';
 export { PostgresPrimaryUnavailableException } from './errors/postgres/postgres-primary-unavailable';
+export { ErasureRequestNotFoundException } from './errors/audit/erasure-request-not-found';
+export { ErasureRequestForbiddenException } from './errors/audit/erasure-request-forbidden';
+export { ErasureRequestInvalidStateException } from './errors/audit/erasure-request-invalid-state';
+export { ErasureNotConfirmedException } from './errors/audit/erasure-not-confirmed';
