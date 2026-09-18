@@ -1,16 +1,24 @@
 schema: work/implementation
 id: impl.plan.todo-app-backend.plan
 title: The plan module - cap guard, subscription lifecycle, payments and reconciliation
-state: todo
+state: done
 repository: todo-app
 owners:
-  - {role: module, path: src/plan/cap-guard.ts}
-  - {role: module, path: src/plan/subscription.ts}
-  - {role: module, path: src/plan/payments.ts}
-  - {role: module, path: src/plan/reconcile.ts}
+  - {role: module, path: src/modules/bussiness/plan}
+  - {role: module, path: src/modules/integrations/sepay}
+  - {role: module, path: src/features/todo/http/webhooks/sepay}
 proves: [br.plan.caps.limit, br.plan.active-scope, br.plan.downgrade.freeze, br.plan.payment.idempotent,
-  br.plan.lapse.reverts-on-read, sds.plan.subscription-lifecycle, sds.plan.cap-guard, sds.plan.reconciliation]
+  br.plan.lapse.reverts-on-read, sds.plan.subscription-lifecycle, sds.plan.cap-guard,
+  contract.plan.create-precondition]
 verification: []
 verificationSource: authored-claim
-blockedBy:
-  - {record: gap.plan.unbuilt-module, because: "The example backend is moving to NestJS, conforming to checks/architecture.mjs and checks/code-patterns/nest*.mjs. Nothing under src/plan exists yet in that layout; an earlier draft of this module was written directly under app/src/plan as a plain .mjs module and has been removed rather than kept as a second, incompatible scaffold. No test has been run against real code, so no evidence.yaml exists for this record or for anything it would prove."}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: Built under nivo's NestJS shape at src/modules/bussiness/plan (capability module),
+    src/modules/integrations/sepay (SepayClient) and src/features/todo/http/webhooks/sepay (the gateway's
+    inbound webhook door), matching checks/architecture.mjs's layout, not the earlier plain-.mjs draft.
+    sds.plan.reconciliation is deliberately not listed in proves - it is built and unit-tested here too
+    (reconcile-payment.handler.ts / .spec.ts) but stays blocked on integration.plan.sepay's live proof,
+    and this record does not claim to prove a spec that is itself still todo (PROVES_TARGET_NOT_DONE).

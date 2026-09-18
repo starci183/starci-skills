@@ -18,7 +18,7 @@ postconditions:
     redirect back to the app alone.
   - Exactly one activation is recorded per payment intent, per br.plan.payment.idempotent.
 composes:
-  - {rule: br.plan.caps.limit, module: src/plan/cap-guard}
+  - {rule: br.plan.caps.limit, module: src/modules/bussiness/plan}
 refs: [sds.plan.subscription-lifecycle, integration.plan.sepay]
 
 requiresProof:
@@ -27,5 +27,15 @@ requiresProof:
   uat:
     required: true
 
+change:
+  rev: 2
+  kind: editorial
+  at: 2026-09-18T16:00:00.000Z
+  reason: The unit half is satisfied - br.plan.caps.limit is done, and upgrade-plan.handler.spec.ts /
+    confirm-payment.handler.spec.ts unit-prove t-checkout-started and t-gateway-confirmed against a fake
+    SepayClient. The remaining blocker is the uat half alone, narrowed from "not built" to the real
+    absences below.
+
 blockedBy:
-  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/subscription; the example backend is moving to NestJS and this flow is specified but not built, so there is no unit suite and no UAT walk to point to yet."}
+  - {record: impl.plan.todo-app-frontend.usage, because: "No usage screen or upgrade action exists yet at app/plan for an owner to actually reach; this backend-only lane does not build the frontend."}
+  - {record: gap.plan.live-proof, because: "uat.verify has not run this flow against the running product yet, and integration.plan.sepay (the live gateway leg the mainFlow's checkout step depends on) is still todo."}

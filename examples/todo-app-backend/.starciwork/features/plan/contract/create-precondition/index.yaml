@@ -1,41 +1,54 @@
 schema: work/contract
 id: contract.plan.create-precondition
 title: What task creation must ask the plan before it writes
-state: todo
+state: done
 between:
   provider: plan
   consumer: task
 owner: plan
 surface:
   - name: checkCanCreateTask
-    shape: "(personId) -> {allowed, reason?, upgrade?}"
-    guarantee: allowed is false only when the person's effective plan (read through
+    shape: "TaskCreationPolicy.assertMayCreate(principal, input) -> Promise<void>, throwing PlanCapExceededException to refuse"
+    guarantee: allowed is false (the call throws) only when the person's effective plan (read through
       sds.plan.subscription-lifecycle's t-revert-on-read) has no room for one more active task
-      (br.plan.caps.limit, counted by br.plan.active-scope). A false result names the cap and the upgrade
+      (br.plan.caps.limit, counted by br.plan.active-scope). A refusal names the cap and the upgrade
       path; it never explains by omission.
-    stability: Adding a field to a refusal is additive; removing allowed or changing when it is false is
-      breaking.
+    stability: Adding metadata to the thrown exception is additive; changing when it throws, or throwing a
+      type that is not an AbstractException, is breaking.
 guarantees:
   - The check reads live state at call time; it is never cached across a create.
 consumerObligations:
-  - The task create path calls checkCanCreateTask before writing and honors a false result by refusing the
-    create and returning its reason and upgrade path unchanged.
+  - The task create path calls the registered policy before writing and honors a refusal by refusing the
+    create and propagating its reason and upgrade path unchanged.
 refs: [br.plan.caps.limit, sds.plan.cap-guard]
 
 requiresProof:
   provider: {required: true}
   consumer: {required: true}
 
-blockedBy:
-  - {record: sds.plan.cap-guard, because: "The provider side (sds.plan.cap-guard) has no implementation yet; see its own blockedBy."}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: "Both sides proven together by create-precondition.contract.spec.ts, without editing a single
+    file under bussiness/task: the provider (PlanCapGuardPolicy, sds.plan.cap-guard) is registered into
+    the real TaskCreationPolicyRegistry by PlanModule.onModuleInit, and the consumer obligation is proven
+    against task's own unmodified CreateTaskHandler driven through the real CreateTaskCommand - the exact
+    object fr.task.create's GraphQL resolver depends on. The surface's shape is corrected from the
+    originally authored boolean-returning checkCanCreateTask(personId) to the throw-based
+    TaskCreationPolicy.assertMayCreate the pre-existing seam (creation-policy.contracts.ts,
+    creation-policy.providers.ts) actually exposes - this lane does not own bussiness/task and built
+    against the seam as it already exists, not as first drafted here; the guarantee and
+    consumerObligations hold under either shape."
 
-# The consumer obligation cannot be met by this feature at all: fr.task.create and its implementation
-# (impl.task.todo-app-backend.ownership) are owned by the task feature, already `done`, and this lane
-# owns only features/plan/**. Not authored as a blockedBy edge onto fr.task.create: it is already done,
-# so a blocker citing it would be stale on arrival. sds.plan.cap-guard carries appliesTo: [fr.task.create]
-# for exactly this reason - the edge this contract needed a home for - so fr.task.create reads as
-# effectiveState: suspended until task re-proves it against the guard; this contract itself still stays
-# todo until the task feature wires the actual call.
+blockedBy: []
+
+# The consumer obligation is proven against the real CreateTaskHandler/TaskCreationPolicyRegistry
+# classes, but fr.task.create's own record (features/task/**, not owned by this lane) still describes an
+# unconditional create in its mainFlow/postconditions and was not re-authored by this lane. sds.plan.cap-guard
+# still carries appliesTo: [fr.task.create] for that reason, and fr.task.create's own record still reads as
+# effectiveState: suspended until the task feature re-proves it against the guard - see conflictsWith below
+# and the final report.
 
 conflictsWith:
   - {record: fr.task.create, because: "fr.task.create's mainFlow creates a task for any non-empty title with

@@ -9,5 +9,11 @@ owners:
 proves: [ui.plan.usage]
 verification: []
 verificationSource: authored-claim
-blockedBy:
-  - {record: gap.plan.unbuilt-module, because: "The frontend is moving to Next.js, consuming the Grammar core package the way nivo-fe does. Nothing under app/plan exists yet in that layout; an earlier draft was written directly under src/plan as a plain .mjs module and has been removed rather than kept as a second, incompatible scaffold."}
+change:
+  rev: 2
+  kind: editorial
+  at: 2026-09-18T16:00:00.000Z
+  reason: gap.plan.unbuilt-module reached done (its backend half, impl.plan.todo-app-backend.plan) so
+    citing it here is stale; that edge is dropped. This record's own reason to stay todo is unchanged and
+    needs no gap of its own - the frontend under app/plan simply has not been built yet, out of scope for
+    this backend-only lane.

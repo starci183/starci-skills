@@ -1,13 +1,17 @@
 schema: work/sds-component
 id: sds.plan.subscription-lifecycle
 title: How a subscription moves between free and paid
-state: todo
+state: done
 responsibility: Holds one row per person's plan and the only place its status is written. Every transition
   below is a guarded write; nothing reads a raw status directly - it goes through the read-time revert
   (t-revert-on-read) so a lapsed row can never look paid because no sweep got to it yet.
 interfaces:
-  - The plan module is the only writer of a subscription row's status.
-  - Every reader of "is this person paid" calls the t-revert-on-read function, never the stored column.
+  - The plan module is the only writer of a subscription row's status, through SubscriptionService
+    (src/modules/bussiness/plan/subscription.service.ts).
+  - Every reader of "is this person paid" calls the t-revert-on-read function
+    (SubscriptionService.readEffectivePlan), never the stored column.
+owners:
+  - {role: module, path: src/modules/bussiness/plan}
 refs: [br.plan.caps.limit, br.plan.downgrade.freeze, br.plan.lapse.reverts-on-read, decision.plan.downgrade.policy]
 dependsOn: [integration.plan.sepay, integration.login.postgres]
 
@@ -76,5 +80,14 @@ requiresProof:
   transitions:
     forEach: stateMachine.transitions
 
-blockedBy:
-  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/subscription. The example backend is moving to NestJS (checks/architecture.mjs); this component is specified but not built or run against that layout, so provenBy is empty rather than claiming transitions that have never executed."}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: Built at src/modules/bussiness/plan (subscription.service.ts); every transition proven directly
+    in subscription.service.spec.ts (t-checkout-started, t-gateway-confirmed, t-gateway-abandoned,
+    t-renewal-due, t-renewal-confirmed, t-lapse, t-downgrade) and t-revert-on-read proven by the same
+    file's lapse case. The webhook/reconcile callers of t-gateway-confirmed/t-renewal-confirmed are
+    ConfirmPaymentHandler and ReconcilePaymentHandler (confirm-payment.handler.spec.ts,
+    reconcile-payment.handler.spec.ts); dependsOn's integration.plan.sepay is the live gateway call these
+    handlers make in production, not a precondition for this component's own state-machine proof.

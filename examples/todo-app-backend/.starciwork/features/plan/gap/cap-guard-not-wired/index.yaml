@@ -1,7 +1,7 @@
 schema: work/gap
 id: gap.plan.cap-guard-not-wired
 title: Nothing on the create path calls the cap guard yet
-state: todo
+state: done
 statement: sds.plan.cap-guard specifies checkCanCreateTask and contract.plan.create-precondition names the
   shape task must call before writing, but fr.task.create's mainFlow ("The task is created, owned by the
   submitter, not complete.") and its implementation (impl.task.todo-app-backend.ownership) still create
@@ -9,4 +9,10 @@ statement: sds.plan.cap-guard specifies checkCanCreateTask and contract.plan.cre
   which is the one fact contract.plan.create-precondition and sds.plan.cap-guard were each citing the other
   over before this record gave it one name.
 closedBy: contract.plan.create-precondition
-change: {rev: 1, kind: initial, at: 2026-09-18T10:00:00.000Z}
+verificationSource: authored-claim
+because: "closedBy names contract.plan.create-precondition, itself done with a fresh proof
+  (create-precondition.contract.spec.ts) that drives task's own real CreateTaskHandler through
+  TaskCreationPolicyRegistry with PlanCapGuardPolicy registered - the guard is built and wired into the
+  actual create path. The gap's closure is a derived fact about that record reaching done, matching how
+  gap.plan.direction-not-drawn closed against ui.plan.usage."
+change: {rev: 2, kind: clarifying, at: 2026-09-18T16:00:00.000Z}

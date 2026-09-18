@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.plan.downgrade.freeze
 title: A downgrade is accepted immediately and freezes creation if it leaves the person over the cap
-state: todo
+state: done
 statements:
   - A downgrade from a paid plan to free takes effect the moment it is requested; it is never refused for
     being over the new cap.
@@ -11,8 +11,13 @@ statements:
 authorityRefs:
   - "decision.plan.downgrade.policy chose accept-and-freeze over refusing the downgrade or trimming data."
 acceptanceCriteria: [over-cap-blocks-create, existing-tasks-untouched]
-module: src/plan/subscription
-change: {rev: 1, kind: initial, at: 2026-09-18T07:01:00.000Z}
+module: src/modules/bussiness/plan
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: SubscriptionService.tDowngrade (accept-and-freeze) always accepts and never touches a task row;
+    PlanCapGuardPolicy then refuses the next create from whatever count the owner is actually at. Proven
+    by subscription.service.spec.ts and cap-guard.policy.spec.ts's own
+    ac.plan.downgrade.freeze.* cases.
 refs: [decision.plan.downgrade.policy, br.plan.caps.limit]
-blockedBy:
-  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/subscription. The decision is settled; nothing has been built or run against the NestJS layout."}

@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.plan.active-scope
 title: What counts as an active task toward the cap
-state: todo
+state: done
 statements:
   - An active task is a row currently owned by the person being capped; br.task.list.owned already means no
     other person's row, and no shared row, can ever appear in that count, because this product has no sharing.
@@ -14,8 +14,12 @@ authorityRefs:
   - "product-intent: The cap counts work in flight, not work ever done; a person who finishes tasks should
     never be told to delete history to make room for new ones."
 acceptanceCriteria: [excludes-complete]
-module: src/plan/cap-guard
-change: {rev: 1, kind: initial, at: 2026-09-18T07:00:30.000Z}
+module: src/modules/bussiness/plan
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: PlanCapGuardPolicy (src/modules/bussiness/plan/cap-guard.policy.ts) computes the active count by
+    filtering out completed tasks from TaskService.listOwnedBy, proven by
+    cap-guard.policy.spec.ts's ac.plan.active-scope.excludes-complete case.
 refs: [br.task.list.owned, br.task.delete.final]
-blockedBy:
-  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/cap-guard. This is a counting definition ready to implement against the NestJS layout, but nothing has been built or run against it."}

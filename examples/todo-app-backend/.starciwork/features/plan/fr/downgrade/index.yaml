@@ -13,7 +13,7 @@ exceptionFlows:
 postconditions:
   - The downgrade is never refused for being over the new cap.
 composes:
-  - {rule: br.plan.downgrade.freeze, module: src/plan/subscription}
+  - {rule: br.plan.downgrade.freeze, module: src/modules/bussiness/plan}
 refs: [decision.plan.downgrade.policy, sds.plan.subscription-lifecycle]
 
 requiresProof:
@@ -22,5 +22,13 @@ requiresProof:
   uat:
     required: true
 
+change:
+  rev: 2
+  kind: editorial
+  at: 2026-09-18T16:00:00.000Z
+  reason: The unit half is satisfied - br.plan.downgrade.freeze is done, proven by
+    downgrade-plan.handler.spec.ts. The remaining blocker is the uat half alone - no usage screen exists
+    yet for an owner to actually downgrade from.
+
 blockedBy:
-  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/subscription; the example backend is moving to NestJS and this flow is specified but not built."}
+  - {record: impl.plan.todo-app-frontend.usage, because: "No usage screen or downgrade action exists yet at app/plan for an owner to actually reach; this backend-only lane does not build the frontend."}

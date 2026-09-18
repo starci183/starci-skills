@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.plan.lapse.reverts-on-read
 title: A lapsed plan reverts to free on read, not by a sweep
-state: todo
+state: done
 statements:
   - Once a subscription reaches lapsed (sds.plan.subscription-lifecycle's t-lapse), every subsequent read of
     that person's effective plan - the cap guard, the usage screen, anything - returns free, computed at the
@@ -14,8 +14,12 @@ authorityRefs:
   - "money-intent: A cap that only tightens once a background job gets around to it is a cap a lapsed person
     can outrun for as long as the job is behind or down."
 acceptanceCriteria: [read-after-grace-is-free]
-module: src/plan/subscription
-change: {rev: 1, kind: initial, at: 2026-09-18T07:03:00.000Z}
+module: src/modules/bussiness/plan
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: SubscriptionService.readEffectivePlan (t-revert-on-read) answers free for a lapsed row by
+    computation, never writing to it; proven by subscription.service.spec.ts's
+    ac.plan.lapse.reverts-on-read.read-after-grace-is-free case.
 refs: [sds.login.session-store, sds.plan.subscription-lifecycle]
-blockedBy:
-  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/subscription. The example backend is moving to NestJS; this rule is specified but not built or run against that layout."}

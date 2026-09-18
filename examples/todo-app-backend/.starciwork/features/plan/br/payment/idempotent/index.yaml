@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.plan.payment.idempotent
 title: The same payment intent is never applied twice
-state: todo
+state: done
 statements:
   - A gateway event names a payment intent id. Applying an event for an intent already recorded as applied
     changes nothing - no second activation, no second period extension, no second ledger entry.
@@ -13,8 +13,13 @@ authorityRefs:
   - "money-intent: A person is charged once per thing they bought. A replay of the same webhook, or a
     reconciliation racing a late webhook, is an infrastructure fact and must never become a billing fact."
 acceptanceCriteria: [replay-is-noop]
-module: src/plan/payments
-change: {rev: 1, kind: initial, at: 2026-09-18T07:02:00.000Z}
+module: src/modules/bussiness/plan
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: PaymentService.markPaidIfNotApplied sets appliedAt at most once per id; ConfirmPaymentHandler
+    (the webhook path) and ReconcilePaymentHandler both apply through this one guard, proven by
+    payment.service.spec.ts and confirm-payment.handler.spec.ts's ac.plan.payment.idempotent.replay-is-noop
+    cases.
 refs: [sds.plan.subscription-lifecycle, sds.plan.reconciliation]
-blockedBy:
-  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/payments. The example backend is moving to NestJS; this rule is specified but not built or run against that layout."}

@@ -19,7 +19,7 @@ postconditions:
   - A person is never charged twice for one intent, however many times reconciliation and a webhook both
     try to apply it.
 composes:
-  - {rule: br.plan.payment.idempotent, module: src/plan/reconcile}
+  - {rule: br.plan.payment.idempotent, module: src/modules/bussiness/plan}
 refs: [sds.plan.reconciliation, integration.plan.sepay]
 
 requiresProof:
@@ -28,5 +28,14 @@ requiresProof:
   uat:
     required: true
 
+change:
+  rev: 2
+  kind: editorial
+  at: 2026-09-18T16:00:00.000Z
+  reason: The unit half is satisfied - br.plan.payment.idempotent is done, and
+    reconcile-payment.handler.spec.ts unit-proves this flow's mainFlow/exceptionFlows against a fake
+    SepayClient. The remaining blocker is the uat half alone, narrowed to the real absences below.
+
 blockedBy:
-  - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/reconcile; the example backend is moving to NestJS and this flow is specified but not built."}
+  - {record: integration.plan.sepay, because: "The mainFlow's gateway poll has never reached the real SePay sandbox; a unit test against a fake proves this flow's logic, not the live integration."}
+  - {record: gap.plan.live-proof, because: "uat.verify has not run this flow, or the journey it belongs to, against the running product yet."}
