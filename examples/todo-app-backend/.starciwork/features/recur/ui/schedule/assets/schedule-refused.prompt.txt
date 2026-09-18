@@ -1,0 +1,33 @@
+Screen: A recurring task's schedule (recur.schedule), route /tasks/:taskId/schedule, actor: owner
+State: refused - the submitted schedule is invalid, for example a weekend-only rule with no matching weekday
+Behavior to depict: a GrammarMessage(tone: danger) names the invalid field; the form retains the entered values
+
+Business grounding (accepted, do not invent beyond these):
+  - fr.recur.make-recurring
+  - fr.recur.see-upcoming
+  - fr.recur.end-rule
+
+Brand (brand/index.yaml rev 2, read do not restate elsewhere):
+  - primary: #2F6BFF
+  - surface: #FFFFFF
+  - typography: Inter, sans-serif
+  - don't: Never place text on the primary colour below a 4.5:1 contrast ratio.
+
+Relevant UI knowledge:
+  - knowledge/ui/composition/collection.yaml (COLLECTION-1, COLLECTION-2)
+
+Actual installed Grammar anatomy (@todo-app/grammar (examples/todo-app-frontend/packages/grammar/src/index.tsx)) - depict exactly these components, no invented ones:
+  - GrammarTextField (rule expression / time / timezone)
+  - GrammarButton (save rule / end rule)
+  - GrammarMessage (tone: danger, refused only)
+  - GrammarButton {type, isDisabled?, onClick?, children: string}
+  - GrammarTextField {id, label, kind?, value, onChange}
+  - GrammarMessage {tone: 'danger', children: string | null} (role=alert on danger)
+
+Layout note: The upcoming-occurrences list is a page section with its own heading, never a card, per COLLECTION-1.
+
+Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
+4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
+beyond brand/assets/**.
+
+Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).

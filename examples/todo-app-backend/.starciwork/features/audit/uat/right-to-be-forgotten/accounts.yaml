@@ -1,4 +1,5 @@
 schema: work/disposable-accounts
+disposable: true
 accounts:
-  - {role: person, username: uat-audit-person, password: uat-audit-person-disposable}
-  - {role: operator, username: uat-audit-operator, password: uat-audit-operator-disposable}
+  - {role: person, identity: identity.todo-app.demo}
+  - {role: operator, identity: identity.todo-app.demo}

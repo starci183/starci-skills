@@ -237,6 +237,99 @@ export function checkWorkTree(workRoot, problems) {
       const ok = typeof m === 'string' ? m.length > 0 : Array.isArray(m) && m.length > 0 && m.every(x => typeof x === 'string' && x.length > 0);
       if (!ok) problems.push(`${rec.shown}: business-rule module must be a non-empty string or a non-empty list of strings`);
     }
+
+    // ---- concept 10: a ui record is done only with a generated direction asset and full state coverage ----
+    if (schema === 'work/ui-screen' && data.state === 'done') {
+      const assets = Array.isArray(data.assets) ? data.assets : [];
+      const hasDirection = assets.some(a => a && typeof a === 'object' && a.generation && a.generation.tool === 'image_gen.imagegen');
+      if (!hasDirection) {
+        problems.push(`${rec.shown}: state is done but no asset carries generation.tool: image_gen.imagegen - a ui record is done only with at least one interface.draw direction, never an authored claim`);
+      }
+      const uiSpec = data.ui;
+      if (uiSpec) {
+        const stateNames = (uiSpec.states ?? []).map(s => s?.name).filter(Boolean);
+        const covered = new Set((uiSpec.coverage?.map ?? []).map(m => m?.state));
+        for (const name of stateNames) {
+          if (!covered.has(name)) problems.push(`${rec.shown}: ui.coverage.map names no entry for state "${name}", which ui.states lists`);
+        }
+      }
+    }
+
+    // ---- concept 11: a generation-carrying asset is ui-owned direction, never an implementation capture ----
+    if (Array.isArray(data.assets)) {
+      for (const a of data.assets) {
+        if (!a || typeof a !== 'object' || !a.generation) continue;
+        if (schema === 'work/implementation') {
+          problems.push(`${rec.shown}: implementation asset ${a.path} carries generation - implementation captures are real running-page screenshots and never carry ImageGen generation provenance`);
+        } else if (schema !== 'work/ui-screen') {
+          problems.push(`${rec.shown}: asset ${a.path} carries generation but the owning record is ${schema}, not work/ui-screen - a generated direction asset is ui-owned only`);
+        }
+      }
+    }
+
+    // ---- concept 12: a done uat-flow needs a settled run with screens, video and a passing result.md ----
+    if (schema === 'work/uat-flow' && data.state === 'done') {
+      const evidenceFile = path.join(rec.dir, 'evidence.yaml');
+      if (!fs.existsSync(evidenceFile)) {
+        problems.push(`${rec.shown}: state is done but there is no sibling evidence.yaml naming the run it settled on`);
+      } else {
+        const ev = parseYaml(fs.readFileSync(evidenceFile, 'utf8'));
+        if (!ev?.run) {
+          problems.push(`${rec.shown}: evidence.yaml has no run pointing at runs/<runId> - a done uat-flow must name the exact run it settled on`);
+        } else {
+          const runDir = path.join(rec.dir, ev.run);
+          const screensDir = path.join(runDir, 'screens');
+          const videosDir = path.join(runDir, 'videos');
+          const resultFile = path.join(runDir, 'result.md');
+          const hasFiles = dir => fs.existsSync(dir) && fs.readdirSync(dir).length > 0;
+          if (!hasFiles(screensDir)) problems.push(`${rec.shown}: run ${ev.run} has no screens/ with at least one screenshot`);
+          if (!hasFiles(videosDir)) problems.push(`${rec.shown}: run ${ev.run} has no videos/ with at least one playable recording`);
+          if (!fs.existsSync(resultFile)) {
+            problems.push(`${rec.shown}: run ${ev.run} has no result.md`);
+          } else if (!/outcome:\s*pass/i.test(fs.readFileSync(resultFile, 'utf8'))) {
+            problems.push(`${rec.shown}: run ${ev.run}'s result.md does not record outcome: pass`);
+          }
+        }
+      }
+    }
+
+    // ---- concept 13: typed _resources use the plain work/resource schema, never an @N suffix ----
+    if (rec.file.replaceAll('\\', '/').includes('/_resources/') && /\/resource\.yaml$/.test(rec.file.replaceAll('\\', '/'))) {
+      if (schema !== 'work/resource') {
+        problems.push(`${rec.shown}: _resources custody uses schema work/resource, not "${schema}" - the op text says work/resource@1, but this layout forbids the @N suffix here`);
+      }
+    }
+  }
+
+  // ---- concept 13 (continued): uat-flow environment/fixtures/accounts refs resolve to a real _resources entry ----
+  const resourceKind = (id) => records.get(id)?.data?.kind;
+  for (const [id, rec] of records) {
+    if (rec.schema !== 'work/uat-flow') continue;
+    const data = rec.data;
+    if (data.environment) {
+      const target = records.get(data.environment);
+      if (!target || target.schema !== 'work/resource') problems.push(`${rec.shown}: environment ${data.environment} does not resolve to a work/resource`);
+      else if (resourceKind(data.environment) !== 'environment') problems.push(`${rec.shown}: environment ${data.environment} resolves to a work/resource of kind "${resourceKind(data.environment)}", not environment`);
+    }
+    if (Array.isArray(data.fixtures)) {
+      for (const fid of data.fixtures) {
+        const target = records.get(fid);
+        if (!target || target.schema !== 'work/resource') problems.push(`${rec.shown}: fixture ${fid} does not resolve to a work/resource`);
+        else if (resourceKind(fid) !== 'fixture') problems.push(`${rec.shown}: fixture ${fid} resolves to a work/resource of kind "${resourceKind(fid)}", not fixture`);
+      }
+    }
+    if (typeof data.accounts === 'string') {
+      const accountsFile = path.join(rec.dir, data.accounts);
+      if (fs.existsSync(accountsFile)) {
+        const accountsDoc = parseYaml(fs.readFileSync(accountsFile, 'utf8'));
+        for (const account of accountsDoc?.accounts ?? []) {
+          if (!account?.identity) continue;
+          const target = records.get(account.identity);
+          if (!target || target.schema !== 'work/resource') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} does not resolve to a work/resource`);
+          else if (resourceKind(account.identity) !== 'identity') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} resolves to a work/resource of kind "${resourceKind(account.identity)}", not identity`);
+        }
+      }
+    }
   }
 
   return {records: records.size, refs: refs.length, evidence: evidenceFiles.length};

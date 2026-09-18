@@ -1,3 +1,4 @@
 schema: work/disposable-accounts
+disposable: true
 accounts:
-  - {role: owner-at-cap, username: uat-plan-owner, password: uat-plan-owner-disposable}
+  - {role: owner-at-cap, identity: identity.todo-app.demo}

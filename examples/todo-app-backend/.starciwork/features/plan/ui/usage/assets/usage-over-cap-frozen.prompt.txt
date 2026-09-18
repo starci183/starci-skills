@@ -1,0 +1,31 @@
+Screen: The usage screen and its upgrade action (plan.usage), route /plan/usage, actor: owner
+State: over-cap-frozen - a create was attempted at the cap and refused
+Behavior to depict: a GrammarMessage(tone: danger) names the cap and the upgrade path; the upgrade GrammarButton is the primary action
+
+Business grounding (accepted, do not invent beyond these):
+  - fr.plan.usage.view
+  - fr.plan.upgrade
+
+Brand (brand/index.yaml rev 2, read do not restate elsewhere):
+  - primary: #2F6BFF
+  - surface: #FFFFFF
+  - typography: Inter, sans-serif
+  - don't: Never place text on the primary colour below a 4.5:1 contrast ratio.
+
+Relevant UI knowledge:
+  - knowledge/ui/proof/brand.yaml (BRAND-1, BRAND-2, BRAND-3)
+
+Actual installed Grammar anatomy (@todo-app/grammar (examples/todo-app-frontend/packages/grammar/src/index.tsx)) - depict exactly these components, no invented ones:
+  - GrammarButton (upgrade)
+  - GrammarMessage (tone: danger, over-cap-frozen only)
+  - GrammarButton {type, isDisabled?, onClick?, children: string}
+  - GrammarTextField {id, label, kind?, value, onChange}
+  - GrammarMessage {tone: 'danger', children: string | null} (role=alert on danger)
+
+Layout note: This is the highest-conversion moment in the product; the upgrade GrammarButton must sit beside the danger message, not below the fold.
+
+Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
+4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
+beyond brand/assets/**.
+
+Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).

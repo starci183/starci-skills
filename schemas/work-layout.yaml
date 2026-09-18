@@ -8,7 +8,20 @@ shape:
   brandAssets: brand/assets/**/<file-in-original-format>
   businessTree: features/<feature>/**/index.yaml
   nodeAssets: <node>/assets/**/<file-in-original-format>
-  uatFlow: features/<feature>/uat/<flow>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql,assets/}
+  uatFlow: "features/<feature>/uat/<flow>/{index.yaml,accounts.yaml,fixtures.yaml,seed.sql,cleanup.sql,assets/}.
+    The flow's index.yaml declares entry, actor, an ordered steps[] (each an action, its expected
+    business outcome and the observed-feedback checks that apply to it), fixtures, effects and
+    cleanup, in uat.verify's own shape. accounts.yaml keeps its work/disposable-accounts schema and
+    stays local/synthetic, but each entry now names {role, identity} (an _resources identity id)
+    instead of a literal password; the literal-secret shape retired with this change."
+  uatRun: "features/<feature>/uat/<flow>/runs/<runId>/{manifest.yaml,run-ledger.json,flows.json,
+    ux-checks.json,walk.json,screens/*.png,videos/*,readback.json,cleanup.json,result.md} - the
+    exact evidence file set uat.verify's writes.evidence names. Runs are append-only - a re-run adds
+    a new runId, never edits a settled one. The flow's own evidence.yaml, beside its index.yaml,
+    points at the run it settled on (a run field naming runs/<runId>). A uat-flow record reaches
+    done only when that run has at least one file under screens/, at least one under videos/ and a
+    result.md whose outcome is pass; until then the record stays todo and cites a
+    gap.<feature>.live-proof record in blockedBy."
   designReview: Current Business overview/SRS/SDS use completion.review inside their owning
     index.yaml, without an evidence folder.
   evidence: Profiles using execution proof may retain <node>/evidence/<id>/manifest.yaml; this is not
@@ -23,8 +36,24 @@ shape:
   gapRecord: features/<feature>/gap/<name>/index.yaml with schema work/gap
   eventRecord: features/<feature>/event/<name>/index.yaml with schema work/event
   moduleUI: features/<feature>/ui/**/{index.yaml,assets/**}
+  uiDirectionAsset: "features/<feature>/ui/<screen>/assets/<name>.png with a sibling
+    <name>.prompt.txt under the same assets/. interface.draw writes both - the record's ui block
+    (intent, surfaces, states, coverage {scale, representativeScreens, map}, accessibility,
+    responsive, artworkSlots, observations, gaps) and, in assets/ui.assets, one entry per
+    representative direction with role direction and a generation object (tool image_gen.imagegen,
+    promptPath, inputRefs) beside the prompt file's own entry with role prompt and no generation. A
+    model name is recorded only when the tool itself exposes one; it is never authored, and it is
+    never the host that ran the tool (an Orca-hosted run is the host, not a field). A ui record
+    reaches done only with at least one asset carrying generation and a coverage map that names
+    every state the record's states list names. Until interface.draw has run, the record stays todo
+    and cites a gap.<feature>.direction-not-drawn record in blockedBy - the image is a designed op
+    output, not something an agent types into place."
   implementation: features/<feature>/implementation/{index.yaml,frontend/**/index.yaml,backend/**/index.yaml}
-  frontendCaptures: features/<feature>/implementation/frontend/assets/<running-page-screenshot>
+  frontendCaptures: "features/<feature>/implementation/frontend/assets/<running-page-screenshot>,
+    with a matching markup reference kept beside each capture. These assets never carry a
+    generation record - that is what tells a capture and a direction apart regardless of prose
+    provenance (see checks/render.mjs's capture-identity rule) - and a generation-bearing asset
+    never sits outside a work/ui-screen record's own assets/."
   businessOverview: features/<feature>/business/overview/index.yaml
   businessSRS: features/<feature>/business/srs/**/index.yaml
   architectureOverview: features/<feature>/architecture/overview/index.yaml with one strict
@@ -33,6 +62,15 @@ shape:
   integration: features/<feature>/integration/<id>/index.yaml
   featureCatalog: features/index.yaml
   feature: features/<feature>/index.yaml
+  resources: ".starciwork/_resources/{environments,identities,fixtures}/<name>/resource.yaml, schema
+    work/resource (plain - see the op-vocabulary mapping below for why the op text says
+    work/resource@1). uat.verify's reads.environment/reads.accounts/reads.fixtures and
+    writes.resources resolve here: an environment resource names target/origins, owner,
+    configuration revision, probes and allowedEffects; an identity resource names its provider,
+    disposability and a custody ref into the repository's sealed secrets (never a secret value
+    itself); a fixture resource names its schema/seed files, preconditions and run-owned namespace.
+    A uat-flow's environment and fixtures[] fields, and its accounts.yaml's accounts[].identity
+    field, are edges into this family and must resolve to a resource.yaml of the matching kind."
 rules:
   - SRS and SDS are the upstream source of truth for every feature and are independent of source
     code. SRS owns required behavior and SDS owns target technical design. UI, implementation and
@@ -148,8 +186,24 @@ rules:
     central schemas stay in .claude.
   - Repository and environment provenance is written directly in sourceRefs or the owning module
     record. refs and dependsOn remain stable technical node IDs for digest propagation.
-  - UAT accounts.yaml uses work/disposable-accounts@1 and may contain only synthetic disposable
-    local role, username and password values. Images and video remain original binary assets.
+  - "UAT accounts.yaml uses schema work/disposable-accounts (the example tree's own convention; the
+    legacy work/disposable-accounts@1 shape in work.schema.yaml embedded a literal username/password
+    pair per entry, which is refused now that _resources/identities/** exists). Each entry is
+    {role, identity: <_resources identity resource id>} - a sealed ref, never a synthetic password
+    written into the flow's own tree. Images and video remain original binary assets."
+  - "Direction, capture and run are three different outputs and never share a shape. interface.draw's
+    generated direction is a ui-owned {path, role: direction, generation: {tool: image_gen.imagegen,
+    promptPath, inputRefs}} asset with its exact prompt kept as a sibling {role: prompt} asset; a
+    model name is recorded only when the tool exposes one, never authored, and never the host (an
+    Orca-run image step is the host, not a generation field). frontend.implement's implementation
+    capture is a real running-page screenshot under implementation/frontend/assets/ with a matching
+    markup reference and never a generation record. uat.verify's run is the append-only
+    uat/<flow>/runs/<runId>/ evidence file set the op's writes.evidence names, settled on by the
+    flow's sibling evidence.yaml (`run: runs/<runId>`). A generation-bearing asset outside a
+    work/ui-screen record, or one inside a work/implementation record, is refused; a work/ui-screen
+    or work/uat-flow record claims `done` only once its own direction asset or settled run actually
+    exists, never by authored claim - both stay `todo` behind a `gap.<feature>.direction-not-drawn`
+    or `gap.<feature>.live-proof` record until the op that produces that output actually runs."
   - "Workflow run state lives in .starciwork/runtime.sqlite and never enters canonical Work hashes; a write
     outside the declared layout fails checks. The ledger holds what a live workflow continues from and
     nothing else: a finished workflow is retired, and an archived one is recovered from a backup rather than
@@ -284,7 +338,99 @@ rules:
     repository. Both host the identical `features/<feature>/{business,architecture,ui,implementation,uat}`
     tree; only where `.starciwork` sits and how its roots are declared differ, and a project does not run
     both shapes for the same product at once."
+opVocabularyMigration:
+  schema: starci/op-vocabulary-migration@1
+  statement: "The layout above is the current one; a real subset of ops/*/operator.yaml still reads and
+    writes the vocabulary an earlier layout generation used. This section states the migration contract -
+    what an op's old path/field means in the current layout - as a fact a future session can act on. It
+    does not touch anything under ops/, ops/*/secondary.yaml or ops/registry.yaml: retargeting an
+    operator's reads/writes is the kernel-refactor lane's decision, not this one's, and editing operator
+    text out from under it would race that work."
+  method: "Grep-verified against this checkout's ops/*/operator.yaml, 2026-09-18: an op counts as affected
+    when it names the literal path `.starciwork/<business>/business/**` or
+    `.starciwork/<business>/architecture/**`, or writes the node@2 completion fields
+    `completion.inputDigest` and `completion.evidence` together. 24 of this checkout's 30 registered ops
+    (ops/registry.yaml) match at least one condition; the owner's own estimate was 21 of 38, which this
+    session could not reproduce from ops/registry.yaml's actual 30 entries - the gap between 21/38 and
+    24/30 is reported rather than silently reconciled."
+  affectedOps:
+    - architecture.decide
+    - backend.implement
+    - brand.decide
+    - business.decide
+    - code.refactor
+    - content.generate
+    - e2e.verify
+    - integration.verify
+    - interface.draw
+    - interface.implement
+    - perf.verify
+    - release.deliver
+    - review.verify
+    - security.verify
+    - test.author
+    - uat.verify
+    - docs.author
+    - goal.revise
+    - grammar.update
+    - knowledge.repair
+    - runtime.operate
+    - scope.define
+    - scope.retire
+    - workspace.manage
+  pathMappings:
+    - opPattern: .starciwork/<business>/business/**/index.yaml
+      layoutPath: features/<feature>/business/{overview/index.yaml,srs/**/index.yaml}
+      note: The op text names one flat business tree per <business> slug; the current layout splits it
+        per feature into an overview and a filesystem-split SRS (functional-requirements,
+        non-functional-requirements, business-rules, data, customer-journeys). An op reading the old
+        pattern must instead read every features/<feature>/business/** the request's scope selects.
+    - opPattern: .starciwork/<business>/architecture/**/index.yaml
+      layoutPath: features/<feature>/architecture/{overview/index.yaml,sds/**/index.yaml}
+      note: Same split, on the architecture side - one SDS overview plus recursive sds/**/index.yaml
+        components per feature, instead of one flat architecture tree per business slug.
+  fieldMappings:
+    - node2Field: state
+      layoutField: state (leaf only)
+      note: node@2 allowed {uninvestigate, todo, doing, blocked, done, na, suspended} authored directly.
+        The current layout narrows authored leaf state to {uninvestigate, todo, done}; doing/blocked
+        become the operational `activity`/`blockers[]` fields, na is dropped (an inapplicable node is
+        not created rather than marked na), and suspended is now `effectiveState`, a value the runtime
+        derives, never one an op authors onto the node.
+    - node2Field: blocker
+      layoutField: blockedBy[] or blockers[]
+      note: node@2's single free-text `blocker` string collapsed a structural dependency and a
+        transient operational impediment into one field. The layout splits them - `blockedBy` is a
+        list of {record, rev?, because} edges at another record the gate resolves and checks for
+        staleness; `blockers[]` stays a plain operational string list for a non-structural impediment
+        (an unavailable tool, a pending owner answer) with no target record to point at.
+    - node2Field: completion.inputDigest
+      layoutField: (none authored) - the kernel computes it
+      note: "node@2 authored an inputDigest binding onto the node itself. The current layout computes
+        this from a record's own index.yaml bytes at read time (sha256, the same digest
+        kernel/reconciliation.mjs's recordDigests/nodeFileOf takes) and compares it against
+        evidence.yaml's authored recordDigest; a mismatch requires stale: true on the evidence
+        rather than a fresh inputDigest authored back onto the node."
+    - node2Field: completion.evidence
+      layoutField: sibling evidence.yaml, or verificationSource + because
+      note: "node@2 nested evidence under the node's own completion key. The current layout keeps
+        evidence as a sibling file (features/<feature>/<family>/<name>/evidence.yaml, schema
+        work/evidence) beside the record's index.yaml, or, for work/data, work/brand,
+        work/policy-decision and any record whose done is genuinely an authored claim,
+        verificationSource: authored-claim plus a because: sentence instead of a run."
+  uatSpecificMappings:
+    - opField: "uat.verify writes.resources: work/resource@1"
+      layoutField: work/resource (no @N)
+      note: The op text's own written content names schema work/resource@1 for
+        .starciwork/_resources/{identities,fixtures}/<name>/resource.yaml. This layout's `resources`
+        shape entry (above) authors plain work/resource instead - the owner has forbidden the @N
+        suffix on this family specifically. The op text is not edited to match; this row is the
+        record of the discrepancy until the kernel-refactor lane resolves which side moves.
 example:
+  _resources/:
+    - environments/dev/resource.yaml
+    - identities/todo-app-demo/resource.yaml
+    - fixtures/todo-app-seed/resource.yaml
   brand/:
     - index.yaml
     - assets/mascot/rest.png
@@ -306,9 +452,17 @@ example:
     - ui/documents/edit/index.yaml
     - ui/documents/edit/assets/states/uploading.webp
     - ui/documents/edit/assets/transitions/update.webm
+    - ui/documents/edit/assets/states/uploading.prompt.txt
     - implementation/frontend/documents/index.yaml
+    - implementation/frontend/documents/assets/list-empty.png
     - uat/documents/update/index.yaml
-    - uat/documents/update/assets/captures/step-3.png
+    - uat/documents/update/accounts.yaml
+    - uat/documents/update/evidence.yaml
+    - uat/documents/update/runs/20260918-uat-1/screens/step-3.png
+    - uat/documents/update/runs/20260918-uat-1/videos/walk.webm
+    - uat/documents/update/runs/20260918-uat-1/result.md
+    - gap/direction-not-drawn/index.yaml
+    - gap/live-proof/index.yaml
     - architecture/overview/index.yaml
     - architecture/sds/index.yaml
     - architecture/sds/runtime/update/index.yaml

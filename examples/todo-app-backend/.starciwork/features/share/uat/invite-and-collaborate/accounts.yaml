@@ -1,5 +1,6 @@
 schema: work/disposable-accounts
+disposable: true
 accounts:
-  - {role: owner, username: uat-share-owner, password: uat-share-owner-disposable}
-  - {role: editor, username: uat-share-editor, password: uat-share-editor-disposable}
-  - {role: viewer, username: uat-share-viewer, password: uat-share-viewer-disposable}
+  - {role: owner, identity: identity.todo-app.demo}
+  - {role: editor, identity: identity.todo-app.demo}
+  - {role: viewer, identity: identity.todo-app.demo}

@@ -1,0 +1,19 @@
+# work-layout.yaml concept 4 (_resources): task fixtures uat.verify's `fixtures` read inspects before
+# seeding prerequisites. Backed by the actual seed scripts under .starcistacks/dev/seeds/, never the
+# outcome the flow is testing.
+schema: work/resource
+id: fixture.todo-app.seed
+kind: fixture
+owner: todo-app-backend
+revision: dev/seeds@2026-09-18
+schemaFiles:
+  - .starcistacks/dev/seeds/01-schema.sql
+seedFiles:
+  - .starcistacks/dev/seeds/02-tasks.sql
+preconditions:
+  - table tasks exists with columns id, owner, title, complete
+namespace: owner LIKE 'uat-%'
+details:
+  seedsOnlyPrerequisites: true
+  neverSeeds: the outcome under test (a completed erasure, a fired cap, a materialised occurrence, an
+    accepted invitation)

@@ -2,17 +2,26 @@ schema: work/uat-flow
 id: uat.notify.digest-and-unsubscribe
 title: Two events settle into one digest, then an unsubscribe silences the next one
 state: todo
+entry: /notify/preferences
+actor: owner
 accounts: accounts.yaml
+environment: environment.todo-app.dev
+fixtures: [fixture.todo-app.seed]
 steps:
-  - Sign in as the owner.
-  - Trigger two notify-worthy events for the owner inside one digest window.
-  - Read the owner's inbox and see exactly one message covering both events.
-  - Unsubscribe from email in the preferences screen.
-  - Trigger a third notify-worthy event.
-  - Confirm no new message arrives for it.
+    - {order: 1, actor: owner, action: "Sign in as the owner.", expected: "the preferences screen is reachable", checks: []}
+    - {order: 2, actor: owner, action: "Trigger two notify-worthy events for the owner inside one digest window.", expected: "both events are recorded for the window", checks: []}
+    - {order: 3, actor: owner, action: "Read the owner's inbox.", expected: "exactly one message covers both events", checks: [{id: completion, expected: yes}]}
+    - {order: 4, actor: owner, action: "Unsubscribe from email in the preferences screen.", expected: "the preference is saved as unsubscribed", checks: [{id: completion, expected: yes}]}
+    - {order: 5, actor: owner, action: "Trigger a third notify-worthy event.", expected: "the event is recorded", checks: []}
+    - {order: 6, actor: owner, action: "Confirm no new message arrives for it.", expected: "the inbox is unchanged since step 3", checks: []}
+effects:
+  - "trigger three notify-worthy product events for the seeded owner"
+  - "save one preference change"
+cleanup:
+  - "restore the preference to its pre-run value; delete any disposable message rows created for this run"
 proves: [fr.notify.digest, fr.notify.unsubscribe, br.notify.digest.window, br.notify.unsubscribe.honored]
-
 blockedBy:
   - {record: ui.notify.preferences, because: "Cannot be walked. ui.notify.preferences (step 4's surface) is todo, and there is no real product action that triggers a \"notify-worthy event\" (steps 2 and 5) because fr.notify.on-completion and fr.notify.on-new-device - the only two things a real person could do to produce one - are both todo, each conflictsWith a foreign gap. A synthetic event injected outside the product would not be a UAT walk of the product surface; it would be a call into internals wearing a UAT record's shape."}
   - {record: fr.notify.on-completion, because: "Cannot be walked. ui.notify.preferences (step 4's surface) is todo, and there is no real product action that triggers a \"notify-worthy event\" (steps 2 and 5) because fr.notify.on-completion and fr.notify.on-new-device - the only two things a real person could do to produce one - are both todo, each conflictsWith a foreign gap. A synthetic event injected outside the product would not be a UAT walk of the product surface; it would be a call into internals wearing a UAT record's shape."}
   - {record: fr.notify.on-new-device, because: "Cannot be walked. ui.notify.preferences (step 4's surface) is todo, and there is no real product action that triggers a \"notify-worthy event\" (steps 2 and 5) because fr.notify.on-completion and fr.notify.on-new-device - the only two things a real person could do to produce one - are both todo, each conflictsWith a foreign gap. A synthetic event injected outside the product would not be a UAT walk of the product surface; it would be a call into internals wearing a UAT record's shape."}
+  - {record: gap.notify.live-proof, because: "uat.verify has not run this flow against the running product yet; no run folder under uat/digest-and-unsubscribe/runs/** exists with screens, video and a passing result.md, only this designed flow shape."}

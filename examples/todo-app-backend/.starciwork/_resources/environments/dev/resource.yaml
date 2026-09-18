@@ -1,0 +1,49 @@
+# work-layout.yaml concept 4 (_resources): typed custody for uat.verify's `environment` read.
+# The op text (ops/uat.verify/operator.yaml, reads.environment) names the path as
+# .starciwork/_resources/environments/<environment>/resource.yaml with schema work/resource@1; the
+# layout's owner forbids the @N suffix on this family, so this file is authored as plain work/resource
+# and the mapping note in work-layout.yaml records the discrepancy rather than silently picking one.
+schema: work/resource
+id: environment.todo-app.dev
+kind: environment
+owner: todo-app-backend
+revision: application-stacks.yaml@2026-09-18
+target:
+  compose: infra/compose/compose.yaml
+  origins:
+    web: http://localhost:3000
+    api: http://localhost:3001
+    keycloak: http://localhost:8089
+    postgres: postgres://localhost:5432
+configuration:
+  renderedFrom: .starcistacks/application-stacks.yaml
+  rendered: .starcistacks/dev/environment.json
+  ports:
+    web: 3000
+    api: 3001
+    keycloak: 8089
+    postgres: 5432
+    redis: 6379
+    minio: 9000
+    prometheus: 9090
+probes:
+  - id: web-reachable
+    method: http-get
+    target: http://localhost:3000
+    expect: 200
+  - id: api-reachable
+    method: http-get
+    target: http://localhost:3001/health
+    expect: 200
+  - id: keycloak-realm-ready
+    method: http-get
+    target: http://localhost:8089/realms/todo-app
+    expect: 200
+allowedEffects:
+  - seed prerequisite SQL rows under owner=uat-*
+  - create/delete disposable Keycloak users under the todo-app realm
+  - delete run-owned rows by exact recorded id
+  - no schema migration, no production data, no unrelated table truncation
+details:
+  status: supported
+  runtime: docker-compose

@@ -2,9 +2,47 @@ schema: work/ui-screen
 id: ui.audit.privacy
 title: The privacy screen - request erasure, export data
 state: todo
-states: [idle, exporting, requesting-erasure, erasure-pending, erasure-complete, erasure-refused]
 brand: {rev: 2}
 refs: [fr.audit.erasure.request, fr.audit.export]
-
+ui:
+  intent: >-
+    Two independent actions on one screen; never merge export and erasure into one control since they have separate acceptance criteria. The representative direction is drawn for the erasure-refused state because it
+    combines the densest actual Grammar anatomy this screen uses and, where the state is an error/refusal,
+    the accessibility-critical GrammarMessage(tone: danger, role=alert) and the brand's contrast don't
+    (Never place text on the primary colour below a 4.5:1 contrast ratio.).
+  surfaces:
+    - {name: privacy, route: /privacy, purpose: "export personal data and request erasure", actors: [person]}
+  states:
+    - {name: idle, trigger: "first paint", behavior: "export and request-erasure actions are both available, no message shown"}
+    - {name: exporting, trigger: "export clicked, response pending", behavior: "the export GrammarButton is disabled and shows a busy label"}
+    - {name: requesting-erasure, trigger: "request-erasure clicked, a confirmation is pending", behavior: "a confirm/cancel pair of GrammarButton replaces the single request action"}
+    - {name: erasure-pending, trigger: "erasure confirmed, not yet complete", behavior: "both actions are disabled with a pending status message (non-danger)"}
+    - {name: erasure-complete, trigger: "erasure has completed", behavior: "a non-danger GrammarMessage confirms completion; both actions are removed"}
+    - {name: erasure-refused, trigger: "the erasure request is rejected, for example a hold applies", behavior: "a GrammarMessage(tone: danger) states the refusal reason; the request action remains available to retry once the hold clears"}
+  coverage:
+    scale: bounded
+    representativeScreens: [privacy]
+    map:
+      - {screen: privacy, state: idle, viewport: desktop-1280, components: ["GrammarButton (export)", "GrammarButton (request erasure / confirm / cancel)", "GrammarMessage (tone: danger, erasure-refused; non-danger for pending/complete)"], derivation: "Derives from the erasure-refused representative direction: same GrammarButton (export), GrammarButton (request erasure / confirm / cancel), GrammarMessage (tone: danger, erasure-refused; non-danger for pending/complete) anatomy; export and request-erasure actions are both available, no message shown."}
+      - {screen: privacy, state: exporting, viewport: desktop-1280, components: ["GrammarButton (export)", "GrammarButton (request erasure / confirm / cancel)", "GrammarMessage (tone: danger, erasure-refused; non-danger for pending/complete)"], derivation: "Derives from the erasure-refused representative direction: same GrammarButton (export), GrammarButton (request erasure / confirm / cancel), GrammarMessage (tone: danger, erasure-refused; non-danger for pending/complete) anatomy; the export GrammarButton is disabled and shows a busy label."}
+      - {screen: privacy, state: requesting-erasure, viewport: desktop-1280, components: ["GrammarButton (export)", "GrammarButton (request erasure / confirm / cancel)", "GrammarMessage (tone: danger, erasure-refused; non-danger for pending/complete)"], derivation: "Derives from the erasure-refused representative direction: same GrammarButton (export), GrammarButton (request erasure / confirm / cancel), GrammarMessage (tone: danger, erasure-refused; non-danger for pending/complete) anatomy; a confirm/cancel pair of GrammarButton replaces the single request action."}
+      - {screen: privacy, state: erasure-pending, viewport: desktop-1280, components: ["GrammarButton (export)", "GrammarButton (request erasure / confirm / cancel)", "GrammarMessage (tone: danger, erasure-refused; non-danger for pending/complete)"], derivation: "Derives from the erasure-refused representative direction: same GrammarButton (export), GrammarButton (request erasure / confirm / cancel), GrammarMessage (tone: danger, erasure-refused; non-danger for pending/complete) anatomy; both actions are disabled with a pending status message (non-danger)."}
+      - {screen: privacy, state: erasure-complete, viewport: desktop-1280, components: ["GrammarButton (export)", "GrammarButton (request erasure / confirm / cancel)", "GrammarMessage (tone: danger, erasure-refused; non-danger for pending/complete)"], derivation: "Derives from the erasure-refused representative direction: same GrammarButton (export), GrammarButton (request erasure / confirm / cancel), GrammarMessage (tone: danger, erasure-refused; non-danger for pending/complete) anatomy; a non-danger GrammarMessage confirms completion; both actions are removed."}
+      - {screen: privacy, state: erasure-refused, viewport: desktop-1280, components: ["GrammarButton (export)", "GrammarButton (request erasure / confirm / cancel)", "GrammarMessage (tone: danger, erasure-refused; non-danger for pending/complete)"], derivation: "Representative direction; generated by interface.draw once gap.audit.direction-not-drawn closes.", directionAsset: assets/privacy-erasure-refused.png}
+  accessibility:
+    - Every interactive control is reachable by keyboard alone in visual order.
+    - GrammarMessage(tone: danger) carries role=alert and is announced without requiring focus.
+    - Text on the primary colour (#2F6BFF) keeps at least a 4.5:1 contrast ratio.
+  responsive:
+    - desktop-1280 is the representative viewport; mobile-390 keeps the same single-column order with no
+      hidden controls, derived rather than separately generated.
+  artworkSlots: []
+  observations: []
+  gaps:
+    - No direction has been generated yet; drawing is deferred to gap.audit.direction-not-drawn.
+assets:
+  - path: assets/privacy-erasure-refused.prompt.txt
+    role: prompt
+    provenance: authored-prompt-awaiting-interface.draw
 blockedBy:
-  - {record: gap.audit.unbuilt-module, because: "The frontend example is moving to Next.js consuming the Grammar core package; no screen exists to describe states against yet, and drawing one against the toy frontend would be thrown away with it."}
+  - {record: gap.audit.direction-not-drawn, because: "interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has produced the erasure-refused representative direction or its sibling prompt bytes yet, only the prompt this record's assets entry names."}

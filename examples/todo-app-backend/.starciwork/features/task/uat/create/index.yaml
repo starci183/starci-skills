@@ -1,12 +1,22 @@
 schema: work/uat-flow
 id: uat.task.create
 title: Create a task, and fail to delete somebody else's
-state: done
+state: todo
+entry: /tasks
+actor: owner
 accounts: accounts.yaml
+environment: environment.todo-app.dev
+fixtures: [fixture.todo-app.seed]
 steps:
-  - Sign in as the owner.
-  - Create a task with a title.
-  - Read the list and see exactly that task.
-  - Sign in as the stranger and attempt to delete it.
-  - See the refusal, and the owner's list unchanged.
+    - {order: 1, actor: owner, action: "Sign in as the owner.", expected: "the task list loads", checks: [{id: loading, expected: yes}, {id: completion, expected: yes}]}
+    - {order: 2, actor: owner, action: "Create a task with a title.", expected: "the task is created and appears in the list", checks: [{id: completion, expected: yes}, {id: validation, expected: no}]}
+    - {order: 3, actor: owner, action: "Read the list.", expected: "exactly that one task is shown", checks: []}
+    - {order: 4, actor: stranger, action: "Sign in as the stranger and attempt to delete it.", expected: "the delete is refused", checks: [{id: errorFeedback, expected: yes}]}
+    - {order: 5, actor: owner, action: "Read the owner's list again.", expected: "the task is still present, unchanged", checks: []}
+effects:
+  - "insert one owner-owned task row"
+cleanup:
+  - "delete the run-owned task row by its recorded id"
 proves: [fr.task.create, br.task.single-owner]
+blockedBy:
+  - {record: gap.task.live-proof, because: "uat.verify has not run this flow against the running product yet; no run folder under uat/create/runs/** exists with screens, video and a passing result.md, only this designed flow shape."}
