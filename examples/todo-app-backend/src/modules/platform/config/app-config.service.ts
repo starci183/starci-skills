@@ -5,6 +5,7 @@ const DEFAULT_KEYCLOAK_TOKEN_URL = 'http://localhost:8089/realms/todo/protocol/o
 const DEFAULT_KEYCLOAK_CLIENT_ID = 'todo-api';
 const DEFAULT_DATABASE_URL = 'postgres://postgres:postgres@localhost:5432/todo';
 const DEFAULT_CORS_ORIGIN = 'http://localhost:3000';
+const DEFAULT_RECUR_TICK_CRON = '*/5 * * * *';
 
 @Injectable()
 export class AppConfigService {
@@ -32,5 +33,12 @@ export class AppConfigService {
   getPort(): number {
     const raw = process.env.PORT;
     return raw ? Number(raw) : 3001;
+  }
+
+  /** integration.recur.scheduler's tick interval - a standard cron expression, defaulting to that
+   * integration record's own declared endpoint (`*\/5 * * * *`, every 5 minutes). Overridable only so a
+   * live-proof run can observe a real tick without a 5-minute wait; production never sets this. */
+  getRecurTickCron(): string {
+    return process.env.RECUR_TICK_CRON ?? DEFAULT_RECUR_TICK_CRON;
   }
 }
