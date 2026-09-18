@@ -9,3 +9,8 @@ export { TaskTitleRequiredException } from './errors/task/task-title-required';
 export { KeycloakInvalidCredentialsException } from './errors/keycloak/keycloak-invalid-credentials';
 export { KeycloakUnavailableException } from './errors/keycloak/keycloak-unavailable';
 export { PostgresPrimaryUnavailableException } from './errors/postgres/postgres-primary-unavailable';
+export { PlanCapExceededException } from './errors/plan/plan-cap-exceeded';
+export { PlanSubscriptionNotFoundException } from './errors/plan/plan-subscription-not-found';
+export { PlanPaymentIntentNotFoundException } from './errors/plan/plan-payment-intent-not-found';
+export { PlanForbiddenException } from './errors/plan/plan-forbidden';
+export { PlanWebhookUnauthorizedException } from './errors/plan/plan-webhook-unauthorized';

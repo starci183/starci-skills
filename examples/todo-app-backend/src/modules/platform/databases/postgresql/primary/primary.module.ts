@@ -5,7 +5,7 @@ import { AppConfigService, ConfigModule } from '../../../config';
 import { ConfigurableModuleClass, OPTIONS_TYPE } from './primary.module-definition';
 import { POSTGRESQL_PRIMARY } from './constants/connection';
 import { PostgresPrimaryClient } from './primary.client';
-import { SessionEntity, TaskEntity } from './entities';
+import { SessionEntity, TaskEntity, SubscriptionEntity, PaymentIntentEntity } from './entities';
 
 /**
  * integration.login.postgres / data.task.task: this is the one platform database module, under nivo's
@@ -29,7 +29,7 @@ export class PostgresqlPrimaryModule extends ConfigurableModuleClass {
           useFactory: (config: AppConfigService) => ({
             type: 'postgres' as const,
             url: config.getDatabaseUrl(),
-            entities: [SessionEntity, TaskEntity],
+            entities: [SessionEntity, TaskEntity, SubscriptionEntity, PaymentIntentEntity],
             migrations: [join(__dirname, 'migrations', '*.{js,ts}')],
             migrationsRun: true,
             synchronize: false,
