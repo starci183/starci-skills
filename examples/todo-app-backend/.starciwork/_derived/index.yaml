@@ -2717,6 +2717,11 @@ records:
     feature: login
     state: null
     effectiveState: null
+  uat.login.sign-in.runs.20260918T080854Z-f7ab26f0:
+    schema: starci/uat-run-manifest@1
+    feature: login
+    state: null
+    effectiveState: null
   uat.notify.digest-and-unsubscribe:
     schema: work/uat-flow
     feature: notify
@@ -2821,6 +2826,11 @@ records:
         because: uat.verify has not run this flow against the running product yet; no run folder under
           uat/create/runs/** exists with screens, video and a passing result.md, only this designed
           flow shape.
+  uat.task.create.runs.20260918T080854Z-f7ab26f0:
+    schema: starci/uat-run-manifest@1
+    feature: task
+    state: null
+    effectiveState: null
   ui.audit.privacy:
     schema: work/ui-screen
     feature: audit
@@ -3727,6 +3737,18 @@ unclassifiedEdges:
   - from: uat.login.sign-in.runs.20260918T070052Z-b037b5fe
     field: nodeId
     target: uat.login.sign-in
+  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
+    field: assertions.id
+    target: br.login.password.sign-in
+  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
+    field: assertions.id
+    target: br.login.session.restores
+  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
+    field: assertions.id
+    target: fr.login.sign-in
+  - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
+    field: nodeId
+    target: uat.login.sign-in
   - from: uat.notify.digest-and-unsubscribe
     field: proves
     target: br.notify.digest.window
@@ -3775,6 +3797,15 @@ unclassifiedEdges:
   - from: uat.task.create
     field: proves
     target: fr.task.create
+  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
+    field: assertions.id
+    target: br.task.single-owner
+  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
+    field: assertions.id
+    target: fr.task.create
+  - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
+    field: nodeId
+    target: uat.task.create
   - from: ui.audit.privacy
     field: assets.generation.inputRefs
     target: fr.audit.erasure.request
