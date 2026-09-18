@@ -295,8 +295,7 @@ records:
     schema: work/business-rule
     feature: login
     state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: done
     usedBy:
       refs:
         - data.login.person
@@ -308,8 +307,7 @@ records:
     schema: work/business-rule
     feature: login
     state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: done
     usedBy:
       refs:
         - contract.login.identity-for-task
@@ -765,8 +763,7 @@ records:
     schema: work/business-rule
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: done
     usedBy:
       composes:
         - fr.task.create
@@ -1109,6 +1106,11 @@ records:
     usedBy:
       blockedBy:
         - contract.task.list-for-dashboard
+  environment.todo-app.dev:
+    schema: work/resource
+    feature: null
+    state: null
+    effectiveState: null
   event.login.new-device-signin:
     schema: work/event
     feature: login
@@ -1201,6 +1203,11 @@ records:
         cyclic: false
         because: no fr or implementation exists for delete beyond br.task.delete.final's acceptance
           criterion; nothing emits this event yet.
+  fixture.todo-app.seed:
+    schema: work/resource
+    feature: null
+    state: null
+    effectiveState: null
   fr.audit.erasure.complete:
     schema: work/functional-requirement
     feature: audit
@@ -1280,8 +1287,7 @@ records:
     schema: work/functional-requirement
     feature: login
     state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: done
     usedBy:
       refs:
         - event.login.new-device-signin
@@ -1360,12 +1366,12 @@ records:
       refs:
         - ui.notify.preferences
     blockers:
-      - id: gap.notify.unbuilt-module
+      - id: gap.notify.direction-not-drawn
         rootKind: gap
         cyclic: false
-        because: No screen exists. The example is moving to a Next.js frontend that consumes the Grammar
-          core package, and this screen has not been built against that layout; there are no
-          captures for any brand revision yet.
+        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
+          produced the refused representative direction or its sibling prompt bytes yet, only the
+          prompt this record's assets entry names.
   fr.plan.downgrade:
     schema: work/functional-requirement
     feature: plan
@@ -1589,8 +1595,7 @@ records:
     schema: work/functional-requirement
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: done
     usedBy:
       refs:
         - event.task.created
@@ -1601,6 +1606,14 @@ records:
         - contract.plan.create-precondition
       provenBy:
         - journey.task.first-task
+  gap.audit.direction-not-drawn:
+    schema: work/gap
+    feature: audit
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - ui.audit.privacy
   gap.audit.emitted-events:
     schema: work/gap
     feature: audit
@@ -1614,6 +1627,14 @@ records:
         - event.task.deleted
         - fr.audit.log.append
         - sds.audit.log-chain
+  gap.audit.live-proof:
+    schema: work/gap
+    feature: audit
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - uat.audit.right-to-be-forgotten
   gap.audit.operator-role:
     schema: work/gap
     feature: audit
@@ -1640,8 +1661,6 @@ records:
         - nfr.audit.retention
         - nfr.audit.tamper-evidence
         - sds.audit.erasure-request
-        - uat.audit.right-to-be-forgotten
-        - ui.audit.privacy
   gap.login.device-field:
     schema: work/gap
     feature: login
@@ -1650,14 +1669,45 @@ records:
     usedBy:
       blockedBy:
         - event.login.new-device-signin
-  gap.login.migration-not-applied:
+  gap.login.direction-not-drawn:
     schema: work/gap
     feature: login
     state: todo
     effectiveState: todo
     usedBy:
       blockedBy:
+        - ui.login.sign-in
+  gap.login.live-proof:
+    schema: work/gap
+    feature: login
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - integration.login.keycloak
         - integration.login.postgres
+        - uat.login.sign-in
+  gap.login.migration-not-applied:
+    schema: work/gap
+    feature: login
+    state: done
+    effectiveState: done
+  gap.notify.direction-not-drawn:
+    schema: work/gap
+    feature: notify
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - ui.notify.preferences
+  gap.notify.live-proof:
+    schema: work/gap
+    feature: notify
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - uat.notify.digest-and-unsubscribe
   gap.notify.new-device-event:
     schema: work/gap
     feature: notify
@@ -1696,7 +1746,22 @@ records:
         - integration.notify.smtp
         - nfr.notify.delivery.latency
         - sds.notify.delivery-lifecycle
-        - ui.notify.preferences
+  gap.plan.direction-not-drawn:
+    schema: work/gap
+    feature: plan
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - ui.plan.usage
+  gap.plan.live-proof:
+    schema: work/gap
+    feature: plan
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - uat.plan.upgrade-after-cap
   gap.plan.unbuilt-module:
     schema: work/gap
     feature: plan
@@ -1719,7 +1784,22 @@ records:
         - sds.plan.cap-guard
         - sds.plan.reconciliation
         - sds.plan.subscription-lifecycle
-        - ui.plan.usage
+  gap.recur.direction-not-drawn:
+    schema: work/gap
+    feature: recur
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - ui.recur.schedule
+  gap.recur.live-proof:
+    schema: work/gap
+    feature: recur
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - uat.recur.make-recurring
   gap.recur.unbuilt-module:
     schema: work/gap
     feature: recur
@@ -1741,7 +1821,22 @@ records:
         - nfr.recur.generation.timeliness
         - sds.recur.generation-engine
         - sds.recur.occurrence-lifecycle
-        - ui.recur.schedule
+  gap.share.direction-not-drawn:
+    schema: work/gap
+    feature: share
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - ui.share.invite
+  gap.share.live-proof:
+    schema: work/gap
+    feature: share
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - uat.share.invite-and-collaborate
   gap.share.unbuilt-module:
     schema: work/gap
     feature: share
@@ -1758,8 +1853,19 @@ records:
         - impl.share.todo-app-frontend.invite-screen
         - nfr.share.revoke.read-latency
         - sds.share.invitation-lifecycle
-        - uat.share.invite-and-collaborate
-        - ui.share.invite
+  gap.task.live-proof:
+    schema: work/gap
+    feature: task
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - uat.task.create
+  identity.todo-app.demo:
+    schema: work/resource
+    feature: null
+    state: null
+    effectiveState: null
   impl.audit.todo-app-backend.erasure:
     schema: work/implementation
     feature: audit
@@ -1797,15 +1903,18 @@ records:
     schema: work/implementation
     feature: login
     state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: done
     usedBy:
       contractProvider:
         - contract.login.identity-for-task
       provenBy:
         - fr.login.sign-in
-        - integration.login.keycloak
         - sds.login.session-store
+  impl.login.todo-app-frontend.sign-in:
+    schema: work/implementation
+    feature: login
+    state: done
+    effectiveState: done
   impl.notify.todo-app-backend.pipeline:
     schema: work/implementation
     feature: notify
@@ -1935,23 +2044,51 @@ records:
           core package the way nivo-fe does; this screen will live at app/share/invite-screen.tsx
           once that scaffold and its Grammar wiring land, and no prior .mjs draft is being carried
           forward into it.
+  impl.task.todo-app-backend.complete-task:
+    schema: work/implementation
+    feature: task
+    state: todo
+    effectiveState: todo
+  impl.task.todo-app-backend.create-task:
+    schema: work/implementation
+    feature: task
+    state: done
+    effectiveState: done
+  impl.task.todo-app-backend.delete-task:
+    schema: work/implementation
+    feature: task
+    state: todo
+    effectiveState: todo
   impl.task.todo-app-backend.list:
     schema: work/implementation
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: done
   impl.task.todo-app-backend.ownership:
     schema: work/implementation
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: done
     usedBy:
       contractConsumer:
         - contract.login.identity-for-task
       provenBy:
         - fr.task.create
+  impl.task.todo-app-backend.platform-database:
+    schema: work/implementation
+    feature: task
+    state: done
+    effectiveState: done
+  impl.task.todo-app-backend.platform-events:
+    schema: work/implementation
+    feature: task
+    state: done
+    effectiveState: done
+  impl.task.todo-app-backend.reopen-task:
+    schema: work/implementation
+    feature: task
+    state: todo
+    effectiveState: todo
   impl.task.todo-app-frontend.task-list:
     schema: work/implementation
     feature: task
@@ -1960,12 +2097,18 @@ records:
   integration.login.keycloak:
     schema: work/integration
     feature: login
-    state: done
+    state: todo
     effectiveState: suspended
     suspensionReason: evidence-marked-stale
     usedBy:
       dependsOn:
         - sds.login.session-store
+    blockers:
+      - id: gap.login.live-proof
+        rootKind: gap
+        cyclic: false
+        because: live proof needs the docker-compose dev stack (Keycloak on 8089) up, and this host cannot
+          start it.
   integration.login.postgres:
     schema: work/integration
     feature: login
@@ -1980,11 +2123,11 @@ records:
         - sds.task.completion-state
         - sds.task.ownership-guard
     blockers:
-      - id: gap.login.migration-not-applied
+      - id: gap.login.live-proof
         rootKind: gap
         cyclic: false
-        because: No migration has been applied against the dev server yet; the schema exists only in
-          data.login.person.
+        because: live proof needs the docker-compose dev stack (Postgres on 5432) up and the migrations
+          applied against it, and this host cannot start that stack.
   integration.notify.queue:
     schema: work/integration
     feature: notify
@@ -2177,8 +2320,7 @@ records:
     schema: work/non-functional-requirement
     feature: login
     state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: done
   nfr.notify.delivery.guarantee:
     schema: work/non-functional-requirement
     feature: notify
@@ -2533,14 +2675,16 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.audit.unbuilt-module
+      - id: gap.audit.live-proof
         rootKind: gap
         cyclic: false
-        because: No screen and no implementation exist yet to walk.
+        because: uat.verify has not run this flow against the running product yet; no run folder under
+          uat/right-to-be-forgotten/runs/** exists with screens, video and a passing result.md, only
+          this designed flow shape.
   uat.login.sign-in:
     schema: work/uat-flow
     feature: login
-    state: done
+    state: todo
     effectiveState: suspended
     suspensionReason: evidence-marked-stale
     usedBy:
@@ -2548,12 +2692,31 @@ records:
         - fr.login.sign-in
         - journey.login.first-sign-in
         - journey.task.first-task
+    blockers:
+      - id: gap.login.live-proof
+        rootKind: gap
+        cyclic: false
+        because: uat.verify has not run this flow against the running product yet; no run folder under
+          uat/sign-in/runs/** exists with screens, video and a passing result.md, only this designed
+          flow shape.
   uat.notify.digest-and-unsubscribe:
     schema: work/uat-flow
     feature: notify
     state: todo
     effectiveState: blocked
     blockers:
+      - id: gap.notify.direction-not-drawn
+        rootKind: gap
+        cyclic: false
+        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
+          produced the refused representative direction or its sibling prompt bytes yet, only the
+          prompt this record's assets entry names.
+      - id: gap.notify.live-proof
+        rootKind: gap
+        cyclic: false
+        because: uat.verify has not run this flow against the running product yet; no run folder under
+          uat/digest-and-unsubscribe/runs/** exists with screens, video and a passing result.md,
+          only this designed flow shape.
       - id: gap.notify.new-device-event
         rootKind: gap
         cyclic: false
@@ -2566,12 +2729,6 @@ records:
         because: task exposes no completion event today; this record stays todo until event.task.completed
           is actually raised, which subscribes now names as the trigger instead of overloading
           contract.notify.task-completion-feed for it.
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No screen exists. The example is moving to a Next.js frontend that consumes the Grammar
-          core package, and this screen has not been built against that layout; there are no
-          captures for any brand revision yet.
   uat.plan.upgrade-after-cap:
     schema: work/uat-flow
     feature: plan
@@ -2587,6 +2744,18 @@ records:
           This feature owns only features/plan/**; it does not edit fr.task.create or the task
           module, and appliesTo (above) is exactly this record's constraint on that record, not a
           request the task feature has honored yet.
+      - id: gap.plan.direction-not-drawn
+        rootKind: gap
+        cyclic: false
+        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
+          produced the over-cap-frozen representative direction or its sibling prompt bytes yet,
+          only the prompt this record's assets entry names.
+      - id: gap.plan.live-proof
+        rootKind: gap
+        cyclic: false
+        because: uat.verify has not run this flow against the running product yet; no run folder under
+          uat/upgrade-after-cap/runs/** exists with screens, video and a passing result.md, only
+          this designed flow shape.
       - id: gap.plan.unbuilt-module
         rootKind: gap
         cyclic: false
@@ -2597,45 +2766,67 @@ records:
     schema: work/uat-flow
     feature: recur
     state: todo
-    effectiveState: todo
+    effectiveState: blocked
+    blockers:
+      - id: gap.recur.live-proof
+        rootKind: gap
+        cyclic: false
+        because: uat.verify has not run this flow against the running product yet; no run folder under
+          uat/make-recurring/runs/** exists with screens, video and a passing result.md, only this
+          designed flow shape.
   uat.share.invite-and-collaborate:
     schema: work/uat-flow
     feature: share
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.share.unbuilt-module
+      - id: gap.share.live-proof
         rootKind: gap
         cyclic: false
-        because: No app exists to walk. The example is moving to a real NestJS backend and a Next.js
-          frontend; this flow has never been run because there is nothing running yet.
+        because: uat.verify has not run this flow against the running product yet; no run folder under
+          uat/invite-and-collaborate/runs/** exists with screens, video and a passing result.md,
+          only this designed flow shape.
   uat.task.create:
     schema: work/uat-flow
     feature: task
-    state: done
+    state: todo
     effectiveState: suspended
     suspensionReason: evidence-marked-stale
     usedBy:
       provenBy:
         - fr.task.create
         - journey.task.first-task
+    blockers:
+      - id: gap.task.live-proof
+        rootKind: gap
+        cyclic: false
+        because: uat.verify has not run this flow against the running product yet; no run folder under
+          uat/create/runs/** exists with screens, video and a passing result.md, only this designed
+          flow shape.
   ui.audit.privacy:
     schema: work/ui-screen
     feature: audit
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.audit.unbuilt-module
+      - id: gap.audit.direction-not-drawn
         rootKind: gap
         cyclic: false
-        because: The frontend example is moving to Next.js consuming the Grammar core package; no screen
-          exists to describe states against yet, and drawing one against the toy frontend would be
-          thrown away with it.
+        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
+          produced the erasure-refused representative direction or its sibling prompt bytes yet,
+          only the prompt this record's assets entry names.
   ui.login.sign-in:
     schema: work/ui-screen
     feature: login
-    state: done
-    effectiveState: done
+    state: todo
+    effectiveState: blocked
+    blockers:
+      - id: gap.login.direction-not-drawn
+        rootKind: gap
+        cyclic: false
+        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
+          produced the refused representative direction or its sibling prompt bytes yet, only the
+          prompt this record's assets entry names.
   ui.notify.preferences:
     schema: work/ui-screen
     feature: notify
@@ -2646,12 +2837,12 @@ records:
         - fr.notify.unsubscribe
         - uat.notify.digest-and-unsubscribe
     blockers:
-      - id: gap.notify.unbuilt-module
+      - id: gap.notify.direction-not-drawn
         rootKind: gap
         cyclic: false
-        because: No screen exists. The example is moving to a Next.js frontend that consumes the Grammar
-          core package, and this screen has not been built against that layout; there are no
-          captures for any brand revision yet.
+        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
+          produced the refused representative direction or its sibling prompt bytes yet, only the
+          prompt this record's assets entry names.
   ui.plan.usage:
     schema: work/ui-screen
     feature: plan
@@ -2663,34 +2854,36 @@ records:
       blockedBy:
         - uat.plan.upgrade-after-cap
     blockers:
-      - id: gap.plan.unbuilt-module
+      - id: gap.plan.direction-not-drawn
         rootKind: gap
         cyclic: false
-        because: No screen exists yet. The frontend is moving to Next.js consuming the Grammar core package
-          the way nivo-fe does; no captures exist for any of the four states against that layout.
+        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
+          produced the over-cap-frozen representative direction or its sibling prompt bytes yet,
+          only the prompt this record's assets entry names.
   ui.recur.schedule:
     schema: work/ui-screen
     feature: recur
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.recur.unbuilt-module
+      - id: gap.recur.direction-not-drawn
         rootKind: gap
         cyclic: false
-        because: No implementation yet. The frontend target moved to Next.js and this screen has not been
-          built there.
+        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
+          produced the refused representative direction or its sibling prompt bytes yet, only the
+          prompt this record's assets entry names.
   ui.share.invite:
     schema: work/ui-screen
     feature: share
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.share.unbuilt-module
+      - id: gap.share.direction-not-drawn
         rootKind: gap
         cyclic: false
-        because: Not built yet. The example frontend is moving to Next.js consuming the Grammar core package
-          the way nivo-fe does; this screen has no source until that scaffold lands, so none of the
-          five states above has a real render to point at.
+        because: interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has
+          produced the refused representative direction or its sibling prompt bytes yet, only the
+          prompt this record's assets entry names.
   ui.task.list:
     schema: work/ui-screen
     feature: task
@@ -2698,59 +2891,67 @@ records:
     effectiveState: todo
 tally:
   overall:
-    done: 20
-    todo: 24
-    stale: 20
-    blocked: 104
-    total: 168
+    done: 33
+    todo: 38
+    stale: 11
+    blocked: 106
+    total: 188
   byFeature:
     audit:
       done: 0
-      todo: 7
-      stale: 0
-      blocked: 17
-      total: 24
-    login:
-      done: 2
-      todo: 4
-      stale: 10
-      blocked: 5
-      total: 21
-    notify:
-      done: 3
-      todo: 3
-      stale: 0
-      blocked: 22
-      total: 28
-    plan:
-      done: 4
-      todo: 1
-      stale: 0
-      blocked: 20
-      total: 25
-    recur:
-      done: 6
-      todo: 3
+      todo: 9
       stale: 0
       blocked: 17
       total: 26
+    login:
+      done: 8
+      todo: 5
+      stale: 5
+      blocked: 6
+      total: 24
+    notify:
+      done: 3
+      todo: 5
+      stale: 0
+      blocked: 22
+      total: 30
+    plan:
+      done: 4
+      todo: 3
+      stale: 0
+      blocked: 20
+      total: 27
+    recur:
+      done: 6
+      todo: 4
+      stale: 0
+      blocked: 18
+      total: 28
     share:
       done: 4
-      todo: 1
+      todo: 3
       stale: 0
       blocked: 17
-      total: 22
+      total: 24
     task:
-      done: 1
-      todo: 5
-      stale: 10
+      done: 8
+      todo: 9
+      stale: 6
       blocked: 6
-      total: 22
+      total: 29
   gaps:
+    - id: gap.audit.direction-not-drawn
+      feature: audit
+      state: todo
+      closedBy: ui.audit.privacy
     - id: gap.audit.emitted-events
       feature: audit
       state: todo
       closedBy: null
+    - id: gap.audit.live-proof
+      feature: audit
+      state: todo
+      closedBy: uat.audit.right-to-be-forgotten
     - id: gap.audit.operator-role
       feature: audit
       state: todo
@@ -2763,10 +2964,26 @@ tally:
       feature: login
       state: todo
       closedBy: decision.login.session.devices
-    - id: gap.login.migration-not-applied
+    - id: gap.login.direction-not-drawn
       feature: login
       state: todo
-      closedBy: null
+      closedBy: ui.login.sign-in
+    - id: gap.login.live-proof
+      feature: login
+      state: todo
+      closedBy: uat.login.sign-in
+    - id: gap.login.migration-not-applied
+      feature: login
+      state: done
+      closedBy: gap.login.live-proof
+    - id: gap.notify.direction-not-drawn
+      feature: notify
+      state: todo
+      closedBy: ui.notify.preferences
+    - id: gap.notify.live-proof
+      feature: notify
+      state: todo
+      closedBy: uat.notify.digest-and-unsubscribe
     - id: gap.notify.new-device-event
       feature: notify
       state: todo
@@ -2779,18 +2996,46 @@ tally:
       feature: notify
       state: todo
       closedBy: impl.notify.todo-app-backend.pipeline
+    - id: gap.plan.direction-not-drawn
+      feature: plan
+      state: todo
+      closedBy: ui.plan.usage
+    - id: gap.plan.live-proof
+      feature: plan
+      state: todo
+      closedBy: uat.plan.upgrade-after-cap
     - id: gap.plan.unbuilt-module
       feature: plan
       state: todo
       closedBy: impl.plan.todo-app-backend.plan
+    - id: gap.recur.direction-not-drawn
+      feature: recur
+      state: todo
+      closedBy: ui.recur.schedule
+    - id: gap.recur.live-proof
+      feature: recur
+      state: todo
+      closedBy: uat.recur.make-recurring
     - id: gap.recur.unbuilt-module
       feature: recur
       state: todo
       closedBy: impl.recur.todo-app-backend.engine
+    - id: gap.share.direction-not-drawn
+      feature: share
+      state: todo
+      closedBy: ui.share.invite
+    - id: gap.share.live-proof
+      feature: share
+      state: todo
+      closedBy: uat.share.invite-and-collaborate
     - id: gap.share.unbuilt-module
       feature: share
       state: todo
       closedBy: impl.share.todo-app-backend.access
+    - id: gap.task.live-proof
+      feature: task
+      state: todo
+      closedBy: uat.task.create
   unbuiltModuleGaps: 5
 frontier:
   - id: br.audit.erasure.logged
@@ -2805,9 +3050,15 @@ frontier:
   - id: decision.audit.erasure-method
     feature: audit
     title: How an erasure actually removes identifying data from an append-only, hash-chained log
+  - id: gap.audit.direction-not-drawn
+    feature: audit
+    title: No interface.draw run has produced a direction for audit.privacy
   - id: gap.audit.emitted-events
     feature: audit
     title: login and task expose no emitted-event contract for audit to subscribe to
+  - id: gap.audit.live-proof
+    feature: audit
+    title: No uat.verify run has produced a live run for audit.right-to-be-forgotten
   - id: gap.audit.operator-role
     feature: audit
     title: No operator/admin role exists to authorize reading the log
@@ -2823,9 +3074,19 @@ frontier:
   - id: gap.login.device-field
     feature: login
     title: No device field exists on a session or person
-  - id: gap.login.migration-not-applied
+  - id: gap.login.direction-not-drawn
     feature: login
-    title: No migration has been applied against the dev server
+    title: No interface.draw run has produced a direction for login.sign-in
+  - id: gap.login.live-proof
+    feature: login
+    title: No live proof exists against the real Keycloak/Postgres stack, and no uat.verify run has
+      executed login.sign-in against it
+  - id: gap.notify.direction-not-drawn
+    feature: notify
+    title: No interface.draw run has produced a direction for notify.preferences
+  - id: gap.notify.live-proof
+    feature: notify
+    title: No uat.verify run has produced a live run for notify.digest-and-unsubscribe
   - id: gap.notify.new-device-event
     feature: notify
     title: login never emits a new-device sign-in signal today
@@ -2835,18 +3096,33 @@ frontier:
   - id: gap.notify.unbuilt-module
     feature: notify
     title: No notify module exists under the NestJS/Next.js layout yet
+  - id: gap.plan.direction-not-drawn
+    feature: plan
+    title: No interface.draw run has produced a direction for plan.usage
+  - id: gap.plan.live-proof
+    feature: plan
+    title: No uat.verify run has produced a live run for plan.upgrade-after-cap
   - id: gap.plan.unbuilt-module
     feature: plan
     title: No plan module exists under the NestJS/Next.js layout yet
   - id: data.recur.occurrence
     feature: recur
     title: Occurrence
+  - id: gap.recur.direction-not-drawn
+    feature: recur
+    title: No interface.draw run has produced a direction for recur.schedule
+  - id: gap.recur.live-proof
+    feature: recur
+    title: No uat.verify run has produced a live run for recur.make-recurring
   - id: gap.recur.unbuilt-module
     feature: recur
     title: No recur module exists under the NestJS/Next.js layout yet
-  - id: uat.recur.make-recurring
-    feature: recur
-    title: Make a task recurring, see its upcoming occurrences, then end it
+  - id: gap.share.direction-not-drawn
+    feature: share
+    title: No interface.draw run has produced a direction for share.invite
+  - id: gap.share.live-proof
+    feature: share
+    title: No uat.verify run has produced a live run for share.invite-and-collaborate
   - id: gap.share.unbuilt-module
     feature: share
     title: No share module exists under the NestJS/Next.js layout yet
@@ -2862,6 +3138,18 @@ frontier:
   - id: decision.task.list.scope
     feature: task
     title: Does an organization owner see the tasks of its members
+  - id: gap.task.live-proof
+    feature: task
+    title: No uat.verify run has produced a live run for task.create
+  - id: impl.task.todo-app-backend.complete-task
+    feature: task
+    title: The complete-task feature
+  - id: impl.task.todo-app-backend.delete-task
+    feature: task
+    title: The delete-task feature
+  - id: impl.task.todo-app-backend.reopen-task
+    feature: task
+    title: The reopen-task feature
   - id: impl.task.todo-app-frontend.task-list
     feature: task
     title: The list screen and the create form
@@ -3022,12 +3310,33 @@ unclassifiedEdges:
   - from: event.task.deleted
     field: producer
     target: br.task.delete.final
+  - from: gap.audit.direction-not-drawn
+    field: closedBy
+    target: ui.audit.privacy
+  - from: gap.audit.live-proof
+    field: closedBy
+    target: uat.audit.right-to-be-forgotten
   - from: gap.audit.unbuilt-module
     field: closedBy
     target: impl.audit.todo-app-backend.log
   - from: gap.login.device-field
     field: closedBy
     target: decision.login.session.devices
+  - from: gap.login.direction-not-drawn
+    field: closedBy
+    target: ui.login.sign-in
+  - from: gap.login.live-proof
+    field: closedBy
+    target: uat.login.sign-in
+  - from: gap.login.migration-not-applied
+    field: closedBy
+    target: gap.login.live-proof
+  - from: gap.notify.direction-not-drawn
+    field: closedBy
+    target: ui.notify.preferences
+  - from: gap.notify.live-proof
+    field: closedBy
+    target: uat.notify.digest-and-unsubscribe
   - from: gap.notify.new-device-event
     field: closedBy
     target: event.login.new-device-signin
@@ -3037,15 +3346,36 @@ unclassifiedEdges:
   - from: gap.notify.unbuilt-module
     field: closedBy
     target: impl.notify.todo-app-backend.pipeline
+  - from: gap.plan.direction-not-drawn
+    field: closedBy
+    target: ui.plan.usage
+  - from: gap.plan.live-proof
+    field: closedBy
+    target: uat.plan.upgrade-after-cap
   - from: gap.plan.unbuilt-module
     field: closedBy
     target: impl.plan.todo-app-backend.plan
+  - from: gap.recur.direction-not-drawn
+    field: closedBy
+    target: ui.recur.schedule
+  - from: gap.recur.live-proof
+    field: closedBy
+    target: uat.recur.make-recurring
   - from: gap.recur.unbuilt-module
     field: closedBy
     target: impl.recur.todo-app-backend.engine
+  - from: gap.share.direction-not-drawn
+    field: closedBy
+    target: ui.share.invite
+  - from: gap.share.live-proof
+    field: closedBy
+    target: uat.share.invite-and-collaborate
   - from: gap.share.unbuilt-module
     field: closedBy
     target: impl.share.todo-app-backend.access
+  - from: gap.task.live-proof
+    field: closedBy
+    target: uat.task.create
   - from: impl.audit.todo-app-backend.erasure
     field: proves
     target: br.audit.erasure.logged
@@ -3073,6 +3403,9 @@ unclassifiedEdges:
   - from: impl.login.todo-app-backend.auth
     field: proves
     target: sds.login.session-store
+  - from: impl.login.todo-app-frontend.sign-in
+    field: proves
+    target: ui.login.sign-in
   - from: impl.notify.todo-app-backend.pipeline
     field: willProve
     target: br.notify.delivery.once
@@ -3157,6 +3490,12 @@ unclassifiedEdges:
   - from: impl.share.todo-app-frontend.invite-screen
     field: proves
     target: ui.share.invite
+  - from: impl.task.todo-app-backend.create-task
+    field: proves
+    target: br.task.title.required
+  - from: impl.task.todo-app-backend.create-task
+    field: proves
+    target: fr.task.create
   - from: impl.task.todo-app-backend.list
     field: proves
     target: nfr.task.list.latency
@@ -3166,6 +3505,18 @@ unclassifiedEdges:
   - from: impl.task.todo-app-backend.ownership
     field: proves
     target: sds.task.ownership-guard
+  - from: impl.task.todo-app-backend.platform-database
+    field: proves
+    target: data.task.task
+  - from: impl.task.todo-app-backend.platform-events
+    field: proves
+    target: event.task.completed
+  - from: impl.task.todo-app-backend.platform-events
+    field: proves
+    target: event.task.created
+  - from: impl.task.todo-app-backend.platform-events
+    field: proves
+    target: event.task.deleted
   - from: impl.task.todo-app-frontend.task-list
     field: proves
     target: ui.task.list
