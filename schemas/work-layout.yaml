@@ -34,7 +34,11 @@ shape:
     one module-root directory that exists on disk (the read-scope boundary a design component describes
     is a module boundary, not a prose claim); a todo one without owners is warned, not refused, since the
     module a design targets may not exist yet."
-  ui: features/<feature>/ui/<name>/index.yaml plus <name>/assets/**, schema work/ui-screen
+  ui: "features/<feature>/ui/<name>/index.yaml plus <name>/assets/**, schema work/ui-screen. Per
+    docs/kinds.md's lane order, drawing precedes implementing: a done work/implementation that names a
+    ui-screen in its own proves, or whose repository is the workspace's frontend repository, is refused
+    (IMPL_BEFORE_DIRECTION) unless every relevant ui-screen - the ones it proves, or, when it proves none
+    by id, every ui-screen its own feature owns - is itself done."
   impl: "features/<feature>/impl/<repository>/<name>/index.yaml, schema work/implementation, one flat
     family folder per feature split by the repository the code lives in (<repository> is the exact value
     the record's own `repository` field names, e.g. impl/todo-app-backend/<name> beside
@@ -308,6 +312,14 @@ rules:
     refuses a `record` that does not resolve. Prose that is not really about a record - an absence with
     no owner - is not authored as `blockedBy` prose; it is a `gap` record (below), and `blockedBy` points
     at its id like any other."
+  - "Blockers form a DAG, and a cycle in it is refused outright (BLOCKER_CYCLE): nothing can honestly wait
+    on something that is itself waiting on it, so a `blockedBy` chain that reaches back to a record already
+    on its own walk is a structural impossibility, not a fact about the work. A chain's real root - the
+    reason nothing further needs authoring - is a `work/gap` or an open `work/policy-decision`
+    (`outcome: open`); a chain that dead-ends at an ordinary record instead (neither cyclic nor gap/open-
+    decision rooted) is warned rather than refused (BLOCKER_UNROOTED), because forcing a gap to be authored
+    for every such dead end in one pass would be a larger sweep than any single change should make - the
+    warning names the actual unrooted target so the fact stays visible until a gap is written for it."
   - "Known absences are records, not restated prose. `work/gap` lives at
     `features/<feature>/gap/<name>/index.yaml`, id `gap.<feature>.<name>`, and carries `state: todo|done`
     and a plain `statement` of the fact that is missing - an event nobody emits yet, a field no data

@@ -86,6 +86,81 @@ test('concept 2: gap records need a valid state, a statement, and a resolving cl
   assert.ok(badClosedBy.some(p => p.includes('closedBy names br.f.ghost')), badClosedBy.join('\n'));
 });
 
+test('trust concept 8: a done implementation is refused when its ui direction is not done yet (IMPL_BEFORE_DIRECTION)', () => {
+  // proves a ui-screen directly, by id, that is not done
+  const provesTodoUi = refusalsFor({
+    'workspace.yaml': 'schema: work/workspace\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: app-frontend}]\n',
+    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: done\nrepository: app-frontend\nowners: [{role: block, path: src/f}]\nproves: [ui.f.screen]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/ui/screen/index.yaml': 'schema: work/ui-screen\nid: ui.f.screen\ntitle: t\nstate: todo\n',
+  });
+  assert.ok(provesTodoUi.some(p => p.includes('IMPL_BEFORE_DIRECTION') && p.includes('ui.f.screen')), provesTodoUi.join('\n'));
+
+  // frontend repository, proves nothing by id - falls back to every ui-screen the feature owns
+  const frontendNoProves = refusalsFor({
+    'workspace.yaml': 'schema: work/workspace\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: app-frontend}]\n',
+    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: done\nrepository: app-frontend\nowners: [{role: block, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/ui/screen/index.yaml': 'schema: work/ui-screen\nid: ui.f.screen\ntitle: t\nstate: todo\n',
+  });
+  assert.ok(frontendNoProves.some(p => p.includes('IMPL_BEFORE_DIRECTION') && p.includes('ui.f.screen')), frontendNoProves.join('\n'));
+
+  // the ui-screen is done - accepted
+  const uiDone = refusalsFor({
+    'workspace.yaml': 'schema: work/workspace\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: app-frontend}]\n',
+    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: done\nrepository: app-frontend\nowners: [{role: block, path: src/f}]\nproves: [ui.f.screen]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/ui/screen/index.yaml': 'schema: work/ui-screen\nid: ui.f.screen\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n',
+  });
+  assert.equal(uiDone.filter(p => p.includes('IMPL_BEFORE_DIRECTION')).length, 0, uiDone.join('\n'));
+
+  // a backend implementation with no ui in its proves is untouched by this rule
+  const backendUntouched = refusalsFor({
+    'workspace.yaml': 'schema: work/workspace\nid: fixture\nrepositories: [{role: be, name: app}, {role: fe, name: app-frontend}]\n',
+    'features/f/impl/y/index.yaml': 'schema: work/implementation\nid: impl.f.y\ntitle: t\nstate: done\nrepository: app\nowners: [{role: module, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/ui/screen/index.yaml': 'schema: work/ui-screen\nid: ui.f.screen\ntitle: t\nstate: todo\n',
+  });
+  assert.equal(backendUntouched.filter(p => p.includes('IMPL_BEFORE_DIRECTION')).length, 0, backendUntouched.join('\n'));
+});
+
+test('trust concept 5: a blockedBy cycle is refused (BLOCKER_CYCLE), and a chain rooted in a gap or an open decision is accepted', () => {
+  const cyclic = refusalsFor({
+    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\nblockedBy:\n  - {record: br.f.b, because: "waiting on b"}\n',
+    'features/f/br/b/index.yaml': 'schema: work/business-rule\nid: br.f.b\ntitle: t\nstate: todo\nblockedBy:\n  - {record: br.f.a, because: "waiting on a"}\n',
+  });
+  assert.ok(cyclic.some(p => p.includes('BLOCKER_CYCLE') && p.includes('br.f.a') && p.includes('br.f.b')), cyclic.join('\n'));
+
+  const rootedInGap = refusalsFor({
+    'features/f/gap/absence/index.yaml': 'schema: work/gap\nid: gap.f.absence\ntitle: t\nstate: todo\nstatement: s\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\nblockedBy:\n  - {record: gap.f.absence, because: "waiting on the gap"}\n',
+  });
+  assert.equal(rootedInGap.filter(p => p.includes('BLOCKER')).length, 0, rootedInGap.join('\n'));
+
+  const rootedInOpenDecision = refusalsFor({
+    'features/f/decision/d/index.yaml': 'schema: work/policy-decision\nid: decision.f.d\ntitle: t\nstate: todo\noutcome: open\noptions: [{id: a, consequence: c}]\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\nblockedBy:\n  - {record: decision.f.d, because: "waiting on the decision"}\n',
+  });
+  assert.equal(rootedInOpenDecision.filter(p => p.includes('BLOCKER')).length, 0, rootedInOpenDecision.join('\n'));
+});
+
+test('trust concept 5: a blockedBy chain that dead-ends at an ordinary record (neither cyclic nor gap/open-decision rooted) is warned, not refused (BLOCKER_UNROOTED)', () => {
+  const workRoot = tree({
+    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\nblockedBy:\n  - {record: br.f.b, because: "waiting on b, which is itself unblocked and unfinished"}\n',
+    'features/f/br/b/index.yaml': 'schema: work/business-rule\nid: br.f.b\ntitle: t\nstate: todo\n',
+  });
+  const problems = [];
+  const warnings = [];
+  checkWorkTree(workRoot, problems, warnings);
+  assert.equal(problems.filter(p => p.includes('BLOCKER')).length, 0, problems.join('\n'));
+  assert.ok(warnings.some(w => w.includes('BLOCKER_UNROOTED') && w.includes('br.f.b')), warnings.join('\n'));
+
+  // A decided (not open) decision is not a valid root either.
+  const workRoot2 = tree({
+    'features/f/decision/d/index.yaml': 'schema: work/policy-decision\nid: decision.f.d\ntitle: t\nstate: done\noutcome: decided\nchosen: a\noptions: [{id: a, consequence: c}]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\nblockedBy:\n  - {record: decision.f.d, because: "waiting on the (now settled) decision"}\n',
+  });
+  const warnings2 = [];
+  checkWorkTree(workRoot2, [], warnings2);
+  assert.ok(warnings2.some(w => w.includes('BLOCKER_UNROOTED') && w.includes('decision.f.d')), warnings2.join('\n'));
+});
+
 test('trust concept 1: a stale codeDigest is refused unless the evidence carries stale: true (CODE_DIGEST_STALE)', () => {
   const workRoot = tree({
     'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',

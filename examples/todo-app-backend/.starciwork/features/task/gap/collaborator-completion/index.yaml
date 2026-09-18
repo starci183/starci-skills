@@ -1,0 +1,15 @@
+schema: work/gap
+id: gap.task.collaborator-completion
+title: The collaborator completion path is not implemented
+state: todo
+statement: "br.task.single-owner rev 2 split completion (owner or an accepted editor collaborator) from
+  deletion (owner only), naming contract.share.completion-guard-for-task as the boundary that call goes
+  through. Neither side of that contract exists yet - share has not built the guard
+  (gap.share.unbuilt-module), and task's own ownership guard (sds.task.ownership-guard) has not been
+  rebuilt to call it, still only knowing t-owner/t-stranger, not t-collaborator. Until
+  impl.share.todo-app-backend.access exists and sds.task.ownership-guard is rebuilt against it, an editor
+  collaborator completing a shared task is a specified path with no implementation, which is the one fact
+  br.task.single-owner, sds.task.ownership-guard and fr.task.complete were each independently citing each
+  other over before this record gave it one name."
+closedBy: [impl.share.todo-app-backend.access]
+change: {rev: 1, kind: initial, at: 2026-09-18T09:30:00.000Z}

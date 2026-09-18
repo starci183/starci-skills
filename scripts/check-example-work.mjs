@@ -318,6 +318,32 @@ export function checkWorkTree(workRoot, problems, warnings = []) {
       }
     }
 
+    // ---- trust concept 8: implementation is held until its ui direction is drawn ----
+    // docs/kinds.md's `implementation/frontend` lane is "held until the feature's ui node is done" -
+    // drawing precedes implementing. A done work/implementation that names a work/ui-screen in its own
+    // `proves`, or whose `repository` is the workspace's frontend repository, is refused
+    // (IMPL_BEFORE_DIRECTION) unless every relevant ui-screen is itself done: the ones it explicitly
+    // proves, or - when it proves none by id - every ui-screen its own feature owns (a frontend
+    // implementation is for some screen even when it did not name one via proves).
+    if (schema === 'work/implementation' && data.state === 'done') {
+      const provesUi = (Array.isArray(data.proves) ? data.proves : []).filter(pid => records.get(pid)?.schema === 'work/ui-screen');
+      const repos = Array.isArray(workspaceDoc?.repositories) ? workspaceDoc.repositories : [];
+      const isFrontendRepo = data.repository ? repos.find(r => r?.name === data.repository)?.role === 'fe' : false;
+      if (provesUi.length || isFrontendRepo) {
+        let relevantUi = provesUi;
+        if (!relevantUi.length) {
+          const feature = path.relative(workRoot, rec.dir).replaceAll('\\', '/').split('/')[1];
+          relevantUi = [...records.entries()]
+            .filter(([, r]) => r.schema === 'work/ui-screen' && path.relative(workRoot, r.dir).replaceAll('\\', '/').split('/')[1] === feature)
+            .map(([uid]) => uid);
+        }
+        const notDone = relevantUi.filter(uid => records.get(uid)?.state !== 'done');
+        if (relevantUi.length && notDone.length) {
+          problems.push(`${rec.shown}: state is done but its ui direction is not - ${notDone.join(', ')} ${notDone.length > 1 ? 'are' : 'is'} not done yet (docs/kinds.md's implementation/frontend lane is held until the feature's ui node is done) [IMPL_BEFORE_DIRECTION]`);
+        }
+      }
+    }
+
     // ---- concept 10: a ui record is done only with a generated direction asset and full state coverage ----
     if (schema === 'work/ui-screen' && data.state === 'done') {
       const assets = Array.isArray(data.assets) ? data.assets : [];
@@ -408,6 +434,89 @@ export function checkWorkTree(workRoot, problems, warnings = []) {
           if (!target || target.schema !== 'work/resource') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} does not resolve to a work/resource`);
           else if (resourceKind(account.identity) !== 'identity') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} resolves to a work/resource of kind "${resourceKind(account.identity)}", not identity`);
         }
+      }
+    }
+  }
+
+  // ---- trust concept 5: blockers form a DAG rooted in gaps or open decisions ----
+  // `blockedBy` is meant to explain *why* work waits, and the layout says the honest root of a wait is
+  // either a `work/gap` (a named absence) or an open `work/policy-decision` - never a loop back on itself.
+  // A cycle is a structural impossibility (nothing can wait on something that is waiting on it) and is
+  // refused (BLOCKER_CYCLE). A chain that dead-ends at an ordinary record - neither a cycle nor a gap/open-
+  // decision root - is not refused: this example tree currently has roughly a dozen such chains across
+  // several features (an implementation waiting on another implementation that itself has not landed,
+  // with no gap ever authored for the absence), and refusing every one of them tree-wide would be a much
+  // larger red surface than this lane is scoped to fix record-by-record. It is warned (BLOCKER_UNROOTED)
+  // instead, naming the actual unrooted target, so the fact is visible without forcing a gap to be
+  // authored for every such chain in one sweep.
+  const blockedByOf = rec => Array.isArray(rec?.data?.blockedBy)
+    ? rec.data.blockedBy.filter(e => e && typeof e === 'object' && typeof e.record === 'string').map(e => e.record)
+    : [];
+
+  /** DFS from `startId` looking for a path back to `startId` itself. Returns the cycle as an array of ids
+   * (startId ... startId) or null. O(V*(V+E)) run once per record is fine at this tree's size (a few
+   * hundred records), and keeps the algorithm obviously correct rather than a from-scratch Tarjan. */
+  const cyclePathFrom = startId => {
+    const visited = new Set();
+    const path = [];
+    const dfs = current => {
+      visited.add(current);
+      path.push(current);
+      for (const next of blockedByOf(records.get(current))) {
+        if (!records.has(next)) continue;
+        if (next === startId) return [...path, next];
+        if (visited.has(next)) continue;
+        const found = dfs(next);
+        if (found) return found;
+      }
+      path.pop();
+      return null;
+    };
+    return dfs(startId);
+  };
+
+  /** Every direct or transitive `blockedBy` root reachable from `startId`, stopping at a gap, an open
+   * decision, a cycle back into the walk, or a dead end with no further blockedBy of its own - the same
+   * shape scripts/example-derive.mjs's own resolveBlockers computes, reimplemented here (not imported: this
+   * module and example-derive.mjs already import from each other in the other direction, and importing
+   * back would create a cycle in the module graph itself, not just the data). Returns a Map(id -> kind),
+   * kind one of gap|decision|record|cyclic|missing. */
+  const rootsFrom = startId => {
+    const roots = new Map();
+    const visitEdge = (targetId, visited) => {
+      if (roots.has(targetId)) return;
+      const target = records.get(targetId);
+      if (!target) { roots.set(targetId, 'missing'); return; } // dangling ref already caught elsewhere
+      if (visited.has(targetId)) { roots.set(targetId, 'cyclic'); return; }
+      const isGap = target.schema === 'work/gap';
+      const isOpenDecision = target.schema === 'work/policy-decision' && target.data?.outcome === 'open';
+      const subEdges = blockedByOf(target);
+      if (isGap || isOpenDecision || !subEdges.length) {
+        roots.set(targetId, isGap ? 'gap' : isOpenDecision ? 'decision' : 'record');
+        return;
+      }
+      const nextVisited = new Set(visited);
+      nextVisited.add(targetId);
+      for (const sub of subEdges) visitEdge(sub, nextVisited);
+    };
+    for (const edge of blockedByOf(records.get(startId))) visitEdge(edge, new Set([startId]));
+    return roots;
+  };
+
+  const cyclicAlready = new Set();
+  for (const [id, rec] of records) {
+    if (!blockedByOf(rec).length || cyclicAlready.has(id)) continue;
+    const cycle = cyclePathFrom(id);
+    if (cycle) {
+      for (const member of cycle) cyclicAlready.add(member);
+      problems.push(`${rec.shown}: blockedBy forms a cycle: ${cycle.join(' -> ')} [BLOCKER_CYCLE]`);
+    }
+  }
+  for (const [id, rec] of records) {
+    if (!blockedByOf(rec).length) continue;
+    for (const [rootId, kind] of rootsFrom(id)) {
+      if (kind === 'record') {
+        warnings.push(`${rec.shown}: blockedBy chain reaches ${rootId}, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]`);
       }
     }
   }
