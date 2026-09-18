@@ -23,4 +23,5 @@ requiresProof:
     required: true
 
 blockedBy:
-  - {record: ui.notify.preferences, because: "No implementation exists, and ui.notify.preferences (the only surface a person would use to unsubscribe) is also todo. The example is moving to a NestJS/Next.js layout and neither side has been built against it."}
+  - {record: gap.notify.unbuilt-module, because: "No implementation exists at src/notify/preferences or app/notify under the NestJS/Next.js layout the example is moving to; ui.notify.preferences (the only surface a person would use to unsubscribe) now has its interface.draw direction and reached done, but nothing on either side has been built against it yet."}
+change: {rev: 1, kind: editorial, at: 2026-09-18T10:00:00.000Z, reason: "Replaced the blockedBy edge on ui.notify.preferences (stale: that record reached done once interface.draw ran) with gap.notify.unbuilt-module, which names the real remaining reason - no notify module exists yet."}

@@ -1,0 +1,83 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: ui.recur.schedule
+recordDigest: 10375f97770b63eb472c40ca1786795ee80fdbf0ca1e0497a48d0a242334d4ad
+outcome: pass
+assertions:
+  - id: png-header-size
+    command: "node -e \"const fs=require('fs');const
+      b=fs.readFileSync('examples/todo-app-backend/.starciwork/features/recur/ui/schedule/assets/sc\
+      hedule-refused.png');if(b.length<=20*1024)throw new Error('too small: '+b.length);const
+      h=b.subarray(0,8).toString('hex');if(h!=='89504e470d0a1a0a')throw new Error('bad header:
+      '+h);console.log('OK png', b.length, h);\""
+    exit: 0
+    outcome: pass
+    observation: "node -e \"const fs=require('fs');const
+      b=fs.readFileSync('examples/todo-app-backend/.starciwork/features/recur/ui/schedule/assets/sc\
+      hedule-refused.png');if(b.length<=20*1024)throw new Error('too small: '+b.length);const
+      h=b.subarray(0,8).toString('hex');if(h!=='89504e470d0a1a0a')throw new Error('bad header:
+      '+h);console.log('OK png', b.length, h);\" exited 0"
+  - id: prompt-exists
+    command: node -e "const fs=require('fs');const
+      p='examples/todo-app-backend/.starciwork/features/recur/ui/schedule/assets/schedule-refused.prompt.txt';const
+      s=fs.statSync(p);if(!s.isFile()||s.size===0)throw new Error('missing or empty
+      prompt');console.log('OK prompt', s.size);"
+    exit: 0
+    outcome: pass
+    observation: node -e "const fs=require('fs');const
+      p='examples/todo-app-backend/.starciwork/features/recur/ui/schedule/assets/schedule-refused.prompt.txt';const
+      s=fs.statSync(p);if(!s.isFile()||s.size===0)throw new Error('missing or empty
+      prompt');console.log('OK prompt', s.size);" exited 0
+  - id: coverage-complete
+    command: "node --input-type=module -e \"import {parseYaml} from './core/yaml.mjs'; import fs from
+      'node:fs'; import path from 'node:path'; const
+      file='examples/todo-app-backend/.starciwork/features/recur/ui/schedule/index.yaml'; const
+      d=parseYaml(fs.readFileSync(file,'utf8')); const states=(d.ui.states||[]).map(s=>s.name);
+      const covered=new Set((d.ui.coverage.map||[]).map(m=>m.state)); const
+      missing=states.filter(s=>!covered.has(s)); if(missing.length) throw new Error('missing
+      coverage: '+missing); const repEntry=(d.ui.coverage.map||[]).find(m=>m.directionAsset);
+      if(!repEntry) throw new Error('no map entry names a directionAsset');
+      if(!fs.existsSync(path.join(path.dirname(file), repEntry.directionAsset))) throw new
+      Error('directionAsset does not exist: '+repEntry.directionAsset); console.log('OK coverage',
+      states.join(','));\""
+    exit: 0
+    outcome: pass
+    observation: "node --input-type=module -e \"import {parseYaml} from './core/yaml.mjs'; import fs
+      from 'node:fs'; import path from 'node:path'; const
+      file='examples/todo-app-backend/.starciwork/features/recur/ui/schedule/index.yaml'; const
+      d=parseYaml(fs.readFileSync(file,'utf8')); const states=(d.ui.states||[]).map(s=>s.name);
+      const covered=new Set((d.ui.coverage.map||[]).map(m=>m.state)); const
+      missing=states.filter(s=>!covered.has(s)); if(missing.length) throw new Error('missing
+      coverage: '+missing); const repEntry=(d.ui.coverage.map||[]).find(m=>m.directionAsset);
+      if(!repEntry) throw new Error('no map entry names a directionAsset');
+      if(!fs.existsSync(path.join(path.dirname(file), repEntry.directionAsset))) throw new
+      Error('directionAsset does not exist: '+repEntry.directionAsset); console.log('OK coverage',
+      states.join(','));\" exited 0"
+  - id: generation-tool
+    command: "node --input-type=module -e \"import {parseYaml} from './core/yaml.mjs'; import fs from
+      'node:fs'; const
+      file='examples/todo-app-backend/.starciwork/features/recur/ui/schedule/index.yaml'; const
+      d=parseYaml(fs.readFileSync(file,'utf8')); const
+      dirAsset=(d.assets||[]).find(a=>a.role==='direction'); if(!dirAsset) throw new Error('no
+      direction asset'); if(!dirAsset.generation || dirAsset.generation.tool!=='image_gen.imagegen')
+      throw new Error('bad generation.tool: '+JSON.stringify(dirAsset.generation)); if('model' in
+      dirAsset.generation) throw new Error('generation must not name a model'); console.log('OK
+      generation.tool', dirAsset.generation.tool);\""
+    exit: 0
+    outcome: pass
+    observation: "node --input-type=module -e \"import {parseYaml} from './core/yaml.mjs'; import fs
+      from 'node:fs'; const
+      file='examples/todo-app-backend/.starciwork/features/recur/ui/schedule/index.yaml'; const
+      d=parseYaml(fs.readFileSync(file,'utf8')); const
+      dirAsset=(d.assets||[]).find(a=>a.role==='direction'); if(!dirAsset) throw new Error('no
+      direction asset'); if(!dirAsset.generation || dirAsset.generation.tool!=='image_gen.imagegen')
+      throw new Error('bad generation.tool: '+JSON.stringify(dirAsset.generation)); if('model' in
+      dirAsset.generation) throw new Error('generation must not name a model'); console.log('OK
+      generation.tool', dirAsset.generation.tool);\" exited 0"
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T08:18:50.090Z

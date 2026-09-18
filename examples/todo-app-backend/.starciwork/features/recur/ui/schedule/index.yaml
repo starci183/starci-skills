@@ -1,7 +1,7 @@
 schema: work/ui-screen
 id: ui.recur.schedule
 title: A recurring task's schedule
-state: todo
+state: done
 brand: {rev: 2}
 refs: [fr.recur.make-recurring, fr.recur.see-upcoming, fr.recur.end-rule]
 ui:
@@ -58,10 +58,8 @@ assets:
       actor: codex
       profile: gpt-5.6-sol
       capturedAt: 2026-09-18T07:42:00.301Z
-blockedBy:
-  - {record: gap.recur.direction-not-drawn, because: "interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has produced the refused representative direction or its sibling prompt bytes yet, only the prompt this record's assets entry names."}
 change:
-  rev: 2
-  kind: clarifying
-  at: 2026-09-18T09:00:00.000Z
-  reason: Re-authored the prompt and coverage map from the actual installed @starci/grammar@0.4.13 common anatomy, replacing the vendored stub's fictitious GrammarTextField/GrammarButton/GrammarMessage names and tightening which states actually carry the upcoming-occurrences section.
+  rev: 3
+  kind: editorial
+  at: 2026-09-18T10:00:00.000Z
+  reason: interface.draw ran and produced the refused representative direction image and its sibling prompt with a real image_gen.imagegen invocation; gap.recur.direction-not-drawn is closed, its blockedBy edge is removed, and this record reaches done on the strength of the evidence.yaml this same run wrote.
