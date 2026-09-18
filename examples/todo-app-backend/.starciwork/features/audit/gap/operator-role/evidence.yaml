@@ -2,17 +2,17 @@
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
-record: fr.audit.export
-recordDigest: eb58436b6c6f3ba08a6d8d50e134a0c62d01df5b5d62814d37dd96b3b1715c21
+record: gap.audit.operator-role
+recordDigest: 942e658b4c054b391376cea3f610d99d4a06c8f5a000afb4b560ddd758b4f41c
 outcome: pass
 assertions:
-  - id: br.audit.append-only
-    command: npx jest src/modules/bussiness/audit/export-my-data.handler.spec.ts
+  - id: gap.audit.operator-role
+    command: npx jest -t "gap.audit.operator-role"
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/audit/export-my-data.handler.spec.ts exited 0
+    observation: npx jest -t "gap.audit.operator-role" exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T11:52:40.141Z
+  capturedAt: 2026-09-18T12:08:10.345Z

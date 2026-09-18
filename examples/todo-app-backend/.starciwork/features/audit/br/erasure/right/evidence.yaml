@@ -14,31 +14,39 @@ codeDigest:
     - path: src/modules/bussiness/audit/append-log-line.handler.ts
       sha256: 0c1869f3cc0be68459f58d11339ff914358e03a147bbb914a4ddf436f3432571
     - path: src/modules/bussiness/audit/audit-erasure.service.spec.ts
-      sha256: 97efd093b73238bfb6c5b520b5671f0bab3c3fa41ee723e57b6e039f20da1210
+      sha256: cd720e2d4a148e99adbb90efdafe2c739ea1d32d54c36d4262f81a4dbd5cf104
     - path: src/modules/bussiness/audit/audit-erasure.service.ts
-      sha256: 37a017fdd5e5dac539f969b801f0253e7175bc1b6862fb1056ee0b1b05eebc35
+      sha256: 8b1698d72ca4236339dbd98724306ccec86c4c2ca8aa7b973efa308a0b29c14f
     - path: src/modules/bussiness/audit/audit-event.subscriber.spec.ts
       sha256: d077a37500a145c8d66570334c4a6d40e849cafb1ae624946d1c193b74ff7066
     - path: src/modules/bussiness/audit/audit-event.subscriber.ts
-      sha256: ee3ce250a34982596580bb5a189ab52eb39e88ec6860a96c8f705778291bbc91
+      sha256: 5c01c71eb8f4c4e133e3e117d1bb5383f90c184440db2e15abbcfa92d1f0e309
     - path: src/modules/bussiness/audit/audit-keystore.service.spec.ts
       sha256: 93b9712ebfb09fab686fc8659389d8d4f59d159a8af0fc1c5cb2f700cd88b855
     - path: src/modules/bussiness/audit/audit-keystore.service.ts
       sha256: f2cc333ed1d11b029d428be373452949508864125986d0c5b1473e083f041267
     - path: src/modules/bussiness/audit/audit-log.handler.spec.ts
-      sha256: d8e15f0b7ddad5017113b8ad8fb0991c8965aeee5ed68863445ae49a74958d05
+      sha256: 8104ce6cb40fa50b7e10a0b41ea4224c534306cc81d550f20887b5aa38ff6dcd
     - path: src/modules/bussiness/audit/audit-log.handler.ts
-      sha256: 0eb14b7560bad4df2ed57371e6b532deeca0ec8e6c8641e146d77fce4c887414
+      sha256: d4af11a0b44d7daaf395fa163ed2aa180a2efc0ad011aff38cd9d4bd10774acb
     - path: src/modules/bussiness/audit/audit-log.query.ts
-      sha256: dbb97ff52a294041f50af8e3915f8bf71f5b91407f2f4b40e39d683d3b8ece83
+      sha256: dbd8ef80fc79235c7f19456800436812e1e26ee132087cb83a1fb32f77b1a70e
     - path: src/modules/bussiness/audit/audit-log.service.spec.ts
       sha256: cefa03c5c1412d51166345b836771f4fc19d18d0dfbab897a183d7b2be99f3fc
     - path: src/modules/bussiness/audit/audit-log.service.ts
-      sha256: 6060c1ca98af3d4c1a9ab6d5715ec253e89ab61b632f3aa965d32f3c3556d1db
+      sha256: 4b5e27e36546320d4f6247c04358bb0bf2a8f88cfe5e77cd60f8a8ecdb867cbd
+    - path: src/modules/bussiness/audit/audit-operator-read.ts
+      sha256: 41dfc4e703529c15ce70a5705c833aa9423cb5c3f8697f93aa6d45de8823adb8
+    - path: src/modules/bussiness/audit/audit-operator-role.guard.ts
+      sha256: 48fa5e7d32eda75bb19cd12745fb4ce19f3c38f0f05cb8bde9dcc92fcdc07820
+    - path: src/modules/bussiness/audit/audit-operator.guard.spec.ts
+      sha256: d24e68a69649fc27478cbae18777901fa6bb578c0d8e2cd2cec40c67bcb640a1
+    - path: src/modules/bussiness/audit/audit-operator.guard.ts
+      sha256: 83cbc03a1ca12920c8a2b28516144ebda3f06018c731f2f37da0db298ddc8b19
     - path: src/modules/bussiness/audit/audit.module-definition.ts
       sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
     - path: src/modules/bussiness/audit/audit.module.ts
-      sha256: a3f49f305def104e9230a378ab6ffe1681b3412278a39d78e62ca05700f367fb
+      sha256: b6e8ea6911982e70bcc85956a9818f0b775ee34cef33efc29832cddb7f0c5e87
     - path: src/modules/bussiness/audit/complete-erasure.command.ts
       sha256: 66f601bb3412b09cd047ba5ed3ae58a6a4e003dc458d2b7f7c965af1d71aba82
     - path: src/modules/bussiness/audit/complete-erasure.handler.spec.ts
@@ -52,7 +60,7 @@ codeDigest:
     - path: src/modules/bussiness/audit/export-my-data.query.ts
       sha256: 1e7756a93e84c771e87fa5fa5f18d687f273ddb966872df5a6860db56113ea6b
     - path: src/modules/bussiness/audit/index.ts
-      sha256: d09e62461c2667b08219177fd0217b6697288935cb5f9c2fe8c2b8e0553b6367
+      sha256: 1d197bf73ac2a43122c54faf98ab569872c3105cdc33e4ca1cdab0f439f91faf
     - path: src/modules/bussiness/audit/request-erasure.command.ts
       sha256: 34258bccb4ef9a8e4a01a1ff8437b234353992ad30cd52be11bb712d51674598
     - path: src/modules/bussiness/audit/request-erasure.handler.spec.ts
@@ -65,7 +73,9 @@ codeDigest:
       sha256: 431e2fe18e4184753aec5cc504bbe0d4fce6949b26ca3ddaf4065fcfb9e980d8
     - path: src/modules/bussiness/audit/types/audit-log-line-record.ts
       sha256: 6da1043d230a77172dffd07ab554c547f49eedf70181dcc9aeb1c50c8cdd9e1e
-  digest: 753eaadf4e97bd3b7717987daf1a8a300014b24cda27c642de613af47f530471
+    - path: src/modules/bussiness/audit/types/resolved-audit-line.ts
+      sha256: 6d217fbf835ab1f7b25c820c796876ae60f3acdaa7713efed415ba06c8ca8971
+  digest: eba24a24a77d94bd7ce91fc1f94c0d58c111e7ea7654583abd68ff3c00ab5162
 outcome: pass
 assertions:
   - id: ac.audit.erasure.right.identifying-fields-unreadable
@@ -77,4 +87,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T09:16:29.312Z
+  capturedAt: 2026-09-18T12:11:45.058Z

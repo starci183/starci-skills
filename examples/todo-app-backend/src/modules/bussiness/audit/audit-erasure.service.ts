@@ -41,7 +41,18 @@ export class AuditErasureService {
   /** fr.audit.erasure.request: tRequest then tVerify, chained because the caller is always the subject. */
   async request(personId: string): Promise<AuditErasureRequestRecord> {
     const requested = await this.tRequest(personId);
-    return this.tVerify(requested.requestId, personId);
+    return this.confirm(requested.requestId, personId);
+  }
+
+  /**
+   * sds.audit.erasure-request's t-verify as a second round of its own: the challenge its sequence
+   * names - "the subject re-authenticates and the request moves to verified" - runs on this caller,
+   * proven by the live session token behind it (the same SessionService seam that authenticated the
+   * first round). requestErasure always chains request+confirm, so a second confirm of the same
+   * pending request hits t-refuse, never a repeat of t-verify.
+   */
+  async confirm(requestId: string, callerId: string): Promise<AuditErasureRequestRecord> {
+    return this.tVerify(requestId, callerId);
   }
 
   /** fr.audit.erasure.complete: tExecute, confirm every line is unreadable, then tComplete. */

@@ -2,8 +2,8 @@
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
-record: br.audit.retention
-recordDigest: 2c46d8a879b590388e0336b1a7ebdf723c8e5efed0d160f0850c8102bac0d7db
+record: impl.audit.todo-app-backend.operator-read
+recordDigest: 38c26b12e801dd564e3f2fc2bdbf33339c82e96e03016cb460872e7f94bb7db1
 codeDigest:
   algorithm: sha256
   files:
@@ -78,13 +78,18 @@ codeDigest:
   digest: eba24a24a77d94bd7ce91fc1f94c0d58c111e7ea7654583abd68ff3c00ab5162
 outcome: pass
 assertions:
-  - id: ac.audit.retention.available-through-window
-    command: npx jest -t "nfr.audit.retention"
+  - id: gap.audit.operator-role
+    command: npx jest -t "gap.audit.operator-role"
     exit: 0
     outcome: pass
-    observation: npx jest -t "nfr.audit.retention" exited 0
+    observation: npx jest -t "gap.audit.operator-role" exited 0
+  - id: operator-check-and-refusal
+    command: npx jest src/modules/bussiness/audit/audit-operator.guard.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/audit/audit-operator.guard.spec.ts exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T12:12:02.558Z
+  capturedAt: 2026-09-18T12:10:50.754Z

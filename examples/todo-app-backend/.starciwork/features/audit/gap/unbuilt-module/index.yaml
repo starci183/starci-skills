@@ -12,10 +12,14 @@ verificationSource: authored-claim
 because: "closedBy names two records, each done with its own fresh evidence.yaml whose assertions
   verified the real module; this gap's closure is a derived fact about both reaching done, not
   something with a separate command of its own to run - matching gap.audit.direction-not-drawn's own
-  verificationSource pattern."
+  verificationSource pattern. The sibling evidence.yaml written this pass is belt-and-braces: every
+  audit spec plus the app boot spec, all exits 0, re-run after the operator-read pass."
 change:
-  rev: 2
+  rev: 3
   kind: clarifying
-  at: 2026-09-18T12:00:00.000Z
-  reason: Both closers reached done in this pass; closedBy widened from a bare id to the list of both,
-    since the log half and the erasure half were built and proven together as one Nest module.
+  at: 2026-09-18T20:40:00.000Z
+  reason: "The closure is unchanged; what moved is its proof. Fresh evidence written by
+    scripts/example-evidence.mjs this run (gap/unbuilt-module/evidence.yaml: every audit spec plus the
+    app boot spec, all exits 0) re-verifies the module after the operator-read pass added
+    audit-operator-read.ts, the operator guard and their specs - the module the rev-2 closure named is
+    still there, built and green. verificationSource/because were superseded by that run."

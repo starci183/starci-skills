@@ -5,7 +5,7 @@ import { AuditLogQuery } from './audit-log.query';
 import { AuditLogHandler } from './audit-log.handler';
 
 describe('AuditLogHandler', () => {
-  it('gap.audit.operator-role todo subset: returns exactly the caller\'s own lines, never another person\'s', async () => {
+  it('gap.audit.operator-role open (rev 2): no role claim exists, so the honest read is the caller\'s own lines only, never another person\'s', async () => {
     const manager = createFakeAuditEntityManager();
     const keystore = new AuditKeystoreService(manager as never);
     const log = new AuditLogService(manager as never, keystore);

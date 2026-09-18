@@ -2,6 +2,27 @@ schema: work/gap
 id: gap.audit.operator-role
 title: No operator/admin role exists to authorize reading the log
 state: todo
-statement: The example has no operator/admin role today. data.login.person has no role field, and no
-  existing record establishes who, besides the log's owner, is authorized to read it.
-change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}
+statement: "The example still has no operator/admin role, and rev 2 names the gap exactly where it
+  lives - not in audit, but in the session shape. SessionService.findActive resolves an actor as a
+  SessionRecord of {token, personId, issuedAt, expiresAt} (sds.login.session-store) and
+  data.login.person has no role field, so no call site can present a role claim to check - which is
+  why this gap carries closedBy: [decision.audit.operator-role], a proposal this lane named but did
+  not and may not decide. What audit has built in the meantime is the fail-closed check the decision
+  will bind to: audit-operator-read.ts's assertOperatorRead/isOperatorRead pair, honored by
+  AuditLogHandler - operator/operator:* claims read the whole chain with fr.audit.log.read's
+  action/target filters, everything else (which is everything the session seam can resolve today)
+  reads exactly their own lines, and an empty actor is refused before any line is touched. The check
+  refuses with AuditOperatorRoleNotAuthorizedException (stable code
+  AUDIT_OPERATOR_ROLE_NOT_AUTHORIZED), proven behind impl.audit.todo-app-backend.operator-read's
+  fresh evidence; the session seam itself stays untouched, per the brief's rule."
+closedBy: [decision.audit.operator-role]
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T20:10:00.000Z
+  reason: "The brief authorized implementing the role check honestly against the session seam without
+    editing it, and naming the schema gap here if no role field exists - it does not, now stated
+    precisely (SessionRecord's exact shape, no role field anywhere in the person or session entity).
+    The check is real and unit-proven in this feature, so the remaining absence is an accepted
+    business decision plus a login-schema change, not unbuilt audit code; closedBy now names
+    decision.audit.operator-role, the record whose settlement actually closes this gap."

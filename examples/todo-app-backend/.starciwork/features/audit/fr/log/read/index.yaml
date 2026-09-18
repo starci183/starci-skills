@@ -25,4 +25,4 @@ requiresProof:
     required: true
 
 blockedBy:
-  - {record: gap.audit.operator-role, because: "The example has no operator/admin role today - data.login.person has no role field and no existing record establishes who is authorized to read the log. This FR cannot be implemented honestly until that authorization boundary is defined, by this feature or by login."}
+  - {record: decision.audit.operator-role, because: "The operator authorization this FR's mainFlow step 1 names has no accepted source: the example's session seam resolves only {token, personId, issuedAt, expiresAt} and data.login.person has no role field (gap.audit.operator-role rev 2). audit-operator-read.ts's fail-closed check stands built and unit-proven waiting for that decision; until it is decided, only the caller's-own-lines read is reachable, which is not this record's whole mainFlow, so it stays todo."}
