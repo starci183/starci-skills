@@ -11,8 +11,7 @@ services:
     secrets:
       - minio-root-password
     ports:
-      # Host 9000 collides with an already-running starci-minio container; host side only.
-      - "9030:9000"
+      - "9000:9000"
     volumes:
       - todo-minio:/data
 secrets:

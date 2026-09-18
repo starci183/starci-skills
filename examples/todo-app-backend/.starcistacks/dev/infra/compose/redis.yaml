@@ -2,6 +2,5 @@ services:
   redis:
     image: redis:7
     ports:
-      # Host 6379 collides with an already-running starci-redis container; host side only.
-      - "6389:6379"
+      - "6379:6379"
 

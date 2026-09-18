@@ -38,21 +38,15 @@ environments:
       - infra/compose/compose.yaml
     components:
       postgres:
-        port: 5440
-        # Declared port 5432 collides with an already-running starci-postgres container on this
-        # machine (docker ps / netstat -ano confirmed host 5432 LISTENING before this stack ever
-        # started). Only the host-side mapping moves; the container still listens on 5432 inside.
+        port: 5432
       keycloak:
         port: 8089
       redis:
-        port: 6389
-        # Declared port 6379 collides with an already-running starci-redis container. Host-side only.
+        port: 6379
       minio:
-        port: 9030
-        # Declared port 9000 collides with an already-running starci-minio container. Host-side only.
+        port: 9000
       prometheus:
-        port: 9091
-        # Declared port 9090 collides with an already-running starci-prometheus container. Host-side only.
+        port: 9090
       api:
         port: 3001
       web:
