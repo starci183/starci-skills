@@ -14,6 +14,7 @@ real deployment, and no real secret may ever be encrypted to this public key.
 | `DATABASE_URL` | `runtime/env/app.env.enc` | Postgres connection for the api |
 | `REDIS_URL` | `runtime/env/app.env.enc` | Cache and session store |
 | `KEYCLOAK_ADMIN_PASSWORD_FILE` | `runtime/files/keycloak-admin-password.key.enc` | Bootstrap password for the realm admin |
+| `POSTGRES_PASSWORD_FILE` | `runtime/files/postgres-password.key.enc` | Postgres superuser password, read by the postgres image itself (was a plaintext POSTGRES_PASSWORD literal in postgres.yaml until the stacks checker's plaintext-sensitive-environment finding) |
 | `MINIO_ROOT_PASSWORD_FILE` | `runtime/files/minio-root-password.key.enc` | Object store root credential |
 | `TODO_SESSION_SECRET_FILE` | `runtime/files/todo-session-secret.key.enc` | Signs the api session cookie |
 | `SMTP_API_KEY_FILE` | `runtime/files/smtp-api-key.key.enc` | Outbound mail for task reminders |

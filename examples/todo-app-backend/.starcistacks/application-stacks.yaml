@@ -65,6 +65,10 @@ environments:
         where: runtime/files/keycloak-admin-password.key
         recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
         keyCustody: DEMO-ONLY - identity committed in this repository for reader round-trip, not real custody
+      - name: postgres-password.key
+        where: runtime/files/postgres-password.key
+        recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
+        keyCustody: DEMO-ONLY - identity committed in this repository for reader round-trip, not real custody
       - name: minio-root-password.key
         where: runtime/files/minio-root-password.key
         recipientPolicy: DEMO-ONLY - encrypted to the example identity at runtime/env/demo.agekey, never a real recipient
