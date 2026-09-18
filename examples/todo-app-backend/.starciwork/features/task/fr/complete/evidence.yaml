@@ -1,0 +1,18 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: fr.task.complete
+recordDigest: ecfbfcfd1dc5e985b93463c6c774852ea9e5d8b2a53dfbfac84221afc75649c5
+outcome: pass
+assertions:
+  - id: e2e
+    command: npm run test:e2e -- tasks/complete
+    exit: 0
+    outcome: pass
+    observation: npm run test:e2e -- tasks/complete exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T19:18:54.086Z
