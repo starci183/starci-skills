@@ -3,3 +3,7 @@ export { TaskEntity } from './task.entity';
 export { ShareInvitationEntity } from './share-invitation.entity';
 export { RuleEntity } from './rule.entity';
 export { OccurrenceEntity } from './occurrence.entity';
+export { NotifyNotificationEntity } from './notification.entity';
+export { NotifyDeliveryAttemptEntity } from './notify-delivery-attempt.entity';
+export { NotifyPreferenceEntity } from './notify-preference.entity';
+export { NotifyDigestWindowEntity } from './notify-digest-window.entity';

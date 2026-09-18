@@ -10,6 +10,4 @@ payload:
   - {name: sourceEventId, type: text, note: "Stable and unique per real completion, including a reopen-then-complete cycle producing a new one."}
 delivery: {guarantee: at-least-once, ordering: per-key}
 refs: [fr.task.complete]
-blockedBy:
-  - {record: gap.notify.unbuilt-module, because: "complete-task's use case now raises this event on the platform event bus after the write succeeds; notify still has nothing to subscribe to it with, because no notify module exists yet under the NestJS/Next.js layout."}
-change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "Dropped the blockedBy on gap.notify.unbuilt-module: it is resolved from the notify side - NotifyEventSubscriber (src/modules/bussiness/notify/notify-event.subscriber.ts) now subscribes to this event on the platform event bus and admits a task-complete notification for its owner (notify-event.subscriber.spec.ts, scripts/live-proof-notify.sh). This edit, by the be-notify lane, touches only this record's stale blocker edge - state, producer, payload and delivery stay exactly as task's own lane authored them."}

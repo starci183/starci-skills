@@ -1,13 +1,11 @@
 schema: work/business-rule
 id: br.notify.unsubscribe.honored
 title: An unsubscribed person receives nothing on that channel
-state: todo
+state: done
 statements:
   - Unsubscribing from a channel is per person and per channel, and takes effect for every event
     enqueued after it, immediately.
   - Suppression by unsubscribe is not an error outcome; it is the requested outcome.
 acceptanceCriteria: [suppresses-future-sends]
-module: src/notify/preferences
-change: {rev: 1, kind: initial, at: 2026-09-18T06:03:00.000Z}
-blockedBy:
-  - {record: gap.notify.unbuilt-module, because: "No code exists yet at src/notify/preferences. The example is moving to a NestJS backend and this module has not been written against that layout, so the rule stays todo."}
+module: src/modules/bussiness/notify
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "PreferencesService (src/modules/bussiness/notify/preferences.service.ts) upserts by the (personId, channel) pair and NotifyService.admit reads it on every admission before a notification ever joins a digest window, so an unsubscribe takes effect immediately for every event enqueued afterward. Proven by preferences.service.spec.ts's ac.notify.unsubscribe.honored.suppresses-future-sends case, notify.service.spec.ts's end-to-end suppress-then-resubscribe case, and scripts/live-proof-notify.sh (real unsubscribe mutation, then a real task completion lands suppressed with failureClass unsubscribed and attempt 0). gap.notify.unbuilt-module's blocker is resolved; module updated from the retired src/notify/preferences prototype path."}

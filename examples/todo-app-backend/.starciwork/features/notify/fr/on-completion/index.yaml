@@ -1,7 +1,7 @@
 schema: work/functional-requirement
 id: fr.notify.on-completion
 title: Notify a person when their task completes
-state: todo
+state: done
 actors: [owner]
 trigger: A task the person owns transitions to complete.
 mainFlow:
@@ -14,16 +14,9 @@ exceptionFlows:
 postconditions:
   - Within the owner's digest window after completion, one message names the task, unless suppressed.
 composes:
-  - {rule: br.notify.delivery.once, module: src/notify/dedupe}
-  - {rule: br.notify.digest.window, module: src/notify/digest}
+  - {rule: br.notify.delivery.once, module: src/modules/bussiness/notify}
+  - {rule: br.notify.digest.window, module: src/modules/bussiness/notify}
 refs: [contract.notify.task-completion-feed]
 subscribes: [event.task.completed]
 
-conflictsWith:
-  - {record: br.task.complete.once, rev: 2, because: "task.complete has no completion event and no
-    stable per-completion id at this commit - fr.task.complete is itself todo, ownership.mjs has no
-    complete transition at all, and nothing in the task feature emits anything notify could admit, so
-    this requirement has no real trigger to attach to."}
-
-blockedBy:
-  - {record: gap.notify.unbuilt-module, because: "event.task.completed is now actually raised by complete-task's use case, which subscribes names as the trigger instead of overloading contract.notify.task-completion-feed for it; this record stays todo because no notify module exists yet under the NestJS/Next.js layout to subscribe to it."}
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "Dropped the conflictsWith on br.task.complete.once rev 2: it is stale - complete-task's use case (src/modules/bussiness/task/complete-task.handler.ts) now publishes event.task.completed with a stable sourceEventId after every write, exactly the trigger this requirement needed. NotifyEventSubscriber (src/modules/bussiness/notify/notify-event.subscriber.ts) subscribes to it via PlatformEventBus and admits a task-complete notification through NotifyService, joining the owner's digest window unless they are unsubscribed. Proven by notify-event.subscriber.spec.ts, notify.service.spec.ts's fr.notify.on-completion case, and scripts/live-proof-notify.sh (a real createTask+completeTask call produces a real notify_notifications/notify_delivery_attempts row for the owner). gap.notify.unbuilt-module's blocker is resolved."}

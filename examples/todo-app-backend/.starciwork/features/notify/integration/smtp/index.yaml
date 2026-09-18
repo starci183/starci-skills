@@ -23,5 +23,7 @@ requiresProof:
     note: A run against a real SMTP host. Evidence must carry proof.boundary live and an empty fakes
       list.
 
+module: src/modules/integrations/notify-smtp
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "NotifySmtpClient now exists and really speaks SMTP over a TCP socket (EHLO/MAIL FROM/RCPT TO/DATA), classifying a connection failure or a 4xx as transient and a 5xx on RCPT TO as a permanent rejection - proven against FakeNotifySmtpClient in delivery.service.spec.ts. The remaining blocker is narrowed from gap.notify.unbuilt-module (resolved: the module exists) to gap.notify.smtp-host-unreachable (still open: no dev SMTP host is declared or reachable), which is the real, specific reason this integration cannot be marked done."}
 blockedBy:
-  - {record: gap.notify.unbuilt-module, because: "No live SMTP boundary is reachable from this worktree: no server is declared or running, and this lane owns no infrastructure to add one honestly without also owning the shared stacks file other lanes touch. Nothing in src/notify (none of which exists yet either) has ever spoken to a real SMTP host, so this record cannot claim done, and no fake run counts as this integration's proof - a run against a fake would only prove it against the fake, per the common brief's own rule."}
+  - {record: gap.notify.smtp-host-unreachable, because: "No dev SMTP host is declared in application-stacks.yaml or reachable from this worktree; scripts/live-proof-notify.sh's dispatch attempt against the configured host fails transiently for exactly that reason. No fake run counts as this integration's proof - a run against a fake would only prove it against the fake, per the common brief's own rule."}

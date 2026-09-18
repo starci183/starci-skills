@@ -6,6 +6,10 @@ const DEFAULT_KEYCLOAK_CLIENT_ID = 'todo-api';
 const DEFAULT_DATABASE_URL = 'postgres://postgres:postgres@localhost:5432/todo';
 const DEFAULT_CORS_ORIGIN = 'http://localhost:3000';
 const DEFAULT_RECUR_TICK_CRON = '*/5 * * * *';
+const DEFAULT_SMTP_HOST = 'localhost';
+const DEFAULT_SMTP_PORT = 1025;
+const DEFAULT_SMTP_FROM = 'notify@todo.dev';
+const DEFAULT_REDIS_URL = 'redis://localhost:6379';
 
 @Injectable()
 export class AppConfigService {
@@ -40,5 +44,24 @@ export class AppConfigService {
    * live-proof run can observe a real tick without a 5-minute wait; production never sets this. */
   getRecurTickCron(): string {
     return process.env.RECUR_TICK_CRON ?? DEFAULT_RECUR_TICK_CRON;
+  /** integration.notify.smtp: the SMTP submission host. No dev host is declared in
+   * application-stacks.yaml at this commit (see that record's `sandbox` note), so this default names
+   * nothing real - a live run only proceeds if SMTP_HOST is actually set to a reachable host. */
+  getSmtpHost(): string {
+    return process.env.SMTP_HOST ?? DEFAULT_SMTP_HOST;
+  }
+
+  getSmtpPort(): number {
+    const raw = process.env.SMTP_PORT;
+    return raw ? Number(raw) : DEFAULT_SMTP_PORT;
+  }
+
+  getSmtpFromAddress(): string {
+    return process.env.SMTP_FROM ?? DEFAULT_SMTP_FROM;
+  }
+
+  /** integration.notify.queue: the dev stack's own Redis (component `redis`, port 6379). */
+  getRedisUrl(): string {
+    return process.env.REDIS_URL ?? DEFAULT_REDIS_URL;
   }
 }

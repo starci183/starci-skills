@@ -1,0 +1,39 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: integration.notify.queue
+recordDigest: 7a077708446dd09cd109599095b952c91069a006cd5b7a233e94287726f19d96
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/modules/integrations/notify-queue/index.ts
+      sha256: def7caab61d61b6db02f1b98bafcbbf4d776909f424246af896a804fc7c7f8d0
+    - path: src/modules/integrations/notify-queue/notify-queue.client.ts
+      sha256: e962acde1138c9bab805d9dbf1fda7a26410fb7ac84232d49158a860e7d389cd
+    - path: src/modules/integrations/notify-queue/notify-queue.contracts.ts
+      sha256: 25211279abd5898bf4ca50e7d74eaa3e04aa12da1043584cebde5c6cc0c4b514
+    - path: src/modules/integrations/notify-queue/notify-queue.module-definition.ts
+      sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
+    - path: src/modules/integrations/notify-queue/notify-queue.module.ts
+      sha256: a6c878a2dff854957f0d2159c9067ac0d42feb852cb10fb5ee62faf5149ec149
+    - path: src/modules/integrations/notify-queue/resp.ts
+      sha256: 0440713d5fd22db22257613fc8b44e94225d25b07e0cedfed471d3788e649b9a
+    - path: src/modules/integrations/notify-queue/testing/fake-notify-queue.client.ts
+      sha256: 40642ee60fc1f3f672933b5cbf2cab9c7709872c4ab00dd51b06fa5db7fc5d32
+  digest: 8f23e4df386e720521321e948f31f03dcd1ed8cfbf3a5279b85f6fcb62d40a06
+outcome: pass
+proof: {boundary: live, fakes: []}
+assertions:
+  - id: live-redis-roundtrip
+    command: node -r ts-node/register/transpile-only -r tsconfig-paths/register
+      scripts/notify-queue-live-check.cjs
+    exit: 0
+    outcome: pass
+    observation: node -r ts-node/register/transpile-only -r tsconfig-paths/register
+      scripts/notify-queue-live-check.cjs exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T09:21:54.282Z

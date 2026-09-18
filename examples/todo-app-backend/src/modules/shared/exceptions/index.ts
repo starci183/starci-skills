@@ -23,3 +23,5 @@ export { RecurRuleForbiddenException } from './errors/recur/rule-forbidden';
 export { RecurRuleInvalidException } from './errors/recur/rule-invalid';
 export { RecurOccurrenceNotFoundException } from './errors/recur/occurrence-not-found';
 export { RecurOccurrenceForbiddenException } from './errors/recur/occurrence-forbidden';
+export { NotifySmtpTransientFailureException } from './errors/notify/notify-smtp-transient-failure';
+export { NotifySmtpPermanentRejectionException } from './errors/notify/notify-smtp-permanent-rejection';

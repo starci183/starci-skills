@@ -7,9 +7,17 @@ import { POSTGRESQL_PRIMARY } from './constants/connection';
 import { PostgresPrimaryClient } from './primary.client';
 <<<<<<< HEAD
 import { SessionEntity, TaskEntity, ShareInvitationEntity } from './entities';
-=======
 import { OccurrenceEntity, RuleEntity, SessionEntity, TaskEntity } from './entities';
->>>>>>> ex-be-recur
+=======
+import {
+  NotifyDeliveryAttemptEntity,
+  NotifyDigestWindowEntity,
+  NotifyNotificationEntity,
+  NotifyPreferenceEntity,
+  SessionEntity,
+  TaskEntity,
+} from './entities';
+>>>>>>> ex-be-notify
 
 /**
  * integration.login.postgres / data.task.task: this is the one platform database module, under nivo's
@@ -35,9 +43,17 @@ export class PostgresqlPrimaryModule extends ConfigurableModuleClass {
             url: config.getDatabaseUrl(),
 <<<<<<< HEAD
             entities: [SessionEntity, TaskEntity, ShareInvitationEntity],
-=======
             entities: [SessionEntity, TaskEntity, RuleEntity, OccurrenceEntity],
->>>>>>> ex-be-recur
+=======
+            entities: [
+              SessionEntity,
+              TaskEntity,
+              NotifyNotificationEntity,
+              NotifyDeliveryAttemptEntity,
+              NotifyPreferenceEntity,
+              NotifyDigestWindowEntity,
+            ],
+>>>>>>> ex-be-notify
             migrations: [join(__dirname, 'migrations', '*.{js,ts}')],
             migrationsRun: true,
             synchronize: false,

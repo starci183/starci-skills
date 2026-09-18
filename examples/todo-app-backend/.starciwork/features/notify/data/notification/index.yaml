@@ -1,7 +1,7 @@
 schema: work/data
 id: data.notify.notification
 title: Notification
-state: todo
+state: done
 fields:
   - {name: id, type: text, required: true, note: "Equal to dedupeKey; there is no separate surrogate id."}
   - {name: dedupeKey, type: text, required: true, note: "sha256 of kind + sourceEventId + recipientId, per decision.notify.dedupe-key."}
@@ -14,5 +14,7 @@ invariants:
   - Two admissions with the same dedupeKey resolve to the same id; there is never a second row for it.
   - digestGroupId is set exactly once and never moved to a different group after being flushed.
 refs: [br.notify.delivery.once, br.notify.digest.window]
-blockedBy:
-  - {record: gap.notify.unbuilt-module, because: "No entity or table exists yet. The example is moving to a NestJS/TypeORM backend and this shape has not been created against that layout."}
+module: src/modules/platform/databases/postgresql/primary/entities/notification.entity.ts
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "NotifyNotificationEntity exists exactly to this shape (notify_notifications table, migration 1758210000000-create-notify-tables.ts); gap.notify.unbuilt-module's blocker is resolved."}
+verificationSource: authored-claim
+because: "work/data's done is an authored claim by nature (schemas/work-layout.yaml); NotifyNotificationEntity's fields and invariants match this record exactly, and the table is exercised live by scripts/live-proof-notify.sh."
