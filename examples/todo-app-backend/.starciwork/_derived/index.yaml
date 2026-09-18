@@ -1291,6 +1291,14 @@ records:
     feature: audit
     state: todo
     effectiveState: todo
+  gap.audit.render-proof:
+    schema: work/gap
+    feature: audit
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - impl.audit.todo-app-frontend.privacy
   gap.audit.unbuilt-module:
     schema: work/gap
     feature: audit
@@ -1513,9 +1521,8 @@ records:
   impl.audit.todo-app-frontend.privacy:
     schema: work/implementation
     feature: audit
-    state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    state: todo
+    effectiveState: todo
   impl.login.todo-app-backend.auth:
     schema: work/implementation
     feature: login
@@ -1531,8 +1538,7 @@ records:
     schema: work/implementation
     feature: login
     state: todo
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: todo
   impl.notify.todo-app-backend.pipeline:
     schema: work/implementation
     feature: notify
@@ -2182,8 +2188,7 @@ records:
     schema: work/ui-screen
     feature: login
     state: done
-    effectiveState: suspended
-    suspensionReason: code-digest-mismatch
+    effectiveState: done
   ui.notify.preferences:
     schema: work/ui-screen
     feature: notify
@@ -2214,22 +2219,22 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 131
-    todo: 32
-    stale: 4
+    done: 132
+    todo: 35
+    stale: 1
     blocked: 36
-    total: 203
+    total: 204
   byFeature:
     audit:
       done: 20
-      todo: 6
-      stale: 1
+      todo: 8
+      stale: 0
       blocked: 3
-      total: 30
+      total: 31
     login:
-      done: 15
-      todo: 4
-      stale: 2
+      done: 16
+      todo: 5
+      stale: 0
       blocked: 3
       total: 24
     notify:
@@ -2283,6 +2288,11 @@ tally:
       state: todo
       closedBy:
         - decision.audit.operator-role
+    - id: gap.audit.render-proof
+      feature: audit
+      state: todo
+      closedBy:
+        - impl.audit.todo-app-frontend.privacy
     - id: gap.audit.unbuilt-module
       feature: audit
       state: done
@@ -2450,9 +2460,16 @@ frontier:
   - id: gap.audit.operator-role
     feature: audit
     title: No operator/admin role exists to authorize reading the log
+  - id: gap.audit.render-proof
+    feature: audit
+    title: The privacy captures fail the canonical render checks - impl.audit.todo-app-frontend.privacy
+      cannot claim done
   - id: impl.audit.todo-app-backend.operator-read
     feature: audit
     title: The fail-closed operator check and the filtered whole-chain read
+  - id: impl.audit.todo-app-frontend.privacy
+    feature: audit
+    title: The privacy screen - export data, request erasure
   - id: contract.login.identity-for-task
     feature: login
     title: How task learns who the actor is
@@ -2700,6 +2717,9 @@ unclassifiedEdges:
   - from: gap.audit.operator-role
     field: closedBy
     target: decision.audit.operator-role
+  - from: gap.audit.render-proof
+    field: closedBy
+    target: impl.audit.todo-app-frontend.privacy
   - from: gap.audit.unbuilt-module
     field: closedBy
     target: impl.audit.todo-app-backend.erasure
