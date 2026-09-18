@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../core/yaml.mjs';
 import {readWorkspace, resolveOwnedDirs, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs} from './example-ownership.mjs';
+import {renderProofProblems} from './example-render-proof.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -404,6 +405,22 @@ export function checkWorkTree(workRoot, problems, warnings = []) {
       if (schema !== 'work/resource') {
         problems.push(`${rec.shown}: _resources custody uses schema work/resource, not "${schema}" - the op text says work/resource@1, but this layout forbids the @N suffix here`);
       }
+    }
+  }
+
+  // ---- trust concept 9: a done frontend implementation needs render/brand proof ----
+  // checks/render.mjs + checks/brand.mjs are the canon for "the running page looks like the brand and the
+  // grammar" - palette from the captured PNG's own bytes, card anatomy from the markup kept beside it,
+  // mascot slots from the ui record's surfaces. Until now nothing ran them against this tree, so a
+  // frontend work/implementation could reach `done` with no capture at all (grit item 55). The rule:
+  // a done implementation that is frontend (same predicate as IMPL_BEFORE_DIRECTION - proves a
+  // work/ui-screen, or its repository resolves to a `role: fe` workspace entry) must keep real capture
+  // artifacts in the shape render.mjs reads (PNG + sibling .html under its assets/) and pass the checks.
+  // A `skip` on a core check is refused as RENDER_PROOF_INCOMPLETE - an uncheckable claim is not a pass.
+  for (const [id, rec] of records) {
+    if (rec.schema !== 'work/implementation' || rec.data?.state !== 'done') continue;
+    for (const problem of renderProofProblems({rec, records, workspaceDoc, workRoot})) {
+      problems.push(`${rec.shown}: ${problem}`);
     }
   }
 

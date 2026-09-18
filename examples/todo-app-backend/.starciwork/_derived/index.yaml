@@ -1291,6 +1291,14 @@ records:
     feature: audit
     state: todo
     effectiveState: todo
+  gap.audit.render-proof:
+    schema: work/gap
+    feature: audit
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - impl.audit.todo-app-frontend.privacy
   gap.audit.unbuilt-module:
     schema: work/gap
     feature: audit
@@ -1431,8 +1439,11 @@ records:
   gap.share.frontend-unbuilt:
     schema: work/gap
     feature: share
-    state: done
-    effectiveState: done
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - impl.share.todo-app-frontend.invite-screen
   gap.share.live-proof:
     schema: work/gap
     feature: share
@@ -1507,6 +1518,11 @@ records:
     feature: audit
     state: todo
     effectiveState: todo
+  impl.audit.todo-app-frontend.privacy:
+    schema: work/implementation
+    feature: audit
+    state: todo
+    effectiveState: todo
   impl.login.todo-app-backend.auth:
     schema: work/implementation
     feature: login
@@ -1522,8 +1538,7 @@ records:
     schema: work/implementation
     feature: login
     state: todo
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    effectiveState: todo
   impl.notify.todo-app-backend.pipeline:
     schema: work/implementation
     feature: notify
@@ -1568,8 +1583,18 @@ records:
   impl.share.todo-app-frontend.invite-screen:
     schema: work/implementation
     feature: share
-    state: done
-    effectiveState: done
+    state: todo
+    effectiveState: blocked
+    blockers:
+      - id: gap.share.frontend-unbuilt
+        rootKind: gap
+        cyclic: false
+        because: Not written yet. The example frontend is moving to Next.js and must consume the Grammar
+          core package the way nivo-fe does; this screen will live at app/share/invite-screen.tsx
+          once that scaffold and its Grammar wiring land, and no prior .mjs draft is being carried
+          forward into it. gap.share.unbuilt-module itself closed on its backend half (lane
+          be-share, backend-only per its brief); this narrower gap names the still-open frontend
+          half.
   impl.task.todo-app-backend.complete-task:
     schema: work/implementation
     feature: task
@@ -2191,26 +2216,25 @@ records:
     schema: work/ui-screen
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: code-digest-mismatch
+    effectiveState: done
 tally:
   overall:
-    done: 133
-    todo: 31
-    stale: 3
-    blocked: 35
-    total: 202
+    done: 132
+    todo: 35
+    stale: 1
+    blocked: 36
+    total: 204
   byFeature:
     audit:
       done: 20
-      todo: 6
+      todo: 8
       stale: 0
       blocked: 3
-      total: 29
+      total: 31
     login:
       done: 16
-      todo: 4
-      stale: 1
+      todo: 5
+      stale: 0
       blocked: 3
       total: 24
     notify:
@@ -2232,15 +2256,15 @@ tally:
       blocked: 6
       total: 28
     share:
-      done: 20
-      todo: 2
+      done: 18
+      todo: 3
       stale: 0
-      blocked: 4
+      blocked: 5
       total: 26
     task:
-      done: 22
+      done: 23
       todo: 6
-      stale: 2
+      stale: 1
       blocked: 4
       total: 34
   gaps:
@@ -2264,6 +2288,11 @@ tally:
       state: todo
       closedBy:
         - decision.audit.operator-role
+    - id: gap.audit.render-proof
+      feature: audit
+      state: todo
+      closedBy:
+        - impl.audit.todo-app-frontend.privacy
     - id: gap.audit.unbuilt-module
       feature: audit
       state: done
@@ -2371,7 +2400,7 @@ tally:
         - ui.share.invite
     - id: gap.share.frontend-unbuilt
       feature: share
-      state: done
+      state: todo
       closedBy:
         - impl.share.todo-app-frontend.invite-screen
     - id: gap.share.live-proof
@@ -2431,9 +2460,16 @@ frontier:
   - id: gap.audit.operator-role
     feature: audit
     title: No operator/admin role exists to authorize reading the log
+  - id: gap.audit.render-proof
+    feature: audit
+    title: The privacy captures fail the canonical render checks - impl.audit.todo-app-frontend.privacy
+      cannot claim done
   - id: impl.audit.todo-app-backend.operator-read
     feature: audit
     title: The fail-closed operator check and the filtered whole-chain read
+  - id: impl.audit.todo-app-frontend.privacy
+    feature: audit
+    title: The privacy screen - export data, request erasure
   - id: contract.login.identity-for-task
     feature: login
     title: How task learns who the actor is
@@ -2488,6 +2524,9 @@ frontier:
   - id: nfr.recur.generation.timeliness
     feature: recur
     title: A due occurrence is materialised close to its due instant
+  - id: gap.share.frontend-unbuilt
+    feature: share
+    title: No share invite screen exists under the Next.js layout yet
   - id: gap.share.live-proof
     feature: share
     title: No uat.verify run has produced a live run for share.invite-and-collaborate
@@ -2678,6 +2717,9 @@ unclassifiedEdges:
   - from: gap.audit.operator-role
     field: closedBy
     target: decision.audit.operator-role
+  - from: gap.audit.render-proof
+    field: closedBy
+    target: impl.audit.todo-app-frontend.privacy
   - from: gap.audit.unbuilt-module
     field: closedBy
     target: impl.audit.todo-app-backend.erasure
@@ -2789,6 +2831,9 @@ unclassifiedEdges:
   - from: impl.audit.todo-app-backend.operator-read
     field: proves
     target: fr.audit.log.read
+  - from: impl.audit.todo-app-frontend.privacy
+    field: proves
+    target: ui.audit.privacy
   - from: impl.login.todo-app-backend.auth
     field: proves
     target: br.login.password.sign-in

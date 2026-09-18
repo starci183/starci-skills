@@ -3,23 +3,23 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: impl.audit.todo-app-frontend.privacy
-recordDigest: b8bd58329cbfcb8b4b866ef2355c423a9f38b866786dca120322d755f47a5f99
+recordDigest: d7f56bc1ecf0f17bf710db6b2366decf311bbc4ba44b14bacfca45a820e08056
 codeDigest:
   algorithm: sha256
   files:
     - path: src/app/audit/privacy/page.tsx
-      sha256: bf67d23f56d21405051b6c6a0099f1f67cfff4583748e3443fd26307fc64ee51
+      sha256: bc9bca70b8aad2e5a3b933af7933f5acf3a337897173ba7d155e37d40b6d6add
     - path: src/components/audit/privacy/api.ts
-      sha256: 51ea43c16e56f5c9bab435c0ae54d903e939d2aedac8cf86757d88618e7e5068
+      sha256: 4a5abd2f090f38866372b0273558552d20b7aa1115c9cda632a36caca229f895
     - path: src/components/audit/privacy/classNames.ts
       sha256: b37ad0a8311eeb07293cd6e9db29f8c9c952ca0de12324e3933b861ad9bd51b4
     - path: src/components/audit/privacy/component.spec.tsx
-      sha256: 8aa3061920b8d227eaf9258a610e0121f049041a282f076e5f88a817c674e005
+      sha256: c5f08d369c1adf351d9c3b736c423a2fb88a8d276a76b00f8dfc4b2ca2bd4f48
     - path: src/components/audit/privacy/component.tsx
-      sha256: 991b1e6afd9deaef8da0510f07fb12f838ed031564019a44f67d4e4a2922f57a
+      sha256: a0c8fb2eeadb737790641e2192e3617389537f1fe2b613e95506636195a633dd
     - path: src/components/audit/privacy/index.tsx
-      sha256: d82b2cf89fff6f5905472a9e121737deae5f1a320d4a335513a2317afc300a5c
-  digest: be76fa444fad1271f50b30584b99864cf4b04a923da06db74d568934d914d1cf
+      sha256: f76008cdf1c8ef2d34230c861e94d018739fbebdcb5e61210519102133001682
+  digest: 8792590c4657352592a1a415b04735887059083949868c6b7363f453993b7019
 outcome: fail
 assertions:
   - id: typecheck
@@ -72,8 +72,15 @@ assertions:
       j=p+'todo-app-export-'+v+'.json';if(!fs.existsSync(j)){ok=false;console.log('missing
       export',j);}}if(!ok)process.exit(1);console.log('12 state captures + 2 real export downloads
       verified');" exited 0
+  - id: render-proof
+    command: node ../../scripts/example-render-proof.mjs --work examples/todo-app-backend/.starciwork
+      --record impl.audit.todo-app-frontend.privacy
+    exit: 1
+    outcome: fail
+    observation: node ../../scripts/example-render-proof.mjs --work
+      examples/todo-app-backend/.starciwork --record impl.audit.todo-app-frontend.privacy exited 1
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T14:26:57.024Z
+  capturedAt: 2026-09-18T15:20:38.077Z

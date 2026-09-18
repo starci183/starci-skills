@@ -1,13 +1,16 @@
-# Assertion commands were actually run by scripts/example-evidence.mjs.
-# Asset bindings and visual review augment that receipt; no kernel or browser proof is claimed.
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: ui.login.sign-in
-recordDigest: 7c709bcac7ae53db3c5fbf675e6080a400753c1762637cdef0871e605c1ef3e3
+recordDigest: a2b8c77443c769f35edc420e9cce09a01cd9e3d4b943555858e50c5c81d24217
 codeDigest:
   algorithm: sha256
   files:
     - path: src/app/sign-in/page.tsx
-      sha256: f02766573a40171c920a27fad2917197fb2099d4c64df150a45702a47b694a4e
+      sha256: fcc572491557720b725c4e0a2f86b0c5a0e5ba9e5541b6675aba06ca9ec47dfd
+    - path: src/app/sign-in/turtle-master.png/route.ts
+      sha256: 3dce471b676cb79752ff125a0dce4f9ad60bd37b7a0dac8713af366865d5b076
     - path: src/components/blocks/sign-in-form/classNames.ts
       sha256: c10ff4de1ed41547e656c02a5a915eb9017818ec2ec9315466a020f1b4529787
     - path: src/components/blocks/sign-in-form/component.spec.tsx
@@ -18,55 +21,41 @@ codeDigest:
       sha256: 58a7701352908bc5d49a4cf9396a00677958f82ca075c0f168759167b4fdb172
     - path: src/features/pages/sign-in/index.tsx
       sha256: 8d77469dc75c695c1a911bd566f419c13e60785c1c81f24a1a05274af5275450
-  digest: 3b4caf175eb47fd672f73b385b97f61cc05c5b2520c2391c61cf56adf5d362fb
+  digest: a3a5b65fb53edb0807f0bf100ff48688ca4bccf10376a7ca482d099105374529
 outcome: pass
 assertions:
   - id: direction-assets-inputs-coverage
     command: node
-      examples/todo-app-backend/.starciwork/features/login/ui/sign-in/assets/verify-direction.mjs >
-      examples/todo-app-backend/.starciwork/features/login/ui/sign-in/assets/direction-check.txt
+      examples/todo-app-backend/.starciwork/features/login/ui/sign-in/assets/verify-direction.mjs
     exit: 0
     outcome: pass
     observation: node
-      examples/todo-app-backend/.starciwork/features/login/ui/sign-in/assets/verify-direction.mjs >
-      examples/todo-app-backend/.starciwork/features/login/ui/sign-in/assets/direction-check.txt
+      examples/todo-app-backend/.starciwork/features/login/ui/sign-in/assets/verify-direction.mjs
       exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T14:51:20.855Z
+  capturedAt: 2026-09-18T15:15:50.688Z
 assets:
   - path: assets/sign-in-refused.prompt.txt
-    sha256: 578e4a0218319ea8a20a10bd1cdf51d6e5cf401399d28353631d25e882ef154d
+    sha256: 1f0c8cc39ef6cac6e396a30af14e1ed094fd88765787891884a3f06cff4dcd42
   - path: assets/sign-in-refused.png
-    sha256: bcec913e1dc8d2f130fc8efdf526cbb30fc7c49b68773d0319baf06e395dce77
+    sha256: 6d730b6697352d8ed9cce27c2597f7528fdf301d0c1c0180a579963605e1ffaa
+  - path: assets/sign-in-refused.initial.prompt.txt
+    sha256: fc6b357b7f75d1bf957c555d7c6434f84fe1e14c04f1bd9418659f38d09da4ab
+  - path: assets/sign-in-refused.initial.png
+    sha256: 85abe9f53f68b9da8c98d1b62c3df72b467be6e4f3ee9dd3a49f6eebed2f94db
   - path: assets/visual-review.md
-    sha256: 6b90fbfc8230f92e3edbef8210d027fb56998c853cbf8d846ff04f60f7a6e02d
+    sha256: 2cf588642ff7e75596f3b1a42399ddab21b7c40328778fd85c470cd9e26db37b
   - path: assets/direction-check.txt
-    sha256: 2d05f1f4cc9a041f1f573d03adbae321f7273dea75d1866398bc10cd1be46fe1
+    sha256: acbd83204382aed13d93017f69f257cde978ed2e492feddf1c939aadada3d5d7
   - path: assets/verify-direction.mjs
-    sha256: afa871ea60c7a2bf647da059cbe50a0201a4218f820cf3957fa24614c68a4317
+    sha256: 8cf91ea1bf0e5a6ef9685f03d636260387ade471082ec3472fc7437567b1ba8a
 directionReview:
   reviewer: codex
   outcome: accepted-proposed-direction
   reviewPath: assets/visual-review.md
   imageTool: image_gen.imagegen
   brandRev: 3
-  addendum: 2
-  anatomySources:
-    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-screen.png
-      sha256: 0619dec4572f8d5931b39075d21aaf089963eaeab4e7bb883a35fb4cd28d5d2e
-      role: actual-full-screen-render-anatomy-source
-    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
-      sha256: e9ea01cbbecb7a5b6f19328184fa5a0eca7e37f4a411351e8582491dde5024d5
-      role: actual-full-screen-render-anatomy-source
-    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/empty-state.png
-      sha256: 09ba45e64e7d0e7167c2572df6ae33406b842859d8528aeb9fd2f756a4b48c26
-      role: actual-full-screen-render-anatomy-source
-    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
-      sha256: 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
-      role: actual-full-screen-render-anatomy-source
-  limitations: Generated direction compared with real full-screen references; not exact component
-    pixels, accessibility contrast, browser or API proof. App-owned regions and uncaptured state
-    limits are explicit.
+  limitations: No exact render, API, browser UAT or model identity claimed; implementation gaps live in ui.gaps.
