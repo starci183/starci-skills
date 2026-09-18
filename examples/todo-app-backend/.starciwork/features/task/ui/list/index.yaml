@@ -43,114 +43,165 @@ ui:
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "Input (id: new-task-title, label: New task)"
           - "Button (type: submit, variant: primary, create)"
           - "Text (tone: muted, 'No tasks yet. Add the first one.')"
-          - "SurfaceListCard (label: All tasks; separate page section)"
+          - "SurfaceListCard (label: All tasks, fact: task count; raised white body encloses all
+            rows; footer outside below)"
           - MediaFrame (brand turtle master, decorative)
+          - "SurfaceCard (ariaLabel: New task; bounded raised composer around label, Input and add
+            Button)"
+          - "EmptyNotice (message: No tasks yet. Add the first one.; inside SurfaceListCard body,
+            with decorative MediaFrame sibling)"
         derivation: Derives from many-tasks with the same workspace shell. Keep shell and add form. Replace
           rows with the turtle master and No tasks yet. Add the first one. No delete controls exist
-          in this state.
+          in this state. Preserve the referenced Input/Button geometry and any mapped raised
+          SurfaceCard at this viewport. Keep label/fact above the shared raised row body and footer
+          below it.
         directionAsset: assets/list-many-tasks.png
       - screen: list
         state: empty
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "Input (id: new-task-title, label: New task)"
           - "Button (type: submit, variant: primary, create)"
           - "Text (tone: muted, 'No tasks yet. Add the first one.')"
-          - "SurfaceListCard (label: All tasks; separate page section)"
+          - "SurfaceListCard (label: All tasks, fact: task count; raised white body encloses all
+            rows; footer outside below)"
           - MediaFrame (brand turtle master, decorative)
+          - "SurfaceCard (ariaLabel: New task; bounded raised composer around label, Input and add
+            Button)"
+          - "EmptyNotice (message: No tasks yet. Add the first one.; inside SurfaceListCard body,
+            with decorative MediaFrame sibling)"
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
           scrolling. Keep shell and add form. Replace rows with the turtle master and No tasks yet.
-          Add the first one. No delete controls exist in this state."
+          Add the first one. No delete controls exist in this state. Preserve the referenced
+          Input/Button geometry and any mapped raised SurfaceCard at this viewport. Keep label/fact
+          above the shared raised row body and footer below it."
         directionAsset: assets/list-many-tasks.png
       - screen: list
         state: one-task
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "Input (id: new-task-title, label: New task)"
           - "Button (type: submit, variant: primary, create)"
           - native checkbox + title text + Button (delete; danger capability required)
-          - "SurfaceListCard (label: All tasks; separate page section)"
+          - "SurfaceListCard (label: All tasks, fact: task count; raised white body encloses all
+            rows; footer outside below)"
+          - "SurfaceCard (ariaLabel: New task; bounded raised composer around label, Input and add
+            Button)"
         derivation: Derives from many-tasks with the same workspace shell. the create form renders above a
-          single row with its own completion checkbox, title and delete action
+          single row with its own completion checkbox, title and delete action. Preserve the
+          referenced Input/Button geometry and any mapped raised SurfaceCard at this viewport. Keep
+          label/fact above the shared raised row body and footer below it.
         directionAsset: assets/list-many-tasks.png
       - screen: list
         state: one-task
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "Input (id: new-task-title, label: New task)"
           - "Button (type: submit, variant: primary, create)"
           - native checkbox + title text + Button (delete; danger capability required)
-          - "SurfaceListCard (label: All tasks; separate page section)"
+          - "SurfaceListCard (label: All tasks, fact: task count; raised white body encloses all
+            rows; footer outside below)"
+          - "SurfaceCard (ariaLabel: New task; bounded raised composer around label, Input and add
+            Button)"
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
           scrolling. the create form renders above a single row with its own completion checkbox,
-          title and delete action"
+          title and delete action. Preserve the referenced Input/Button geometry and any mapped
+          raised SurfaceCard at this viewport. Keep label/fact above the shared raised row body and
+          footer below it."
         directionAsset: assets/list-many-tasks.png
       - screen: list
         state: many-tasks
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "Input (id: new-task-title, label: New task)"
           - "Button (type: submit, variant: primary, create)"
           - native checkbox + title text + Button (delete; danger capability required) per row
-          - "SurfaceListCard (label: All tasks; separate page section)"
+          - "SurfaceListCard (label: All tasks, fact: task count; raised white body encloses all
+            rows; footer outside below)"
+          - "SurfaceCard (ariaLabel: New task; bounded raised composer around label, Input and add
+            Button)"
         derivation: Representative direction. the create form renders above multiple rows, each with its own
-          completion checkbox, title and delete action
+          completion checkbox, title and delete action. Preserve the referenced Input/Button
+          geometry and any mapped raised SurfaceCard at this viewport. Keep label/fact above the
+          shared raised row body and footer below it.
         directionAsset: assets/list-many-tasks.png
       - screen: list
         state: many-tasks
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "Input (id: new-task-title, label: New task)"
           - "Button (type: submit, variant: primary, create)"
           - native checkbox + title text + Button (delete; danger capability required) per row
-          - "SurfaceListCard (label: All tasks; separate page section)"
+          - "SurfaceListCard (label: All tasks, fact: task count; raised white body encloses all
+            rows; footer outside below)"
+          - "SurfaceCard (ariaLabel: New task; bounded raised composer around label, Input and add
+            Button)"
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
           scrolling. the create form renders above multiple rows, each with its own completion
-          checkbox, title and delete action"
+          checkbox, title and delete action. Preserve the referenced Input/Button geometry and any
+          mapped raised SurfaceCard at this viewport. Keep label/fact above the shared raised row
+          body and footer below it."
         directionAsset: assets/list-many-tasks.png
       - screen: list
         state: refused
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "Text (live: assertive, the refusal sentence)"
         derivation: Derives from many-tasks with the same workspace shell. Keep the shell, navigation and
           heading. The current block replaces form/list with assertive-live refusal; do not claim a
-          successful empty list.
+          successful empty list. Preserve the referenced Input/Button geometry and any mapped raised
+          SurfaceCard at this viewport.
         directionAsset: assets/list-many-tasks.png
       - screen: list
         state: refused
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "Text (live: assertive, the refusal sentence)"
@@ -158,7 +209,8 @@ ui:
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
           scrolling. Keep the shell, navigation and heading. The current block replaces form/list
-          with assertive-live refusal; do not claim a successful empty list."
+          with assertive-live refusal; do not claim a successful empty list. Preserve the referenced
+          Input/Button geometry and any mapped raised SurfaceCard at this viewport."
         directionAsset: assets/list-many-tasks.png
   accessibility:
     - Keyboard order follows visual and DOM order; all control names remain visible.
@@ -185,7 +237,8 @@ ui:
       master:
         record: brand
         path: assets/turtle-master.png
-      placement: empty-state section outside the add form; no delete actions exist in empty state
+      placement: Inside the empty SurfaceListCard body as a decorative MediaFrame sibling of EmptyNotice,
+        outside the separate composer; no rows/delete controls exist.
       decorative: true
       status: derived state; use master bytes during implementation
   observations:
@@ -193,12 +246,10 @@ ui:
       interaction or API proof.
     - Read brand/index.yaml rev 3 for palette and master provenance; generated colours and glyphs
       are approximate until implementation uses the exact CSS tokens.
-    - Real top navigation and Alex presence; add-task input/action, four native checkbox rows,
-      per-row Share/Schedule/Delete, and footer links are visible.
-    - Corrected Delete text to dark ink inside danger outlines. Rows remain a plain collection,
-      without individual cards or a enclosing list card.
-    - No mascot in the populated destructive-action view. Empty state explicitly derives from this
-      shell with no rows/delete controls and the brand turtle master.
+    - Raised composer card and one rounded raised SurfaceListCard enclosing all four rows; external
+      All tasks / 4 tasks header and external footer; pill actions; no mascot in populated state.
+    - Compared all mapped components against actual supplied renders and installed source. See
+      assets/visual-review.md for component-level decisions and remaining coverage limits.
   gaps:
     - code: THEME_IMPLEMENTATION_REQUIRED
       detail: Only the accent override is wired here. Activate the accepted Core token vocabulary, load
@@ -207,6 +258,13 @@ ui:
       detail: Installed ButtonVariant has no danger variant. Delete/revoke/erasure/end-rule danger
         direction requires a Grammar-owned capability; no invented prop or app-local red is
         authorized.
+    - code: KNOWLEDGE_RENDERER_CONFLICT
+      detail: COLLECTION-1 cases 1-4 and COLLECTION-2 prohibit an enclosing card, but @starci/grammar
+        0.4.13 SurfaceListCard actually renders a raised shell around its rows. The coordinator
+        addendum explicitly requires this shipped anatomy. Preserve the external section label/fact
+        and footer; use the published collection owner without an extra SurfaceCard or per-row
+        cards. This is a documented knowledge/renderer conflict, not a claimed pass of those
+        contradictory cases.
   status: reviewed-proposed-direction
   shell:
     kind: workspace
@@ -233,6 +291,7 @@ ui:
       - label: Terms
         href: /terms
         status: proposed unimplemented policy route
+    headerOwner: NavigationFeatureNav
   links:
     - label: Tasks
       href: /tasks
@@ -255,11 +314,12 @@ ui:
   assets:
     - path: assets/list-many-tasks.prompt.txt
       role: prompt
-      sha256: e1c9d8c08d7ce8ee480e253b2e0ee56b49419cc9efd6355f454861ab9da0a4ce
-      provenance: Exact prompt sent to image_gen.imagegen for this final PNG.
+      sha256: 46509603956a36fe0f5c9dbfcb702e3673ea4b93bd0fc9ea1388ed2a5a5a3a4e
+      provenance: Exact prompt sent to image_gen.imagegen for the anatomy-corrected selected PNG; actual
+        reference PNG paths cited as anatomy sources.
     - path: assets/list-many-tasks.png
       role: direction
-      sha256: 9bf10368a7319782318d131f90b309b79adf92d2a0ae2f043d439ab47a3ab47f
+      sha256: c7dd58006db611bc82bef05d8602f003fb3e7ee421857debaa467b2c19774651
       width: 1536
       height: 1024
       generation:
@@ -277,12 +337,15 @@ ui:
           - knowledge/ui/composition/collection.yaml
           - knowledge/ui/composition/cta.yaml
           - knowledge/ui/composition/responsive.yaml
-          - assets/list-many-tasks.initial.png
-          - assets/list-many-tasks.initial.prompt.txt
+          - examples/todo-app-backend/.starciwork/features/task/ui/list/assets/list-many-tasks.anatomy-initial.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-composer.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-list.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
       provenance:
         actor: codex
         tool: image_gen.imagegen
-        capturedAt: 2026-09-18T12:29:10.478Z
+        capturedAt: 2026-09-18T13:58:00.231Z
         kind: generated-proposed-direction
         modelDisclosure: Tool response did not expose a model field; no model claimed.
     - path: assets/list-many-tasks.initial.prompt.txt
@@ -312,6 +375,73 @@ ui:
         tool: image_gen.imagegen
         capturedAt: 2026-09-18T12:22:17.281Z
         kind: superseded-initial-direction
+        modelDisclosure: Tool response did not expose a model field; no model claimed.
+    - path: assets/list-many-tasks.v4.prompt.txt
+      role: prompt
+      sha256: e1c9d8c08d7ce8ee480e253b2e0ee56b49419cc9efd6355f454861ab9da0a4ce
+      provenance: Exact pre-addendum prompt, retained with the v4 edit input; its flat-row interpretation
+        is superseded.
+    - path: assets/list-many-tasks.v4.png
+      role: iteration-input
+      sha256: 9bf10368a7319782318d131f90b309b79adf92d2a0ae2f043d439ab47a3ab47f
+      width: 1536
+      height: 1024
+      generation:
+        tool: image_gen.imagegen
+        promptPath: assets/list-many-tasks.v4.prompt.txt
+        inputRefs:
+          - brand
+          - fr.task.create
+          - br.task.delete.final
+          - br.task.list.owned
+          - sds.task.completion-state
+          - knowledge/ui/proof/brand.yaml
+          - knowledge/ui/proof/contrast.yaml
+          - knowledge/ui/composition/layout.yaml
+          - knowledge/ui/composition/collection.yaml
+          - knowledge/ui/composition/cta.yaml
+          - knowledge/ui/composition/responsive.yaml
+          - assets/list-many-tasks.initial.png
+          - assets/list-many-tasks.initial.prompt.txt
+      provenance:
+        actor: codex
+        tool: image_gen.imagegen
+        capturedAt: 2026-09-18T12:29:10.478Z
+        kind: superseded-v4-direction
+        modelDisclosure: Tool response did not expose a model field; no model claimed.
+    - path: assets/list-many-tasks.anatomy-initial.prompt.txt
+      role: prompt
+      sha256: d1bf0b8092bad1bc003ff9bfb6f670598fa0589ef1ebc580580976cac2fbdd11
+      provenance: Exact first anatomy-correction prompt; retained because the final correction consumes
+        this image.
+    - path: assets/list-many-tasks.anatomy-initial.png
+      role: iteration-input
+      sha256: 0afb32f7c019fab663db7056f20baf7b8ccde8cbc77a2c4c51e43399471b3352
+      generation:
+        tool: image_gen.imagegen
+        promptPath: assets/list-many-tasks.anatomy-initial.prompt.txt
+        inputRefs:
+          - brand
+          - fr.task.create
+          - br.task.delete.final
+          - br.task.list.owned
+          - sds.task.completion-state
+          - knowledge/ui/proof/brand.yaml
+          - knowledge/ui/proof/contrast.yaml
+          - knowledge/ui/composition/layout.yaml
+          - knowledge/ui/composition/collection.yaml
+          - knowledge/ui/composition/cta.yaml
+          - knowledge/ui/composition/responsive.yaml
+          - examples/todo-app-backend/.starciwork/features/task/ui/list/assets/list-many-tasks.v4.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-composer.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-list.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+      provenance:
+        actor: codex
+        tool: image_gen.imagegen
+        capturedAt: 2026-09-18T13:56:36.794Z
+        kind: superseded-anatomy-iteration
         modelDisclosure: Tool response did not expose a model field; no model claimed.
   acceptedInputs:
     brand:
@@ -350,20 +480,48 @@ ui:
       location: brand.grammar.inspectedFiles
       version: 0.4.13
       installation: prior draw checkout with identical frontend lockfile; current node_modules absent
+    grammarReferences:
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+        sha256: 81fc3540234b264cf0f1fd11670474f1db42aaf961420ba3f9d8a7cb4318539c
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-composer.png
+        sha256: 3bdd79f76d91b3735bfe296c8fdc1df399ccf6c63f578ae56289f7841c89c7e5
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-list.png
+        sha256: 8a441d4efabb9c1dd56083d31418434cb597e3bced3f28efa81380b760c971ba
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+        sha256: 9189c6b63af7b744824f7ffc9cf3c282c027c58d3eb614fb5bc80606ec3d74c9
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/empty-state.png
+        sha256: 5b7f81d7db9982db08ba0b4a9e1018f32e476d24b88b2b19d1903fbda54fe803
+        role: actual-render-anatomy-source
   interactions:
     - Add submits a nonempty title; action owns pending and failure; no optimistic successful write
       claim.
     - Checkbox toggles completion; accessible row label names the task.
     - Delete asks a concise inline confirmation naming the task, then exposes danger Delete and
       secondary Cancel; never use blue for the destructive commit.
+  anatomyReview:
+    reviewer: codex
+    reviewedAt: 2026-09-18T14:05:58.053Z
+    comparison: regenerated after comparison with actual Grammar captures
+    before: Missing composer SurfaceCard; task rows lie flat on canvas; count beside label; rectangular
+      actions.
+    after: Raised composer card and one rounded raised SurfaceListCard enclosing all four rows; external
+      All tasks / 4 tasks header and external footer; pill actions; no mascot in populated state.
+    reviewPath: assets/visual-review.md
+    sourcePolicy: Rendered Grammar component anatomy; unchanged brand rev 3 tokens/contrast and mascot
+      rules take priority over screenshot colour defaults.
 assets:
   - path: assets/list-many-tasks.prompt.txt
     role: prompt
-    sha256: e1c9d8c08d7ce8ee480e253b2e0ee56b49419cc9efd6355f454861ab9da0a4ce
-    provenance: Exact prompt sent to image_gen.imagegen for this final PNG.
+    sha256: 46509603956a36fe0f5c9dbfcb702e3673ea4b93bd0fc9ea1388ed2a5a5a3a4e
+    provenance: Exact prompt sent to image_gen.imagegen for the anatomy-corrected selected PNG; actual
+      reference PNG paths cited as anatomy sources.
   - path: assets/list-many-tasks.png
     role: direction
-    sha256: 9bf10368a7319782318d131f90b309b79adf92d2a0ae2f043d439ab47a3ab47f
+    sha256: c7dd58006db611bc82bef05d8602f003fb3e7ee421857debaa467b2c19774651
     width: 1536
     height: 1024
     generation:
@@ -381,12 +539,15 @@ assets:
         - knowledge/ui/composition/collection.yaml
         - knowledge/ui/composition/cta.yaml
         - knowledge/ui/composition/responsive.yaml
-        - assets/list-many-tasks.initial.png
-        - assets/list-many-tasks.initial.prompt.txt
+        - examples/todo-app-backend/.starciwork/features/task/ui/list/assets/list-many-tasks.anatomy-initial.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-composer.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-list.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
     provenance:
       actor: codex
       tool: image_gen.imagegen
-      capturedAt: 2026-09-18T12:29:10.478Z
+      capturedAt: 2026-09-18T13:58:00.231Z
       kind: generated-proposed-direction
       modelDisclosure: Tool response did not expose a model field; no model claimed.
   - path: assets/list-many-tasks.initial.prompt.txt
@@ -417,9 +578,76 @@ assets:
       capturedAt: 2026-09-18T12:22:17.281Z
       kind: superseded-initial-direction
       modelDisclosure: Tool response did not expose a model field; no model claimed.
+  - path: assets/list-many-tasks.v4.prompt.txt
+    role: prompt
+    sha256: e1c9d8c08d7ce8ee480e253b2e0ee56b49419cc9efd6355f454861ab9da0a4ce
+    provenance: Exact pre-addendum prompt, retained with the v4 edit input; its flat-row interpretation
+      is superseded.
+  - path: assets/list-many-tasks.v4.png
+    role: iteration-input
+    sha256: 9bf10368a7319782318d131f90b309b79adf92d2a0ae2f043d439ab47a3ab47f
+    width: 1536
+    height: 1024
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/list-many-tasks.v4.prompt.txt
+      inputRefs:
+        - brand
+        - fr.task.create
+        - br.task.delete.final
+        - br.task.list.owned
+        - sds.task.completion-state
+        - knowledge/ui/proof/brand.yaml
+        - knowledge/ui/proof/contrast.yaml
+        - knowledge/ui/composition/layout.yaml
+        - knowledge/ui/composition/collection.yaml
+        - knowledge/ui/composition/cta.yaml
+        - knowledge/ui/composition/responsive.yaml
+        - assets/list-many-tasks.initial.png
+        - assets/list-many-tasks.initial.prompt.txt
+    provenance:
+      actor: codex
+      tool: image_gen.imagegen
+      capturedAt: 2026-09-18T12:29:10.478Z
+      kind: superseded-v4-direction
+      modelDisclosure: Tool response did not expose a model field; no model claimed.
+  - path: assets/list-many-tasks.anatomy-initial.prompt.txt
+    role: prompt
+    sha256: d1bf0b8092bad1bc003ff9bfb6f670598fa0589ef1ebc580580976cac2fbdd11
+    provenance: Exact first anatomy-correction prompt; retained because the final correction consumes
+      this image.
+  - path: assets/list-many-tasks.anatomy-initial.png
+    role: iteration-input
+    sha256: 0afb32f7c019fab663db7056f20baf7b8ccde8cbc77a2c4c51e43399471b3352
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/list-many-tasks.anatomy-initial.prompt.txt
+      inputRefs:
+        - brand
+        - fr.task.create
+        - br.task.delete.final
+        - br.task.list.owned
+        - sds.task.completion-state
+        - knowledge/ui/proof/brand.yaml
+        - knowledge/ui/proof/contrast.yaml
+        - knowledge/ui/composition/layout.yaml
+        - knowledge/ui/composition/collection.yaml
+        - knowledge/ui/composition/cta.yaml
+        - knowledge/ui/composition/responsive.yaml
+        - examples/todo-app-backend/.starciwork/features/task/ui/list/assets/list-many-tasks.v4.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-composer.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-list.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+    provenance:
+      actor: codex
+      tool: image_gen.imagegen
+      capturedAt: 2026-09-18T13:56:36.794Z
+      kind: superseded-anatomy-iteration
+      modelDisclosure: Tool response did not expose a model field; no model claimed.
 change:
-  rev: 3
+  rev: 4
   kind: clarifying
-  at: 2026-09-18T12:20:51.681Z
-  reason: "Owner-directed redraw against brand rev 3: real shell/auth composition, full web UX,
-    explicit mobile/state derivations and honest Grammar/link implementation gaps."
+  at: 2026-09-18T14:05:58.053Z
+  reason: "Coordinator addendum: align direction with actual rendered Grammar surfaces, collection
+    boundaries, Inputs, Buttons and navigation; keep brand rev 3 unchanged."

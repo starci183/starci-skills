@@ -1,6 +1,6 @@
 schema: work/evidence
 record: ui.task.list
-recordDigest: d7a3aebd655a435d5d948980970724d631340ae45d146d711063b01e2c781007
+recordDigest: 0ef3d24be1683ec11f03a2aeddbace1715fa73d26e93b37528bdbd4e0919218f
 codeDigest:
   algorithm: sha256
   files:
@@ -20,36 +20,70 @@ codeDigest:
 outcome: pass
 assertions:
   - id: direction-assets-inputs-coverage
-    command: node examples/todo-app-backend/.starciwork/features/task/ui/list/assets/verify-direction.mjs
+    command: node
+      examples/todo-app-backend/.starciwork/features/task/ui/list/assets/verify-direction.mjs >
+      examples/todo-app-backend/.starciwork/features/task/ui/list/assets/direction-check.txt
     exit: 0
     outcome: pass
     observation: node
-      examples/todo-app-backend/.starciwork/features/task/ui/list/assets/verify-direction.mjs exited
+      examples/todo-app-backend/.starciwork/features/task/ui/list/assets/verify-direction.mjs >
+      examples/todo-app-backend/.starciwork/features/task/ui/list/assets/direction-check.txt exited
       0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T12:40:54.596Z
+  capturedAt: 2026-09-18T14:10:33.539Z
 assets:
   - path: assets/list-many-tasks.prompt.txt
-    sha256: e1c9d8c08d7ce8ee480e253b2e0ee56b49419cc9efd6355f454861ab9da0a4ce
+    sha256: 46509603956a36fe0f5c9dbfcb702e3673ea4b93bd0fc9ea1388ed2a5a5a3a4e
   - path: assets/list-many-tasks.png
-    sha256: 9bf10368a7319782318d131f90b309b79adf92d2a0ae2f043d439ab47a3ab47f
+    sha256: c7dd58006db611bc82bef05d8602f003fb3e7ee421857debaa467b2c19774651
   - path: assets/list-many-tasks.initial.prompt.txt
     sha256: 524b6188f373ece9702ecf1aecedf6c8118a74ffd84d2b8a2d3b03f60c91285e
   - path: assets/list-many-tasks.initial.png
     sha256: 07fa285e15b27ad898b10648493ca43807a10d80bfcaba1e5dece7d26dea1202
+  - path: assets/list-many-tasks.v4.prompt.txt
+    sha256: e1c9d8c08d7ce8ee480e253b2e0ee56b49419cc9efd6355f454861ab9da0a4ce
+  - path: assets/list-many-tasks.v4.png
+    sha256: 9bf10368a7319782318d131f90b309b79adf92d2a0ae2f043d439ab47a3ab47f
+  - path: assets/list-many-tasks.anatomy-initial.prompt.txt
+    sha256: d1bf0b8092bad1bc003ff9bfb6f670598fa0589ef1ebc580580976cac2fbdd11
+  - path: assets/list-many-tasks.anatomy-initial.png
+    sha256: 0afb32f7c019fab663db7056f20baf7b8ccde8cbc77a2c4c51e43399471b3352
   - path: assets/visual-review.md
-    sha256: ac0392cfde6a7df7b826d92171bb70221e056fe6bb5682608518b4b105477434
+    sha256: 98a0428857b4e7f465ffc0834f7f70d6a2baa7176bbcf6eefa65b31495a74875
   - path: assets/direction-check.txt
-    sha256: 2a4025bc32a9cd2ce29b61de3218bbdd1903e3e5aa7564992f57b08c099e752d
+    sha256: 514ca3128637a6f714d58ddbb7f5bfbe01fdca12d2f42f403b26890b8833a350
   - path: assets/verify-direction.mjs
-    sha256: 8cf91ea1bf0e5a6ef9685f03d636260387ade471082ec3472fc7437567b1ba8a
+    sha256: 243c4fb8589ed0ed4870df1b8f299af43e0d45146316883d12087d8b6e0be46f
+  - path: assets/grammar-reference-review.json
+    sha256: e5f369a187672cf3aab4b9cfdcfc3163d25784ef3a8d59fd60d4c7c67e4fdc72
+  - path: assets/grammar-reference-review.md
+    sha256: b05a77d6c657fd894b03cafad7613d258783196268236ffedd5aa87757ee695e
+  - path: assets/grammar-reference-check.txt
+    sha256: 836dddd109ee35c3657dc9fa3bb3f81ca39032725b19cb70f7cf58b57ff1456c
 directionReview:
   reviewer: codex
   outcome: accepted-proposed-direction
   reviewPath: assets/visual-review.md
   imageTool: image_gen.imagegen
   brandRev: 3
-  limitations: No exact render, API, browser UAT or model identity claimed; implementation gaps live in ui.gaps.
+  anatomySources:
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+      sha256: 81fc3540234b264cf0f1fd11670474f1db42aaf961420ba3f9d8a7cb4318539c
+      role: actual-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-composer.png
+      sha256: 3bdd79f76d91b3735bfe296c8fdc1df399ccf6c63f578ae56289f7841c89c7e5
+      role: actual-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-list.png
+      sha256: 8a441d4efabb9c1dd56083d31418434cb597e3bced3f28efa81380b760c971ba
+      role: actual-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+      sha256: 9189c6b63af7b744824f7ffc9cf3c282c027c58d3eb614fb5bc80606ec3d74c9
+      role: actual-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/empty-state.png
+      sha256: 5b7f81d7db9982db08ba0b4a9e1018f32e476d24b88b2b19d1903fbda54fe803
+      role: actual-render-anatomy-source
+  limitations: Generated direction; manual anatomy comparison and replayable structural/hash checks,
+    not browser or API proof. Unchanged brand constraints and declared Grammar/theme gaps remain.

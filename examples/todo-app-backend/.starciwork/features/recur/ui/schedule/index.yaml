@@ -42,99 +42,121 @@ ui:
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Schedule)"
-          - "Input (id: recur-rule, label: Repeat)"
           - "Button (save rule, type: submit, variant: primary)"
           - native frequency radio group (every-weekday/every-n-days/monthly-day)
-          - "Input (kind: text; conditional n/dayOfMonth)"
-          - "Input (kind: text; time HH:MM)"
-          - "Input (kind: text; timeZone IANA)"
-          - "Input (kind: text; startDate YYYY-MM-DD)"
+          - "Input (kind: text; conditional n/dayOfMonth, label above)"
+          - "Input (kind: text; time HH:MM, label and hint above)"
+          - "Input (kind: text; timeZone IANA, label and hint above)"
+          - "Input (kind: text; startDate YYYY-MM-DD, label and hint above)"
         derivation: Derives from refused with the same workspace shell. only the make-recurring form is
-          shown, no upcoming-occurrences list
+          shown, no upcoming-occurrences list. Preserve the referenced Input/Button geometry and any
+          mapped raised SurfaceCard at this viewport.
         directionAsset: assets/schedule-refused.png
       - screen: schedule
         state: no-rule
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Schedule)"
-          - "Input (id: recur-rule, label: Repeat)"
           - "Button (save rule, type: submit, variant: primary)"
           - native frequency radio group (every-weekday/every-n-days/monthly-day)
-          - "Input (kind: text; conditional n/dayOfMonth)"
-          - "Input (kind: text; time HH:MM)"
-          - "Input (kind: text; timeZone IANA)"
-          - "Input (kind: text; startDate YYYY-MM-DD)"
+          - "Input (kind: text; conditional n/dayOfMonth, label above)"
+          - "Input (kind: text; time HH:MM, label and hint above)"
+          - "Input (kind: text; timeZone IANA, label and hint above)"
+          - "Input (kind: text; startDate YYYY-MM-DD, label and hint above)"
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
-          scrolling. only the make-recurring form is shown, no upcoming-occurrences list"
+          scrolling. only the make-recurring form is shown, no upcoming-occurrences list. Preserve
+          the referenced Input/Button geometry and any mapped raised SurfaceCard at this viewport."
         directionAsset: assets/schedule-refused.png
       - screen: schedule
         state: active
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Schedule)"
           - Text (rule summary sentence)
           - "Button (end rule, variant: outline)"
-          - "SurfaceListCard (label: Upcoming occurrences)"
+          - "SurfaceListCard (label: Upcoming occurrences, fact: occurrence count; raised white body
+            encloses StaticStateRow children; footer outside below)"
           - StaticStateRow (one per occurrence)
         derivation: Derives from refused with the same workspace shell. the upcoming-occurrences list
-          renders below the rule summary and an end-rule Button
+          renders below the rule summary and an end-rule Button. Preserve the referenced
+          Input/Button geometry and any mapped raised SurfaceCard at this viewport. Keep label/fact
+          above the shared raised row body and footer below it.
         directionAsset: assets/schedule-refused.png
       - screen: schedule
         state: active
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Schedule)"
           - Text (rule summary sentence)
           - "Button (end rule, variant: outline)"
-          - "SurfaceListCard (label: Upcoming occurrences)"
+          - "SurfaceListCard (label: Upcoming occurrences, fact: occurrence count; raised white body
+            encloses StaticStateRow children; footer outside below)"
           - StaticStateRow (one per occurrence)
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
           scrolling. the upcoming-occurrences list renders below the rule summary and an end-rule
-          Button"
+          Button. Preserve the referenced Input/Button geometry and any mapped raised SurfaceCard at
+          this viewport. Keep label/fact above the shared raised row body and footer below it."
         directionAsset: assets/schedule-refused.png
       - screen: schedule
         state: ended
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Schedule)"
           - Text (rule summary sentence, ended)
-          - "SurfaceListCard (label: Upcoming occurrences)"
+          - "SurfaceListCard (label: Occurrence history, fact: history count; raised white body
+            encloses materialised StaticStateRow children; footer outside below)"
           - StaticStateRow (materialised history; completed/skipped retained, outstanding become
             orphaned)
           - EmptyNotice (nothing upcoming)
         derivation: Derives from refused with the same workspace shell. Remove future previews and end
           action; keep materialised history. Completed/skipped statuses stay; outstanding
-          materialised occurrences become orphaned under fr.recur.end-rule.
+          materialised occurrences become orphaned under fr.recur.end-rule. Preserve the referenced
+          Input/Button geometry and any mapped raised SurfaceCard at this viewport. Keep label/fact
+          above the shared raised row body and footer below it. EmptyNotice describes no future
+          occurrences outside the retained history collection.
         directionAsset: assets/schedule-refused.png
       - screen: schedule
         state: ended
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Schedule)"
           - Text (rule summary sentence, ended)
-          - "SurfaceListCard (label: Upcoming occurrences)"
+          - "SurfaceListCard (label: Occurrence history, fact: history count; raised white body
+            encloses materialised StaticStateRow children; footer outside below)"
           - StaticStateRow (materialised history; completed/skipped retained, outstanding become
             orphaned)
           - EmptyNotice (nothing upcoming)
@@ -143,50 +165,57 @@ ui:
           Form fields stack and row actions wrap without hiding controls or horizontal page
           scrolling. Remove future previews and end action; keep materialised history.
           Completed/skipped statuses stay; outstanding materialised occurrences become orphaned
-          under fr.recur.end-rule."
+          under fr.recur.end-rule. Preserve the referenced Input/Button geometry and any mapped
+          raised SurfaceCard at this viewport. Keep label/fact above the shared raised row body and
+          footer below it. EmptyNotice describes no future occurrences outside the retained history
+          collection."
         directionAsset: assets/schedule-refused.png
       - screen: schedule
         state: refused
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Schedule)"
-          - "Input (id: recur-rule, label: Repeat)"
           - "Text (live: assertive, the invalid-field sentence)"
           - "Button (save rule, type: submit, variant: primary)"
           - native frequency radio group (every-weekday/every-n-days/monthly-day)
-          - "Input (kind: text; conditional n/dayOfMonth)"
-          - "Input (kind: text; time HH:MM)"
-          - "Input (kind: text; timeZone IANA)"
-          - "Input (kind: text; startDate YYYY-MM-DD)"
+          - "Input (kind: text; label: Every (days), value: 0, isError, errorMessage below)"
+          - "Input (kind: text; time HH:MM, label and hint above)"
+          - "Input (kind: text; timeZone IANA, label and hint above)"
+          - "Input (kind: text; startDate YYYY-MM-DD, label and hint above)"
         derivation: Representative direction. Retain frequency, n, local time, IANA time zone and start
           date; identify n as requiring a positive integer. No rule or upcoming preview exists yet.
-          Monthly day 31 remains valid.
+          Monthly day 31 remains valid. Preserve the referenced Input/Button geometry and any mapped
+          raised SurfaceCard at this viewport.
         directionAsset: assets/schedule-refused.png
       - screen: schedule
         state: refused
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Schedule)"
-          - "Input (id: recur-rule, label: Repeat)"
           - "Text (live: assertive, the invalid-field sentence)"
           - "Button (save rule, type: submit, variant: primary)"
           - native frequency radio group (every-weekday/every-n-days/monthly-day)
-          - "Input (kind: text; conditional n/dayOfMonth)"
-          - "Input (kind: text; time HH:MM)"
-          - "Input (kind: text; timeZone IANA)"
-          - "Input (kind: text; startDate YYYY-MM-DD)"
+          - "Input (kind: text; label: Every (days), value: 0, isError, errorMessage below)"
+          - "Input (kind: text; time HH:MM, label and hint above)"
+          - "Input (kind: text; timeZone IANA, label and hint above)"
+          - "Input (kind: text; startDate YYYY-MM-DD, label and hint above)"
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
           scrolling. Retain frequency, n, local time, IANA time zone and start date; identify n as
           requiring a positive integer. No rule or upcoming preview exists yet. Monthly day 31
-          remains valid."
+          remains valid. Preserve the referenced Input/Button geometry and any mapped raised
+          SurfaceCard at this viewport."
         directionAsset: assets/schedule-refused.png
   accessibility:
     - Keyboard order follows visual and DOM order; all control names remain visible.
@@ -211,12 +240,10 @@ ui:
       interaction or API proof.
     - Read brand/index.yaml rev 3 for palette and master provenance; generated colours and glyphs
       are approximate until implementation uses the exact CSS tokens.
-    - Task context, frequency radio options, retained n=0 refusal, time, IANA zone and start date
-      are legible. Save schedule, Cancel, shell and policy links are visible.
-    - Invalid positive-integer input replaces the old invented weekend refusal; day 31 remains
-      allowed by the accepted specification.
-    - No upcoming list or end-rule action before a rule exists. Active/ended states separately map
-      previews and materialised history; no mascot in this refusal screen.
+    - Raised form SurfaceCard, labels and hints above rounded Inputs, error below n=0, paired
+      time/time-zone grid, pill actions; no upcoming/end action before rule exists.
+    - Compared all mapped components against actual supplied renders and installed source. See
+      assets/visual-review.md for component-level decisions and remaining coverage limits.
   gaps:
     - code: THEME_IMPLEMENTATION_REQUIRED
       detail: Only the accent override is wired here. Activate the accepted Core token vocabulary, load
@@ -225,6 +252,17 @@ ui:
       detail: Installed ButtonVariant has no danger variant. Delete/revoke/erasure/end-rule danger
         direction requires a Grammar-owned capability; no invented prop or app-local red is
         authorized.
+    - code: KNOWLEDGE_RENDERER_CONFLICT
+      detail: COLLECTION-1 cases 1-4 and COLLECTION-2 prohibit an enclosing card, but @starci/grammar
+        0.4.13 SurfaceListCard actually renders a raised shell around its rows. The coordinator
+        addendum explicitly requires this shipped anatomy. Preserve the external section label/fact
+        and footer; use the published collection owner without an extra SurfaceCard or per-row
+        cards. This is a documented knowledge/renderer conflict, not a claimed pass of those
+        contradictory cases.
+    - code: GRAMMAR_ERROR_INK_REQUIRED
+      detail: inputs.png shows saturated danger error ink. The unchanged brand contrast rule requires
+        readable dark error copy while retaining the danger field edge. Implement through
+        Grammar-owned theme support; no arbitrary replacement red or fabricated Text tone.
   status: reviewed-proposed-direction
   shell:
     kind: workspace
@@ -251,6 +289,7 @@ ui:
       - label: Terms
         href: /terms
         status: proposed unimplemented policy route
+    headerOwner: NavigationFeatureNav
   links:
     - label: Tasks
       href: /tasks
@@ -273,11 +312,12 @@ ui:
   assets:
     - path: assets/schedule-refused.prompt.txt
       role: prompt
-      sha256: c95b1b219a08bd6ae604adb46de8b722feb512a7b91157c385380b0e74282c3b
-      provenance: Exact prompt sent to image_gen.imagegen for this final PNG.
+      sha256: 5422440ad6dee0bca97bddea096348e3451ffca89f6c31cef2666718a8b2abd4
+      provenance: Exact prompt sent to image_gen.imagegen for the anatomy-corrected selected PNG; actual
+        reference PNG paths cited as anatomy sources.
     - path: assets/schedule-refused.png
       role: direction
-      sha256: 8da30b01000f8f232067d6e440cf9e5ce55a59a9a804504f151539d3aa6f8c4f
+      sha256: 72d414204d5e268e80de282db9747f3ef6dead9aa39bcae909b8f432189e2d1a
       width: 1536
       height: 1024
       generation:
@@ -297,11 +337,85 @@ ui:
           - knowledge/ui/composition/collection.yaml
           - knowledge/ui/composition/cta.yaml
           - knowledge/ui/composition/responsive.yaml
+          - examples/todo-app-backend/.starciwork/features/recur/ui/schedule/assets/schedule-refused.anatomy-initial.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/inputs.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+      provenance:
+        actor: codex
+        tool: image_gen.imagegen
+        capturedAt: 2026-09-18T14:05:07.981Z
+        kind: generated-proposed-direction
+        modelDisclosure: Tool response did not expose a model field; no model claimed.
+    - path: assets/schedule-refused.v4.prompt.txt
+      role: prompt
+      sha256: c95b1b219a08bd6ae604adb46de8b722feb512a7b91157c385380b0e74282c3b
+      provenance: Exact pre-addendum prompt, retained with the v4 edit input; its flat-row interpretation
+        is superseded.
+    - path: assets/schedule-refused.v4.png
+      role: iteration-input
+      sha256: 8da30b01000f8f232067d6e440cf9e5ce55a59a9a804504f151539d3aa6f8c4f
+      width: 1536
+      height: 1024
+      generation:
+        tool: image_gen.imagegen
+        promptPath: assets/schedule-refused.v4.prompt.txt
+        inputRefs:
+          - brand
+          - fr.recur.make-recurring
+          - fr.recur.see-upcoming
+          - fr.recur.end-rule
+          - data.recur.rule
+          - sds.recur.generation-engine
+          - sds.recur.occurrence-lifecycle
+          - knowledge/ui/proof/brand.yaml
+          - knowledge/ui/proof/contrast.yaml
+          - knowledge/ui/composition/layout.yaml
+          - knowledge/ui/composition/collection.yaml
+          - knowledge/ui/composition/cta.yaml
+          - knowledge/ui/composition/responsive.yaml
       provenance:
         actor: codex
         tool: image_gen.imagegen
         capturedAt: 2026-09-18T12:26:24.711Z
-        kind: generated-proposed-direction
+        kind: superseded-v4-direction
+        modelDisclosure: Tool response did not expose a model field; no model claimed.
+    - path: assets/schedule-refused.anatomy-initial.prompt.txt
+      role: prompt
+      sha256: dcecbb8978b8e17c088efdfc601b37de8b7d1dec987ef77e0ab7a3d1f4088d0a
+      provenance: Exact first anatomy-correction prompt; retained because the final correction consumes
+        this image.
+    - path: assets/schedule-refused.anatomy-initial.png
+      role: iteration-input
+      sha256: f2fa72f4f4c610cedd9aba0ac8d27babef58a7c08ec9c1ee929752cac43355f0
+      generation:
+        tool: image_gen.imagegen
+        promptPath: assets/schedule-refused.anatomy-initial.prompt.txt
+        inputRefs:
+          - brand
+          - fr.recur.make-recurring
+          - fr.recur.see-upcoming
+          - fr.recur.end-rule
+          - data.recur.rule
+          - sds.recur.generation-engine
+          - sds.recur.occurrence-lifecycle
+          - knowledge/ui/proof/brand.yaml
+          - knowledge/ui/proof/contrast.yaml
+          - knowledge/ui/composition/layout.yaml
+          - knowledge/ui/composition/collection.yaml
+          - knowledge/ui/composition/cta.yaml
+          - knowledge/ui/composition/responsive.yaml
+          - examples/todo-app-backend/.starciwork/features/recur/ui/schedule/assets/schedule-refused.v4.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/inputs.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+      provenance:
+        actor: codex
+        tool: image_gen.imagegen
+        capturedAt: 2026-09-18T14:03:24.423Z
+        kind: superseded-anatomy-iteration
         modelDisclosure: Tool response did not expose a model field; no model claimed.
   acceptedInputs:
     brand:
@@ -346,18 +460,48 @@ ui:
       location: brand.grammar.inspectedFiles
       version: 0.4.13
       installation: prior draw checkout with identical frontend lockfile; current node_modules absent
+    grammarReferences:
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+        sha256: 81fc3540234b264cf0f1fd11670474f1db42aaf961420ba3f9d8a7cb4318539c
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+        sha256: b1948cf75464804f055ea37953c72751f3e36795267f1f204179917da1d6eeee
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/inputs.png
+        sha256: 812589428e7f1fb3cd538f5502f8cc58f0981270ecdcc15e908f86737a87e112
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+        sha256: 9189c6b63af7b744824f7ffc9cf3c282c027c58d3eb614fb5bc80606ec3d74c9
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/empty-state.png
+        sha256: 5b7f81d7db9982db08ba0b4a9e1018f32e476d24b88b2b19d1903fbda54fe803
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-list.png
+        sha256: 8a441d4efabb9c1dd56083d31418434cb597e3bced3f28efa81380b760c971ba
+        role: actual-render-anatomy-source
   interactions:
     - Frequency controls determine whether n or dayOfMonth appears. Local time, IANA zone and start
       date remain explicit.
     - "End rule confirms the consequence: stop future occurrences and retain materialised history."
+  anatomyReview:
+    reviewer: codex
+    reviewedAt: 2026-09-18T14:05:58.053Z
+    comparison: regenerated after comparison with actual Grammar captures
+    before: Outlined panel; labels beside Inputs and hints below; rectangular actions.
+    after: Raised form SurfaceCard, labels and hints above rounded Inputs, error below n=0, paired
+      time/time-zone grid, pill actions; no upcoming/end action before rule exists.
+    reviewPath: assets/visual-review.md
+    sourcePolicy: Rendered Grammar component anatomy; unchanged brand rev 3 tokens/contrast and mascot
+      rules take priority over screenshot colour defaults.
 assets:
   - path: assets/schedule-refused.prompt.txt
     role: prompt
-    sha256: c95b1b219a08bd6ae604adb46de8b722feb512a7b91157c385380b0e74282c3b
-    provenance: Exact prompt sent to image_gen.imagegen for this final PNG.
+    sha256: 5422440ad6dee0bca97bddea096348e3451ffca89f6c31cef2666718a8b2abd4
+    provenance: Exact prompt sent to image_gen.imagegen for the anatomy-corrected selected PNG; actual
+      reference PNG paths cited as anatomy sources.
   - path: assets/schedule-refused.png
     role: direction
-    sha256: 8da30b01000f8f232067d6e440cf9e5ce55a59a9a804504f151539d3aa6f8c4f
+    sha256: 72d414204d5e268e80de282db9747f3ef6dead9aa39bcae909b8f432189e2d1a
     width: 1536
     height: 1024
     generation:
@@ -377,15 +521,89 @@ assets:
         - knowledge/ui/composition/collection.yaml
         - knowledge/ui/composition/cta.yaml
         - knowledge/ui/composition/responsive.yaml
+        - examples/todo-app-backend/.starciwork/features/recur/ui/schedule/assets/schedule-refused.anatomy-initial.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/inputs.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+    provenance:
+      actor: codex
+      tool: image_gen.imagegen
+      capturedAt: 2026-09-18T14:05:07.981Z
+      kind: generated-proposed-direction
+      modelDisclosure: Tool response did not expose a model field; no model claimed.
+  - path: assets/schedule-refused.v4.prompt.txt
+    role: prompt
+    sha256: c95b1b219a08bd6ae604adb46de8b722feb512a7b91157c385380b0e74282c3b
+    provenance: Exact pre-addendum prompt, retained with the v4 edit input; its flat-row interpretation
+      is superseded.
+  - path: assets/schedule-refused.v4.png
+    role: iteration-input
+    sha256: 8da30b01000f8f232067d6e440cf9e5ce55a59a9a804504f151539d3aa6f8c4f
+    width: 1536
+    height: 1024
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/schedule-refused.v4.prompt.txt
+      inputRefs:
+        - brand
+        - fr.recur.make-recurring
+        - fr.recur.see-upcoming
+        - fr.recur.end-rule
+        - data.recur.rule
+        - sds.recur.generation-engine
+        - sds.recur.occurrence-lifecycle
+        - knowledge/ui/proof/brand.yaml
+        - knowledge/ui/proof/contrast.yaml
+        - knowledge/ui/composition/layout.yaml
+        - knowledge/ui/composition/collection.yaml
+        - knowledge/ui/composition/cta.yaml
+        - knowledge/ui/composition/responsive.yaml
     provenance:
       actor: codex
       tool: image_gen.imagegen
       capturedAt: 2026-09-18T12:26:24.711Z
-      kind: generated-proposed-direction
+      kind: superseded-v4-direction
+      modelDisclosure: Tool response did not expose a model field; no model claimed.
+  - path: assets/schedule-refused.anatomy-initial.prompt.txt
+    role: prompt
+    sha256: dcecbb8978b8e17c088efdfc601b37de8b7d1dec987ef77e0ab7a3d1f4088d0a
+    provenance: Exact first anatomy-correction prompt; retained because the final correction consumes
+      this image.
+  - path: assets/schedule-refused.anatomy-initial.png
+    role: iteration-input
+    sha256: f2fa72f4f4c610cedd9aba0ac8d27babef58a7c08ec9c1ee929752cac43355f0
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/schedule-refused.anatomy-initial.prompt.txt
+      inputRefs:
+        - brand
+        - fr.recur.make-recurring
+        - fr.recur.see-upcoming
+        - fr.recur.end-rule
+        - data.recur.rule
+        - sds.recur.generation-engine
+        - sds.recur.occurrence-lifecycle
+        - knowledge/ui/proof/brand.yaml
+        - knowledge/ui/proof/contrast.yaml
+        - knowledge/ui/composition/layout.yaml
+        - knowledge/ui/composition/collection.yaml
+        - knowledge/ui/composition/cta.yaml
+        - knowledge/ui/composition/responsive.yaml
+        - examples/todo-app-backend/.starciwork/features/recur/ui/schedule/assets/schedule-refused.v4.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/inputs.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+    provenance:
+      actor: codex
+      tool: image_gen.imagegen
+      capturedAt: 2026-09-18T14:03:24.423Z
+      kind: superseded-anatomy-iteration
       modelDisclosure: Tool response did not expose a model field; no model claimed.
 change:
-  rev: 4
+  rev: 5
   kind: clarifying
-  at: 2026-09-18T12:20:51.698Z
-  reason: "Owner-directed redraw against brand rev 3: real shell/auth composition, full web UX,
-    explicit mobile/state derivations and honest Grammar/link implementation gaps."
+  at: 2026-09-18T14:05:58.053Z
+  reason: "Coordinator addendum: align direction with actual rendered Grammar surfaces, collection
+    boundaries, Inputs, Buttons and navigation; keep brand rev 3 unchanged."

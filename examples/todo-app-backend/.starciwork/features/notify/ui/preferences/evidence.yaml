@@ -1,36 +1,58 @@
 schema: work/evidence
 record: ui.notify.preferences
-recordDigest: 0dac45992cf0703aa7b95f9e6a44bbdba02fac66198febc7a9f4f30758ff5e2c
+recordDigest: e6f57b9c97e52b5aed76ba4ba3f730ae3f17d0e3a00418dc3c728ded4d1c53d5
 outcome: pass
 assertions:
   - id: direction-assets-inputs-coverage
     command: node
       examples/todo-app-backend/.starciwork/features/notify/ui/preferences/assets/verify-direction.mjs
+      >
+      examples/todo-app-backend/.starciwork/features/notify/ui/preferences/assets/direction-check.txt
     exit: 0
     outcome: pass
     observation: node
       examples/todo-app-backend/.starciwork/features/notify/ui/preferences/assets/verify-direction.mjs
+      >
+      examples/todo-app-backend/.starciwork/features/notify/ui/preferences/assets/direction-check.txt
       exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T12:40:55.388Z
+  capturedAt: 2026-09-18T14:10:34.701Z
 assets:
   - path: assets/preferences-refused.prompt.txt
-    sha256: 2decd0656f69b963380f3600a34dc2775df6bac5f1267c757e4f7a8d20bfb81b
+    sha256: bbbbb54928c8f7925b3fbec784df39dd843291fb90bacefe29141b2771a466cb
   - path: assets/preferences-refused.png
+    sha256: a290a13530fa98fdd881ca4b28ec62ce1704ea423f4d326a78fe0499f17b8140
+  - path: assets/preferences-refused.v4.prompt.txt
+    sha256: 2decd0656f69b963380f3600a34dc2775df6bac5f1267c757e4f7a8d20bfb81b
+  - path: assets/preferences-refused.v4.png
     sha256: 53a7bf26c06989cf7b906e37f232b23799150ae3dc544aa81f9dc59e8204e183
   - path: assets/visual-review.md
-    sha256: 98ed8fa0b6be9ea2642fa5673b66d0df4fcfc792fb4db81842b2d29fd2deabed
+    sha256: 1bd5c464dc92b964911251b304559edaee1058627235651b937ee1ab561e61da
   - path: assets/direction-check.txt
-    sha256: 8357bd444c0a181e2117a43b28b44d6838f7d3473fc4099104b1ba68a4c8d9a9
+    sha256: d56893c5fc4906e619ab5cea8259d013d20717c7e34bb6fe23310fd2927acfc8
   - path: assets/verify-direction.mjs
-    sha256: 8cf91ea1bf0e5a6ef9685f03d636260387ade471082ec3472fc7437567b1ba8a
+    sha256: 243c4fb8589ed0ed4870df1b8f299af43e0d45146316883d12087d8b6e0be46f
 directionReview:
   reviewer: codex
   outcome: accepted-proposed-direction
   reviewPath: assets/visual-review.md
   imageTool: image_gen.imagegen
   brandRev: 3
-  limitations: No exact render, API, browser UAT or model identity claimed; implementation gaps live in ui.gaps.
+  anatomySources:
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+      sha256: 81fc3540234b264cf0f1fd11670474f1db42aaf961420ba3f9d8a7cb4318539c
+      role: actual-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+      sha256: b1948cf75464804f055ea37953c72751f3e36795267f1f204179917da1d6eeee
+      role: actual-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+      sha256: 9189c6b63af7b744824f7ffc9cf3c282c027c58d3eb614fb5bc80606ec3d74c9
+      role: actual-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/text-and-actions.png
+      sha256: bc0242e9ebe4c3b4930dc7457f115b6b25742c1ca262cee338fa813830b6bd73
+      role: actual-render-anatomy-source
+  limitations: Generated direction; manual anatomy comparison and replayable structural/hash checks,
+    not browser or API proof. Unchanged brand constraints and declared Grammar/theme gaps remain.

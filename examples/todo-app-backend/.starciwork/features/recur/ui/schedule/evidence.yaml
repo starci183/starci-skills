@@ -1,36 +1,66 @@
 schema: work/evidence
 record: ui.recur.schedule
-recordDigest: f95113c73499fbe31f342fefc6bc05ef49c5c9b95128bfc023fc4d1f00f588b0
+recordDigest: 2154697822a1607936f271f9a76906eaebf4d509ee8ead8ba0ecb7f66554b216
 outcome: pass
 assertions:
   - id: direction-assets-inputs-coverage
     command: node
-      examples/todo-app-backend/.starciwork/features/recur/ui/schedule/assets/verify-direction.mjs
+      examples/todo-app-backend/.starciwork/features/recur/ui/schedule/assets/verify-direction.mjs >
+      examples/todo-app-backend/.starciwork/features/recur/ui/schedule/assets/direction-check.txt
     exit: 0
     outcome: pass
     observation: node
-      examples/todo-app-backend/.starciwork/features/recur/ui/schedule/assets/verify-direction.mjs
+      examples/todo-app-backend/.starciwork/features/recur/ui/schedule/assets/verify-direction.mjs >
+      examples/todo-app-backend/.starciwork/features/recur/ui/schedule/assets/direction-check.txt
       exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T12:40:56.762Z
+  capturedAt: 2026-09-18T14:10:35.810Z
 assets:
   - path: assets/schedule-refused.prompt.txt
-    sha256: c95b1b219a08bd6ae604adb46de8b722feb512a7b91157c385380b0e74282c3b
+    sha256: 5422440ad6dee0bca97bddea096348e3451ffca89f6c31cef2666718a8b2abd4
   - path: assets/schedule-refused.png
+    sha256: 72d414204d5e268e80de282db9747f3ef6dead9aa39bcae909b8f432189e2d1a
+  - path: assets/schedule-refused.v4.prompt.txt
+    sha256: c95b1b219a08bd6ae604adb46de8b722feb512a7b91157c385380b0e74282c3b
+  - path: assets/schedule-refused.v4.png
     sha256: 8da30b01000f8f232067d6e440cf9e5ce55a59a9a804504f151539d3aa6f8c4f
+  - path: assets/schedule-refused.anatomy-initial.prompt.txt
+    sha256: dcecbb8978b8e17c088efdfc601b37de8b7d1dec987ef77e0ab7a3d1f4088d0a
+  - path: assets/schedule-refused.anatomy-initial.png
+    sha256: f2fa72f4f4c610cedd9aba0ac8d27babef58a7c08ec9c1ee929752cac43355f0
   - path: assets/visual-review.md
-    sha256: 8e6ae68bee61d78375a2fd6e9c595d5628dd93d2f3daaf96fb3bc89ceeba4dc4
+    sha256: c1e494407d3c9d91d92562fe15886576749b62d07d1c230d506f48ccca4280a9
   - path: assets/direction-check.txt
-    sha256: 7492f0387734b94149abaa66cedd9416674bdd9a92a4cad7e370cee006312be0
+    sha256: 61c07ca8e3870c3338a3b82950c9da157dcd4bb3c8d09b85529f7f2df9f611ac
   - path: assets/verify-direction.mjs
-    sha256: 8cf91ea1bf0e5a6ef9685f03d636260387ade471082ec3472fc7437567b1ba8a
+    sha256: 243c4fb8589ed0ed4870df1b8f299af43e0d45146316883d12087d8b6e0be46f
 directionReview:
   reviewer: codex
   outcome: accepted-proposed-direction
   reviewPath: assets/visual-review.md
   imageTool: image_gen.imagegen
   brandRev: 3
-  limitations: No exact render, API, browser UAT or model identity claimed; implementation gaps live in ui.gaps.
+  anatomySources:
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+      sha256: 81fc3540234b264cf0f1fd11670474f1db42aaf961420ba3f9d8a7cb4318539c
+      role: actual-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+      sha256: b1948cf75464804f055ea37953c72751f3e36795267f1f204179917da1d6eeee
+      role: actual-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/inputs.png
+      sha256: 812589428e7f1fb3cd538f5502f8cc58f0981270ecdcc15e908f86737a87e112
+      role: actual-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+      sha256: 9189c6b63af7b744824f7ffc9cf3c282c027c58d3eb614fb5bc80606ec3d74c9
+      role: actual-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/empty-state.png
+      sha256: 5b7f81d7db9982db08ba0b4a9e1018f32e476d24b88b2b19d1903fbda54fe803
+      role: actual-render-anatomy-source
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-list.png
+      sha256: 8a441d4efabb9c1dd56083d31418434cb597e3bced3f28efa81380b760c971ba
+      role: actual-render-anatomy-source
+  limitations: Generated direction; manual anatomy comparison and replayable structural/hash checks,
+    not browser or API proof. Unchanged brand constraints and declared Grammar/theme gaps remain.

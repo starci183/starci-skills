@@ -45,6 +45,8 @@ ui:
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Invite collaborators)"
@@ -52,13 +54,16 @@ ui:
           - "Button (invite, type: submit, variant: primary)"
           - native labelled radio group (viewer/editor; no fabricated Grammar Select)
         derivation: Derives from refused with the same workspace shell. only the invite form is shown, no
-          collaborator list section
+          collaborator list section. Preserve the referenced Input/Button geometry and any mapped
+          raised SurfaceCard at this viewport.
         directionAsset: assets/invite-refused.png
       - screen: invite
         state: empty
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Invite collaborators)"
@@ -68,13 +73,16 @@ ui:
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
-          scrolling. only the invite form is shown, no collaborator list section"
+          scrolling. only the invite form is shown, no collaborator list section. Preserve the
+          referenced Input/Button geometry and any mapped raised SurfaceCard at this viewport."
         directionAsset: assets/invite-refused.png
       - screen: invite
         state: inviting
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Invite collaborators)"
@@ -82,13 +90,16 @@ ui:
           - "Button (invite, type: submit, variant: primary, isDisabled, isPending)"
           - native labelled radio group (viewer/editor; no fabricated Grammar Select)
         derivation: Derives from refused with the same workspace shell. the invite Button is disabled and
-          shows a busy label
+          shows a busy label. Preserve the referenced Input/Button geometry and any mapped raised
+          SurfaceCard at this viewport.
         directionAsset: assets/invite-refused.png
       - screen: invite
         state: inviting
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Invite collaborators)"
@@ -98,125 +109,164 @@ ui:
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
-          scrolling. the invite Button is disabled and shows a busy label"
+          scrolling. the invite Button is disabled and shows a busy label. Preserve the referenced
+          Input/Button geometry and any mapped raised SurfaceCard at this viewport."
         directionAsset: assets/invite-refused.png
       - screen: invite
         state: pending-list
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Invite collaborators)"
           - "Input (id: invite-email, kind: email)"
           - "Button (invite, type: submit, variant: primary)"
-          - "SurfaceListCard (label: Collaborators)"
+          - "SurfaceListCard (label: Collaborators, fact: collaborator count; raised white body
+            encloses rows; expiry footer outside below)"
           - Text (row email)
           - "Badge (tone: neutral, pending)"
-          - "Button (revoke, variant: ghost)"
+          - "Button (revoke, variant: outline; danger treatment requires declared Grammar
+            capability)"
           - native labelled radio group (viewer/editor; no fabricated Grammar Select)
         derivation: Derives from refused with the same workspace shell. the collaborator list section
-          renders with a heading; pending rows show role and a revoke Button
+          renders with a heading; pending rows show role and a revoke Button. Preserve the
+          referenced Input/Button geometry and any mapped raised SurfaceCard at this viewport. Keep
+          label/fact above the shared raised row body and footer below it.
         directionAsset: assets/invite-refused.png
       - screen: invite
         state: pending-list
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Invite collaborators)"
           - "Input (id: invite-email, kind: email)"
           - "Button (invite, type: submit, variant: primary)"
-          - "SurfaceListCard (label: Collaborators)"
+          - "SurfaceListCard (label: Collaborators, fact: collaborator count; raised white body
+            encloses rows; expiry footer outside below)"
           - Text (row email)
           - "Badge (tone: neutral, pending)"
-          - "Button (revoke, variant: ghost)"
+          - "Button (revoke, variant: outline; danger treatment requires declared Grammar
+            capability)"
           - native labelled radio group (viewer/editor; no fabricated Grammar Select)
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
           scrolling. the collaborator list section renders with a heading; pending rows show role
-          and a revoke Button"
+          and a revoke Button. Preserve the referenced Input/Button geometry and any mapped raised
+          SurfaceCard at this viewport. Keep label/fact above the shared raised row body and footer
+          below it."
         directionAsset: assets/invite-refused.png
       - screen: invite
         state: accepted
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Invite collaborators)"
           - "Input (id: invite-email, kind: email)"
           - "Button (invite, type: submit, variant: primary)"
-          - "SurfaceListCard (label: Collaborators)"
+          - "SurfaceListCard (label: Collaborators, fact: collaborator count; raised white body
+            encloses rows; expiry footer outside below)"
           - Text (row email)
           - "Badge (tone: neutral, accepted)"
-          - "Button (revoke, variant: ghost)"
+          - "Button (revoke, variant: outline; danger treatment requires declared Grammar
+            capability)"
           - native labelled radio group (viewer/editor; no fabricated Grammar Select)
         derivation: Derives from refused with the same workspace shell. that row's status changes from
-          pending to accepted; revoke remains available
+          pending to accepted; revoke remains available. Preserve the referenced Input/Button
+          geometry and any mapped raised SurfaceCard at this viewport. Keep label/fact above the
+          shared raised row body and footer below it.
         directionAsset: assets/invite-refused.png
       - screen: invite
         state: accepted
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Invite collaborators)"
           - "Input (id: invite-email, kind: email)"
           - "Button (invite, type: submit, variant: primary)"
-          - "SurfaceListCard (label: Collaborators)"
+          - "SurfaceListCard (label: Collaborators, fact: collaborator count; raised white body
+            encloses rows; expiry footer outside below)"
           - Text (row email)
           - "Badge (tone: neutral, accepted)"
-          - "Button (revoke, variant: ghost)"
+          - "Button (revoke, variant: outline; danger treatment requires declared Grammar
+            capability)"
           - native labelled radio group (viewer/editor; no fabricated Grammar Select)
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
-          scrolling. that row's status changes from pending to accepted; revoke remains available"
+          scrolling. that row's status changes from pending to accepted; revoke remains available.
+          Preserve the referenced Input/Button geometry and any mapped raised SurfaceCard at this
+          viewport. Keep label/fact above the shared raised row body and footer below it."
         directionAsset: assets/invite-refused.png
       - screen: invite
         state: refused
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Invite collaborators)"
-          - "Input (id: invite-email, kind: email)"
+          - "Input (id: invite-email, kind: email, isError, errorMessage: Enter a valid email
+            address.)"
           - "Text (live: assertive, the refusal sentence)"
           - "Button (invite, type: submit, variant: primary)"
-          - "SurfaceListCard (label: Collaborators)"
+          - "SurfaceListCard (label: Collaborators, fact: collaborator count; raised white body
+            encloses rows; expiry footer outside below)"
           - Text (row email)
           - "Badge (tone: neutral, explicit status label)"
-          - "Button (revoke, variant: ghost)"
+          - "Button (revoke, variant: outline; danger treatment requires declared Grammar
+            capability)"
           - native labelled radio group (viewer/editor; no fabricated Grammar Select)
         derivation: Representative direction. Retain entered email and viewer/editor choice, show field
-          error and assertive Text, keep existing collaborator rows unchanged.
+          error and assertive Text, keep existing collaborator rows unchanged. Preserve the
+          referenced Input/Button geometry and any mapped raised SurfaceCard at this viewport. Keep
+          label/fact above the shared raised row body and footer below it.
         directionAsset: assets/invite-refused.png
       - screen: invite
         state: refused
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Invite collaborators)"
-          - "Input (id: invite-email, kind: email)"
+          - "Input (id: invite-email, kind: email, isError, errorMessage: Enter a valid email
+            address.)"
           - "Text (live: assertive, the refusal sentence)"
           - "Button (invite, type: submit, variant: primary)"
-          - "SurfaceListCard (label: Collaborators)"
+          - "SurfaceListCard (label: Collaborators, fact: collaborator count; raised white body
+            encloses rows; expiry footer outside below)"
           - Text (row email)
           - "Badge (tone: neutral, explicit status label)"
-          - "Button (revoke, variant: ghost)"
+          - "Button (revoke, variant: outline; danger treatment requires declared Grammar
+            capability)"
           - native labelled radio group (viewer/editor; no fabricated Grammar Select)
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
           scrolling. Retain entered email and viewer/editor choice, show field error and assertive
-          Text, keep existing collaborator rows unchanged."
+          Text, keep existing collaborator rows unchanged. Preserve the referenced Input/Button
+          geometry and any mapped raised SurfaceCard at this viewport. Keep label/fact above the
+          shared raised row body and footer below it."
         directionAsset: assets/invite-refused.png
   accessibility:
     - Keyboard order follows visual and DOM order; all control names remain visible.
@@ -241,12 +291,10 @@ ui:
       interaction or API proof.
     - Read brand/index.yaml rev 3 for palette and master provenance; generated colours and glyphs
       are approximate until implementation uses the exact CSS tokens.
-    - Task breadcrumb and Back to task place the screen. Invalid retained email, Viewer/Editor
-      choices, refusal, Send invitation and two unchanged collaborators are visible.
-    - Removed the initial outer card around the collaborator collection and corrected refusal ink.
-      Revoke labels remain dark within danger outlines. Pending expiry copy is 14 days.
-    - No mascot. Invalid-email refusal is grounded in fr.share.invite; this image does not invent a
-      duplicate-invitation backend rule.
+    - Raised invitation SurfaceCard and separate raised SurfaceListCard enclosing column labels and
+      both rows; external Collaborators / 2 people header and expiry footer; pill actions.
+    - Compared all mapped components against actual supplied renders and installed source. See
+      assets/visual-review.md for component-level decisions and remaining coverage limits.
   gaps:
     - code: THEME_IMPLEMENTATION_REQUIRED
       detail: Only the accent override is wired here. Activate the accepted Core token vocabulary, load
@@ -255,6 +303,17 @@ ui:
       detail: Installed ButtonVariant has no danger variant. Delete/revoke/erasure/end-rule danger
         direction requires a Grammar-owned capability; no invented prop or app-local red is
         authorized.
+    - code: KNOWLEDGE_RENDERER_CONFLICT
+      detail: COLLECTION-1 cases 1-4 and COLLECTION-2 prohibit an enclosing card, but @starci/grammar
+        0.4.13 SurfaceListCard actually renders a raised shell around its rows. The coordinator
+        addendum explicitly requires this shipped anatomy. Preserve the external section label/fact
+        and footer; use the published collection owner without an extra SurfaceCard or per-row
+        cards. This is a documented knowledge/renderer conflict, not a claimed pass of those
+        contradictory cases.
+    - code: GRAMMAR_ERROR_INK_REQUIRED
+      detail: inputs.png shows saturated danger error ink. The unchanged brand contrast rule requires
+        readable dark error copy while retaining the danger field edge. Implement through
+        Grammar-owned theme support; no arbitrary replacement red or fabricated Text tone.
   status: reviewed-proposed-direction
   shell:
     kind: workspace
@@ -281,6 +340,7 @@ ui:
       - label: Terms
         href: /terms
         status: proposed unimplemented policy route
+    headerOwner: NavigationFeatureNav
   links:
     - label: Tasks
       href: /tasks
@@ -303,11 +363,12 @@ ui:
   assets:
     - path: assets/invite-refused.prompt.txt
       role: prompt
-      sha256: 6033834c00bceffb22af88a9f2dbae3a59a079725a19725c8ec9d8624c668638
-      provenance: Exact prompt sent to image_gen.imagegen for this final PNG.
+      sha256: ee0cd1479244127806a8c898c85e0403447d7daed9a2afaf59775963794ecb48
+      provenance: Exact prompt sent to image_gen.imagegen for the anatomy-corrected selected PNG; actual
+        reference PNG paths cited as anatomy sources.
     - path: assets/invite-refused.png
       role: direction
-      sha256: 3e3040354d9ae1e9d874f7a04f0731166def52e465bfb739c7b630daf1f321b7
+      sha256: 775ba751b492d27690a45aa78a47c7aebf96402404c78c4c45ac69b1aff13662
       width: 1536
       height: 1024
       generation:
@@ -324,12 +385,15 @@ ui:
           - knowledge/ui/composition/collection.yaml
           - knowledge/ui/composition/cta.yaml
           - knowledge/ui/composition/responsive.yaml
-          - assets/invite-refused.initial.png
-          - assets/invite-refused.initial.prompt.txt
+          - examples/todo-app-backend/.starciwork/features/share/ui/invite/assets/invite-refused.v4.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-list.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
       provenance:
         actor: codex
         tool: image_gen.imagegen
-        capturedAt: 2026-09-18T12:30:38.429Z
+        capturedAt: 2026-09-18T13:59:16.009Z
         kind: generated-proposed-direction
         modelDisclosure: Tool response did not expose a model field; no model claimed.
     - path: assets/invite-refused.initial.prompt.txt
@@ -358,6 +422,38 @@ ui:
         tool: image_gen.imagegen
         capturedAt: 2026-09-18T12:23:39.052Z
         kind: superseded-initial-direction
+        modelDisclosure: Tool response did not expose a model field; no model claimed.
+    - path: assets/invite-refused.v4.prompt.txt
+      role: prompt
+      sha256: 6033834c00bceffb22af88a9f2dbae3a59a079725a19725c8ec9d8624c668638
+      provenance: Exact pre-addendum prompt, retained with the v4 edit input; its flat-row interpretation
+        is superseded.
+    - path: assets/invite-refused.v4.png
+      role: iteration-input
+      sha256: 3e3040354d9ae1e9d874f7a04f0731166def52e465bfb739c7b630daf1f321b7
+      width: 1536
+      height: 1024
+      generation:
+        tool: image_gen.imagegen
+        promptPath: assets/invite-refused.v4.prompt.txt
+        inputRefs:
+          - brand
+          - fr.share.invite
+          - fr.share.list
+          - fr.share.revoke
+          - knowledge/ui/proof/brand.yaml
+          - knowledge/ui/proof/contrast.yaml
+          - knowledge/ui/composition/layout.yaml
+          - knowledge/ui/composition/collection.yaml
+          - knowledge/ui/composition/cta.yaml
+          - knowledge/ui/composition/responsive.yaml
+          - assets/invite-refused.initial.png
+          - assets/invite-refused.initial.prompt.txt
+      provenance:
+        actor: codex
+        tool: image_gen.imagegen
+        capturedAt: 2026-09-18T12:30:38.429Z
+        kind: superseded-v4-direction
         modelDisclosure: Tool response did not expose a model field; no model claimed.
   acceptedInputs:
     brand:
@@ -393,18 +489,45 @@ ui:
       location: brand.grammar.inspectedFiles
       version: 0.4.13
       installation: prior draw checkout with identical frontend lockfile; current node_modules absent
+    grammarReferences:
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+        sha256: 81fc3540234b264cf0f1fd11670474f1db42aaf961420ba3f9d8a7cb4318539c
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+        sha256: b1948cf75464804f055ea37953c72751f3e36795267f1f204179917da1d6eeee
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-list.png
+        sha256: 8a441d4efabb9c1dd56083d31418434cb597e3bced3f28efa81380b760c971ba
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+        sha256: 9189c6b63af7b744824f7ffc9cf3c282c027c58d3eb614fb5bc80606ec3d74c9
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/inputs.png
+        sha256: 812589428e7f1fb3cd538f5502f8cc58f0981270ecdcc15e908f86737a87e112
+        role: actual-render-anatomy-source
   interactions:
     - Viewer/editor is a native named radio group; a submission requires an email and one accepted
       role.
     - Revoke confirms the named collaborator and removes access only after the backend accepts.
+  anatomyReview:
+    reviewer: codex
+    reviewedAt: 2026-09-18T14:05:58.053Z
+    comparison: regenerated after comparison with actual Grammar captures
+    before: Outlined invitation panel; collaborator rows lie flat on canvas; no count; rectangular actions.
+    after: Raised invitation SurfaceCard and separate raised SurfaceListCard enclosing column labels and
+      both rows; external Collaborators / 2 people header and expiry footer; pill actions.
+    reviewPath: assets/visual-review.md
+    sourcePolicy: Rendered Grammar component anatomy; unchanged brand rev 3 tokens/contrast and mascot
+      rules take priority over screenshot colour defaults.
 assets:
   - path: assets/invite-refused.prompt.txt
     role: prompt
-    sha256: 6033834c00bceffb22af88a9f2dbae3a59a079725a19725c8ec9d8624c668638
-    provenance: Exact prompt sent to image_gen.imagegen for this final PNG.
+    sha256: ee0cd1479244127806a8c898c85e0403447d7daed9a2afaf59775963794ecb48
+    provenance: Exact prompt sent to image_gen.imagegen for the anatomy-corrected selected PNG; actual
+      reference PNG paths cited as anatomy sources.
   - path: assets/invite-refused.png
     role: direction
-    sha256: 3e3040354d9ae1e9d874f7a04f0731166def52e465bfb739c7b630daf1f321b7
+    sha256: 775ba751b492d27690a45aa78a47c7aebf96402404c78c4c45ac69b1aff13662
     width: 1536
     height: 1024
     generation:
@@ -421,12 +544,15 @@ assets:
         - knowledge/ui/composition/collection.yaml
         - knowledge/ui/composition/cta.yaml
         - knowledge/ui/composition/responsive.yaml
-        - assets/invite-refused.initial.png
-        - assets/invite-refused.initial.prompt.txt
+        - examples/todo-app-backend/.starciwork/features/share/ui/invite/assets/invite-refused.v4.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/task-list.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
     provenance:
       actor: codex
       tool: image_gen.imagegen
-      capturedAt: 2026-09-18T12:30:38.429Z
+      capturedAt: 2026-09-18T13:59:16.009Z
       kind: generated-proposed-direction
       modelDisclosure: Tool response did not expose a model field; no model claimed.
   - path: assets/invite-refused.initial.prompt.txt
@@ -456,9 +582,41 @@ assets:
       capturedAt: 2026-09-18T12:23:39.052Z
       kind: superseded-initial-direction
       modelDisclosure: Tool response did not expose a model field; no model claimed.
+  - path: assets/invite-refused.v4.prompt.txt
+    role: prompt
+    sha256: 6033834c00bceffb22af88a9f2dbae3a59a079725a19725c8ec9d8624c668638
+    provenance: Exact pre-addendum prompt, retained with the v4 edit input; its flat-row interpretation
+      is superseded.
+  - path: assets/invite-refused.v4.png
+    role: iteration-input
+    sha256: 3e3040354d9ae1e9d874f7a04f0731166def52e465bfb739c7b630daf1f321b7
+    width: 1536
+    height: 1024
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/invite-refused.v4.prompt.txt
+      inputRefs:
+        - brand
+        - fr.share.invite
+        - fr.share.list
+        - fr.share.revoke
+        - knowledge/ui/proof/brand.yaml
+        - knowledge/ui/proof/contrast.yaml
+        - knowledge/ui/composition/layout.yaml
+        - knowledge/ui/composition/collection.yaml
+        - knowledge/ui/composition/cta.yaml
+        - knowledge/ui/composition/responsive.yaml
+        - assets/invite-refused.initial.png
+        - assets/invite-refused.initial.prompt.txt
+    provenance:
+      actor: codex
+      tool: image_gen.imagegen
+      capturedAt: 2026-09-18T12:30:38.429Z
+      kind: superseded-v4-direction
+      modelDisclosure: Tool response did not expose a model field; no model claimed.
 change:
-  rev: 4
+  rev: 5
   kind: clarifying
-  at: 2026-09-18T12:20:51.685Z
-  reason: "Owner-directed redraw against brand rev 3: real shell/auth composition, full web UX,
-    explicit mobile/state derivations and honest Grammar/link implementation gaps."
+  at: 2026-09-18T14:05:58.053Z
+  reason: "Coordinator addendum: align direction with actual rendered Grammar surfaces, collection
+    boundaries, Inputs, Buttons and navigation; keep brand rev 3 unchanged."

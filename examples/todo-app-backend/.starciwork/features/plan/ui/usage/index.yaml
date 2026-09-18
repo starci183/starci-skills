@@ -44,19 +44,24 @@ ui:
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Usage)"
           - "Text (size: metric-lead, usage count)"
           - "Progress (label: Tasks used against your free plan cap)"
         derivation: Derives from over-cap-frozen with the same workspace shell. a plain usage count is
-          shown, no message, no upgrade prompt required
+          shown, no message, no upgrade prompt required. Preserve the referenced Input/Button
+          geometry and any mapped raised SurfaceCard at this viewport.
         directionAsset: assets/usage-over-cap-frozen.png
       - screen: usage
         state: under-cap
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Usage)"
@@ -65,13 +70,16 @@ ui:
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
-          scrolling. a plain usage count is shown, no message, no upgrade prompt required"
+          scrolling. a plain usage count is shown, no message, no upgrade prompt required. Preserve
+          the referenced Input/Button geometry and any mapped raised SurfaceCard at this viewport."
         directionAsset: assets/usage-over-cap-frozen.png
       - screen: usage
         state: at-cap
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Usage)"
@@ -80,13 +88,16 @@ ui:
           - "Text (live: polite, non-danger warning)"
           - "Button (upgrade, variant: secondary)"
         derivation: Derives from over-cap-frozen with the same workspace shell. a non-danger message warns
-          the next create will be refused; the upgrade Button is shown but not forced
+          the next create will be refused; the upgrade Button is shown but not forced. Preserve the
+          referenced Input/Button geometry and any mapped raised SurfaceCard at this viewport.
         directionAsset: assets/usage-over-cap-frozen.png
       - screen: usage
         state: at-cap
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Usage)"
@@ -98,13 +109,16 @@ ui:
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
           scrolling. a non-danger message warns the next create will be refused; the upgrade Button
-          is shown but not forced"
+          is shown but not forced. Preserve the referenced Input/Button geometry and any mapped
+          raised SurfaceCard at this viewport."
         directionAsset: assets/usage-over-cap-frozen.png
       - screen: usage
         state: over-cap-frozen
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Usage)"
@@ -115,13 +129,16 @@ ui:
         derivation: Representative direction. Show 40 active tasks against cap 20; existing tasks are
           preserved, creation frozen, Upgrade plan and Manage tasks available. At exactly cap, the
           next create is still refused by br.plan.caps.limit. Progress receives value 100 (clamped),
-          while visible ratio/aria description states 40 of 20, 200% of cap.
+          while visible ratio/aria description states 40 of 20, 200% of cap. Preserve the referenced
+          Input/Button geometry and any mapped raised SurfaceCard at this viewport.
         directionAsset: assets/usage-over-cap-frozen.png
       - screen: usage
         state: over-cap-frozen
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Usage)"
@@ -135,25 +152,31 @@ ui:
           scrolling. Show 40 active tasks against cap 20; existing tasks are preserved, creation
           frozen, Upgrade plan and Manage tasks available. At exactly cap, the next create is still
           refused by br.plan.caps.limit. Progress receives value 100 (clamped), while visible
-          ratio/aria description states 40 of 20, 200% of cap."
+          ratio/aria description states 40 of 20, 200% of cap. Preserve the referenced Input/Button
+          geometry and any mapped raised SurfaceCard at this viewport."
         directionAsset: assets/usage-over-cap-frozen.png
       - screen: usage
         state: paid-unlimited
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Usage)"
           - "Text (size: metric-lead, usage count)"
         derivation: Derives from over-cap-frozen with the same workspace shell. the cap and upgrade action
-          are both removed; only the usage count remains
+          are both removed; only the usage count remains. Preserve the referenced Input/Button
+          geometry and any mapped raised SurfaceCard at this viewport.
         directionAsset: assets/usage-over-cap-frozen.png
       - screen: usage
         state: paid-unlimited
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Usage)"
@@ -161,7 +184,9 @@ ui:
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
-          scrolling. the cap and upgrade action are both removed; only the usage count remains"
+          scrolling. the cap and upgrade action are both removed; only the usage count remains.
+          Preserve the referenced Input/Button geometry and any mapped raised SurfaceCard at this
+          viewport."
         directionAsset: assets/usage-over-cap-frozen.png
   accessibility:
     - Keyboard order follows visual and DOM order; all control names remain visible.
@@ -186,12 +211,10 @@ ui:
       interaction or API proof.
     - Read brand/index.yaml rev 3 for palette and master provenance; generated colours and glyphs
       are approximate until implementation uses the exact CSS tokens.
-    - Free plan shows 40 active tasks against a 20 task cap, preserved work, paused creation,
-      Upgrade plan and Manage tasks within the app shell.
-    - Corrected the initial 100% caption to 200% of cap. Progress fill is clamped to its published
-      0-100 value while the visible actual ratio remains 40/20.
-    - No price or payment success invented. No mascot; frozen creation does not remove existing
-      tasks.
+    - Raised usage SurfaceCard with primary upgrade pill; 40 active tasks, cap 20 and 200% caption
+      retained with paused creation and preserved work.
+    - Compared all mapped components against actual supplied renders and installed source. See
+      assets/visual-review.md for component-level decisions and remaining coverage limits.
   gaps:
     - code: THEME_IMPLEMENTATION_REQUIRED
       detail: Only the accent override is wired here. Activate the accepted Core token vocabulary, load
@@ -222,6 +245,7 @@ ui:
       - label: Terms
         href: /terms
         status: proposed unimplemented policy route
+    headerOwner: NavigationFeatureNav
   links:
     - label: Tasks
       href: /tasks
@@ -244,11 +268,12 @@ ui:
   assets:
     - path: assets/usage-over-cap-frozen.prompt.txt
       role: prompt
-      sha256: 008ba7ef56b6f3220368dac59e9502014e4ad0a73e71350aea217b98ff446bcc
-      provenance: Exact prompt sent to image_gen.imagegen for this final PNG.
+      sha256: 88653842649981d2811a725af97aee7e7598a42d58cb5d6d15d56b42e323a2b1
+      provenance: Exact prompt sent to image_gen.imagegen for the anatomy-corrected selected PNG; actual
+        reference PNG paths cited as anatomy sources.
     - path: assets/usage-over-cap-frozen.png
       role: direction
-      sha256: 47c52b209bde6d026b54bd6609fce8ee66a9ff96f4b5c9cdfc14e368645b5faf
+      sha256: 4b48d389766f8f649ec45329c1a68314684d716507c4c8d37ffe1ef5f2f2f1d5
       width: 1536
       height: 1024
       generation:
@@ -267,12 +292,15 @@ ui:
           - knowledge/ui/composition/collection.yaml
           - knowledge/ui/composition/cta.yaml
           - knowledge/ui/composition/responsive.yaml
-          - assets/usage-over-cap-frozen.initial.png
-          - assets/usage-over-cap-frozen.initial.prompt.txt
+          - examples/todo-app-backend/.starciwork/features/plan/ui/usage/assets/usage-over-cap-frozen.v4.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/text-and-actions.png
       provenance:
         actor: codex
         tool: image_gen.imagegen
-        capturedAt: 2026-09-18T12:30:38.430Z
+        capturedAt: 2026-09-18T14:01:44.400Z
         kind: generated-proposed-direction
         modelDisclosure: Tool response did not expose a model field; no model claimed.
     - path: assets/usage-over-cap-frozen.initial.prompt.txt
@@ -303,6 +331,40 @@ ui:
         tool: image_gen.imagegen
         capturedAt: 2026-09-18T12:25:01.089Z
         kind: superseded-initial-direction
+        modelDisclosure: Tool response did not expose a model field; no model claimed.
+    - path: assets/usage-over-cap-frozen.v4.prompt.txt
+      role: prompt
+      sha256: 008ba7ef56b6f3220368dac59e9502014e4ad0a73e71350aea217b98ff446bcc
+      provenance: Exact pre-addendum prompt, retained with the v4 edit input; its flat-row interpretation
+        is superseded.
+    - path: assets/usage-over-cap-frozen.v4.png
+      role: iteration-input
+      sha256: 47c52b209bde6d026b54bd6609fce8ee66a9ff96f4b5c9cdfc14e368645b5faf
+      width: 1536
+      height: 1024
+      generation:
+        tool: image_gen.imagegen
+        promptPath: assets/usage-over-cap-frozen.v4.prompt.txt
+        inputRefs:
+          - brand
+          - fr.plan.usage.view
+          - fr.plan.upgrade
+          - br.plan.caps.limit
+          - decision.plan.downgrade.policy
+          - sds.plan.subscription-lifecycle
+          - knowledge/ui/proof/brand.yaml
+          - knowledge/ui/proof/contrast.yaml
+          - knowledge/ui/composition/layout.yaml
+          - knowledge/ui/composition/collection.yaml
+          - knowledge/ui/composition/cta.yaml
+          - knowledge/ui/composition/responsive.yaml
+          - assets/usage-over-cap-frozen.initial.png
+          - assets/usage-over-cap-frozen.initial.prompt.txt
+      provenance:
+        actor: codex
+        tool: image_gen.imagegen
+        capturedAt: 2026-09-18T12:30:38.430Z
+        kind: superseded-v4-direction
         modelDisclosure: Tool response did not expose a model field; no model claimed.
   acceptedInputs:
     brand:
@@ -344,17 +406,41 @@ ui:
       location: brand.grammar.inspectedFiles
       version: 0.4.13
       installation: prior draw checkout with identical frontend lockfile; current node_modules absent
+    grammarReferences:
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+        sha256: 81fc3540234b264cf0f1fd11670474f1db42aaf961420ba3f9d8a7cb4318539c
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+        sha256: b1948cf75464804f055ea37953c72751f3e36795267f1f204179917da1d6eeee
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+        sha256: 9189c6b63af7b744824f7ffc9cf3c282c027c58d3eb614fb5bc80606ec3d74c9
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/text-and-actions.png
+        sha256: bc0242e9ebe4c3b4930dc7457f115b6b25742c1ca262cee338fa813830b6bd73
+        role: actual-render-anatomy-source
   interactions:
     - Upgrade starts a payment flow; no paid state is shown before provider confirmation. Manage
       tasks remains available while creation is frozen.
+  anatomyReview:
+    reviewer: codex
+    reviewedAt: 2026-09-18T14:05:58.053Z
+    comparison: regenerated after comparison with actual Grammar captures
+    before: Outlined panel rather than raised SurfaceCard; rectangular upgrade action.
+    after: Raised usage SurfaceCard with primary upgrade pill; 40 active tasks, cap 20 and 200% caption
+      retained with paused creation and preserved work.
+    reviewPath: assets/visual-review.md
+    sourcePolicy: Rendered Grammar component anatomy; unchanged brand rev 3 tokens/contrast and mascot
+      rules take priority over screenshot colour defaults.
 assets:
   - path: assets/usage-over-cap-frozen.prompt.txt
     role: prompt
-    sha256: 008ba7ef56b6f3220368dac59e9502014e4ad0a73e71350aea217b98ff446bcc
-    provenance: Exact prompt sent to image_gen.imagegen for this final PNG.
+    sha256: 88653842649981d2811a725af97aee7e7598a42d58cb5d6d15d56b42e323a2b1
+    provenance: Exact prompt sent to image_gen.imagegen for the anatomy-corrected selected PNG; actual
+      reference PNG paths cited as anatomy sources.
   - path: assets/usage-over-cap-frozen.png
     role: direction
-    sha256: 47c52b209bde6d026b54bd6609fce8ee66a9ff96f4b5c9cdfc14e368645b5faf
+    sha256: 4b48d389766f8f649ec45329c1a68314684d716507c4c8d37ffe1ef5f2f2f1d5
     width: 1536
     height: 1024
     generation:
@@ -373,12 +459,15 @@ assets:
         - knowledge/ui/composition/collection.yaml
         - knowledge/ui/composition/cta.yaml
         - knowledge/ui/composition/responsive.yaml
-        - assets/usage-over-cap-frozen.initial.png
-        - assets/usage-over-cap-frozen.initial.prompt.txt
+        - examples/todo-app-backend/.starciwork/features/plan/ui/usage/assets/usage-over-cap-frozen.v4.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/text-and-actions.png
     provenance:
       actor: codex
       tool: image_gen.imagegen
-      capturedAt: 2026-09-18T12:30:38.430Z
+      capturedAt: 2026-09-18T14:01:44.400Z
       kind: generated-proposed-direction
       modelDisclosure: Tool response did not expose a model field; no model claimed.
   - path: assets/usage-over-cap-frozen.initial.prompt.txt
@@ -410,9 +499,43 @@ assets:
       capturedAt: 2026-09-18T12:25:01.089Z
       kind: superseded-initial-direction
       modelDisclosure: Tool response did not expose a model field; no model claimed.
+  - path: assets/usage-over-cap-frozen.v4.prompt.txt
+    role: prompt
+    sha256: 008ba7ef56b6f3220368dac59e9502014e4ad0a73e71350aea217b98ff446bcc
+    provenance: Exact pre-addendum prompt, retained with the v4 edit input; its flat-row interpretation
+      is superseded.
+  - path: assets/usage-over-cap-frozen.v4.png
+    role: iteration-input
+    sha256: 47c52b209bde6d026b54bd6609fce8ee66a9ff96f4b5c9cdfc14e368645b5faf
+    width: 1536
+    height: 1024
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/usage-over-cap-frozen.v4.prompt.txt
+      inputRefs:
+        - brand
+        - fr.plan.usage.view
+        - fr.plan.upgrade
+        - br.plan.caps.limit
+        - decision.plan.downgrade.policy
+        - sds.plan.subscription-lifecycle
+        - knowledge/ui/proof/brand.yaml
+        - knowledge/ui/proof/contrast.yaml
+        - knowledge/ui/composition/layout.yaml
+        - knowledge/ui/composition/collection.yaml
+        - knowledge/ui/composition/cta.yaml
+        - knowledge/ui/composition/responsive.yaml
+        - assets/usage-over-cap-frozen.initial.png
+        - assets/usage-over-cap-frozen.initial.prompt.txt
+    provenance:
+      actor: codex
+      tool: image_gen.imagegen
+      capturedAt: 2026-09-18T12:30:38.430Z
+      kind: superseded-v4-direction
+      modelDisclosure: Tool response did not expose a model field; no model claimed.
 change:
-  rev: 4
+  rev: 5
   kind: clarifying
-  at: 2026-09-18T12:20:51.692Z
-  reason: "Owner-directed redraw against brand rev 3: real shell/auth composition, full web UX,
-    explicit mobile/state derivations and honest Grammar/link implementation gaps."
+  at: 2026-09-18T14:05:58.053Z
+  reason: "Coordinator addendum: align direction with actual rendered Grammar surfaces, collection
+    boundaries, Inputs, Buttons and navigation; keep brand rev 3 unchanged."

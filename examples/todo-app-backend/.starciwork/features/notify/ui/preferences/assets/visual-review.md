@@ -1,18 +1,30 @@
 # Visual review: ui.notify.preferences
 
-Reviewed by Codex from the actual generated image on 2026-09-18T12:24:31.258Z.
-Outcome: accepted as a proposed direction with the implementation gaps named in index.yaml.
+Reviewed by Codex on 2026-09-18T14:05:58.053Z. Outcome: accepted proposed direction with the declared implementation gaps.
 
-- Notifications navigation is selected with Alex present. Current On state, Turn off, refusal, Save preferences, Back to tasks, unsubscribe link and policy footer are visible.
-- The control is an ordinary labelled Button, not an invented Grammar Switch. The refused save retains the prior setting.
-- Signed-out unsubscribe is an explicit derived screen without authenticated shell or login prerequisite. No mascot or false delivery-success claim.
+## Before / corrected
 
-Final PNG: assets/preferences-refused.png (1536 x 1024), sha256 53a7bf26c06989cf7b906e37f232b23799150ae3dc544aa81f9dc59e8204e183.
-Exact final prompt: assets/preferences-refused.prompt.txt, sha256 2decd0656f69b963380f3600a34dc2775df6bac5f1267c757e4f7a8d20bfb81b.
+Before: Outlined panel rather than raised SurfaceCard; rectangular primary and toggle actions.
 
-Coverage: 12 explicit state/screen/viewport entries; desktop-1280 is a design target, not a browser-captured viewport. Mobile-390 entries derive from the same direction and retain all controls.
-One generation invocation produced the selected direction.
+Corrected: Raised Email digest SurfaceCard; secondary pill Turn off, primary pill Save preferences; On value and save refusal retained.
 
-Truth boundary: image_gen.imagegen generated every pixel. No image model field was exposed. The PNG is not a running-product screenshot and proves neither exact Grammar rendering, CSS colour values, focus/keyboard behavior nor API outcomes. Implementation must use brand rev 3 tokens rather than sampling the raster, reuse the actual turtle master where allowed, address declared Grammar/theme/link gaps, and provide real implementation captures and independent browser UAT.
+## Actual anatomy sources
 
-Checks: BRAND-1/2/3, CONTRAST-1, LAYOUT-1/2/3, COLLECTION-1/2, CTA-1/2/3/4 and RESPONSIVE-1/3 were applied as direction criteria. Contrast numbers belong to the source tokens; no pixel-level accessibility pass is claimed.
+- [app-shell.png](../../../../../brand/assets/grammar-reference/app-shell.png) - actual render, SHA256 81fc3540234b264cf0f1fd11670474f1db42aaf961420ba3f9d8a7cb4318539c
+- [sign-in-card.png](../../../../../brand/assets/grammar-reference/sign-in-card.png) - actual render, SHA256 b1948cf75464804f055ea37953c72751f3e36795267f1f204179917da1d6eeee
+- [buttons.png](../../../../../brand/assets/grammar-reference/buttons.png) - actual render, SHA256 9189c6b63af7b744824f7ffc9cf3c282c027c58d3eb614fb5bc80606ec3d74c9
+- [text-and-actions.png](../../../../../brand/assets/grammar-reference/text-and-actions.png) - actual render, SHA256 bc0242e9ebe4c3b4930dc7457f115b6b25742c1ca262cee338fa813830b6bd73
+
+SurfaceCard (ariaLabel, bounded) supplies the raised rounded shell and inset content; it does not add a visible external label unless label is supplied. SurfaceListCard supplies a separate label/fact row above its one continuous raised row body, with footer below. Input supplies label and hint above the field and error below. Button uses pill geometry. WorkspaceShell plus NavigationFeatureNav supplies identity, named destinations and account actions; authentication remains the owner-required PrimaryRailLayout split. Native checkbox/radio controls are application content, not fabricated Grammar exports.
+
+Text/TextAction/Badge content and state semantics remain mapped; dark ink follows brand rev 3 where screenshots use blue/white/orange ink. Progress and PrimaryRailLayout are not independently demonstrated by these eight captures. The package source inspection and preserved business inputs remain their authority.
+
+One reference-guided imagegen invocation produced this correction.
+
+## Provenance and limits
+
+Selected PNG: assets/preferences-refused.png (1536 x 1024), SHA256 a290a13530fa98fdd881ca4b28ec62ce1704ea423f4d326a78fe0499f17b8140. Exact final prompt: assets/preferences-refused.prompt.txt, SHA256 bbbbb54928c8f7925b3fbec784df39dd843291fb90bacefe29141b2771a466cb. Every supplied generation image is retained and named in generation.inputRefs. The .v4 PNG/prompt pair preserves the actual pre-addendum input; earlier .initial pairs remain historical inputs.
+
+Coverage: 12 explicit state/screen/viewport entries. Desktop is generated direction; mobile-390 and other states are derived specifications, not extra captured screens.
+
+image_gen.imagegen generated the PNG. No model field was exposed. Manual inspection confirms the intended visible anatomy and retained UX, not exact CSS values, pixel-perfect component rendering, focus behavior or API outcomes. Frontend implementation must use actual components and exact brand tokens, provide Grammar-owned dark label/error and danger capability where declared, then produce real browser/UAT proof. Brand index and all pre-existing brand assets were left byte-for-byte unchanged.

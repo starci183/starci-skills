@@ -5,6 +5,11 @@ PASS asset hash assets/preferences-refused.png
 PASS PNG header and dimensions assets/preferences-refused.png
 PASS real tool, no invented model assets/preferences-refused.png
 PASS retained exact prompt assets/preferences-refused.png
+PASS asset hash assets/preferences-refused.v4.prompt.txt
+PASS asset hash assets/preferences-refused.v4.png
+PASS PNG header and dimensions assets/preferences-refused.v4.png
+PASS real tool, no invented model assets/preferences-refused.v4.png
+PASS retained exact prompt assets/preferences-refused.v4.png
 PASS one selected representative direction
 PASS coverage loading desktop-1280
 PASS coverage loading mobile-390
@@ -26,8 +31,25 @@ PASS accepted input knowledge/ui/composition/collection.yaml
 PASS accepted input knowledge/ui/composition/cta.yaml
 PASS accepted input knowledge/ui/composition/responsive.yaml
 PASS brand/Grammar/knowledge prompt provenance order assets/preferences-refused.prompt.txt
+PASS brand/Grammar/knowledge prompt provenance order assets/preferences-refused.v4.prompt.txt
 PASS retained visual review
 PASS product shell, feature navigation, account presence
+PASS actual rendered anatomy references bound
+PASS actual reference bytes examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+PASS actual reference bytes examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+PASS actual reference bytes examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+PASS actual reference bytes examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/text-and-actions.png
+PASS retained image edit target and anatomy inputs
+PASS generation image retained examples/todo-app-backend/.starciwork/features/notify/ui/preferences/assets/preferences-refused.v4.png
+PASS generation image cited in exact prompt examples/todo-app-backend/.starciwork/features/notify/ui/preferences/assets/preferences-refused.v4.png
+PASS generation image retained examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+PASS generation image cited in exact prompt examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+PASS generation image retained examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+PASS generation image cited in exact prompt examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+PASS generation image retained examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+PASS generation image cited in exact prompt examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+PASS generation image retained examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/text-and-actions.png
+PASS generation image cited in exact prompt examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/text-and-actions.png
+PASS final prompt identifies actual anatomy source
+PASS workspace maps actual navigation composition
 INFO structural/hash checks complement manual visual review; no browser/render/API proof.
-
-exit: 0

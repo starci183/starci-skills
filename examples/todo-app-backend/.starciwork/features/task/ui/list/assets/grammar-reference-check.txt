@@ -1,0 +1,25 @@
+Command: node scripts/check-example-work.mjs
+Exit: 1
+REFUSED examples/todo-app-backend/.starciwork/features/login/impl/todo-app-frontend/sign-in/evidence.yaml: recordDigest f30937a3e53f7a31191f6ca1b4008259dfa967a692f15125dcf1fa1b86d9e89b no longer matches impl.login.todo-app-frontend.sign-in's current digest c5bbc20edea0af2485a788c7317a9058edd4010c90152d67fe2d9e89c8c332e3; refused unless it carries stale: true
+REFUSED examples/todo-app-backend/.starciwork/features/task/impl/todo-app-backend/platform-database/evidence.yaml: codeDigest 58622b782235f7c8fb071c763892519151b7510a38c48bf6453c6dfd387fdcac no longer matches the code currently under impl.task.todo-app-backend.platform-database's owners/module (now e3b2b48499da8fbe77fb136bdd890bfb743340f984f51520c65e7481d5451aa9); refused unless it carries stale: true [CODE_DIGEST_STALE]
+REFUSED examples/todo-app-backend/.starciwork/features/login/uat/sign-in/index.yaml: run runs/20260918T090054Z-240aa95e has no videos/ with at least one playable recording
+REFUSED examples/todo-app-backend/.starciwork/features/task/br/single-owner/index.yaml: blockedBy on gap.task.collaborator-completion is stale - it is done at rev 2, cited rev was (none)
+WARN examples/todo-app-backend/.starciwork/features/plan/impl/todo-app-frontend/usage/index.yaml: owners/module names a directory that does not exist on disk: app/plan [OWNER_PATH_MISSING]
+WARN examples/todo-app-backend/.starciwork/features/recur/impl/todo-app-frontend/schedule/index.yaml: owners/module names a directory that does not exist on disk: app/recur [OWNER_PATH_MISSING]
+WARN examples/todo-app-backend/.starciwork/features/share/impl/todo-app-frontend/invite-screen/index.yaml: owners/module names a directory that does not exist on disk: app/share [OWNER_PATH_MISSING]
+WARN examples/todo-app-backend/.starciwork/features/task/sds/completion-state/index.yaml: work/sds-component carries no owners naming a module directory - a design component's read-scope boundary is a module boundary, not a prose claim
+WARN examples/todo-app-backend/.starciwork/features/task/sds/ownership-guard/index.yaml: work/sds-component carries no owners naming a module directory - a design component's read-scope boundary is a module boundary, not a prose claim
+WARN examples/todo-app-backend/.starciwork/features/notify/journey/told-about-completion/index.yaml: blockedBy chain reaches br.task.complete.once, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]
+WARN examples/todo-app-backend/.starciwork/features/plan/fr/downgrade/index.yaml: blockedBy chain reaches impl.plan.todo-app-frontend.usage, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]
+WARN examples/todo-app-backend/.starciwork/features/plan/fr/upgrade/index.yaml: blockedBy chain reaches impl.plan.todo-app-frontend.usage, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]
+WARN examples/todo-app-backend/.starciwork/features/plan/fr/usage/view/index.yaml: blockedBy chain reaches impl.plan.todo-app-frontend.usage, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]
+WARN examples/todo-app-backend/.starciwork/features/plan/journey/hits-the-cap/index.yaml: blockedBy chain reaches impl.plan.todo-app-frontend.usage, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]
+WARN examples/todo-app-backend/.starciwork/features/plan/uat/upgrade-after-cap/index.yaml: blockedBy chain reaches impl.plan.todo-app-frontend.usage, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]
+WARN examples/todo-app-backend/.starciwork/features/share/contract/completion-guard-for-task/index.yaml: blockedBy chain reaches br.task.complete.once, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]
+WARN examples/todo-app-backend/.starciwork/features/task/fr/complete/index.yaml: blockedBy chain reaches br.task.complete.once, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]
+WARN examples/todo-app-backend/.starciwork/features/task/fr/reopen/index.yaml: blockedBy chain reaches br.task.complete.once, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]
+WARN examples/todo-app-backend/.starciwork/features/task/sds/completion-state/index.yaml: blockedBy chain reaches br.task.complete.once, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]
+256 record(s), 2462 ref(s), 77 evidence file(s): 4 refused, 15 warned
+
+Compared against prior committed brand/assets/work-check-final.txt: 0 new refusals.
+Existing tracked brand files byte-identical to HEAD: 14.

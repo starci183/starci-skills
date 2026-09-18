@@ -42,6 +42,8 @@ ui:
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Notification preferences)"
@@ -49,13 +51,16 @@ ui:
           - Button (toggle, isSkeleton)
           - Button (save, isDisabled)
         derivation: Derives from refused with the same workspace shell. the toggle renders in a
-          disabled/skeleton state, no message shown
+          disabled/skeleton state, no message shown. Preserve the referenced Input/Button geometry
+          and any mapped raised SurfaceCard at this viewport.
         directionAsset: assets/preferences-refused.png
       - screen: preferences
         state: loading
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Notification preferences)"
@@ -65,42 +70,52 @@ ui:
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
-          scrolling. the toggle renders in a disabled/skeleton state, no message shown"
+          scrolling. the toggle renders in a disabled/skeleton state, no message shown. Preserve the
+          referenced Input/Button geometry and any mapped raised SurfaceCard at this viewport."
         directionAsset: assets/preferences-refused.png
       - screen: preferences
         state: subscribed
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Notification preferences)"
           - Text (row label)
-          - "Button (toggle, variant: primary)"
+          - "Button (toggle, variant: secondary)"
           - "Button (save, variant: primary)"
-        derivation: Derives from refused with the same workspace shell. the toggle is on, save is available
+        derivation: Derives from refused with the same workspace shell. the toggle is on, save is available.
+          Preserve the referenced Input/Button geometry and any mapped raised SurfaceCard at this
+          viewport.
         directionAsset: assets/preferences-refused.png
       - screen: preferences
         state: subscribed
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Notification preferences)"
           - Text (row label)
-          - "Button (toggle, variant: primary)"
+          - "Button (toggle, variant: secondary)"
           - "Button (save, variant: primary)"
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
-          scrolling. the toggle is on, save is available"
+          scrolling. the toggle is on, save is available. Preserve the referenced Input/Button
+          geometry and any mapped raised SurfaceCard at this viewport."
         directionAsset: assets/preferences-refused.png
       - screen: preferences
         state: unsubscribed
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Notification preferences)"
@@ -109,13 +124,16 @@ ui:
           - "Button (save, variant: primary)"
           - "Text (live: polite, non-danger confirmation)"
         derivation: Derives from refused with the same workspace shell. the toggle is off; a non-danger
-          message confirms the change on the next successful save
+          message confirms the change on the next successful save. Preserve the referenced
+          Input/Button geometry and any mapped raised SurfaceCard at this viewport.
         directionAsset: assets/preferences-refused.png
       - screen: preferences
         state: unsubscribed
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Notification preferences)"
@@ -127,70 +145,83 @@ ui:
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
           scrolling. the toggle is off; a non-danger message confirms the change on the next
-          successful save"
+          successful save. Preserve the referenced Input/Button geometry and any mapped raised
+          SurfaceCard at this viewport."
         directionAsset: assets/preferences-refused.png
       - screen: preferences
         state: saving
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Notification preferences)"
           - Text (row label)
-          - Button (toggle)
+          - "Button (toggle, variant: secondary)"
           - Button (save, isDisabled, isPending)
         derivation: Derives from refused with the same workspace shell. the save Button is disabled and
-          shows a busy label
+          shows a busy label. Preserve the referenced Input/Button geometry and any mapped raised
+          SurfaceCard at this viewport.
         directionAsset: assets/preferences-refused.png
       - screen: preferences
         state: saving
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Notification preferences)"
           - Text (row label)
-          - Button (toggle)
+          - "Button (toggle, variant: secondary)"
           - Button (save, isDisabled, isPending)
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
-          scrolling. the save Button is disabled and shows a busy label"
+          scrolling. the save Button is disabled and shows a busy label. Preserve the referenced
+          Input/Button geometry and any mapped raised SurfaceCard at this viewport."
         directionAsset: assets/preferences-refused.png
       - screen: preferences
         state: refused
         viewport: desktop-1280
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Notification preferences)"
           - Text (row label)
-          - Button (toggle)
+          - "Button (toggle, variant: secondary)"
           - "Button (save, variant: primary)"
           - "Text (live: assertive, the refusal sentence)"
         derivation: "Representative direction. a Text(live: assertive) appears above the toggle; the toggle
-          keeps its pre-save value"
+          keeps its pre-save value. Preserve the referenced Input/Button geometry and any mapped
+          raised SurfaceCard at this viewport."
         directionAsset: assets/preferences-refused.png
       - screen: preferences
         state: refused
         viewport: mobile-390
         components:
           - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - NavigationFeatureNav (identity, navigation, navigationLabel, compactNavigationTrigger,
+            compactNavigationTriggerLabel, actions)
           - TextAction (href, actual destination)
           - "Text (synthetic account presence: Alex)"
           - "SurfaceCard (ariaLabel: Notification preferences)"
           - Text (row label)
-          - Button (toggle)
+          - "Button (toggle, variant: secondary)"
           - "Button (save, variant: primary)"
           - "Text (live: assertive, the refusal sentence)"
         derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
           compactNavigation own the compact shell; include all four destinations and account access.
           Form fields stack and row actions wrap without hiding controls or horizontal page
           scrolling. a Text(live: assertive) appears above the toggle; the toggle keeps its pre-save
-          value"
+          value. Preserve the referenced Input/Button geometry and any mapped raised SurfaceCard at
+          this viewport."
         directionAsset: assets/preferences-refused.png
       - screen: unsubscribe-link
         state: unsubscribed
@@ -201,7 +232,8 @@ ui:
           - TextAction (policy links)
         derivation: "Signed-out email-link projection: omit authenticated shell and Alex; keep product name,
           token-bound unsubscribe control, explicit outcome and policy links. Never require sign-in.
-          Link token validation and failure use the backend contract."
+          Link token validation and failure use the backend contract. Preserve the referenced
+          Input/Button geometry and any mapped raised SurfaceCard at this viewport."
         directionAsset: assets/preferences-refused.png
       - screen: unsubscribe-link
         state: unsubscribed
@@ -212,7 +244,8 @@ ui:
           - TextAction (policy links)
         derivation: "Signed-out email-link projection: omit authenticated shell and Alex; keep product name,
           token-bound unsubscribe control, explicit outcome and policy links. Never require sign-in.
-          Link token validation and failure use the backend contract."
+          Link token validation and failure use the backend contract. Preserve the referenced
+          Input/Button geometry and any mapped raised SurfaceCard at this viewport."
         directionAsset: assets/preferences-refused.png
   accessibility:
     - Keyboard order follows visual and DOM order; all control names remain visible.
@@ -237,12 +270,10 @@ ui:
       interaction or API proof.
     - Read brand/index.yaml rev 3 for palette and master provenance; generated colours and glyphs
       are approximate until implementation uses the exact CSS tokens.
-    - Notifications navigation is selected with Alex present. Current On state, Turn off, refusal,
-      Save preferences, Back to tasks, unsubscribe link and policy footer are visible.
-    - The control is an ordinary labelled Button, not an invented Grammar Switch. The refused save
-      retains the prior setting.
-    - Signed-out unsubscribe is an explicit derived screen without authenticated shell or login
-      prerequisite. No mascot or false delivery-success claim.
+    - Raised Email digest SurfaceCard; secondary pill Turn off, primary pill Save preferences; On
+      value and save refusal retained.
+    - Compared all mapped components against actual supplied renders and installed source. See
+      assets/visual-review.md for component-level decisions and remaining coverage limits.
   gaps:
     - code: THEME_IMPLEMENTATION_REQUIRED
       detail: Only the accent override is wired here. Activate the accepted Core token vocabulary, load
@@ -273,6 +304,7 @@ ui:
       - label: Terms
         href: /terms
         status: proposed unimplemented policy route
+    headerOwner: NavigationFeatureNav
   links:
     - label: Tasks
       href: /tasks
@@ -295,11 +327,12 @@ ui:
   assets:
     - path: assets/preferences-refused.prompt.txt
       role: prompt
-      sha256: 2decd0656f69b963380f3600a34dc2775df6bac5f1267c757e4f7a8d20bfb81b
-      provenance: Exact prompt sent to image_gen.imagegen for this final PNG.
+      sha256: bbbbb54928c8f7925b3fbec784df39dd843291fb90bacefe29141b2771a466cb
+      provenance: Exact prompt sent to image_gen.imagegen for the anatomy-corrected selected PNG; actual
+        reference PNG paths cited as anatomy sources.
     - path: assets/preferences-refused.png
       role: direction
-      sha256: 53a7bf26c06989cf7b906e37f232b23799150ae3dc544aa81f9dc59e8204e183
+      sha256: a290a13530fa98fdd881ca4b28ec62ce1704ea423f4d326a78fe0499f17b8140
       width: 1536
       height: 1024
       generation:
@@ -315,11 +348,45 @@ ui:
           - knowledge/ui/composition/collection.yaml
           - knowledge/ui/composition/cta.yaml
           - knowledge/ui/composition/responsive.yaml
+          - examples/todo-app-backend/.starciwork/features/notify/ui/preferences/assets/preferences-refused.v4.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+          - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/text-and-actions.png
+      provenance:
+        actor: codex
+        tool: image_gen.imagegen
+        capturedAt: 2026-09-18T14:00:51.969Z
+        kind: generated-proposed-direction
+        modelDisclosure: Tool response did not expose a model field; no model claimed.
+    - path: assets/preferences-refused.v4.prompt.txt
+      role: prompt
+      sha256: 2decd0656f69b963380f3600a34dc2775df6bac5f1267c757e4f7a8d20bfb81b
+      provenance: Exact pre-addendum prompt, retained with the v4 edit input; its flat-row interpretation
+        is superseded.
+    - path: assets/preferences-refused.v4.png
+      role: iteration-input
+      sha256: 53a7bf26c06989cf7b906e37f232b23799150ae3dc544aa81f9dc59e8204e183
+      width: 1536
+      height: 1024
+      generation:
+        tool: image_gen.imagegen
+        promptPath: assets/preferences-refused.v4.prompt.txt
+        inputRefs:
+          - brand
+          - fr.notify.unsubscribe
+          - sds.notify.delivery-lifecycle
+          - knowledge/ui/proof/brand.yaml
+          - knowledge/ui/proof/contrast.yaml
+          - knowledge/ui/composition/layout.yaml
+          - knowledge/ui/composition/collection.yaml
+          - knowledge/ui/composition/cta.yaml
+          - knowledge/ui/composition/responsive.yaml
       provenance:
         actor: codex
         tool: image_gen.imagegen
         capturedAt: 2026-09-18T12:24:31.258Z
-        kind: generated-proposed-direction
+        kind: superseded-v4-direction
         modelDisclosure: Tool response did not expose a model field; no model claimed.
   acceptedInputs:
     brand:
@@ -352,17 +419,41 @@ ui:
       location: brand.grammar.inspectedFiles
       version: 0.4.13
       installation: prior draw checkout with identical frontend lockfile; current node_modules absent
+    grammarReferences:
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+        sha256: 81fc3540234b264cf0f1fd11670474f1db42aaf961420ba3f9d8a7cb4318539c
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+        sha256: b1948cf75464804f055ea37953c72751f3e36795267f1f204179917da1d6eeee
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+        sha256: 9189c6b63af7b744824f7ffc9cf3c282c027c58d3eb614fb5bc80606ec3d74c9
+        role: actual-render-anatomy-source
+      - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/text-and-actions.png
+        sha256: bc0242e9ebe4c3b4930dc7457f115b6b25742c1ca262cee338fa813830b6bd73
+        role: actual-render-anatomy-source
   interactions:
     - Turn off changes draft preference; Save owns pending and refusal. Unsubscribe email link
       remains usable without signing in.
+  anatomyReview:
+    reviewer: codex
+    reviewedAt: 2026-09-18T14:05:58.053Z
+    comparison: regenerated after comparison with actual Grammar captures
+    before: Outlined panel rather than raised SurfaceCard; rectangular primary and toggle actions.
+    after: Raised Email digest SurfaceCard; secondary pill Turn off, primary pill Save preferences; On
+      value and save refusal retained.
+    reviewPath: assets/visual-review.md
+    sourcePolicy: Rendered Grammar component anatomy; unchanged brand rev 3 tokens/contrast and mascot
+      rules take priority over screenshot colour defaults.
 assets:
   - path: assets/preferences-refused.prompt.txt
     role: prompt
-    sha256: 2decd0656f69b963380f3600a34dc2775df6bac5f1267c757e4f7a8d20bfb81b
-    provenance: Exact prompt sent to image_gen.imagegen for this final PNG.
+    sha256: bbbbb54928c8f7925b3fbec784df39dd843291fb90bacefe29141b2771a466cb
+    provenance: Exact prompt sent to image_gen.imagegen for the anatomy-corrected selected PNG; actual
+      reference PNG paths cited as anatomy sources.
   - path: assets/preferences-refused.png
     role: direction
-    sha256: 53a7bf26c06989cf7b906e37f232b23799150ae3dc544aa81f9dc59e8204e183
+    sha256: a290a13530fa98fdd881ca4b28ec62ce1704ea423f4d326a78fe0499f17b8140
     width: 1536
     height: 1024
     generation:
@@ -378,15 +469,49 @@ assets:
         - knowledge/ui/composition/collection.yaml
         - knowledge/ui/composition/cta.yaml
         - knowledge/ui/composition/responsive.yaml
+        - examples/todo-app-backend/.starciwork/features/notify/ui/preferences/assets/preferences-refused.v4.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/app-shell.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/sign-in-card.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/buttons.png
+        - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/text-and-actions.png
+    provenance:
+      actor: codex
+      tool: image_gen.imagegen
+      capturedAt: 2026-09-18T14:00:51.969Z
+      kind: generated-proposed-direction
+      modelDisclosure: Tool response did not expose a model field; no model claimed.
+  - path: assets/preferences-refused.v4.prompt.txt
+    role: prompt
+    sha256: 2decd0656f69b963380f3600a34dc2775df6bac5f1267c757e4f7a8d20bfb81b
+    provenance: Exact pre-addendum prompt, retained with the v4 edit input; its flat-row interpretation
+      is superseded.
+  - path: assets/preferences-refused.v4.png
+    role: iteration-input
+    sha256: 53a7bf26c06989cf7b906e37f232b23799150ae3dc544aa81f9dc59e8204e183
+    width: 1536
+    height: 1024
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/preferences-refused.v4.prompt.txt
+      inputRefs:
+        - brand
+        - fr.notify.unsubscribe
+        - sds.notify.delivery-lifecycle
+        - knowledge/ui/proof/brand.yaml
+        - knowledge/ui/proof/contrast.yaml
+        - knowledge/ui/composition/layout.yaml
+        - knowledge/ui/composition/collection.yaml
+        - knowledge/ui/composition/cta.yaml
+        - knowledge/ui/composition/responsive.yaml
     provenance:
       actor: codex
       tool: image_gen.imagegen
       capturedAt: 2026-09-18T12:24:31.258Z
-      kind: generated-proposed-direction
+      kind: superseded-v4-direction
       modelDisclosure: Tool response did not expose a model field; no model claimed.
 change:
-  rev: 4
+  rev: 5
   kind: clarifying
-  at: 2026-09-18T12:20:51.689Z
-  reason: "Owner-directed redraw against brand rev 3: real shell/auth composition, full web UX,
-    explicit mobile/state derivations and honest Grammar/link implementation gaps."
+  at: 2026-09-18T14:05:58.053Z
+  reason: "Coordinator addendum: align direction with actual rendered Grammar surfaces, collection
+    boundaries, Inputs, Buttons and navigation; keep brand rev 3 unchanged."
