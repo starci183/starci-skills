@@ -4,6 +4,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../core/yaml.mjs';
 import {walk} from './check-example-work.mjs';
 import {runDerive} from './example-derive.mjs';
+import {runCritique} from './example-critique.mjs';
 
 /**
  * A separate gate rather than a line inside scripts/check-example-work.mjs: another lane owns that file's
@@ -11,7 +12,7 @@ import {runDerive} from './example-derive.mjs';
  * field shaped like a derived one" rule) do not need anything check-example-work.mjs's `checkWorkTree`
  * already computes. Keeping this in its own file keeps both diffs small and independent to merge.
  *
- * Two checks, per `.starciwork` tree found under examples/:
+ * Three checks, per `.starciwork` tree found under examples/:
  *  1. `_derived/index.yaml` exists and matches what scripts/example-derive.mjs computes right now (a stale
  *     or missing derived index is refused - it would be exactly the "authored by hand, drifts silently"
  *     failure mode the derivation exists to prevent).
@@ -19,12 +20,17 @@ import {runDerive} from './example-derive.mjs';
  *     `effectiveState` or `frontier` - those are this tool's output vocabulary; a record that writes one by
  *     hand is indistinguishable from one the tool actually computed, which is the confusion the whole
  *     exercise exists to rule out.
+ *  3. `_derived/critique.yaml` and `_derived/critique.md` exist and match what scripts/example-critique.mjs
+ *     computes right now - the same freshness contract as #1, extended to the critique built on top of it.
  */
 const FORBIDDEN_TOP_LEVEL_FIELDS = ['usedBy', 'effectiveState', 'frontier'];
 
 export function checkExampleDerived(workRoot, problems) {
   const result = runDerive(workRoot, {write: false});
   if (!result.ok) problems.push(`${workRoot}/_derived/index.yaml is missing or stale; run \`node scripts/example-derive.mjs --work ${workRoot} --write\` to refresh it`);
+
+  const critiqueResult = runCritique(workRoot, {write: false});
+  if (!critiqueResult.ok) problems.push(`${workRoot}/_derived/critique.yaml or critique.md is missing or stale; run \`node scripts/example-critique.mjs --work ${workRoot} --write\` to refresh them`);
 
   for (const file of walk(workRoot).filter(f => f.endsWith('.yaml'))) {
     const rel = path.relative(workRoot, file).replaceAll('\\', '/');
