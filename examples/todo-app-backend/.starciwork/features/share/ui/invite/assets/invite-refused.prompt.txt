@@ -1,6 +1,7 @@
 Screen: The invitation screen and the collaborator list (share.invite), route /tasks/:taskId/share, actor: owner
 State: refused - the invite is rejected, for example inviting an existing collaborator twice
-Behavior to depict: a GrammarMessage(tone: danger) appears beside the invite form; the collaborator list is unchanged
+Behavior to depict: an assertive-live line of copy appears beside the invite form stating the invite was
+refused; the existing collaborator list, when one exists, is unchanged beside it
 
 Business grounding (accepted, do not invent beyond these):
   - fr.share.invite
@@ -15,18 +16,37 @@ Brand (brand/index.yaml rev 2, read do not restate elsewhere):
 Relevant UI knowledge:
   - knowledge/ui/composition/collection.yaml (COLLECTION-1, COLLECTION-2)
 
-Actual installed Grammar anatomy (@todo-app/grammar (examples/todo-app-frontend/packages/grammar/src/index.tsx)) - depict exactly these components, no invented ones:
-  - GrammarTextField (invitee email)
-  - GrammarButton (invite / revoke)
-  - GrammarMessage (tone: danger, refused only)
-  - GrammarButton {type, isDisabled?, onClick?, children: string}
-  - GrammarTextField {id, label, kind?, value, onChange}
-  - GrammarMessage {tone: 'danger', children: string | null} (role=alert on danger)
+Actual installed Grammar anatomy (@starci/grammar@0.4.13, family common, resolved at
+examples/todo-app-frontend/node_modules/@starci/grammar/package.json, package sha256
+9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824) - depict exactly these components, no
+invented ones. impl.share.todo-app-frontend.invite-screen is still unbuilt (blockedBy
+gap.share.unbuilt-module), so this binding is drawn directly from the real export list:
+  - SurfaceCard {ariaLabel: "Invite collaborators", measure: "formCompact"} - the invite form's own
+    bounded surface, holding only the form, never the list
+  - Input {id: "invite-email", name: "email", label: "Invite by email", kind: "email"}
+  - Text {live: "assertive"}, plain body copy carrying the refusal sentence beside the form - Common
+    ships no Message/Alert renderer and Text has no `tone: "danger"` value; severity is carried by the
+    sentence and by `aria-live="assertive"` alone
+  - Button {type: "submit", variant: "primary", isPending}, the invite action
+  - SurfaceListCard {label: "Collaborators", isVerdict: false}, the collaborator list's own container -
+    the real published collection container per COLLECTION-1 case-5, a distinct component from
+    SurfaceCard and not a second card wrapped around the same list
+  - one application-owned row per collaborator inside SurfaceListCard's children, each carrying:
+    Text (the collaborator's email), Badge {tone: "neutral" (pending) | "success" (accepted)}, and
+    Button {type: "button", variant: "ghost"} (revoke) - StaticStateRow cannot hold this row because it
+    is documented non-interactive and a revoke action is required, so the row is application-owned markup
+    exactly as SurfaceListCard's own doc describes ("an application-owned row spells the attribute itself
+    and gets exactly the same shipped edge")
 
-Layout note: The collaborator list is a page section with its own heading, never a card; one collaborator is one plain list item, per COLLECTION-1.
+Nothing outside this exact export list from @starci/grammar/common may appear in the frame - no vendored
+GrammarTextField/GrammarButton/GrammarMessage anatomy, no HeroUI component reached directly, no invented
+Alert/Toast/Banner, and no second SurfaceCard wrapped around the collaborator rows.
+
+Layout note: The collaborator list is a page section named by SurfaceListCard's own `label`, never a
+card; one collaborator is one plain row inside it, per COLLECTION-1.
 
 Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
 4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
-beyond brand/assets/**.
+beyond brand/assets/**; no second card nested around the collaborator rows (COLLECTION-2 case-4).
 
 Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).

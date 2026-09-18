@@ -2,51 +2,57 @@ schema: work/ui-screen
 id: ui.task.list
 title: The task list and its create form
 state: todo
-states: [empty, one-task, many-tasks, refused]
 brand: {rev: 2}
 refs: [fr.task.create]
-# Captures exist for brand rev 1 only; rev 2 changed the primary colour token. Not authored as
-# blockedBy: brand is already done, so citing it as a blocker would be stale on arrival.
 ui:
   intent: >-
-    The create form precedes a task-list page section with its own heading; the list is never wrapped in a card and each task is one plain row, per COLLECTION-1. The representative direction is drawn for the refused state because it combines the densest actual Grammar anatomy this screen uses, including the accessibility-critical GrammarMessage(tone: danger, role=alert), while preserving the existing list when an empty title is refused by br.task.title.required.
+    A single bounded surface holding the create form above the row list; rows are plain list items, never
+    individually carded (COLLECTION-2). The representative direction is drawn for the many-tasks state,
+    not refused: the real consuming block at
+    examples/todo-app-frontend/src/components/blocks/task-list/component.tsx renders `refused` as ONLY an
+    assertive-live Text line, hiding the create form and the row list entirely, so refused is this
+    screen's LOWEST-anatomy state, not its densest. many-tasks instead carries the SurfaceCard, the create
+    Input and Button, and multiple rows each with a completion checkbox and a delete Button - the densest
+    actual Grammar anatomy this screen reaches. @starci/grammar/common ships no Message/Alert renderer and
+    no SurfaceListCard/StaticStateRow usage here; the real block renders task rows as plain native
+    `<ul>`/`<li>` markup, not a Grammar collection composite.
   surfaces:
-    - {name: list, route: /tasks, purpose: "create a task and read the task list", actors: [owner]}
+    - {name: list, route: /tasks, purpose: "create tasks and see the owner's own list", actors: [owner]}
   states:
-    - {name: empty, trigger: "the list has no tasks", behavior: "an empty state says what to do next and the create form remains available"}
-    - {name: one-task, trigger: "one task has been created", behavior: "one plain task row appears in the task-list section"}
-    - {name: many-tasks, trigger: "multiple tasks exist", behavior: "equal plain task rows appear in the task-list section with no card wrapper"}
-    - {name: refused, trigger: "the owner submits an empty or whitespace-only title", behavior: "a GrammarMessage(tone: danger) appears above the create form; nothing is created and the task list remains unchanged"}
+    - {name: empty, trigger: "first paint, or every task has been deleted", behavior: "the create form renders above a muted Text line ('No tasks yet. Add the first one.'); no rows"}
+    - {name: one-task, trigger: "exactly one task exists", behavior: "the create form renders above a single row with its own completion checkbox, title and delete action"}
+    - {name: many-tasks, trigger: "two or more tasks exist", behavior: "the create form renders above multiple rows, each with its own completion checkbox, title and delete action"}
+    - {name: refused, trigger: "the create submission is refused, for example an empty title", behavior: "only an assertive-live Text line renders inside the SurfaceCard; the create form and the row list are both hidden until the state changes"}
   coverage:
     scale: bounded
     representativeScreens: [list]
     map:
-      - {screen: list, state: empty, viewport: desktop-1280, components: ["GrammarTextField (task title)", "GrammarButton (create task)", "GrammarMessage (tone: danger, refused only)", "grammar-row CSS anatomy (plain task rows)"], derivation: "Derives from the refused representative direction: same GrammarTextField (task title), GrammarButton (create task), GrammarMessage (tone: danger, refused only) and task-list section anatomy; no rows are present and an empty state says what to do next."}
-      - {screen: list, state: one-task, viewport: desktop-1280, components: ["GrammarTextField (task title)", "GrammarButton (create task)", "GrammarMessage (tone: danger, refused only)", "grammar-row CSS anatomy (plain task rows)"], derivation: "Derives from the refused representative direction: the danger message is absent and one plain task row appears in the task-list section."}
-      - {screen: list, state: many-tasks, viewport: desktop-1280, components: ["GrammarTextField (task title)", "GrammarButton (create task)", "GrammarMessage (tone: danger, refused only)", "grammar-row CSS anatomy (plain task rows)"], derivation: "Derives from the refused representative direction: the danger message is absent and equal plain task rows repeat in the task-list section without a card wrapper."}
-      - {screen: list, state: refused, viewport: desktop-1280, components: ["GrammarTextField (task title)", "GrammarButton (create task)", "GrammarMessage (tone: danger, refused only)", "grammar-row CSS anatomy (plain task rows)"], derivation: "Representative direction; an empty or whitespace-only title is refused, nothing is created and the existing list remains unchanged.", directionAsset: assets/list-refused.png}
+      - {screen: list, state: empty, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Tasks, measure: formCompact)", "Input (id: new-task-title, label: New task)", "Button (type: submit, variant: primary, create)", "Text (tone: muted, 'No tasks yet. Add the first one.')"], derivation: "Derives from the many-tasks representative direction: same SurfaceCard, Input, Button (create) anatomy; the row list is replaced by a single muted Text line since no task exists yet."}
+      - {screen: list, state: one-task, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Tasks, measure: formCompact)", "Input (id: new-task-title, label: New task)", "Button (type: submit, variant: primary, create)", "native checkbox + title text + Button (variant: ghost, delete)"], derivation: "Derives from the many-tasks representative direction: same SurfaceCard, Input, Button (create) anatomy, with exactly one native row instead of several."}
+      - {screen: list, state: many-tasks, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Tasks, measure: formCompact)", "Input (id: new-task-title, label: New task)", "Button (type: submit, variant: primary, create)", "native checkbox + title text + Button (variant: ghost, delete) per row"], derivation: "Representative direction; generated by interface.draw once gap.task.direction-not-drawn closes.", directionAsset: assets/list-many-tasks.png}
+      - {screen: list, state: refused, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Tasks, measure: formCompact)", "Text (live: assertive, the refusal sentence)"], derivation: "Derives from the many-tasks representative direction's SurfaceCard only: the real block's `refused` branch renders exclusively the assertive-live Text line, hiding the Input, the create Button and every row until the state changes."}
   accessibility:
     - Every interactive control is reachable by keyboard alone in visual order.
-    - GrammarMessage(tone: danger) carries role=alert and is announced without requiring focus.
+    - "The refusal Text carries `live: \"assertive\"` and is announced without requiring focus; Common
+      sets no `role=\"alert\"` and Text has no danger tone, so severity is carried by the sentence and
+      the live region alone."
+    - Each row's completion control is a native checkbox with its own associated label; delete is a named
+      Button, never an icon-only control without an accessible name.
     - Text on the primary colour (#2F6BFF) keeps at least a 4.5:1 contrast ratio.
   responsive:
     - desktop-1280 is the representative viewport; mobile-390 keeps the same single-column order with no
       hidden controls, derived rather than separately generated.
   artworkSlots: []
   observations: []
-  gaps:
-    - Grammar publishes row styling but no collection container; the task collection stays a page section with plain rows rather than an invented card component.
+  gaps: []
 assets:
-  - path: assets/list-refused.prompt.txt
+  - path: assets/list-many-tasks.prompt.txt
     role: prompt
-    provenance: authored-prompt-for-interface.draw
-  - path: assets/list-refused.png
-    role: direction
-    generation:
-      tool: image_gen.imagegen
-      promptPath: assets/list-refused.prompt.txt
-      inputRefs: [ui.task.list, fr.task.create, br.task.title.required, brand]
-    provenance:
-      actor: codex
-      profile: gpt-5.6-sol
-      capturedAt: "2026-09-18T06:01:43.0535860Z"
+    provenance: authored-prompt-awaiting-interface.draw
+blockedBy:
+  - {record: gap.task.direction-not-drawn, because: "interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has produced the many-tasks representative direction or its sibling prompt bytes yet, only the prompt this record's assets entry names."}
+change:
+  rev: 1
+  kind: initial
+  at: 2026-09-18T09:00:00.000Z
+  reason: First full ui block authored from the actual installed @starci/grammar@0.4.13 common anatomy and the real task-list block; previously this record was a title/state stub with no coverage map or prompt.
