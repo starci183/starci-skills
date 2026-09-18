@@ -1,0 +1,24 @@
+{
+  "name": "@ecommerce/fe",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n landing,shop -c cyan,magenta \"npm:dev:landing\" \"npm:dev:shop\"",
+    "dev:landing": "npm run dev -w @ecommerce/landing",
+    "dev:shop": "npm run dev -w @ecommerce/shop",
+    "build": "npm run build -w @ecommerce/landing && npm run build -w @ecommerce/shop",
+    "start": "concurrently -n landing,shop -c cyan,magenta \"npm:start:landing\" \"npm:start:shop\"",
+    "start:landing": "npm run start -w @ecommerce/landing",
+    "start:shop": "npm run start -w @ecommerce/shop",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "concurrently": "^9.0.0",
+    "typescript": "^5.6.2"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "schema": "starci/architecture-config@1",
+  "kinds": ["frontend"],
+  "tsconfig": "tsconfig.json",
+  "roots": ["apps/*"],
+  "apps": [
+    {
+      "id": "landing",
+      "package": "@ecommerce/landing",
+      "root": "apps/landing",
+      "routes": "apps/landing/src/app",
+      "devPort": 3069,
+      "public": true,
+      "summary": "Marketing site and catalogue teaser; links into the authenticated shop app."
+    },
+    {
+      "id": "shop",
+      "package": "@ecommerce/shop",
+      "root": "apps/shop",
+      "routes": "apps/shop/src/app",
+      "devPort": 4069,
+      "public": false,
+      "summary": "Authenticated product app: browse, cart, checkout and account.",
+      "consumes": [
+        {
+          "service": "order",
+          "env": "NEXT_PUBLIC_ORDER_API_URL",
+          "localhostFallback": "http://localhost:6070"
+        },
+        {
+          "service": "identity",
+          "env": "NEXT_PUBLIC_IDENTITY_API_URL",
+          "localhostFallback": "http://localhost:5070"
+        }
+      ]
+    }
+  ],
+  "frontend": {
+    "routes": "apps/*/src/app",
+    "components": "apps/*/src/components",
+    "modules": "apps/*/src/modules",
+    "transport": "apps/shop/src/modules/api"
+  }
+}
