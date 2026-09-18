@@ -21,11 +21,13 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
   }
   for(const file of ['checks/stacks.mjs','schemas/application-stacks.schema.json','knowledge/application-stacks.json',
     'docs/application-stacks.md','docs/application-stacks-vps.md',
-    ...['app/Dockerfile','app/server.mjs','gateway/nginx.conf','scripts/prepare.sh','scripts/prepare.ps1',
-      '.gitignore','.starcistacks/application-stacks.yaml','.starcistacks/dev/compose.yaml','.starcistacks/vps/stack.yaml']
+    ...['gateway/nginx.conf','scripts/prepare.sh','scripts/prepare.ps1','.gitignore',
+      '.starcistacks/application-stacks.yaml','.starcistacks/dev/README.md','.starcistacks/dev/infra/compose/compose.yaml',
+      '.starcistacks/vps/README.md','.starcistacks/vps/infra/stack.yaml']
       .map(name=>'examples/todo-app-backend/'+name)])assert.ok(files.has(file),file);
   assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app-backend/')&&
     (/\/(runtime|generated|\.runtime)\//.test(file)||/\.(enc|agekey)$/.test(file))),false);
+  assert.equal([...files.keys()].some(file=>file.startsWith('examples/todo-app-backend/')&&file.endsWith('.mjs')),false);
 });
 
 test('stacks CLI refuses missing or malformed evidence without echoing file contents or mutation',t=>{
@@ -58,5 +60,5 @@ test('runtime packaging excludes accidental generated example plaintext and ciph
   }
   const files=buildFiles(directory);
   for(const suffix of ['secrets.yaml','secrets.yaml.enc','runtime/files/secret.yaml','generated/deployment-model.yaml'])assert.equal(files.has(base+suffix),false);
-  assert.ok(files.has(base+'compose.yaml'));
+  assert.ok(files.has(base+'infra/compose/compose.yaml'));
 });
