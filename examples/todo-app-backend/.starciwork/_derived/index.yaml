@@ -1524,9 +1524,8 @@ records:
   impl.login.todo-app-frontend.sign-in:
     schema: work/implementation
     feature: login
-    state: todo
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
+    state: done
+    effectiveState: done
   impl.notify.todo-app-backend.pipeline:
     schema: work/implementation
     feature: notify
@@ -2207,9 +2206,9 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 132
+    done: 133
     todo: 32
-    stale: 2
+    stale: 1
     blocked: 36
     total: 202
   byFeature:
@@ -2220,9 +2219,9 @@ tally:
       blocked: 3
       total: 29
     login:
-      done: 16
+      done: 17
       todo: 4
-      stale: 1
+      stale: 0
       blocked: 3
       total: 24
     notify:
@@ -2458,9 +2457,6 @@ frontier:
   - id: gap.login.device-field
     feature: login
     title: No device field exists on a session or person
-  - id: impl.login.todo-app-frontend.sign-in
-    feature: login
-    title: The sign-in route, feature and block
   - id: contract.notify.task-completion-feed
     feature: notify
     title: What notify needs from task to notify on completion

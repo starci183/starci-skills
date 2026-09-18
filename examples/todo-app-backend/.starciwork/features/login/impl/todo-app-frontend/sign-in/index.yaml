@@ -1,18 +1,104 @@
 schema: work/implementation
 id: impl.login.todo-app-frontend.sign-in
-title: The sign-in route, feature and block
-state: todo
+title: The sign-in route and screen block
+state: done
 repository: todo-app-frontend
 owners:
   - {role: route, path: src/app/sign-in}
-  - {role: feature, path: src/features/pages/sign-in}
-  - {role: block, path: src/components/blocks/sign-in-form}
+  - {role: block, path: src/components/login/sign-in}
+revision: b104d717
 proves: [ui.login.sign-in]
-
+assets:
+  - path: assets/sign-in-empty-desktop-1280.png
+    role: capture
+    sha256: 384ccde5315c8934cc83df9b0d8a052a38eac0173a4fcbae6c0f2d25eaa64750
+    provenance: Running-page screenshot of /sign-in served by the production build (next start), empty state, desktop-1280 viewport.
+  - path: assets/sign-in-empty-desktop-1280.html
+    role: markup
+    sha256: a4292a47840fbdb749f4aa884b394ccad0ebf9f7133f446088f225e304099a81
+    provenance: Rendered DOM markup kept beside the empty desktop-1280 capture.
+  - path: assets/sign-in-empty-mobile-390.png
+    role: capture
+    sha256: f9aaab12b05fd46d64fa893d27b1e2768628b01820da53f3b9b2a0d45a536816
+    provenance: Running-page screenshot of /sign-in served by the production build (next start), empty state, mobile-390 viewport.
+  - path: assets/sign-in-empty-mobile-390.html
+    role: markup
+    sha256: a4292a47840fbdb749f4aa884b394ccad0ebf9f7133f446088f225e304099a81
+    provenance: Rendered DOM markup kept beside the empty mobile-390 capture.
+  - path: assets/sign-in-filled-desktop-1280.png
+    role: capture
+    sha256: 8061ec9eb0f2fd222cd91976312f76e212ad35433969297788bafd0b568a4971
+    provenance: Running-page screenshot of /sign-in served by the production build (next start), filled state, desktop-1280 viewport.
+  - path: assets/sign-in-filled-desktop-1280.html
+    role: markup
+    sha256: 9db6398f95205cae53b7ae5140d17f4c76051dd5518da71c0ff45df41a7854ce
+    provenance: Rendered DOM markup kept beside the filled desktop-1280 capture.
+  - path: assets/sign-in-filled-mobile-390.png
+    role: capture
+    sha256: 3fc8ed867a801cf61e11aef356d263b6b85579d5105a477a04496f714ecbec79
+    provenance: Running-page screenshot of /sign-in served by the production build (next start), filled state, mobile-390 viewport.
+  - path: assets/sign-in-filled-mobile-390.html
+    role: markup
+    sha256: 9db6398f95205cae53b7ae5140d17f4c76051dd5518da71c0ff45df41a7854ce
+    provenance: Rendered DOM markup kept beside the filled mobile-390 capture.
+  - path: assets/sign-in-working-desktop-1280.png
+    role: capture
+    sha256: a6e132a31fe390061fc5e991fb092e120be389c59776f01fca0cc7884cb145a5
+    provenance: Running-page screenshot of /sign-in served by the production build (next start), working state (submit held in flight), desktop-1280 viewport.
+  - path: assets/sign-in-working-desktop-1280.html
+    role: markup
+    sha256: 0851a1a23682623776283d44281a01d103799edec1a11fd5f62a0668809e1ac7
+    provenance: Rendered DOM markup kept beside the working desktop-1280 capture.
+  - path: assets/sign-in-working-mobile-390.png
+    role: capture
+    sha256: 3bd7dfccf8f1548cc10393c1b7f3b98a4b2580cdceb773b47da20bd7928540a4
+    provenance: Running-page screenshot of /sign-in served by the production build (next start), working state (submit held in flight), mobile-390 viewport.
+  - path: assets/sign-in-working-mobile-390.html
+    role: markup
+    sha256: 0851a1a23682623776283d44281a01d103799edec1a11fd5f62a0668809e1ac7
+    provenance: Rendered DOM markup kept beside the working mobile-390 capture.
+  - path: assets/sign-in-refused-desktop-1280.png
+    role: capture
+    sha256: cc9a6273759c5492615db114079db38b95c8388d81b8d18a5cc160ff75b44241
+    provenance: Running-page screenshot of /sign-in served by the production build (next start), refused state (UNAUTHENTICATED reply), desktop-1280 viewport.
+  - path: assets/sign-in-refused-desktop-1280.html
+    role: markup
+    sha256: 3d488522581172a6dffe0fee6c1cb614cd8fefae79986f1ce4d81e0ff0ddcdf5
+    provenance: Rendered DOM markup kept beside the refused desktop-1280 capture.
+  - path: assets/sign-in-refused-mobile-390.png
+    role: capture
+    sha256: 25542af156cc92a957c131263f878e28fd708a78578f7acb7ce10f08f8dd25ab
+    provenance: Running-page screenshot of /sign-in served by the production build (next start), refused state (UNAUTHENTICATED reply), mobile-390 viewport.
+  - path: assets/sign-in-refused-mobile-390.html
+    role: markup
+    sha256: 3d488522581172a6dffe0fee6c1cb614cd8fefae79986f1ce4d81e0ff0ddcdf5
+    provenance: Rendered DOM markup kept beside the refused mobile-390 capture.
+observations:
+  - Captures were taken against the production build served by `next start` (localhost:3199) via
+    Playwright chromium; the one GraphQL sign-in call was held in flight to expose the working
+    state, then answered with an UNAUTHENTICATED refusal for the refused state.
+  - "Every state was captured at desktop-1280 and mobile-390 with zero horizontal page overflow and
+    zero console errors; the enabled submit renders the brand primary #2F6BFF with a black label,
+    and empty/refused/working carry the direction's pale-blue unavailable treatment."
+  - This repository carries no coverage runner and no Sonar configuration, so those two quality
+    checks are recorded as not-run, never claimed as pass.
+  - The pre-direction surface (src/features/pages/sign-in, src/components/blocks/sign-in-form)
+    remains on disk unmounted; it sits outside this lane's write scope and outside this record's
+    owners, which now name the directories that actually render the screen.
 # gap.login.direction-not-drawn closed once interface.draw ran and ui.login.sign-in reached done
-# (see that record's evidence.yaml); the blockedBy edge that named it is removed because the gate
-# refuses a blocker whose target has since reached done (a stale citation), not because this impl
-# record itself now claims done. The route/feature/block code at the owners above is real and its
-# own vitest suite passes, but re-claiming done against the now-done ui node is implementation work
-# this record does not perform here; it stays state: todo, simply no longer citing a resolved blocker.
-change: {rev: 1, kind: editorial, at: 2026-09-18T10:00:00.000Z, reason: "Removed the blockedBy edge on gap.login.direction-not-drawn: that gap reached done (closed by ui.login.sign-in), so the edge was stale per the layout's own staleness rule. No other field changed."}
+# (see that record's evidence.yaml); the blockedBy edge that named it was removed at rev 1 because
+# the gate refuses a blocker whose target has since reached done. rev 2 claims done: the route and
+# block the owners name now render the settled direction, proven by the captures under assets/ and
+# the replayable commands in evidence.yaml.
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T14:25:00.000Z
+  reason: "Implemented the settled ui.login.sign-in direction: /sign-in now renders the split-screen
+    auth shell through Grammar primitives (PrimaryRailLayout with collapsedOrder primary-first,
+    MediaFrame over the brand turtle master's own bytes served by the turtle-master.png route
+    handler, SurfaceCard/Input/Button/TextAction furniture) across all four states with the uniform
+    refusal, retained email and cleared password. owners now name the directories that actually
+    render the screen; the earlier feature/block paths described the pre-direction surface. Eight
+    running-page captures (four states x two viewports, PNG plus rendered markup) under assets/ are
+    the render proof, and evidence.yaml replays typecheck, unit, lint and build."

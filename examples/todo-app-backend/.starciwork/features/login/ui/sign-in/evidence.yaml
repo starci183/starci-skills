@@ -1,3 +1,6 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: ui.login.sign-in
 recordDigest: a2b8c77443c769f35edc420e9cce09a01cd9e3d4b943555858e50c5c81d24217
@@ -5,18 +8,22 @@ codeDigest:
   algorithm: sha256
   files:
     - path: src/app/sign-in/page.tsx
-      sha256: f02766573a40171c920a27fad2917197fb2099d4c64df150a45702a47b694a4e
-    - path: src/components/blocks/sign-in-form/classNames.ts
-      sha256: c10ff4de1ed41547e656c02a5a915eb9017818ec2ec9315466a020f1b4529787
-    - path: src/components/blocks/sign-in-form/component.spec.tsx
-      sha256: dfe7cbb6d3bb0fb1507312204c9fc3ff71f74e6f81e6b6b0f4142163119783ae
-    - path: src/components/blocks/sign-in-form/component.tsx
-      sha256: 76fecb6a5643503d9fce934d20d202600c9affeb972680f9912648a97f751512
-    - path: src/components/blocks/sign-in-form/index.tsx
-      sha256: 58a7701352908bc5d49a4cf9396a00677958f82ca075c0f168759167b4fdb172
-    - path: src/features/pages/sign-in/index.tsx
-      sha256: 8d77469dc75c695c1a911bd566f419c13e60785c1c81f24a1a05274af5275450
-  digest: 3b4caf175eb47fd672f73b385b97f61cc05c5b2520c2391c61cf56adf5d362fb
+      sha256: fcc572491557720b725c4e0a2f86b0c5a0e5ba9e5541b6675aba06ca9ec47dfd
+    - path: src/app/sign-in/turtle-master.png/route.ts
+      sha256: 4f8093c275c8a2f634fccd7e147e9e87c822948faa4c4f601460a271b834c7b6
+    - path: src/components/login/sign-in/classNames.ts
+      sha256: 0485eb4a208093bf455bc2df1a028ca73c3f5d5d66499baa5400455fdb70c38e
+    - path: src/components/login/sign-in/component.spec.tsx
+      sha256: 6632fc88dc6d16fb77b582610a7d1949b5ebd1bed5e38ee73ae77e83f8606e49
+    - path: src/components/login/sign-in/component.tsx
+      sha256: 22dc5f022c216c225894d602d83992991026d3f6aa7e4c20ca08dd77fff61af4
+    - path: src/components/login/sign-in/destinations.ts
+      sha256: 41861a2f12e714ff09293114e4a062713d7de1c426d9fd53b4aaa6278ac91818
+    - path: src/components/login/sign-in/index.spec.tsx
+      sha256: 2682499e55198d9431646cb6147410ed9b4106c551449a6aad6d4e3daa082974
+    - path: src/components/login/sign-in/index.tsx
+      sha256: 1ab30360881765df66c35d5c2403d751603a5528a72b134b3a1835b9b5b02fe7
+  digest: 6b6625efaeeb63bea1bdd8c14b9c24032a15c64ef8feb71037cd7565315bed82
 outcome: pass
 assertions:
   - id: direction-assets-inputs-coverage
@@ -31,26 +38,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T12:40:54.151Z
-assets:
-  - path: assets/sign-in-refused.prompt.txt
-    sha256: 1f0c8cc39ef6cac6e396a30af14e1ed094fd88765787891884a3f06cff4dcd42
-  - path: assets/sign-in-refused.png
-    sha256: 6d730b6697352d8ed9cce27c2597f7528fdf301d0c1c0180a579963605e1ffaa
-  - path: assets/sign-in-refused.initial.prompt.txt
-    sha256: fc6b357b7f75d1bf957c555d7c6434f84fe1e14c04f1bd9418659f38d09da4ab
-  - path: assets/sign-in-refused.initial.png
-    sha256: 85abe9f53f68b9da8c98d1b62c3df72b467be6e4f3ee9dd3a49f6eebed2f94db
-  - path: assets/visual-review.md
-    sha256: 2cf588642ff7e75596f3b1a42399ddab21b7c40328778fd85c470cd9e26db37b
-  - path: assets/direction-check.txt
-    sha256: acbd83204382aed13d93017f69f257cde978ed2e492feddf1c939aadada3d5d7
-  - path: assets/verify-direction.mjs
-    sha256: 8cf91ea1bf0e5a6ef9685f03d636260387ade471082ec3472fc7437567b1ba8a
-directionReview:
-  reviewer: codex
-  outcome: accepted-proposed-direction
-  reviewPath: assets/visual-review.md
-  imageTool: image_gen.imagegen
-  brandRev: 3
-  limitations: No exact render, API, browser UAT or model identity claimed; implementation gaps live in ui.gaps.
+  capturedAt: 2026-09-18T14:38:28.961Z
