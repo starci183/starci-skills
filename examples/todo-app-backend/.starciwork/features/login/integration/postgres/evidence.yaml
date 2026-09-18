@@ -1,0 +1,37 @@
+# Written by hand: a work/integration's requiresProof.live asks for proof {boundary: live, fakes: []}
+# against the real provider (schemas/work-layout.yaml). scripts/live-proof.sh is the replayable command;
+# the migration check below was run directly against the container as a second, independent proof that
+# the schema (not only a session row) is real.
+schema: work/evidence
+record: integration.login.postgres
+proof:
+  boundary: live
+  fakes: []
+outcome: pass
+assertions:
+  - id: real-postgres-round-trip
+    command: bash scripts/live-proof.sh
+    exit: 0
+    outcome: pass
+    observation: >-
+      Ran against the real Postgres container (todo-app-dev-postgres-1, port 5432, database "todo" -
+      reused read-only, this lane started/stopped nothing on it) with the backend's real
+      PostgresqlPrimaryModule (no fake EntityManager). Every signIn/createTask/completeTask/
+      reopenTask/deleteTask/tasks step in live-proof.sh writes to and reads from the real `sessions`
+      and `tasks` tables. 22/22 steps passed (run: 2026-09-18, this lane), including three new checks
+      that a missing/empty/malformed Authorization header is refused before any row is returned or
+      written.
+  - id: migrations-applied
+    command: docker exec todo-app-dev-postgres-1 psql -U postgres -d todo -c "select * from migrations;"
+    exit: 0
+    outcome: pass
+    observation: >-
+      Returns both CreateSessionsTable1758160000000 and CreateTasksTable1758160000001; `\d sessions`
+      and `\d tasks` show columns matching the current SessionEntity/TaskEntity exactly (token/
+      person_id/issued_at/expires_at; id/owner/title/complete/completed_at). This closes
+      gap.login.migration-not-applied's own question independently of live-proof.sh.
+provenance:
+  actor: example-evidence
+  tool: scripts/live-proof.sh plus a direct psql check (both run by hand, not scripts/example-evidence.mjs)
+  environment: local
+  capturedAt: 2026-09-18T08:52:00.000Z

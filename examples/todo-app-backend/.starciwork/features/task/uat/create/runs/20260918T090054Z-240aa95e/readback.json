@@ -1,0 +1,9 @@
+{
+  "schema": "starci/uat-readback@1",
+  "flow": "uat.task.create",
+  "checked": [
+    "fr.task.create",
+    "br.task.single-owner"
+  ],
+  "notRun": []
+}

@@ -1,7 +1,7 @@
 schema: work/integration
 id: integration.login.postgres
 title: PostgreSQL holds the session and person rows
-state: todo
+state: done
 provider: postgresql
 boundary: The product owns its schema and its migrations. The database is not shared with another product,
   so a breaking migration is this product's decision alone.
@@ -18,6 +18,3 @@ requiresProof:
   live:
     required: true
     note: A migration applied and a row round-tripped against the real server, not against a fake.
-
-blockedBy:
-  - {record: gap.login.live-proof, because: "live proof needs the docker-compose dev stack (Postgres on 5432) up and the migrations applied against it, and this host cannot start that stack."}

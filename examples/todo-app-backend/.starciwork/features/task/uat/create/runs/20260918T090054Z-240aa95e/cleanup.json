@@ -1,0 +1,7 @@
+{
+  "schema": "starci/uat-cleanup@1",
+  "flow": "uat.task.create",
+  "ownedResourcesCreated": [],
+  "ownedResourcesDeleted": [],
+  "note": "This run created no run-owned fixture rows against a database this lane owns; nothing to clean up."
+}

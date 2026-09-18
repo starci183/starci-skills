@@ -1,0 +1,30 @@
+{
+  "schema": "starci/uat-walk@1",
+  "flow": "uat.task.create",
+  "steps": [
+    {
+      "step": "owner-signed-in",
+      "startedAt": "2026-09-18T09:00:58.082Z",
+      "endedAt": "2026-09-18T09:00:58.574Z",
+      "screenshot": "owner-signed-in"
+    },
+    {
+      "step": "task-created",
+      "startedAt": "2026-09-18T09:00:58.615Z",
+      "endedAt": "2026-09-18T09:00:58.805Z",
+      "screenshot": "task-created"
+    },
+    {
+      "step": "stranger-delete-refused",
+      "startedAt": "2026-09-18T09:00:58.867Z",
+      "endedAt": "2026-09-18T09:00:59.240Z",
+      "screenshot": "stranger-delete-refused"
+    },
+    {
+      "step": "owner-list-unchanged-and-cleaned-up",
+      "startedAt": "2026-09-18T09:00:59.284Z",
+      "endedAt": "2026-09-18T09:00:59.722Z",
+      "screenshot": "owner-list-unchanged-and-cleaned-up"
+    }
+  ]
+}
