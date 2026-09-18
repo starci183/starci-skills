@@ -12,8 +12,7 @@ interfaces:
 refs: [br.task.single-owner]
 dependsOn: [integration.login.postgres, contract.share.completion-guard-for-task]
 blockedBy:
-  - {record: br.task.single-owner, rev: 2, because: "br.task.single-owner is todo at rev 2. Its t-owner/t-stranger transitions below described an owner-or-nobody guard for every mutation; that is still true for delete but no longer for complete, and this component has not been rebuilt to call contract.share.completion-guard-for-task. Its previous proof stood for the withdrawn rev 1 statement, not for this one."}
-  - {record: contract.share.completion-guard-for-task, rev: 2, because: "br.task.single-owner is todo at rev 2. Its t-owner/t-stranger transitions below described an owner-or-nobody guard for every mutation; that is still true for delete but no longer for complete, and this component has not been rebuilt to call contract.share.completion-guard-for-task. Its previous proof stood for the withdrawn rev 1 statement, not for this one."}
+  - {record: gap.task.collaborator-completion, because: "This component's t-owner/t-stranger transitions below described an owner-or-nobody guard for every mutation; that is still true for delete but no longer for complete, and this component has not been rebuilt to call contract.share.completion-guard-for-task. Its previous proof stood for br.task.single-owner's withdrawn rev 1 statement, not the current one - and the reason it cannot be rebuilt yet is exactly the absence gap.task.collaborator-completion names."}
 
 stateMachine:
   states: [unchecked, owned, collaborating, foreign]
