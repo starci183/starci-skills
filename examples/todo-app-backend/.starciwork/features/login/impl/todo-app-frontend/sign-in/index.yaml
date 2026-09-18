@@ -9,5 +9,10 @@ owners:
   - {role: block, path: src/components/blocks/sign-in-form}
 proves: [ui.login.sign-in]
 
-blockedBy:
-  - {record: gap.login.direction-not-drawn, because: "ui.login.sign-in (what this implements) is itself todo - interface.draw has not run, so no representative direction image exists yet (docs/kinds.md's implementation/frontend lane is held until the feature's ui node is done). The route/feature/block code is real and its own vitest suite passes, but that is not what is missing: this impl was recorded done against a ui-screen record that has since been pulled back to todo, and it cannot honestly re-claim done until the ui node it proves does."}
+# gap.login.direction-not-drawn closed once interface.draw ran and ui.login.sign-in reached done
+# (see that record's evidence.yaml); the blockedBy edge that named it is removed because the gate
+# refuses a blocker whose target has since reached done (a stale citation), not because this impl
+# record itself now claims done. The route/feature/block code at the owners above is real and its
+# own vitest suite passes, but re-claiming done against the now-done ui node is implementation work
+# this record does not perform here; it stays state: todo, simply no longer citing a resolved blocker.
+change: {rev: 1, kind: editorial, at: 2026-09-18T10:00:00.000Z, reason: "Removed the blockedBy edge on gap.login.direction-not-drawn: that gap reached done (closed by ui.login.sign-in), so the edge was stale per the layout's own staleness rule. No other field changed."}
