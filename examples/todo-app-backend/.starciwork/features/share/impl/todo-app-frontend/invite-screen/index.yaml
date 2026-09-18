@@ -1,10 +1,53 @@
 schema: work/implementation
 id: impl.share.todo-app-frontend.invite-screen
 title: The invitation screen and its create/revoke controls
-state: todo
+state: done
 repository: todo-app-frontend
 owners:
-  - {role: module, path: app/share}
+  - {role: route, path: "src/app/tasks/[taskId]/share"}
+  - {role: feature, path: src/features/pages/share}
+  - {role: block, path: src/components/blocks/share-invite}
+  - {role: hooks, path: src/hooks/share}
+  - {role: api, path: src/modules/api}
+  - {role: leaf, path: src/components/leaves/Link}
+  - {role: hooks, path: src/hooks/auth}
 proves: [ui.share.invite]
-blockedBy:
-  - {record: gap.share.frontend-unbuilt, because: "Not written yet. The example frontend is moving to Next.js and must consume the Grammar core package the way nivo-fe does; this screen will live at app/share/invite-screen.tsx once that scaffold and its Grammar wiring land, and no prior .mjs draft is being carried forward into it. gap.share.unbuilt-module itself closed on its backend half (lane be-share, backend-only per its brief); this narrower gap names the still-open frontend half."}
+
+change:
+  rev: 1
+  kind: initial
+  at: 2026-09-18T15:00:00.000Z
+  reason: "Implements ui.share.invite against its settled direction (features/share/ui/invite,
+    invite-refused representative). Route adapter src/app/tasks/[taskId]/share/page.tsx mounts
+    features/pages/share -> components/blocks/share-invite (connected index.tsx hands every render
+    to the pure component.tsx); hooks share/* adapt the real GraphQL collaborators / invite /
+    revokeCollaborator operations through src/modules/api transport with SWR reads and
+    useSWRMutation writes, and WorkspaceShell + SurfaceCard + SurfaceListCard + Input + Button +
+    Badge + Text + TextAction render all five mapped states at desktop-1280 and mobile-390.
+    Route deviation kept visible: the lane brief guessed src/app/share, but the settled
+    direction and uat.share.invite-and-collaborate both name /tasks/:taskId/share, and the
+    frontend canon's route -> feature -> block -> hooks layering (FE_* checks in
+    cli/main.mjs architecture + scripts/check-scoped-lint.mjs, both green) requires the
+    feature/block/hooks homes, so the served route is /tasks/<id>/share.
+    Rendered proof: the 10 PNG+HTML captures in ./assets were captured from this worktree's own
+    `next start` production build at localhost:3010 driving the live backend at :3001; the only
+    harness seam is a Playwright route that rewrites Access-Control-Allow-Origin for the 3010
+    origin - every request executes against the real backend and dev database. Real data: two
+    invitations created through the real invite mutation (pat viewer, sam editor), pat accepted
+    through the real acceptInvitation mutation with a dev invitee session, lee/kim invited and
+    revoked through the running UI mid-capture (revoked rows cleaned from the dev database
+    afterwards), and the refused state is a real SHARE_INVALID_EMAIL refusal that retains the
+    draft. Mobile captures are viewport-sized because compactNavigation is position:sticky and a
+    fullPage stitch paints it mid-page. Known open conflicts kept visible: the canon palette
+    check reports off-brand dominant colours that are all installed-Grammar theme rendering -
+    the isPending button tint (~88% of saturated pixels in the inviting captures), HeroUI's
+    danger hue in the refused captures (deltaE 9.1 from the brand danger token), and antialiased
+    accent blends on glyph edges; activating the accepted Core token vocabulary is the
+    THEME_IMPLEMENTATION_REQUIRED gap ui.share.invite already records, and globals.css is outside
+    this lane's ceiling. Installed @starci/grammar 0.4.13 has no danger Button variant
+    (GRAMMAR_REQUIRED), so revoke uses ghost variant exactly as the coverage map declares.
+    `starci render check` cannot run on this example tree (its brand record is work/brand while
+    checks/brand.mjs reads work/node@2), so the three render rules were executed directly:
+    entity-list-in-card and primary-absent pass on all 10 captures, palette-off-brand fails as
+    recorded. Sonar and coverage gates: no runner is configured in this repository - not run,
+    never claimed."

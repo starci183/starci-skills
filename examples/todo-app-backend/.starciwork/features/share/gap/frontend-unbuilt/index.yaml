@@ -1,12 +1,28 @@
 schema: work/gap
 id: gap.share.frontend-unbuilt
 title: No share invite screen exists under the Next.js layout yet
-state: todo
+state: done
 statement: gap.share.unbuilt-module closed on its backend half (src/modules/bussiness/share exists,
   proven by jest and scripts/live-proof-share.sh - lane be-share, backend-only per its brief). The
-  frontend half it also named - app/share/invite-screen.tsx, consuming the Grammar core package the way
-  nivo-fe does - still does not exist. This record names that remaining half on its own so
-  impl.share.todo-app-frontend.invite-screen has a real, currently-open gap to cite instead of one that
-  has since closed.
+  frontend half it also named now exists too - impl.share.todo-app-frontend.invite-screen is done -
+  the served route /tasks/<id>/share mounts features/pages/share -> components/blocks/share-invite,
+  consuming the Grammar core package (WorkspaceShell, SurfaceCard, SurfaceListCard, Input, Button,
+  Badge, Text, TextAction) over the real collaborators / invite / revokeCollaborator GraphQL
+  operations, with running-page PNG+HTML captures for all five mapped states at desktop-1280 and
+  mobile-390 in its assets/.
 closedBy: impl.share.todo-app-frontend.invite-screen
-change: {rev: 1, kind: initial, at: 2026-09-18T16:00:00.000Z}
+verificationSource: authored-claim
+because: "closedBy names impl.share.todo-app-frontend.invite-screen, itself done with a fresh
+  evidence.yaml whose assertions re-ran typecheck, unit tests, lint, the architecture and scoped-lint
+  gates, the capture/markup checks and a production build; the gap's closure is a derived fact about
+  that record reaching done, not something with a separate command of its own to run - matching
+  gap.audit.direction-not-drawn's own verificationSource pattern."
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T21:00:00.000Z
+  reason: "The gap's remaining half closed: impl.share.todo-app-frontend.invite-screen reached done,
+    so the absence this record names - no share invite screen under the Next.js layout - no longer
+    exists. Statement updated to describe the code now standing where the gap was; the route served is
+    /tasks/<id>/share rather than the app/share guess the first statement carried, matching the settled
+    direction and uat.share.invite-and-collaborate."
