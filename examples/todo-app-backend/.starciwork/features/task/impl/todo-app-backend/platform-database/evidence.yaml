@@ -5,15 +5,16 @@ schema: work/evidence
 record: impl.task.todo-app-backend.platform-database
 recordDigest: e1d1b624f2ce9e7552d4446de36430a4b4adb2409da86415a01cded1edcf6d8b
 stale: true
-staleReason: "Lane be-share added ShareInvitationEntity, its migration and one added line each to
-  entities/index.ts, primary/index.ts and primary.module.ts, under this shared module's owned
-  directory, to register the share feature's own table alongside SessionEntity/TaskEntity - see
-  impl.share.todo-app-backend.invitations. The task/session-store proof this evidence recorded is
-  unaffected (npx jest src/modules/bussiness/task and src/modules/bussiness/session still pass, see
-  br.share's own evidence for the added share coverage); this flag only acknowledges that the digested
-  code under this record's own owners/module changed since it was captured, per
-  scripts/check-example-work.mjs's CODE_DIGEST_STALE rule. Re-capturing codeDigest is impl.task.todo-app-backend.platform-database's
-  own owner's call, not this lane's - this lane does not own that record."
+staleSince: {record: impl.share.todo-app-backend.invitations}
+staleReason: "Two later features registered their own tables inside this shared platform database
+  module: share added ShareInvitationEntity with migration 1758160000002, recur added RuleEntity and
+  OccurrenceEntity with migration 1758246000000, each appending one line to entities/index.ts,
+  primary/index.ts and primary.module.ts. That changes this record's owned-directory codeDigest
+  although nothing about SessionEntity, TaskEntity or their own migrations changed. The assertions
+  below were not re-run by those additions and still describe the session and task stores correctly;
+  only the recorded codeDigest is stale against the directory's current contents. Re-capturing it is
+  this record's own owner's call - see impl.share.todo-app-backend.invitations and
+  impl.recur.todo-app-backend.engine for the proofs of what was added."
 codeDigest:
   algorithm: sha256
   files:
@@ -43,14 +44,6 @@ codeDigest:
       sha256: f07588abb29e3d0f6344c771c0d3e537a8720dad18e5e4e0e817725a58ce7a5e
   digest: d3cb079b772b78edee99b97cfcf9095fa94b08c106e286b2c89eb66d3b5b4f68
 outcome: pass
-stale: true
-staleSince: {record: impl.recur.todo-app-backend.engine}
-staleReason: "The recur feature added RuleEntity and OccurrenceEntity plus one migration
-  (1758246000000-create-recur-tables.ts) under this same shared module
-  (src/modules/platform/databases/postgresql/primary), which changes this record's owned-directory
-  codeDigest even though nothing about SessionEntity/TaskEntity or their own migrations changed. The
-  assertions below were not re-run by this addition and still describe SessionEntity/TaskEntity's own
-  behaviour correctly; only the recorded codeDigest is stale against the directory's current contents."
 assertions:
   - id: data.task.task
     command: npx jest src/modules/bussiness/task
