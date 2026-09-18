@@ -1510,12 +1510,6 @@ records:
     feature: audit
     state: todo
     effectiveState: todo
-  impl.audit.todo-app-frontend.privacy:
-    schema: work/implementation
-    feature: audit
-    state: done
-    effectiveState: suspended
-    suspensionReason: digest-mismatch
   impl.login.todo-app-backend.auth:
     schema: work/implementation
     feature: login
@@ -1534,6 +1528,11 @@ records:
     effectiveState: suspended
     suspensionReason: digest-mismatch
   impl.notify.todo-app-backend.pipeline:
+    schema: work/implementation
+    feature: notify
+    state: done
+    effectiveState: done
+  impl.notify.todo-app-frontend.preferences:
     schema: work/implementation
     feature: notify
     state: done
@@ -2182,8 +2181,7 @@ records:
     schema: work/ui-screen
     feature: login
     state: done
-    effectiveState: suspended
-    suspensionReason: code-digest-mismatch
+    effectiveState: done
   ui.notify.preferences:
     schema: work/ui-screen
     feature: notify
@@ -2214,30 +2212,30 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 131
+    done: 133
     todo: 32
-    stale: 4
+    stale: 2
     blocked: 36
     total: 203
   byFeature:
     audit:
       done: 20
       todo: 6
-      stale: 1
+      stale: 0
       blocked: 3
-      total: 30
+      total: 29
     login:
-      done: 15
+      done: 16
       todo: 4
-      stale: 2
+      stale: 1
       blocked: 3
       total: 24
     notify:
-      done: 19
+      done: 20
       todo: 6
       stale: 0
       blocked: 6
-      total: 31
+      total: 32
     plan:
       done: 17
       todo: 4
@@ -2811,9 +2809,6 @@ unclassifiedEdges:
   - from: impl.audit.todo-app-backend.operator-read
     field: proves
     target: fr.audit.log.read
-  - from: impl.audit.todo-app-frontend.privacy
-    field: proves
-    target: ui.audit.privacy
   - from: impl.login.todo-app-backend.auth
     field: proves
     target: br.login.password.sign-in
@@ -2841,6 +2836,9 @@ unclassifiedEdges:
   - from: impl.notify.todo-app-backend.pipeline
     field: proves
     target: sds.notify.delivery-lifecycle
+  - from: impl.notify.todo-app-frontend.preferences
+    field: proves
+    target: ui.notify.preferences
   - from: impl.plan.todo-app-backend.plan
     field: proves
     target: br.plan.active-scope
