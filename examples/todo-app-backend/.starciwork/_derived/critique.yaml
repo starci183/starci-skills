@@ -57,21 +57,18 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.password.sign-in sends 49 other record(s) back to todo, would
-      stale 16 evidence file(s), and touches 35 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/app/sign-in/**, src/app/tasks/**,
+      stale 6 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
-      src/components/blocks/sign-in-form/**, src/components/blocks/task-list/**,
-      src/features/create-task/**, src/features/pages/sign-in/**, src/features/pages/tasks/**,
-      src/features/sign-in/**, src/features/sign-out/**, src/modules/domain/session,
-      src/modules/domain/session/**, src/modules/domain/task/completion-authority.contracts.ts,
-      src/modules/domain/task/completion-authority.providers.ts,
-      src/modules/domain/task/ownership.guard.ts, src/modules/domain/task/task.repository.ts,
-      src/modules/integrations/keycloak/**, src/modules/platform/events/**, src/plan/cap-guard.ts,
-      src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription,
-      src/plan/subscription.ts, src/recur/generator.service.ts, src/recur/occurrence.service.ts,
-      src/recur/rule.service.ts, src/recur/zone.util.ts, src/share) - this is the number a reviewer
-      wants before approving the change.
+      src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
+      src/features/pages/sign-in, src/features/pages/tasks/**,
+      src/features/todo/graphql/mutations/session, src/modules/bussiness/session,
+      src/modules/bussiness/task, src/modules/integrations/keycloak, src/modules/platform/events,
+      src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts,
+      src/plan/subscription, src/plan/subscription.ts, src/recur/generator.service.ts,
+      src/recur/occurrence.service.ts, src/recur/rule.service.ts, src/recur/zone.util.ts, src/share)
+      - this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.login.session.restores
     kind: blast-radius
     severity: critical
@@ -126,21 +123,18 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.restores sends 48 other record(s) back to todo, would
-      stale 14 evidence file(s), and touches 35 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/app/sign-in/**, src/app/tasks/**,
+      stale 5 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
-      src/components/blocks/sign-in-form/**, src/components/blocks/task-list/**,
-      src/features/create-task/**, src/features/pages/sign-in/**, src/features/pages/tasks/**,
-      src/features/sign-in/**, src/features/sign-out/**, src/modules/domain/session,
-      src/modules/domain/session/**, src/modules/domain/task/completion-authority.contracts.ts,
-      src/modules/domain/task/completion-authority.providers.ts,
-      src/modules/domain/task/ownership.guard.ts, src/modules/domain/task/task.repository.ts,
-      src/modules/integrations/keycloak/**, src/modules/platform/events/**, src/plan/cap-guard.ts,
-      src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription,
-      src/plan/subscription.ts, src/recur/generator.service.ts, src/recur/occurrence.service.ts,
-      src/recur/rule.service.ts, src/recur/zone.util.ts, src/share) - this is the number a reviewer
-      wants before approving the change.
+      src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
+      src/features/pages/sign-in, src/features/pages/tasks/**,
+      src/features/todo/graphql/mutations/session, src/modules/bussiness/session,
+      src/modules/bussiness/task, src/modules/integrations/keycloak, src/modules/platform/events,
+      src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts,
+      src/plan/subscription, src/plan/subscription.ts, src/recur/generator.service.ts,
+      src/recur/occurrence.service.ts, src/recur/rule.service.ts, src/recur/zone.util.ts, src/share)
+      - this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.login.session.single-device
     kind: blast-radius
     severity: critical
@@ -195,27 +189,23 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.single-device sends 48 other record(s) back to todo,
-      would stale 14 evidence file(s), and touches 35 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/app/sign-in/**, src/app/tasks/**,
+      would stale 5 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
-      src/components/blocks/sign-in-form/**, src/components/blocks/task-list/**,
-      src/features/create-task/**, src/features/pages/sign-in/**, src/features/pages/tasks/**,
-      src/features/sign-in/**, src/features/sign-out/**, src/modules/domain/session,
-      src/modules/domain/session/**, src/modules/domain/task/completion-authority.contracts.ts,
-      src/modules/domain/task/completion-authority.providers.ts,
-      src/modules/domain/task/ownership.guard.ts, src/modules/domain/task/task.repository.ts,
-      src/modules/integrations/keycloak/**, src/modules/platform/events/**, src/plan/cap-guard.ts,
-      src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription,
-      src/plan/subscription.ts, src/recur/generator.service.ts, src/recur/occurrence.service.ts,
-      src/recur/rule.service.ts, src/recur/zone.util.ts, src/share) - this is the number a reviewer
-      wants before approving the change.
+      src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
+      src/features/pages/sign-in, src/features/pages/tasks/**,
+      src/features/todo/graphql/mutations/session, src/modules/bussiness/session,
+      src/modules/bussiness/task, src/modules/integrations/keycloak, src/modules/platform/events,
+      src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts,
+      src/plan/subscription, src/plan/subscription.ts, src/recur/generator.service.ts,
+      src/recur/occurrence.service.ts, src/recur/rule.service.ts, src/recur/zone.util.ts, src/share)
+      - this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.share.revoke.on-read
     kind: blast-radius
     severity: critical
     records:
       - br.share.revoke.on-read
-      - contract.login.identity-for-task
       - contract.plan.create-precondition
       - contract.share.completion-guard-for-task
       - data.share.collaborator
@@ -226,8 +216,6 @@ findings:
       - fr.share.revoke
       - fr.task.complete
       - fr.task.create
-      - impl.audit.todo-app-backend.erasure
-      - impl.audit.todo-app-backend.log
       - impl.plan.todo-app-backend.plan
       - impl.share.todo-app-backend.invitations
       - impl.share.todo-app-frontend.invite-screen
@@ -237,8 +225,6 @@ findings:
       - impl.task.todo-app-frontend.task-list
       - journey.task.first-task
       - nfr.share.revoke.read-latency
-      - sds.audit.erasure-request
-      - sds.audit.log-chain
       - sds.plan.cap-guard
       - sds.share.invitation-lifecycle
       - sds.task.ownership-guard
@@ -246,15 +232,10 @@ findings:
       - uat.task.create
       - ui.share.invite
       - ui.task.list
-    because: A breaking change to br.share.revoke.on-read sends 31 other record(s) back to todo, would
-      stale 8 evidence file(s), and touches 21 code path(s) (app/share, src/app/tasks/**,
-      src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
-      src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
-      src/components/blocks/task-list/**, src/features/create-task/**, src/features/pages/tasks/**,
-      src/modules/domain/task/completion-authority.contracts.ts,
-      src/modules/domain/task/completion-authority.providers.ts,
-      src/modules/domain/task/ownership.guard.ts, src/modules/domain/task/task.repository.ts,
-      src/modules/platform/events/**, src/plan/cap-guard.ts, src/plan/payments.ts,
+    because: A breaking change to br.share.revoke.on-read sends 26 other record(s) back to todo, would
+      stale 2 evidence file(s), and touches 12 code path(s) (app/share, src/app/tasks/**,
+      src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
+      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments.ts,
       src/plan/reconcile.ts, src/plan/subscription.ts, src/share, src/share/invitation.service.ts) -
       this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.share.role.permissions
@@ -262,7 +243,6 @@ findings:
     severity: critical
     records:
       - br.share.role.permissions
-      - contract.login.identity-for-task
       - contract.plan.create-precondition
       - contract.share.completion-guard-for-task
       - data.share.collaborator
@@ -273,8 +253,6 @@ findings:
       - fr.share.invite
       - fr.task.complete
       - fr.task.create
-      - impl.audit.todo-app-backend.erasure
-      - impl.audit.todo-app-backend.log
       - impl.plan.todo-app-backend.plan
       - impl.share.todo-app-backend.access
       - impl.share.todo-app-backend.invitations
@@ -284,8 +262,6 @@ findings:
       - impl.task.todo-app-backend.platform-events
       - impl.task.todo-app-frontend.task-list
       - journey.task.first-task
-      - sds.audit.erasure-request
-      - sds.audit.log-chain
       - sds.plan.cap-guard
       - sds.share.invitation-lifecycle
       - sds.task.ownership-guard
@@ -293,15 +269,10 @@ findings:
       - uat.task.create
       - ui.share.invite
       - ui.task.list
-    because: A breaking change to br.share.role.permissions sends 31 other record(s) back to todo, would
-      stale 8 evidence file(s), and touches 21 code path(s) (app/share, src/app/tasks/**,
-      src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
-      src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
-      src/components/blocks/task-list/**, src/features/create-task/**, src/features/pages/tasks/**,
-      src/modules/domain/task/completion-authority.contracts.ts,
-      src/modules/domain/task/completion-authority.providers.ts,
-      src/modules/domain/task/ownership.guard.ts, src/modules/domain/task/task.repository.ts,
-      src/modules/platform/events/**, src/plan/cap-guard.ts, src/plan/payments.ts,
+    because: A breaking change to br.share.role.permissions sends 26 other record(s) back to todo, would
+      stale 2 evidence file(s), and touches 12 code path(s) (app/share, src/app/tasks/**,
+      src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
+      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments.ts,
       src/plan/reconcile.ts, src/plan/subscription.ts, src/share, src/share/access.service.ts) -
       this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.task.single-owner
@@ -333,54 +304,13 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.task.single-owner sends 23 other record(s) back to todo, would
-      stale 9 evidence file(s), and touches 19 code path(s) (src/app/tasks/**,
+      stale 3 evidence file(s), and touches 15 code path(s) (src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
-      src/components/blocks/task-list/**, src/features/create-task/**, src/features/pages/tasks/**,
-      src/modules/domain/task/completion-authority.contracts.ts,
-      src/modules/domain/task/completion-authority.providers.ts,
-      src/modules/domain/task/ownership.guard.ts, src/modules/domain/task/task.repository.ts,
-      src/modules/integrations/postgres/**, src/modules/platform/events/**, src/plan/cap-guard.ts,
-      src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription.ts) - this is the number a
-      reviewer wants before approving the change.
-  - id: blast-radius:br.share.editor.no-delete
-    kind: blast-radius
-    severity: critical
-    records:
-      - br.share.editor.no-delete
-      - contract.login.identity-for-task
-      - contract.plan.create-precondition
-      - contract.share.completion-guard-for-task
-      - event.task.completed
-      - event.task.created
-      - fr.task.complete
-      - fr.task.create
-      - impl.audit.todo-app-backend.erasure
-      - impl.audit.todo-app-backend.log
-      - impl.plan.todo-app-backend.plan
-      - impl.share.todo-app-backend.access
-      - impl.task.todo-app-backend.create-task
-      - impl.task.todo-app-backend.ownership
-      - impl.task.todo-app-backend.platform-events
-      - impl.task.todo-app-frontend.task-list
-      - journey.task.first-task
-      - sds.audit.erasure-request
-      - sds.audit.log-chain
-      - sds.plan.cap-guard
-      - sds.task.ownership-guard
-      - uat.task.create
-      - ui.task.list
-    because: A breaking change to br.share.editor.no-delete sends 22 other record(s) back to todo, would
-      stale 8 evidence file(s), and touches 20 code path(s) (src/app/tasks/**,
-      src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
-      src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
-      src/components/blocks/task-list/**, src/features/create-task/**, src/features/pages/tasks/**,
-      src/modules/domain/task/completion-authority.contracts.ts,
-      src/modules/domain/task/completion-authority.providers.ts,
-      src/modules/domain/task/ownership.guard.ts, src/modules/domain/task/task.repository.ts,
-      src/modules/platform/events/**, src/plan/cap-guard.ts, src/plan/payments.ts,
-      src/plan/reconcile.ts, src/plan/subscription.ts, src/share, src/share/access.service.ts) -
-      this is the number a reviewer wants before approving the change.
+      src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
+      src/modules/platform/databases/postgresql/primary, src/modules/platform/events,
+      src/plan/cap-guard.ts, src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription.ts)
+      - this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.plan.caps.limit
     kind: blast-radius
     severity: critical
@@ -410,6 +340,34 @@ findings:
       app/plan/usage-screen.tsx, src/plan/cap-guard, src/plan/cap-guard.ts, src/plan/payments,
       src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription, src/plan/subscription.ts)
       - this is the number a reviewer wants before approving the change.
+  - id: blast-radius:br.share.editor.no-delete
+    kind: blast-radius
+    severity: critical
+    records:
+      - br.share.editor.no-delete
+      - contract.plan.create-precondition
+      - contract.share.completion-guard-for-task
+      - event.task.completed
+      - event.task.created
+      - fr.task.complete
+      - fr.task.create
+      - impl.plan.todo-app-backend.plan
+      - impl.share.todo-app-backend.access
+      - impl.task.todo-app-backend.create-task
+      - impl.task.todo-app-backend.ownership
+      - impl.task.todo-app-backend.platform-events
+      - impl.task.todo-app-frontend.task-list
+      - journey.task.first-task
+      - sds.plan.cap-guard
+      - sds.task.ownership-guard
+      - uat.task.create
+      - ui.task.list
+    because: A breaking change to br.share.editor.no-delete sends 17 other record(s) back to todo, would
+      stale 2 evidence file(s), and touches 11 code path(s) (src/app/tasks/**,
+      src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
+      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments.ts,
+      src/plan/reconcile.ts, src/plan/subscription.ts, src/share, src/share/access.service.ts) -
+      this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.plan.downgrade.freeze
     kind: blast-radius
     severity: critical
@@ -593,9 +551,9 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.task.title.required sends 11 other record(s) back to todo, would
-      stale 5 evidence file(s), and touches 9 code path(s) (src/app/tasks/**,
-      src/components/blocks/task-list/**, src/features/create-task/**, src/features/pages/tasks/**,
-      src/modules/platform/events/**, src/plan/cap-guard.ts, src/plan/payments.ts,
+      stale 2 evidence file(s), and touches 9 code path(s) (src/app/tasks/**,
+      src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
+      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments.ts,
       src/plan/reconcile.ts, src/plan/subscription.ts) - this is the number a reviewer wants before
       approving the change.
   - id: blast-radius:br.notify.digest.window
@@ -651,8 +609,8 @@ findings:
       - sds.plan.cap-guard
       - ui.plan.usage
     because: A breaking change to br.task.list.owned sends 10 other record(s) back to todo, would stale
-      2 evidence file(s), and touches 8 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/features/list-tasks/**, src/plan/cap-guard,
+      0 evidence file(s), and touches 8 code path(s) (app/plan/upgrade-button.tsx,
+      app/plan/usage-screen.tsx, src/modules/bussiness/task, src/plan/cap-guard,
       src/plan/cap-guard.ts, src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription.ts)
       - this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.notify.delivery.once
@@ -687,9 +645,8 @@ findings:
       - sds.plan.cap-guard
       - ui.plan.usage
     because: A breaking change to br.task.delete.final sends 9 other record(s) back to todo, would stale
-      1 evidence file(s), and touches 10 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/features/delete-task/**,
-      src/modules/domain/task/task.repository.ts, src/modules/platform/events/**,
+      0 evidence file(s), and touches 9 code path(s) (app/plan/upgrade-button.tsx,
+      app/plan/usage-screen.tsx, src/modules/bussiness/task, src/modules/platform/events,
       src/plan/cap-guard, src/plan/cap-guard.ts, src/plan/payments.ts, src/plan/reconcile.ts,
       src/plan/subscription.ts) - this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.audit.erasure.right
@@ -822,10 +779,9 @@ findings:
       - impl.task.todo-app-backend.platform-events
       - sds.task.completion-state
     because: A breaking change to br.task.complete.once sends 6 other record(s) back to todo, would
-      stale 2 evidence file(s), and touches 5 code path(s) (src/features/complete-task/**,
-      src/features/reopen-task/**, src/modules/domain/task/task.repository.ts,
-      src/modules/integrations/postgres/**, src/modules/platform/events/**) - this is the number a
-      reviewer wants before approving the change.
+      stale 1 evidence file(s), and touches 3 code path(s) (src/modules/bussiness/task,
+      src/modules/platform/databases/postgresql/primary, src/modules/platform/events) - this is the
+      number a reviewer wants before approving the change.
   - id: blast-radius:br.notify.failure.classified
     kind: blast-radius
     severity: warn
@@ -934,110 +890,6 @@ findings:
     because: br.task.single-owner is used 8 time(s) (top decile of fan-in); it is owned by task and read
       by 2 other feature(s) (login, share), so a change here is cross-feature coupling, not a local
       edit.
-  - id: done-proves-not-done:impl.login.todo-app-frontend.sign-in
-    kind: done-proves-not-done
-    severity: warn
-    records:
-      - impl.login.todo-app-frontend.sign-in
-      - ui.login.sign-in
-    because: "impl.login.todo-app-frontend.sign-in is state: done and proves ui.login.sign-in, but that
-      target is not itself done - an implementation cannot outrun the specification it claims to
-      prove."
-  - id: done-proves-not-done:impl.task.todo-app-backend.ownership
-    kind: done-proves-not-done
-    severity: warn
-    records:
-      - impl.task.todo-app-backend.ownership
-      - br.task.single-owner
-      - sds.task.ownership-guard
-    because: "impl.task.todo-app-backend.ownership is state: done and proves br.task.single-owner,
-      sds.task.ownership-guard, but that target is not itself done - an implementation cannot outrun
-      the specification it claims to prove."
-  - id: done-proves-not-done:impl.task.todo-app-backend.platform-events
-    kind: done-proves-not-done
-    severity: warn
-    records:
-      - impl.task.todo-app-backend.platform-events
-      - event.task.created
-      - event.task.completed
-      - event.task.deleted
-    because: "impl.task.todo-app-backend.platform-events is state: done and proves event.task.created,
-      event.task.completed, event.task.deleted, but that target is not itself done - an
-      implementation cannot outrun the specification it claims to prove."
-  - id: done-without-anchor:br.login.password.sign-in
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - br.login.password.sign-in
-    because: "br.login.password.sign-in is state: done but 2 of its 2 anchor path(s) do not exist on
-      disk: src/features/sign-in/** (module), src/modules/integrations/keycloak/** (module) - the
-      record claims proof over code that is not there to have been proven."
-  - id: done-without-anchor:br.login.session.restores
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - br.login.session.restores
-    because: "br.login.session.restores is state: done but 2 of its 2 anchor path(s) do not exist on
-      disk: src/modules/domain/session/** (module), src/features/sign-out/** (module) - the record
-      claims proof over code that is not there to have been proven."
-  - id: done-without-anchor:br.task.title.required
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - br.task.title.required
-    because: "br.task.title.required is state: done but 1 of its 1 anchor path(s) do not exist on disk:
-      src/features/create-task/** (module) - the record claims proof over code that is not there to
-      have been proven."
-  - id: done-without-anchor:impl.login.todo-app-backend.auth
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.login.todo-app-backend.auth
-    because: "impl.login.todo-app-backend.auth is state: done but 4 of its 4 anchor path(s) do not exist
-      on disk: src/features/sign-in/** (owners), src/features/sign-out/** (owners),
-      src/modules/domain/session/** (owners), src/modules/integrations/keycloak/** (owners) - the
-      record claims proof over code that is not there to have been proven."
-  - id: done-without-anchor:impl.login.todo-app-frontend.sign-in
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.login.todo-app-frontend.sign-in
-    because: "impl.login.todo-app-frontend.sign-in is state: done but 3 of its 3 anchor path(s) do not
-      exist on disk: src/app/sign-in/** (owners), src/features/pages/sign-in/** (owners),
-      src/components/blocks/sign-in-form/** (owners) - the record claims proof over code that is not
-      there to have been proven."
-  - id: done-without-anchor:impl.task.todo-app-backend.create-task
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.task.todo-app-backend.create-task
-    because: "impl.task.todo-app-backend.create-task is state: done but 1 of its 1 anchor path(s) do not
-      exist on disk: src/features/create-task/** (owners) - the record claims proof over code that
-      is not there to have been proven."
-  - id: done-without-anchor:impl.task.todo-app-backend.list
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.task.todo-app-backend.list
-    because: "impl.task.todo-app-backend.list is state: done but 1 of its 1 anchor path(s) do not exist
-      on disk: src/features/list-tasks/** (owners) - the record claims proof over code that is not
-      there to have been proven."
-  - id: done-without-anchor:impl.task.todo-app-backend.platform-database
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.task.todo-app-backend.platform-database
-    because: "impl.task.todo-app-backend.platform-database is state: done but 1 of its 1 anchor path(s)
-      do not exist on disk: src/modules/integrations/postgres/** (owners) - the record claims proof
-      over code that is not there to have been proven."
-  - id: done-without-anchor:impl.task.todo-app-backend.platform-events
-    kind: done-without-anchor
-    severity: critical
-    records:
-      - impl.task.todo-app-backend.platform-events
-    because: "impl.task.todo-app-backend.platform-events is state: done but 1 of its 1 anchor path(s) do
-      not exist on disk: src/modules/platform/events/** (owners) - the record claims proof over code
-      that is not there to have been proven."
   - id: unbound-sds:sds.audit.erasure-request
     kind: unbound-sds
     severity: warn
@@ -1158,8 +1010,18 @@ findings:
       - decision.task.list.scope
       - br.task.list.owned
       - contract.task.list-for-dashboard
-    because: decision.task.list.scope is still open and holds 2 record(s) (br.task.list.owned,
-      contract.task.list-for-dashboard) - none of them can move until this is decided.
+      - impl.task.todo-app-backend.list
+    because: decision.task.list.scope is still open and holds 3 record(s) (br.task.list.owned,
+      contract.task.list-for-dashboard, impl.task.todo-app-backend.list) - none of them can move
+      until this is decided.
+  - id: designed-todo:br.login.session.single-device
+    kind: designed-todo
+    severity: info
+    records:
+      - br.login.session.single-device
+      - decision.login.session.devices
+    because: br.login.session.single-device is todo, blocked on decision.login.session.devices - a real
+      product question, not missing code; it moves once that is settled.
   - id: designed-todo:br.task.complete.once
     kind: designed-todo
     severity: info
@@ -1296,6 +1158,14 @@ findings:
       - gap.audit.operator-role
     because: fr.audit.log.read is todo, blocked on gap.audit.operator-role - a real product question,
       not missing code; it moves once that is settled.
+  - id: designed-todo:fr.login.sign-out
+    kind: designed-todo
+    severity: info
+    records:
+      - fr.login.sign-out
+      - decision.login.session.devices
+    because: fr.login.sign-out is todo, blocked on decision.login.session.devices - a real product
+      question, not missing code; it moves once that is settled.
   - id: designed-todo:fr.notify.on-completion
     kind: designed-todo
     severity: info
@@ -1336,6 +1206,22 @@ findings:
       - decision.audit.erasure-method
     because: impl.audit.todo-app-backend.erasure is todo, blocked on decision.audit.erasure-method - a
       real product question, not missing code; it moves once that is settled.
+  - id: designed-todo:impl.login.todo-app-frontend.sign-in
+    kind: designed-todo
+    severity: info
+    records:
+      - impl.login.todo-app-frontend.sign-in
+      - gap.login.direction-not-drawn
+    because: impl.login.todo-app-frontend.sign-in is todo, blocked on gap.login.direction-not-drawn - a
+      real product question, not missing code; it moves once that is settled.
+  - id: designed-todo:impl.task.todo-app-backend.list
+    kind: designed-todo
+    severity: info
+    records:
+      - impl.task.todo-app-backend.list
+      - decision.task.list.scope
+    because: impl.task.todo-app-backend.list is todo, blocked on decision.task.list.scope - a real
+      product question, not missing code; it moves once that is settled.
   - id: designed-todo:integration.login.keycloak
     kind: designed-todo
     severity: info
@@ -1351,6 +1237,14 @@ findings:
       - integration.login.postgres
       - gap.login.live-proof
     because: integration.login.postgres is todo, blocked on gap.login.live-proof - a real product
+      question, not missing code; it moves once that is settled.
+  - id: designed-todo:journey.login.first-sign-in
+    kind: designed-todo
+    severity: info
+    records:
+      - journey.login.first-sign-in
+      - gap.login.live-proof
+    because: journey.login.first-sign-in is todo, blocked on gap.login.live-proof - a real product
       question, not missing code; it moves once that is settled.
   - id: designed-todo:journey.notify.told-about-completion
     kind: designed-todo
@@ -1368,6 +1262,14 @@ findings:
       - gap.plan.cap-guard-not-wired
     because: journey.plan.hits-the-cap is todo, blocked on gap.plan.cap-guard-not-wired - a real product
       question, not missing code; it moves once that is settled.
+  - id: designed-todo:journey.task.first-task
+    kind: designed-todo
+    severity: info
+    records:
+      - journey.task.first-task
+      - gap.task.live-proof
+    because: journey.task.first-task is todo, blocked on gap.task.live-proof - a real product question,
+      not missing code; it moves once that is settled.
   - id: designed-todo:nfr.notify.delivery.guarantee
     kind: designed-todo
     severity: info
@@ -1697,6 +1599,14 @@ findings:
       - gap.task.collaborator-completion
     because: br.task.single-owner is todo, blocked on gap.task.collaborator-completion - code that
       simply has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:contract.login.identity-for-task
+    kind: leftover-todo
+    severity: info
+    records:
+      - contract.login.identity-for-task
+      - gap.task.collaborator-completion
+    because: contract.login.identity-for-task is todo, blocked on gap.task.collaborator-completion -
+      code that simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:data.notify.delivery-attempt
     kind: leftover-todo
     severity: info
@@ -1905,6 +1815,14 @@ findings:
       - gap.share.unbuilt-module
     because: impl.share.todo-app-frontend.invite-screen is todo, blocked on gap.share.unbuilt-module -
       code that simply has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:impl.task.todo-app-backend.ownership
+    kind: leftover-todo
+    severity: info
+    records:
+      - impl.task.todo-app-backend.ownership
+      - gap.task.collaborator-completion
+    because: impl.task.todo-app-backend.ownership is todo, blocked on gap.task.collaborator-completion -
+      code that simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:integration.notify.queue
     kind: leftover-todo
     severity: info
@@ -2069,91 +1987,3 @@ findings:
       - gap.task.collaborator-completion
     because: sds.task.ownership-guard is todo, blocked on gap.task.collaborator-completion - code that
       simply has not been written yet; the owner wants this count at zero.
-  - id: stale-evidence-bulk-edit:br.task.complete.once
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - br.task.complete.once
-    because: br.task.complete.once's evidence is stale with no staleSince at all - a bare digest
-      mismatch with nothing recorded about why, even where the record's own staleReason prose
-      describes a real revision (bulk-edit-after-capture territory either way).
-  - id: stale-evidence-bulk-edit:br.task.single-owner
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - br.task.single-owner
-    because: br.task.single-owner's evidence is stale with no staleSince at all - a bare digest mismatch
-      with nothing recorded about why, even where the record's own staleReason prose describes a
-      real revision (bulk-edit-after-capture territory either way).
-  - id: stale-evidence-bulk-edit:contract.login.identity-for-task
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - contract.login.identity-for-task
-    because: contract.login.identity-for-task's evidence is stale with staleSince naming only itself - a
-      bare digest mismatch (the record's own bytes moved after capture), not a change in some other
-      record it depends on.
-  - id: stale-evidence-bulk-edit:integration.login.keycloak
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - integration.login.keycloak
-    because: integration.login.keycloak's evidence is stale with staleSince naming only itself - a bare
-      digest mismatch (the record's own bytes moved after capture), not a change in some other
-      record it depends on.
-  - id: stale-evidence-bulk-edit:journey.login.first-sign-in
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - journey.login.first-sign-in
-    because: journey.login.first-sign-in's evidence is stale with staleSince naming only itself - a bare
-      digest mismatch (the record's own bytes moved after capture), not a change in some other
-      record it depends on.
-  - id: stale-evidence-bulk-edit:journey.task.first-task
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - journey.task.first-task
-    because: journey.task.first-task's evidence is stale with staleSince naming only itself - a bare
-      digest mismatch (the record's own bytes moved after capture), not a change in some other
-      record it depends on.
-  - id: stale-evidence-bulk-edit:nfr.task.list.latency
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - nfr.task.list.latency
-    because: nfr.task.list.latency's evidence is stale with staleSince naming only itself - a bare
-      digest mismatch (the record's own bytes moved after capture), not a change in some other
-      record it depends on.
-  - id: stale-evidence-bulk-edit:sds.login.session-store
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - sds.login.session-store
-    because: sds.login.session-store's evidence is stale with staleSince naming only itself - a bare
-      digest mismatch (the record's own bytes moved after capture), not a change in some other
-      record it depends on.
-  - id: stale-evidence-bulk-edit:sds.task.ownership-guard
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - sds.task.ownership-guard
-    because: sds.task.ownership-guard's evidence is stale with no staleSince at all - a bare digest
-      mismatch with nothing recorded about why, even where the record's own staleReason prose
-      describes a real revision (bulk-edit-after-capture territory either way).
-  - id: stale-evidence-bulk-edit:uat.login.sign-in
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - uat.login.sign-in
-    because: uat.login.sign-in's evidence is stale with staleSince naming only itself - a bare digest
-      mismatch (the record's own bytes moved after capture), not a change in some other record it
-      depends on.
-  - id: stale-evidence-bulk-edit:uat.task.create
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - uat.task.create
-    because: uat.task.create's evidence is stale with staleSince naming only itself - a bare digest
-      mismatch (the record's own bytes moved after capture), not a change in some other record it
-      depends on.
