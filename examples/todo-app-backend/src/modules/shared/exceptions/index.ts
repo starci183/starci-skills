@@ -9,3 +9,5 @@ export { TaskTitleRequiredException } from './errors/task/task-title-required';
 export { KeycloakInvalidCredentialsException } from './errors/keycloak/keycloak-invalid-credentials';
 export { KeycloakUnavailableException } from './errors/keycloak/keycloak-unavailable';
 export { PostgresPrimaryUnavailableException } from './errors/postgres/postgres-primary-unavailable';
+export { NotifySmtpTransientFailureException } from './errors/notify/notify-smtp-transient-failure';
+export { NotifySmtpPermanentRejectionException } from './errors/notify/notify-smtp-permanent-rejection';

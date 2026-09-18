@@ -4,6 +4,7 @@ import { PlatformEventsModule } from './modules/platform/events';
 import { PostgresqlPrimaryModule } from './modules/platform/databases/postgresql/primary';
 import { SessionModule } from './modules/bussiness/session';
 import { TaskModule } from './modules/bussiness/task';
+import { NotifyModule } from './modules/bussiness/notify';
 import { TodoGraphqlModule } from './features/todo/graphql/graphql.module';
 import { HealthModule } from './features/todo/http/health/health.module';
 
@@ -27,6 +28,7 @@ import { HealthModule } from './features/todo/http/health/health.module';
     PostgresqlPrimaryModule.register(),
     SessionModule.register({ isGlobal: true }),
     TaskModule.register(),
+    NotifyModule.register(),
     TodoGraphqlModule,
     HealthModule.register(),
   ],
