@@ -1,0 +1,8 @@
+schema: work/acceptance-criterion
+id: ac.plan.downgrade.freeze.over-cap-blocks-create
+rule: br.plan.downgrade.freeze
+given: A paid person with 40 active tasks who downgrades to free
+when: They then try to create one more task
+then:
+  - The downgrade itself already happened; the subscription is free.
+  - The create is refused, naming the same over-the-cap reason an at-cap create would.

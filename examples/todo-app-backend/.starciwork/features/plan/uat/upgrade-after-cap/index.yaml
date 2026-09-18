@@ -1,0 +1,14 @@
+schema: work/uat-flow
+id: uat.plan.upgrade-after-cap
+title: Hit the cap, get refused, upgrade, create past it
+state: todo
+accounts: accounts.yaml
+steps:
+  - Sign in as an owner already at 20 active tasks.
+  - Attempt to create a 21st task and see the refusal naming the cap and the upgrade path.
+  - Start checkout for the paid plan and complete it at the gateway sandbox.
+  - Return to the app once the gateway acknowledges and see the usage screen show no cap.
+  - Create the 21st task and see it appear.
+blockedBy:
+  - Nothing to walk yet - fr.plan.upgrade, ui.plan.usage and the cap guard itself are all todo, and the cap
+    guard is not wired into task creation at all (contract.plan.create-precondition).

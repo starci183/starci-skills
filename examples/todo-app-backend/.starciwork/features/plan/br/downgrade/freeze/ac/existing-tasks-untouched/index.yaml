@@ -1,0 +1,8 @@
+schema: work/acceptance-criterion
+id: ac.plan.downgrade.freeze.existing-tasks-untouched
+rule: br.plan.downgrade.freeze
+given: A paid person with 40 active tasks
+when: They downgrade to free
+then:
+  - All 40 tasks still exist, unowned change, uncompleted change, untouched.
+  - Only the subscription row changes.

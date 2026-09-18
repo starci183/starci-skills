@@ -14,6 +14,9 @@ features:
   - id: notify
     directory: features/notify
     description: Telling a person something happened, outside the product - email now, other channels later.
+  - id: plan
+    directory: features/plan
+    description: A paid plan that caps what the product will do.
   - id: audit
     directory: features/audit
     description: An append-only record of what happened, and the right to have it erased.

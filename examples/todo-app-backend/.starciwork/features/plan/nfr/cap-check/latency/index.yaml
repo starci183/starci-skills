@@ -1,0 +1,21 @@
+schema: work/non-functional-requirement
+id: nfr.plan.cap-check.latency
+title: The cap check adds no noticeable delay to creating a task
+quality: latency
+state: todo
+observableCriterion: With the cap guard consulted on every create, the create endpoint's p95 latency does
+  not regress by more than 10 ms versus its latency with no cap check, for a person with 20 existing tasks.
+measurement:
+  how: k6 run scripts/load/create.js twice - once against the guarded path, once against a build with the
+    guard stubbed to always allow - and diff the p95.
+  threshold: p95 regression < 10ms
+  environment: dev
+appliesTo: [br.plan.caps.limit]
+
+requiresProof:
+  measurement:
+    required: true
+
+blockedBy:
+  - No create path or cap guard exists yet to measure; the example backend is moving to NestJS and no
+    load-test harness has been pointed at it.

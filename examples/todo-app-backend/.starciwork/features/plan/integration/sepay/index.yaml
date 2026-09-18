@@ -1,0 +1,29 @@
+schema: work/integration
+id: integration.plan.sepay
+title: SePay processes the checkout and confirms payment
+state: todo
+provider: sepay
+boundary: The product never stores a card or bank credential; SePay owns the transfer, and this product owns
+  the subscription row that follows a confirmed payment, keyed by SePay's payment intent id.
+endpoints:
+  - {name: create-intent, method: POST, path: /userapi/transactions/qr}
+  - {name: get-transaction, method: GET, path: /userapi/transactions/details/:id}
+  - {name: webhook, method: POST, path: /webhooks/sepay}
+credential:
+  name: SEPAY_API_KEY_FILE
+  providedBy: owner
+  where: .starcistacks/dev/runtime/files/sepay-api-key.key.enc
+sandbox: SePay's own sandbox merchant account, called for real from the dev environment; not a stub.
+refs: [br.plan.payment.idempotent, sds.plan.subscription-lifecycle]
+
+requiresProof:
+  live:
+    required: true
+    note: A run against the real SePay sandbox API. Evidence must carry proof.boundary live and an empty
+      fakes list.
+
+blockedBy:
+  - No call has been made against the real SePay sandbox yet; there is no module to make one. The example
+    backend is moving to NestJS, and this integration is specified but not implemented against it. Tests
+    written against a fake gateway response would settle sds.plan.subscription-lifecycle and
+    sds.plan.reconciliation's transitions, never this record - a fake proves the guard, not the gateway.

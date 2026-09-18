@@ -1,0 +1,22 @@
+schema: work/functional-requirement
+id: fr.plan.usage.view
+title: View usage against the cap
+state: todo
+actors: [owner]
+trigger: The owner opens the usage screen.
+mainFlow:
+  - The owner's effective plan is read (t-revert-on-read) and their active task count is computed
+    (br.plan.active-scope).
+  - The screen shows the count against the cap, or "no cap" on the paid plan, and an upgrade action when free.
+postconditions:
+  - The count shown always matches what the cap guard would compute for the same person at that moment.
+refs: [sds.plan.subscription-lifecycle, br.plan.active-scope, ui.plan.usage]
+
+requiresProof:
+  uat:
+    required: true
+
+blockedBy:
+  - No module exists yet at src/plan/cap-guard or the usage screen; the example backend is moving to NestJS
+    and the frontend to Next.js consuming the Grammar core package, and this flow is specified but not built
+    against either layout.

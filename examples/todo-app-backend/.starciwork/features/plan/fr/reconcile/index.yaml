@@ -1,0 +1,33 @@
+schema: work/functional-requirement
+id: fr.plan.reconcile
+title: Reconcile a payment whose webhook never arrived
+state: todo
+actors: [scheduler, owner]
+trigger: A payment intent has been pending past a short grace window, either found by a scheduled sweep or
+  by the owner asking the usage screen to check their payment.
+mainFlow:
+  - The intent's status is fetched directly from the gateway (sds.plan.reconciliation).
+  - If the gateway shows it paid, the same activation a webhook would have caused is applied, once, per
+    br.plan.payment.idempotent.
+  - If the gateway shows it failed or expired, the subscription returns to free (t-gateway-abandoned).
+exceptionFlows:
+  - The gateway still shows the intent pending; nothing changes and it is checked again later.
+  - The webhook arrives after reconciliation already applied the same intent; the webhook is a no-op, per
+    br.plan.payment.idempotent.
+postconditions:
+  - No pending intent is left unresolved forever.
+  - A person is never charged twice for one intent, however many times reconciliation and a webhook both
+    try to apply it.
+composes:
+  - {rule: br.plan.payment.idempotent, module: src/plan/reconcile}
+refs: [sds.plan.reconciliation, integration.plan.sepay]
+
+requiresProof:
+  unit:
+    forEach: composes
+  uat:
+    required: true
+
+blockedBy:
+  - No module exists yet at src/plan/reconcile; the example backend is moving to NestJS and this flow is
+    specified but not built.

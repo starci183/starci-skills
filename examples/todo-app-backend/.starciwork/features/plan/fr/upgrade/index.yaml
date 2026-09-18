@@ -1,0 +1,32 @@
+schema: work/functional-requirement
+id: fr.plan.upgrade
+title: Upgrade to the paid plan
+state: todo
+actors: [owner]
+trigger: The owner chooses the paid plan from the usage screen.
+mainFlow:
+  - The owner starts checkout; a pending subscription and a payment intent are created (t-checkout-started).
+  - The owner completes payment at the gateway.
+  - The gateway's webhook confirms the intent, and the subscription becomes active (t-gateway-confirmed).
+exceptionFlows:
+  - The owner abandons checkout, or the gateway's webhook never arrives and reconciliation finds the intent
+    unpaid; the subscription returns to free (t-gateway-abandoned), and fr.plan.reconcile is what notices.
+  - The webhook arrives with an invalid signature; it is ignored, the subscription stays pending, and no
+    money is treated as received.
+postconditions:
+  - The subscription is active only once a gateway acknowledgement has actually been observed, never on the
+    redirect back to the app alone.
+  - Exactly one activation is recorded per payment intent, per br.plan.payment.idempotent.
+composes:
+  - {rule: br.plan.caps.limit, module: src/plan/cap-guard}
+refs: [sds.plan.subscription-lifecycle, integration.plan.sepay]
+
+requiresProof:
+  unit:
+    forEach: composes
+  uat:
+    required: true
+
+blockedBy:
+  - No module exists yet at src/plan/subscription; the example backend is moving to NestJS and this flow is
+    specified but not built, so there is no unit suite and no UAT walk to point to yet.

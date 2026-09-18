@@ -1,0 +1,22 @@
+schema: work/customer-journey
+id: journey.plan.hits-the-cap
+title: A free person fills up their list and pays to keep going
+state: todo
+crossesFeatures: [task, plan]
+steps:
+  - {actor: person, does: "Creates twenty tasks one at a time, expects: Each appears, same as always."}
+  - {actor: person, does: "Tries to create a twenty-first, expects: A refusal that says why and how to fix it."}
+  - {actor: person, does: "Upgrades from that refusal and the gateway acknowledges, expects: A short checkout, then a confirmation."}
+  - {actor: person, does: "Creates the twenty-first task, expects: It appears; the usage screen shows no cap."}
+requirements: [fr.task.create, fr.plan.upgrade, fr.plan.usage.view]
+
+requiresProof:
+  uat:
+    required: true
+  requirements:
+    forEach: requirements
+
+blockedBy:
+  - fr.plan.upgrade and fr.plan.usage.view are todo, and the cap guard they depend on is not wired into
+    fr.task.create at all (see contract.plan.create-precondition); a walk of this journey today would create
+    a 21st task on the free plan without ever being asked to pay.

@@ -11,6 +11,8 @@ Every row is one secret. The `.enc` member is the tracked record; the decrypted 
 | `MINIO_ROOT_PASSWORD_FILE` | `runtime/files/minio-root-password.key.enc` | Object store root credential |
 | `TODO_SESSION_SECRET_FILE` | `runtime/files/todo-session-secret.key.enc` | Signs the api session cookie |
 | `SMTP_API_KEY_FILE` | `runtime/files/smtp-api-key.key.enc` | Outbound mail for task reminders |
+| `SEPAY_API_KEY_FILE` | `runtime/files/sepay-api-key.key.enc` | Calls SePay to create and query a payment intent (integration.plan.sepay) |
+| `SEPAY_WEBHOOK_SECRET_FILE` | `runtime/files/sepay-webhook-secret.key.enc` | Verifies the signature on a SePay webhook before it can confirm a payment |
 
 A key that the declaration names and this table does not is an undocumented secret: the check reports it
 rather than assuming somebody knows what it unlocks.

@@ -1,0 +1,9 @@
+schema: work/acceptance-criterion
+id: ac.plan.caps.limit.refuses-over-cap
+rule: br.plan.caps.limit
+given: A free-plan owner already holding 20 active tasks
+when: They submit a title to create one more
+then:
+  - Creation is refused.
+  - Nothing is written.
+  - The refusal names the cap of 20 and the upgrade path.

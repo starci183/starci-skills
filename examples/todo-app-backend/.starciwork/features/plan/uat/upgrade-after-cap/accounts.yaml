@@ -1,0 +1,3 @@
+schema: work/disposable-accounts
+accounts:
+  - {role: owner-at-cap, username: uat-plan-owner, password: uat-plan-owner-disposable}
