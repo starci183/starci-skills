@@ -5,6 +5,9 @@ purpose: >-
   Image Layout Specification: what directories exist, what they are named, which files are required and which
   are refused. application-stacks.schema.yaml governs the CONTENT of the model document; this file governs
   the TREE that holds it. Confusing the two is why three incompatible .starcistacks trees exist today.
+  application-stacks.schema.yaml is this file's machine form for that content half: every field it requires
+  is one this file's shape/runbook/secrets sections name, and it is the one place to read the exact,
+  checkable field list a real application-stacks.yaml must satisfy.
 root: <bound-source-repository>/.starcistacks
 declaration: .starcistacks/application-stacks.yaml
 identity: the environment name is the directory name; there is no id indirection here, unlike the Work tree
