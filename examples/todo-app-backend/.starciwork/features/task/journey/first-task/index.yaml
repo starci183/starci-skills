@@ -1,7 +1,7 @@
 schema: work/customer-journey
 id: journey.task.first-task
 title: A new person captures their first task
-state: done
+state: todo
 crossesFeatures: [login, task]
 steps:
   - {actor: person, does: "Signs in and lands on an empty list, expects: An empty state that says what to do next."}
@@ -15,8 +15,10 @@ requiresProof:
   requirements:
     forEach: requirements
 
+blockedBy:
+  - {record: gap.task.live-proof, because: "This journey's requiresProof.uat names uat.task.create and uat.login.sign-in; both are themselves todo - no uat/create/runs/<runId>/ or uat/sign-in/runs/<runId>/ folder with real screenshots and a passing result.md exists yet. The former evidence.yaml here (provenance: starci-kernel, stale: true) pointed at runs that never happened."}
+
 # provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
 # An agent-authored provenBy is refused: it would be this record speaking for another one.
 provenBy:
-  uat: [uat.task.create, uat.login.sign-in]
   requirements: [fr.login.sign-in, fr.task.create]

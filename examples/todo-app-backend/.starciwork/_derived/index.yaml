@@ -319,7 +319,7 @@ records:
     schema: work/business-rule
     feature: login
     state: todo
-    effectiveState: todo
+    effectiveState: blocked
     usedBy:
       refs:
         - event.login.new-device-signin
@@ -331,6 +331,11 @@ records:
         - fr.notify.on-new-device
       blockedBy:
         - fr.login.sign-out
+    blockers:
+      - id: decision.login.session.devices
+        rootKind: decision
+        cyclic: false
+        because: which devices may hold a session is undecided
   br.notify.delivery.once:
     schema: work/business-rule
     feature: notify
@@ -677,8 +682,7 @@ records:
     schema: work/business-rule
     feature: task
     state: todo
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: todo
     usedBy:
       refs:
         - data.task.task
@@ -718,8 +722,7 @@ records:
     schema: work/business-rule
     feature: task
     state: todo
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: blocked
     usedBy:
       refs:
         - contract.login.identity-for-task
@@ -763,12 +766,19 @@ records:
   contract.login.identity-for-task:
     schema: work/contract
     feature: login
-    state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    state: todo
+    effectiveState: blocked
     usedBy:
       dependsOn:
         - sds.audit.log-chain
+    blockers:
+      - id: gap.task.collaborator-completion
+        rootKind: gap
+        cyclic: false
+        because: "The consumer side (impl.task.todo-app-backend.ownership) went back to todo for the same
+          reason: its owner-only guard has not been rebuilt to also honour an accepted editor
+          collaborator, so it cannot re-prove this contract's consumer obligations until that gap
+          closes."
   contract.notify.new-device-signal:
     schema: work/contract
     feature: notify
@@ -1012,6 +1022,7 @@ records:
     effectiveState: todo
     usedBy:
       blockedBy:
+        - br.login.session.single-device
         - contract.notify.new-device-signal
   decision.notify.dedupe-key:
     schema: work/policy-decision
@@ -1081,6 +1092,7 @@ records:
     usedBy:
       blockedBy:
         - contract.task.list-for-dashboard
+        - impl.task.todo-app-backend.list
   environment.todo-app.dev:
     schema: work/resource
     feature: null
@@ -1280,10 +1292,10 @@ records:
       refs:
         - event.login.signed-out
     blockers:
-      - id: br.login.session.single-device
-        rootKind: record
+      - id: decision.login.session.devices
+        rootKind: decision
         cyclic: false
-        because: br.login.session.single-device is todo; the device rule it composes has no evidence yet.
+        because: which devices may hold a session is undecided
   fr.notify.digest:
     schema: work/functional-requirement
     feature: notify
@@ -1636,6 +1648,7 @@ records:
     effectiveState: todo
     usedBy:
       blockedBy:
+        - impl.login.todo-app-frontend.sign-in
         - ui.login.sign-in
   gap.login.live-proof:
     schema: work/gap
@@ -1646,12 +1659,13 @@ records:
       blockedBy:
         - integration.login.keycloak
         - integration.login.postgres
+        - journey.login.first-sign-in
         - uat.login.sign-in
   gap.login.migration-not-applied:
     schema: work/gap
     feature: login
-    state: done
-    effectiveState: done
+    state: todo
+    effectiveState: todo
   gap.notify.direction-not-drawn:
     schema: work/gap
     feature: notify
@@ -1821,7 +1835,9 @@ records:
     usedBy:
       blockedBy:
         - br.task.single-owner
+        - contract.login.identity-for-task
         - fr.task.complete
+        - impl.task.todo-app-backend.ownership
         - sds.task.ownership-guard
   gap.task.live-proof:
     schema: work/gap
@@ -1830,6 +1846,7 @@ records:
     effectiveState: todo
     usedBy:
       blockedBy:
+        - journey.task.first-task
         - uat.task.create
   identity.todo-app.demo:
     schema: work/resource
@@ -1883,8 +1900,18 @@ records:
   impl.login.todo-app-frontend.sign-in:
     schema: work/implementation
     feature: login
-    state: done
-    effectiveState: done
+    state: todo
+    effectiveState: blocked
+    blockers:
+      - id: gap.login.direction-not-drawn
+        rootKind: gap
+        cyclic: false
+        because: "ui.login.sign-in (what this implements) is itself todo - interface.draw has not run, so no
+          representative direction image exists yet (docs/kinds.md's implementation/frontend lane is
+          held until the feature's ui node is done). The route/feature/block code is real and its
+          own vitest suite passes, but that is not what is missing: this impl was recorded done
+          against a ui-screen record that has since been pulled back to todo, and it cannot honestly
+          re-claim done until the ui node it proves does."
   impl.notify.todo-app-backend.pipeline:
     schema: work/implementation
     feature: notify
@@ -2032,18 +2059,37 @@ records:
   impl.task.todo-app-backend.list:
     schema: work/implementation
     feature: task
-    state: done
-    effectiveState: done
+    state: todo
+    effectiveState: blocked
+    blockers:
+      - id: decision.task.list.scope
+        rootKind: decision
+        cyclic: false
+        because: "br.task.list.owned (what this query implements and nfr.task.list.latency measures) is
+          itself todo: whether an organization owner sees its members' tasks is undecided, and this
+          record cannot honestly claim done against a rule whose own shape is still open.
+          ListTasksHandler is real and its ac.task.list.owned.excludes-others test passes today, but
+          that proves the current owner-only reading, not the rule this record is filed against once
+          that decision lands. nfr.task.list.latency separately has no k6 harness in this host to
+          measure against."
   impl.task.todo-app-backend.ownership:
     schema: work/implementation
     feature: task
-    state: done
-    effectiveState: done
+    state: todo
+    effectiveState: blocked
     usedBy:
-      contractConsumer:
-        - contract.login.identity-for-task
       provenBy:
         - fr.task.create
+    blockers:
+      - id: gap.task.collaborator-completion
+        rootKind: gap
+        cyclic: false
+        because: "OwnershipGuard/CompletionAuthorityRegistry only know t-owner/t-stranger: delete stays
+          correctly owner-only, but br.task.single-owner rev 2 and sds.task.ownership-guard both now
+          also describe an accepted-editor-collaborator completing a task through
+          contract.share.completion-guard-for-task, and neither the guard nor that contract exists.
+          This was proven done against rev 1 of both targets; rev 2 needs the collaborator half
+          gap.task.collaborator-completion names before it can be proven again."
   impl.task.todo-app-backend.platform-database:
     schema: work/implementation
     feature: task
@@ -2052,8 +2098,8 @@ records:
   impl.task.todo-app-backend.platform-events:
     schema: work/implementation
     feature: task
-    state: done
-    effectiveState: done
+    state: todo
+    effectiveState: todo
   impl.task.todo-app-backend.reopen-task:
     schema: work/implementation
     feature: task
@@ -2068,8 +2114,7 @@ records:
     schema: work/integration
     feature: login
     state: todo
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: blocked
     usedBy:
       dependsOn:
         - sds.login.session-store
@@ -2192,9 +2237,17 @@ records:
   journey.login.first-sign-in:
     schema: work/customer-journey
     feature: login
-    state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    state: todo
+    effectiveState: blocked
+    blockers:
+      - id: gap.login.live-proof
+        rootKind: gap
+        cyclic: false
+        because: "This journey's own requiresProof.uat names uat.login.sign-in, which is itself todo - no
+          uat/sign-in/runs/<runId>/ folder with real screenshots and a passing result.md exists yet,
+          only the designed flow. The former evidence.yaml here (provenance: starci-kernel, stale:
+          true) pointed at that same never-executed run; a lane's own toolkit script cannot honestly
+          re-mint starci-kernel provenance for a run that did not happen."
   journey.notify.told-about-completion:
     schema: work/customer-journey
     feature: notify
@@ -2253,9 +2306,16 @@ records:
   journey.task.first-task:
     schema: work/customer-journey
     feature: task
-    state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    state: todo
+    effectiveState: blocked
+    blockers:
+      - id: gap.task.live-proof
+        rootKind: gap
+        cyclic: false
+        because: "This journey's requiresProof.uat names uat.task.create and uat.login.sign-in; both are
+          themselves todo - no uat/create/runs/<runId>/ or uat/sign-in/runs/<runId>/ folder with
+          real screenshots and a passing result.md exists yet. The former evidence.yaml here
+          (provenance: starci-kernel, stale: true) pointed at runs that never happened."
   login:
     schema: work/feature
     feature: login
@@ -2357,9 +2417,8 @@ records:
   nfr.task.list.latency:
     schema: work/non-functional-requirement
     feature: task
-    state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    state: todo
+    effectiveState: todo
   notify:
     schema: work/feature
     feature: notify
@@ -2439,8 +2498,7 @@ records:
     schema: work/sds-component
     feature: login
     state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: done
     usedBy:
       refs:
         - br.plan.lapse.reverts-on-read
@@ -2584,8 +2642,7 @@ records:
     schema: work/sds-component
     feature: task
     state: todo
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: blocked
     blockers:
       - id: gap.task.collaborator-completion
         rootKind: gap
@@ -2632,13 +2689,10 @@ records:
     schema: work/uat-flow
     feature: login
     state: todo
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: blocked
     usedBy:
       provenBy:
         - fr.login.sign-in
-        - journey.login.first-sign-in
-        - journey.task.first-task
     blockers:
       - id: gap.login.live-proof
         rootKind: gap
@@ -2737,12 +2791,10 @@ records:
     schema: work/uat-flow
     feature: task
     state: todo
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: blocked
     usedBy:
       provenBy:
         - fr.task.create
-        - journey.task.first-task
     blockers:
       - id: gap.task.live-proof
         rootKind: gap
@@ -2838,10 +2890,10 @@ records:
     effectiveState: todo
 tally:
   overall:
-    done: 33
-    todo: 39
-    stale: 11
-    blocked: 106
+    done: 29
+    todo: 42
+    stale: 0
+    blocked: 118
     total: 189
   byFeature:
     audit:
@@ -2851,10 +2903,10 @@ tally:
       blocked: 17
       total: 26
     login:
-      done: 8
+      done: 7
       todo: 5
-      stale: 5
-      blocked: 6
+      stale: 0
+      blocked: 12
       total: 24
     notify:
       done: 3
@@ -2881,10 +2933,10 @@ tally:
       blocked: 17
       total: 24
     task:
-      done: 8
-      todo: 10
-      stale: 6
-      blocked: 6
+      done: 5
+      todo: 13
+      stale: 0
+      blocked: 12
       total: 30
   gaps:
     - id: gap.audit.direction-not-drawn
@@ -2927,7 +2979,7 @@ tally:
         - uat.login.sign-in
     - id: gap.login.migration-not-applied
       feature: login
-      state: done
+      state: todo
       closedBy:
         - gap.login.live-proof
     - id: gap.notify.direction-not-drawn
@@ -3039,9 +3091,6 @@ frontier:
   - id: gap.audit.unbuilt-module
     feature: audit
     title: No audit module exists under the NestJS layout yet
-  - id: br.login.session.single-device
-    feature: login
-    title: Signing in on a new device ends the old session
   - id: decision.login.session.devices
     feature: login
     title: How many devices may hold a live session
@@ -3055,6 +3104,9 @@ frontier:
     feature: login
     title: No live proof exists against the real Keycloak/Postgres stack, and no uat.verify run has
       executed login.sign-in against it
+  - id: gap.login.migration-not-applied
+    feature: login
+    title: No migration has been applied against the dev server
   - id: gap.notify.direction-not-drawn
     feature: notify
     title: No interface.draw run has produced a direction for notify.preferences
@@ -3124,12 +3176,18 @@ frontier:
   - id: impl.task.todo-app-backend.delete-task
     feature: task
     title: The delete-task feature
+  - id: impl.task.todo-app-backend.platform-events
+    feature: task
+    title: The platform events module (typed in-process event bus)
   - id: impl.task.todo-app-backend.reopen-task
     feature: task
     title: The reopen-task feature
   - id: impl.task.todo-app-frontend.task-list
     feature: task
     title: The list screen and the create form
+  - id: nfr.task.list.latency
+    feature: task
+    title: A list read feels immediate
   - id: ui.task.list
     feature: task
     title: The task list and its create form

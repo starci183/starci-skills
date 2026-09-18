@@ -7,6 +7,6 @@ statements:
 openQuestions:
   - Whether an organization owner sees the tasks of its members is undecided; decision.task.list.scope owns it.
 acceptanceCriteria: [excludes-others]
-module: src/features/list-tasks/**
+module: src/modules/bussiness/task
 change: {rev: 1, kind: initial, at: 2026-09-18T02:14:00.000Z}
 

@@ -30,6 +30,12 @@ describe('SessionService', () => {
   const buildService = () =>
     new SessionService(new FakeSessionRepository() as unknown as Repository<SessionEntity>, new AppConfigService());
 
+  it('t-begin: a malformed email is refused before any write, and a well-formed one passes through', () => {
+    const service = buildService();
+    expect(() => service.tBegin('not-an-email')).toThrow(expect.objectContaining({ code: 'INVALID_CREDENTIALS' }));
+    expect(() => service.tBegin('person@example.com')).not.toThrow();
+  });
+
   it('sds.login.session-store: expiry is enforced on read, and the row is deleted on the way out', async () => {
     const service = buildService();
     const session = await service.tAccept('person-1');

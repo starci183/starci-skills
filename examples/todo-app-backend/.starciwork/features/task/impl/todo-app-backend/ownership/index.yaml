@@ -1,14 +1,11 @@
 schema: work/implementation
 id: impl.task.todo-app-backend.ownership
 title: Ownership binding and its guard
-state: done
+state: todo
 repository: todo-app
 owners:
-  - {role: module, path: src/modules/domain/task/ownership.guard.ts}
-  - {role: module, path: src/modules/domain/task/completion-authority.contracts.ts}
-  - {role: module, path: src/modules/domain/task/completion-authority.providers.ts}
-  - {role: module, path: src/modules/domain/task/task.repository.ts}
-revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
+  - {role: module, path: src/modules/bussiness/task}
 proves: [br.task.single-owner, sds.task.ownership-guard]
-verification: [npx jest src/modules/domain/task exited 0]
-verificationSource: kernel-observed
+
+blockedBy:
+  - {record: gap.task.collaborator-completion, because: "OwnershipGuard/CompletionAuthorityRegistry only know t-owner/t-stranger: delete stays correctly owner-only, but br.task.single-owner rev 2 and sds.task.ownership-guard both now also describe an accepted-editor-collaborator completing a task through contract.share.completion-guard-for-task, and neither the guard nor that contract exists. This was proven done against rev 1 of both targets; rev 2 needs the collaborator half gap.task.collaborator-completion names before it can be proven again."}

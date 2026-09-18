@@ -5,5 +5,5 @@ state: done
 statements:
   - A task is created only with a non-empty title, trimmed of surrounding whitespace.
 acceptanceCriteria: [refuses-empty]
-module: src/features/create-task/**
+module: src/modules/bussiness/task
 change: {rev: 1, kind: initial, at: 2026-09-18T02:11:00.000Z}

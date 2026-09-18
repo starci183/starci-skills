@@ -3,14 +3,76 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: impl.login.todo-app-backend.auth
-recordDigest: dea1f57e2ea797d230230c6be4569619d22c627ce82f7139b28238d5d589e019
+recordDigest: 53fda9a27fa2c6d5ec19a145ac56f72be1a54c3fb650ad9119e5fc5c525b384b
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/features/todo/graphql/mutations/session/sign-in/graphql-types/input.ts
+      sha256: 59a22055e4d8026b21371bd3835a4f1fd14f51ba66f3e797843c19611cbc776c
+    - path: src/features/todo/graphql/mutations/session/sign-in/graphql-types/response.ts
+      sha256: 77bb2222ec4cd82c7bf559878470d77f59475124ff726a0847c2f50e272c4c27
+    - path: src/features/todo/graphql/mutations/session/sign-in/sign-in.module-definition.ts
+      sha256: 553421dc5426ca2794762235b8749e59c155be7832a602da9b40845f1e6e912b
+    - path: src/features/todo/graphql/mutations/session/sign-in/sign-in.module.ts
+      sha256: fe418a4a9386b2b51bf49a6b322ed7e20d82393729040307d580af5cb11c41d0
+    - path: src/features/todo/graphql/mutations/session/sign-in/sign-in.resolver.ts
+      sha256: 3564012d9f6eaa3496329573eb11738355ba9447383adf63eb79f4f0c2d27d3f
+    - path: src/features/todo/graphql/mutations/session/sign-out/graphql-types/input.ts
+      sha256: a2d5417aeec4f252351cb153347dcc76fca5ee9e1d41f86b7d20c14eb9358d47
+    - path: src/features/todo/graphql/mutations/session/sign-out/graphql-types/response.ts
+      sha256: 1735a0e141fc899910c0d1e1647f0c34da4f338cc0d10d4c25da8053c083af9d
+    - path: src/features/todo/graphql/mutations/session/sign-out/sign-out.module-definition.ts
+      sha256: 553421dc5426ca2794762235b8749e59c155be7832a602da9b40845f1e6e912b
+    - path: src/features/todo/graphql/mutations/session/sign-out/sign-out.module.ts
+      sha256: 155a28e05d66d5c1e9e3471559087d500efb49a271a6281ed7073624cb4d7ab4
+    - path: src/features/todo/graphql/mutations/session/sign-out/sign-out.resolver.ts
+      sha256: 49b2e097050daa9fe4427368785f5594d76b88a6270cda17efd4c2e3c5157ee3
+    - path: src/modules/bussiness/session/index.ts
+      sha256: 3a8329aee8e0b50f3d094d66145a5de0831dc0e6e178efa0a5e6fb9e48870eea
+    - path: src/modules/bussiness/session/session.exception.ts
+      sha256: 0e93a5468650514a4f33c5f451789e6abc978b35544828fdf1a926da033535ae
+    - path: src/modules/bussiness/session/session.module-definition.ts
+      sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
+    - path: src/modules/bussiness/session/session.module.ts
+      sha256: c625f88ae0df96a76fe4a0bd5a3526787180013a48c82145404a1bc83ecd1787
+    - path: src/modules/bussiness/session/session.service.spec.ts
+      sha256: 0a6f954a1da1f6dab875eee54b9986ac805b3e453faef481c9d7daa1c9b00798
+    - path: src/modules/bussiness/session/session.service.ts
+      sha256: acf82ed6fcb636c8d563487e57aca922fbb6ae8332b7a18cc9cfb298f4bcdb8d
+    - path: src/modules/bussiness/session/sign-in.command.ts
+      sha256: 6de433b280b1358369e98cbf31025ee05fb799f58c9540bbc74b98b22cbd2d5a
+    - path: src/modules/bussiness/session/sign-in.handler.spec.ts
+      sha256: b4ba2922aa57e49b5cc575d0ef0e7b0c2f14a2437c198a1e080b40c2fa09f36c
+    - path: src/modules/bussiness/session/sign-in.handler.ts
+      sha256: f54db534bce71f1d173a275eaae720c18db27fb63221beb28a95257a5946dc20
+    - path: src/modules/bussiness/session/sign-out.command.ts
+      sha256: df6ef31df63b6eaf5f9e103c9c117429342a4535dd80962396292f8b076b6f0b
+    - path: src/modules/bussiness/session/sign-out.handler.spec.ts
+      sha256: 0aac798c1d324dafa8bce4dcd11a253cbfb62969e0e625f8f8ea544828b80463
+    - path: src/modules/bussiness/session/sign-out.handler.ts
+      sha256: 401ced0572a611bb29b9667dccacb7b9e2a086a8bc2654e5fda4daaebcbd9673
+    - path: src/modules/bussiness/session/types/session-record.ts
+      sha256: 9f77414952e6b2c9559e9dcddf88e11d456ed18be4bb5fd93c78cc747ffca85c
+    - path: src/modules/integrations/keycloak/index.ts
+      sha256: 381cb1580d1a75cff8a8c7ecc0f89bfbeff9e8eaf9dd20f823439937608cb205
+    - path: src/modules/integrations/keycloak/keycloak.client.ts
+      sha256: b73f1fdafef6fecaca17c03a8a053c57313c09579477b5f0ed2d34466c27246a
+    - path: src/modules/integrations/keycloak/keycloak.exception.ts
+      sha256: 54c5b7ced6e8a5130adc4e5adae00733e3779ee63f77a26d899df69eccec0ebd
+    - path: src/modules/integrations/keycloak/keycloak.module-definition.ts
+      sha256: b68cba5705e7c44730af03602e3233926e63fa5ed74cade5059536eee0ae974f
+    - path: src/modules/integrations/keycloak/keycloak.module.ts
+      sha256: 0d07946e6715c00304c5136fc5d106cb5219f8c53750160900e6c15343e2e5a7
+  digest: 2732690f9557d49988c7a020e69cda85125a654edac1b218303951591390c04a
 outcome: pass
 assertions:
   - id: unit-suite-green
+    command: npx jest src/modules/bussiness/session src/modules/integrations/keycloak
+    exit: 0
     outcome: pass
-    observation: npx jest src/features/sign-in src/features/sign-out src/modules/domain/session exited 0
+    observation: npx jest src/modules/bussiness/session src/modules/integrations/keycloak exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T05:30:07.397Z
+  capturedAt: 2026-09-18T07:27:22.169Z

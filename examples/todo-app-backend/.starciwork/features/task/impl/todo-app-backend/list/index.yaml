@@ -1,11 +1,11 @@
 schema: work/implementation
 id: impl.task.todo-app-backend.list
 title: The owned-list query
-state: done
+state: todo
 repository: todo-app
 owners:
-  - {role: feature, path: src/features/list-tasks/**}
-revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
+  - {role: module, path: src/modules/bussiness/task}
 proves: [nfr.task.list.latency]
-verification: [npx jest src/features/list-tasks exited 0]
-verificationSource: kernel-observed
+
+blockedBy:
+  - {record: decision.task.list.scope, because: "br.task.list.owned (what this query implements and nfr.task.list.latency measures) is itself todo: whether an organization owner sees its members' tasks is undecided, and this record cannot honestly claim done against a rule whose own shape is still open. ListTasksHandler is real and its ac.task.list.owned.excludes-others test passes today, but that proves the current owner-only reading, not the rule this record is filed against once that decision lands. nfr.task.list.latency separately has no k6 harness in this host to measure against."}

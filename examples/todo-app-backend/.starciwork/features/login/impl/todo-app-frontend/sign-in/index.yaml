@@ -1,13 +1,13 @@
 schema: work/implementation
 id: impl.login.todo-app-frontend.sign-in
 title: The sign-in route, feature and block
-state: done
+state: todo
 repository: todo-app-frontend
 owners:
-  - {role: route, path: src/app/sign-in/**}
-  - {role: feature, path: src/features/pages/sign-in/**}
-  - {role: block, path: src/components/blocks/sign-in-form/**}
-revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
+  - {role: route, path: src/app/sign-in}
+  - {role: feature, path: src/features/pages/sign-in}
+  - {role: block, path: src/components/blocks/sign-in-form}
 proves: [ui.login.sign-in]
-verification: [npx vitest run src/components/blocks/sign-in-form exited 0]
-verificationSource: kernel-observed
+
+blockedBy:
+  - {record: gap.login.direction-not-drawn, because: "ui.login.sign-in (what this implements) is itself todo - interface.draw has not run, so no representative direction image exists yet (docs/kinds.md's implementation/frontend lane is held until the feature's ui node is done). The route/feature/block code is real and its own vitest suite passes, but that is not what is missing: this impl was recorded done against a ui-screen record that has since been pulled back to todo, and it cannot honestly re-claim done until the ui node it proves does."}

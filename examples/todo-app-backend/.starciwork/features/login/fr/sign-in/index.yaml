@@ -13,9 +13,9 @@ postconditions:
   - Exactly one live session exists for that person.
 composes:
   - rule: br.login.password.sign-in
-    module: src/features/sign-in/**
+    module: src/modules/bussiness/session
   - rule: br.login.session.restores
-    module: src/modules/domain/session/**
+    module: src/modules/bussiness/session
 
 requiresProof:
   unit:

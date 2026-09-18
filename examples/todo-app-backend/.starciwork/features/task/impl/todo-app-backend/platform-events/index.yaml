@@ -1,14 +1,22 @@
 schema: work/implementation
 id: impl.task.todo-app-backend.platform-events
 title: The platform events module (typed in-process event bus)
-state: done
+state: todo
 repository: todo-app
 owners:
-  - {role: module, path: src/modules/platform/events/**}
-revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
+  - {role: module, path: src/modules/platform/events}
 # Shared like platform-database: this is the seam event.task.created/completed/deleted and
 # event.login.signed-in/signed-out are typed against, and every producer (task's and login's use cases
 # alike) depends on it. Recorded once, here under task, for the same reason platform-database is.
+#
+# Not proven done (lead follow-up on PROVES_TARGET_NOT_DONE, 2026-09-18): every one of
+# event.task.created/completed/deleted is itself todo - created and deleted are blocked by
+# gap.audit.emitted-events (an audit-lane record), completed by gap.notify.task-completion-event, and
+# fr.task.complete/br.task.delete.final (their own producers) are themselves todo. CreateTaskHandler/
+# CompleteTaskHandler/DeleteTaskHandler do all call PlatformEventBus.publish(...) today (see
+# create-task.handler.spec.ts's "event.task.created" test, which passes), so the bus and every call site
+# are real and unit-tested; what is not proven is that any of the three events is a done product event
+# a subscriber can rely on, which is what `proves` would be claiming. Narrowing to a smaller proves list
+# does not fix this, because all three candidates are equally todo - only flipping this record itself to
+# todo is honest.
 proves: [event.task.created, event.task.completed, event.task.deleted]
-verification: [npx jest src/modules/platform/events exited 0]
-verificationSource: kernel-observed

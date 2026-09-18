@@ -4,16 +4,80 @@
 schema: work/evidence
 record: fr.task.create
 recordDigest: 45818e4d4d72c387739eaa8e551509671ea00ad26be3a58e5cb15b8865cd08b6
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/modules/bussiness/task/complete-task.command.ts
+      sha256: 905ccd97b11edf7080657db67d6a2ebf6286d952cef3dcf5153e3830292cbf85
+    - path: src/modules/bussiness/task/complete-task.handler.spec.ts
+      sha256: bd8a08b326e3e2432a0e7d537f8ea6d074fa7da20b8a3ee2668802bd215f05a1
+    - path: src/modules/bussiness/task/complete-task.handler.ts
+      sha256: 19ce75996a8d7ab44f87918c61fe3426e7df1b950e47a336664b90ab4cbb04e9
+    - path: src/modules/bussiness/task/completion-authority.contracts.ts
+      sha256: a87ffd0c98ac55bb537e58bdfa3c6bd80b070c19e45029cce5f0212fc6c6376b
+    - path: src/modules/bussiness/task/completion-authority.providers.ts
+      sha256: fc3433001812710f106200d01d429ea95032cb8d09b3e435cbb645ec38c19497
+    - path: src/modules/bussiness/task/completion-authority.spec.ts
+      sha256: cc576729df18966e81c0f1606c05ed97f8386795a96de675ed65aa3c286064ac
+    - path: src/modules/bussiness/task/create-task.command.ts
+      sha256: 022b9c0ebb8c36a392cc3902b45c4c8f93ab00d85295fac0af76563ae4bb6d60
+    - path: src/modules/bussiness/task/create-task.handler.spec.ts
+      sha256: 82be73481e264a3527daad5f15a35d191765c81790154ac41f2229511276e8bd
+    - path: src/modules/bussiness/task/create-task.handler.ts
+      sha256: 5f100ff4187311962761f32b44ca49aa8c719cdb8dd5e194e42782083a1a8307
+    - path: src/modules/bussiness/task/creation-policy.contracts.ts
+      sha256: c779bb17a6cc2b10163047b2e7fa6e5f339c43b55014df5ec8de2fe3e220f749
+    - path: src/modules/bussiness/task/creation-policy.providers.ts
+      sha256: 5d2965fcca9be3a1e2bc4bde62a20470f88034da49dcad3a976ee1fefa03b790
+    - path: src/modules/bussiness/task/delete-task.command.ts
+      sha256: 6b7b17d0d57d78ae47af31a1ac11ca554748da0bd0a23825839413f38e9bf88b
+    - path: src/modules/bussiness/task/delete-task.handler.spec.ts
+      sha256: 6432c515082a7ae4313b5e1ef5e1c460e990825c7db59de1aba2c13a46741335
+    - path: src/modules/bussiness/task/delete-task.handler.ts
+      sha256: b88c4fe59b1b054cf433ef64139e33251aba97b0b7858dd4fc51d862cd937eae
+    - path: src/modules/bussiness/task/index.ts
+      sha256: 099ac69d8d48d95e70f68e5dc05ac0445c8233678dd4968fc90472af8bae0914
+    - path: src/modules/bussiness/task/list-tasks.handler.spec.ts
+      sha256: 91ebee3592b7d8dbfa9ff624909b90f7be4791aa3862cf99d41cf52b5409330f
+    - path: src/modules/bussiness/task/list-tasks.handler.ts
+      sha256: 5bbb597121fe3e1d54ad7d4fd141267be0c729263641238a63cb9e285911ef00
+    - path: src/modules/bussiness/task/list-tasks.query.ts
+      sha256: 786c8bd4e9c62f6eb2cf2499034990cf3d28c51cd712f88d6cc27c62b8d85a34
+    - path: src/modules/bussiness/task/ownership.guard.ts
+      sha256: 41050d414ef78e2a41fd7d132648934a71bda013082114b1aaa6a79eb6c8d301
+    - path: src/modules/bussiness/task/reopen-task.command.ts
+      sha256: f5af4f8e1d5267ad968734b452bab7545f5551ecf3729ca6631cea87e3d0ebe6
+    - path: src/modules/bussiness/task/reopen-task.handler.spec.ts
+      sha256: 2210e90f7da8fb26a52ffc130b0394ee7995d2a9438368461df692c1db2e7913
+    - path: src/modules/bussiness/task/reopen-task.handler.ts
+      sha256: 726c0144dd70d97c6083120d1d40c853b6b1f076b320f878fd18d203ae6bb292
+    - path: src/modules/bussiness/task/task.exception.ts
+      sha256: b04c8f10cff0de2c10ef32891357172aa51fdb1ce8cbf60488057c7c1eeb03ec
+    - path: src/modules/bussiness/task/task.module-definition.ts
+      sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
+    - path: src/modules/bussiness/task/task.module.ts
+      sha256: ca8fe35db2f6c3f5d88794b3cd72a8dc6f18c3f217da32179a2f15c5acc8f4bd
+    - path: src/modules/bussiness/task/task.service.spec.ts
+      sha256: cee1fabe16ae044cf10e92b06758feda59b8e1c33a07317e17aaf2de8a8a199c
+    - path: src/modules/bussiness/task/task.service.ts
+      sha256: de07732fc6e36f42ebef3f3ccc29d2efa059aa2d310079479a4918a3a6387b11
+    - path: src/modules/bussiness/task/types/task-record.ts
+      sha256: 2dd6e270d672bf9d8eed0da0a67de448873e3f0e106f071350d5ff32fb2ea541
+  digest: 266865270258dcfe6fe0d34945bf03b851ad60b7b7bc4045a880aa1dffb6e8be
 outcome: pass
 assertions:
   - id: unit-composed-rules
+    command: npx jest src/modules/bussiness/task
+    exit: 0
     outcome: pass
-    observation: npx jest src/features/create-task exited 0
+    observation: npx jest src/modules/bussiness/task exited 0
   - id: boot-drives-real-create-route
+    command: npx jest src/app.boot.spec.ts -t "drives sign-in, the full task lifecycle"
+    exit: 0
     outcome: pass
-    observation: npx jest src/app.boot.spec.ts -t "drives sign-in" exited 0
+    observation: npx jest src/app.boot.spec.ts -t "drives sign-in, the full task lifecycle" exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T06:05:28.055Z
+  capturedAt: 2026-09-18T07:25:50.283Z

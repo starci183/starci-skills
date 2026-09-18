@@ -1,7 +1,7 @@
 schema: work/customer-journey
 id: journey.login.first-sign-in
 title: A new person gets in and stays in
-state: done
+state: todo
 crossesFeatures: [login, task]
 steps:
   - {actor: person, does: "Signs up, expects: Lands on an empty list that says what to do next."}
@@ -14,8 +14,10 @@ requiresProof:
   requirements:
     forEach: requirements
 
+blockedBy:
+  - {record: gap.login.live-proof, because: "This journey's own requiresProof.uat names uat.login.sign-in, which is itself todo - no uat/sign-in/runs/<runId>/ folder with real screenshots and a passing result.md exists yet, only the designed flow. The former evidence.yaml here (provenance: starci-kernel, stale: true) pointed at that same never-executed run; a lane's own toolkit script cannot honestly re-mint starci-kernel provenance for a run that did not happen."}
+
 # provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
 # An agent-authored provenBy is refused: it would be this record speaking for another one.
 provenBy:
-  uat: [uat.login.sign-in]
   requirements: [fr.login.sign-in]

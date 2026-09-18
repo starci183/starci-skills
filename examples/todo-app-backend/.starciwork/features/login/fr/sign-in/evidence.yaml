@@ -3,17 +3,21 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: fr.login.sign-in
-recordDigest: 66a73fc312e39658a944d7f140ae3af8621e75b7b8d693ee012b993b0721aafb
+recordDigest: 816e6e9a72d5f6dd93e689bc371320c98f61cc477becc5c0db737234a0139ee8
 outcome: pass
 assertions:
   - id: unit-composed-rules
+    command: npx jest src/modules/bussiness/session
+    exit: 0
     outcome: pass
-    observation: npx jest src/features/sign-in exited 0
+    observation: npx jest src/modules/bussiness/session exited 0
   - id: boot-drives-real-sign-in-route
+    command: npx jest src/app.boot.spec.ts -t "drives sign-in"
+    exit: 0
     outcome: pass
     observation: npx jest src/app.boot.spec.ts -t "drives sign-in" exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T06:05:06.320Z
+  capturedAt: 2026-09-18T07:27:17.487Z

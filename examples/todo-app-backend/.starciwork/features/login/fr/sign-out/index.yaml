@@ -8,9 +8,9 @@ mainFlow:
   - The session ends and the next request is unauthenticated.
 composes:
   - rule: br.login.session.restores
-    module: src/modules/domain/session/**
+    module: src/modules/bussiness/session
   - rule: br.login.session.single-device
-    module: src/modules/domain/session/**
+    module: src/modules/bussiness/session
 blockedBy:
   - {record: br.login.session.single-device, because: "br.login.session.single-device is todo; the device rule it composes has no evidence yet."}
 

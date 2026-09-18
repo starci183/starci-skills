@@ -2,7 +2,7 @@ schema: work/non-functional-requirement
 id: nfr.task.list.latency
 title: A list read feels immediate
 quality: latency
-state: done
+state: todo
 observableCriterion: The list endpoint answers in under 200 ms at the 95th percentile for a person with
   1000 tasks.
 measurement:
@@ -13,10 +13,3 @@ refs: [br.task.list.owned]
 requiresProof:
   measurement:
     required: true
-
-# provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
-# An agent-authored provenBy is refused: it would be this record speaking for another one.
-provenBy:
-  measurement:
-    - command: see the measurement block of this record
-      exit: 0

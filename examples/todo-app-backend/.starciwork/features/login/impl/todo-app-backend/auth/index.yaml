@@ -4,11 +4,8 @@ title: The auth module
 state: done
 repository: todo-app
 owners:
-  - {role: feature, path: src/features/sign-in/**}
-  - {role: feature, path: src/features/sign-out/**}
-  - {role: module, path: src/modules/domain/session/**}
-  - {role: module, path: src/modules/integrations/keycloak/**}
-revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
+  - {role: module, path: src/modules/bussiness/session}
+  - {role: module, path: src/modules/integrations/keycloak}
+  - {role: feature, path: src/features/todo/graphql/mutations/session}
+revision: 750bd4b1
 proves: [br.login.password.sign-in, br.login.session.restores, sds.login.session-store]
-verification: [npx jest src/features/sign-in src/features/sign-out src/modules/domain/session exited 0]
-verificationSource: kernel-observed

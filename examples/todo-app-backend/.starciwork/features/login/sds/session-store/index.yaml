@@ -7,7 +7,7 @@ responsibility: Holds one row per live session with its person, its device and i
 interfaces:
   - The auth module is the only writer; every other reader goes through it.
 owners:
-  - {role: module, path: src/modules/domain/session}
+  - {role: module, path: src/modules/bussiness/session}
 refs: [br.login.session.restores, br.login.session.single-device]
 dependsOn: [integration.login.postgres, integration.login.keycloak]
 

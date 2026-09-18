@@ -7,6 +7,9 @@ recordDigest: 09de9b7caccb077b38dbe7b1eda1a0d072fd063fa1d4efb907c4e3add189913d
 outcome: pass
 assertions:
   - id: identical-refusal-parity
+    command: npx jest src/app.boot.spec.ts -t "refuses sign-in with the wrong password and with an
+      unknown email identically"
+    exit: 0
     outcome: pass
     observation: npx jest src/app.boot.spec.ts -t "refuses sign-in with the wrong password and with an
       unknown email identically" exited 0
@@ -14,4 +17,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T05:29:55.960Z
+  capturedAt: 2026-09-18T07:19:17.786Z
