@@ -12,3 +12,4 @@ export {
   NotifyPreferenceEntity,
   NotifyDigestWindowEntity,
 } from './entities';
+export { SessionEntity, TaskEntity, AuditLogLineEntity, AuditKeyEntity, AuditErasureRequestEntity } from './entities';

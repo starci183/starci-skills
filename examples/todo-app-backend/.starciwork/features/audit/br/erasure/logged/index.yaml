@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.audit.erasure.logged
 title: An erasure is itself logged
-state: todo
+state: done
 statements:
   - Both the request and the completion of an erasure become their own appended log lines.
   - Those lines name the erasure request, never the identity that was erased, so the record of having
@@ -9,7 +9,15 @@ statements:
 authorityRefs:
   - "owner-intent: an erasure nobody can point to did not verifiably happen."
 acceptanceCriteria: [request-and-completion-are-lines]
-module: src/audit/erasure
-openQuestions:
-  - Depends on decision.audit.erasure-method the same way br.audit.erasure.right does.
-change: {rev: 1, kind: initial, at: 2026-09-18T06:03:00.000Z}
+module: src/modules/bussiness/audit
+
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: "decision.audit.erasure-method is settled and built: AuditErasureService.tRequest/tComplete
+    (src/modules/bussiness/audit/audit-erasure.service.ts) append an erasure-requested and an
+    erasure-completed line, both sealed under AuditKeystoreService.SYSTEM_ACTOR_ID's key and both naming
+    only the requestId as target, never the subject's personId - proven in
+    audit-erasure.service.spec.ts. module corrected from the drafted src/audit/erasure (never built) to
+    the real Nest capability directory."

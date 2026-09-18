@@ -1,7 +1,7 @@
 schema: work/functional-requirement
 id: fr.audit.erasure.request
 title: Request erasure
-state: todo
+state: done
 actors: [person]
 trigger: A signed-in person asks to have what identifies them removed from the log.
 mainFlow:
@@ -10,8 +10,8 @@ mainFlow:
 postconditions:
   - Exactly one erasure-request row exists per submission, in state requested.
 composes:
-  - {rule: br.audit.erasure.right, module: src/audit/erasure}
-  - {rule: br.audit.erasure.logged, module: src/audit/erasure}
+  - {rule: br.audit.erasure.right, module: src/modules/bussiness/audit}
+  - {rule: br.audit.erasure.logged, module: src/modules/bussiness/audit}
 
 requiresProof:
   unit:
@@ -21,6 +21,15 @@ requiresProof:
   uat:
     required: true
 
-blockedBy:
-  - {record: sds.audit.erasure-request, because: "decision.audit.erasure-method is now decided (crypto-shred), so sds.audit.erasure-request's t-request no longer merely assumes an answer - but that component itself is still todo, unproven under the NestJS layout the example is moving to."}
-  - {record: gap.audit.unbuilt-module, because: "No implementation exists yet under the NestJS layout the example is moving to."}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: "sds.audit.erasure-request and gap.audit.unbuilt-module are both closed. The GraphQL
+    requestErasure mutation (features/todo/graphql/mutations/audit/request-erasure) dispatches
+    RequestErasureCommand, handled by RequestErasureHandler, which calls
+    AuditErasureService.request (src/modules/bussiness/audit/audit-erasure.service.ts) - t-request then
+    t-verify, proven in audit-erasure.service.spec.ts and request-erasure.handler.spec.ts, and exercised
+    end to end by scripts/live-proof-audit.sh. composes[].module corrected to the real capability
+    directory. requiresProof.uat stays unfulfilled: uat.audit.right-to-be-forgotten (gap.audit.live-proof)
+    has not run and is outside this backend lane's scope."

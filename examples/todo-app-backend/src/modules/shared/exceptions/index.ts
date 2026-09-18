@@ -25,3 +25,7 @@ export { RecurOccurrenceNotFoundException } from './errors/recur/occurrence-not-
 export { RecurOccurrenceForbiddenException } from './errors/recur/occurrence-forbidden';
 export { NotifySmtpTransientFailureException } from './errors/notify/notify-smtp-transient-failure';
 export { NotifySmtpPermanentRejectionException } from './errors/notify/notify-smtp-permanent-rejection';
+export { ErasureRequestNotFoundException } from './errors/audit/erasure-request-not-found';
+export { ErasureRequestForbiddenException } from './errors/audit/erasure-request-forbidden';
+export { ErasureRequestInvalidStateException } from './errors/audit/erasure-request-invalid-state';
+export { ErasureNotConfirmedException } from './errors/audit/erasure-not-confirmed';

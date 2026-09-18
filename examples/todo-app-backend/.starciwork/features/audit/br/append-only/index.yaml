@@ -1,15 +1,21 @@
 schema: work/business-rule
 id: br.audit.append-only
 title: A log line is never altered
-state: todo
+state: done
 statements:
   - Once a line is appended, its stored bytes and its position in the chain never change again.
   - Any alteration of a line, or removal of a line, is detectable by recomputing the chain.
 authorityRefs:
   - "owner-intent: A log nobody can trust is worthless; the check has to be real, not a promise."
 acceptanceCriteria: [chain-detects-tamper]
-module: src/audit/log
-blockedBy:
-  - {record: gap.audit.unbuilt-module, because: "The example's backend is moving to NestJS; src/audit/log does not exist yet. No evidence is authored until a real Nest module and test prove the chain, not a description of one."}
+module: src/modules/bussiness/audit
 
-change: {rev: 1, kind: initial, at: 2026-09-18T06:00:00.000Z}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: "gap.audit.unbuilt-module is closed: AuditLogService.verifyChain (src/modules/bussiness/audit
+    /audit-log.service.ts) recomputes the hash chain from the first line forward and reports the exact
+    break index and reason, proven by an out-of-band mutation fuzz over every line and field plus every
+    middle-line removal in audit-log.service.spec.ts - never through the module's own write path. module
+    corrected from the drafted src/audit/log (never built) to the real Nest capability directory."

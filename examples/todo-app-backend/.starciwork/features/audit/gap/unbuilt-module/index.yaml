@@ -1,9 +1,21 @@
 schema: work/gap
 id: gap.audit.unbuilt-module
 title: No audit module exists under the NestJS layout yet
-state: todo
-statement: The example backend is moving to NestJS (checks/architecture.mjs, checks/code-patterns/nest*.mjs).
-  No src/audit directory or Nest module has been written under that layout at this commit, so nothing in
-  this feature has code to run acceptance criteria, load tests or UAT walks against.
-closedBy: impl.audit.todo-app-backend.log
-change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}
+state: done
+statement: The example backend has moved to NestJS. src/modules/bussiness/audit now exists under that
+  layout (AuditLogService, AuditKeystoreService, AuditErasureService, AuditEventSubscriber, every audit
+  CQRS command/query handler, registered as AuditModule in app.module.ts, plus the auditLog/exportMyData
+  GraphQL queries and requestErasure/completeErasure GraphQL mutations under features/todo/graphql), so
+  this feature's acceptance criteria and unit tests now have real code to run against.
+closedBy: [impl.audit.todo-app-backend.log, impl.audit.todo-app-backend.erasure]
+verificationSource: authored-claim
+because: "closedBy names two records, each done with its own fresh evidence.yaml whose assertions
+  verified the real module; this gap's closure is a derived fact about both reaching done, not
+  something with a separate command of its own to run - matching gap.audit.direction-not-drawn's own
+  verificationSource pattern."
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: Both closers reached done in this pass; closedBy widened from a bare id to the list of both,
+    since the log half and the erasure half were built and proven together as one Nest module.

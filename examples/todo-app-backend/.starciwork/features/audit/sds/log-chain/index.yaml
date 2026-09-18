@@ -1,7 +1,7 @@
 schema: work/sds-component
 id: sds.audit.log-chain
 title: The hash-chained, per-person-sealed log
-state: todo
+state: done
 responsibility: Appends one line per tracked action, hashing each line onto the previous one, and
   seals the acting person's id under a key addressed by an opaque keyId rather than the person's own id.
 interfaces:
@@ -10,6 +10,8 @@ interfaces:
 refs: [br.audit.append-only, br.audit.retention]
 dependsOn: [contract.login.identity-for-task]
 subscribes: [event.task.created, event.task.completed, event.task.deleted, event.login.signed-in, event.login.signed-out]
+owners:
+  - {role: module, path: src/modules/bussiness/audit}
 
 stateMachine:
   states: [open, appended]
@@ -36,6 +38,12 @@ requiresProof:
   transitions:
     forEach: stateMachine.transitions
 
-blockedBy:
-  - {record: impl.audit.todo-app-backend.log, because: "No implementation exists: the example is moving to a NestJS backend and this module has not been written under that layout yet. This record stays todo, and no provenBy or evidence is authored for it, until impl.audit.todo-app-backend.log names a real Nest module and a real test proves t-append and the tamper check in ac.audit.append-only.chain-detects-tamper - see impl.audit.todo-app-backend.log's own blockedBy on gap.audit.unbuilt-module for the absence itself, rather than restating it here as a second edge onto the acceptance criterion that module would eventually satisfy."}
-  - {record: gap.audit.unbuilt-module, because: "dependsOn names contract.login.identity-for-task because that is the only stable, existing surface that gives this module a personId to seal; login and task now actually raise the five events subscribes names, from their own use cases, on the platform event bus. What remains is that no audit module exists yet under the NestJS layout to subscribe to them - the same absence impl.audit.todo-app-backend.log's own blockedBy names, cited again here because this record's own subscribes edge is what would need a real subscriber."}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: "impl.audit.todo-app-backend.log names the real module: AuditLogService.append
+    (src/modules/bussiness/audit/audit-log.service.ts) is t-append, dispatched by AppendLogLineHandler,
+    itself driven by AuditEventSubscriber subscribing to PlatformEventBus for exactly the five events
+    `subscribes` names (audit-event.subscriber.spec.ts proves the routing for each). owners added
+    naming the real capability directory; blockedBy removed now that gap.audit.unbuilt-module is closed."

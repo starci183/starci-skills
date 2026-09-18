@@ -1,12 +1,24 @@
 schema: work/implementation
 id: impl.audit.todo-app-backend.erasure
 title: The erasure-request module
-state: todo
+state: done
 repository: todo-app
 owners:
-  - {role: module, path: src/audit/erasure.service.ts}
-  - {role: module, path: src/audit/erasure-request.repository.ts}
+  - {role: module, path: src/modules/bussiness/audit}
 proves: [br.audit.erasure.right, br.audit.erasure.logged, sds.audit.erasure-request]
 
-blockedBy:
-  - {record: gap.audit.unbuilt-module, because: "decision.audit.erasure-method is now decided (crypto-shred), so this module has a settled mechanism to build against; what remains is that no Nest module exists yet under the layout the example is moving to."}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: "Closes gap.audit.unbuilt-module for the erasure half of this feature, against
+    decision.audit.erasure-method's settled crypto-shred mechanism. Real files: AuditErasureService
+    (tRequest/tVerify/tRefuse/tExecute/tComplete), RequestErasureCommand/Handler,
+    CompleteErasureCommand/Handler, the four ERASURE_REQUEST_*/ERASURE_NOT_CONFIRMED exceptions under
+    src/modules/shared/exceptions/errors/audit, and the AuditErasureRequest entity and migration under
+    src/modules/platform/databases/postgresql/primary, all under src/modules/bussiness/audit/ (the same
+    directory impl.audit.todo-app-backend.log owns - one capability module, following
+    impl.task.todo-app-backend.platform-database's precedent for a directory two impl records both name).
+    Owners corrected from the drafted src/audit/erasure.service.ts + src/audit
+    /erasure-request.repository.ts (never built, and no separate repository file - see
+    impl.audit.todo-app-backend.log's own reason)."

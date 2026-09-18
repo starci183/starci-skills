@@ -1,0 +1,94 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: impl.audit.todo-app-backend.erasure
+recordDigest: 7ef02c4cb213c2e0cbdd1317ea4d0366a7d224d22900d19d1b9e7991c76a5e15
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/modules/bussiness/audit/append-log-line.command.ts
+      sha256: fdde0ba6da67b6a4e7c9cdb2b545bd0a559fe2d1bc23d640c508b9d764bc0014
+    - path: src/modules/bussiness/audit/append-log-line.handler.spec.ts
+      sha256: 36f8679ace7e5e6605df4edc641298c31ed76c34d0f59bff30ce1ea351fb1e69
+    - path: src/modules/bussiness/audit/append-log-line.handler.ts
+      sha256: 0c1869f3cc0be68459f58d11339ff914358e03a147bbb914a4ddf436f3432571
+    - path: src/modules/bussiness/audit/audit-erasure.service.spec.ts
+      sha256: 97efd093b73238bfb6c5b520b5671f0bab3c3fa41ee723e57b6e039f20da1210
+    - path: src/modules/bussiness/audit/audit-erasure.service.ts
+      sha256: 37a017fdd5e5dac539f969b801f0253e7175bc1b6862fb1056ee0b1b05eebc35
+    - path: src/modules/bussiness/audit/audit-event.subscriber.spec.ts
+      sha256: d077a37500a145c8d66570334c4a6d40e849cafb1ae624946d1c193b74ff7066
+    - path: src/modules/bussiness/audit/audit-event.subscriber.ts
+      sha256: ee3ce250a34982596580bb5a189ab52eb39e88ec6860a96c8f705778291bbc91
+    - path: src/modules/bussiness/audit/audit-keystore.service.spec.ts
+      sha256: 93b9712ebfb09fab686fc8659389d8d4f59d159a8af0fc1c5cb2f700cd88b855
+    - path: src/modules/bussiness/audit/audit-keystore.service.ts
+      sha256: f2cc333ed1d11b029d428be373452949508864125986d0c5b1473e083f041267
+    - path: src/modules/bussiness/audit/audit-log.handler.spec.ts
+      sha256: d8e15f0b7ddad5017113b8ad8fb0991c8965aeee5ed68863445ae49a74958d05
+    - path: src/modules/bussiness/audit/audit-log.handler.ts
+      sha256: 0eb14b7560bad4df2ed57371e6b532deeca0ec8e6c8641e146d77fce4c887414
+    - path: src/modules/bussiness/audit/audit-log.query.ts
+      sha256: dbb97ff52a294041f50af8e3915f8bf71f5b91407f2f4b40e39d683d3b8ece83
+    - path: src/modules/bussiness/audit/audit-log.service.spec.ts
+      sha256: cefa03c5c1412d51166345b836771f4fc19d18d0dfbab897a183d7b2be99f3fc
+    - path: src/modules/bussiness/audit/audit-log.service.ts
+      sha256: 6060c1ca98af3d4c1a9ab6d5715ec253e89ab61b632f3aa965d32f3c3556d1db
+    - path: src/modules/bussiness/audit/audit.module-definition.ts
+      sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
+    - path: src/modules/bussiness/audit/audit.module.ts
+      sha256: a3f49f305def104e9230a378ab6ffe1681b3412278a39d78e62ca05700f367fb
+    - path: src/modules/bussiness/audit/complete-erasure.command.ts
+      sha256: 66f601bb3412b09cd047ba5ed3ae58a6a4e003dc458d2b7f7c965af1d71aba82
+    - path: src/modules/bussiness/audit/complete-erasure.handler.spec.ts
+      sha256: 27479e59fe026f0c094d59a14db48a0699f11ba8c94abdc5e18f21b89d825e0b
+    - path: src/modules/bussiness/audit/complete-erasure.handler.ts
+      sha256: d1eb4b5b178cf536ea8aafda5aa8596b9d1cb08d485607ca66b49bbb82ffd268
+    - path: src/modules/bussiness/audit/export-my-data.handler.spec.ts
+      sha256: 2d9e74a6f57f1d2c9ead0efe0f246025cdf29e8e2c2e05c2f62c805a3e0935af
+    - path: src/modules/bussiness/audit/export-my-data.handler.ts
+      sha256: c0aed303bb6058bad4eef34038c8ca83872bb2e263d78fa59b3e220f9ed8d669
+    - path: src/modules/bussiness/audit/export-my-data.query.ts
+      sha256: 1e7756a93e84c771e87fa5fa5f18d687f273ddb966872df5a6860db56113ea6b
+    - path: src/modules/bussiness/audit/index.ts
+      sha256: d09e62461c2667b08219177fd0217b6697288935cb5f9c2fe8c2b8e0553b6367
+    - path: src/modules/bussiness/audit/request-erasure.command.ts
+      sha256: 34258bccb4ef9a8e4a01a1ff8437b234353992ad30cd52be11bb712d51674598
+    - path: src/modules/bussiness/audit/request-erasure.handler.spec.ts
+      sha256: 88442c0fd64d5179971a15f37cc57e5b2057a8fd22a0d033e049ab9796ba5288
+    - path: src/modules/bussiness/audit/request-erasure.handler.ts
+      sha256: 0b62601f784eeb69ff5a80f7f70ba5aed6b713b334ab850a5458917cf6c7b07f
+    - path: src/modules/bussiness/audit/testing/fake-audit-entity-manager.ts
+      sha256: c69009b3b18c01ae2af68b24211af4ed991822810cf05329f26b2e0d089fd3d3
+    - path: src/modules/bussiness/audit/types/audit-erasure-request-record.ts
+      sha256: 431e2fe18e4184753aec5cc504bbe0d4fce6949b26ca3ddaf4065fcfb9e980d8
+    - path: src/modules/bussiness/audit/types/audit-log-line-record.ts
+      sha256: 6da1043d230a77172dffd07ab554c547f49eedf70181dcc9aeb1c50c8cdd9e1e
+  digest: 753eaadf4e97bd3b7717987daf1a8a300014b24cda27c642de613af47f530471
+outcome: pass
+assertions:
+  - id: br.audit.erasure.right
+    command: npx jest -t "ac.audit.erasure.right.identifying-fields-unreadable"
+    exit: 0
+    outcome: pass
+    observation: npx jest -t "ac.audit.erasure.right.identifying-fields-unreadable" exited 0
+  - id: br.audit.erasure.logged
+    command: npx jest -t "ac.audit.erasure.logged.request-and-completion-are-lines"
+    exit: 0
+    outcome: pass
+    observation: npx jest -t "ac.audit.erasure.logged.request-and-completion-are-lines" exited 0
+  - id: sds.audit.erasure-request
+    command: npx jest src/modules/bussiness/audit/audit-erasure.service.spec.ts
+      src/modules/bussiness/audit/request-erasure.handler.spec.ts
+      src/modules/bussiness/audit/complete-erasure.handler.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/audit/audit-erasure.service.spec.ts
+      src/modules/bussiness/audit/request-erasure.handler.spec.ts
+      src/modules/bussiness/audit/complete-erasure.handler.spec.ts exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T09:17:52.072Z

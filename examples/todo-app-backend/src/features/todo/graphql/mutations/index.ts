@@ -13,6 +13,8 @@ import { EditRecurrenceSingleMutationModule } from './recur/edit-recurrence/edit
 import { EndRecurrenceSingleMutationModule } from './recur/end-recurrence/end-recurrence.module';
 import { UpdateNotificationPreferencesSingleMutationModule } from './notify/update-notification-preferences/update-notification-preferences.module';
 import { UnsubscribeSingleMutationModule } from './notify/unsubscribe/unsubscribe.module';
+import { RequestErasureSingleMutationModule } from './audit/request-erasure/request-erasure.module';
+import { CompleteErasureSingleMutationModule } from './audit/complete-erasure/complete-erasure.module';
 
 /** Every GraphQL mutation module the todo API exposes, gathered exactly like nivo's own
  * `mutations/index.ts` gathers `MUTATION_MODULES`. */
@@ -31,4 +33,6 @@ export const MUTATION_MODULES: Array<DynamicModule | (new () => unknown)> = [
   EndRecurrenceSingleMutationModule.register({}),
   UpdateNotificationPreferencesSingleMutationModule.register({}),
   UnsubscribeSingleMutationModule.register({}),
+  RequestErasureSingleMutationModule.register({}),
+  CompleteErasureSingleMutationModule.register({}),
 ];

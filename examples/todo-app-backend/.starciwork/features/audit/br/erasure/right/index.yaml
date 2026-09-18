@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.audit.erasure.right
 title: A person may have what identifies them erased
-state: todo
+state: done
 statements:
   - A verified erasure request makes every existing log line the person produced permanently
     unreadable to any reader, without deleting the line, rewriting its content or breaking the chain.
@@ -9,16 +9,23 @@ statements:
 authorityRefs:
   - "owner-intent: the log is a record of events, not a permanent record of the people in them."
 acceptanceCriteria: [identifying-fields-unreadable]
-module: src/audit/erasure
-openQuestions:
-  - "decision.audit.erasure-method has not settled how identifying fields are actually removed: it
-    recommends crypto-shredding (destroying the person's encryption key rather than editing any line),
-    but the record stays todo until that decision closes and a Nest module implements it."
+module: src/modules/bussiness/audit
 conflictsWith:
   - record: br.audit.retention
-    rev: 1
+    rev: 2
     because: "retention promises a line is never lost within 400 days; a verified erasure request can
       arrive on day one of that window and must still take effect immediately, so the two rules cannot
       both be satisfied by 'keep everything, always, for 400 days' - retention has to mean the line's
       existence and chain position, not the readability of every field in it."
-change: {rev: 1, kind: initial, at: 2026-09-18T06:02:00.000Z}
+
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: "decision.audit.erasure-method's openQuestion is settled (chosen: crypto-shred) and built:
+    AuditErasureService.execute (src/modules/bussiness/audit/audit-erasure.service.ts) destroys the
+    subject's key and personId-to-keyId mapping through AuditKeystoreService.destroyKey, never touching
+    a log line; audit-erasure.service.spec.ts proves every line's bytes, position and hash are unchanged
+    after completion and that no reader (own-read or export) resolves the subject's identity afterward.
+    module corrected from the drafted src/audit/erasure (never built) to the real Nest capability
+    directory; openQuestions removed now that it is answered and proven, not merely decided."

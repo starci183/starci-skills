@@ -7,6 +7,7 @@ import { TaskModule } from './modules/bussiness/task';
 import { ShareModule } from './modules/bussiness/share';
 import { RecurModule } from './modules/bussiness/recur';
 import { NotifyModule } from './modules/bussiness/notify';
+import { AuditModule } from './modules/bussiness/audit';
 import { TodoGraphqlModule } from './features/todo/graphql/graphql.module';
 import { HealthModule } from './features/todo/http/health/health.module';
 
@@ -33,6 +34,7 @@ import { HealthModule } from './features/todo/http/health/health.module';
     ShareModule.register(),
     RecurModule.register(),
     NotifyModule.register(),
+    AuditModule.register(),
     TodoGraphqlModule,
     HealthModule.register(),
   ],

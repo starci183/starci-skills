@@ -7,3 +7,6 @@ export { NotifyNotificationEntity } from './notification.entity';
 export { NotifyDeliveryAttemptEntity } from './notify-delivery-attempt.entity';
 export { NotifyPreferenceEntity } from './notify-preference.entity';
 export { NotifyDigestWindowEntity } from './notify-digest-window.entity';
+export { AuditLogLineEntity } from './audit-log-line.entity';
+export { AuditKeyEntity } from './audit-key.entity';
+export { AuditErasureRequestEntity } from './audit-erasure-request.entity';

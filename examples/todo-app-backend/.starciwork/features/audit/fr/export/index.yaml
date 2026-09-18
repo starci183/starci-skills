@@ -1,7 +1,7 @@
 schema: work/functional-requirement
 id: fr.audit.export
 title: Export a person's data from the log
-state: todo
+state: done
 actors: [person]
 trigger: A signed-in person asks for every log line naming them.
 mainFlow:
@@ -12,7 +12,7 @@ exceptionFlows:
 postconditions:
   - The export contains no other person's lines.
 composes:
-  - {rule: br.audit.append-only, module: src/audit/log}
+  - {rule: br.audit.append-only, module: src/modules/bussiness/audit}
 
 requiresProof:
   unit:
@@ -22,5 +22,16 @@ requiresProof:
   uat:
     required: true
 
-blockedBy:
-  - {record: gap.audit.unbuilt-module, because: "No implementation exists yet under the NestJS layout the example is moving to."}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: "gap.audit.unbuilt-module is closed. The GraphQL exportMyData query
+    (features/todo/graphql/queries/audit/export-my-data) dispatches ExportMyDataQuery to
+    ExportMyDataHandler, which calls AuditLogService.exportForPerson
+    (src/modules/bussiness/audit/audit-log.service.ts) - filters by the caller's own keyId, decrypts,
+    and returns nothing once a completed erasure has destroyed that keyId's mapping (the exceptionFlow
+    above), proven in export-my-data.handler.spec.ts and exercised end to end by
+    scripts/live-proof-audit.sh. composes[].module corrected to the real capability directory.
+    requiresProof.uat stays unfulfilled: uat.audit.right-to-be-forgotten (gap.audit.live-proof) has not
+    run and is outside this backend lane's scope."
