@@ -371,6 +371,51 @@ test('declared package export key must resolve to its declared target rather tha
   assert.ok(result.errors.some(item => item.ruleId === 'ARCH_PACKAGE_EXPORT_BYPASS' && item.specifier === '@fixture/ui/public'), JSON.stringify(result, null, 2));
 });
 
+test('single-application composition root excludes nested feature/module roots from app containment', t => {
+  const root = fixture(t, 'backend', {
+    'src/features/orders/value.ts': 'export const value = 1\n',
+    'src/modules/catalog/consumer.ts': 'import { value } from "@features/orders/value"; export const consumer = value\n',
+    'src/app.module.ts': 'import { value } from "@features/orders/value"; export const AppModule = value\n',
+    'src/main.ts': 'import { AppModule } from "./app.module"; void AppModule\n',
+  });
+  const configFile = path.join(root, 'architecture.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.backend = { apps: ['src'] };
+  fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+  const result = check(root);
+  assert.equal(result.violations.some(item => item.ruleId === 'BE_MODULE_IMPORTS_APP'), false, JSON.stringify(result, null, 2));
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_MODULE_IMPORTS_FEATURE'), JSON.stringify(result, null, 2));
+});
+
+test('single-application composition root still refuses a business-role file placed directly at its root', t => {
+  const root = fixture(t, 'backend', {
+    'src/features/orders/value.ts': 'export const value = 1\n',
+    'src/modules/catalog/value.ts': 'export const catalogValue = 1\n',
+    'src/app.module.ts': 'export const AppModule = 1\n',
+    'src/main.ts': 'import { AppModule } from "./app.module"; void AppModule\n',
+    'src/leaky.service.ts': 'export class LeakyService { run(){return 1} }\n',
+  });
+  const configFile = path.join(root, 'architecture.json');
+  const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  config.backend = { apps: ['src'] };
+  fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
+  const result = check(root);
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_APP_BUSINESS_ROLE' && item.path.endsWith('/leaky.service.ts')), JSON.stringify(result, null, 2));
+});
+
+test('single-application layout infers its composition root without a declared apps entry', t => {
+  const root = fixture(t, 'backend', {
+    'src/features/orders/value.ts': 'export const value = 1\n',
+    'src/modules/catalog/value.ts': 'export const catalogValue = 1\n',
+    'src/app.module.ts': 'import { value } from "@features/orders/value"; export const AppModule = value\n',
+    'src/main.ts': 'import { AppModule } from "./app.module"; void AppModule\n',
+    'src/leaky.service.ts': 'export class LeakyService { run(){return 1} }\n',
+  });
+  const result = check(root);
+  assert.ok(result.violations.some(item => item.ruleId === 'BE_APP_BUSINESS_ROLE' && item.path.endsWith('/leaky.service.ts')), JSON.stringify(result, null, 2));
+  assert.equal(result.violations.some(item => item.ruleId === 'BE_MODULE_IMPORTS_APP'), false, JSON.stringify(result, null, 2));
+});
+
 test('backend workspace packages cannot reach executable app packages through type exports', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starci-architecture-be-workspaces-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

@@ -25,7 +25,8 @@ function insideFeatureLayer(featureRoots, fileName, layer) {
     && relativePath(root, fileName).split('/').some(segment => segment.toLowerCase() === layer));
 }
 
-function appSource(config, fileName) {
+function appSource(config, fileName, excludedRoots = []) {
+  if (excludedRoots.some(excluded => isInside(excluded, fileName))) return null;
   for (const appRoot of roots(config.root, config.backend.apps)) {
     if (!isInside(appRoot, fileName)) continue;
     const parts = relativePath(appRoot, fileName).split('/');
@@ -303,14 +304,15 @@ export function checkBackend(config, context) {
   const violations = [];
   const moduleRoots = roots(config.root, config.backend.modules);
   const featureRoots = roots(config.root, config.backend.features);
+  const nonAppRoots = [...moduleRoots, ...featureRoots];
   const sourceFiles = new Map(context.files.map(file => [path.resolve(file.fileName), file]));
-  const isApp = file => Boolean(appSource(config, file));
+  const isApp = file => Boolean(appSource(config, file, nonAppRoots));
   for (const sourceFile of context.files) {
     const fileName = path.resolve(sourceFile.fileName);
     const fromModules = insideAny(moduleRoots, fileName);
     const fromFeatures = insideAny(featureRoots, fileName);
     const fromApplication = fromFeatures && insideFeatureLayer(featureRoots, fileName, 'application');
-    const app = !fromModules && !fromFeatures ? appSource(config, fileName) : null;
+    const app = !fromModules && !fromFeatures ? appSource(config, fileName, nonAppRoots) : null;
     if (app) {
       const evidence = roleEvidence(context.ts, sourceFile);
       if (evidence) {
