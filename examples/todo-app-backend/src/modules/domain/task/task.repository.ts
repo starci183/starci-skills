@@ -1,75 +1,92 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { TASK_STORE } from '../../integrations/postgres';
 import { OwnershipGuard } from './ownership.guard';
 import { TaskRecord } from './task-record.types';
+import { TaskRow, TaskRowStore } from './task-row-store';
 import { TaskNotFoundException, TaskTitleRequiredException } from './task.exception';
 
 /**
  * data.task.task: owner is bound at creation and never rewritten; completedAt is set if and only if
  * complete is true. Completion method names mirror sds.task.completion-state's transitions
- * (t-complete, t-complete-again, t-reopen) so a reader can hold the record beside the code.
+ * (t-complete, t-complete-again, t-reopen) so a reader can hold the record beside the code. The row
+ * itself lives wherever TASK_STORE points - Postgres in production, a fake in a test.
  */
 @Injectable()
 export class TaskRepository {
-  private readonly rows = new Map<string, TaskRecord>();
   private readonly guard = new OwnershipGuard();
 
-  create(owner: string, title: string): TaskRecord {
+  constructor(@Inject(TASK_STORE) private readonly rows: TaskRowStore) {}
+
+  async create(owner: string, title: string): Promise<TaskRecord> {
     const trimmed = title.trim();
     if (!trimmed) {
       throw new TaskTitleRequiredException();
     }
-    const record = new TaskRecord(randomUUID(), owner, trimmed, false, null);
-    this.rows.set(record.id, record);
-    return record;
+    const row: TaskRow = { id: randomUUID(), owner, title: trimmed, complete: false, completedAt: null };
+    const saved = await this.rows.save(row);
+    return toRecord(saved);
   }
 
-  findById(id: string): TaskRecord {
-    const record = this.rows.get(id);
-    if (!record) {
+  async findById(id: string): Promise<TaskRecord> {
+    const row = await this.rows.findOneBy({ id });
+    if (!row) {
       throw new TaskNotFoundException();
     }
-    return record;
+    return toRecord(row);
   }
 
-  listOwnedBy(owner: string): TaskRecord[] {
-    return [...this.rows.values()].filter(row => row.owner === owner);
+  async listOwnedBy(owner: string): Promise<TaskRecord[]> {
+    const rows = await this.rows.findBy({ owner });
+    return rows.map(toRecord);
   }
 
-  complete(id: string, actorId: string): TaskRecord {
-    const record = this.findById(id);
-    this.guard.assert(record, actorId);
-    return this.tComplete(record);
+  async complete(id: string, actorId: string): Promise<TaskRecord> {
+    const row = await this.findOwnedRow(id, actorId);
+    return this.tComplete(row);
   }
 
-  reopen(id: string, actorId: string): TaskRecord {
-    const record = this.findById(id);
-    this.guard.assert(record, actorId);
-    return this.tReopen(record);
+  async reopen(id: string, actorId: string): Promise<TaskRecord> {
+    const row = await this.findOwnedRow(id, actorId);
+    return this.tReopen(row);
   }
 
-  delete(id: string, actorId: string): void {
-    const record = this.findById(id);
-    this.guard.assert(record, actorId);
-    this.rows.delete(id);
+  async delete(id: string, actorId: string): Promise<void> {
+    const row = await this.findOwnedRow(id, actorId);
+    await this.rows.delete(row.id);
   }
 
-  private tComplete(record: TaskRecord): TaskRecord {
-    if (record.complete) {
-      return this.tCompleteAgain(record);
+  private async findOwnedRow(id: string, actorId: string): Promise<TaskRow> {
+    const row = await this.rows.findOneBy({ id });
+    if (!row) {
+      throw new TaskNotFoundException();
     }
-    record.complete = true;
-    record.completedAt = new Date();
-    return record;
+    this.guard.assert(toRecord(row), actorId);
+    return row;
   }
 
-  private tCompleteAgain(record: TaskRecord): TaskRecord {
-    return record;
+  private async tComplete(row: TaskRow): Promise<TaskRecord> {
+    if (row.complete) {
+      return this.tCompleteAgain(row);
+    }
+    row.complete = true;
+    row.completedAt = new Date();
+    const saved = await this.rows.save(row);
+    return toRecord(saved);
   }
 
-  private tReopen(record: TaskRecord): TaskRecord {
-    record.complete = false;
-    record.completedAt = null;
-    return record;
+  private async tCompleteAgain(row: TaskRow): Promise<TaskRecord> {
+    return toRecord(row);
   }
+
+  private async tReopen(row: TaskRow): Promise<TaskRecord> {
+    row.complete = false;
+    row.completedAt = null;
+    const saved = await this.rows.save(row);
+    return toRecord(saved);
+  }
+}
+
+function toRecord(row: TaskRow): TaskRecord {
+  return new TaskRecord(row.id, row.owner, row.title, row.complete, row.completedAt);
 }

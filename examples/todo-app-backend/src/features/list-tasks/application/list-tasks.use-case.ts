@@ -8,7 +8,8 @@ export class ListTasksUseCase {
   constructor(private readonly taskRepository: TaskRepository) {}
 
   async execute(params: ListTasksParams): Promise<ListTasksResult> {
-    const tasks: TaskSummaryResult[] = this.taskRepository.listOwnedBy(params.ownerId).map(record => ({
+    const records = await this.taskRepository.listOwnedBy(params.ownerId);
+    const tasks: TaskSummaryResult[] = records.map(record => ({
       taskId: record.id,
       title: record.title,
       complete: record.complete,

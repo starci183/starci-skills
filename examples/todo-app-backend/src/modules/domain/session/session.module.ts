@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { PasswordService } from './password.service';
-import { PersonRepository } from './person.repository';
+import { PostgresModule } from '../../integrations/postgres';
+import { ConfigModule } from '../../platform/config';
 import { SessionRepository } from './session.repository';
 
 @Module({
-  providers: [PasswordService, PersonRepository, SessionRepository],
-  exports: [PasswordService, PersonRepository, SessionRepository],
+  imports: [PostgresModule, ConfigModule],
+  providers: [SessionRepository],
+  exports: [SessionRepository],
 })
 export class SessionModule {}

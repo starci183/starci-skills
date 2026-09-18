@@ -18,7 +18,7 @@ export class CreateTaskController {
     @Body() request: CreateTaskRequest,
   ): Promise<CreateTaskResponse> {
     try {
-      const session = this.sessionRepository.findActive(sessionToken);
+      const session = await this.sessionRepository.findActive(sessionToken);
       const result = await this.createTaskUseCase.execute({ ownerId: session.personId, title: request.title });
       return new CreateTaskResponse(result.taskId, result.title);
     } catch (error) {

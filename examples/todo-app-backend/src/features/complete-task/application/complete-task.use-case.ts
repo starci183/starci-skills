@@ -11,7 +11,7 @@ export class CompleteTaskUseCase {
   constructor(private readonly taskRepository: TaskRepository) {}
 
   async execute(params: CompleteTaskParams): Promise<CompleteTaskResult> {
-    const record = this.taskRepository.complete(params.taskId, params.actorId);
+    const record = await this.taskRepository.complete(params.taskId, params.actorId);
     return { taskId: record.id, complete: record.complete };
   }
 }

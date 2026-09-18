@@ -1,27 +1,49 @@
+import { TaskRow, TaskRowStore } from './task-row-store';
 import { TaskRepository } from './task.repository';
 
+class FakeTaskStore implements TaskRowStore {
+  private readonly byId = new Map<string, TaskRow>();
+
+  async findOneBy(where: { id: string }): Promise<TaskRow | null> {
+    return this.byId.get(where.id) ?? null;
+  }
+
+  async findBy(where: { owner: string }): Promise<TaskRow[]> {
+    return [...this.byId.values()].filter(row => row.owner === where.owner);
+  }
+
+  async save(row: TaskRow): Promise<TaskRow> {
+    this.byId.set(row.id, row);
+    return row;
+  }
+
+  async delete(id: string): Promise<unknown> {
+    return this.byId.delete(id);
+  }
+}
+
 describe('TaskRepository', () => {
-  it('br.task.single-owner: a task belongs to exactly one person, and only that person may complete or delete it', () => {
-    const repository = new TaskRepository();
-    const record = repository.create('owner-1', 'Ship it');
+  it('br.task.single-owner: a task belongs to exactly one person, and only that person may complete or delete it', async () => {
+    const repository = new TaskRepository(new FakeTaskStore());
+    const record = await repository.create('owner-1', 'Ship it');
 
-    expect(() => repository.complete(record.id, 'owner-2')).toThrow(expect.objectContaining({ code: 'TASK_FORBIDDEN' }));
-    expect(() => repository.delete(record.id, 'owner-2')).toThrow(expect.objectContaining({ code: 'TASK_FORBIDDEN' }));
-    expect(repository.findById(record.id).complete).toBe(false);
+    await expect(repository.complete(record.id, 'owner-2')).rejects.toMatchObject({ code: 'TASK_FORBIDDEN' });
+    await expect(repository.delete(record.id, 'owner-2')).rejects.toMatchObject({ code: 'TASK_FORBIDDEN' });
+    expect((await repository.findById(record.id)).complete).toBe(false);
   });
 
-  it('br.task.delete.final: deleting a task removes it; there is no recovery path', () => {
-    const repository = new TaskRepository();
-    const record = repository.create('owner-1', 'Ship it');
+  it('br.task.delete.final: deleting a task removes it; there is no recovery path', async () => {
+    const repository = new TaskRepository(new FakeTaskStore());
+    const record = await repository.create('owner-1', 'Ship it');
 
-    repository.delete(record.id, 'owner-1');
+    await repository.delete(record.id, 'owner-1');
 
-    expect(() => repository.findById(record.id)).toThrow(expect.objectContaining({ code: 'TASK_NOT_FOUND' }));
+    await expect(repository.findById(record.id)).rejects.toMatchObject({ code: 'TASK_NOT_FOUND' });
   });
 
-  it('ac.task.title.required.refuses-empty: a creation request with an empty or whitespace title is refused', () => {
-    const repository = new TaskRepository();
+  it('ac.task.title.required.refuses-empty: a creation request with an empty or whitespace title is refused', async () => {
+    const repository = new TaskRepository(new FakeTaskStore());
 
-    expect(() => repository.create('owner-1', '   ')).toThrow(expect.objectContaining({ code: 'TASK_TITLE_REQUIRED' }));
+    await expect(repository.create('owner-1', '   ')).rejects.toMatchObject({ code: 'TASK_TITLE_REQUIRED' });
   });
 });
