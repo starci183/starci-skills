@@ -17,7 +17,7 @@ export class DeleteTaskController {
     @Param('id') taskId: string,
   ): Promise<DeleteTaskResponse> {
     try {
-      const session = this.sessionRepository.findActive(sessionToken);
+      const session = await this.sessionRepository.findActive(sessionToken);
       const result = await this.deleteTaskUseCase.execute({ actorId: session.personId, taskId });
       return new DeleteTaskResponse(result.deleted);
     } catch (error) {

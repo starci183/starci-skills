@@ -1,43 +1,36 @@
 import { Injectable } from '@nestjs/common';
-import { InvalidCredentialsException, PasswordService, PersonRepository, SessionRepository } from '../../../modules/domain/session';
+import { InvalidCredentialsException, SessionRepository } from '../../../modules/domain/session';
+import { KeycloakClient, KeycloakInvalidCredentialsException } from '../../../modules/integrations/keycloak';
 import { SignInParams, SignInResult } from './sign-in.contracts';
 
 /**
- * br.login.password.sign-in: a sign-in succeeds only when the email is known and the password matches
- * its stored hash. The refusal for an unknown email must be indistinguishable from the refusal for a
- * known email with a wrong password, including in timing (nfr.login.sign-in-timing) - so the password
- * hash is always verified, against a fixed decoy when no person was found, rather than returning early.
+ * br.login.password.sign-in: a sign-in succeeds only when Keycloak accepts the pair. Keycloak wins over
+ * the earlier local-hash design (data.login.person, nfr.login.sign-in-timing's decoy hash): the product
+ * never sees or stores a password, and the uniform refusal required by br.login.password.sign-in and
+ * nfr.login.sign-in-timing comes from Keycloak's own direct access grant already answering an unknown
+ * email and a wrong password with the same invalid_grant response, in one round-trip.
  */
 @Injectable()
 export class SignInUseCase {
   constructor(
-    private readonly personRepository: PersonRepository,
-    private readonly passwordService: PasswordService,
+    private readonly keycloakClient: KeycloakClient,
     private readonly sessionRepository: SessionRepository,
   ) {}
 
   async execute(params: SignInParams): Promise<SignInResult> {
     this.sessionRepository.tBegin(params.email);
-    let personId: string | null = null;
-    let hashToCompare = this.passwordService.getDecoyHash();
+    let personId: string;
     try {
-      const person = this.personRepository.findByEmail(params.email);
-      personId = person.id;
-      hashToCompare = person.passwordHash;
-    } catch {
-      personId = null;
-    }
-    try {
-      this.passwordService.assertMatches(params.password, hashToCompare);
+      const result = await this.keycloakClient.signIn(params.email, params.password);
+      personId = result.subject;
     } catch (error) {
       this.sessionRepository.tRefuse();
+      if (error instanceof KeycloakInvalidCredentialsException) {
+        throw new InvalidCredentialsException();
+      }
       throw error;
     }
-    if (!personId) {
-      this.sessionRepository.tRefuse();
-      throw new InvalidCredentialsException();
-    }
-    const session = this.sessionRepository.tAccept(personId);
+    const session = await this.sessionRepository.tAccept(personId);
     return { sessionToken: session.token, personId };
   }
 }

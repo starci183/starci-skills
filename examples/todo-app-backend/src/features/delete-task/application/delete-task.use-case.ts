@@ -12,7 +12,7 @@ export class DeleteTaskUseCase {
   constructor(private readonly taskRepository: TaskRepository) {}
 
   async execute(params: DeleteTaskParams): Promise<DeleteTaskResult> {
-    this.taskRepository.delete(params.taskId, params.actorId);
+    await this.taskRepository.delete(params.taskId, params.actorId);
     return { deleted: true };
   }
 }

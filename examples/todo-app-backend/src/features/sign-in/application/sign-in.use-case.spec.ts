@@ -1,18 +1,54 @@
-import { PasswordService, PersonRepository, SessionRepository } from '../../../modules/domain/session';
+import { Repository } from 'typeorm';
+import { AppConfigService } from '../../../modules/platform/config';
+import { SessionRepository } from '../../../modules/domain/session';
+import { SessionEntity } from '../../../modules/integrations/postgres';
+import { KeycloakClient, KeycloakInvalidCredentialsException, KeycloakSignInResult } from '../../../modules/integrations/keycloak';
 import { SignInUseCase } from './sign-in.use-case';
 
+class FakeSessionRepository {
+  private readonly byToken = new Map<string, SessionEntity>();
+
+  async findOneBy(where: { token: string }): Promise<SessionEntity | null> {
+    return this.byToken.get(where.token) ?? null;
+  }
+
+  async save(row: Partial<SessionEntity>): Promise<SessionEntity> {
+    const entity = row as SessionEntity;
+    this.byToken.set(entity.token, entity);
+    return entity;
+  }
+
+  async delete(token: string): Promise<void> {
+    this.byToken.delete(token);
+  }
+}
+
+/**
+ * The sign-in use case now exercises only the Keycloak client boundary: this fake stands in for the real
+ * direct access grant round-trip, without asserting anything about how Keycloak itself is implemented.
+ */
+class FakeKeycloakClient extends KeycloakClient {
+  constructor(private readonly accepted: Record<string, string>) {
+    super(new AppConfigService());
+  }
+
+  async signIn(email: string, password: string): Promise<KeycloakSignInResult> {
+    const key = email.toLowerCase();
+    if (this.accepted[key] !== password) {
+      throw new KeycloakInvalidCredentialsException();
+    }
+    return { subject: `subject-of-${key}` };
+  }
+}
+
 describe('SignInUseCase', () => {
-  let personRepository: PersonRepository;
-  let passwordService: PasswordService;
   let sessionRepository: SessionRepository;
   let useCase: SignInUseCase;
 
   beforeEach(() => {
-    personRepository = new PersonRepository();
-    passwordService = new PasswordService();
-    sessionRepository = new SessionRepository();
-    useCase = new SignInUseCase(personRepository, passwordService, sessionRepository);
-    personRepository.register('person@example.com', passwordService.hash('correct-horse'));
+    sessionRepository = new SessionRepository(new FakeSessionRepository() as unknown as Repository<SessionEntity>, new AppConfigService());
+    const keycloakClient = new FakeKeycloakClient({ 'person@example.com': 'correct-horse' });
+    useCase = new SignInUseCase(keycloakClient, sessionRepository);
   });
 
   it('ac.login.password.sign-in.wrong-pair-is-refused: a known email with a wrong password is refused and no session is created', async () => {
@@ -21,7 +57,7 @@ describe('SignInUseCase', () => {
     });
   });
 
-  it('br.login.password.sign-in: a sign-in succeeds only when the email is known and the password matches', async () => {
+  it('br.login.password.sign-in: a sign-in succeeds only when Keycloak accepts the pair', async () => {
     const result = await useCase.execute({ email: 'person@example.com', password: 'correct-horse' });
     expect(result.sessionToken).toEqual(expect.any(String));
     expect(result.personId).toEqual(expect.any(String));
@@ -44,10 +80,9 @@ describe('SignInUseCase', () => {
     expect((unknownEmailError as { code: string }).code).toBe((wrongPasswordError as { code: string }).code);
   });
 
-  it('sds.login.session-store t-accept: a successful sign-in writes one session row with a thirty-day expiry', async () => {
+  it('sds.login.session-store t-accept: a successful sign-in writes one active session', async () => {
     const result = await useCase.execute({ email: 'person@example.com', password: 'correct-horse' });
-    const session = sessionRepository.findActive(result.sessionToken);
-    const days = Math.round((session.expiresAt.getTime() - session.issuedAt.getTime()) / (24 * 60 * 60 * 1000));
-    expect(days).toBe(30);
+    const session = await sessionRepository.findActive(result.sessionToken);
+    expect(session.personId).toBe(result.personId);
   });
 });

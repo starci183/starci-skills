@@ -1,20 +1,13 @@
-.starciwork/runtime.sqlite
-.starciwork/runtime.sqlite-wal
-.starciwork/runtime.sqlite-shm
-.starciwork/kernel-evidence/
-.starciwork/kernel-strays/
-.starciwork/kernel-headless/
-.starciwork/kernel-approvals/
-.starcistacks/*/secrets/*
-!.starcistacks/*/secrets/*.enc
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Decrypted, DEMO-ONLY secret materializations - never the tracked record.
 .starcistacks/*/runtime/env/*.env
 !.starcistacks/*/runtime/env/*.env.enc
 .starcistacks/*/runtime/files/*.key
 !.starcistacks/*/runtime/files/*.key.enc
 .starcistacks/*/runtime/config/*.yaml
 !.starcistacks/*/runtime/config/*.yaml.enc
-
-node_modules/
-dist/
-*.tsbuildinfo
-
+.starcistacks/*/secrets/*
+!.starcistacks/*/secrets/*.enc

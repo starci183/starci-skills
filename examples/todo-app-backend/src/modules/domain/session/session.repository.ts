@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
+import { Repository } from 'typeorm';
+import { AppConfigService } from '../../platform/config';
+import { SessionEntity } from '../../integrations/postgres';
 import { SessionRecord } from './session-record.types';
 import { InvalidCredentialsException, SessionExpiredException, SessionNotFoundException } from './session.exception';
 
-const SESSION_TTL_DAYS = 30;
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -11,10 +14,14 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * sds.login.session-store: one row per live session, expiry enforced on read rather than by a sweep, so
  * a stopped sweeper can never leave a session alive past its time. Method names mirror the record's five
  * transitions (t-begin, t-accept, t-refuse, t-expire, t-revoke) so the record and the code read together.
+ * The row lives in Postgres, through the platform database module's SessionEntity.
  */
 @Injectable()
 export class SessionRepository {
-  private readonly rows = new Map<string, SessionRecord>();
+  constructor(
+    @InjectRepository(SessionEntity) private readonly rows: Repository<SessionEntity>,
+    private readonly config: AppConfigService,
+  ) {}
 
   tBegin(email: string): void {
     if (!EMAIL_PATTERN.test(email)) {
@@ -22,35 +29,38 @@ export class SessionRepository {
     }
   }
 
-  tAccept(personId: string): SessionRecord {
+  async tAccept(personId: string): Promise<SessionRecord> {
     const issuedAt = new Date();
-    const expiresAt = new Date(issuedAt.getTime() + SESSION_TTL_DAYS * MILLISECONDS_PER_DAY);
-    const record = new SessionRecord(randomUUID(), personId, issuedAt, expiresAt);
-    this.rows.set(record.token, record);
-    return record;
+    const expiresAt = new Date(issuedAt.getTime() + this.config.getSessionTtlDays() * MILLISECONDS_PER_DAY);
+    const saved = await this.rows.save({ token: randomUUID(), personId, issuedAt, expiresAt });
+    return toRecord(saved);
   }
 
   tRefuse(): void {
     // Nothing is written, and the refusal that follows does not say which half was wrong.
   }
 
-  tExpire(token: string): void {
-    this.rows.delete(token);
+  async tExpire(token: string): Promise<void> {
+    await this.rows.delete(token);
   }
 
-  tRevoke(token: string): void {
-    this.rows.delete(token);
+  async tRevoke(token: string): Promise<void> {
+    await this.rows.delete(token);
   }
 
-  findActive(token: string): SessionRecord {
-    const row = this.rows.get(token);
+  async findActive(token: string): Promise<SessionRecord> {
+    const row = await this.rows.findOneBy({ token });
     if (!row) {
       throw new SessionNotFoundException();
     }
     if (row.expiresAt.getTime() <= Date.now()) {
-      this.tExpire(token);
+      await this.tExpire(token);
       throw new SessionExpiredException();
     }
-    return row;
+    return toRecord(row);
   }
+}
+
+function toRecord(row: SessionEntity): SessionRecord {
+  return new SessionRecord(row.token, row.personId, row.issuedAt, row.expiresAt);
 }

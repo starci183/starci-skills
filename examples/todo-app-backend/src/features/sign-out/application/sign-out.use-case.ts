@@ -16,8 +16,8 @@ export class SignOutUseCase {
   ) {}
 
   async execute(params: SignOutParams): Promise<SignOutResult> {
-    const session = this.sessionRepository.findActive(params.sessionToken);
-    this.sessionRepository.tRevoke(params.sessionToken);
+    const session = await this.sessionRepository.findActive(params.sessionToken);
+    await this.sessionRepository.tRevoke(params.sessionToken);
     try {
       await this.keycloakClient.notifySignOut(session.personId);
     } catch {

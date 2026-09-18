@@ -1,6 +1,10 @@
 services:
   api:
+    # No build context is declared for this placeholder image, so it is profile-gated: `docker compose up`
+    # (no --profile app) brings up only the infra this example actually proves (postgres, keycloak) - the
+    # api itself runs on the host via `npm run build && npm run start`, per the dev README.
     image: todo-app/api
+    profiles: [app]
     depends_on:
       - postgres
       - keycloak
