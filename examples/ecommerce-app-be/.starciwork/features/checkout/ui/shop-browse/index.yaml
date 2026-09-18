@@ -1,0 +1,218 @@
+schema: work/ui-screen
+id: ui.checkout.shop-browse
+title: Shop browse direction
+state: uninvestigate
+brand:
+  rev: 1
+refs:
+- fr.checkout.place-order
+ui:
+  status: generated-and-agent-reviewed-proposed-direction
+  intent: Browse six editorial sample products in a three-column grid with proposed add-to-cart actions.
+  surfaces:
+  - name: shop-browse
+    route: http://localhost:4069/browse
+    purpose: Browse six editorial sample products in a three-column grid with proposed add-to-cart actions.
+    actors:
+    - visitor
+    - person
+  states:
+  - name: six-products
+    trigger: Representative state selected by OP-BRIEF.md
+    behavior: Browse six editorial sample products in a three-column grid with proposed add-to-cart actions.
+  coverage:
+    scale: bounded
+    representativeScreens:
+    - shop-browse
+    map:
+    - screen: shop-browse
+      state: six-products
+      viewport: desktop-1536x1024
+      components:
+      - SurfaceCard geometry for app-owned product tiles
+      - Button primary
+      - TextAction
+      directionAsset: assets/shop-browse.png
+      derivation: Real rendered grammar anatomy + brand rev 1 surface + declared app-owned composition.
+        Five-screen draw scope only; no runtime evidence.
+  accessibility:
+  - Use visible input labels and keyboard-operable semantic controls in implementation. No accessibility
+    pass is claimed by a raster.
+  - 'Brand #0D9488 with black #000000 button ink has calculated contrast 5.6086:1; white ink has only
+    3.7443:1. Keep the primary token unchanged.'
+  - Decorative duck and product artwork should have empty alt text when adjacent text conveys the same
+    information.
+  responsive:
+  - Only desktop 1536x1024 is drawn. Mobile and intermediate layouts are not verified or claimed.
+  artworkSlots: []
+  mascotPolicy: No mascot in this populated collection.
+  appOwnedRegions:
+  - name: product-grid
+    anatomy: Six separate cards in three columns and two rows; every illustration, name, descriptor, price
+      and button inside its own card. No outer grid panel. Section label/count outside above.
+  - name: review-caption
+    anatomy: DIRECTION - NOT IMPLEMENTATION at bottom-right outside product regions. Artifact metadata
+      only; omit from production UI.
+  controls:
+  - label: Northwind Supply
+    destination: http://localhost:4069/browse
+    status: Wordmark link to /browse exists in the shop layout. Northwind Supply is the proposed unified
+      label; current source says Northwind Shop. Runtime unverified.
+  - label: Browse
+    destination: http://localhost:4069/browse
+    status: Route exists in frontend source; runtime behavior was not tested in this draw task.
+  - label: Cart
+    destination: http://localhost:4069/cart
+    status: Route exists in frontend source; runtime behavior was not tested in this draw task.
+  - label: Checkout
+    destination: http://localhost:4069/checkout
+    status: Route exists in frontend source; runtime behavior was not tested in this draw task.
+  - label: Account
+    destination: http://localhost:4069/account
+    status: Route exists in frontend source; runtime behavior was not tested in this draw task.
+  - label: Add to cart (each of six products)
+    destination: Cart mutation for the selected product
+    status: Proposed control; not wired in the current frontend.
+  assets:
+  - path: assets/shop-browse.initial.prompt.txt
+    role: prompt
+    sha256: e7f1f90c9a8a66c766210f2e7deb821e0504d586caab2e217b2886feaca49ab3
+    provenance: Exact UTF-8 prompt sent to image_gen.imagegen, including the edit instructions.
+  - path: assets/shop-browse.initial.png
+    role: generation-history
+    selected: false
+    sha256: cd340aa2dd84bc32e0e1bf644f3080e302f9a66eafd1a16e2ecedb3c5efe8918
+    width: 1536
+    height: 1024
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/shop-browse.initial.prompt.txt
+      inputRefs:
+      - examples/ecommerce-app-be/.starciwork/brand/index.yaml
+      - knowledge/ui/proof/anatomy-source.yaml
+      - examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
+      - examples/ecommerce-app-be/.starciwork/features/checkout/fr/place-order/index.yaml
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      referencedImages:
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      mode: generate-with-anatomy-references
+    provenance:
+      stage: initial
+      tool: image_gen.imagegen
+      toolOutputBasename: exec-d3e4b497-444a-4573-b683-ac564da2e1b6.png
+      modelDisclosure: The tool did not expose a model identifier; none is claimed.
+      kind: non-selected-generation-history
+      postProcessing: None. Generated PNG bytes were copied without raster modification.
+  - path: assets/shop-browse.prompt.txt
+    role: prompt
+    sha256: 2b3359e0daa6b902812203cf3fa339ea3827661892d9cb696d2d8bca05687799
+    provenance: Exact UTF-8 prompt sent to image_gen.imagegen, including the edit instructions.
+  - path: assets/shop-browse.png
+    role: direction
+    selected: true
+    sha256: 3fb9b09d5ef7f69c28a5dba22a3fa69e3809751a40f110cc6331523dc1e8a7f8
+    width: 1536
+    height: 1024
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/shop-browse.prompt.txt
+      inputRefs:
+      - examples/ecommerce-app-be/.starciwork/brand/index.yaml
+      - knowledge/ui/proof/anatomy-source.yaml
+      - examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
+      - examples/ecommerce-app-be/.starciwork/features/checkout/fr/place-order/index.yaml
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app-be/.starciwork/features/checkout/ui/shop-browse/assets/shop-browse.initial.png
+      referencedImages:
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      - examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      - examples/ecommerce-app-be/.starciwork/features/checkout/ui/shop-browse/assets/shop-browse.initial.png
+      mode: edit-with-anatomy-references
+    provenance:
+      stage: final
+      tool: image_gen.imagegen
+      toolOutputBasename: exec-2c60812f-3bfe-4133-8319-1472a28c41c3.png
+      modelDisclosure: The tool did not expose a model identifier; none is claimed.
+      kind: generated-proposed-direction
+      postProcessing: None. Generated PNG bytes were copied without raster modification.
+  provenance:
+    sourceCommit: e901ebac48087d4585434c2d7959f6d980187516
+    brand:
+      path: examples/ecommerce-app-be/.starciwork/brand/index.yaml
+      sha256: c1d62c610275497bb7d334ec31218a12644d886672355c8b4c118640c70160cb
+      rev: 1
+    anatomyReferences:
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/tasks-screen.png
+      sha256: e9ea01cbbecb7a5b6f19328184fa5a0eca7e37f4a411351e8582491dde5024d5
+      role: actual-installed-grammar-render; read-only reuse
+    - path: examples/todo-app-backend/.starciwork/brand/assets/grammar-reference/primitives.png
+      sha256: 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
+      role: actual-installed-grammar-render; read-only reuse
+    grammarVersion: '@starci/grammar@0.4.13 as recorded by the existing Todo reference provenance; not
+      reinstalled or recaptured here.'
+    knowledge:
+      path: knowledge/ui/proof/anatomy-source.yaml
+      sha256: 60242ce2f09da22bbd84e6a1486daa5d37b709f837482b40f091ffd3778220c8
+      rules:
+      - ANATOMY-1
+      - ANATOMY-2
+      - ANATOMY-3
+      - ANATOMY-4
+      - ANATOMY-5
+      - prompt-shape-b2
+      - list-separator-bleed
+      - direction-scale-drift
+    promptExample:
+      path: examples/ecommerce-app-be/.starciwork/features/checkout/ui/landing-home/assets/B3-source.txt
+      sha256: f77c0f9fc0715599d4ee2985ae04fe6ca514321c62c6dcc32f389880ca1c109d
+      originalLocation: ../ex-draw-v4/gen-lab/out/B3-final.txt
+      note: The brief named gen-lab/prompts/B3-final.txt; inspection found the proven prompt under gen-lab/out
+        instead. Retained byte-for-byte.
+    business:
+    - path: examples/ecommerce-app-be/.starciwork/features/checkout/fr/place-order/index.yaml
+      sha256: 652c16c914e566da909b400864f7e769c24702c18c204283026691cfddd4c632
+    frontendContext:
+    - path: examples/ecommerce-app-fe/apps/shop/src/app/browse/page.tsx
+      sha256: b1d5be469ffd94eb4c1e20ef5e7f3f444ab584ea2e687974ff99974f8689ba7d
+    - path: examples/ecommerce-app-fe/apps/shop/src/components/ProductTile.tsx
+      sha256: 8a385f326ef32508a2bf19a26c56ee96d4aaef3ba441b3579e9a7deb5bfeab7f
+    - path: examples/ecommerce-app-fe/apps/shop/src/components/AppNav.tsx
+      sha256: ac7d46b5f513b087ee36baeb25bb69475218430fc48173161eb81671e8781917
+    - path: examples/ecommerce-app-fe/apps/shop/src/app/page.tsx
+      sha256: 95e20ad4ee355b0165c8e8a4412db39b3f84e1d6b16f2b1a3fd6a5235117c290
+    - path: examples/ecommerce-app-fe/apps/landing/src/data/catalog.ts
+      sha256: 407fa5dcd5b6c97cca07c2716c5f0903b4d68b88b6ebe31f507cea0d0fb57936
+    - path: examples/ecommerce-app-fe/apps/shop/src/app/layout.tsx
+      sha256: 5c4d20f851083a183b0fe9eee2481b2834f89254ecffd6e1da29a3abcb417f0d
+  review:
+    status: agent-reviewed-proposal; owner acceptance not claimed
+    reviewedAt: '2026-09-18T16:38:48.982865+00:00'
+    method: Visual inspection of references and each generated image, then targeted imagegen edits and
+      reinspection.
+    passed:
+    - Six complete product cards; labels and count outside the grid; prices and actions inside each card.
+    - No duck and no additional navigation, filters or search controls.
+    - Visible DIRECTION - NOT IMPLEMENTATION label.
+    - Saved PNG and exact sibling prompt with hashed brand/reference provenance.
+    limits:
+    - 'Raster teal is approximate even after a colour-only imagegen correction; exact #0D9488 remains
+      the sole implementation primary token. Do not sample the PNG as token truth.'
+    - Generated typography/control sizes and some radii are enlarged or approximate; the installed grammar
+      CSS remains size/shape truth (direction-scale-drift).
+    - Generated product render style and duck poses vary between screens; these are composition references,
+      not a final production artwork pack.
+    - Owner acceptance, live-browser fidelity, accessibility and API behavior are not asserted.
+  observations:
+  - SurfaceCard labels are inside; SurfaceListCard labels/counts are outside above and captions outside
+    below.
+  - The B3 example includes edge-to-edge static-row dividers; the reference task capture itself has plain
+    rows. Separator intent comes from the explicit list-separator-bleed observation.
+  - Source Todo brand and turtle placement are not authority for ecommerce brand rules.
+  - Generation is complete for this bounded draw request. State remains uninvestigate for proposed design
+    review, rather than asserting owner acceptance.
+  gaps:
+  - Live shop data comes from the order API. These six products are editorial sample data from the landing
+    catalogue; Add to cart is not implemented by ProductTile.

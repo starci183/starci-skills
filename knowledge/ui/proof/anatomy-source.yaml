@@ -167,6 +167,49 @@ observations:
       and touches both edges. Only the row's content is inset by the row's own padding.
       Rows opt into this shipped geometry via `starci-core-static-row` — an app-owned row
       without the class renders no separator at all.
+  - id: card-division-and-measure
+    lane: ui
+    kind: anatomy-detail
+    summary: |-
+      Grammar ships card division and card width — a direction that invents either is
+      app-owned and must say so. `SurfaceCard composition="joined"` stacks children
+      edge-to-edge inside one card with shipped separators (the dashboard's
+      ChangelogList/WeeklyChallengeCard pattern); it divides VERTICALLY only — a
+      side-by-side split inside one card is not shipped anatomy. `SurfaceCard
+      measure="form"/"formCompact"` is the owned width contract for compact forms: a
+      direction drawing a form card full-width and filling the dead space is answering
+      a question `measure` already answers better.
+  - id: joined-band-treatment
+    lane: ui
+    kind: anatomy-detail
+    summary: |-
+      Emphasis inside a joined card is a flush band, not an inset panel. The academy
+      dashboard's settled vocabulary: children stack full-bleed inside the bounded
+      surface (`joined` sets the content to gap:0/padding:0), adjacent bands separate
+      with an edge-to-edge `border-t` hairline, and a band that needs emphasis carries
+      `bg-surface-secondary` (neutral) or `bg-accent-soft` (accent tint) across the
+      card's full width with its own padding (px-4/pt-4/pb-3 top, p-3 middle). A
+      nested rounded box floating inside the card is not the pattern.
+  - id: special-card-recipe
+    lane: ui
+    kind: anatomy-detail
+    summary: |-
+      The dashboard's "special card" formula is composition, not decoration: IMAGE × joined
+      plus HIGHLIGHT × joined. Proof in source — `DailyQuest`: a joined card whose first band
+      is an accent-filled hero slab (`bg-accent`) carrying a decorative 3D illustration
+      anchored to the trailing edge (`aria-hidden`, `pointer-events-none`, bottom/right
+      absolute); separator; a reward band that is neutral by default and turns
+      `bg-success-soft` ONLY on the claimed state ("only a proven claimed outcome receives
+      success"); separator; a task-cell grid using `divide-y`/`divide-x` for edge-to-edge
+      cell lines. `ProSubscriptionBlock`: joined card = intro band + full-bleed journey
+      illustration band + benefit list, with MISSING-ASSET discipline — the illustration is
+      withheld entirely under the dark scheme rather than repainted. Grammar ships the
+      card-level "special" affordance itself: `SurfaceCard isHighlight` wraps the surface in
+      an animated conic-gradient edge sweep (`starci-core-surface-highlight-sweep`, 3s spin,
+      suppressed while `pending`). Direction prompts MAY therefore use: a tinted hero slab
+      band with anchored decorative art, state-semantic tinted bands (accent-soft /
+      surface-secondary / success-soft), and the card edge highlight — but a highlight or
+      tint must always MEAN a state, never mere prettiness.
   - id: direction-scale-drift
     lane: ui
     kind: known-drift

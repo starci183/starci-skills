@@ -1,17 +1,27 @@
 schema: work/implementation
 id: impl.task.todo-app-frontend.task-list
 title: The list screen and the create form
-state: todo
+state: done
 repository: todo-app-frontend
 owners:
-  - {role: block, path: src/components/blocks/task-list/**}
-  - {role: feature, path: src/features/pages/tasks/**}
-  - {role: route, path: src/app/tasks/**}
-revision: bfc3cdabb3c6c5afcd3f6371beaeca184a55a75d
+  - {role: block, path: src/components/blocks/task-list}
+  - {role: feature, path: src/features/pages/tasks}
+  - {role: route, path: src/app/tasks}
+revision: 5ff83e19
 proves: [ui.task.list]
-verification: [source inspection only; no fresh focused test run]
-verificationSource: authored-claim
-# ui.task.list itself is state: todo (brand rev 2 changed the primary colour token and the capture set was
-# never retaken - see that record's own note). This implementation record does not outrun it: real,
-# vitest-tested code exists at the owners above (see src/components/blocks/task-list/component.spec.tsx),
-# but it is left todo rather than claimed done against a ui-screen record that is itself still open.
+verification:
+  - "focused vitest suite green (src/components/blocks/task-list + src/features/pages/tasks)"
+  - "npx tsc --noEmit clean"
+  - "npm run build clean (lint + type validation included)"
+  - "npm run uat:typecheck clean"
+  - "8 running-page captures (4 states x 2 viewports) under assets/, each with serialized markup"
+  - "render checks green on all 8 captures: palette-off-brand, primary-absent, entity-list-in-card"
+verificationSource: observed
+# Completed against ui.task.list (done, direction assets/list-many-tasks.png). The settled direction
+# was implemented without redrawing: WorkspaceShell header/compact slots, dark tab ink with the
+# current tab's accent underline, synthetic account presence (Alex + Sign out), New task form with
+# the accent primary and black ink, "All tasks" section as a plain collection (never inside a card),
+# Share/Schedule/Delete row actions with inline delete confirmation, turtle master in the empty
+# state only, refused state replacing the task block with assertive text. captures under assets/
+# were produced by assets/capture.mjs (production build, stubbed GraphQL transport, no shared
+# API/Postgres writes) and checked by assets/render-check.mjs.

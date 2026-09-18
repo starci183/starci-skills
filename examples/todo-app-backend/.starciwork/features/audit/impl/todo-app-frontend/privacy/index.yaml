@@ -1,7 +1,8 @@
 schema: work/implementation
 id: impl.audit.todo-app-frontend.privacy
 title: The privacy screen - export data, request erasure
-state: done
+state: todo
+blockedBy: gap.audit.render-proof
 repository: todo-app-frontend
 owners:
   - {role: route, path: src/app/audit}
@@ -9,10 +10,18 @@ owners:
 proves: [ui.audit.privacy]
 
 change:
-  rev: 1
-  kind: initial
-  at: 2026-09-18T21:30:00.000Z
-  reason: "Implements ui.audit.privacy against its settled direction
+  rev: 2
+  kind: breaking
+  at: 2026-10-12T00:00:00.000Z
+  reason: "Done -> todo: the render-proof wiring (grit item 55) ran the canonical checks in
+    checks/render.mjs over this record's real captures for the first time, and the proof does not
+    hold. All 12 PNGs fail palette-off-brand - the captures carry lossy-compression chroma smearing
+    whose dominant colours match no brand token - and entity-list-in-card cannot run because the
+    brand's identity family `common` has no DNA snapshot on this host, so card anatomy is
+    unresolvable (a skip is not a pass). The captures are real and stay; the done claim was
+    unproven, so the record regresses to todo behind gap.audit.render-proof until the owning lane
+    re-captures honestly. The rev-1 narrative below is kept verbatim as the record of what was
+    built and how the existing captures were made: Implements ui.audit.privacy against its settled direction
     (features/audit/ui/privacy, rev of the erasure-refused representative state).
     Route adapter src/app/audit/privacy/page.tsx mounts the connected block
     src/components/audit/privacy/index.tsx; the pure view component.tsx renders

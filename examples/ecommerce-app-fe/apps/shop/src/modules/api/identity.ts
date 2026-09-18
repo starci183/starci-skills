@@ -12,7 +12,7 @@ export type CurrentUser = {
  * Read the signed-in shopper, if there is one.
  *
  * contract: the landing → shop session handoff. This is the exact seam a later workstream fills in —
- * `identity` (allocated port 5070) mints the session and hands it to the shop; how it is carried (cookie on
+ * `identity` (its port resolved from the product projection) mints the session and hands it to the shop; how it is carried (cookie on
  * a shared parent domain, or a token exchanged at a callback) is the backend lane's decision, not this
  * skeleton's. Until that contract is settled this call reads `/me` with whatever ambient credentials the
  * browser already has and returns `null` for an anonymous visitor, so every gated page degrades to a clear
