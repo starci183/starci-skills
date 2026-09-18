@@ -50,6 +50,7 @@ Usage:
   starci code-patterns check --profile <nest|next> --root <repo-root> --all [--architecture-config <file>]
   starci check-stales --work <work-root> --repo <id>=<git-root> [--repo ...] [--target <node-id> ...]
   starci stacks check <repo-root> --environment dev|vps --deployment-model <rendered.yaml-or-json>
+  starci work-layout check --work <work-root>
   starci validate <work-root>
   starci identity set <slug> --name <VAR> [--work-root <path>] [--expected-write-revision <revision|none>]   (the value is read from stdin, never printed)
   starci identity fill <slug> --name <VAR> [--name <VAR>] [--work-root <path>]   (it asks for each one here, with the echo off)
@@ -222,6 +223,20 @@ export async function main(argv = process.argv.slice(2), io = { out: value => pr
       const {checkApplicationStacks}=await import('../checks/stacks.mjs');
       const result=checkApplicationStacks({repoRoot,environment:options['--environment'],deploymentModelFile:options['--deployment-model']});
       emit(result);return result.ok?0:1;
+    }
+    if(command==='work-layout'){
+      const [action,...rest]=args;
+      if(action!=='check')throw Error('Use starci work-layout check --work <work-root>.');
+      const options={};
+      for(let index=0;index<rest.length;index+=2){
+        const key=rest[index],value=rest[index+1];
+        if(key!=='--work'||!value||value.startsWith('--')||Object.hasOwn(options,key))throw Error('Invalid work-layout check options.');
+        options[key]=value;
+      }
+      if(!options['--work'])throw Error('work-layout check requires --work.');
+      const {checkWorkLayout}=await import('../checks/work-layout.mjs');
+      // Report-only: the findings are the output, and the verb never turns a description into a refusal.
+      emit(checkWorkLayout({workRoot:options['--work']}));return 0;
     }
     if(command==='approval'){
       const [action,...input]=args;
