@@ -1,0 +1,14 @@
+@import '@todo-app/grammar/styles.css';
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: var(--grammar-color-surface);
+  color: var(--grammar-color-ink);
+}
+
+main {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
