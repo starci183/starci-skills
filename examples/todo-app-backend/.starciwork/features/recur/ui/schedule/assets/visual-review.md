@@ -1,36 +1,30 @@
-# Visual review: ui.recur.schedule
+# Visual review: ui.recur.schedule / ADDENDUM 2
 
-Reviewed by Codex on 2026-09-18T14:05:58.053Z. Outcome: accepted proposed direction with the declared implementation gaps.
+Reviewed by Codex on 2026-09-18T14:41:21.685Z. Accepted as proposed direction, with implementation/render proof still separate.
 
-## Before / corrected
+Before: White nested fields, black primary/secondary ink and dark invalid-field error differed from the real components.
 
-Before: Outlined panel; labels beside Inputs and hints below; rectangular actions.
+Corrected: All fields use grey secondary anatomy, error label/border/message use the actual Input invalid state, Save has white ink and Cancel has blue ink.
 
-Corrected: Raised form SurfaceCard, labels and hints above rounded Inputs, error below n=0, paired time/time-zone grid, pill actions; no upcoming/end action before rule exists.
+## Anatomy sources
 
-## Actual anatomy sources
+- [tasks-screen.png](../../../../../brand/assets/grammar-reference/tasks-screen.png) - actual render; SHA256 e9ea01cbbecb7a5b6f19328184fa5a0eca7e37f4a411351e8582491dde5024d5
+- [primitives.png](../../../../../brand/assets/grammar-reference/primitives.png) - actual render; SHA256 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
 
-- [app-shell.png](../../../../../brand/assets/grammar-reference/app-shell.png) - actual render, SHA256 81fc3540234b264cf0f1fd11670474f1db42aaf961420ba3f9d8a7cb4318539c
-- [sign-in-card.png](../../../../../brand/assets/grammar-reference/sign-in-card.png) - actual render, SHA256 b1948cf75464804f055ea37953c72751f3e36795267f1f204179917da1d6eeee
-- [inputs.png](../../../../../brand/assets/grammar-reference/inputs.png) - actual render, SHA256 812589428e7f1fb3cd538f5502f8cc58f0981270ecdcc15e908f86737a87e112
-- [buttons.png](../../../../../brand/assets/grammar-reference/buttons.png) - actual render, SHA256 9189c6b63af7b744824f7ffc9cf3c282c027c58d3eb614fb5bc80606ec3d74c9
-- [empty-state.png](../../../../../brand/assets/grammar-reference/empty-state.png) - actual render, SHA256 5b7f81d7db9982db08ba0b4a9e1018f32e476d24b88b2b19d1903fbda54fe803
-- [task-list.png](../../../../../brand/assets/grammar-reference/task-list.png) - actual render, SHA256 8a441d4efabb9c1dd56083d31418434cb597e3bced3f28efa81380b760c971ba
+The exact prompt cites brand/index.yaml rev 3, these real-render PNGs and ANATOMY-1/2/3/4. Grey secondary Input interiors, actual field-error treatment, white primary ink, blue secondary ink and neutral outlines come from real captures. The workspace follows tasks-screen.png; auth follows sign-in-screen.png without an outer raised form card.
 
-SurfaceCard (ariaLabel, bounded) supplies the raised rounded shell and inset content; it does not add a visible external label unless label is supplied. SurfaceListCard supplies a separate label/fact row above its one continuous raised row body, with footer below. Input supplies label and hint above the field and error below. Button uses pill geometry. WorkspaceShell plus NavigationFeatureNav supplies identity, named destinations and account actions; authentication remains the owner-required PrimaryRailLayout split. Native checkbox/radio controls are application content, not fabricated Grammar exports.
+## Composition and state
 
-Text/TextAction/Badge content and state semantics remain mapped; dark ink follows brand rev 3 where screenshots use blue/white/orange ink. Progress and PrimaryRailLayout are not independently demonstrated by these eight captures. The package source inspection and preserved business inputs remain their authority.
+The record declares layout, native task/choice controls, breadcrumb/account content and applicable empty/occurrence groups as application-owned regions. Business inputs and all 8 state/screen/viewport entries remain bound. Mobile is a derived specification, not a captured screen.
 
-The first anatomy render copied orange error ink; a second imagegen invocation corrected that sentence to dark text while retaining the danger edge. Active/ended states place StaticStateRow children inside the shared raised SurfaceListCard. EmptyNotice remains source-grounded because the empty capture has no visible notice text.
+The new empty-state.png shows shell, heading, zero count and a blank raised list body. It does not visibly show EmptyNotice content, turtle or composer. StaticStateRow and Progress are not rendered by this four-image set. Those names no longer claim a proven visual anatomy: empty/occurrence content is app-owned composition of referenced primitives, and usage uses text instead of a bar. Loading skeleton and alternate viewport/state appearances remain unproven until actual captures exist.
 
-## Knowledge conflict
+## Authority and provenance
 
-COLLECTION-1 cases 1-4 and COLLECTION-2 prohibit an enclosing card, but @starci/grammar 0.4.13 SurfaceListCard actually renders a raised shell around its rows. The coordinator addendum explicitly requires this shipped anatomy. Preserve the external section label/fact and footer; use the published collection owner without an extra SurfaceCard or per-row cards. This is a documented knowledge/renderer conflict, not a claimed pass of those contradictory cases.
+ADDENDUM 2 explicitly requires white primary label ink and actual component anatomy. This supersedes earlier agent-derived black label, dark Input-error, custom disabled, danger-outline and auth-card treatments. Brand rev 3 stays byte-identical; its conflicting foreground/contrast prescriptions are recorded as unresolved specification differences, not used to recolour component internals. No accessibility contrast pass is claimed.
 
-## Provenance and limits
+Selected PNG: assets/schedule-refused.png (1536 x 1024), SHA256 906bf920bf47482a955be3fef79ed8536cd4a7226d37f44b4908e23dc12ab29e. Exact prompt: assets/schedule-refused.prompt.txt, SHA256 2c2d892e2e493785fd8250fc5899df299da50b14b719740f252019547c6bdd13. Tool: image_gen.imagegen; no model field exposed. One generation from the actual reference images produced this direction.
 
-Selected PNG: assets/schedule-refused.png (1536 x 1024), SHA256 72d414204d5e268e80de282db9747f3ef6dead9aa39bcae909b8f432189e2d1a. Exact final prompt: assets/schedule-refused.prompt.txt, SHA256 5422440ad6dee0bca97bddea096348e3451ffca89f6c31cef2666718a8b2abd4. Every supplied generation image is retained and named in generation.inputRefs. The .v4 PNG/prompt pair preserves the actual pre-addendum input; earlier .initial pairs remain historical inputs.
+The coordinator knowledge file was read from C:/Users/Hi/orca/workspaces/.claude/ex-lint/knowledge/ui/proof/anatomy-source.yaml; its exact bytes are retained at examples/todo-app-backend/.starciwork/features/task/ui/list/assets/anatomy-source.accepted.yaml.txt because the canonical file is absent in this checkout. All four current reference files are versioned at their existing brand asset owner. The former reference set and previous selected direction are pinned to Git revision 41471a63; historical prompts are not current instructions.
 
-Coverage: 8 explicit state/screen/viewport entries. Desktop is generated direction; mobile-390 and other states are derived specifications, not extra captured screens.
-
-image_gen.imagegen generated the PNG. No model field was exposed. Manual inspection confirms the intended visible anatomy and retained UX, not exact CSS values, pixel-perfect component rendering, focus behavior or API outcomes. Frontend implementation must use actual components and exact brand tokens, provide Grammar-owned dark label/error and danger capability where declared, then produce real browser/UAT proof. Brand index and all pre-existing brand assets were left byte-for-byte unchanged.
+This generated PNG is manually reviewed design input, not an exact browser capture, pixel-level contrast certification, keyboard proof or API evidence. Later implementation must render real components and obtain browser/UAT evidence.

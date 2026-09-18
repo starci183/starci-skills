@@ -1,5 +1,3 @@
-Command: node scripts/check-example-work.mjs
-Exit: 1
 REFUSED examples/todo-app-backend/.starciwork/features/login/impl/todo-app-frontend/sign-in/evidence.yaml: recordDigest f30937a3e53f7a31191f6ca1b4008259dfa967a692f15125dcf1fa1b86d9e89b no longer matches impl.login.todo-app-frontend.sign-in's current digest c5bbc20edea0af2485a788c7317a9058edd4010c90152d67fe2d9e89c8c332e3; refused unless it carries stale: true
 REFUSED examples/todo-app-backend/.starciwork/features/task/impl/todo-app-backend/platform-database/evidence.yaml: codeDigest 58622b782235f7c8fb071c763892519151b7510a38c48bf6453c6dfd387fdcac no longer matches the code currently under impl.task.todo-app-backend.platform-database's owners/module (now e3b2b48499da8fbe77fb136bdd890bfb743340f984f51520c65e7481d5451aa9); refused unless it carries stale: true [CODE_DIGEST_STALE]
 REFUSED examples/todo-app-backend/.starciwork/features/login/uat/sign-in/index.yaml: run runs/20260918T090054Z-240aa95e has no videos/ with at least one playable recording
@@ -19,7 +17,9 @@ WARN examples/todo-app-backend/.starciwork/features/share/contract/completion-gu
 WARN examples/todo-app-backend/.starciwork/features/task/fr/complete/index.yaml: blockedBy chain reaches br.task.complete.once, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]
 WARN examples/todo-app-backend/.starciwork/features/task/fr/reopen/index.yaml: blockedBy chain reaches br.task.complete.once, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]
 WARN examples/todo-app-backend/.starciwork/features/task/sds/completion-state/index.yaml: blockedBy chain reaches br.task.complete.once, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]
-256 record(s), 2462 ref(s), 77 evidence file(s): 4 refused, 15 warned
+256 record(s), 2376 ref(s), 77 evidence file(s): 4 refused, 15 warned
 
-Compared against prior committed brand/assets/work-check-final.txt: 0 new refusals.
-Existing tracked brand files byte-identical to HEAD: 14.
+Baseline refusals: 4
+Current refusals: 4
+New refusals: 0
+Brand files outside superseded reference set unchanged: 14

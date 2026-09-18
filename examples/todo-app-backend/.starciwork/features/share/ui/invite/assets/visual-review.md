@@ -1,35 +1,30 @@
-# Visual review: ui.share.invite
+# Visual review: ui.share.invite / ADDENDUM 2
 
-Reviewed by Codex on 2026-09-18T14:05:58.053Z. Outcome: accepted proposed direction with the declared implementation gaps.
+Reviewed by Codex on 2026-09-18T14:41:21.685Z. Accepted as proposed direction, with implementation/render proof still separate.
 
-## Before / corrected
+Before: White invalid input, black primary label, custom Revoke outlines and error ink.
 
-Before: Outlined invitation panel; collaborator rows lie flat on canvas; no count; rectangular actions.
+Corrected: Grey invalid secondary field with actual label/error treatment, white Send invitation label, neutral Revoke buttons and reference-backed collection shell.
 
-Corrected: Raised invitation SurfaceCard and separate raised SurfaceListCard enclosing column labels and both rows; external Collaborators / 2 people header and expiry footer; pill actions.
+## Anatomy sources
 
-## Actual anatomy sources
+- [tasks-screen.png](../../../../../brand/assets/grammar-reference/tasks-screen.png) - actual render; SHA256 e9ea01cbbecb7a5b6f19328184fa5a0eca7e37f4a411351e8582491dde5024d5
+- [primitives.png](../../../../../brand/assets/grammar-reference/primitives.png) - actual render; SHA256 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
 
-- [app-shell.png](../../../../../brand/assets/grammar-reference/app-shell.png) - actual render, SHA256 81fc3540234b264cf0f1fd11670474f1db42aaf961420ba3f9d8a7cb4318539c
-- [sign-in-card.png](../../../../../brand/assets/grammar-reference/sign-in-card.png) - actual render, SHA256 b1948cf75464804f055ea37953c72751f3e36795267f1f204179917da1d6eeee
-- [task-list.png](../../../../../brand/assets/grammar-reference/task-list.png) - actual render, SHA256 8a441d4efabb9c1dd56083d31418434cb597e3bced3f28efa81380b760c971ba
-- [buttons.png](../../../../../brand/assets/grammar-reference/buttons.png) - actual render, SHA256 9189c6b63af7b744824f7ffc9cf3c282c027c58d3eb614fb5bc80606ec3d74c9
-- [inputs.png](../../../../../brand/assets/grammar-reference/inputs.png) - actual render, SHA256 812589428e7f1fb3cd538f5502f8cc58f0981270ecdcc15e908f86737a87e112
+The exact prompt cites brand/index.yaml rev 3, these real-render PNGs and ANATOMY-1/2/3/4. Grey secondary Input interiors, actual field-error treatment, white primary ink, blue secondary ink and neutral outlines come from real captures. The workspace follows tasks-screen.png; auth follows sign-in-screen.png without an outer raised form card.
 
-SurfaceCard (ariaLabel, bounded) supplies the raised rounded shell and inset content; it does not add a visible external label unless label is supplied. SurfaceListCard supplies a separate label/fact row above its one continuous raised row body, with footer below. Input supplies label and hint above the field and error below. Button uses pill geometry. WorkspaceShell plus NavigationFeatureNav supplies identity, named destinations and account actions; authentication remains the owner-required PrimaryRailLayout split. Native checkbox/radio controls are application content, not fabricated Grammar exports.
+## Composition and state
 
-Text/TextAction/Badge content and state semantics remain mapped; dark ink follows brand rev 3 where screenshots use blue/white/orange ink. Progress and PrimaryRailLayout are not independently demonstrated by these eight captures. The package source inspection and preserved business inputs remain their authority.
+The record declares layout, native task/choice controls, breadcrumb/account content and applicable empty/occurrence groups as application-owned regions. Business inputs and all 10 state/screen/viewport entries remain bound. Mobile is a derived specification, not a captured screen.
 
-One reference-guided imagegen invocation produced this correction.
+The new empty-state.png shows shell, heading, zero count and a blank raised list body. It does not visibly show EmptyNotice content, turtle or composer. StaticStateRow and Progress are not rendered by this four-image set. Those names no longer claim a proven visual anatomy: empty/occurrence content is app-owned composition of referenced primitives, and usage uses text instead of a bar. Loading skeleton and alternate viewport/state appearances remain unproven until actual captures exist.
 
-## Knowledge conflict
+## Authority and provenance
 
-COLLECTION-1 cases 1-4 and COLLECTION-2 prohibit an enclosing card, but @starci/grammar 0.4.13 SurfaceListCard actually renders a raised shell around its rows. The coordinator addendum explicitly requires this shipped anatomy. Preserve the external section label/fact and footer; use the published collection owner without an extra SurfaceCard or per-row cards. This is a documented knowledge/renderer conflict, not a claimed pass of those contradictory cases.
+ADDENDUM 2 explicitly requires white primary label ink and actual component anatomy. This supersedes earlier agent-derived black label, dark Input-error, custom disabled, danger-outline and auth-card treatments. Brand rev 3 stays byte-identical; its conflicting foreground/contrast prescriptions are recorded as unresolved specification differences, not used to recolour component internals. No accessibility contrast pass is claimed.
 
-## Provenance and limits
+Selected PNG: assets/invite-refused.png (1536 x 1024), SHA256 7340a96a89d848e9b33f639433a823eeb7994ce7a4dd6a80de0f69bb54343ef0. Exact prompt: assets/invite-refused.prompt.txt, SHA256 81f800c2a28b76143dc8c1870ded6c6c5f676943bc8bd1a8a5d36c65cfe6efee. Tool: image_gen.imagegen; no model field exposed. One generation from the actual reference images produced this direction.
 
-Selected PNG: assets/invite-refused.png (1536 x 1024), SHA256 775ba751b492d27690a45aa78a47c7aebf96402404c78c4c45ac69b1aff13662. Exact final prompt: assets/invite-refused.prompt.txt, SHA256 ee0cd1479244127806a8c898c85e0403447d7daed9a2afaf59775963794ecb48. Every supplied generation image is retained and named in generation.inputRefs. The .v4 PNG/prompt pair preserves the actual pre-addendum input; earlier .initial pairs remain historical inputs.
+The coordinator knowledge file was read from C:/Users/Hi/orca/workspaces/.claude/ex-lint/knowledge/ui/proof/anatomy-source.yaml; its exact bytes are retained at examples/todo-app-backend/.starciwork/features/task/ui/list/assets/anatomy-source.accepted.yaml.txt because the canonical file is absent in this checkout. All four current reference files are versioned at their existing brand asset owner. The former reference set and previous selected direction are pinned to Git revision 41471a63; historical prompts are not current instructions.
 
-Coverage: 10 explicit state/screen/viewport entries. Desktop is generated direction; mobile-390 and other states are derived specifications, not extra captured screens.
-
-image_gen.imagegen generated the PNG. No model field was exposed. Manual inspection confirms the intended visible anatomy and retained UX, not exact CSS values, pixel-perfect component rendering, focus behavior or API outcomes. Frontend implementation must use actual components and exact brand tokens, provide Grammar-owned dark label/error and danger capability where declared, then produce real browser/UAT proof. Brand index and all pre-existing brand assets were left byte-for-byte unchanged.
+This generated PNG is manually reviewed design input, not an exact browser capture, pixel-level contrast certification, keyboard proof or API evidence. Later implementation must render real components and obtain browser/UAT evidence.

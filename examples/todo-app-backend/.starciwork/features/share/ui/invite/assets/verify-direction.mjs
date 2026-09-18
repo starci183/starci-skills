@@ -33,11 +33,16 @@ else check(d.ui.shell.owner==='WorkspaceShell'&&d.ui.shell.navigation.length===4
 if(d.id==='ui.task.list')check(d.ui.artworkSlots.some(s=>s.states.includes('empty')&&s.master.record==='brand'),'derived empty-state turtle master');
 if(['ui.audit.privacy','ui.share.invite','ui.plan.usage'].includes(d.id))check(d.ui.artworkSlots.length===0,'no mascot slot on destructive/refusal surface');
 const finalPrompt=read(path.join(dir,chosen[0].generation.promptPath)).toString();
-check(inputs.grammarReferences.length>=4,'actual rendered anatomy references bound');
+check(inputs.grammarReferences.length===4&&['sign-in-screen.png','tasks-screen.png','empty-state.png','primitives.png'].every(name=>inputs.grammarReferences.some(r=>r.path.endsWith('/'+name))),'current four full-screen anatomy references bound');
 for(const ref of inputs.grammarReferences)check(hash(path.join(root,ref.path))===ref.sha256,'actual reference bytes '+ref.path);
 const referencedImages=chosen[0].generation.inputRefs.filter(p=>p.endsWith('.png'));
-check(referencedImages.length>1,'retained image edit target and anatomy inputs');
+check(referencedImages.length>1,'retained actual anatomy image inputs');
 for(const p of referencedImages){const file=path.join(root,p);check(fs.existsSync(file),'generation image retained '+p);check(finalPrompt.includes(p),'generation image cited in exact prompt '+p);}
 check(finalPrompt.includes('ANATOMY SOURCE')&&finalPrompt.includes('grammar-reference/'),'final prompt identifies actual anatomy source');
 if(d.ui.shell.owner==='WorkspaceShell')check(d.ui.coverage.map.filter(m=>m.components.some(c=>c.startsWith('WorkspaceShell'))).every(m=>m.components.some(c=>c.startsWith('NavigationFeatureNav'))),'workspace maps actual navigation composition');
+check(d.ui.anatomyReview.formula==='direction = real-render(anatomy) + brand(surface) + composition(intent)','anatomy formula bound per screen');
+check(finalPrompt.includes('ANATOMY-1/2/3/4')&&finalPrompt.includes('PRIMARY BUTTON LABELS ARE WHITE'),'current anatomy rules and white primary ink cited');
+const mappedInputs=d.ui.coverage.map.flatMap(m=>m.components).filter(c=>c.startsWith('Input ('));
+check(mappedInputs.every(c=>c.includes('variant: secondary')),'all mapped nested Inputs use secondary variant');
+check(d.ui.appOwnedRegions.length>0,'application-owned composition regions declared');
 console.log('INFO structural/hash checks complement manual visual review; no browser/render/API proof.');

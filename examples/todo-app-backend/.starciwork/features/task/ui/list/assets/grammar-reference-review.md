@@ -1,40 +1,50 @@
-# Grammar reference comparison: all seven UI directions
+# Full-screen anatomy comparison: ADDENDUM 2
 
-Coordinator addendum completed by Codex. Brand remains rev 3; the existing brand record, mascot master, token wiring and brand evidence were not edited. All eight supplied reference PNGs were inspected before regeneration, alongside every screen component map and selected v4 direction.
+All seven directions were compared with the four superseding real renders and regenerated using image_gen.imagegen. Brand rev 3 remains unchanged.
 
-| UI | Mismatch found | Corrected direction and exact prompt |
+Formula: **direction = real-render(anatomy) + brand(surface) + composition(intent)**. The actual component controls shape and state styling. Page layout, content and declared application-owned regions carry composition intent.
+
+| UI | Corrected direction | PNG and exact prompt |
 |---|---|---|
-| ui.task.list | Missing composer SurfaceCard; task rows lie flat on canvas; count beside label; rectangular actions. | [PNG](list-many-tasks.png), [prompt](list-many-tasks.prompt.txt) |
-| ui.share.invite | Outlined invitation panel; collaborator rows lie flat on canvas; no count; rectangular actions. | [PNG](../../../../share/ui/invite/assets/invite-refused.png), [prompt](../../../../share/ui/invite/assets/invite-refused.prompt.txt) |
-| ui.login.sign-in | No bounded form SurfaceCard; outlined square controls and disabled rectangular action. | [PNG](../../../../login/ui/sign-in/assets/sign-in-refused.png), [prompt](../../../../login/ui/sign-in/assets/sign-in-refused.prompt.txt) |
-| ui.notify.preferences | Outlined panel rather than raised SurfaceCard; rectangular primary and toggle actions. | [PNG](../../../../notify/ui/preferences/assets/preferences-refused.png), [prompt](../../../../notify/ui/preferences/assets/preferences-refused.prompt.txt) |
-| ui.plan.usage | Outlined panel rather than raised SurfaceCard; rectangular upgrade action. | [PNG](../../../../plan/ui/usage/assets/usage-over-cap-frozen.png), [prompt](../../../../plan/ui/usage/assets/usage-over-cap-frozen.prompt.txt) |
-| ui.audit.privacy | Two detached outlined panels contradict the mapped joined SurfaceCard; export variant contradicts secondary map. | [PNG](../../../../audit/ui/privacy/assets/privacy-erasure-refused.png), [prompt](../../../../audit/ui/privacy/assets/privacy-erasure-refused.prompt.txt) |
-| ui.recur.schedule | Outlined panel; labels beside Inputs and hints below; rectangular actions. | [PNG](../../../../recur/ui/schedule/assets/schedule-refused.png), [prompt](../../../../recur/ui/schedule/assets/schedule-refused.prompt.txt) |
+| ui.login.sign-in | Frameless compact form in the right half, grey secondary inputs, stock white-label disabled primary, real auth links and master turtle in the left panel. | [PNG](../../../../login/ui/sign-in/assets/sign-in-refused.png), [prompt](../../../../login/ui/sign-in/assets/sign-in-refused.prompt.txt) |
+| ui.task.list | Reference-scale shell, grey composer input, white Add task label, neutral Delete outline and raised list body with external label/count/footer. | [PNG](list-many-tasks.png), [prompt](list-many-tasks.prompt.txt) |
+| ui.share.invite | Grey invalid secondary field with actual label/error treatment, white Send invitation label, neutral Revoke buttons and reference-backed collection shell. | [PNG](../../../../share/ui/invite/assets/invite-refused.png), [prompt](../../../../share/ui/invite/assets/invite-refused.prompt.txt) |
+| ui.notify.preferences | White Save preferences label, blue secondary Turn off label, restrained reference typography and dark plain save refusal. | [PNG](../../../../notify/ui/preferences/assets/preferences-refused.png), [prompt](../../../../notify/ui/preferences/assets/preferences-refused.prompt.txt) |
+| ui.plan.usage | White primary label; preserved 40/20 and 200% over-cap state composed using Text, with no uncaptured progress control. | [PNG](../../../../plan/ui/usage/assets/usage-over-cap-frozen.png), [prompt](../../../../plan/ui/usage/assets/usage-over-cap-frozen.prompt.txt) |
+| ui.audit.privacy | Actual blue-label secondary Export and neutral-outline Request erasure; two app-owned content groups inside the real SurfaceCard boundary. | [PNG](../../../../audit/ui/privacy/assets/privacy-erasure-refused.png), [prompt](../../../../audit/ui/privacy/assets/privacy-erasure-refused.prompt.txt) |
+| ui.recur.schedule | All fields use grey secondary anatomy, error label/border/message use the actual Input invalid state, Save has white ink and Cancel has blue ink. | [PNG](../../../../recur/ui/schedule/assets/schedule-refused.png), [prompt](../../../../recur/ui/schedule/assets/schedule-refused.prompt.txt) |
 
-All seven required regeneration. Each owner has an updated visual-review.md and evidence.yaml. Original v4 PNG/prompt pairs are retained as edit inputs. Task and recurrence also retain the first anatomy correction, followed by a focused ink correction. All generated images are 1536 x 1024.
+## Current references
 
-## Component comparison
+- [sign-in-screen.png](../../../../../brand/assets/grammar-reference/sign-in-screen.png) - SHA256 0619dec4572f8d5931b39075d21aaf089963eaeab4e7bb883a35fb4cd28d5d2e
+- [tasks-screen.png](../../../../../brand/assets/grammar-reference/tasks-screen.png) - SHA256 e9ea01cbbecb7a5b6f19328184fa5a0eca7e37f4a411351e8582491dde5024d5
+- [empty-state.png](../../../../../brand/assets/grammar-reference/empty-state.png) - SHA256 09ba45e64e7d0e7167c2572df6ae33406b842859d8528aeb9fd2f756a4b48c26
+- [primitives.png](../../../../../brand/assets/grammar-reference/primitives.png) - SHA256 21fe46c116fa5ede07ff044c4fbdf5f1600686cbd8b955f2d3d82cc9e0f8ba91
 
-| Component | Actual source | Decision |
-|---|---|---|
-| WorkspaceShell + NavigationFeatureNav | app-shell.png | Six signed-in screens use the real header composition; plain A/Alex account presence and named destination row. |
-| SurfaceCard | sign-in-card.png, task-composer.png | Raised white rounded body, soft shadow and content inset. Auth gains its form card, task gains its composer; other outlined panels are replaced. Privacy joins its two action bands in one subject card, per its existing component map and the published composition prop. |
-| SurfaceListCard | task-list.png, empty-state.png | Shared raised white row body, external label/fact above and footer below. Applied to task and collaborators, and mapped recurrence active/history variants. |
-| Input | inputs.png, sign-in-card.png, task-composer.png | Label and hint above, error below; rounded field. Recurrence corrected from side labels. Brand dark error ink is preserved as a declared theme requirement. |
-| Button | buttons.png | Pill primary/secondary/outline shapes and inactive fill. Black primary labels follow unchanged brand contrast; destructive outline capability remains declared. |
-| Text, TextAction, Badge | text-and-actions.png | Plain text hierarchy, text links and neutral status labels; no invented message component. |
-| EmptyNotice / StaticStateRow | empty-state.png / task-list.png plus installed source | empty-state.png visibly contains the All tasks / 0 tasks header and blank raised shell; it does not show legible EmptyNotice content. task-list.png supplies the repeated-row boundary. No separate visible StaticStateRow sample or Progress/PrimaryRailLayout render is present. Those prop and state contracts remain grounded in the inspected installed source and existing brand/business input, not falsely certified by these PNGs. |
-| PrimaryRailLayout, MediaFrame, Progress, native radios/checkboxes | existing brand and accepted source/contracts | No dedicated render in this set; keep owner split auth, turtle placement, progress value/ratio and native control semantics. No screenshot certification is claimed. |
+The old reference set is superseded and remains recoverable at Git revision 41471a63. Current records, generation inputs and checks bind only the new set. Task and Notifications retain their first full-screen generation plus the exact prompt because a final targeted edit consumed it. Earlier .v4/.initial/.anatomy-initial files are history, not current instructions.
 
-## Conflict disposition
+## Rule source and authority
 
-COLLECTION-1 cases 1-4 and COLLECTION-2 prohibit an enclosing card, but @starci/grammar 0.4.13 SurfaceListCard actually renders a raised shell around its rows. The coordinator addendum explicitly requires this shipped anatomy. Preserve the external section label/fact and footer; use the published collection owner without an extra SurfaceCard or per-row cards. This is a documented knowledge/renderer conflict, not a claimed pass of those contradictory cases.
+The canonical knowledge file is absent from this checkout. The coordinator version was read at C:/Users/Hi/orca/workspaces/.claude/ex-lint/knowledge/ui/proof/anatomy-source.yaml and its exact bytes retained as [anatomy-source.accepted.yaml.txt](anatomy-source.accepted.yaml.txt), SHA256 db4352239c7991a58e8d970e2373858c3ef9ed34f37b369a15563bb94e60d48f. No knowledge or operator source was modified. ANATOMY-1 through ANATOMY-4 are bound in each prompt and record.
 
-The user requested brand rev 3 unchanged, so this finding is recorded in UI-owned artifacts and gaps. Ops, knowledge, schema, checks, runtime and implementation code remain untouched.
+ADDENDUM 2 explicitly requires white primary label ink and actual component anatomy. This supersedes earlier agent-derived black label, dark Input-error, custom disabled, danger-outline and auth-card treatments. Brand rev 3 stays byte-identical; its conflicting foreground/contrast prescriptions are recorded as unresolved specification differences, not used to recolour component internals. No accessibility contrast pass is claimed.
 
-## Verification
+The earlier COLLECTION-1/2 flat-row interpretation remains overridden by real SurfaceListCard containment, as required by both addenda.
 
-The seven owned verifiers check selected PNG and prompt hashes, retained image inputs, actual reference hashes, brand/business/knowledge hashes, explicit state/viewport maps and prompt citation order. Evidence is generated by actually running those commands with scripts/example-evidence.mjs; it is not kernel provenance. The overall example-work check retains its four pre-existing refusals and fifteen warnings, with no new refusal. See grammar-reference-check.txt for exact output.
+## Component review
 
-These remain ImageGen directions, not browser renders. The supplied grammar-reference PNGs are the real component captures; the corrected directions approximate their anatomy. Current implementation/theme/danger/link gaps stay explicit.
+| Owner | Source and treatment |
+|---|---|
+| WorkspaceShell / NavigationFeatureNav | tasks-screen.png: compact header, identity and text navigation/account actions. |
+| SurfaceCard / SurfaceListCard | tasks-screen.png: white raised body; all list rows share one body, external label/fact and footer. Privacy content groups are application composition within the ordinary SurfaceCard. |
+| Input | sign-in-screen.png, tasks-screen.png and primitives.png: every field on a surface uses secondary grey fill. Invalid fields preserve the real danger label/edge/error and grey interior. |
+| Button | primitives.png: primary white ink, secondary blue ink, neutral outline, stock pending/disabled treatment. |
+| Text and destinations | primitives.png and sign-in-screen.png: normal dark refusal Text, separate Input-owned error treatment. Native breadcrumb/radio/checkbox content is application-owned. |
+| Auth composition | sign-in-screen.png: left illustration/master, right compact frameless form; full web links and refusal semantics preserved. |
+| Other-state content | The new empty-state.png shows shell, heading, zero count and a blank raised list body. It does not visibly show EmptyNotice content, turtle or composer. StaticStateRow and Progress are not rendered by this four-image set. Those names no longer claim a proven visual anatomy: empty/occurrence content is app-owned composition of referenced primitives, and usage uses text instead of a bar. Loading skeleton and alternate viewport/state appearances remain unproven until actual captures exist. |
+
+## Verification and limits
+
+Seven owned verification commands check asset/prompt hashes, current reference hashes, accepted inputs, source citation order, secondary Input mappings, app-owned regions and state/viewport coverage. Evidence is generated by actually running those commands with scripts/example-evidence.mjs, not attributed to a kernel. See [grammar-reference-check.txt](grammar-reference-check.txt) for the full workspace result and unchanged-brand check.
+
+The directions are generated design inputs; real-render references remain separate. Exact pixels, browser interactions and accessibility contrast still require implementation captures and UAT. No frontend implementation or brand decision files were changed.
