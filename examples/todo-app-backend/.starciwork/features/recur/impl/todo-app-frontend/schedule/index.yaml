@@ -8,5 +8,10 @@ owners:
   - {role: module, path: app/recur/upcoming-list.tsx}
   - {role: module, path: app/recur/end-rule-dialog.tsx}
 proves: [ui.recur.schedule]
-blockedBy:
-  - {record: gap.recur.unbuilt-module, because: "Not implemented. The frontend target moved to Next.js and must consume the Grammar core package the way nivo-fe does; none of these files exist yet and no test or capture has been taken."}
+# gap.recur.unbuilt-module closed at rev 2 (closedBy: impl.recur.todo-app-backend.engine, the backend
+# half); the blockedBy edge that named it here is removed because it is now stale (a resolved blocker
+# cited with no rev pin), matching impl.login.todo-app-frontend.sign-in's own precedent for the same
+# situation. This is a housekeeping removal only - none of app/recur/{schedule-screen,upcoming-list,
+# end-rule-dialog}.tsx exist yet, so this record stays state: todo and this backend-only lane does not
+# build them (out of its own owner-ruled scope: "examples only").
+change: {rev: 1, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "Removed the stale blockedBy edge on gap.recur.unbuilt-module (done at rev 2, cited with no rev pin). No other field changed; the frontend schedule screen remains unbuilt."}

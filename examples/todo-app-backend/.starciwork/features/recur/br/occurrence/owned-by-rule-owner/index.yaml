@@ -1,14 +1,12 @@
 schema: work/business-rule
 id: br.recur.occurrence.owned-by-rule-owner
 title: An occurrence belongs to the rule's owner
-state: todo
+state: done
 statements:
   - Every occurrence a rule materialises carries the owner of that rule, bound at materialisation and
     never rewritten.
   - Only that owner may complete or skip the occurrence; anyone else's attempt is refused and the
     occurrence is unchanged.
 acceptanceCriteria: [refuses-non-owner]
-module: src/recur/occurrence
-change: {rev: 1, kind: initial, at: 2026-09-18T05:12:00.000Z}
-blockedBy:
-  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The example's backend target moved to NestJS and this feature has not been built there; there is no occurrence store to guard."}
+module: src/modules/bussiness/recur
+change: {rev: 2, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "impl.recur.todo-app-backend.engine now exists: module corrected from the stale pre-migration path src/recur/occurrence to the real module root src/modules/bussiness/recur (OccurrenceService's ownership guard), and the gap.recur.unbuilt-module blockedBy edge is removed since that gap is now closed by this feature's implementation. ac.recur.occurrence.owned-by-rule-owner.refuses-non-owner passes at src/modules/bussiness/recur/occurrence.service.spec.ts, complete-occurrence.handler.spec.ts and skip-occurrence.handler.spec.ts."}

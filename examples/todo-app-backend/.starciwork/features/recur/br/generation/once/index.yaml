@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.recur.generation.once
 title: A rule never produces two occurrences for one window
-state: todo
+state: done
 statements:
   - Running the generator twice for a window that overlaps a previous run creates no second occurrence
     for any date that run already covered.
@@ -10,7 +10,5 @@ statements:
 authorityRefs:
   - "product-intent: A generator that can be safely re-run is the only kind that can also be safely retried after a crash."
 acceptanceCriteria: [is-idempotent-on-rerun]
-module: src/recur/generator
-change: {rev: 1, kind: initial, at: 2026-09-18T05:10:00.000Z}
-blockedBy:
-  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The example's backend target moved to NestJS and this feature has not been built there; there is no generator module to run twice."}
+module: src/modules/bussiness/recur
+change: {rev: 2, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "impl.recur.todo-app-backend.engine now exists: module corrected from the stale pre-migration path src/recur/generator to the real module root src/modules/bussiness/recur (GeneratorService/OccurrenceService), and the gap.recur.unbuilt-module blockedBy edge is removed since that gap is now closed by this feature's implementation. ac.recur.generation.once.is-idempotent-on-rerun passes at src/modules/bussiness/recur/generator.service.spec.ts and occurrence.service.spec.ts."}

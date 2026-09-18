@@ -18,3 +18,8 @@ export { ShareInvitationExpiredException } from './errors/share/invitation-expir
 export { ShareInvitationRevokedException } from './errors/share/invitation-revoked';
 export { ShareInvitationAlreadyClosedException } from './errors/share/invitation-already-closed';
 export { ShareForbiddenException } from './errors/share/forbidden';
+export { RecurRuleNotFoundException } from './errors/recur/rule-not-found';
+export { RecurRuleForbiddenException } from './errors/recur/rule-forbidden';
+export { RecurRuleInvalidException } from './errors/recur/rule-invalid';
+export { RecurOccurrenceNotFoundException } from './errors/recur/occurrence-not-found';
+export { RecurOccurrenceForbiddenException } from './errors/recur/occurrence-forbidden';

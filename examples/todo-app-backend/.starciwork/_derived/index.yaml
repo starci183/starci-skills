@@ -496,8 +496,8 @@ records:
   br.recur.ending.preserves-history:
     schema: work/business-rule
     feature: recur
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.recur.occurrence
@@ -505,33 +505,21 @@ records:
         - sds.recur.occurrence-lifecycle
       composes:
         - fr.recur.end-rule
-    blockers:
-      - id: gap.recur.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation yet. The example's backend target moved to NestJS and this feature has
-          not been built there; there is no occurrence store to orphan against.
   br.recur.generation.once:
     schema: work/business-rule
     feature: recur
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.recur.occurrence
         - nfr.recur.generation.timeliness
         - sds.recur.occurrence-lifecycle
-    blockers:
-      - id: gap.recur.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation yet. The example's backend target moved to NestJS and this feature has
-          not been built there; there is no generator module to run twice.
   br.recur.impossible-date.skips:
     schema: work/business-rule
     feature: recur
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.recur.rule
@@ -539,47 +527,28 @@ records:
       composes:
         - fr.recur.make-recurring
         - fr.recur.see-upcoming
-    blockers:
-      - id: gap.recur.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation yet. The example's backend target moved to NestJS and this feature has
-          not been built there; there is no rule module to walk a month's calendar dates.
   br.recur.occurrence.owned-by-rule-owner:
     schema: work/business-rule
     feature: recur
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.recur.occurrence
         - sds.recur.occurrence-lifecycle
       composes:
         - fr.recur.edit-rule
-    blockers:
-      - id: gap.recur.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation yet. The example's backend target moved to NestJS and this feature has
-          not been built there; there is no occurrence store to guard.
   br.recur.timezone.owner-local-time:
     schema: work/business-rule
     feature: recur
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.recur.rule
         - sds.recur.generation-engine
       composes:
         - fr.recur.make-recurring
-    blockers:
-      - id: gap.recur.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation yet. The example's backend target moved to NestJS and this feature has
-          not been built there; there is no zone-conversion module to run these fixed instants
-          against.
   br.share.editor.no-delete:
     schema: work/business-rule
     feature: share
@@ -901,8 +870,8 @@ records:
   data.recur.occurrence:
     schema: work/data
     feature: recur
-    state: todo
-    effectiveState: todo
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - fr.recur.see-upcoming
@@ -1346,11 +1315,17 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.recur.unbuilt-module
+      - id: gap.recur.live-proof
         rootKind: gap
         cyclic: false
-        because: No implementation yet. The example's backend target moved to NestJS and this feature has
-          not been built there.
+        because: gap.recur.unbuilt-module is resolved - impl.recur.todo-app-backend.engine is real and
+          unit-tested (EditRecurrenceHandler/RuleService.edit, edit-recurrence.handler.spec.ts), and
+          this flow's backend half runs end to end against the live dev stack
+          (scripts/live-proof-recur.sh's editRecurrence step, including the non-owner refusal). What
+          remains unmet is requiresProof.uat (uat.recur.make-recurring's own run composes this flow,
+          and has no runs/ folder yet - gap.recur.live-proof, not mine to close) and
+          requiresProof.e2e's npm run test:e2e script, which does not exist in this generation of
+          the backend.
   fr.recur.end-rule:
     schema: work/functional-requirement
     feature: recur
@@ -1362,11 +1337,18 @@ records:
       blockedBy:
         - journey.recur.first-recurring-task
     blockers:
-      - id: gap.recur.unbuilt-module
+      - id: gap.recur.live-proof
         rootKind: gap
         cyclic: false
-        because: No implementation yet. The example's backend target moved to NestJS and this feature has
-          not been built there.
+        because: gap.recur.unbuilt-module is resolved - impl.recur.todo-app-backend.engine is real and
+          unit-tested (EndRecurrenceHandler/OccurrenceService.orphanEndedOccurrences,
+          end-recurrence.handler.spec.ts, proving
+          ac.recur.ending.preserves-history.ended-rule-keeps-past-occurrences exactly), and this
+          flow's backend half runs end to end against the live dev stack
+          (scripts/live-proof-recur.sh's endRecurrence step). What remains unmet is
+          requiresProof.uat (uat.recur.make-recurring's own run composes this flow, and has no runs/
+          folder yet - gap.recur.live-proof, not mine to close) and requiresProof.e2e's npm run
+          test:e2e script, which does not exist in this generation of the backend.
   fr.recur.make-recurring:
     schema: work/functional-requirement
     feature: recur
@@ -1378,11 +1360,19 @@ records:
       blockedBy:
         - journey.recur.first-recurring-task
     blockers:
-      - id: gap.recur.unbuilt-module
+      - id: gap.recur.live-proof
         rootKind: gap
         cyclic: false
-        because: No implementation yet. The example's backend target moved to NestJS and the frontend to
-          Next.js; this flow has not been built on either side.
+        because: "gap.recur.unbuilt-module is resolved - impl.recur.todo-app-backend.engine is real,
+          unit-tested (composes' both rules pass) and this flow's own backend half runs end to end
+          against the live dev stack (scripts/live-proof-recur.sh's
+          makeRecurring/upcomingOccurrences steps). What remains unmet is this record's own
+          uat.required and e2e proof: uat.recur.make-recurring has no runs/ folder yet
+          (gap.recur.live-proof, not mine to close - ui/uat records are out of this lane's scope)
+          and requiresProof.e2e's npm run test:e2e script does not exist in this generation of the
+          backend (scripts/live-proof-recur.sh is its current successor, per this feature's own
+          brief, but requiresProof.e2e.command itself is left as authored rather than edited by this
+          lane)."
   fr.recur.see-upcoming:
     schema: work/functional-requirement
     feature: recur
@@ -1392,11 +1382,19 @@ records:
       refs:
         - ui.recur.schedule
     blockers:
-      - id: gap.recur.unbuilt-module
+      - id: gap.recur.live-proof
         rootKind: gap
         cyclic: false
-        because: No implementation yet. The example's backend target moved to NestJS and the frontend to
-          Next.js; the schedule screen has not been built on either side.
+        because: gap.recur.unbuilt-module is resolved on the backend - impl.recur.todo-app-backend.engine is
+          real and unit-tested (UpcomingOccurrencesHandler, upcoming-occurrences.handler.spec.ts,
+          including the ended-rule-shows-no-preview exceptionFlow), and this flow's backend half
+          runs end to end against the live dev stack (scripts/live-proof-recur.sh's
+          upcomingOccurrences steps, before and after ending). The frontend schedule screen
+          (impl.recur.todo-app-frontend.schedule) remains unbuilt and is outside this lane's scope.
+          What remains unmet is requiresProof.uat (uat.recur.make-recurring's own run composes this
+          flow, and has no runs/ folder yet - gap.recur.live-proof, not mine to close) and
+          requiresProof.e2e's npm run test:e2e script, which does not exist in this generation of
+          the backend.
   fr.share.accept:
     schema: work/functional-requirement
     feature: share
@@ -1673,29 +1671,16 @@ records:
     effectiveState: todo
     usedBy:
       blockedBy:
-        - uat.recur.make-recurring
-  gap.recur.unbuilt-module:
-    schema: work/gap
-    feature: recur
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - br.recur.ending.preserves-history
-        - br.recur.generation.once
-        - br.recur.impossible-date.skips
-        - br.recur.occurrence.owned-by-rule-owner
-        - br.recur.timezone.owner-local-time
         - fr.recur.edit-rule
         - fr.recur.end-rule
         - fr.recur.make-recurring
         - fr.recur.see-upcoming
-        - impl.recur.todo-app-backend.engine
-        - impl.recur.todo-app-frontend.schedule
-        - integration.recur.scheduler
-        - nfr.recur.generation.timeliness
-        - sds.recur.generation-engine
-        - sds.recur.occurrence-lifecycle
+        - uat.recur.make-recurring
+  gap.recur.unbuilt-module:
+    schema: work/gap
+    feature: recur
+    state: done
+    effectiveState: done
   gap.share.direction-not-drawn:
     schema: work/gap
     feature: share
@@ -1859,32 +1844,13 @@ records:
   impl.recur.todo-app-backend.engine:
     schema: work/implementation
     feature: recur
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.recur.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: Not implemented. The example's backend target moved to NestJS; none of these files exist
-          yet under src/recur, and no command has been run against them. The pinned instants in
-          ac.recur.timezone.owner-local-time.dst-spring-forward-shifts-by-gap,
-          ac.recur.timezone.owner-local-time.dst-fall-back-picks-earliest and
-          ac.recur.impossible-date.skips.skips-nonexistent-day are written precisely enough to
-          implement and test against once that module exists - gap.recur.unbuilt-module names that
-          one absence instead of citing each pinned acceptance criterion as if it were itself the
-          missing thing.
+    state: done
+    effectiveState: done
   impl.recur.todo-app-frontend.schedule:
     schema: work/implementation
     feature: recur
     state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.recur.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: Not implemented. The frontend target moved to Next.js and must consume the Grammar core
-          package the way nivo-fe does; none of these files exist yet and no test or capture has
-          been taken.
+    effectiveState: todo
   impl.share.todo-app-backend.access:
     schema: work/implementation
     feature: share
@@ -1942,8 +1908,7 @@ records:
     schema: work/implementation
     feature: task
     state: done
-    effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    effectiveState: done
   impl.task.todo-app-backend.platform-events:
     schema: work/implementation
     feature: task
@@ -2062,20 +2027,14 @@ records:
   integration.recur.scheduler:
     schema: work/integration
     feature: recur
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - nfr.recur.generation.timeliness
       dependsOn:
         - sds.recur.generation-engine
         - sds.recur.occurrence-lifecycle
-    blockers:
-      - id: gap.recur.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: Not implemented. There is no NestJS scheduler module for this feature yet, so there is no
-          tick to run against.
   journey.audit.right-to-be-forgotten:
     schema: work/customer-journey
     feature: audit
@@ -2142,11 +2101,19 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.recur.unbuilt-module
+      - id: gap.recur.live-proof
         rootKind: gap
         cyclic: false
-        because: No implementation yet. The example's backend target moved to NestJS and the frontend to
-          Next.js; this flow has not been built on either side.
+        because: "gap.recur.unbuilt-module is resolved - impl.recur.todo-app-backend.engine is real,
+          unit-tested (composes' both rules pass) and this flow's own backend half runs end to end
+          against the live dev stack (scripts/live-proof-recur.sh's
+          makeRecurring/upcomingOccurrences steps). What remains unmet is this record's own
+          uat.required and e2e proof: uat.recur.make-recurring has no runs/ folder yet
+          (gap.recur.live-proof, not mine to close - ui/uat records are out of this lane's scope)
+          and requiresProof.e2e's npm run test:e2e script does not exist in this generation of the
+          backend (scripts/live-proof-recur.sh is its current successor, per this feature's own
+          brief, but requiresProof.e2e.command itself is left as authored rather than edited by this
+          lane)."
   journey.share.collaborate-on-a-task:
     schema: work/customer-journey
     feature: share
@@ -2255,12 +2222,7 @@ records:
     schema: work/non-functional-requirement
     feature: recur
     state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.recur.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation yet; there is no scheduler tick or generator to measure against.
+    effectiveState: todo
   nfr.share.revoke.read-latency:
     schema: work/non-functional-requirement
     feature: share
@@ -2435,29 +2397,16 @@ records:
   sds.recur.generation-engine:
     schema: work/sds-component
     feature: recur
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - integration.recur.scheduler
-    blockers:
-      - id: gap.recur.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation yet. The example's backend target moved to NestJS and this feature has
-          not been built there; there is no calendar walk or zone conversion to run the pinned DST
-          and impossible-date acceptance criteria against.
   sds.recur.occurrence-lifecycle:
     schema: work/sds-component
     feature: recur
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.recur.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation yet. The example's backend target moved to NestJS and this feature has
-          not been built there; none of these five transitions has a function behind it.
+    state: done
+    effectiveState: done
   sds.share.invitation-lifecycle:
     schema: work/sds-component
     feature: share
@@ -2685,10 +2634,10 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 60
+    done: 72
     todo: 40
-    stale: 1
-    blocked: 95
+    stale: 0
+    blocked: 84
     total: 196
   byFeature:
     audit:
@@ -2716,10 +2665,10 @@ tally:
       blocked: 19
       total: 29
     recur:
-      done: 8
+      done: 19
       todo: 3
       stale: 0
-      blocked: 17
+      blocked: 6
       total: 28
     share:
       done: 18
@@ -2728,9 +2677,9 @@ tally:
       blocked: 5
       total: 26
     task:
-      done: 9
+      done: 10
       todo: 15
-      stale: 1
+      stale: 0
       blocked: 8
       total: 33
   gaps:
@@ -2839,7 +2788,7 @@ tally:
         - uat.recur.make-recurring
     - id: gap.recur.unbuilt-module
       feature: recur
-      state: todo
+      state: done
       closedBy:
         - impl.recur.todo-app-backend.engine
     - id: gap.share.direction-not-drawn
@@ -2887,7 +2836,7 @@ tally:
       feature: task
       state: done
       closedBy: null
-  unbuiltModuleGaps: 4
+  unbuiltModuleGaps: 3
 frontier:
   - id: br.audit.erasure.logged
     feature: audit
@@ -2947,15 +2896,15 @@ frontier:
   - id: gap.plan.unbuilt-module
     feature: plan
     title: No plan module exists under the NestJS/Next.js layout yet
-  - id: data.recur.occurrence
-    feature: recur
-    title: Occurrence
   - id: gap.recur.live-proof
     feature: recur
     title: No uat.verify run has produced a live run for recur.make-recurring
-  - id: gap.recur.unbuilt-module
+  - id: impl.recur.todo-app-frontend.schedule
     feature: recur
-    title: No recur module exists under the NestJS/Next.js layout yet
+    title: The schedule screen
+  - id: nfr.recur.generation.timeliness
+    feature: recur
+    title: A due occurrence is materialised close to its due instant
   - id: gap.share.frontend-unbuilt
     feature: share
     title: No share invite screen exists under the Next.js layout yet

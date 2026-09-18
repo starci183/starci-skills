@@ -57,18 +57,18 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.password.sign-in sends 49 other record(s) back to todo, would
-      stale 11 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      stale 13 evidence file(s), and touches 28 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
       src/features/pages/sign-in, src/features/pages/tasks/**,
-      src/features/todo/graphql/mutations/session, src/modules/bussiness/session,
-      src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/keycloak,
-      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts,
-      src/plan/reconcile.ts, src/plan/subscription, src/plan/subscription.ts,
-      src/recur/generator.service.ts, src/recur/occurrence.service.ts, src/recur/rule.service.ts,
-      src/recur/zone.util.ts) - this is the number a reviewer wants before approving the change.
+      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/mutations/session,
+      src/features/todo/graphql/queries/recur, src/modules/bussiness/recur,
+      src/modules/bussiness/session, src/modules/bussiness/share, src/modules/bussiness/task,
+      src/modules/integrations/keycloak, src/modules/platform/events, src/plan/cap-guard.ts,
+      src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription,
+      src/plan/subscription.ts) - this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.login.session.restores
     kind: blast-radius
     severity: critical
@@ -123,18 +123,18 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.restores sends 48 other record(s) back to todo, would
-      stale 10 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      stale 12 evidence file(s), and touches 28 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
       src/features/pages/sign-in, src/features/pages/tasks/**,
-      src/features/todo/graphql/mutations/session, src/modules/bussiness/session,
-      src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/keycloak,
-      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts,
-      src/plan/reconcile.ts, src/plan/subscription, src/plan/subscription.ts,
-      src/recur/generator.service.ts, src/recur/occurrence.service.ts, src/recur/rule.service.ts,
-      src/recur/zone.util.ts) - this is the number a reviewer wants before approving the change.
+      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/mutations/session,
+      src/features/todo/graphql/queries/recur, src/modules/bussiness/recur,
+      src/modules/bussiness/session, src/modules/bussiness/share, src/modules/bussiness/task,
+      src/modules/integrations/keycloak, src/modules/platform/events, src/plan/cap-guard.ts,
+      src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription,
+      src/plan/subscription.ts) - this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.login.session.single-device
     kind: blast-radius
     severity: critical
@@ -189,18 +189,18 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.single-device sends 48 other record(s) back to todo,
-      would stale 10 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      would stale 12 evidence file(s), and touches 28 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
       src/features/pages/sign-in, src/features/pages/tasks/**,
-      src/features/todo/graphql/mutations/session, src/modules/bussiness/session,
-      src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/keycloak,
-      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts,
-      src/plan/reconcile.ts, src/plan/subscription, src/plan/subscription.ts,
-      src/recur/generator.service.ts, src/recur/occurrence.service.ts, src/recur/rule.service.ts,
-      src/recur/zone.util.ts) - this is the number a reviewer wants before approving the change.
+      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/mutations/session,
+      src/features/todo/graphql/queries/recur, src/modules/bussiness/recur,
+      src/modules/bussiness/session, src/modules/bussiness/share, src/modules/bussiness/task,
+      src/modules/integrations/keycloak, src/modules/platform/events, src/plan/cap-guard.ts,
+      src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription,
+      src/plan/subscription.ts) - this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.share.revoke.on-read
     kind: blast-radius
     severity: critical
@@ -304,7 +304,7 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.task.single-owner sends 23 other record(s) back to todo, would
-      stale 4 evidence file(s), and touches 15 code path(s) (src/app/tasks/**,
+      stale 3 evidence file(s), and touches 15 code path(s) (src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
@@ -463,10 +463,11 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.impossible-date.skips sends 13 other record(s) back to todo,
-      would stale 1 evidence file(s), and touches 8 code path(s) (app/recur/end-rule-dialog.tsx,
-      app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx, src/recur/generator.service.ts,
-      src/recur/occurrence.service.ts, src/recur/rule, src/recur/rule.service.ts,
-      src/recur/zone.util.ts) - this is the number a reviewer wants before approving the change.
+      would stale 5 evidence file(s), and touches 6 code path(s) (app/recur/end-rule-dialog.tsx,
+      app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx,
+      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/queries/recur,
+      src/modules/bussiness/recur) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.recur.timezone.owner-local-time
     kind: blast-radius
     severity: critical
@@ -486,11 +487,11 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.timezone.owner-local-time sends 13 other record(s) back to
-      todo, would stale 1 evidence file(s), and touches 8 code path(s)
+      todo, would stale 5 evidence file(s), and touches 6 code path(s)
       (app/recur/end-rule-dialog.tsx, app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx,
-      src/recur/generator.service.ts, src/recur/occurrence.service.ts, src/recur/rule.service.ts,
-      src/recur/zone, src/recur/zone.util.ts) - this is the number a reviewer wants before approving
-      the change.
+      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/queries/recur,
+      src/modules/bussiness/recur) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.audit.append-only
     kind: blast-radius
     severity: critical
@@ -529,11 +530,11 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.ending.preserves-history sends 11 other record(s) back to
-      todo, would stale 1 evidence file(s), and touches 8 code path(s)
+      todo, would stale 3 evidence file(s), and touches 6 code path(s)
       (app/recur/end-rule-dialog.tsx, app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx,
-      src/recur/generator.service.ts, src/recur/occurrence, src/recur/occurrence.service.ts,
-      src/recur/rule.service.ts, src/recur/zone.util.ts) - this is the number a reviewer wants
-      before approving the change.
+      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/queries/recur,
+      src/modules/bussiness/recur) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.task.title.required
     kind: blast-radius
     severity: critical
@@ -679,10 +680,11 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.generation.once sends 8 other record(s) back to todo, would
-      stale 1 evidence file(s), and touches 8 code path(s) (app/recur/end-rule-dialog.tsx,
-      app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx, src/recur/generator,
-      src/recur/generator.service.ts, src/recur/occurrence.service.ts, src/recur/rule.service.ts,
-      src/recur/zone.util.ts) - this is the number a reviewer wants before approving the change.
+      stale 3 evidence file(s), and touches 6 code path(s) (app/recur/end-rule-dialog.tsx,
+      app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx,
+      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/queries/recur,
+      src/modules/bussiness/recur) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.recur.occurrence.owned-by-rule-owner
     kind: blast-radius
     severity: warn
@@ -697,11 +699,11 @@ findings:
       - uat.recur.make-recurring
       - ui.recur.schedule
     because: A breaking change to br.recur.occurrence.owned-by-rule-owner sends 8 other record(s) back
-      to todo, would stale 1 evidence file(s), and touches 8 code path(s)
+      to todo, would stale 3 evidence file(s), and touches 6 code path(s)
       (app/recur/end-rule-dialog.tsx, app/recur/schedule-screen.tsx, app/recur/upcoming-list.tsx,
-      src/recur/generator.service.ts, src/recur/occurrence, src/recur/occurrence.service.ts,
-      src/recur/rule.service.ts, src/recur/zone.util.ts) - this is the number a reviewer wants
-      before approving the change.
+      src/features/todo/graphql/mutations/recur, src/features/todo/graphql/queries/recur,
+      src/modules/bussiness/recur) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.audit.erasure.logged
     kind: blast-radius
     severity: warn
@@ -763,7 +765,7 @@ findings:
       - impl.task.todo-app-backend.platform-events
       - sds.task.completion-state
     because: A breaking change to br.task.complete.once sends 7 other record(s) back to todo, would
-      stale 1 evidence file(s), and touches 3 code path(s) (src/modules/bussiness/task,
+      stale 0 evidence file(s), and touches 3 code path(s) (src/modules/bussiness/task,
       src/modules/platform/databases/postgresql/primary, src/modules/platform/events) - this is the
       number a reviewer wants before approving the change.
   - id: blast-radius:br.plan.active-scope
@@ -817,14 +819,6 @@ findings:
       - gap.plan.unbuilt-module
     because: gap.plan.unbuilt-module is used 16 time(s) (top decile of fan-in); it is owned by plan and
       read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
-      here is cross-feature coupling, not a local edit.
-  - id: fan-in-hotspot:gap.recur.unbuilt-module
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - gap.recur.unbuilt-module
-    because: gap.recur.unbuilt-module is used 15 time(s) (top decile of fan-in); it is owned by recur
-      and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
       here is cross-feature coupling, not a local edit.
   - id: fan-in-hotspot:br.notify.delivery.once
     kind: fan-in-hotspot
@@ -938,22 +932,6 @@ findings:
     because: sds.plan.subscription-lifecycle authors no owners entry, so it has no bound module and no
       read-scope boundary - anything could claim to implement it, and nothing narrows what a
       reviewer must open to check.
-  - id: unbound-sds:sds.recur.generation-engine
-    kind: unbound-sds
-    severity: warn
-    records:
-      - sds.recur.generation-engine
-    because: sds.recur.generation-engine authors no owners entry, so it has no bound module and no
-      read-scope boundary - anything could claim to implement it, and nothing narrows what a
-      reviewer must open to check.
-  - id: unbound-sds:sds.recur.occurrence-lifecycle
-    kind: unbound-sds
-    severity: warn
-    records:
-      - sds.recur.occurrence-lifecycle
-    because: sds.recur.occurrence-lifecycle authors no owners entry, so it has no bound module and no
-      read-scope boundary - anything could claim to implement it, and nothing narrows what a
-      reviewer must open to check.
   - id: unbound-sds:sds.task.completion-state
     kind: unbound-sds
     severity: warn
@@ -1026,6 +1004,38 @@ findings:
       - gap.notify.new-device-event
     because: fr.notify.on-new-device is todo, blocked on gap.notify.new-device-event - a real product
       question, not missing code; it moves once that is settled.
+  - id: designed-todo:fr.recur.edit-rule
+    kind: designed-todo
+    severity: info
+    records:
+      - fr.recur.edit-rule
+      - gap.recur.live-proof
+    because: fr.recur.edit-rule is todo, blocked on gap.recur.live-proof - a real product question, not
+      missing code; it moves once that is settled.
+  - id: designed-todo:fr.recur.end-rule
+    kind: designed-todo
+    severity: info
+    records:
+      - fr.recur.end-rule
+      - gap.recur.live-proof
+    because: fr.recur.end-rule is todo, blocked on gap.recur.live-proof - a real product question, not
+      missing code; it moves once that is settled.
+  - id: designed-todo:fr.recur.make-recurring
+    kind: designed-todo
+    severity: info
+    records:
+      - fr.recur.make-recurring
+      - gap.recur.live-proof
+    because: fr.recur.make-recurring is todo, blocked on gap.recur.live-proof - a real product question,
+      not missing code; it moves once that is settled.
+  - id: designed-todo:fr.recur.see-upcoming
+    kind: designed-todo
+    severity: info
+    records:
+      - fr.recur.see-upcoming
+      - gap.recur.live-proof
+    because: fr.recur.see-upcoming is todo, blocked on gap.recur.live-proof - a real product question,
+      not missing code; it moves once that is settled.
   - id: designed-todo:integration.login.keycloak
     kind: designed-todo
     severity: info
@@ -1058,6 +1068,14 @@ findings:
       - gap.plan.cap-guard-not-wired
     because: journey.plan.hits-the-cap is todo, blocked on gap.plan.cap-guard-not-wired - a real product
       question, not missing code; it moves once that is settled.
+  - id: designed-todo:journey.recur.first-recurring-task
+    kind: designed-todo
+    severity: info
+    records:
+      - journey.recur.first-recurring-task
+      - gap.recur.live-proof
+    because: journey.recur.first-recurring-task is todo, blocked on gap.recur.live-proof - a real
+      product question, not missing code; it moves once that is settled.
   - id: designed-todo:journey.share.collaborate-on-a-task
     kind: designed-todo
     severity: info
@@ -1246,46 +1264,6 @@ findings:
       - gap.plan.unbuilt-module
     because: br.plan.payment.idempotent is todo, blocked on gap.plan.unbuilt-module - code that simply
       has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.recur.ending.preserves-history
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.recur.ending.preserves-history
-      - gap.recur.unbuilt-module
-    because: br.recur.ending.preserves-history is todo, blocked on gap.recur.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.recur.generation.once
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.recur.generation.once
-      - gap.recur.unbuilt-module
-    because: br.recur.generation.once is todo, blocked on gap.recur.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.recur.impossible-date.skips
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.recur.impossible-date.skips
-      - gap.recur.unbuilt-module
-    because: br.recur.impossible-date.skips is todo, blocked on gap.recur.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.recur.occurrence.owned-by-rule-owner
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.recur.occurrence.owned-by-rule-owner
-      - gap.recur.unbuilt-module
-    because: br.recur.occurrence.owned-by-rule-owner is todo, blocked on gap.recur.unbuilt-module - code
-      that simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.recur.timezone.owner-local-time
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.recur.timezone.owner-local-time
-      - gap.recur.unbuilt-module
-    because: br.recur.timezone.owner-local-time is todo, blocked on gap.recur.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:br.task.single-owner
     kind: leftover-todo
     severity: info
@@ -1471,38 +1449,6 @@ findings:
       - gap.plan.unbuilt-module
     because: fr.plan.usage.view is todo, blocked on gap.plan.unbuilt-module - code that simply has not
       been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.recur.edit-rule
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.recur.edit-rule
-      - gap.recur.unbuilt-module
-    because: fr.recur.edit-rule is todo, blocked on gap.recur.unbuilt-module - code that simply has not
-      been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.recur.end-rule
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.recur.end-rule
-      - gap.recur.unbuilt-module
-    because: fr.recur.end-rule is todo, blocked on gap.recur.unbuilt-module - code that simply has not
-      been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.recur.make-recurring
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.recur.make-recurring
-      - gap.recur.unbuilt-module
-    because: fr.recur.make-recurring is todo, blocked on gap.recur.unbuilt-module - code that simply has
-      not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.recur.see-upcoming
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.recur.see-upcoming
-      - gap.recur.unbuilt-module
-    because: fr.recur.see-upcoming is todo, blocked on gap.recur.unbuilt-module - code that simply has
-      not been written yet; the owner wants this count at zero.
   - id: leftover-todo:fr.task.complete
     kind: leftover-todo
     severity: info
@@ -1551,22 +1497,6 @@ findings:
       - gap.plan.unbuilt-module
     because: impl.plan.todo-app-frontend.usage is todo, blocked on gap.plan.unbuilt-module - code that
       simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:impl.recur.todo-app-backend.engine
-    kind: leftover-todo
-    severity: info
-    records:
-      - impl.recur.todo-app-backend.engine
-      - gap.recur.unbuilt-module
-    because: impl.recur.todo-app-backend.engine is todo, blocked on gap.recur.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:impl.recur.todo-app-frontend.schedule
-    kind: leftover-todo
-    severity: info
-    records:
-      - impl.recur.todo-app-frontend.schedule
-      - gap.recur.unbuilt-module
-    because: impl.recur.todo-app-frontend.schedule is todo, blocked on gap.recur.unbuilt-module - code
-      that simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:impl.share.todo-app-frontend.invite-screen
     kind: leftover-todo
     severity: info
@@ -1601,14 +1531,6 @@ findings:
     because: integration.plan.sepay is todo, blocked on gap.plan.sepay-not-reachable,
       gap.plan.unbuilt-module - code that simply has not been written yet; the owner wants this
       count at zero.
-  - id: leftover-todo:integration.recur.scheduler
-    kind: leftover-todo
-    severity: info
-    records:
-      - integration.recur.scheduler
-      - gap.recur.unbuilt-module
-    because: integration.recur.scheduler is todo, blocked on gap.recur.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:journey.audit.right-to-be-forgotten
     kind: leftover-todo
     severity: info
@@ -1625,14 +1547,6 @@ findings:
       - gap.notify.unbuilt-module
     because: journey.notify.told-about-completion is todo, blocked on gap.notify.unbuilt-module - code
       that simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:journey.recur.first-recurring-task
-    kind: leftover-todo
-    severity: info
-    records:
-      - journey.recur.first-recurring-task
-      - gap.recur.unbuilt-module
-    because: journey.recur.first-recurring-task is todo, blocked on gap.recur.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:nfr.audit.retention
     kind: leftover-todo
     severity: info
@@ -1665,14 +1579,6 @@ findings:
       - gap.plan.unbuilt-module
     because: nfr.plan.cap-check.latency is todo, blocked on gap.plan.unbuilt-module - code that simply
       has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:nfr.recur.generation.timeliness
-    kind: leftover-todo
-    severity: info
-    records:
-      - nfr.recur.generation.timeliness
-      - gap.recur.unbuilt-module
-    because: nfr.recur.generation.timeliness is todo, blocked on gap.recur.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:sds.audit.erasure-request
     kind: leftover-todo
     severity: info
@@ -1715,27 +1621,3 @@ findings:
       - gap.plan.unbuilt-module
     because: sds.plan.subscription-lifecycle is todo, blocked on gap.plan.unbuilt-module - code that
       simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:sds.recur.generation-engine
-    kind: leftover-todo
-    severity: info
-    records:
-      - sds.recur.generation-engine
-      - gap.recur.unbuilt-module
-    because: sds.recur.generation-engine is todo, blocked on gap.recur.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:sds.recur.occurrence-lifecycle
-    kind: leftover-todo
-    severity: info
-    records:
-      - sds.recur.occurrence-lifecycle
-      - gap.recur.unbuilt-module
-    because: sds.recur.occurrence-lifecycle is todo, blocked on gap.recur.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
-  - id: stale-evidence-bulk-edit:impl.task.todo-app-backend.platform-database
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - impl.task.todo-app-backend.platform-database
-    because: impl.task.todo-app-backend.platform-database's evidence is stale with no staleSince at all
-      - a bare digest mismatch with nothing recorded about why, even where the record's own
-      staleReason prose describes a real revision (bulk-edit-after-capture territory either way).

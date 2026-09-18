@@ -5,6 +5,7 @@ import { PostgresqlPrimaryModule } from './modules/platform/databases/postgresql
 import { SessionModule } from './modules/bussiness/session';
 import { TaskModule } from './modules/bussiness/task';
 import { ShareModule } from './modules/bussiness/share';
+import { RecurModule } from './modules/bussiness/recur';
 import { TodoGraphqlModule } from './features/todo/graphql/graphql.module';
 import { HealthModule } from './features/todo/http/health/health.module';
 
@@ -29,6 +30,7 @@ import { HealthModule } from './features/todo/http/health/health.module';
     SessionModule.register({ isGlobal: true }),
     TaskModule.register(),
     ShareModule.register(),
+    RecurModule.register(),
     TodoGraphqlModule,
     HealthModule.register(),
   ],

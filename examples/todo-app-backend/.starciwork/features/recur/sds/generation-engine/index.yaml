@@ -1,7 +1,9 @@
 schema: work/sds-component
 id: sds.recur.generation-engine
 title: How a rule's due dates are computed and resolved to instants
-state: todo
+state: done
+owners:
+  - {role: module, path: src/modules/bussiness/recur}
 responsibility: "Walks a rule's real calendar dates one by one between its last-generated date and now,
   selecting the ones the rule fires on, and resolves each to a UTC instant from the rule's declared time
   zone. Owns every decision this feature made about time: decision.recur.timezone.anchor,
@@ -17,5 +19,4 @@ requiresProof:
   implementation:
     required: true
 
-blockedBy:
-  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The example's backend target moved to NestJS and this feature has not been built there; there is no calendar walk or zone conversion to run the pinned DST and impossible-date acceptance criteria against."}
+change: {rev: 1, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "impl.recur.todo-app-backend.engine now implements this component (calendar.util.ts's datesForRule walk, zone.util.ts's resolveLocalTimeToUtc, generator.service.ts's per-rule run) - the gap.recur.unbuilt-module blockedBy edge is removed since that gap is now closed, and owners is added naming the real module root. Proven at src/modules/bussiness/recur/{zone.util,calendar.util,generator.service}.spec.ts, including the pinned decision.recur.timezone.dst instants and the decision.recur.impossible-date skip."}

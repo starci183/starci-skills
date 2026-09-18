@@ -4,3 +4,4 @@ export { PostgresPrimaryUnavailableException } from '@modules/shared/exceptions'
 export { POSTGRESQL_PRIMARY } from './constants/connection';
 export { InjectPrimaryEntityManager } from './primary.decorators';
 export { SessionEntity, TaskEntity, ShareInvitationEntity } from './entities';
+export { SessionEntity, TaskEntity, RuleEntity, OccurrenceEntity } from './entities';

@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.recur.impossible-date.skips
 title: A month without the rule's day produces no occurrence
-state: todo
+state: done
 statements:
   - A monthly-day rule whose day does not exist in a given month (the 31st in a month with 30 or fewer
     days, February most of all) produces no occurrence for that month.
@@ -10,7 +10,5 @@ statements:
 authorityRefs:
   - "decision.recur.impossible-date: skip is the chosen behaviour, over clamp and over refusing the rule at creation."
 acceptanceCriteria: [skips-nonexistent-day]
-module: src/recur/rule
-change: {rev: 1, kind: initial, at: 2026-09-18T05:11:00.000Z}
-blockedBy:
-  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The example's backend target moved to NestJS and this feature has not been built there; there is no rule module to walk a month's calendar dates."}
+module: src/modules/bussiness/recur
+change: {rev: 2, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "impl.recur.todo-app-backend.engine now exists: module corrected from the stale pre-migration path src/recur/rule to the real module root src/modules/bussiness/recur (calendar.util.ts's datesForRule walk), and the gap.recur.unbuilt-module blockedBy edge is removed since that gap is now closed by this feature's implementation. ac.recur.impossible-date.skips.skips-nonexistent-day passes at src/modules/bussiness/recur/calendar.util.spec.ts."}
