@@ -6,119 +6,37 @@ This is the adopted Nest/TypeScript implementation of the [portable responsibili
 
 An application composes a process. A feature orchestrates an externally meaningful use case. A module owns a cohesive domain, platform, or provider capability. Transport adapts a protocol into a use case. Persistence adapts a named data store into its owning capability. A class, file, database table, or second consumer is not itself a reason to create another module.
 
-Use this default tree for new source - the owner's own backend shape (nivo), reviewed against the
-`examples/todo-app-backend` refactor on `ex-nivo-shape` (2026-09-18). Create only folders with an actual
-responsibility:
-
-```text
-src/
-  main.ts                          # startup, shutdown, process wiring
-  app.module.ts                    # feature/module composition and app-wide adapters
-  modules/
-    platform/<capability>/         # configuration, errors, events, health, runtime facilities
-    platform/databases/<engine>/<name>/
-      constants/connection.ts      # the named connection token every capability imports by
-      entities/                    # every ORM entity, centralised, never owned by a feature
-      migrations/
-      <name>.module.ts             # owns the one connection; TypeOrmModule.forRootAsync({name: ...})
-      <name>.module-definition.ts
-      <name>.client.ts
-    integrations/<provider>/       # external protocol/client, validation, failure translation
-      <provider>.module.ts
-      <provider>.module-definition.ts
-      <provider>.client.ts
-    bussiness/<capability>/        # (nivo's own spelling) a cohesive domain/business capability
-      <capability>.module.ts       # static @Module({}) extends ConfigurableModuleClass
-      <capability>.module-definition.ts   # ConfigurableModuleBuilder().setExtras({isGlobal}, ...)
-      <capability>.service.ts      # persistence + business rules together; spec beside it
-      <capability>.service.spec.ts
-      <action>.command.ts          # a write: plain data, dispatched by CommandBus
-      <action>.handler.ts          # @CommandHandler(<Action>Command); owns the orchestration
-      <action>.handler.spec.ts
-      <read-action>.query.ts       # a read expressed as CQRS; @QueryHandler(<Read>Query)
-      <read-action>.handler.ts
-      types/<shape>.ts             # plain, un-suffixed data shapes (folder name is the role signal)
-  features/<feature>/
-    graphql/
-      graphql.module.ts            # NestGraphQLModule.forRoot (Apollo, code-first) + operation modules
-      mutations/
-        index.ts                   # MUTATION_MODULES
-        <domain>/<action>/
-          <action>.module.ts       # one small module per mutation
-          <action>.module-definition.ts
-          <action>.resolver.ts     # dispatches CommandBus/QueryBus; no business decision here
-          graphql-types/{input,response}.ts
-      queries/
-        index.ts                   # QUERY_MODULES
-        <domain>/<action>/…        # same per-action shape
-    http/<door>/                   # only a door with no GraphQL equivalent (health checks, webhooks)
-      <door>.controller.ts
-      <door>.module.ts
-  tests/{integration,fixtures,harness}/
-```
-
-A capability module (`bussiness/<capability>`) is transport-first at the granularity of its own commands/
-queries: it has no `application/` versus `transport/` split inside itself, because its whole folder *is*
-the application layer - the protocol adapter lives entirely in `features/<feature>/graphql`, one small
-module per action, calling the capability's CommandBus/QueryBus surface and never its internals directly.
-Give every owned module (platform database, integration, capability, and single-action GraphQL module
-alike) its own `<name>.module-definition.ts` built from `ConfigurableModuleBuilder().setExtras({isGlobal},
-...)`, even with no other caller-supplied option: it is nivo's uniform, real knob for whether a module is
-imported once globally (an app-wide capability such as session identity, needed by several unrelated
-GraphQL action modules) or locally per importer, not a ceremonial wrapper. A normal static `@Module({...
-})` with no `register()` is still correct for a module with no reason to ever be either.
-
-Mutations are CQRS `command` + `handler` when the use case is a write; give a read its own `query` +
-`handler` once the write half of the same capability is already CQRS, so both sides dispatch through the
-same bus shape - a capability with no writes yet may still expose a read as a plain service method. A
-handler that spans two capabilities (nivo's own `sign-in`/`sign-out`, which need both session identity and
-the Keycloak integration) is owned by the capability the command is named after, and imports the other
-capability's module the same way a plain service would.
-
-For a standard single application the composition files may be `src/main.ts` and `src/app.module.ts`,
-with `src/features` and `src/modules` unchanged. In a package monorepo put each deployable process in
-`apps/<app>` and independently owned reusable packages in `packages/<capability>`; each package declares
-its explicit exports. Package extraction is justified by ownership/build/lifecycle, not by a wish to fill
-a `packages` folder. Configure the actual roots in `architecture.json`; topology never reverses
-dependencies.
-
-### Previous default (domain-first; superseded 2026-09-18)
-
-Before this revision the default was a domain-first tree with an explicit `application/` versus
-`transport/<protocol>/` split inside every feature, and reusable capabilities filed under
-`modules/domain/<capability>/` alongside separate `modules/platform/` and `modules/integrations/` roots.
-That shape remains valid for source that already uses it - `starci architecture check` still recognises
-it - but new source follows the nivo shape above instead:
+Use this default tree for new source. Create only folders with an actual responsibility:
 
 ```text
 apps/<app>/src/
-  main.ts
-  app.module.ts
+  main.ts                         # startup, shutdown, process wiring
+  app.module.ts                   # feature/module composition and app-wide adapters
 src/
   features/<feature>/
-    index.ts
-    <feature>.module.ts
+    index.ts                      # explicit consumer API; no export-star collection
+    <feature>.module.ts           # Nest registration
     application/
-      <action>.use-case.ts
-      <action>.contracts.ts
+      <action>.use-case.ts         # orchestration, authorization, transaction boundary
+      <action>.contracts.ts       # protocol-neutral input/result
       <action>.use-case.spec.ts
     transport/
       http/<action>.controller.ts # or graphql/<action>.resolver.ts, message/<event>.consumer.ts
       http/dto/<action>.request.ts
       http/dto/<action>.response.ts
-      http/<action>.mapper.ts
+      http/<action>.mapper.ts     # only if conversion has substance
   modules/
-    domain/<capability>/
-    platform/<capability>/
-    integrations/<provider>/
+    domain/<capability>/          # reusable business invariants and owned state
+    platform/<capability>/        # configuration, database, logging, health, runtime facilities
+    integrations/<provider>/     # external protocol/client, validation, failure translation
   tests/{integration,fixtures,harness}/
 ```
 
-The Academy transport-first `src/features/api/core/graphql/...` tree remains a mapped existing layout
-too - a feature root that never places a file under `application/` is transport-first by the same
-definition the nivo shape above relies on, and its resolver/DTO files are not forced under a nested
-`transport/<protocol>/` segment either. A migration is an authorized source change with fresh evidence;
-installing this runtime does not move project files or bless old violations.
+Within a module use a narrow `index.ts`, `<name>.module.ts` when Nest registration is needed, meaningful services/policies/contracts, and colocated tests. An independently configurable module may add `<name>.module-definition.ts`. A pure TypeScript library does not need a Nest module. A database module can own `entities/` and `migrations/`; another persistence layout must still identify one connection, schema/migration owner, and transaction owner. Do not scatter schema ownership among feature transports.
+
+For a standard single application the composition files may be `src/main.ts` and `src/app.module.ts`, with `src/features` and `src/modules` unchanged. In a package monorepo put each deployable process in `apps/<app>` and independently owned reusable packages in `packages/<capability>`; each package declares its explicit exports. Package extraction is justified by ownership/build/lifecycle, not by a wish to fill a `packages` folder. Configure the actual roots in `architecture.json`; topology never reverses dependencies.
+
+The Academy transport-first `src/features/api/core/graphql/...` tree remains a mapped existing layout. New cohesive features use the domain-first layout above so HTTP, messages and GraphQL can call the same use case. A migration is an authorized source change with fresh evidence; installing this runtime does not move project files or bless old violations.
 
 ## Dependency and contract boundaries
 

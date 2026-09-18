@@ -184,65 +184,18 @@ function tokenEntries(ts, checker, initializer, localFiles, field) {
 function metadataTokens(ts, checker, metadata, field, localFiles) {
   metadata = unwrapExpression(ts, metadata);
   if (!ts.isObjectLiteralExpression(metadata)) return { tokens: new Map(), unknown: true };
+  if (metadata.properties.some(property => ts.isSpreadAssignment(property))) return { tokens: new Map(), unknown: true };
   const matches = metadata.properties.filter(property => propertyName(ts, property) === field);
-  const hasSpread = metadata.properties.some(property => ts.isSpreadAssignment(property));
-  if (!matches.length) return { tokens: new Map(), unknown: hasSpread };
+  if (!matches.length) return { tokens: new Map(), unknown: false };
   if (matches.length !== 1 || !ts.isPropertyAssignment(matches[0])) return { tokens: new Map(), unknown: true };
-  // A spread that occurs BEFORE the explicit field in source order (`{...base, providers: [...]}`) cannot
-  // shadow it - object-literal evaluation is left to right, so the later, explicit `providers:` always
-  // wins and is exactly what nivo's own `static register(): DynamicModule { const base = super.register
-  // (options); return {...base, providers: [...base.providers ?? [], Handler]}; }` pattern relies on. A
-  // spread AFTER the field could still silently override it, so that case is still `unknown`.
-  const matchIndex = metadata.properties.indexOf(matches[0]);
-  const shadowedBySpread = metadata.properties.some((property, index) => ts.isSpreadAssignment(property) && index > matchIndex);
-  if (shadowedBySpread) return { tokens: new Map(), unknown: true };
   return tokenEntries(ts, checker, matches[0].initializer, localFiles, field);
 }
 
-/** A static method declaration on `declaration` literally named `name` (e.g. a ConfigurableModuleBuilder
- * capability's own `static register(options): DynamicModule { ... }`), or null if there isn't one. */
-function staticMethod(ts, declaration, name) {
-  return declaration.members.find(member => ts.isMethodDeclaration(member) && member.name
-    && (ts.isIdentifier(member.name) || ts.isStringLiteralLike(member.name)) && member.name.text === name
-    && ts.canHaveModifiers(member) && (ts.getModifiers(member) ?? []).some(modifier => modifier.kind === ts.SyntaxKind.StaticKeyword)) ?? null;
-}
-
-/** Every `return <expr>` inside `method`'s own body, not crossing into a nested function's body. */
-function methodReturnExpressions(ts, method) {
-  const results = [];
-  const visit = node => {
-    if (ts.isReturnStatement(node)) { if (node.expression) results.push(node.expression); return; }
-    if (node !== method && (ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node)
-      || ts.isMethodDeclaration(node) || ts.isGetAccessor(node) || ts.isSetAccessor(node))) return;
-    ts.forEachChild(node, visit);
-  };
-  if (method.body) visit(method.body);
-  return results;
-}
-
-function mergeTokens(into, from) {
-  for (const [key, nodes] of from) {
-    if (!into.has(key)) into.set(key, []);
-    into.get(key).push(...nodes);
-  }
-}
-
-/**
- * Reads a Nest module's providers/exports from its `@Module({...})` decorator argument AND, when the
- * class declares its own `static register(...)` (nivo's `ConfigurableModuleBuilder` capability-module
- * convention - see `agent-workspace-operations.module.ts`: `@Module({}) export class X extends
- * ConfigurableModuleClass { static register(): DynamicModule { ...; return {...base, providers:[...]} }
- * }`), from that method's own returned object literal too. A module using this convention always
- * declares an empty (or near-empty) decorator argument and assembles its real metadata inside
- * `register()`; reading only the decorator argument made every such module look like it registered no
- * providers at all, which produced a false BE_MODULE_HANDLER_REGISTRATION violation on nivo's own shape.
- */
 function moduleRecord(config, context, sourceFile, declaration, decorator, checker, localFiles) {
-  const ts = context.ts;
   const call = decorator.expression;
   const location = declaration.name ?? declaration;
   const base = {
-    key: declaration.name ? localClassKey(ts, checker, declaration.name, localFiles) : null,
+    key: declaration.name ? localClassKey(context.ts, checker, declaration.name, localFiles) : null,
     name: declaration.name?.text ?? '(anonymous)',
     path: relativePath(config.root, sourceFile.fileName),
     ...sourceLocation(sourceFile, location),
@@ -250,27 +203,10 @@ function moduleRecord(config, context, sourceFile, declaration, decorator, check
     exports: new Map(),
     unknown: false,
   };
-  if (!ts.isCallExpression(call) || call.arguments.length !== 1 || !base.key) return { ...base, unknown: true };
-  const providers = metadataTokens(ts, checker, call.arguments[0], 'providers', localFiles);
-  const exportsFound = metadataTokens(ts, checker, call.arguments[0], 'exports', localFiles);
-  const providerTokens = providers.tokens;
-  const exportTokens = exportsFound.tokens;
-  let unknown = providers.unknown || exportsFound.unknown;
-
-  const registerMethod = staticMethod(ts, declaration, 'register');
-  if (registerMethod) {
-    const returns = methodReturnExpressions(ts, registerMethod);
-    if (returns.length !== 1) unknown = true;
-    else {
-      const literal = unwrapExpression(ts, returns[0]);
-      const extraProviders = metadataTokens(ts, checker, literal, 'providers', localFiles);
-      const extraExports = metadataTokens(ts, checker, literal, 'exports', localFiles);
-      mergeTokens(providerTokens, extraProviders.tokens);
-      mergeTokens(exportTokens, extraExports.tokens);
-      unknown = unknown || extraProviders.unknown || extraExports.unknown;
-    }
-  }
-  return { ...base, providers: providerTokens, exports: exportTokens, unknown };
+  if (!context.ts.isCallExpression(call) || call.arguments.length !== 1 || !base.key) return { ...base, unknown: true };
+  const providers = metadataTokens(context.ts, checker, call.arguments[0], 'providers', localFiles);
+  const exports = metadataTokens(context.ts, checker, call.arguments[0], 'exports', localFiles);
+  return { ...base, providers: providers.tokens, exports: exports.tokens, unknown: providers.unknown || exports.unknown };
 }
 
 function registrationFinding(module, node, ruleId, message, extra = {}) {

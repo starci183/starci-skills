@@ -101,21 +101,6 @@ Repositories with equivalent responsibilities at different paths may add a small
 
 All paths are repository-relative. The config is a regular file inside the checked repository.
 
-A feature root whose files never place anything under an `application/` directory is treated as
-transport-first (matching the already-adopted `src/features/api/core/graphql/...` exception below):
-its resolver/controller/DTO files and GraphQL `@InputType`/`@ObjectType`/`@ArgsType` classes are not
-required to additionally nest under `transport/<protocol>/`, because the whole root already is a
-protocol adapter with no application layer to keep separate from. The moment any file under that root
-sits inside `application/`, the strict split applies again. `@Args`/`@Query`/`@Mutation` field and
-argument names are required to be camelCase identifiers, not a specific literal string; a `types/`
-folder joins `constants/enums/errors/migrations` as a declarative folder whose files are not required to
-carry a role suffix. `moduleRegistration` also credits providers/exports assembled inside a class's own
-`static register(options)` (the `ConfigurableModuleBuilder` capability-module shape: an empty `@Module({})`
-plus a `register()` that spreads a `super.register(options)`-derived base and appends explicit
-providers/exports), not only a literal `@Module({...})` decorator argument - as long as the explicit
-`providers`/`exports` property is written after any object spread in that same literal, so it cannot be
-silently shadowed by it.
-
 ## Failure classes
 
 `errors` report missing target TypeScript, malformed manifests/tsconfig, source syntax problems, unresolved internal imports/exports, and invalid checker configuration. `violations` report source dependencies or shapes that cross a resolved responsibility boundary. An unavailable parser or required input is an error, not a passing check.
