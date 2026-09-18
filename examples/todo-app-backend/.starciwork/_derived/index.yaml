@@ -408,23 +408,17 @@ records:
   br.plan.active-scope:
     schema: work/business-rule
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - fr.plan.usage.view
         - sds.plan.cap-guard
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/cap-guard. This is a counting definition ready to
-          implement against the NestJS layout, but nothing has been built or run against it.
   br.plan.caps.limit:
     schema: work/business-rule
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - br.plan.downgrade.freeze
@@ -436,50 +430,31 @@ records:
         - sds.plan.subscription-lifecycle
       composes:
         - fr.plan.upgrade
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/cap-guard. The example backend is moving to NestJS
-          (checks/architecture.mjs, checks/code-patterns/nest*.mjs); the guard is specified here but
-          not built against that layout, so there is nothing to run and nothing to prove.
   br.plan.downgrade.freeze:
     schema: work/business-rule
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.plan.subscription
         - sds.plan.subscription-lifecycle
       composes:
         - fr.plan.downgrade
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/subscription. The decision is settled; nothing has been
-          built or run against the NestJS layout.
   br.plan.lapse.reverts-on-read:
     schema: work/business-rule
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.plan.subscription
         - sds.plan.subscription-lifecycle
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/subscription. The example backend is moving to NestJS;
-          this rule is specified but not built or run against that layout.
   br.plan.payment.idempotent:
     schema: work/business-rule
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.plan.payment-intent
@@ -487,12 +462,6 @@ records:
         - sds.plan.reconciliation
       composes:
         - fr.plan.reconcile
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/payments. The example backend is moving to NestJS; this
-          rule is specified but not built or run against that layout.
   br.recur.ending.preserves-history:
     schema: work/business-rule
     feature: recur
@@ -811,31 +780,11 @@ records:
   contract.plan.create-precondition:
     schema: work/contract
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       dependsOn:
         - sds.plan.cap-guard
-      blockedBy:
-        - journey.plan.hits-the-cap
-        - uat.plan.upgrade-after-cap
-    blockers:
-      - id: gap.plan.cap-guard-not-wired
-        rootKind: gap
-        cyclic: false
-        because: Even once built, nothing calls it today - fr.task.create's mainFlow ("The task is created,
-          owned by the submitter, not complete.") and its implementation
-          (impl.task.todo-app-backend.ownership) create unconditionally once the title is non-empty.
-          This feature owns only features/plan/**; it does not edit fr.task.create or the task
-          module, and appliesTo (above) is exactly this record's constraint on that record, not a
-          request the task feature has honored yet. gap.plan.cap-guard-not-wired names that absence
-          instead of citing contract.plan.create-precondition directly, which itself waits on this
-          record - the two are not both allowed to cite each other over the same fact.
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/cap-guard. The example backend is moving to NestJS; this
-          component is specified but not built.
   contract.share.completion-guard-for-task:
     schema: work/contract
     feature: share
@@ -1329,11 +1278,11 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
         cyclic: false
-        because: No module exists yet at src/plan/subscription; the example backend is moving to NestJS and
-          this flow is specified but not built.
+        because: No usage screen or downgrade action exists yet at app/plan for an owner to actually reach;
+          this backend-only lane does not build the frontend.
   fr.plan.reconcile:
     schema: work/functional-requirement
     feature: plan
@@ -1343,11 +1292,19 @@ records:
       refs:
         - sds.plan.reconciliation
     blockers:
-      - id: gap.plan.unbuilt-module
+      - id: gap.plan.live-proof
         rootKind: gap
         cyclic: false
-        because: No module exists yet at src/plan/reconcile; the example backend is moving to NestJS and
-          this flow is specified but not built.
+        because: uat.verify has not run this flow, or the journey it belongs to, against the running product
+          yet.
+      - id: gap.plan.sepay-not-reachable
+        rootKind: gap
+        cyclic: false
+        because: No call has been made against the real SePay sandbox yet. SepayClient
+          (src/modules/integrations/sepay/sepay.client.ts) makes the real HTTP calls this record's
+          endpoints name, and is unit-tested against an in-process fake override, but a fake proves
+          the guard (sds.plan.cap-guard, sds.plan.subscription-lifecycle, sds.plan.reconciliation),
+          never this integration itself.
   fr.plan.upgrade:
     schema: work/functional-requirement
     feature: plan
@@ -1360,12 +1317,17 @@ records:
         - journey.plan.hits-the-cap
         - uat.plan.upgrade-after-cap
     blockers:
-      - id: gap.plan.unbuilt-module
+      - id: gap.plan.live-proof
         rootKind: gap
         cyclic: false
-        because: No module exists yet at src/plan/subscription; the example backend is moving to NestJS and
-          this flow is specified but not built, so there is no unit suite and no UAT walk to point
-          to yet.
+        because: uat.verify has not run this flow against the running product yet, and
+          integration.plan.sepay (the live gateway leg the mainFlow's checkout step depends on) is
+          still todo.
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
+        cyclic: false
+        because: No usage screen or upgrade action exists yet at app/plan for an owner to actually reach;
+          this backend-only lane does not build the frontend.
   fr.plan.usage.view:
     schema: work/functional-requirement
     feature: plan
@@ -1377,12 +1339,11 @@ records:
       blockedBy:
         - journey.plan.hits-the-cap
     blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
         cyclic: false
-        because: No module exists yet at src/plan/cap-guard or the usage screen; the example backend is
-          moving to NestJS and the frontend to Next.js consuming the Grammar core package, and this
-          flow is specified but not built against either layout.
+        because: No usage screen exists yet at app/plan/usage-screen.tsx for an owner to actually open; this
+          backend-only lane does not build the frontend.
   fr.recur.edit-rule:
     schema: work/functional-requirement
     feature: recur
@@ -1521,7 +1482,8 @@ records:
     schema: work/functional-requirement
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: appliesTo-newer:sds.plan.cap-guard
     usedBy:
       refs:
         - event.task.created
@@ -1681,11 +1643,8 @@ records:
   gap.plan.cap-guard-not-wired:
     schema: work/gap
     feature: plan
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - sds.plan.cap-guard
+    state: done
+    effectiveState: done
   gap.plan.direction-not-drawn:
     schema: work/gap
     feature: plan
@@ -1698,7 +1657,17 @@ records:
     effectiveState: todo
     usedBy:
       blockedBy:
+        - fr.plan.reconcile
+        - fr.plan.upgrade
         - uat.plan.upgrade-after-cap
+  gap.plan.no-load-harness:
+    schema: work/gap
+    feature: plan
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - nfr.plan.cap-check.latency
   gap.plan.sepay-not-reachable:
     schema: work/gap
     feature: plan
@@ -1710,26 +1679,8 @@ records:
   gap.plan.unbuilt-module:
     schema: work/gap
     feature: plan
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - br.plan.active-scope
-        - br.plan.caps.limit
-        - br.plan.downgrade.freeze
-        - br.plan.lapse.reverts-on-read
-        - br.plan.payment.idempotent
-        - fr.plan.downgrade
-        - fr.plan.reconcile
-        - fr.plan.upgrade
-        - fr.plan.usage.view
-        - impl.plan.todo-app-backend.plan
-        - impl.plan.todo-app-frontend.usage
-        - nfr.plan.cap-check.latency
-        - sds.plan.cap-guard
-        - sds.plan.reconciliation
-        - sds.plan.subscription-lifecycle
-        - uat.plan.upgrade-after-cap
+    state: done
+    effectiveState: done
   gap.recur.direction-not-drawn:
     schema: work/gap
     feature: recur
@@ -1899,31 +1850,19 @@ records:
   impl.plan.todo-app-backend.plan:
     schema: work/implementation
     feature: plan
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: The example backend is moving to NestJS, conforming to checks/architecture.mjs and
-          checks/code-patterns/nest*.mjs. Nothing under src/plan exists yet in that layout; an
-          earlier draft of this module was written directly under app/src/plan as a plain .mjs
-          module and has been removed rather than kept as a second, incompatible scaffold. No test
-          has been run against real code, so no evidence.yaml exists for this record or for anything
-          it would prove.
+    state: done
+    effectiveState: done
   impl.plan.todo-app-frontend.usage:
     schema: work/implementation
     feature: plan
     state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: The frontend is moving to Next.js, consuming the Grammar core package the way nivo-fe does.
-          Nothing under app/plan exists yet in that layout; an earlier draft was written directly
-          under src/plan as a plain .mjs module and has been removed rather than kept as a second,
-          incompatible scaffold.
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - fr.plan.downgrade
+        - fr.plan.upgrade
+        - fr.plan.usage.view
+        - uat.plan.upgrade-after-cap
   impl.recur.todo-app-backend.engine:
     schema: work/implementation
     feature: recur
@@ -2133,23 +2072,17 @@ records:
         - sds.plan.reconciliation
         - sds.plan.subscription-lifecycle
       blockedBy:
+        - fr.plan.reconcile
         - sds.plan.reconciliation
     blockers:
       - id: gap.plan.sepay-not-reachable
         rootKind: gap
         cyclic: false
-        because: No call has been made against the real SePay sandbox yet; there is no module to make one.
-          Tests written against a fake gateway response would settle sds.plan.subscription-lifecycle
-          and sds.plan.reconciliation's transitions, never this record - a fake proves the guard,
-          not the gateway. gap.plan.sepay-not-reachable names that absence instead of citing
-          sds.plan.reconciliation directly, which itself waits on this record - the two are not both
-          allowed to cite each other over the same fact.
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/subscription. The example backend is moving to NestJS
-          (checks/architecture.mjs); this component is specified but not built or run against that
-          layout, so provenBy is empty rather than claiming transitions that have never executed.
+        because: No call has been made against the real SePay sandbox yet. SepayClient
+          (src/modules/integrations/sepay/sepay.client.ts) makes the real HTTP calls this record's
+          endpoints name, and is unit-tested against an in-process fake override, but a fake proves
+          the guard (sds.plan.cap-guard, sds.plan.subscription-lifecycle, sds.plan.reconciliation),
+          never this integration itself.
   integration.recur.scheduler:
     schema: work/integration
     feature: recur
@@ -2210,23 +2143,17 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.plan.cap-guard-not-wired
+      - id: gap.plan.live-proof
         rootKind: gap
         cyclic: false
-        because: Even once built, nothing calls it today - fr.task.create's mainFlow ("The task is created,
-          owned by the submitter, not complete.") and its implementation
-          (impl.task.todo-app-backend.ownership) create unconditionally once the title is non-empty.
-          This feature owns only features/plan/**; it does not edit fr.task.create or the task
-          module, and appliesTo (above) is exactly this record's constraint on that record, not a
-          request the task feature has honored yet. gap.plan.cap-guard-not-wired names that absence
-          instead of citing contract.plan.create-precondition directly, which itself waits on this
-          record - the two are not both allowed to cite each other over the same fact.
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
+        because: uat.verify has not run this flow against the running product yet, and
+          integration.plan.sepay (the live gateway leg the mainFlow's checkout step depends on) is
+          still todo.
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
         cyclic: false
-        because: No module exists yet at src/plan/subscription; the example backend is moving to NestJS and
-          this flow is specified but not built, so there is no unit suite and no UAT walk to point
-          to yet.
+        because: No usage screen or upgrade action exists yet at app/plan for an owner to actually reach;
+          this backend-only lane does not build the frontend.
   journey.recur.first-recurring-task:
     schema: work/customer-journey
     feature: recur
@@ -2335,11 +2262,11 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.plan.unbuilt-module
+      - id: gap.plan.no-load-harness
         rootKind: gap
         cyclic: false
-        because: No create path or cap guard exists yet to measure; the example backend is moving to NestJS
-          and no load-test harness has been pointed at it.
+        because: No scripts/load/create.js or k6 installation exists in this repository to run the
+          measurement this record specifies.
   nfr.recur.generation.timeliness:
     schema: work/non-functional-requirement
     feature: recur
@@ -2446,30 +2373,11 @@ records:
   sds.plan.cap-guard:
     schema: work/sds-component
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - contract.plan.create-precondition
-      blockedBy:
-        - contract.plan.create-precondition
-    blockers:
-      - id: gap.plan.cap-guard-not-wired
-        rootKind: gap
-        cyclic: false
-        because: Even once built, nothing calls it today - fr.task.create's mainFlow ("The task is created,
-          owned by the submitter, not complete.") and its implementation
-          (impl.task.todo-app-backend.ownership) create unconditionally once the title is non-empty.
-          This feature owns only features/plan/**; it does not edit fr.task.create or the task
-          module, and appliesTo (above) is exactly this record's constraint on that record, not a
-          request the task feature has honored yet. gap.plan.cap-guard-not-wired names that absence
-          instead of citing contract.plan.create-precondition directly, which itself waits on this
-          record - the two are not both allowed to cite each other over the same fact.
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/cap-guard. The example backend is moving to NestJS; this
-          component is specified but not built.
   sds.plan.reconciliation:
     schema: work/sds-component
     feature: plan
@@ -2483,22 +2391,16 @@ records:
       - id: gap.plan.sepay-not-reachable
         rootKind: gap
         cyclic: false
-        because: No call has been made against the real SePay sandbox yet; there is no module to make one.
-          Tests written against a fake gateway response would settle sds.plan.subscription-lifecycle
-          and sds.plan.reconciliation's transitions, never this record - a fake proves the guard,
-          not the gateway. gap.plan.sepay-not-reachable names that absence instead of citing
-          sds.plan.reconciliation directly, which itself waits on this record - the two are not both
-          allowed to cite each other over the same fact.
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/reconcile. The example backend is moving to NestJS; this
-          component is specified but not built.
+        because: No call has been made against the real SePay sandbox yet. SepayClient
+          (src/modules/integrations/sepay/sepay.client.ts) makes the real HTTP calls this record's
+          endpoints name, and is unit-tested against an in-process fake override, but a fake proves
+          the guard (sds.plan.cap-guard, sds.plan.subscription-lifecycle, sds.plan.reconciliation),
+          never this integration itself.
   sds.plan.subscription-lifecycle:
     schema: work/sds-component
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - br.plan.lapse.reverts-on-read
@@ -2510,15 +2412,6 @@ records:
       dependsOn:
         - sds.plan.cap-guard
         - sds.plan.reconciliation
-      blockedBy:
-        - integration.plan.sepay
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/subscription. The example backend is moving to NestJS
-          (checks/architecture.mjs); this component is specified but not built or run against that
-          layout, so provenBy is empty rather than claiming transitions that have never executed.
   sds.recur.generation-engine:
     schema: work/sds-component
     feature: recur
@@ -2685,29 +2578,17 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.plan.cap-guard-not-wired
-        rootKind: gap
-        cyclic: false
-        because: Even once built, nothing calls it today - fr.task.create's mainFlow ("The task is created,
-          owned by the submitter, not complete.") and its implementation
-          (impl.task.todo-app-backend.ownership) create unconditionally once the title is non-empty.
-          This feature owns only features/plan/**; it does not edit fr.task.create or the task
-          module, and appliesTo (above) is exactly this record's constraint on that record, not a
-          request the task feature has honored yet. gap.plan.cap-guard-not-wired names that absence
-          instead of citing contract.plan.create-precondition directly, which itself waits on this
-          record - the two are not both allowed to cite each other over the same fact.
       - id: gap.plan.live-proof
         rootKind: gap
         cyclic: false
-        because: uat.verify has not run this flow against the running product yet; no run folder under
-          uat/upgrade-after-cap/runs/** exists with screens, video and a passing result.md, only
-          this designed flow shape.
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
+        because: uat.verify has not run this flow against the running product yet, and
+          integration.plan.sepay (the live gateway leg the mainFlow's checkout step depends on) is
+          still todo.
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
         cyclic: false
-        because: No module exists yet at src/plan/subscription; the example backend is moving to NestJS and
-          this flow is specified but not built, so there is no unit suite and no UAT walk to point
-          to yet.
+        because: No usage screen or upgrade action exists yet at app/plan for an owner to actually reach;
+          this backend-only lane does not build the frontend.
   uat.recur.make-recurring:
     schema: work/uat-flow
     feature: recur
@@ -2792,11 +2673,11 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 48
+    done: 58
     todo: 35
-    stale: 0
-    blocked: 111
-    total: 194
+    stale: 1
+    blocked: 101
+    total: 195
   byFeature:
     audit:
       done: 3
@@ -2817,11 +2698,11 @@ tally:
       blocked: 21
       total: 30
     plan:
-      done: 6
+      done: 17
       todo: 4
       stale: 0
-      blocked: 19
-      total: 29
+      blocked: 9
+      total: 30
     recur:
       done: 8
       todo: 3
@@ -2835,9 +2716,9 @@ tally:
       blocked: 16
       total: 24
     task:
-      done: 9
+      done: 8
       todo: 12
-      stale: 0
+      stale: 1
       blocked: 12
       total: 33
   gaps:
@@ -2911,7 +2792,7 @@ tally:
         - impl.notify.todo-app-backend.pipeline
     - id: gap.plan.cap-guard-not-wired
       feature: plan
-      state: todo
+      state: done
       closedBy:
         - contract.plan.create-precondition
     - id: gap.plan.direction-not-drawn
@@ -2924,6 +2805,11 @@ tally:
       state: todo
       closedBy:
         - uat.plan.upgrade-after-cap
+    - id: gap.plan.no-load-harness
+      feature: plan
+      state: todo
+      closedBy:
+        - nfr.plan.cap-check.latency
     - id: gap.plan.sepay-not-reachable
       feature: plan
       state: todo
@@ -2931,7 +2817,7 @@ tally:
         - integration.plan.sepay
     - id: gap.plan.unbuilt-module
       feature: plan
-      state: todo
+      state: done
       closedBy:
         - impl.plan.todo-app-backend.plan
     - id: gap.recur.direction-not-drawn
@@ -2983,7 +2869,7 @@ tally:
       feature: task
       state: done
       closedBy: null
-  unbuiltModuleGaps: 5
+  unbuiltModuleGaps: 4
 frontier:
   - id: br.audit.erasure.logged
     feature: audit
@@ -3028,18 +2914,18 @@ frontier:
   - id: gap.notify.unbuilt-module
     feature: notify
     title: No notify module exists under the NestJS/Next.js layout yet
-  - id: gap.plan.cap-guard-not-wired
-    feature: plan
-    title: Nothing on the create path calls the cap guard yet
   - id: gap.plan.live-proof
     feature: plan
     title: No uat.verify run has produced a live run for plan.upgrade-after-cap
+  - id: gap.plan.no-load-harness
+    feature: plan
+    title: No k6 load-test harness exists to measure the cap check's latency
   - id: gap.plan.sepay-not-reachable
     feature: plan
     title: No call has ever been made against the real SePay sandbox
-  - id: gap.plan.unbuilt-module
+  - id: impl.plan.todo-app-frontend.usage
     feature: plan
-    title: No plan module exists under the NestJS/Next.js layout yet
+    title: The usage screen and its upgrade action
   - id: data.recur.occurrence
     feature: recur
     title: Occurrence
@@ -3275,6 +3161,9 @@ unclassifiedEdges:
   - from: gap.plan.live-proof
     field: closedBy
     target: uat.plan.upgrade-after-cap
+  - from: gap.plan.no-load-harness
+    field: closedBy
+    target: nfr.plan.cap-check.latency
   - from: gap.plan.sepay-not-reachable
     field: closedBy
     target: integration.plan.sepay
@@ -3370,10 +3259,10 @@ unclassifiedEdges:
     target: br.plan.payment.idempotent
   - from: impl.plan.todo-app-backend.plan
     field: proves
-    target: sds.plan.cap-guard
+    target: contract.plan.create-precondition
   - from: impl.plan.todo-app-backend.plan
     field: proves
-    target: sds.plan.reconciliation
+    target: sds.plan.cap-guard
   - from: impl.plan.todo-app-backend.plan
     field: proves
     target: sds.plan.subscription-lifecycle
