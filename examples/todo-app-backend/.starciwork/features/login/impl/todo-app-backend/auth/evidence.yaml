@@ -67,8 +67,18 @@ assertions:
     exit: 0
     outcome: pass
     observation: npx jest src/modules/bussiness/session src/modules/integrations/keycloak exited 0
+  - id: contract.login.identity-for-task
+    command: npx jest src/app.boot.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/app.boot.spec.ts exited 0
+  - id: typecheck
+    command: npx tsc --noEmit
+    exit: 0
+    outcome: pass
+    observation: npx tsc --noEmit exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T08:38:10.799Z
+  capturedAt: 2026-09-18T11:19:41.249Z
