@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.share.revoke.on-read
 title: A removed collaborator loses access on their next read, not by a sweep
-state: todo
+state: done
 statements:
   - Revoking a collaborator marks the invitation revoked immediately.
   - No background process is required for the revocation to take effect; the very next read that checks
@@ -10,7 +10,13 @@ authorityRefs:
   - "owner-intent: An owner who removes somebody expects the door to be shut now, not at the next run of a
     job they cannot see or time."
 acceptanceCriteria: [removed-loses-access-next-read]
-module: src/share/invitation.service.ts
-change: {rev: 1, kind: initial, at: 2026-09-18T06:00:00.000Z}
-blockedBy:
-  - {record: gap.share.unbuilt-module, because: "The example is moving to a real NestJS backend; src/share/invitation.service.ts does not exist yet, so the acceptance criterion has not been run."}
+module: src/modules/bussiness/share
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: impl.share.todo-app-backend.invitations is built (src/modules/bussiness/share, not the
+    earlier-guessed src/share); the acceptance criterion is proven both by a unit test asserting the
+    synchronous CollaboratorCache clears at the moment revoke() commits, and by an integration test and
+    scripts/live-proof-share.sh showing the very next completion attempt already refused, with no wait.
+    gap.share.unbuilt-module's blockedBy is resolved.

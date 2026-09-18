@@ -11,8 +11,12 @@ interfaces:
     instead of comparing actor to owner directly.
 refs: [br.task.single-owner]
 dependsOn: [integration.login.postgres, contract.share.completion-guard-for-task]
-blockedBy:
-  - {record: gap.task.collaborator-completion, because: "This component's t-owner/t-stranger transitions below described an owner-or-nobody guard for every mutation; that is still true for delete but no longer for complete, and this component has not been rebuilt to call contract.share.completion-guard-for-task. Its previous proof stood for br.task.single-owner's withdrawn rev 1 statement, not the current one - and the reason it cannot be rebuilt yet is exactly the absence gap.task.collaborator-completion names."}
+# gap.task.collaborator-completion closed (lane be-share): contract.share.completion-guard-for-task's
+# provider half is real (impl.share.todo-app-backend.access) and task's own CompletionAuthorityRegistry
+# seam already routes complete/reopen through whichever authority is registered, unchanged by this
+# lane. Whether this component's own transitions/interfaces below are re-described accurately enough
+# to call it "rebuilt" - and re-proven against br.task.single-owner's rev 2 - is lane login-impl/task's
+# call, not this lane's, so it stays todo with no blockedBy of its own rather than citing a resolved gap.
 
 stateMachine:
   states: [unchecked, owned, collaborating, foreign]

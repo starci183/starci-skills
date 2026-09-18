@@ -11,7 +11,7 @@ measurement:
   environment: dev
 refs: [br.share.revoke.on-read, br.share.invite.expiry]
 blockedBy:
-  - {record: gap.share.unbuilt-module, because: "No load run has actually been made against src/share; this lane only ran node:test unit tests, which say nothing about latency under load."}
+  - {record: gap.share.load-proof, because: "The share module now exists (src/modules/bussiness/share) and its read path is functionally proven, but no k6 run has been made against it - this lane ran jest unit/integration tests and a curl-based live-proof script, neither of which say anything about latency under load."}
 
 requiresProof:
   measurement:

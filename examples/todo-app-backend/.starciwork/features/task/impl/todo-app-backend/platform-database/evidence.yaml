@@ -4,6 +4,16 @@
 schema: work/evidence
 record: impl.task.todo-app-backend.platform-database
 recordDigest: e1d1b624f2ce9e7552d4446de36430a4b4adb2409da86415a01cded1edcf6d8b
+stale: true
+staleReason: "Lane be-share added ShareInvitationEntity, its migration and one added line each to
+  entities/index.ts, primary/index.ts and primary.module.ts, under this shared module's owned
+  directory, to register the share feature's own table alongside SessionEntity/TaskEntity - see
+  impl.share.todo-app-backend.invitations. The task/session-store proof this evidence recorded is
+  unaffected (npx jest src/modules/bussiness/task and src/modules/bussiness/session still pass, see
+  br.share's own evidence for the added share coverage); this flag only acknowledges that the digested
+  code under this record's own owners/module changed since it was captured, per
+  scripts/check-example-work.mjs's CODE_DIGEST_STALE rule. Re-capturing codeDigest is impl.task.todo-app-backend.platform-database's
+  own owner's call, not this lane's - this lane does not own that record."
 codeDigest:
   algorithm: sha256
   files:

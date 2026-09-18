@@ -1,7 +1,7 @@
 schema: work/functional-requirement
 id: fr.share.accept
 title: Accept an invitation
-state: todo
+state: done
 actors: [collaborator]
 trigger: The invited person accepts a pending invitation addressed to them.
 mainFlow:
@@ -14,14 +14,22 @@ exceptionFlows:
 postconditions:
   - Exactly one collaborator with the invited role exists on the task.
 composes:
-  - {rule: br.share.invite.expiry, module: src/share/invitation.service.ts}
-  - {rule: br.share.role.permissions, module: src/share/access.service.ts}
-blockedBy:
-  - {record: br.share.invite.expiry, because: "br.share.invite.expiry and br.share.role.permissions are both todo; the NestJS module they compose does not exist yet."}
-  - {record: br.share.role.permissions, because: "br.share.invite.expiry and br.share.role.permissions are both todo; the NestJS module they compose does not exist yet."}
+  - {rule: br.share.invite.expiry, module: src/modules/bussiness/share}
+  - {rule: br.share.role.permissions, module: src/modules/bussiness/share}
 
 requiresProof:
   unit:
     forEach: composes
   uat:
     required: true
+
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: br.share.invite.expiry and br.share.role.permissions are both done; AcceptInvitationHandler
+    dispatches to InvitationService.accept, proven by accept-invitation.handler.spec.ts,
+    invitation.service.spec.ts (all three exceptionFlows, including the fourteen-day boundary by
+    backdating sentAt) and scripts/live-proof-share.sh's accept steps against the real GraphQL endpoint.
+    requiresProof.uat.required is not yet satisfied by a recorded uat.verify walk - see the same
+    gap.share.live-proof note on fr.share.invite's own change entry.

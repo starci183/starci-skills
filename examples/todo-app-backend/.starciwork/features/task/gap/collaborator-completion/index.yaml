@@ -1,7 +1,7 @@
 schema: work/gap
 id: gap.task.collaborator-completion
 title: The collaborator completion path is not implemented
-state: todo
+state: done
 statement: "br.task.single-owner rev 2 split completion (owner or an accepted editor collaborator) from
   deletion (owner only), naming contract.share.completion-guard-for-task as the boundary that call goes
   through. Neither side of that contract exists yet - share has not built the guard
@@ -12,4 +12,16 @@ statement: "br.task.single-owner rev 2 split completion (owner or an accepted ed
   br.task.single-owner, sds.task.ownership-guard and fr.task.complete were each independently citing each
   other over before this record gave it one name."
 closedBy: [impl.share.todo-app-backend.access]
-change: {rev: 1, kind: initial, at: 2026-09-18T09:30:00.000Z}
+verificationSource: authored-claim
+because: "closedBy's impl.share.todo-app-backend.access is done: ShareCompletionAuthority is a real
+  CompletionAuthority subclass, registered into task's own (unmodified) CompletionAuthorityRegistry
+  through the sanctioned seam (task.module.ts's registry export, consumed from
+  ShareCompletionAuthoritySetup.onModuleInit) - task's side of that seam already existed and was already
+  tested (bussiness/task/completion-authority.spec.ts's 'a registered widened authority lets a non-owner
+  complete/reopen' predates this lane). completion-authority.spec.ts and scripts/live-proof-share.sh both
+  prove an accepted editor collaborator can complete/reopen a shared task while delete stays refused.
+  This closes the specific absence this gap named (no implementation on either side); it does not itself
+  re-prove sds.task.ownership-guard or set fr.task.complete to done - both remain for lane login-impl/task
+  to re-run from their own composed rules, per this lane's brief, and br.task.single-owner/its evidence
+  are left untouched."
+change: {rev: 2, kind: clarifying, at: 2026-09-18T16:00:00.000Z}

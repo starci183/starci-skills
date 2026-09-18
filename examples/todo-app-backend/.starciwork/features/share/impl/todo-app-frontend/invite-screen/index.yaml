@@ -7,4 +7,4 @@ owners:
   - {role: module, path: app/share}
 proves: [ui.share.invite]
 blockedBy:
-  - {record: gap.share.unbuilt-module, because: "Not written yet. The example frontend is moving to Next.js and must consume the Grammar core package the way nivo-fe does; this screen will live at app/share/invite-screen.tsx once that scaffold and its Grammar wiring land, and no prior .mjs draft is being carried forward into it."}
+  - {record: gap.share.frontend-unbuilt, because: "Not written yet. The example frontend is moving to Next.js and must consume the Grammar core package the way nivo-fe does; this screen will live at app/share/invite-screen.tsx once that scaffold and its Grammar wiring land, and no prior .mjs draft is being carried forward into it. gap.share.unbuilt-module itself closed on its backend half (lane be-share, backend-only per its brief); this narrower gap names the still-open frontend half."}

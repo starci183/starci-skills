@@ -1,0 +1,23 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: fr.share.revoke
+recordDigest: 164c4f48d169ffd0fcbe6a8060557febaa295a3b808727b924fee208396e2a6d
+outcome: pass
+assertions:
+  - id: unit
+    command: npx jest src/modules/bussiness/share/revoke-collaborator.handler.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/share/revoke-collaborator.handler.spec.ts exited 0
+  - id: live-proof
+    command: bash scripts/live-proof-share.sh
+    exit: 0
+    outcome: pass
+    observation: bash scripts/live-proof-share.sh exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T09:15:43.464Z

@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.share.editor.no-delete
 title: An editor may never delete
-state: todo
+state: done
 statements:
   - No role a collaborator can hold ever authorizes deleting the task. Deletion stays with the owner alone,
     unconditionally, regardless of any role sharing grants.
@@ -9,7 +9,12 @@ authorityRefs:
   - "owner-intent: Sharing is meant to let somebody help finish the work, never to let somebody else remove
     it. Widening delete would make an invitation as dangerous to accept as it is useful."
 acceptanceCriteria: [delete-refused-for-editor]
-module: src/share/access.service.ts
-change: {rev: 1, kind: initial, at: 2026-09-18T06:00:00.000Z}
-blockedBy:
-  - {record: gap.share.unbuilt-module, because: "The example is moving to a real NestJS backend; src/share/access.service.ts does not exist yet, so the acceptance criterion has not been run."}
+module: src/modules/bussiness/share
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: impl.share.todo-app-backend.access is built (src/modules/bussiness/share, not the earlier-guessed
+    src/share); completion-authority.spec.ts proves an accepted editor collaborator refused at delete
+    through task's own unmodified OwnershipGuard, and scripts/live-proof-share.sh proves the same refusal
+    end to end against the real running stack. gap.share.unbuilt-module's blockedBy is resolved.

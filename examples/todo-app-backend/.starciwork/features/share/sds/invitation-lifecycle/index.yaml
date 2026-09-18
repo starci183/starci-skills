@@ -1,7 +1,7 @@
 schema: work/sds-component
 id: sds.share.invitation-lifecycle
 title: Where an invitation lives and how it ends
-state: todo
+state: done
 responsibility: Holds one row per invited email per task, its role and its status. Expiry and revocation
   are both enforced on read, never by a sweep, so a stopped or never-run background job can never leave an
   invitation looking more alive than it is.
@@ -10,8 +10,8 @@ interfaces:
     it, never directly.
 refs: [br.share.invite.expiry, br.share.revoke.on-read, br.share.role.permissions]
 dependsOn: [integration.login.postgres]
-blockedBy:
-  - {record: gap.share.unbuilt-module, because: "This component is designed but not built: the example is moving to a real NestJS backend and src/share/invitation.service.ts does not exist yet. No transition below has been run."}
+owners:
+  - {role: module, path: src/modules/bussiness/share}
 
 stateMachine:
   states: [requested, pending, accepted, expired, revoked]
@@ -50,18 +50,32 @@ stateMachine:
 sequence:
   participants: [owner, api, collaborator, postgres]
   steps:
-    - {from: owner, to: api, message: "POST /tasks/:id/collaborators with an email and a role, observable: http"}
-    - {from: api, to: postgres, message: "INSERT one invitation row with a fourteen-day expiry, observable: write"}
-    - {from: collaborator, to: api, message: "POST /invitations/:id/accept, observable: http"}
+    - {from: owner, to: api, message: "mutation invite(input: {taskId, email, role}), observable: graphql"}
+    - {from: api, to: postgres, message: "INSERT (or re-open) one invitation row with a fourteen-day expiry, observable: write"}
+    - {from: collaborator, to: api, message: "mutation acceptInvitation(input: {invitationId, email}), observable: graphql"}
     - {from: api, to: postgres, message: "UPDATE the row to accepted, or refuse it past the expiry, observable: write"}
-    - {from: collaborator, to: api, message: "a later request against the shared task, observable: http"}
+    - {from: collaborator, to: api, message: "a later mutation/query against the shared task, observable: graphql"}
     - {from: api, to: postgres, message: "SELECT the invitation row to re-check it is still accepted, observable: read"}
-    - {from: api, to: collaborator, message: "the refusal, once the owner has revoked or the window has passed, observable: http"}
+    - {from: api, to: collaborator, message: "the refusal, once the owner has revoked or the window has passed, observable: graphql"}
   note: Only interactions an end-to-end run can observe are bound here. The internal order in which the
     share module checks expiry versus revocation on that final read is the implementation's business.
+    Rewritten for GraphQL (the transport every other feature in this backend already moved to, see
+    scripts/live-proof.sh's own comment) rather than the REST shape this record originally described;
+    the state machine and the observable read/write pattern are unchanged.
 
 requiresProof:
   implementation:
     required: true
   transitions:
     forEach: stateMachine.transitions
+
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: impl.share.todo-app-backend.invitations built this component at src/modules/bussiness/share;
+    every transition is proven by invitation.service.spec.ts (t-invite, t-accept, t-revoke-pending,
+    t-revoke-accepted) and completion-authority.spec.ts/scripts/live-proof-share.sh (t-expire's
+    read-time recompute, and the revoke-then-refuse sequence). The sequence's transport is updated from
+    the originally-drafted REST shape to the GraphQL mutations actually built; the state machine and its
+    guards are unchanged.

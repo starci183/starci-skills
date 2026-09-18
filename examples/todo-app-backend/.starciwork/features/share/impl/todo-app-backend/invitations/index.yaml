@@ -1,10 +1,18 @@
 schema: work/implementation
 id: impl.share.todo-app-backend.invitations
 title: The invitation store and its lifecycle
-state: todo
+state: done
 repository: todo-app
 owners:
-  - {role: module, path: src/share}
+  - {role: module, path: src/modules/bussiness/share}
 proves: [br.share.invite.expiry, br.share.revoke.on-read, sds.share.invitation-lifecycle]
-blockedBy:
-  - {record: gap.share.unbuilt-module, because: "Not written yet. The example backend is moving to NestJS with its own architecture checks (checks/architecture.mjs, checks/code-patterns/nest*.mjs); this module will live at src/share/invitation.service.ts once that scaffold lands, and no prior .mjs draft is being carried forward into it."}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: Built under nivo's real scaffold at src/modules/bussiness/share (invitation.service.ts,
+    collaborator-cache.ts, ShareInvitationEntity + its migration), not the earlier-guessed src/share.
+    Expiry and revocation are both enforced on read (never a sweep), matching
+    sds.share.invitation-lifecycle's five transitions exactly. Proven by invitation.service.spec.ts,
+    completion-authority.spec.ts and scripts/live-proof-share.sh against the running stack.
+    gap.share.unbuilt-module's blockedBy is resolved.
