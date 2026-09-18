@@ -1,14 +1,10 @@
 schema: work/gap
 id: gap.audit.direction-not-drawn
 title: No interface.draw run has produced a direction for audit.privacy
-state: done
+state: todo
 statement: ui.audit.privacy names its representative state (erasure-refused) and an exact
   prompt at audit/ui/privacy/assets/privacy-erasure-refused.prompt.txt, but no interface.draw run has invoked built-in image_gen.imagegen
   against it yet - the lead performs that run through Orca (sol 5.6). Until it runs, the screen has a
   designed prompt and a coverage map, not a direction image or its generation provenance.
 closedBy: ui.audit.privacy
-verificationSource: authored-claim
-because: "Closed by ui.audit.privacy, whose own evidence.yaml (scripts/example-evidence.mjs) now proves
-  the erasure-refused direction PNG, its sibling prompt and a complete ui.coverage.map exist for this
-  screen - the absence this gap named no longer holds."
 change: {rev: 1, kind: initial, at: 2026-09-18T08:00:00.000Z}

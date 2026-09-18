@@ -1,7 +1,7 @@
 schema: work/ui-screen
 id: ui.task.list
 title: The task list and its create form
-state: done
+state: todo
 states: [empty, one-task, many-tasks, refused]
 brand: {rev: 2}
 refs: [fr.task.create]
