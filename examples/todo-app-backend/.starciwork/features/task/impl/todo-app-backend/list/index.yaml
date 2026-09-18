@@ -1,17 +1,20 @@
 schema: work/implementation
 id: impl.task.todo-app-backend.list
 title: The owned-list query
-state: todo
+state: done
 repository: todo-app
 owners:
   - {role: module, path: src/modules/bussiness/task}
-proves: [nfr.task.list.latency]
+proves: [br.task.list.owned]
 
-# decision.task.list.scope is now decided (owner-only: this product has no organization concept, so a
-# list is unconditionally the reader's own tasks), which is exactly br.task.list.owned's own statement.
-# This record's own honest-done claim still cannot move ahead of br.task.list.owned - ListTasksHandler is
-# real and its ac.task.list.owned.excludes-others test passes today, but nfr.task.list.latency separately
-# has no k6 harness in this host to measure against - but br.task.list.owned is an ordinary record with
-# no gap or open decision of its own to name as the reason, so no blockedBy edge is authored onto it here
-# (a dead-end edge is a warned, not refused, shape, but this lane's own scope is to bring the tree's
-# BLOCKER_UNROOTED count down, not add to it for a record no gap has been written against yet).
+# decision.task.list.scope is decided (owner-only: this product has no organization concept, so a
+# list is unconditionally the reader's own tasks), which is exactly br.task.list.owned's own
+# statement - now proven (named ac.task.list.owned.excludes-others test, plus the two-identity live
+# scripts/live-proof.sh steps against an API built from this source tree), so this record no longer
+# sits behind it. nfr.task.list.latency has been dropped from proves: this lane never measured a p95
+# - there is no k6 harness on this host - and a done record claiming an unmeasured nfr is exactly
+# the pattern the tree's own gate exists to refuse. The nfr stays todo on its own terms; nothing
+# here pretends its number was observed. The provider half of contract.task.list-for-dashboard
+# (TaskCountsQuery/TaskCountsHandler, counting through this record's own read path) is carried as an
+# assertion in this record's evidence.yaml; the contract itself stays todo because its consumer half
+# - a dashboard - has no record in any lane to do the reading with.

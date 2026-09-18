@@ -1,0 +1,23 @@
+schema: work/gap
+id: gap.task.share-edge-hold
+title: br.task.single-owner's done flag is held by an out-of-lane blocker edge
+state: todo
+statement: >-
+  br.task.single-owner's rev-2 split (delete owner-only always; complete widened to accepted editor
+  collaborators through contract.share.completion-guard-for-task) is implemented and proven, and the
+  record's own evidence.yaml carries a fresh passing capture of exactly that split. The record still
+  cannot honestly be marked done: contract.share.completion-guard-for-task (features/share/**, owned
+  by the share lane) lists br.task.single-owner rev 2 in its blockedBy, and the work gate refuses any
+  record whose blockedBy cites an already-done record. So the flip is held by a mechanical edge in a
+  file this lane may not write, not by missing evidence.
+verificationSource: authored-claim
+because: >-
+  ops/backend.implement's boundaries for this lane allow writes under .starciwork/features/task/**
+  only; features/share/contract/completion-guard-for-task/index.yaml is outside them, and editing it
+  from here to obtain the flip is exactly the "add/remove edges to obtain pass" the operator forbids.
+  The share lane retires that edge (its own rev-2 because-text is already stale against the tree:
+  the guard and task's call site both exist now), and br.task.single-owner flips done on the evidence
+  already captured under it. Nothing else names this record as its reason, so no BLOCKER_UNROOTED
+  dead-end is created - fr.task.complete's chain now terminates here.
+closedBy: [contract.share.completion-guard-for-task]
+change: {rev: 1, kind: initial, at: 2026-09-18T17:30:00.000Z, reason: "Named by the task lane (ex-be-task) while closing this feature's implementation records."}

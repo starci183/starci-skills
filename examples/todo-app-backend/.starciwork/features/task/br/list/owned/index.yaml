@@ -1,10 +1,16 @@
 schema: work/business-rule
 id: br.task.list.owned
 title: A list shows only the reader's own tasks
-state: todo
+state: done
 statements:
   - A task list contains exactly the tasks owned by the person reading it.
 acceptanceCriteria: [excludes-others]
 module: src/modules/bussiness/task
 change: {rev: 1, kind: initial, at: 2026-09-18T02:14:00.000Z}
-
+# Proven at rev 1, unchanged: ac.task.list.owned.excludes-others is the named jest test in
+# list-tasks.handler.spec.ts (two owners, the reader sees exactly its own one row), and the
+# boundary is proven live too - scripts/live-proof.sh's two-identity steps (demo2 creates a task;
+# demo1's tasks query never contains it) pass against an API built from this source tree, and its
+# no-/malformed-Authorization steps prove the GraphQL tasks query refuses a stranger outright
+# rather than listing someone else's. The provider of contract.task.list-for-dashboard counts
+# through this same query path, so the counts obey this rule by construction.

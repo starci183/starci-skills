@@ -1,0 +1,47 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: impl.task.todo-app-backend.platform-events
+recordDigest: 78cfe599997d4027b15f6536047b75a4c507bb67d6989a0753b5ead7f29bc065
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/modules/platform/events/event-bus.providers.spec.ts
+      sha256: 3f06301094e888cc784ff2972028ce15f8421d16ae0356b4aa7048f483c0cbe5
+    - path: src/modules/platform/events/event-bus.providers.ts
+      sha256: 8e40444d31cce51fea6d4fc8a798998f94a56d3ead1a79002031f303e39587ee
+    - path: src/modules/platform/events/events.module-definition.ts
+      sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
+    - path: src/modules/platform/events/events.module.ts
+      sha256: ccf06e54bb84054cccd5e3aebf1862533b0d1cf8b2ae1ebb50cedbb2609897d3
+    - path: src/modules/platform/events/events.types.ts
+      sha256: 701836c2d7f359be39ca1b450bf2d638206ca753ccbb684ed0580419c5143a3e
+    - path: src/modules/platform/events/index.ts
+      sha256: e06c417d067371d0b27a42d611bd8e1f468c0f9c1c2ee7a60bc7f7ece882803a
+  digest: 7d593d12bafa669eaac558f7815d24a40f477e381efddad6fa4378057ffc9bb7
+outcome: pass
+assertions:
+  - id: event.task.created
+    command: npx jest src/modules/bussiness/task/create-task.handler.spec.ts -t "event.task.created"
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/task/create-task.handler.spec.ts -t "event.task.created"
+      exited 0
+  - id: event.task.completed
+    command: npx jest src/modules/bussiness/task/complete-task.handler.spec.ts -t "event.task.completed"
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/task/complete-task.handler.spec.ts -t
+      "event.task.completed" exited 0
+  - id: event.task.deleted
+    command: npx jest src/modules/bussiness/task/delete-task.handler.spec.ts -t "event.task.deleted"
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/task/delete-task.handler.spec.ts -t "event.task.deleted"
+      exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T12:01:03.704Z

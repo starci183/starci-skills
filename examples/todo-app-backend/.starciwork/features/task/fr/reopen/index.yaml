@@ -20,5 +20,11 @@ requiresProof:
   uat:
     required: true
 
-blockedBy:
-  - {record: br.task.complete.once, because: "br.task.complete.once is todo at rev 2; its reversible statement's evidence was withdrawn along with the rule it replaced and must be regenerated - a kernel/uat lane's job, not something this record's own authoring can settle."}
+# The blockedBy onto br.task.complete.once is dropped: the rule is now done at rev 2 - the reversible
+# statement its rev-2 change demanded as proof is proven (ac.task.complete.once.is-reversible in
+# reopen-task.handler.spec.ts, plus the live scripts/live-proof.sh reopen step against an API built
+# from this tree), which is exactly what that edge said was still missing. This record stays todo on
+# its own requiresProof: the named e2e command (`npm run test:e2e -- tasks/reopen`) does not exist in
+# this repository (acceptance data; left untouched per this op's rules - scripts/live-proof.sh's
+# reopenTask step is the live equivalent and passed), and no uat.flow for reopening exists under
+# features/task/uat/**.

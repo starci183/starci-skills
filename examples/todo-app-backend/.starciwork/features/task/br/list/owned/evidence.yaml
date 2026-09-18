@@ -2,8 +2,8 @@
 # against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
-record: br.task.single-owner
-recordDigest: 36ce286450761a02b3fcfe79a109e7c687e59bdc977752b596460e6c1b8738af
+record: br.task.list.owned
+recordDigest: 57ba1918de6aa444adab85d48c4c083eb156e987ebfcd4a600b0752fede81b48
 codeDigest:
   algorithm: sha256
   files:
@@ -70,34 +70,20 @@ codeDigest:
   digest: 20d1a7193f9211433e90876d9f43ecc2efb156a1c7e79abb4266eb92fc33f1ea
 outcome: pass
 assertions:
-  - id: ac.task.single-owner.refuses-stranger
-    command: npx jest -t "ac.task.single-owner.refuses-stranger"
+  - id: ac.task.list.owned.excludes-others
+    command: npx jest src/modules/bussiness/task/list-tasks.handler.spec.ts -t
+      "ac.task.list.owned.excludes-others"
     exit: 0
     outcome: pass
-    observation: npx jest -t "ac.task.single-owner.refuses-stranger" exited 0
-  - id: br.task.single-owner.owner-passes-both
-    command: npx jest src/modules/bussiness/task/completion-authority.spec.ts -t
-      "sds.task.ownership-guard.t-owner:"
+    observation: npx jest src/modules/bussiness/task/list-tasks.handler.spec.ts -t
+      "ac.task.list.owned.excludes-others" exited 0
+  - id: br.task.list.owned.live-proof
+    command: C:\PROGRA~1\Git\bin\bash.exe -c "API_URL=http://localhost:3005 scripts/live-proof.sh"
     exit: 0
     outcome: pass
-    observation: npx jest src/modules/bussiness/task/completion-authority.spec.ts -t
-      "sds.task.ownership-guard.t-owner:" exited 0
-  - id: br.task.single-owner.editor-completes
-    command: npx jest src/modules/bussiness/share/completion-authority.spec.ts -t
-      "ac.share.role.permissions.editor-can-complete"
-    exit: 0
-    outcome: pass
-    observation: npx jest src/modules/bussiness/share/completion-authority.spec.ts -t
-      "ac.share.role.permissions.editor-can-complete" exited 0
-  - id: br.task.single-owner.editor-cannot-delete
-    command: npx jest src/modules/bussiness/share/completion-authority.spec.ts -t
-      "ac.share.editor.no-delete.delete-refused-for-editor"
-    exit: 0
-    outcome: pass
-    observation: npx jest src/modules/bussiness/share/completion-authority.spec.ts -t
-      "ac.share.editor.no-delete.delete-refused-for-editor" exited 0
+    observation: C:\PROGRA~1\Git\bin\bash.exe -c "API_URL=http://localhost:3005 scripts/live-proof.sh" exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T11:57:32.942Z
+  capturedAt: 2026-09-18T11:56:17.380Z

@@ -14,7 +14,10 @@ describe('DeleteTaskHandler', () => {
     const result = await handler.execute(new DeleteTaskCommand({ actorId: 'owner-1', taskId: created.id }));
 
     expect(result.deleted).toBe(true);
-    await expect(taskService.findById(created.id)).rejects.toThrow();
+    await expect(taskService.findById(created.id)).rejects.toMatchObject({ code: 'TASK_NOT_FOUND' });
+    // The list a person reads (br.task.list.owned) must agree: the row is gone from the store of
+    // record, not merely hidden from one read path.
+    expect(await taskService.listOwnedBy('owner-1')).toHaveLength(0);
   });
 
   it("ac.task.single-owner.refuses-stranger: a stranger cannot delete somebody else's task", async () => {
@@ -43,5 +46,8 @@ describe('DeleteTaskHandler', () => {
     expect(published).toBeInstanceOf(TaskDeletedEvent);
     expect(published.taskId).toBe(created.id);
     expect(published.ownerId).toBe('owner-1');
+    expect(published.deletedAt).toBeInstanceOf(Date);
+    expect(published.sourceEventId).toEqual(expect.any(String));
+    expect(published.sourceEventId.length).toBeGreaterThan(0);
   });
 });

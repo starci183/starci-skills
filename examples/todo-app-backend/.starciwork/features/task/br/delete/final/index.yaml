@@ -1,10 +1,20 @@
 schema: work/business-rule
 id: br.task.delete.final
 title: A deleted task does not come back
-state: todo
+state: done
 statements:
   - Deleting a task removes it; there is no recovery path in this product.
 acceptanceCriteria: [stays-gone]
 module: [src/modules/bussiness/task]
 change: {rev: 1, kind: initial, at: 2026-09-18T02:13:00.000Z}
-
+# Proven at rev 1: ac.task.delete.final.stays-gone is the named jest test in
+# delete-task.handler.spec.ts - after the delete, findById rejects with TASK_NOT_FOUND and the
+# owner's own list no longer contains the row - and the same sequence passes against a live API
+# built from this source tree over the shared dev stack (scripts/live-proof.sh: deleteTask ->
+# deleted:true, then the tasks query no longer contains the deleted task). The "and after a
+# restart" half of the criterion rides on there being exactly one durable store: the delete is a
+# DELETE against the shared Postgres TaskEntity table, no second cache exists on the read path,
+# and that store's persistence is what impl.task.todo-app-backend.platform-database is done for.
+# The tension with the audit log keeping the task's identifier in an append-only line is recorded
+# and accepted on data.audit.log-line's own conflictsWith entry (rev 1, unchanged by this flip),
+# not resolved here.
