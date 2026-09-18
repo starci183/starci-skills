@@ -1,0 +1,20 @@
+schema: work/uat-flow
+id: uat.notify.digest-and-unsubscribe
+title: Two events settle into one digest, then an unsubscribe silences the next one
+state: todo
+accounts: accounts.yaml
+steps:
+  - Sign in as the owner.
+  - Trigger two notify-worthy events for the owner inside one digest window.
+  - Read the owner's inbox and see exactly one message covering both events.
+  - Unsubscribe from email in the preferences screen.
+  - Trigger a third notify-worthy event.
+  - Confirm no new message arrives for it.
+proves: [fr.notify.digest, fr.notify.unsubscribe, br.notify.digest.window, br.notify.unsubscribe.honored]
+
+blockedBy:
+  - Cannot be walked. ui.notify.preferences (step 4's surface) is todo, and there is no real product
+    action that triggers a "notify-worthy event" (steps 2 and 5) because fr.notify.on-completion and
+    fr.notify.on-new-device - the only two things a real person could do to produce one - are both todo,
+    each conflictsWith a foreign gap. A synthetic event injected outside the product would not be a UAT
+    walk of the product surface; it would be a call into internals wearing a UAT record's shape.

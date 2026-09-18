@@ -1,0 +1,11 @@
+schema: work/ui-screen
+id: ui.notify.preferences
+title: The notification preferences screen
+state: todo
+states: [loading, subscribed, unsubscribed, saving, refused]
+brand: {rev: 2}
+refs: [fr.notify.unsubscribe]
+blockedBy:
+  - No screen exists. The example is moving to a Next.js frontend that consumes the Grammar core
+    package, and this screen has not been built against that layout; there are no captures for any
+    brand revision yet.

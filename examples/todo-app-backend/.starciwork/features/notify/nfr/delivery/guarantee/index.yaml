@@ -1,0 +1,29 @@
+schema: work/non-functional-requirement
+id: nfr.notify.delivery.guarantee
+title: Effectively-once delivery, measured, not asserted
+quality: reliability
+state: todo
+observableCriterion: "The guarantee is at-least-once transport collapsed to effectively-once by dedupe
+  key: replaying the same (kind, sourceEventId, recipientId) triple any number of times within 24 hours
+  produces exactly one notification with exactly one terminal delivery-attempt outcome recorded against
+  it, and never a second attempt once a terminal outcome is reached."
+measurement:
+  how: A harness admits the same triple N times (N from 2 to 100) at random intervals within 24h,
+    drives the resulting delivery to a terminal state once, and asserts the notification store's size
+    for that key stays 1 and no second delivery-attempt row is created for it.
+  threshold: 100% of runs show exactly one notification and exactly one terminal delivery-attempt per
+    dedupe key; 0 duplicate sends.
+  environment: dev
+appliesTo: [br.notify.delivery.once]
+
+requiresProof:
+  measurement:
+    required: true
+
+blockedBy:
+  - "No implementation exists. The example is moving to a NestJS backend and this module has not been
+    built against that layout. Effectively-once is also only as strong as the dedupe key's inputs, per
+    decision.notify.dedupe-key - it holds for a retried delivery of the same real event, and it does
+    not hold if a producer is ever forced to invent a new sourceEventId for what is really the same
+    event, which is exactly the situation fr.notify.on-completion and fr.notify.on-new-device are in
+    today."

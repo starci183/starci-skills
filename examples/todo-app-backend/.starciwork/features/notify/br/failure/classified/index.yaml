@@ -1,0 +1,22 @@
+schema: work/business-rule
+id: br.notify.failure.classified
+title: A mail host outage, a bounce and an unsubscribe are three different outcomes
+state: todo
+statements:
+  - A transient failure (the mail host is unreachable) retries up to a bounded number of attempts and
+    is not reported as an error while attempts remain.
+  - A permanent bounce (the address is rejected by the provider) is terminal and does not retry.
+  - A recipient who unsubscribed is suppressed before an attempt is ever made, so an unsubscribe never
+    shows up as a delivery failure at all.
+  - Retries exhausted on a transient failure is recorded as its own outcome, not silently merged into a
+    bounce and not silently dropped.
+authorityRefs:
+  - "owner-intent: An operator paging on 'delivery error' should not be woken by an unsubscribe, and
+    should not be told an outage is the same problem as a bad address."
+acceptanceCriteria: [retries-transient, suppresses-bounced-address, suppresses-unsubscribed]
+module: src/notify/delivery
+change: {rev: 1, kind: initial, at: 2026-09-18T06:02:00.000Z}
+blockedBy:
+  - No code exists yet at src/notify/delivery. The example is moving to a NestJS backend and this
+    module has not been written against that layout, so the classification stays a design, not a
+    demonstrated fact.

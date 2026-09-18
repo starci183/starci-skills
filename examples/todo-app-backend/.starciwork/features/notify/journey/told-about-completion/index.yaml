@@ -1,0 +1,15 @@
+schema: work/customer-journey
+id: journey.notify.told-about-completion
+title: A person closes their laptop and later learns their task was handled
+state: todo
+crossesFeatures: [task, notify]
+steps:
+  - {actor: owner, does: "Completes a task and closes the browser, expects: nothing further from them is required."}
+  - {actor: owner, does: "Some time later, checks email, expects: a message naming the completed task, not a raw log line."}
+  - {actor: owner, does: "Had unsubscribed last week, expects: no message at all, and no sense that something went wrong."}
+requirements: [fr.task.complete, fr.notify.on-completion, fr.notify.digest, fr.notify.unsubscribe]
+
+blockedBy:
+  - Every requirement this journey needs is todo, and one of them (fr.notify.on-completion) conflictsWith
+    a gap in the feature that would have to start the journey. The journey is real and worth stating -
+    it is the reason notify exists - but nothing in it can be walked today.

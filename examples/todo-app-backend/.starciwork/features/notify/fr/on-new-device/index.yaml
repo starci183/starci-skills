@@ -1,0 +1,30 @@
+schema: work/functional-requirement
+id: fr.notify.on-new-device
+title: Notify a person when their session signs in from a new device
+state: todo
+actors: [person]
+trigger: A sign-in creates a session that single-device semantics would end a prior live session for.
+mainFlow:
+  - The new sign-in is admitted as an event with a stable id, the person as recipient, and kind
+    new-device.
+  - It joins the person's open digest window for the email channel.
+exceptionFlows:
+  - The person unsubscribed from email; the event is suppressed.
+postconditions:
+  - Within the person's digest window after the new sign-in, one message names that a new device signed
+    in, unless suppressed.
+composes:
+  - {rule: br.notify.delivery.once, module: src/notify/dedupe}
+  - {rule: br.notify.digest.window, module: src/notify/digest}
+refs: [contract.notify.new-device-signal]
+
+conflictsWith:
+  - {record: br.login.session.single-device, rev: 1, because: "the login session store (sds.login.session-store,
+    data.login.person) exposes no device identity field at all - only prose in sds.login.session-store's
+    responsibility and br.login.session.single-device's title mention a device - and
+    decision.login.session.devices is still open, so there is no signal to derive a 'new device' event
+    from, let alone a stable id for one."}
+
+blockedBy:
+  - contract.notify.new-device-signal is todo; login exposes no device field on a session today. This
+    record stays todo until that contract is met.

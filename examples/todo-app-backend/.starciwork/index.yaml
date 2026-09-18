@@ -11,6 +11,9 @@ features:
   - id: share
     directory: features/share
     description: A task shared with other people through role-bounded, expiring invitations.
+  - id: notify
+    directory: features/notify
+    description: Telling a person something happened, outside the product - email now, other channels later.
   - id: audit
     directory: features/audit
     description: An append-only record of what happened, and the right to have it erased.

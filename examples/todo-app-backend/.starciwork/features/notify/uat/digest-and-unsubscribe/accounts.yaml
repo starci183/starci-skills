@@ -1,0 +1,3 @@
+schema: work/disposable-accounts
+accounts:
+  - {role: owner, username: uat-notify-owner, password: uat-notify-owner-disposable}

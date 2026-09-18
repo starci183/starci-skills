@@ -1,0 +1,27 @@
+schema: work/policy-decision
+id: decision.notify.ordering
+title: Whether notify guarantees the order of two events about the same task
+state: done
+outcome: decided
+question: Two events about the same task (for example, completed then reopened) can reach the pipeline
+  out of order - a retry, a slow producer, two queue consumers. Does notify guarantee it processes and
+  reports them in the order they happened?
+options:
+  - id: guarantee-order
+    summary: Buffer and re-sequence by a producer-supplied sequence number before admitting anything.
+    consequence: Needs a per-recipient sequence number from every producer and a hold-and-reorder
+      buffer with its own timeout, which is a second queue behind the first one.
+  - id: refuse-order-read-current-state
+    summary: Make no ordering promise between events; a digest's content is read from current state at
+      flush time, not assembled by replaying events in arrival order.
+    consequence: An out-of-order pair produces the same digest regardless of which one the pipeline saw
+      first, because nothing in the pipeline depends on which one it saw first.
+recommendation: refuse-order-read-current-state
+recommendationReason: This product has no producer that supplies a sequence number today (task and
+  login emit no events at all yet), so guaranteeing order would be a promise with nothing behind it.
+  Refusing the guarantee and proving the refusal - the digest is order-independent by construction - is
+  honest about what the system actually does.
+chosen: refuse-order-read-current-state
+targetModule: src/notify/pipeline.ts, functions enqueue and digestFor - not yet written; the example is
+  moving to the Nest layout and no lane-owned code exists at this commit. The order-independence claim
+  is a test obligation on that module once it is written, not a demonstrated fact yet.

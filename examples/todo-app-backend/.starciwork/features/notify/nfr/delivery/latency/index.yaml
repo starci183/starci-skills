@@ -1,0 +1,23 @@
+schema: work/non-functional-requirement
+id: nfr.notify.delivery.latency
+title: A digested message goes out promptly after its window closes
+quality: latency
+state: todo
+observableCriterion: For a message with at least one admitted event, the delay between the window's
+  closesAt and the first t-dispatch attempt is under 5 seconds at the 95th percentile.
+measurement:
+  how: A load harness enqueues events at a steady rate and measures wall-clock time between each
+    group's closesAt and its first dispatch attempt, once the pipeline exists.
+  threshold: p95 < 5s
+  environment: dev
+appliesTo: [br.notify.digest.window]
+
+requiresProof:
+  measurement:
+    required: true
+
+blockedBy:
+  - No implementation exists to measure. The example is moving to a NestJS backend and neither the
+    pipeline nor a scheduler that closes windows on a clock (rather than on the next enqueue call) has
+    been built; today closing a window requires another admit call to observe it, which the measurement
+    above cannot honestly claim meets a wall-clock bound.
