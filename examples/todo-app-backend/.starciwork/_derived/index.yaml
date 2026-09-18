@@ -317,10 +317,13 @@ records:
       blockedBy:
         - fr.login.sign-out
     blockers:
-      - id: decision.login.session.devices
-        rootKind: decision
+      - id: gap.login.device-field
+        rootKind: gap
         cyclic: false
-        because: which devices may hold a session is undecided
+        because: decision.login.session.devices is now decided (single-device), settling this statement, but
+          sds.login.session-store's stateMachine and data.login.person's fields carry no device
+          identity and session.mjs's accept()/actorOf() take no device argument - there is no device
+          field to evict a prior session against yet.
   br.notify.delivery.once:
     schema: work/business-rule
     feature: notify
@@ -674,19 +677,23 @@ records:
         - sds.task.completion-state
       composes:
         - fr.task.complete
+        - fr.task.reopen
       conflictsWith:
         - contract.notify.task-completion-feed
         - fr.notify.on-completion
       blockedBy:
         - fr.task.complete
+        - fr.task.reopen
         - sds.task.completion-state
     blockers:
-      - id: gap.task.reopen-not-specified
+      - id: gap.task.collaborator-completion
         rootKind: gap
         cyclic: false
-        because: impl.task.todo-app-backend.reopen-task's code at src/features/reopen-task/** is real and
-          passes its own unit tests, but no fr.task.reopen (or equivalent) record requires it, so
-          nothing has ever run an acceptance check against the reversible statement above.
+        because: This rule's evidence must be regenerated for both statements now that rev 2 withdrew the
+          old one - a kernel/uat lane's job, not this record's own authoring. That regeneration is
+          bound up with fr.task.complete's own composed proof, which spans both actors this rule's
+          module serves; the collaborator half of that proof has no implementation yet, which is the
+          one absence gap.task.collaborator-completion names.
   br.task.delete.final:
     schema: work/business-rule
     feature: task
@@ -776,12 +783,15 @@ records:
       refs:
         - fr.notify.on-new-device
     blockers:
-      - id: decision.login.session.devices
-        rootKind: decision
+      - id: gap.login.device-field
+        rootKind: gap
         cyclic: false
-        because: Owned entirely by the notify side of an interface that login has not built, and blocked
-          further upstream by decision.login.session.devices being open. This record cannot move to
-          done without a change in features/login, which this lane does not own.
+        because: "Owned entirely by the notify side of an interface that login has not built.
+          decision.login.session.devices is now decided (single-device), but that settles the
+          question, not the field: sds.login.session-store and data.login.person still carry no
+          device identity, so there is no deviceId this surface could honestly be given yet. This
+          record cannot move to done without a change in features/login, which this lane does not
+          own."
   contract.notify.task-completion-feed:
     schema: work/contract
     feature: notify
@@ -791,11 +801,13 @@ records:
       refs:
         - fr.notify.on-completion
     blockers:
-      - id: gap.notify.task-completion-event
+      - id: gap.notify.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: Owned entirely by the notify side of an interface that task has not built. This record
-          cannot move to done without a change in features/task, which this lane does not own.
+        because: "Owned entirely by the notify side of an interface that task has now built: complete-task's
+          use case publishes event.task.completed on the platform event bus. What remains is that no
+          notify module exists yet under the NestJS/Next.js layout to host onTaskComplete and call
+          it."
   contract.plan.create-precondition:
     schema: work/contract
     feature: plan
@@ -838,53 +850,30 @@ records:
       - id: gap.task.collaborator-completion
         rootKind: gap
         cyclic: false
-        because: "The withdrawn clause was what ac.task.single-owner.refuses-stranger and
-          sds.task.ownership-guard were proven against; both need a live re-check against the split
-          statements above, through contract.share.completion-guard-for-task, before this rule is
-          done again. sds.task.ownership-guard and contract.share.completion-guard-for-task were
-          each separately cited here for the same reason: the collaborator-completion path this rule
-          now describes has no implementation yet. gap.task.collaborator-completion names that one
-          absence instead of restating it as record-to-record edges (onto the acceptance criterion
-          the old clause was proven against, and onto records that themselves blocked back on this
-          one)."
-      - id: gap.task.reopen-not-specified
-        rootKind: gap
-        cyclic: false
-        because: impl.task.todo-app-backend.reopen-task's code at src/features/reopen-task/** is real and
-          passes its own unit tests, but no fr.task.reopen (or equivalent) record requires it, so
-          nothing has ever run an acceptance check against the reversible statement above.
+        because: This rule's evidence must be regenerated for both statements now that rev 2 withdrew the
+          old one - a kernel/uat lane's job, not this record's own authoring. That regeneration is
+          bound up with fr.task.complete's own composed proof, which spans both actors this rule's
+          module serves; the collaborator half of that proof has no implementation yet, which is the
+          one absence gap.task.collaborator-completion names.
   contract.task.list-for-dashboard:
     schema: work/contract
     feature: task
     state: todo
-    effectiveState: blocked
-    blockers:
-      - id: decision.task.list.scope
-        rootKind: decision
-        cyclic: false
-        because: br.task.list.owned is todo, and decision.task.list.scope has not chosen whether an
-          organization owner reads member tasks. A contract written before that decision would
-          encode the wrong boundary - decision.task.list.scope is the open question
-          br.task.list.owned's own openQuestions names, so this waits on the decision rather than
-          restating br.task.list.owned itself as a second, dead-end blocker.
+    effectiveState: todo
   data.audit.erasure-request:
     schema: work/data
     feature: audit
     state: todo
     effectiveState: blocked
     blockers:
-      - id: decision.audit.erasure-method
-        rootKind: decision
-        cyclic: false
-        because: decision.audit.erasure-method is open. This state machine assumes its recommended answer
-          (crypto-shred), and t-execute's effect is written against that assumption; if the decision
-          settles on something else, t-execute's effect and requiresProof both change. No
-          implementation is authored against an open decision, so this stays todo even once a Nest
-          module exists to host it.
       - id: gap.audit.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: No implementation exists yet under the NestJS layout the example is moving to.
+        because: decision.audit.erasure-method is now decided (crypto-shred), confirming this state
+          machine's t-execute effect was written against the answer that actually settled - no
+          further change to t-execute's effect or requiresProof is expected on that account. What
+          remains is that no implementation exists yet under the NestJS layout the example is moving
+          to.
   data.audit.log-line:
     schema: work/data
     feature: audit
@@ -992,23 +981,13 @@ records:
   decision.audit.erasure-method:
     schema: work/policy-decision
     feature: audit
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - fr.audit.erasure.complete
-        - fr.audit.erasure.request
-        - impl.audit.todo-app-backend.erasure
-        - sds.audit.erasure-request
+    state: done
+    effectiveState: done
   decision.login.session.devices:
     schema: work/policy-decision
     feature: login
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - br.login.session.single-device
-        - contract.notify.new-device-signal
+    state: done
+    effectiveState: done
   decision.notify.dedupe-key:
     schema: work/policy-decision
     feature: notify
@@ -1072,12 +1051,8 @@ records:
   decision.task.list.scope:
     schema: work/policy-decision
     feature: task
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - contract.task.list-for-dashboard
-        - impl.task.todo-app-backend.list
+    state: done
+    effectiveState: done
   environment.todo-app.dev:
     schema: work/resource
     feature: null
@@ -1107,11 +1082,12 @@ records:
         - fr.audit.log.append
         - sds.audit.log-chain
     blockers:
-      - id: gap.audit.emitted-events
+      - id: gap.audit.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: fr.login.sign-in's implementation raises no event today; audit's fr.audit.log.append has
-          nothing to subscribe to yet.
+        because: fr.login.sign-in's implementation now raises this event on the platform event bus after a
+          successful sign-in; audit's fr.audit.log.append still has nothing to subscribe to it with,
+          because no audit module exists yet under the NestJS layout.
   event.login.signed-out:
     schema: work/event
     feature: login
@@ -1122,11 +1098,12 @@ records:
         - fr.audit.log.append
         - sds.audit.log-chain
     blockers:
-      - id: gap.audit.emitted-events
+      - id: gap.audit.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: fr.login.sign-out has no evidence yet (br.login.session.single-device is todo) and raises
-          no event today.
+        because: fr.login.sign-out's implementation now raises this event on the platform event bus after
+          the session is revoked; audit's fr.audit.log.append still has nothing to subscribe to it
+          with, because no audit module exists yet under the NestJS layout.
   event.task.completed:
     schema: work/event
     feature: task
@@ -1138,12 +1115,12 @@ records:
         - fr.notify.on-completion
         - sds.audit.log-chain
     blockers:
-      - id: gap.notify.task-completion-event
+      - id: gap.notify.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: "task has no completion event today: fr.task.complete is itself todo and nothing in the
-          task feature's code emits one; this record specifies the shape notify (and audit) will
-          subscribe to once it does."
+        because: complete-task's use case now raises this event on the platform event bus after the write
+          succeeds; notify still has nothing to subscribe to it with, because no notify module
+          exists yet under the NestJS/Next.js layout.
   event.task.created:
     schema: work/event
     feature: task
@@ -1154,12 +1131,12 @@ records:
         - fr.audit.log.append
         - sds.audit.log-chain
     blockers:
-      - id: gap.audit.emitted-events
+      - id: gap.audit.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: fr.task.create's implementation (impl.task.todo-app-backend.ownership) raises no event
-          today; this record specifies the shape a future emit must have, not a signal that fires
-          yet.
+        because: create-task's use case now raises this event on the platform event bus after the write
+          succeeds; audit's fr.audit.log.append still has nothing to subscribe to it with, because
+          no audit module exists yet under the NestJS layout.
   event.task.deleted:
     schema: work/event
     feature: task
@@ -1170,11 +1147,12 @@ records:
         - fr.audit.log.append
         - sds.audit.log-chain
     blockers:
-      - id: gap.audit.emitted-events
+      - id: gap.audit.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: no fr or implementation exists for delete beyond br.task.delete.final's acceptance
-          criterion; nothing emits this event yet.
+        because: delete-task's use case now raises this event on the platform event bus after the row is
+          gone; audit's fr.audit.log.append still has nothing to subscribe to it with, because no
+          audit module exists yet under the NestJS layout.
   fixture.todo-app.seed:
     schema: work/resource
     feature: null
@@ -1186,14 +1164,14 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: decision.audit.erasure-method
-        rootKind: decision
-        cyclic: false
-        because: decision.audit.erasure-method is open; the same gap fr.audit.erasure.request records.
       - id: gap.audit.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: No implementation exists yet under the NestJS layout the example is moving to.
+        because: decision.audit.erasure-method is now decided (crypto-shred), confirming this state
+          machine's t-execute effect was written against the answer that actually settled - no
+          further change to t-execute's effect or requiresProof is expected on that account. What
+          remains is that no implementation exists yet under the NestJS layout the example is moving
+          to.
   fr.audit.erasure.request:
     schema: work/functional-requirement
     feature: audit
@@ -1205,15 +1183,14 @@ records:
       blockedBy:
         - fr.audit.erasure.complete
     blockers:
-      - id: decision.audit.erasure-method
-        rootKind: decision
-        cyclic: false
-        because: decision.audit.erasure-method is open; sds.audit.erasure-request's t-request assumes its
-          recommended answer. No implementation is authored against an open decision.
       - id: gap.audit.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: No implementation exists yet under the NestJS layout the example is moving to.
+        because: decision.audit.erasure-method is now decided (crypto-shred), confirming this state
+          machine's t-execute effect was written against the answer that actually settled - no
+          further change to t-execute's effect or requiresProof is expected on that account. What
+          remains is that no implementation exists yet under the NestJS layout the example is moving
+          to.
   fr.audit.export:
     schema: work/functional-requirement
     feature: audit
@@ -1233,15 +1210,12 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.audit.emitted-events
-        rootKind: gap
-        cyclic: false
-        because: subscribes now names the five events this FR needs, but none of them is actually raised by
-          login's or task's implementation yet, so there is nothing live to wire this trigger to.
       - id: gap.audit.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: No implementation exists yet under the NestJS layout the example is moving to.
+        because: subscribes now names the five events this FR needs, and login's and task's implementations
+          actually raise all five today - the remaining absence is that no audit module exists yet
+          under the NestJS layout to host this trigger and wire it to them.
   fr.audit.log.read:
     schema: work/functional-requirement
     feature: audit
@@ -1277,10 +1251,13 @@ records:
       refs:
         - event.login.signed-out
     blockers:
-      - id: decision.login.session.devices
-        rootKind: decision
+      - id: gap.login.device-field
+        rootKind: gap
         cyclic: false
-        because: which devices may hold a session is undecided
+        because: decision.login.session.devices is now decided (single-device), settling this statement, but
+          sds.login.session-store's stateMachine and data.login.person's fields carry no device
+          identity and session.mjs's accept()/actorOf() take no device argument - there is no device
+          field to evict a prior session against yet.
   fr.notify.digest:
     schema: work/functional-requirement
     feature: notify
@@ -1305,12 +1282,13 @@ records:
         - nfr.notify.delivery.guarantee
         - uat.notify.digest-and-unsubscribe
     blockers:
-      - id: gap.notify.task-completion-event
+      - id: gap.notify.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: task exposes no completion event today; this record stays todo until event.task.completed
-          is actually raised, which subscribes now names as the trigger instead of overloading
-          contract.notify.task-completion-feed for it.
+        because: event.task.completed is now actually raised by complete-task's use case, which subscribes
+          names as the trigger instead of overloading contract.notify.task-completion-feed for it;
+          this record stays todo because no notify module exists yet under the NestJS/Next.js layout
+          to subscribe to it.
   fr.notify.on-new-device:
     schema: work/functional-requirement
     feature: notify
@@ -1533,21 +1511,11 @@ records:
       - id: gap.task.collaborator-completion
         rootKind: gap
         cyclic: false
-        because: "The withdrawn clause was what ac.task.single-owner.refuses-stranger and
-          sds.task.ownership-guard were proven against; both need a live re-check against the split
-          statements above, through contract.share.completion-guard-for-task, before this rule is
-          done again. sds.task.ownership-guard and contract.share.completion-guard-for-task were
-          each separately cited here for the same reason: the collaborator-completion path this rule
-          now describes has no implementation yet. gap.task.collaborator-completion names that one
-          absence instead of restating it as record-to-record edges (onto the acceptance criterion
-          the old clause was proven against, and onto records that themselves blocked back on this
-          one)."
-      - id: gap.task.reopen-not-specified
-        rootKind: gap
-        cyclic: false
-        because: impl.task.todo-app-backend.reopen-task's code at src/features/reopen-task/** is real and
-          passes its own unit tests, but no fr.task.reopen (or equivalent) record requires it, so
-          nothing has ever run an acceptance check against the reversible statement above.
+        because: This rule's evidence must be regenerated for both statements now that rev 2 withdrew the
+          old one - a kernel/uat lane's job, not this record's own authoring. That regeneration is
+          bound up with fr.task.complete's own composed proof, which spans both actors this rule's
+          module serves; the collaborator half of that proof has no implementation yet, which is the
+          one absence gap.task.collaborator-completion names.
   fr.task.create:
     schema: work/functional-requirement
     feature: task
@@ -1563,6 +1531,20 @@ records:
         - contract.plan.create-precondition
       provenBy:
         - journey.task.first-task
+  fr.task.reopen:
+    schema: work/functional-requirement
+    feature: task
+    state: todo
+    effectiveState: blocked
+    blockers:
+      - id: gap.task.collaborator-completion
+        rootKind: gap
+        cyclic: false
+        because: This rule's evidence must be regenerated for both statements now that rev 2 withdrew the
+          old one - a kernel/uat lane's job, not this record's own authoring. That regeneration is
+          bound up with fr.task.complete's own composed proof, which spans both actors this rule's
+          module serves; the collaborator half of that proof has no implementation yet, which is the
+          one absence gap.task.collaborator-completion names.
   gap.audit.direction-not-drawn:
     schema: work/gap
     feature: audit
@@ -1576,14 +1558,6 @@ records:
     feature: audit
     state: todo
     effectiveState: todo
-    usedBy:
-      blockedBy:
-        - event.login.signed-in
-        - event.login.signed-out
-        - event.task.created
-        - event.task.deleted
-        - fr.audit.log.append
-        - sds.audit.log-chain
   gap.audit.live-proof:
     schema: work/gap
     feature: audit
@@ -1609,15 +1583,21 @@ records:
       blockedBy:
         - br.audit.append-only
         - br.audit.retention
+        - event.login.signed-in
+        - event.login.signed-out
+        - event.task.created
+        - event.task.deleted
         - fr.audit.erasure.complete
         - fr.audit.erasure.request
         - fr.audit.export
         - fr.audit.log.append
+        - impl.audit.todo-app-backend.erasure
         - impl.audit.todo-app-backend.log
         - journey.audit.right-to-be-forgotten
         - nfr.audit.retention
         - nfr.audit.tamper-evidence
         - sds.audit.erasure-request
+        - sds.audit.log-chain
   gap.login.device-field:
     schema: work/gap
     feature: login
@@ -1625,6 +1605,8 @@ records:
     effectiveState: todo
     usedBy:
       blockedBy:
+        - br.login.session.single-device
+        - contract.notify.new-device-signal
         - event.login.new-device-signin
   gap.login.direction-not-drawn:
     schema: work/gap
@@ -1649,8 +1631,8 @@ records:
   gap.login.migration-not-applied:
     schema: work/gap
     feature: login
-    state: todo
-    effectiveState: todo
+    state: done
+    effectiveState: done
   gap.notify.direction-not-drawn:
     schema: work/gap
     feature: notify
@@ -1680,11 +1662,6 @@ records:
     feature: notify
     state: todo
     effectiveState: todo
-    usedBy:
-      blockedBy:
-        - contract.notify.task-completion-feed
-        - event.task.completed
-        - fr.notify.on-completion
   gap.notify.unbuilt-module:
     schema: work/gap
     feature: notify
@@ -1696,10 +1673,13 @@ records:
         - br.notify.digest.window
         - br.notify.failure.classified
         - br.notify.unsubscribe.honored
+        - contract.notify.task-completion-feed
         - data.notify.delivery-attempt
         - data.notify.notification
         - data.notify.preference
+        - event.task.completed
         - fr.notify.digest
+        - fr.notify.on-completion
         - impl.notify.todo-app-backend.pipeline
         - integration.notify.queue
         - integration.notify.smtp
@@ -1836,6 +1816,7 @@ records:
     effectiveState: todo
     usedBy:
       blockedBy:
+        - br.task.complete.once
         - br.task.single-owner
         - contract.login.identity-for-task
         - fr.task.complete
@@ -1861,11 +1842,8 @@ records:
   gap.task.reopen-not-specified:
     schema: work/gap
     feature: task
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - br.task.complete.once
+    state: done
+    effectiveState: done
   identity.todo-app.demo:
     schema: work/resource
     feature: null
@@ -1877,13 +1855,12 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: decision.audit.erasure-method
-        rootKind: decision
+      - id: gap.audit.unbuilt-module
+        rootKind: gap
         cyclic: false
-        because: "No Nest module exists yet, and decision.audit.erasure-method is still open. Authoring this
-          against an undecided mechanism would make the implementation the thing that quietly
-          settled the decision, which is backwards: the decision record is supposed to settle it in
-          the open, not the code."
+        because: decision.audit.erasure-method is now decided (crypto-shred), so this module has a settled
+          mechanism to build against; what remains is that no Nest module exists yet under the
+          layout the example is moving to.
   impl.audit.todo-app-backend.log:
     schema: work/implementation
     feature: audit
@@ -2062,18 +2039,7 @@ records:
     schema: work/implementation
     feature: task
     state: todo
-    effectiveState: blocked
-    blockers:
-      - id: decision.task.list.scope
-        rootKind: decision
-        cyclic: false
-        because: "br.task.list.owned (what this query implements and nfr.task.list.latency measures) is
-          itself todo: whether an organization owner sees its members' tasks is undecided, and this
-          record cannot honestly claim done against a rule whose own shape is still open.
-          ListTasksHandler is real and its ac.task.list.owned.excludes-others test passes today, but
-          that proves the current owner-only reading, not the rule this record is filed against once
-          that decision lands. nfr.task.list.latency separately has no k6 harness in this host to
-          measure against."
+    effectiveState: todo
   impl.task.todo-app-backend.ownership:
     schema: work/implementation
     feature: task
@@ -2259,12 +2225,13 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.notify.task-completion-event
+      - id: gap.notify.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: task exposes no completion event today; this record stays todo until event.task.completed
-          is actually raised, which subscribes now names as the trigger instead of overloading
-          contract.notify.task-completion-feed for it.
+        because: event.task.completed is now actually raised by complete-task's use case, which subscribes
+          names as the trigger instead of overloading contract.notify.task-completion-feed for it;
+          this record stays todo because no notify module exists yet under the NestJS/Next.js layout
+          to subscribe to it.
   journey.plan.hits-the-cap:
     schema: work/customer-journey
     feature: plan
@@ -2370,12 +2337,13 @@ records:
         because: login exposes no device field on a session today; this record stays todo until
           event.login.new-device-signin is actually raised, which subscribes now names as the
           trigger instead of overloading contract.notify.new-device-signal for it.
-      - id: gap.notify.task-completion-event
+      - id: gap.notify.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: task exposes no completion event today; this record stays todo until event.task.completed
-          is actually raised, which subscribes now names as the trigger instead of overloading
-          contract.notify.task-completion-feed for it.
+        because: event.task.completed is now actually raised by complete-task's use case, which subscribes
+          names as the trigger instead of overloading contract.notify.task-completion-feed for it;
+          this record stays todo because no notify module exists yet under the NestJS/Next.js layout
+          to subscribe to it.
   nfr.notify.delivery.latency:
     schema: work/non-functional-requirement
     feature: notify
@@ -2451,18 +2419,14 @@ records:
         - data.audit.erasure-request
         - fr.audit.erasure.request
     blockers:
-      - id: decision.audit.erasure-method
-        rootKind: decision
-        cyclic: false
-        because: decision.audit.erasure-method is open. This state machine assumes its recommended answer
-          (crypto-shred), and t-execute's effect is written against that assumption; if the decision
-          settles on something else, t-execute's effect and requiresProof both change. No
-          implementation is authored against an open decision, so this stays todo even once a Nest
-          module exists to host it.
       - id: gap.audit.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: No implementation exists yet under the NestJS layout the example is moving to.
+        because: decision.audit.erasure-method is now decided (crypto-shred), confirming this state
+          machine's t-execute effect was written against the answer that actually settled - no
+          further change to t-execute's effect or requiresProof is expected on that account. What
+          remains is that no implementation exists yet under the NestJS layout the example is moving
+          to.
   sds.audit.log-chain:
     schema: work/sds-component
     feature: audit
@@ -2472,16 +2436,6 @@ records:
       dependsOn:
         - sds.audit.erasure-request
     blockers:
-      - id: gap.audit.emitted-events
-        rootKind: gap
-        cyclic: false
-        because: dependsOn names contract.login.identity-for-task because that is the only stable, existing
-          surface that gives this module a personId to seal; login and task expose request/response
-          contracts (actorOf, contract.task.list-for-dashboard) but, at this commit, neither
-          feature's implementation actually raises the five events subscribes now names. Earlier
-          this had no record to point at with conflictsWith, because conflictsWith needs a record
-          that exists and this was an absence, not a contradiction; it is gap.audit.emitted-events
-          now.
       - id: gap.audit.unbuilt-module
         rootKind: gap
         cyclic: false
@@ -2639,12 +2593,14 @@ records:
       conflictsWith:
         - data.recur.occurrence
     blockers:
-      - id: gap.task.reopen-not-specified
+      - id: gap.task.collaborator-completion
         rootKind: gap
         cyclic: false
-        because: impl.task.todo-app-backend.reopen-task's code at src/features/reopen-task/** is real and
-          passes its own unit tests, but no fr.task.reopen (or equivalent) record requires it, so
-          nothing has ever run an acceptance check against the reversible statement above.
+        because: This rule's evidence must be regenerated for both statements now that rev 2 withdrew the
+          old one - a kernel/uat lane's job, not this record's own authoring. That regeneration is
+          bound up with fr.task.complete's own composed proof, which spans both actors this rule's
+          module serves; the collaborator half of that proof has no implementation yet, which is the
+          one absence gap.task.collaborator-completion names.
   sds.task.ownership-guard:
     schema: work/sds-component
     feature: task
@@ -2746,12 +2702,13 @@ records:
         because: login exposes no device field on a session today; this record stays todo until
           event.login.new-device-signin is actually raised, which subscribes now names as the
           trigger instead of overloading contract.notify.new-device-signal for it.
-      - id: gap.notify.task-completion-event
+      - id: gap.notify.unbuilt-module
         rootKind: gap
         cyclic: false
-        because: task exposes no completion event today; this record stays todo until event.task.completed
-          is actually raised, which subscribes now names as the trigger instead of overloading
-          contract.notify.task-completion-feed for it.
+        because: event.task.completed is now actually raised by complete-task's use case, which subscribes
+          names as the trigger instead of overloading contract.notify.task-completion-feed for it;
+          this record stays todo because no notify module exists yet under the NestJS/Next.js layout
+          to subscribe to it.
   uat.plan.upgrade-after-cap:
     schema: work/uat-flow
     feature: plan
@@ -2926,21 +2883,21 @@ records:
           prompt this record's assets entry names.
 tally:
   overall:
-    done: 29
-    todo: 44
+    done: 34
+    todo: 41
     stale: 0
-    blocked: 120
-    total: 193
+    blocked: 119
+    total: 194
   byFeature:
     audit:
-      done: 0
-      todo: 9
+      done: 1
+      todo: 8
       stale: 0
       blocked: 17
       total: 26
     login:
-      done: 7
-      todo: 5
+      done: 9
+      todo: 3
       stale: 0
       blocked: 12
       total: 24
@@ -2969,11 +2926,11 @@ tally:
       blocked: 17
       total: 24
     task:
-      done: 5
+      done: 7
       todo: 13
       stale: 0
-      blocked: 14
-      total: 32
+      blocked: 13
+      total: 33
   gaps:
     - id: gap.audit.direction-not-drawn
       feature: audit
@@ -2983,7 +2940,8 @@ tally:
     - id: gap.audit.emitted-events
       feature: audit
       state: todo
-      closedBy: null
+      closedBy:
+        - impl.task.todo-app-backend.platform-events
     - id: gap.audit.live-proof
       feature: audit
       state: todo
@@ -3001,8 +2959,7 @@ tally:
     - id: gap.login.device-field
       feature: login
       state: todo
-      closedBy:
-        - decision.login.session.devices
+      closedBy: null
     - id: gap.login.direction-not-drawn
       feature: login
       state: todo
@@ -3015,9 +2972,9 @@ tally:
         - uat.login.sign-in
     - id: gap.login.migration-not-applied
       feature: login
-      state: todo
+      state: done
       closedBy:
-        - gap.login.live-proof
+        - impl.task.todo-app-backend.platform-database
     - id: gap.notify.direction-not-drawn
       feature: notify
       state: todo
@@ -3037,7 +2994,7 @@ tally:
       feature: notify
       state: todo
       closedBy:
-        - event.task.completed
+        - impl.task.todo-app-backend.platform-events
     - id: gap.notify.unbuilt-module
       feature: notify
       state: todo
@@ -3115,9 +3072,8 @@ tally:
         - uat.task.create
     - id: gap.task.reopen-not-specified
       feature: task
-      state: todo
-      closedBy:
-        - br.task.complete.once
+      state: done
+      closedBy: null
   unbuiltModuleGaps: 5
 frontier:
   - id: br.audit.erasure.logged
@@ -3129,9 +3085,6 @@ frontier:
   - id: data.audit.log-line
     feature: audit
     title: Log line
-  - id: decision.audit.erasure-method
-    feature: audit
-    title: How an erasure actually removes identifying data from an append-only, hash-chained log
   - id: gap.audit.direction-not-drawn
     feature: audit
     title: No interface.draw run has produced a direction for audit.privacy
@@ -3147,9 +3100,6 @@ frontier:
   - id: gap.audit.unbuilt-module
     feature: audit
     title: No audit module exists under the NestJS layout yet
-  - id: decision.login.session.devices
-    feature: login
-    title: How many devices may hold a live session
   - id: gap.login.device-field
     feature: login
     title: No device field exists on a session or person
@@ -3160,9 +3110,6 @@ frontier:
     feature: login
     title: No live proof exists against the real Keycloak/Postgres stack, and no uat.verify run has
       executed login.sign-in against it
-  - id: gap.login.migration-not-applied
-    feature: login
-    title: No migration has been applied against the dev server
   - id: gap.notify.direction-not-drawn
     feature: notify
     title: No interface.draw run has produced a direction for notify.preferences
@@ -3220,9 +3167,9 @@ frontier:
   - id: br.task.list.owned
     feature: task
     title: A list shows only the reader's own tasks
-  - id: decision.task.list.scope
+  - id: contract.task.list-for-dashboard
     feature: task
-    title: Does an organization owner see the tasks of its members
+    title: What a dashboard may read about a person's tasks
   - id: gap.task.collaborator-completion
     feature: task
     title: The collaborator completion path is not implemented
@@ -3232,15 +3179,15 @@ frontier:
   - id: gap.task.live-proof
     feature: task
     title: No uat.verify run has produced a live run for task.create
-  - id: gap.task.reopen-not-specified
-    feature: task
-    title: Nothing names the reopen code as proving the reversible statement
   - id: impl.task.todo-app-backend.complete-task
     feature: task
     title: The complete-task feature
   - id: impl.task.todo-app-backend.delete-task
     feature: task
     title: The delete-task feature
+  - id: impl.task.todo-app-backend.list
+    feature: task
+    title: The owned-list query
   - id: impl.task.todo-app-backend.platform-events
     feature: task
     title: The platform events module (typed in-process event bus)
@@ -3371,24 +3318,9 @@ unclassifiedEdges:
   - from: ac.task.title.required.refuses-empty
     field: rule
     target: br.task.title.required
-  - from: decision.audit.erasure-method
-    field: blocks
-    target: br.audit.erasure.logged
-  - from: decision.audit.erasure-method
-    field: blocks
-    target: br.audit.erasure.right
-  - from: decision.audit.erasure-method
-    field: blocks
-    target: sds.audit.erasure-request
-  - from: decision.login.session.devices
-    field: blocks
-    target: br.login.session.single-device
   - from: decision.plan.downgrade.policy
     field: blocks
     target: br.plan.downgrade.freeze
-  - from: decision.task.list.scope
-    field: blocks
-    target: br.task.list.owned
   - from: event.login.new-device-signin
     field: producer
     target: fr.login.sign-in
@@ -3410,15 +3342,15 @@ unclassifiedEdges:
   - from: gap.audit.direction-not-drawn
     field: closedBy
     target: ui.audit.privacy
+  - from: gap.audit.emitted-events
+    field: closedBy
+    target: impl.task.todo-app-backend.platform-events
   - from: gap.audit.live-proof
     field: closedBy
     target: uat.audit.right-to-be-forgotten
   - from: gap.audit.unbuilt-module
     field: closedBy
     target: impl.audit.todo-app-backend.log
-  - from: gap.login.device-field
-    field: closedBy
-    target: decision.login.session.devices
   - from: gap.login.direction-not-drawn
     field: closedBy
     target: ui.login.sign-in
@@ -3427,7 +3359,7 @@ unclassifiedEdges:
     target: uat.login.sign-in
   - from: gap.login.migration-not-applied
     field: closedBy
-    target: gap.login.live-proof
+    target: impl.task.todo-app-backend.platform-database
   - from: gap.notify.direction-not-drawn
     field: closedBy
     target: ui.notify.preferences
@@ -3439,7 +3371,7 @@ unclassifiedEdges:
     target: event.login.new-device-signin
   - from: gap.notify.task-completion-event
     field: closedBy
-    target: event.task.completed
+    target: impl.task.todo-app-backend.platform-events
   - from: gap.notify.unbuilt-module
     field: closedBy
     target: impl.notify.todo-app-backend.pipeline
@@ -3485,9 +3417,6 @@ unclassifiedEdges:
   - from: gap.task.live-proof
     field: closedBy
     target: uat.task.create
-  - from: gap.task.reopen-not-specified
-    field: closedBy
-    target: br.task.complete.once
   - from: impl.audit.todo-app-backend.erasure
     field: proves
     target: br.audit.erasure.logged

@@ -751,6 +751,22 @@ findings:
     because: A breaking change to br.notify.unsubscribe.honored sends 7 other record(s) back to todo,
       would stale 0 evidence file(s), and touches 1 code path(s) (src/notify/preferences) - this is
       the number a reviewer wants before approving the change.
+  - id: blast-radius:br.task.complete.once
+    kind: blast-radius
+    severity: warn
+    records:
+      - br.task.complete.once
+      - data.task.task
+      - event.task.completed
+      - fr.task.complete
+      - fr.task.reopen
+      - impl.task.todo-app-backend.platform-database
+      - impl.task.todo-app-backend.platform-events
+      - sds.task.completion-state
+    because: A breaking change to br.task.complete.once sends 7 other record(s) back to todo, would
+      stale 1 evidence file(s), and touches 3 code path(s) (src/modules/bussiness/task,
+      src/modules/platform/databases/postgresql/primary, src/modules/platform/events) - this is the
+      number a reviewer wants before approving the change.
   - id: blast-radius:br.plan.active-scope
     kind: blast-radius
     severity: warn
@@ -767,21 +783,6 @@ findings:
       app/plan/usage-screen.tsx, src/plan/cap-guard, src/plan/cap-guard.ts, src/plan/payments.ts,
       src/plan/reconcile.ts, src/plan/subscription.ts) - this is the number a reviewer wants before
       approving the change.
-  - id: blast-radius:br.task.complete.once
-    kind: blast-radius
-    severity: warn
-    records:
-      - br.task.complete.once
-      - data.task.task
-      - event.task.completed
-      - fr.task.complete
-      - impl.task.todo-app-backend.platform-database
-      - impl.task.todo-app-backend.platform-events
-      - sds.task.completion-state
-    because: A breaking change to br.task.complete.once sends 6 other record(s) back to todo, would
-      stale 1 evidence file(s), and touches 3 code path(s) (src/modules/bussiness/task,
-      src/modules/platform/databases/postgresql/primary, src/modules/platform/events) - this is the
-      number a reviewer wants before approving the change.
   - id: blast-radius:br.notify.failure.classified
     kind: blast-radius
     severity: warn
@@ -794,6 +795,22 @@ findings:
     because: A breaking change to br.notify.failure.classified sends 4 other record(s) back to todo,
       would stale 0 evidence file(s), and touches 1 code path(s) (src/notify/delivery) - this is the
       number a reviewer wants before approving the change.
+  - id: fan-in-hotspot:gap.audit.unbuilt-module
+    kind: fan-in-hotspot
+    severity: info
+    records:
+      - gap.audit.unbuilt-module
+    because: gap.audit.unbuilt-module is used 17 time(s) (top decile of fan-in); it is owned by audit
+      and read by 2 other feature(s) (login, task), so a change here is cross-feature coupling, not
+      a local edit.
+  - id: fan-in-hotspot:gap.notify.unbuilt-module
+    kind: fan-in-hotspot
+    severity: info
+    records:
+      - gap.notify.unbuilt-module
+    because: gap.notify.unbuilt-module is used 16 time(s) (top decile of fan-in); it is owned by notify
+      and read by 1 other feature(s) (task), so a change here is cross-feature coupling, not a local
+      edit.
   - id: fan-in-hotspot:gap.plan.unbuilt-module
     kind: fan-in-hotspot
     severity: info
@@ -808,22 +825,6 @@ findings:
     records:
       - gap.recur.unbuilt-module
     because: gap.recur.unbuilt-module is used 15 time(s) (top decile of fan-in); it is owned by recur
-      and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
-      here is cross-feature coupling, not a local edit.
-  - id: fan-in-hotspot:gap.notify.unbuilt-module
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - gap.notify.unbuilt-module
-    because: gap.notify.unbuilt-module is used 13 time(s) (top decile of fan-in); it is owned by notify
-      and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
-      here is cross-feature coupling, not a local edit.
-  - id: fan-in-hotspot:gap.audit.unbuilt-module
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - gap.audit.unbuilt-module
-    because: gap.audit.unbuilt-module is used 11 time(s) (top decile of fan-in); it is owned by audit
       and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
       here is cross-feature coupling, not a local edit.
   - id: fan-in-hotspot:br.notify.delivery.once
@@ -857,6 +858,14 @@ findings:
       - br.share.role.permissions
     because: br.share.role.permissions is used 9 time(s) (top decile of fan-in); it is owned by share
       and read by 1 other feature(s) (task), so a change here is cross-feature coupling, not a local
+      edit.
+  - id: fan-in-hotspot:br.task.complete.once
+    kind: fan-in-hotspot
+    severity: info
+    records:
+      - br.task.complete.once
+    because: br.task.complete.once is used 9 time(s) (top decile of fan-in); it is owned by task and
+      read by 1 other feature(s) (notify), so a change here is cross-feature coupling, not a local
       edit.
   - id: fan-in-hotspot:gap.share.unbuilt-module
     kind: fan-in-hotspot
@@ -978,74 +987,22 @@ findings:
     because: sds.task.ownership-guard authors no owners entry, so it has no bound module and no
       read-scope boundary - anything could claim to implement it, and nothing narrows what a
       reviewer must open to check.
-  - id: open-decision:decision.audit.erasure-method
-    kind: open-decision
-    severity: info
-    records:
-      - decision.audit.erasure-method
-      - br.audit.erasure.logged
-      - br.audit.erasure.right
-      - fr.audit.erasure.complete
-      - fr.audit.erasure.request
-      - impl.audit.todo-app-backend.erasure
-      - sds.audit.erasure-request
-    because: decision.audit.erasure-method is still open and holds 6 record(s) (br.audit.erasure.logged,
-      br.audit.erasure.right, fr.audit.erasure.complete, fr.audit.erasure.request,
-      impl.audit.todo-app-backend.erasure, sds.audit.erasure-request) - none of them can move until
-      this is decided.
-  - id: open-decision:decision.login.session.devices
-    kind: open-decision
-    severity: info
-    records:
-      - decision.login.session.devices
-      - br.login.session.single-device
-      - contract.notify.new-device-signal
-    because: decision.login.session.devices is still open and holds 2 record(s)
-      (br.login.session.single-device, contract.notify.new-device-signal) - none of them can move
-      until this is decided.
-  - id: open-decision:decision.task.list.scope
-    kind: open-decision
-    severity: info
-    records:
-      - decision.task.list.scope
-      - br.task.list.owned
-      - contract.task.list-for-dashboard
-      - impl.task.todo-app-backend.list
-    because: decision.task.list.scope is still open and holds 3 record(s) (br.task.list.owned,
-      contract.task.list-for-dashboard, impl.task.todo-app-backend.list) - none of them can move
-      until this is decided.
   - id: designed-todo:br.login.session.single-device
     kind: designed-todo
     severity: info
     records:
       - br.login.session.single-device
-      - decision.login.session.devices
-    because: br.login.session.single-device is todo, blocked on decision.login.session.devices - a real
-      product question, not missing code; it moves once that is settled.
-  - id: designed-todo:br.task.complete.once
-    kind: designed-todo
-    severity: info
-    records:
-      - br.task.complete.once
-      - gap.task.reopen-not-specified
-    because: br.task.complete.once is todo, blocked on gap.task.reopen-not-specified - a real product
+      - gap.login.device-field
+    because: br.login.session.single-device is todo, blocked on gap.login.device-field - a real product
       question, not missing code; it moves once that is settled.
   - id: designed-todo:contract.notify.new-device-signal
     kind: designed-todo
     severity: info
     records:
       - contract.notify.new-device-signal
-      - decision.login.session.devices
-    because: contract.notify.new-device-signal is todo, blocked on decision.login.session.devices - a
-      real product question, not missing code; it moves once that is settled.
-  - id: designed-todo:contract.notify.task-completion-feed
-    kind: designed-todo
-    severity: info
-    records:
-      - contract.notify.task-completion-feed
-      - gap.notify.task-completion-event
-    because: contract.notify.task-completion-feed is todo, blocked on gap.notify.task-completion-event -
-      a real product question, not missing code; it moves once that is settled.
+      - gap.login.device-field
+    because: contract.notify.new-device-signal is todo, blocked on gap.login.device-field - a real
+      product question, not missing code; it moves once that is settled.
   - id: designed-todo:contract.plan.create-precondition
     kind: designed-todo
     severity: info
@@ -1053,30 +1010,6 @@ findings:
       - contract.plan.create-precondition
       - gap.plan.cap-guard-not-wired
     because: contract.plan.create-precondition is todo, blocked on gap.plan.cap-guard-not-wired - a real
-      product question, not missing code; it moves once that is settled.
-  - id: designed-todo:contract.share.completion-guard-for-task
-    kind: designed-todo
-    severity: info
-    records:
-      - contract.share.completion-guard-for-task
-      - gap.task.reopen-not-specified
-    because: contract.share.completion-guard-for-task is todo, blocked on gap.task.reopen-not-specified
-      - a real product question, not missing code; it moves once that is settled.
-  - id: designed-todo:contract.task.list-for-dashboard
-    kind: designed-todo
-    severity: info
-    records:
-      - contract.task.list-for-dashboard
-      - decision.task.list.scope
-    because: contract.task.list-for-dashboard is todo, blocked on decision.task.list.scope - a real
-      product question, not missing code; it moves once that is settled.
-  - id: designed-todo:data.audit.erasure-request
-    kind: designed-todo
-    severity: info
-    records:
-      - data.audit.erasure-request
-      - decision.audit.erasure-method
-    because: data.audit.erasure-request is todo, blocked on decision.audit.erasure-method - a real
       product question, not missing code; it moves once that is settled.
   - id: designed-todo:event.login.new-device-signin
     kind: designed-todo
@@ -1086,70 +1019,6 @@ findings:
       - gap.login.device-field
     because: event.login.new-device-signin is todo, blocked on gap.login.device-field - a real product
       question, not missing code; it moves once that is settled.
-  - id: designed-todo:event.login.signed-in
-    kind: designed-todo
-    severity: info
-    records:
-      - event.login.signed-in
-      - gap.audit.emitted-events
-    because: event.login.signed-in is todo, blocked on gap.audit.emitted-events - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:event.login.signed-out
-    kind: designed-todo
-    severity: info
-    records:
-      - event.login.signed-out
-      - gap.audit.emitted-events
-    because: event.login.signed-out is todo, blocked on gap.audit.emitted-events - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:event.task.completed
-    kind: designed-todo
-    severity: info
-    records:
-      - event.task.completed
-      - gap.notify.task-completion-event
-    because: event.task.completed is todo, blocked on gap.notify.task-completion-event - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:event.task.created
-    kind: designed-todo
-    severity: info
-    records:
-      - event.task.created
-      - gap.audit.emitted-events
-    because: event.task.created is todo, blocked on gap.audit.emitted-events - a real product question,
-      not missing code; it moves once that is settled.
-  - id: designed-todo:event.task.deleted
-    kind: designed-todo
-    severity: info
-    records:
-      - event.task.deleted
-      - gap.audit.emitted-events
-    because: event.task.deleted is todo, blocked on gap.audit.emitted-events - a real product question,
-      not missing code; it moves once that is settled.
-  - id: designed-todo:fr.audit.erasure.complete
-    kind: designed-todo
-    severity: info
-    records:
-      - fr.audit.erasure.complete
-      - decision.audit.erasure-method
-    because: fr.audit.erasure.complete is todo, blocked on decision.audit.erasure-method - a real
-      product question, not missing code; it moves once that is settled.
-  - id: designed-todo:fr.audit.erasure.request
-    kind: designed-todo
-    severity: info
-    records:
-      - fr.audit.erasure.request
-      - decision.audit.erasure-method
-    because: fr.audit.erasure.request is todo, blocked on decision.audit.erasure-method - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:fr.audit.log.append
-    kind: designed-todo
-    severity: info
-    records:
-      - fr.audit.log.append
-      - gap.audit.emitted-events
-    because: fr.audit.log.append is todo, blocked on gap.audit.emitted-events - a real product question,
-      not missing code; it moves once that is settled.
   - id: designed-todo:fr.audit.log.read
     kind: designed-todo
     severity: info
@@ -1163,17 +1032,9 @@ findings:
     severity: info
     records:
       - fr.login.sign-out
-      - decision.login.session.devices
-    because: fr.login.sign-out is todo, blocked on decision.login.session.devices - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:fr.notify.on-completion
-    kind: designed-todo
-    severity: info
-    records:
-      - fr.notify.on-completion
-      - gap.notify.task-completion-event
-    because: fr.notify.on-completion is todo, blocked on gap.notify.task-completion-event - a real
-      product question, not missing code; it moves once that is settled.
+      - gap.login.device-field
+    because: fr.login.sign-out is todo, blocked on gap.login.device-field - a real product question, not
+      missing code; it moves once that is settled.
   - id: designed-todo:fr.notify.on-new-device
     kind: designed-todo
     severity: info
@@ -1190,22 +1051,6 @@ findings:
       - gap.notify.direction-not-drawn
     because: fr.notify.unsubscribe is todo, blocked on gap.notify.direction-not-drawn - a real product
       question, not missing code; it moves once that is settled.
-  - id: designed-todo:fr.task.complete
-    kind: designed-todo
-    severity: info
-    records:
-      - fr.task.complete
-      - gap.task.reopen-not-specified
-    because: fr.task.complete is todo, blocked on gap.task.reopen-not-specified - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:impl.audit.todo-app-backend.erasure
-    kind: designed-todo
-    severity: info
-    records:
-      - impl.audit.todo-app-backend.erasure
-      - decision.audit.erasure-method
-    because: impl.audit.todo-app-backend.erasure is todo, blocked on decision.audit.erasure-method - a
-      real product question, not missing code; it moves once that is settled.
   - id: designed-todo:impl.login.todo-app-frontend.sign-in
     kind: designed-todo
     severity: info
@@ -1214,14 +1059,6 @@ findings:
       - gap.login.direction-not-drawn
     because: impl.login.todo-app-frontend.sign-in is todo, blocked on gap.login.direction-not-drawn - a
       real product question, not missing code; it moves once that is settled.
-  - id: designed-todo:impl.task.todo-app-backend.list
-    kind: designed-todo
-    severity: info
-    records:
-      - impl.task.todo-app-backend.list
-      - decision.task.list.scope
-    because: impl.task.todo-app-backend.list is todo, blocked on decision.task.list.scope - a real
-      product question, not missing code; it moves once that is settled.
   - id: designed-todo:integration.login.keycloak
     kind: designed-todo
     severity: info
@@ -1246,14 +1083,6 @@ findings:
       - gap.login.live-proof
     because: journey.login.first-sign-in is todo, blocked on gap.login.live-proof - a real product
       question, not missing code; it moves once that is settled.
-  - id: designed-todo:journey.notify.told-about-completion
-    kind: designed-todo
-    severity: info
-    records:
-      - journey.notify.told-about-completion
-      - gap.notify.task-completion-event
-    because: journey.notify.told-about-completion is todo, blocked on gap.notify.task-completion-event -
-      a real product question, not missing code; it moves once that is settled.
   - id: designed-todo:journey.plan.hits-the-cap
     kind: designed-todo
     severity: info
@@ -1276,26 +1105,8 @@ findings:
     records:
       - nfr.notify.delivery.guarantee
       - gap.notify.new-device-event
-      - gap.notify.task-completion-event
-    because: nfr.notify.delivery.guarantee is todo, blocked on gap.notify.new-device-event,
-      gap.notify.task-completion-event - a real product question, not missing code; it moves once
-      that is settled.
-  - id: designed-todo:sds.audit.erasure-request
-    kind: designed-todo
-    severity: info
-    records:
-      - sds.audit.erasure-request
-      - decision.audit.erasure-method
-    because: sds.audit.erasure-request is todo, blocked on decision.audit.erasure-method - a real
+    because: nfr.notify.delivery.guarantee is todo, blocked on gap.notify.new-device-event - a real
       product question, not missing code; it moves once that is settled.
-  - id: designed-todo:sds.audit.log-chain
-    kind: designed-todo
-    severity: info
-    records:
-      - sds.audit.log-chain
-      - gap.audit.emitted-events
-    because: sds.audit.log-chain is todo, blocked on gap.audit.emitted-events - a real product question,
-      not missing code; it moves once that is settled.
   - id: designed-todo:sds.plan.cap-guard
     kind: designed-todo
     severity: info
@@ -1304,14 +1115,6 @@ findings:
       - gap.plan.cap-guard-not-wired
     because: sds.plan.cap-guard is todo, blocked on gap.plan.cap-guard-not-wired - a real product
       question, not missing code; it moves once that is settled.
-  - id: designed-todo:sds.task.completion-state
-    kind: designed-todo
-    severity: info
-    records:
-      - sds.task.completion-state
-      - gap.task.reopen-not-specified
-    because: sds.task.completion-state is todo, blocked on gap.task.reopen-not-specified - a real
-      product question, not missing code; it moves once that is settled.
   - id: designed-todo:uat.audit.right-to-be-forgotten
     kind: designed-todo
     severity: info
@@ -1336,10 +1139,9 @@ findings:
       - gap.notify.direction-not-drawn
       - gap.notify.live-proof
       - gap.notify.new-device-event
-      - gap.notify.task-completion-event
     because: uat.notify.digest-and-unsubscribe is todo, blocked on gap.notify.direction-not-drawn,
-      gap.notify.live-proof, gap.notify.new-device-event, gap.notify.task-completion-event - a real
-      product question, not missing code; it moves once that is settled.
+      gap.notify.live-proof, gap.notify.new-device-event - a real product question, not missing
+      code; it moves once that is settled.
   - id: designed-todo:uat.plan.upgrade-after-cap
     kind: designed-todo
     severity: info
@@ -1591,6 +1393,14 @@ findings:
       - gap.share.unbuilt-module
     because: br.share.role.permissions is todo, blocked on gap.share.unbuilt-module - code that simply
       has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:br.task.complete.once
+    kind: leftover-todo
+    severity: info
+    records:
+      - br.task.complete.once
+      - gap.task.collaborator-completion
+    because: br.task.complete.once is todo, blocked on gap.task.collaborator-completion - code that
+      simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:br.task.single-owner
     kind: leftover-todo
     severity: info
@@ -1607,6 +1417,31 @@ findings:
       - gap.task.collaborator-completion
     because: contract.login.identity-for-task is todo, blocked on gap.task.collaborator-completion -
       code that simply has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:contract.notify.task-completion-feed
+    kind: leftover-todo
+    severity: info
+    records:
+      - contract.notify.task-completion-feed
+      - gap.notify.unbuilt-module
+    because: contract.notify.task-completion-feed is todo, blocked on gap.notify.unbuilt-module - code
+      that simply has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:contract.share.completion-guard-for-task
+    kind: leftover-todo
+    severity: info
+    records:
+      - contract.share.completion-guard-for-task
+      - gap.task.collaborator-completion
+    because: contract.share.completion-guard-for-task is todo, blocked on
+      gap.task.collaborator-completion - code that simply has not been written yet; the owner wants
+      this count at zero.
+  - id: leftover-todo:data.audit.erasure-request
+    kind: leftover-todo
+    severity: info
+    records:
+      - data.audit.erasure-request
+      - gap.audit.unbuilt-module
+    because: data.audit.erasure-request is todo, blocked on gap.audit.unbuilt-module - code that simply
+      has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:data.notify.delivery-attempt
     kind: leftover-todo
     severity: info
@@ -1631,6 +1466,62 @@ findings:
       - gap.notify.unbuilt-module
     because: data.notify.preference is todo, blocked on gap.notify.unbuilt-module - code that simply has
       not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:event.login.signed-in
+    kind: leftover-todo
+    severity: info
+    records:
+      - event.login.signed-in
+      - gap.audit.unbuilt-module
+    because: event.login.signed-in is todo, blocked on gap.audit.unbuilt-module - code that simply has
+      not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:event.login.signed-out
+    kind: leftover-todo
+    severity: info
+    records:
+      - event.login.signed-out
+      - gap.audit.unbuilt-module
+    because: event.login.signed-out is todo, blocked on gap.audit.unbuilt-module - code that simply has
+      not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:event.task.completed
+    kind: leftover-todo
+    severity: info
+    records:
+      - event.task.completed
+      - gap.notify.unbuilt-module
+    because: event.task.completed is todo, blocked on gap.notify.unbuilt-module - code that simply has
+      not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:event.task.created
+    kind: leftover-todo
+    severity: info
+    records:
+      - event.task.created
+      - gap.audit.unbuilt-module
+    because: event.task.created is todo, blocked on gap.audit.unbuilt-module - code that simply has not
+      been written yet; the owner wants this count at zero.
+  - id: leftover-todo:event.task.deleted
+    kind: leftover-todo
+    severity: info
+    records:
+      - event.task.deleted
+      - gap.audit.unbuilt-module
+    because: event.task.deleted is todo, blocked on gap.audit.unbuilt-module - code that simply has not
+      been written yet; the owner wants this count at zero.
+  - id: leftover-todo:fr.audit.erasure.complete
+    kind: leftover-todo
+    severity: info
+    records:
+      - fr.audit.erasure.complete
+      - gap.audit.unbuilt-module
+    because: fr.audit.erasure.complete is todo, blocked on gap.audit.unbuilt-module - code that simply
+      has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:fr.audit.erasure.request
+    kind: leftover-todo
+    severity: info
+    records:
+      - fr.audit.erasure.request
+      - gap.audit.unbuilt-module
+    because: fr.audit.erasure.request is todo, blocked on gap.audit.unbuilt-module - code that simply
+      has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:fr.audit.export
     kind: leftover-todo
     severity: info
@@ -1638,6 +1529,14 @@ findings:
       - fr.audit.export
       - gap.audit.unbuilt-module
     because: fr.audit.export is todo, blocked on gap.audit.unbuilt-module - code that simply has not
+      been written yet; the owner wants this count at zero.
+  - id: leftover-todo:fr.audit.log.append
+    kind: leftover-todo
+    severity: info
+    records:
+      - fr.audit.log.append
+      - gap.audit.unbuilt-module
+    because: fr.audit.log.append is todo, blocked on gap.audit.unbuilt-module - code that simply has not
       been written yet; the owner wants this count at zero.
   - id: leftover-todo:fr.notify.digest
     kind: leftover-todo
@@ -1647,6 +1546,14 @@ findings:
       - gap.notify.unbuilt-module
     because: fr.notify.digest is todo, blocked on gap.notify.unbuilt-module - code that simply has not
       been written yet; the owner wants this count at zero.
+  - id: leftover-todo:fr.notify.on-completion
+    kind: leftover-todo
+    severity: info
+    records:
+      - fr.notify.on-completion
+      - gap.notify.unbuilt-module
+    because: fr.notify.on-completion is todo, blocked on gap.notify.unbuilt-module - code that simply
+      has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:fr.plan.downgrade
     kind: leftover-todo
     severity: info
@@ -1743,6 +1650,30 @@ findings:
       - gap.share.unbuilt-module
     because: fr.share.revoke is todo, blocked on gap.share.unbuilt-module - code that simply has not
       been written yet; the owner wants this count at zero.
+  - id: leftover-todo:fr.task.complete
+    kind: leftover-todo
+    severity: info
+    records:
+      - fr.task.complete
+      - gap.task.collaborator-completion
+    because: fr.task.complete is todo, blocked on gap.task.collaborator-completion - code that simply
+      has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:fr.task.reopen
+    kind: leftover-todo
+    severity: info
+    records:
+      - fr.task.reopen
+      - gap.task.collaborator-completion
+    because: fr.task.reopen is todo, blocked on gap.task.collaborator-completion - code that simply has
+      not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:impl.audit.todo-app-backend.erasure
+    kind: leftover-todo
+    severity: info
+    records:
+      - impl.audit.todo-app-backend.erasure
+      - gap.audit.unbuilt-module
+    because: impl.audit.todo-app-backend.erasure is todo, blocked on gap.audit.unbuilt-module - code
+      that simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:impl.audit.todo-app-backend.log
     kind: leftover-todo
     severity: info
@@ -1865,6 +1796,14 @@ findings:
       - gap.audit.unbuilt-module
     because: journey.audit.right-to-be-forgotten is todo, blocked on gap.audit.unbuilt-module - code
       that simply has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:journey.notify.told-about-completion
+    kind: leftover-todo
+    severity: info
+    records:
+      - journey.notify.told-about-completion
+      - gap.notify.unbuilt-module
+    because: journey.notify.told-about-completion is todo, blocked on gap.notify.unbuilt-module - code
+      that simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:journey.recur.first-recurring-task
     kind: leftover-todo
     severity: info
@@ -1929,6 +1868,22 @@ findings:
       - gap.share.unbuilt-module
     because: nfr.share.revoke.read-latency is todo, blocked on gap.share.unbuilt-module - code that
       simply has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:sds.audit.erasure-request
+    kind: leftover-todo
+    severity: info
+    records:
+      - sds.audit.erasure-request
+      - gap.audit.unbuilt-module
+    because: sds.audit.erasure-request is todo, blocked on gap.audit.unbuilt-module - code that simply
+      has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:sds.audit.log-chain
+    kind: leftover-todo
+    severity: info
+    records:
+      - sds.audit.log-chain
+      - gap.audit.unbuilt-module
+    because: sds.audit.log-chain is todo, blocked on gap.audit.unbuilt-module - code that simply has not
+      been written yet; the owner wants this count at zero.
   - id: leftover-todo:sds.notify.delivery-lifecycle
     kind: leftover-todo
     severity: info
@@ -1978,6 +1933,14 @@ findings:
       - sds.share.invitation-lifecycle
       - gap.share.unbuilt-module
     because: sds.share.invitation-lifecycle is todo, blocked on gap.share.unbuilt-module - code that
+      simply has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:sds.task.completion-state
+    kind: leftover-todo
+    severity: info
+    records:
+      - sds.task.completion-state
+      - gap.task.collaborator-completion
+    because: sds.task.completion-state is todo, blocked on gap.task.collaborator-completion - code that
       simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:sds.task.ownership-guard
     kind: leftover-todo
