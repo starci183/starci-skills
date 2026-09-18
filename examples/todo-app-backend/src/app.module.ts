@@ -4,8 +4,10 @@ import { PlatformEventsModule } from './modules/platform/events';
 import { PostgresqlPrimaryModule } from './modules/platform/databases/postgresql/primary';
 import { SessionModule } from './modules/bussiness/session';
 import { TaskModule } from './modules/bussiness/task';
+import { PlanModule } from './modules/bussiness/plan';
 import { TodoGraphqlModule } from './features/todo/graphql/graphql.module';
 import { HealthModule } from './features/todo/http/health/health.module';
+import { SepayWebhookModule } from './features/todo/http/webhooks/sepay/sepay-webhook.module';
 
 /**
  * Composition only, under nivo's shape: capability modules (`bussiness/session`, `bussiness/task`) and
@@ -27,8 +29,10 @@ import { HealthModule } from './features/todo/http/health/health.module';
     PostgresqlPrimaryModule.register(),
     SessionModule.register({ isGlobal: true }),
     TaskModule.register(),
+    PlanModule.register(),
     TodoGraphqlModule,
     HealthModule.register(),
+    SepayWebhookModule.register(),
   ],
 })
 export class AppModule {}
