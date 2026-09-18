@@ -5,9 +5,9 @@
  * Check command: npm run test:e2e -- auth/sign-in
  */
 
-const { call, persona } = require('../lib/client');
-const { scenario, assertImplemented } = require('../lib/scenario');
-const { listTasks, uniqueTitle } = require('../lib/fixtures');
+const { call, persona } = require('../../lib/client');
+const { scenario, assertImplemented } = require('../../lib/scenario');
+const { listTasks, uniqueTitle } = require('../../lib/fixtures');
 
 const GROUP = 'auth/sign-in';
 const DEMO = 'demo@todo.dev';

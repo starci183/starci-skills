@@ -10,9 +10,9 @@
  * (see lib/registry.js) and the coverage guard fails this group loudly rather than passing it quietly.
  */
 
-const { call, persona } = require('../lib/client');
-const { scenario, assertImplemented } = require('../lib/scenario');
-const { uniqueTitle, createTask, sleep, erase } = require('../lib/fixtures');
+const { call, persona } = require('../../lib/client');
+const { scenario, assertImplemented } = require('../../lib/scenario');
+const { uniqueTitle, createTask, sleep, erase } = require('../../lib/fixtures');
 
 const GROUP = 'audit/log-read';
 /** The seal format is `iv.tag.ciphertext`, three base64 parts - the thing the postcondition forbids. */

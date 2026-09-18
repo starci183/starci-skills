@@ -159,7 +159,10 @@ async function main() {
       E2E_COMPOSE_PROJECT: started.project,
     };
 
-    specFile = path.join(__dirname, 'scenarios', `${slug(group)}${SPEC_SUFFIX}`);
+    // The spec lives at scenarios/<feature>/<flow>.e2e-spec.js, the registry group name used 1:1 as a
+    // path (group "tasks/reopen" -> scenarios/tasks/reopen.e2e-spec.js); path.join treats the slash as a
+    // directory separator. `slug()` above is only the per-run temp journal directory name.
+    specFile = path.join(__dirname, 'scenarios', `${group}${SPEC_SUFFIX}`);
     if (!fs.existsSync(specFile)) {
       console.error(`e2e: no spec file for group ${group} at ${specFile}`);
       return 1;

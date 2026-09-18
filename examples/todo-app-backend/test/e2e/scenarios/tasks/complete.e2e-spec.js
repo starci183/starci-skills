@@ -5,9 +5,9 @@
  * Check command: npm run test:e2e -- tasks/complete
  */
 
-const { call, persona } = require('../lib/client');
-const { scenario, assertImplemented } = require('../lib/scenario');
-const { uniqueTitle, createTask, listTasks, findTask, acceptInvitation, emailOf } = require('../lib/fixtures');
+const { call, persona } = require('../../lib/client');
+const { scenario, assertImplemented } = require('../../lib/scenario');
+const { uniqueTitle, createTask, listTasks, findTask, acceptInvitation, emailOf } = require('../../lib/fixtures');
 
 const GROUP = 'tasks/complete';
 

@@ -9,9 +9,9 @@
  * chain break index back - neither of which any public operation offers.
  */
 
-const { call, persona } = require('../lib/client');
-const { scenario, assertImplemented } = require('../lib/scenario');
-const { uniqueTitle, createTask, exportLines, sleep, erase } = require('../lib/fixtures');
+const { call, persona } = require('../../lib/client');
+const { scenario, assertImplemented } = require('../../lib/scenario');
+const { uniqueTitle, createTask, exportLines, sleep, erase } = require('../../lib/fixtures');
 
 const GROUP = 'audit/export';
 

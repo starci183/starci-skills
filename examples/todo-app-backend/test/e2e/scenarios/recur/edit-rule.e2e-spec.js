@@ -9,11 +9,11 @@
  * about cannot be requested from outside at all.
  */
 
-const { call, persona } = require('../lib/client');
-const { scenario, assertImplemented } = require('../lib/scenario');
+const { call, persona } = require('../../lib/client');
+const { scenario, assertImplemented } = require('../../lib/scenario');
 const {
   uniqueTitle, makeRule, editRule, upcoming, occurrencesAfterTick, localDates, localDateOffset,
-} = require('../lib/fixtures');
+} = require('../../lib/fixtures');
 
 const GROUP = 'recur/edit-rule';
 

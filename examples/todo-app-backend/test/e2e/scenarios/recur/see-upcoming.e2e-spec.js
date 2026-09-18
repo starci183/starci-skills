@@ -5,11 +5,11 @@
  * Check command: npm run test:e2e -- recur/see-upcoming
  */
 
-const { call, persona } = require('../lib/client');
-const { scenario, assertImplemented } = require('../lib/scenario');
+const { call, persona } = require('../../lib/client');
+const { scenario, assertImplemented } = require('../../lib/scenario');
 const {
   uniqueTitle, makeRule, endRule, upcoming, occurrencesAfterTick, localDates, localDateOffset,
-} = require('../lib/fixtures');
+} = require('../../lib/fixtures');
 
 const GROUP = 'recur/see-upcoming';
 

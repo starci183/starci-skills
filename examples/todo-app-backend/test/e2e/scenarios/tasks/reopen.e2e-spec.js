@@ -5,9 +5,9 @@
  * Check command: npm run test:e2e -- tasks/reopen
  */
 
-const { call, persona } = require('../lib/client');
-const { scenario, assertImplemented } = require('../lib/scenario');
-const { uniqueTitle, createTask, findTask, listTasks } = require('../lib/fixtures');
+const { call, persona } = require('../../lib/client');
+const { scenario, assertImplemented } = require('../../lib/scenario');
+const { uniqueTitle, createTask, findTask, listTasks } = require('../../lib/fixtures');
 
 const GROUP = 'tasks/reopen';
 

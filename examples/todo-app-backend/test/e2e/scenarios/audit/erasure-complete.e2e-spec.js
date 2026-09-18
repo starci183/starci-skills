@@ -14,9 +14,9 @@
  * (the two erasure lines are sealed under the system actor's key, which no caller can ever read).
  */
 
-const { call, persona } = require('../lib/client');
-const { scenario, assertImplemented } = require('../lib/scenario');
-const { uniqueTitle, createTask, sleep, requestErasure, completeErasure, exportLines, auditLines } = require('../lib/fixtures');
+const { call, persona } = require('../../lib/client');
+const { scenario, assertImplemented } = require('../../lib/scenario');
+const { uniqueTitle, createTask, sleep, requestErasure, completeErasure, exportLines, auditLines } = require('../../lib/fixtures');
 
 const GROUP = 'audit/erasure-complete';
 

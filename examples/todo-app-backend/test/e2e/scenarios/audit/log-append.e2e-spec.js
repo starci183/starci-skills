@@ -13,9 +13,9 @@
  * it, or moves the clock.
  */
 
-const { call, signIn } = require('../lib/client');
-const { scenario, assertImplemented } = require('../lib/scenario');
-const { uniqueTitle, createTask, auditLines, sleep, until } = require('../lib/fixtures');
+const { call, signIn } = require('../../lib/client');
+const { scenario, assertImplemented } = require('../../lib/scenario');
+const { uniqueTitle, createTask, auditLines, sleep, until } = require('../../lib/fixtures');
 
 const GROUP = 'audit/log-append';
 const DEMO = 'demo@todo.dev';

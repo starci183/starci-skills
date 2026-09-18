@@ -8,10 +8,10 @@
  * given clause needs an occurrence whose status is already completed and no public operation can set one.
  */
 
-const { scenario, assertImplemented } = require('../lib/scenario');
+const { scenario, assertImplemented } = require('../../lib/scenario');
 const {
   uniqueTitle, makeRule, endRule, upcoming, occurrencesAfterTick, localDates, occurrenceOn, localDateOffset, sleep,
-} = require('../lib/fixtures');
+} = require('../../lib/fixtures');
 
 const GROUP = 'recur/end-rule';
 

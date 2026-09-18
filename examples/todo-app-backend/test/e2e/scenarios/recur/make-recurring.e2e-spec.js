@@ -9,9 +9,9 @@
  * every scenario waits for a real tick and reads the rows back through upcomingOccurrences.
  */
 
-const { call, persona } = require('../lib/client');
-const { scenario, assertImplemented } = require('../lib/scenario');
-const { uniqueTitle, makeRule, upcoming, occurrencesAfterTick, localDates } = require('../lib/fixtures');
+const { call, persona } = require('../../lib/client');
+const { scenario, assertImplemented } = require('../../lib/scenario');
+const { uniqueTitle, makeRule, upcoming, occurrencesAfterTick, localDates } = require('../../lib/fixtures');
 
 const GROUP = 'recur/make-recurring';
 const FAR = 999;

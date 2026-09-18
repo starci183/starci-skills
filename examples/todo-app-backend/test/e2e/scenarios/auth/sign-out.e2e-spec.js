@@ -8,9 +8,9 @@
  * public operation ages a session, so "signed in yesterday" cannot be created).
  */
 
-const { call, signIn, forgetPersona, persona } = require('../lib/client');
-const { scenario, assertImplemented } = require('../lib/scenario');
-const { listTasks } = require('../lib/fixtures');
+const { call, signIn, forgetPersona, persona } = require('../../lib/client');
+const { scenario, assertImplemented } = require('../../lib/scenario');
+const { listTasks } = require('../../lib/fixtures');
 
 const GROUP = 'auth/sign-out';
 const DEMO = 'demo@todo.dev';

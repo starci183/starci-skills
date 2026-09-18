@@ -10,9 +10,9 @@
  * so no client can ever see them.
  */
 
-const { call, persona } = require('../lib/client');
-const { scenario, assertImplemented } = require('../lib/scenario');
-const { uniqueTitle, createTask, sleep, requestErasure, completeErasure, exportLines, auditLines } = require('../lib/fixtures');
+const { call, persona } = require('../../lib/client');
+const { scenario, assertImplemented } = require('../../lib/scenario');
+const { uniqueTitle, createTask, sleep, requestErasure, completeErasure, exportLines, auditLines } = require('../../lib/fixtures');
 
 const GROUP = 'audit/erasure-request';
 
