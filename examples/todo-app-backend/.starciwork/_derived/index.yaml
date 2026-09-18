@@ -1056,17 +1056,11 @@ records:
       - id: gap.plan.sepay-not-reachable
         rootKind: gap
         cyclic: false
-        because: Two measured absences, both replayable from this record's own evidence.yaml (2026-09-18) -
-          this checkout holds no real SePay credential (SEPAY_API_KEY_FILE is the DEMO-ONLY
-          placeholder .starcistacks/dev/runtime/env/KEYS.md says is never a real credential), so the
-          get-transaction route answers 401; and the create-intent route named above answers 404 on
-          the live host the way an unrouted path does, so a credential alone would not complete a
-          checkout either. A fake gateway proves sds.plan.cap-guard, sds.plan.subscription-lifecycle
-          and sds.plan.reconciliation's transitions, never this integration. SepayClient
-          (src/modules/integrations/sepay/sepay.client.ts) does make the real call every time - it
-          now reports the gateway's own HTTP status instead of masking it behind a JSON parse error,
-          and refuses any transaction status outside pending|paid|failed rather than casting one
-          into a subscription activation.
+        because: No call has been made against the real SePay sandbox yet. SepayClient
+          (src/modules/integrations/sepay/sepay.client.ts) makes the real HTTP calls this record's
+          endpoints name, and is unit-tested against an in-process fake override, but a fake proves
+          the guard (sds.plan.cap-guard, sds.plan.subscription-lifecycle, sds.plan.reconciliation),
+          never this integration itself.
   fr.plan.upgrade:
     schema: work/functional-requirement
     feature: plan
@@ -1697,17 +1691,11 @@ records:
       - id: gap.plan.sepay-not-reachable
         rootKind: gap
         cyclic: false
-        because: Two measured absences, both replayable from this record's own evidence.yaml (2026-09-18) -
-          this checkout holds no real SePay credential (SEPAY_API_KEY_FILE is the DEMO-ONLY
-          placeholder .starcistacks/dev/runtime/env/KEYS.md says is never a real credential), so the
-          get-transaction route answers 401; and the create-intent route named above answers 404 on
-          the live host the way an unrouted path does, so a credential alone would not complete a
-          checkout either. A fake gateway proves sds.plan.cap-guard, sds.plan.subscription-lifecycle
-          and sds.plan.reconciliation's transitions, never this integration. SepayClient
-          (src/modules/integrations/sepay/sepay.client.ts) does make the real call every time - it
-          now reports the gateway's own HTTP status instead of masking it behind a JSON parse error,
-          and refuses any transaction status outside pending|paid|failed rather than casting one
-          into a subscription activation.
+        because: No call has been made against the real SePay sandbox yet. SepayClient
+          (src/modules/integrations/sepay/sepay.client.ts) makes the real HTTP calls this record's
+          endpoints name, and is unit-tested against an in-process fake override, but a fake proves
+          the guard (sds.plan.cap-guard, sds.plan.subscription-lifecycle, sds.plan.reconciliation),
+          never this integration itself.
   integration.recur.scheduler:
     schema: work/integration
     feature: recur
@@ -1958,17 +1946,11 @@ records:
       - id: gap.plan.sepay-not-reachable
         rootKind: gap
         cyclic: false
-        because: Two measured absences, both replayable from this record's own evidence.yaml (2026-09-18) -
-          this checkout holds no real SePay credential (SEPAY_API_KEY_FILE is the DEMO-ONLY
-          placeholder .starcistacks/dev/runtime/env/KEYS.md says is never a real credential), so the
-          get-transaction route answers 401; and the create-intent route named above answers 404 on
-          the live host the way an unrouted path does, so a credential alone would not complete a
-          checkout either. A fake gateway proves sds.plan.cap-guard, sds.plan.subscription-lifecycle
-          and sds.plan.reconciliation's transitions, never this integration. SepayClient
-          (src/modules/integrations/sepay/sepay.client.ts) does make the real call every time - it
-          now reports the gateway's own HTTP status instead of masking it behind a JSON parse error,
-          and refuses any transaction status outside pending|paid|failed rather than casting one
-          into a subscription activation.
+        because: No call has been made against the real SePay sandbox yet. SepayClient
+          (src/modules/integrations/sepay/sepay.client.ts) makes the real HTTP calls this record's
+          endpoints name, and is unit-tested against an in-process fake override, but a fake proves
+          the guard (sds.plan.cap-guard, sds.plan.subscription-lifecycle, sds.plan.reconciliation),
+          never this integration itself.
   sds.plan.subscription-lifecycle:
     schema: work/sds-component
     feature: plan
@@ -2474,7 +2456,7 @@ frontier:
     title: No k6 load-test harness exists to measure the cap check's latency
   - id: gap.plan.sepay-not-reachable
     feature: plan
-    title: No live run has completed a checkout against the real SePay sandbox
+    title: No call has ever been made against the real SePay sandbox
   - id: impl.plan.todo-app-frontend.usage
     feature: plan
     title: The usage screen and its upgrade action

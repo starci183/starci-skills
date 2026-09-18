@@ -28,7 +28,7 @@ Open unbuilt-module gaps: 0.
 ## plan
 - gap.plan.live-proof — No uat.verify run has produced a live run for plan.upgrade-after-cap
 - gap.plan.no-load-harness — No k6 load-test harness exists to measure the cap check's latency
-- gap.plan.sepay-not-reachable — No live run has completed a checkout against the real SePay sandbox
+- gap.plan.sepay-not-reachable — No call has ever been made against the real SePay sandbox
 - impl.plan.todo-app-frontend.usage — The usage screen and its upgrade action
 
 ## recur
