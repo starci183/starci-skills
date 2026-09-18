@@ -1,0 +1,31 @@
+schema: work/integration
+id: integration.notify.smtp
+title: The SMTP host that carries a notification out of the product
+state: todo
+provider: smtp
+boundary: notify hands a rendered message to this host and afterward owns only the outcome of that
+  handoff (accepted, permanently rejected, or a transient failure); it never sees whether the person
+  actually reads it.
+endpoints:
+  - {name: send, method: SMTP, path: "the SMTP submission port of the configured host"}
+credential:
+  name: SMTP_API_KEY_FILE
+  providedBy: owner
+  where: .starcistacks/dev/runtime/files/smtp-api-key.key.enc
+sandbox: Undecided. The secret already exists in the stack (see KEYS.md, purpose currently reads "task
+  reminders", a different feature's placeholder) but no compose component, no port and no dev host for
+  an SMTP server exist in application-stacks.yaml at this commit; this lane added no infra.
+refs: [br.notify.failure.classified, br.notify.delivery.once]
+
+requiresProof:
+  live:
+    required: true
+    note: A run against a real SMTP host. Evidence must carry proof.boundary live and an empty fakes
+      list.
+
+blockedBy:
+  - "No live SMTP boundary is reachable from this worktree: no server is declared or running, and this
+    lane owns no infrastructure to add one honestly without also owning the shared stacks file other
+    lanes touch. Nothing in src/notify (none of which exists yet either) has ever spoken to a real SMTP
+    host, so this record cannot claim done, and no fake run counts as this integration's proof - a run
+    against a fake would only prove it against the fake, per the common brief's own rule."

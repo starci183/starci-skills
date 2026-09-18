@@ -1,0 +1,27 @@
+schema: work/functional-requirement
+id: fr.notify.digest
+title: Collapse several events into one message
+state: todo
+actors: [owner, person]
+trigger: A second (or later) event for the same person and channel is admitted while their window is
+  still open.
+mainFlow:
+  - The event joins the same group as the earlier one instead of starting a new message.
+  - When the window closes, every admitted event in the group is read together and rendered as one
+    message.
+exceptionFlows:
+  - The window has already closed; the event opens a fresh window instead of joining the flushed one.
+postconditions:
+  - No person receives more than one message per open-then-closed window per channel.
+composes:
+  - {rule: br.notify.digest.window, module: src/notify/digest}
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- notify/digest
+
+blockedBy:
+  - No implementation exists. The example is moving to a NestJS backend and this module has not been
+    built against that layout.

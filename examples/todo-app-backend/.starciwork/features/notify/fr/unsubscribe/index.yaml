@@ -1,0 +1,28 @@
+schema: work/functional-requirement
+id: fr.notify.unsubscribe
+title: Stop receiving notifications on a channel
+state: todo
+actors: [person]
+trigger: The person unsubscribes from a channel.
+mainFlow:
+  - The preference is recorded for that person and channel.
+  - Every event enqueued afterward for that person and channel is suppressed before dispatch.
+exceptionFlows:
+  - The person re-subscribes; a later event reaches the digest window again.
+postconditions:
+  - No message on that channel is sent to that person until they re-subscribe.
+composes:
+  - {rule: br.notify.unsubscribe.honored, module: src/notify/preferences}
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- notify/unsubscribe
+  uat:
+    required: true
+
+blockedBy:
+  - No implementation exists, and ui.notify.preferences (the only surface a person would use to
+    unsubscribe) is also todo. The example is moving to a NestJS/Next.js layout and neither side has
+    been built against it.

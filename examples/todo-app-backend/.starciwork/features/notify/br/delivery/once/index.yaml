@@ -1,0 +1,18 @@
+schema: work/business-rule
+id: br.notify.delivery.once
+title: A delivery may be attempted twice; the person is told once
+state: todo
+statements:
+  - "The transport that carries a notification out of the product is at-least-once: a network retry, a
+    redelivered queue message or a re-run producer can call the pipeline again for the same event."
+  - A second call for the same event admits the same notification rather than creating a second one.
+authorityRefs:
+  - "owner-intent: A person who is told about the same task completing twice trusts the product less,
+    not more."
+acceptanceCriteria: [dedupe-collapses-retry]
+module: src/notify/dedupe
+change: {rev: 1, kind: initial, at: 2026-09-18T06:00:00.000Z}
+blockedBy:
+  - No code exists yet at src/notify/dedupe. The example is moving to a NestJS backend and this module
+    has not been written against that layout; the statement is agreed but not implementable-and-proven
+    until it is, so it stays todo rather than done on the strength of a design alone.

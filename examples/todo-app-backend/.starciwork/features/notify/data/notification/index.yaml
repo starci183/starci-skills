@@ -1,0 +1,19 @@
+schema: work/data
+id: data.notify.notification
+title: Notification
+state: todo
+fields:
+  - {name: id, type: text, required: true, note: "Equal to dedupeKey; there is no separate surrogate id."}
+  - {name: dedupeKey, type: text, required: true, note: "sha256 of kind + sourceEventId + recipientId, per decision.notify.dedupe-key."}
+  - {name: kind, type: text, required: true, note: "e.g. task-complete, new-device. The producer's event vocabulary."}
+  - {name: recipientId, type: text, required: true}
+  - {name: payload, type: object, required: true}
+  - {name: digestGroupId, type: text, required: false, note: "Set once admitted into a digest window; null before that."}
+  - {name: createdAt, type: timestamp, required: true}
+invariants:
+  - Two admissions with the same dedupeKey resolve to the same id; there is never a second row for it.
+  - digestGroupId is set exactly once and never moved to a different group after being flushed.
+appliesTo: [br.notify.delivery.once, br.notify.digest.window]
+blockedBy:
+  - No entity or table exists yet. The example is moving to a NestJS/TypeORM backend and this shape has
+    not been created against that layout.

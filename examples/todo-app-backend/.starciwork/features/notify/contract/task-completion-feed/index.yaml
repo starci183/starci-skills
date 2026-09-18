@@ -1,0 +1,41 @@
+schema: work/contract
+id: contract.notify.task-completion-feed
+title: What notify needs from task to notify on completion
+state: todo
+between:
+  provider: task
+  consumer: notify
+owner: notify
+surface:
+  - name: onTaskComplete
+    shape: "(event: {taskId, ownerId, completedAt, sourceEventId}) -> void, called once per real
+      completion"
+    guarantee: sourceEventId is stable and unique per real completion, including a reopen-then-complete
+      cycle producing a new one; it is the only thing notify's dedupe key can honestly hash.
+    stability: A change to sourceEventId's stability (e.g. reusing it across completions) is breaking
+      for notify, silently, because dedupe would start merging distinct events.
+guarantees: []
+consumerObligations:
+  - notify never invents a sourceEventId when the producer omits one; it leaves the record todo instead,
+    per br.notify.delivery.once.
+refs: [br.notify.delivery.once, fr.notify.on-completion]
+
+conflictsWith:
+  - {record: br.task.complete.once, rev: 2, because: "task has no completion event today: ownership.mjs
+    (the only task code that exists at this commit) has no complete transition, fr.task.complete is
+    itself todo, and sds.task.completion-state's t-complete/t-complete-again/t-reopen transitions have
+    no implementation and no sourceEventId concept anywhere in the task feature's records or code. There
+    is nothing for this surface to call."}
+
+requiresProof:
+  provider:
+    required: true
+    note: task proves it calls onTaskComplete exactly once per real completion with a stable
+      sourceEventId.
+  consumer:
+    required: true
+    note: notify proves it only ever hashes a sourceEventId the provider actually supplied.
+
+blockedBy:
+  - Owned entirely by the notify side of an interface that task has not built. This record cannot move
+    to done without a change in features/task, which this lane does not own.

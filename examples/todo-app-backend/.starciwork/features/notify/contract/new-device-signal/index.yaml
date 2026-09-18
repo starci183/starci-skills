@@ -1,0 +1,41 @@
+schema: work/contract
+id: contract.notify.new-device-signal
+title: What notify needs from login to notify on a new device
+state: todo
+between:
+  provider: login
+  consumer: notify
+owner: notify
+surface:
+  - name: onNewDeviceSignIn
+    shape: "(event: {personId, deviceId, signedInAt, sourceEventId}) -> void, called once per sign-in
+      that ends a prior session under single-device semantics"
+    guarantee: deviceId identifies the device well enough that the same device signing in twice is
+      recognizable as not new; sourceEventId is stable and unique per sign-in.
+    stability: A change to what deviceId is derived from is breaking for notify, silently, because a
+      device that used to read as known would start reading as new.
+guarantees: []
+consumerObligations:
+  - notify never infers a device identity from anything other than what this surface supplies.
+refs: [br.notify.delivery.once, fr.notify.on-new-device]
+
+conflictsWith:
+  - {record: br.login.session.single-device, rev: 1, because: "the login session store has no device
+    field: sds.login.session-store's stateMachine and data.login.person's fields carry no device
+    identity, session.mjs's accept()/actorOf() take no device argument, and
+    decision.login.session.devices - which is exactly the open question of how many devices a session
+    model allows - is still open. There is no deviceId this surface could honestly be given."}
+
+requiresProof:
+  provider:
+    required: true
+    note: login proves it calls onNewDeviceSignIn exactly once per sign-in that ends a prior session,
+      with a deviceId that survives decision.login.session.devices being settled.
+  consumer:
+    required: true
+    note: notify proves it only ever reads deviceId from this surface.
+
+blockedBy:
+  - Owned entirely by the notify side of an interface that login has not built, and blocked further
+    upstream by decision.login.session.devices being open. This record cannot move to done without a
+    change in features/login, which this lane does not own.

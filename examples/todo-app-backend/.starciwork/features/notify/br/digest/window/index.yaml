@@ -1,0 +1,19 @@
+schema: work/business-rule
+id: br.notify.digest.window
+title: Several events in a person's quiet window become one message
+state: todo
+statements:
+  - Every notification admitted for one person and one channel before their window closes joins the
+    same group.
+  - The group's content is read when the window closes, never when it opens - a message can carry an
+    event that had not happened yet when the first one in the group arrived.
+authorityRefs:
+  - "owner-intent: A separate email for every task completed in one busy minute is the failure mode
+    this rule exists to prevent."
+acceptanceCriteria: [collapses-into-one-message]
+module: src/notify/digest
+change: {rev: 1, kind: initial, at: 2026-09-18T06:01:00.000Z}
+blockedBy:
+  - No code exists yet at src/notify/digest. The example is moving to a NestJS backend and this module
+    has not been written against that layout, so the rule stays todo rather than claiming proof it does
+    not have.

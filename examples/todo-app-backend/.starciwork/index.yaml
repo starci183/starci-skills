@@ -8,4 +8,7 @@ features:
   - id: task
     directory: features/task
     description: A task a person creates, completes and deletes.
+  - id: notify
+    directory: features/notify
+    description: Telling a person something happened, outside the product - email now, other channels later.
 

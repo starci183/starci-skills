@@ -1,0 +1,30 @@
+schema: work/functional-requirement
+id: fr.notify.on-completion
+title: Notify a person when their task completes
+state: todo
+actors: [owner]
+trigger: A task the person owns transitions to complete.
+mainFlow:
+  - The completion is admitted as an event with a stable id for that completion, the owner as
+    recipient, and kind task-complete.
+  - It joins the owner's open digest window for the email channel and is included in the next flushed
+    message.
+exceptionFlows:
+  - The owner unsubscribed from email; the event is suppressed and no message is sent.
+postconditions:
+  - Within the owner's digest window after completion, one message names the task, unless suppressed.
+composes:
+  - {rule: br.notify.delivery.once, module: src/notify/dedupe}
+  - {rule: br.notify.digest.window, module: src/notify/digest}
+refs: [contract.notify.task-completion-feed]
+
+conflictsWith:
+  - {record: br.task.complete.once, rev: 2, because: "task.complete has no completion event and no
+    stable per-completion id at this commit - fr.task.complete is itself todo, ownership.mjs has no
+    complete transition at all, and nothing in the task feature emits anything notify could admit, so
+    this requirement has no real trigger to attach to."}
+
+blockedBy:
+  - contract.notify.task-completion-feed is todo; the task feature exposes no completion event today.
+    This record stays todo until that contract is met or the trigger is redesigned around something
+    task actually emits.

@@ -1,0 +1,32 @@
+schema: work/integration
+id: integration.notify.queue
+title: The queue that holds a delivery between admission and dispatch
+state: todo
+provider: redis
+boundary: The queue holds a delivery attempt while it waits to be dispatched or retried; it never holds
+  rendered message content, and it is not the source of the dedupe key or the digest grouping, both of
+  which are notify's own logic regardless of which queue technology carries the attempt between them.
+endpoints:
+  - {name: enqueue, method: "queue-native", path: "a per-recipient-channel list or stream key"}
+  - {name: dequeue, method: "queue-native", path: "a worker consumer group"}
+credential:
+  name: REDIS_URL
+  providedBy: owner
+  where: .starcistacks/dev/runtime/env/app.env.enc
+sandbox: The dev stack already runs a real Redis (component redis, port 6379 in application-stacks.yaml)
+  for cache and session use; reusing it as a queue backend is a design choice this record makes, not
+  infrastructure this lane added.
+refs: [br.notify.delivery.once, sds.notify.delivery-lifecycle]
+
+requiresProof:
+  live:
+    required: true
+    note: A run against the real dev Redis. Evidence must carry proof.boundary live and an empty fakes
+      list.
+
+blockedBy:
+  - "No code reaches Redis: nothing under this feature exists yet (the example is moving to a NestJS
+    backend and no lane-owned module has been written against it), and a probe from this worktree found
+    no Redis listening on 6379 (connection refused), so even a manual smoke check has no live boundary
+    to run against right now. Marking this done on the strength of Redis existing elsewhere in the stack
+    for a different purpose would be exactly the invented evidence the common brief refuses."

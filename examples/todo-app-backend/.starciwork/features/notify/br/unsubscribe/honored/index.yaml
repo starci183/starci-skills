@@ -1,0 +1,14 @@
+schema: work/business-rule
+id: br.notify.unsubscribe.honored
+title: An unsubscribed person receives nothing on that channel
+state: todo
+statements:
+  - Unsubscribing from a channel is per person and per channel, and takes effect for every event
+    enqueued after it, immediately.
+  - Suppression by unsubscribe is not an error outcome; it is the requested outcome.
+acceptanceCriteria: [suppresses-future-sends]
+module: src/notify/preferences
+change: {rev: 1, kind: initial, at: 2026-09-18T06:03:00.000Z}
+blockedBy:
+  - No code exists yet at src/notify/preferences. The example is moving to a NestJS backend and this
+    module has not been written against that layout, so the rule stays todo.
