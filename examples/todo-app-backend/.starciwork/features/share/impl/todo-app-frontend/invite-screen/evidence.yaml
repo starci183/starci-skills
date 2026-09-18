@@ -1,0 +1,123 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: impl.share.todo-app-frontend.invite-screen
+recordDigest: 4a16706133c4cbadb02a2d5f07ca81cbd74b0fe26ef42829896ee09255bcf624
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/app/tasks/[taskId]/share/page.tsx
+      sha256: 920b68611c2745384e3a1560a9a9d908de2e2098a761fb6dd3ce596e01de5bfe
+    - path: src/components/blocks/share-invite/classNames.ts
+      sha256: 56bf11a2927bbaac2b5a346f4db3194d5546641e5ef3c65369e261a7cab2d044
+    - path: src/components/blocks/share-invite/component.spec.tsx
+      sha256: 7c298d54dd43307a446671e59c117769f62d8585ccebf73a92d6849c53ca160e
+    - path: src/components/blocks/share-invite/component.tsx
+      sha256: 6960d2c4f7ed44df06cf8c6f29693a173d17556a9991b5d1fc6560e9db13b0d0
+    - path: src/components/blocks/share-invite/index.tsx
+      sha256: b2422442e8bacc5675365d4babc95cba8c0ebaca233d5495280eb1e2906afecf
+    - path: src/components/leaves/Link/index.tsx
+      sha256: 74581c6c336576b1298d9af23dedf3c392a4a7ae3d87467834cea7750ae7b9d4
+    - path: src/features/pages/share/index.tsx
+      sha256: 45d06692cd4280346fc6aa9495462b18fe27f2cf0d4acbcbb4f4c81b2f96c7c3
+    - path: src/hooks/auth/index.ts
+      sha256: 4a8111a1290b179929bced23dede9a604abf0fab29b4250b88e1dbf9bdce6fd5
+    - path: src/hooks/auth/useSessionToken.ts
+      sha256: 89cdbae79f9dc7bd5410b95b26afd94583c7d26d001c388623b1c9b47be6b142
+    - path: src/hooks/auth/useSignIn.spec.ts
+      sha256: f5d0f2a915b5c45a4eaffb6524915a306059fc5b1e8f61d9a205e280000ec864
+    - path: src/hooks/auth/useSignIn.ts
+      sha256: ece37bc59c399991ae06f1b487a3cf200596a7e30bb2be07dbae29fd5615243b
+    - path: src/hooks/auth/useSignOut.ts
+      sha256: 92dfc44c7b87758527b13a3db491df21796d22599ceb3ab8c2d37f37f19fc285
+    - path: src/hooks/share/index.ts
+      sha256: 5f718cd1f5175ffeed19024dd47e287b0e8eeaf07b5315d513263aa1cadf587d
+    - path: src/hooks/share/useCollaborators.ts
+      sha256: 4e13d84408e3d027e848fc01d56509d027ee890975fbe57036ca8bd732eacf3f
+    - path: src/hooks/share/useInviteCollaborator.ts
+      sha256: 47696271258a1f58287b48246fc3cb3427aa2f31e92f2c952526bff4cd6cb9a7
+    - path: src/hooks/share/useRevokeCollaborator.ts
+      sha256: fb22bd214e270707d36aa76b999b8da1cf8f0eb02c9c77ddaaf4a8d3800a42ed
+    - path: src/hooks/share/useTaskTitle.ts
+      sha256: 344719ff80988e2c4e4b3fe1e762d4a2b5de955ab343ee5e83f67496389a0d0e
+    - path: src/modules/api/auth.spec.ts
+      sha256: b65bfdec2c0f19a557350a83756ade950173c8ed3447e3306376c82255943264
+    - path: src/modules/api/auth.ts
+      sha256: 4a033193a60e945932c60e0ba47c92125077248b5c42ccb0b26ae43ca206f8b6
+    - path: src/modules/api/graphql.spec.ts
+      sha256: 2e7a86c47a5753ee64e7c2b9286ef7df2b8f7157eaf8130ebd9214b891506e57
+    - path: src/modules/api/graphql.ts
+      sha256: 73e32b2c997bc252097d5a50b483431d6b28ae967d6e979f25b3b7e06fc5b299
+    - path: src/modules/api/share.spec.ts
+      sha256: e316e793f3e62c219b21c94e6e8a989f6a685d4d9f004be1e151275dbc39feb4
+    - path: src/modules/api/share.ts
+      sha256: b8084fc80073297e1899ae5769d45b790376146d9a65569b5690124b9fe05316
+    - path: src/modules/api/tasks.spec.ts
+      sha256: ff08b4e781b875324620bf6b16aaf77a8c5a2c83a538d6f25cc693394cc0d99d
+    - path: src/modules/api/tasks.ts
+      sha256: a0b3f639279ef6c0ad9591d591bd4d4a2e31fd61474348973710aafb5ebac409
+    - path: src/modules/api/write-feedback.ts
+      sha256: ee799de1124933fbae1eb5477bc0731b5cd16d2d668f38507930ac7f9fb32289
+  digest: 2c3e6d8eb05966557da8ac5e3c782e63f90ddd41e9894cd531c5087fcb168ddd
+outcome: fail
+assertions:
+  - id: typecheck
+    command: npx tsc --noEmit
+    exit: 0
+    outcome: pass
+    observation: npx tsc --noEmit exited 0
+  - id: unit-tests
+    command: npx vitest run
+    exit: 0
+    outcome: pass
+    observation: npx vitest run exited 0
+  - id: lint
+    command: npx eslint .
+    exit: 0
+    outcome: pass
+    observation: npx eslint . exited 0
+  - id: architecture
+    command: node ../../cli/main.mjs architecture check . --config architecture.json
+    exit: 0
+    outcome: pass
+    observation: node ../../cli/main.mjs architecture check . --config architecture.json exited 0
+  - id: scoped-lint
+    command: node -e "require('fs').rmSync('.next',{recursive:true,force:true})" && node
+      ../../scripts/check-scoped-lint.mjs --profile next --root . --architecture-config
+      architecture.json --all
+    exit: 0
+    outcome: pass
+    observation: node -e "require('fs').rmSync('.next',{recursive:true,force:true})" && node
+      ../../scripts/check-scoped-lint.mjs --profile next --root . --architecture-config
+      architecture.json --all exited 0
+  - id: captures
+    command: node verify-captures.mjs assets
+    exit: 0
+    outcome: pass
+    observation: node verify-captures.mjs assets exited 0
+  - id: render-entity-list-in-card
+    command: node verify-captures.mjs entity-list
+    exit: 0
+    outcome: pass
+    observation: node verify-captures.mjs entity-list exited 0
+  - id: render-primary-absent
+    command: node verify-captures.mjs primary
+    exit: 0
+    outcome: pass
+    observation: node verify-captures.mjs primary exited 0
+  - id: render-palette-off-brand
+    command: node verify-captures.mjs palette
+    exit: 1
+    outcome: fail
+    observation: node verify-captures.mjs palette exited 1
+  - id: build
+    command: npx next build
+    exit: 0
+    outcome: pass
+    observation: npx next build exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T15:23:54.370Z

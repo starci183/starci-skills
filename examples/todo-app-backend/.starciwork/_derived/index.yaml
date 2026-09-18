@@ -1431,11 +1431,8 @@ records:
   gap.share.frontend-unbuilt:
     schema: work/gap
     feature: share
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - impl.share.todo-app-frontend.invite-screen
+    state: done
+    effectiveState: done
   gap.share.live-proof:
     schema: work/gap
     feature: share
@@ -1571,18 +1568,8 @@ records:
   impl.share.todo-app-frontend.invite-screen:
     schema: work/implementation
     feature: share
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.share.frontend-unbuilt
-        rootKind: gap
-        cyclic: false
-        because: Not written yet. The example frontend is moving to Next.js and must consume the Grammar
-          core package the way nivo-fe does; this screen will live at app/share/invite-screen.tsx
-          once that scaffold and its Grammar wiring land, and no prior .mjs draft is being carried
-          forward into it. gap.share.unbuilt-module itself closed on its backend half (lane
-          be-share, backend-only per its brief); this narrower gap names the still-open frontend
-          half.
+    state: done
+    effectiveState: done
   impl.task.todo-app-backend.complete-task:
     schema: work/implementation
     feature: task
@@ -1629,8 +1616,8 @@ records:
   impl.task.todo-app-frontend.task-list:
     schema: work/implementation
     feature: task
-    state: done
-    effectiveState: done
+    state: todo
+    effectiveState: todo
   integration.login.keycloak:
     schema: work/integration
     feature: login
@@ -2205,13 +2192,13 @@ records:
     feature: task
     state: done
     effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    suspensionReason: code-digest-mismatch
 tally:
   overall:
-    done: 132
+    done: 133
     todo: 31
     stale: 3
-    blocked: 36
+    blocked: 35
     total: 202
   byFeature:
     audit:
@@ -2245,14 +2232,14 @@ tally:
       blocked: 6
       total: 28
     share:
-      done: 18
-      todo: 3
+      done: 20
+      todo: 2
       stale: 0
-      blocked: 5
+      blocked: 4
       total: 26
     task:
-      done: 23
-      todo: 5
+      done: 22
+      todo: 6
       stale: 2
       blocked: 4
       total: 34
@@ -2384,7 +2371,7 @@ tally:
         - ui.share.invite
     - id: gap.share.frontend-unbuilt
       feature: share
-      state: todo
+      state: done
       closedBy:
         - impl.share.todo-app-frontend.invite-screen
     - id: gap.share.live-proof
@@ -2501,9 +2488,6 @@ frontier:
   - id: nfr.recur.generation.timeliness
     feature: recur
     title: A due occurrence is materialised close to its due instant
-  - id: gap.share.frontend-unbuilt
-    feature: share
-    title: No share invite screen exists under the Next.js layout yet
   - id: gap.share.live-proof
     feature: share
     title: No uat.verify run has produced a live run for share.invite-and-collaborate
@@ -2522,6 +2506,9 @@ frontier:
   - id: gap.task.share-edge-hold
     feature: task
     title: br.task.single-owner's done flag is held by an out-of-lane blocker edge
+  - id: impl.task.todo-app-frontend.task-list
+    feature: task
+    title: The list screen and the create form
   - id: nfr.task.list.latency
     feature: task
     title: A list read feels immediate

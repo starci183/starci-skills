@@ -3,6 +3,7 @@
   "kinds": ["frontend"],
   "tsconfig": "tsconfig.json",
   "owners": [
+    { "id": "feature.pages.share", "root": "src/features/pages/share", "entry": "src/features/pages/share/index.tsx" },
     { "id": "feature.pages.sign-in", "root": "src/features/pages/sign-in", "entry": "src/features/pages/sign-in/index.tsx" },
     { "id": "feature.pages.tasks", "root": "src/features/pages/tasks", "entry": "src/features/pages/tasks/index.tsx" }
   ],

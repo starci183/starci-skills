@@ -47,6 +47,10 @@
         ],
         "owners": [
           {
+            "root": "src/components/blocks/share-invite",
+            "name": "ShareInvite"
+          },
+          {
             "root": "src/components/blocks/task-list",
             "name": "TaskList"
           },
@@ -77,6 +81,72 @@
             }
           ],
           "worldMappings": [
+            {
+              "id": "share-collaborators-read-refusal",
+              "owner": {
+                "path": "src/components/blocks/share-invite/index.tsx",
+                "export": "ShareInviteBlock"
+              },
+              "source": {
+                "path": "src/hooks/share/useCollaborators.ts",
+                "export": "useCollaborators"
+              },
+              "failurePath": "collaboratorsQuery.error",
+              "state": {
+                "path": "src/components/blocks/share-invite/component.tsx",
+                "export": "ShareInviteState"
+              },
+              "failureState": "refused",
+              "render": {
+                "path": "src/components/blocks/share-invite/component.tsx",
+                "symbol": "ShareInviteView",
+                "stateProp": "state"
+              }
+            },
+            {
+              "id": "share-invite-refusal",
+              "owner": {
+                "path": "src/components/blocks/share-invite/index.tsx",
+                "export": "ShareInviteBlock"
+              },
+              "source": {
+                "path": "src/hooks/share/useInviteCollaborator.ts",
+                "export": "useInviteCollaborator"
+              },
+              "failurePath": "invite.error",
+              "state": {
+                "path": "src/components/blocks/share-invite/component.tsx",
+                "export": "ShareInviteState"
+              },
+              "failureState": "refused",
+              "render": {
+                "path": "src/components/blocks/share-invite/component.tsx",
+                "symbol": "ShareInviteView",
+                "stateProp": "state"
+              }
+            },
+            {
+              "id": "share-revoke-refusal",
+              "owner": {
+                "path": "src/components/blocks/share-invite/index.tsx",
+                "export": "ShareInviteBlock"
+              },
+              "source": {
+                "path": "src/hooks/share/useRevokeCollaborator.ts",
+                "export": "useRevokeCollaborator"
+              },
+              "failurePath": "revoke.error",
+              "state": {
+                "path": "src/components/blocks/share-invite/component.tsx",
+                "export": "ShareInviteState"
+              },
+              "failureState": "refused",
+              "render": {
+                "path": "src/components/blocks/share-invite/component.tsx",
+                "symbol": "ShareInviteView",
+                "stateProp": "state"
+              }
+            },
             {
               "id": "task-list-read-refusal",
               "owner": {
@@ -124,6 +194,40 @@
           ],
           "envelopes": [],
           "writes": [
+            {
+              "action": {
+                "path": "src/modules/api/share.ts",
+                "export": "inviteCollaborator"
+              },
+              "feedback": {
+                "path": "src/modules/api/write-feedback.ts",
+                "export": "runWrite"
+              },
+              "binding": "callback",
+              "sites": [
+                {
+                  "path": "src/modules/api/share.ts",
+                  "export": "inviteCollaboratorAndNotify"
+                }
+              ]
+            },
+            {
+              "action": {
+                "path": "src/modules/api/share.ts",
+                "export": "revokeCollaborator"
+              },
+              "feedback": {
+                "path": "src/modules/api/write-feedback.ts",
+                "export": "runWrite"
+              },
+              "binding": "callback",
+              "sites": [
+                {
+                  "path": "src/modules/api/share.ts",
+                  "export": "revokeCollaboratorAndNotify"
+                }
+              ]
+            },
             {
               "action": {
                 "path": "src/modules/api/tasks.ts",
@@ -186,6 +290,90 @@
             "major": 2
           },
           "hooks": [
+            {
+              "id": "share-collaborators-query",
+              "path": "src/hooks/share/useCollaborators.ts",
+              "export": "useCollaborators",
+              "kind": "query",
+              "resultBinding": "collaboratorsQuery",
+              "identities": [
+                {
+                  "id": "viewer",
+                  "binding": "token",
+                  "gatesRequest": true,
+                  "resource": true
+                },
+                {
+                  "id": "task",
+                  "binding": "taskId",
+                  "gatesRequest": true,
+                  "resource": true
+                }
+              ]
+            },
+            {
+              "id": "share-invite-mutation",
+              "path": "src/hooks/share/useInviteCollaborator.ts",
+              "export": "useInviteCollaborator",
+              "kind": "mutation",
+              "resultBinding": "invite",
+              "identities": [
+                {
+                  "id": "viewer",
+                  "binding": "token",
+                  "gatesRequest": true,
+                  "resource": true
+                },
+                {
+                  "id": "task",
+                  "binding": "taskId",
+                  "gatesRequest": true,
+                  "resource": true
+                }
+              ]
+            },
+            {
+              "id": "share-revoke-mutation",
+              "path": "src/hooks/share/useRevokeCollaborator.ts",
+              "export": "useRevokeCollaborator",
+              "kind": "mutation",
+              "resultBinding": "revoke",
+              "identities": [
+                {
+                  "id": "viewer",
+                  "binding": "token",
+                  "gatesRequest": true,
+                  "resource": true
+                },
+                {
+                  "id": "task",
+                  "binding": "taskId",
+                  "gatesRequest": true,
+                  "resource": true
+                }
+              ]
+            },
+            {
+              "id": "share-task-title-query",
+              "path": "src/hooks/share/useTaskTitle.ts",
+              "export": "useTaskTitle",
+              "kind": "query",
+              "resultBinding": "taskTitleQuery",
+              "identities": [
+                {
+                  "id": "viewer",
+                  "binding": "token",
+                  "gatesRequest": true,
+                  "resource": true
+                },
+                {
+                  "id": "task",
+                  "binding": "taskId",
+                  "gatesRequest": true,
+                  "resource": true
+                }
+              ]
+            },
             {
               "id": "task-list-query",
               "path": "src/hooks/task/useTasks.ts",
