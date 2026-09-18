@@ -239,6 +239,13 @@ rules:
     does not equal that digest, computed now, must carry `stale: true`; the gate refuses one that does
     not. Staleness is never cleared by editing `recordDigest` to match - only a fresh run, which is a
     kernel act, retires it."
+  - "`work/evidence`'s `provenance.actor` names who ran the assertions, and the value is a claim that must
+    be true, not a label of convenience. `starci-kernel` means a live kernel workflow's own
+    `ctx.work.api.markDone` write settled the record, re-running the checks itself. `example-evidence`
+    means `scripts/example-evidence.mjs` produced the file by actually running the given commands outside
+    any kernel workflow, against one of the example trees - a real run, with a real recordDigest, just not
+    one a kernel operation performed. Neither actor authors `state` on the record beside it; only a
+    person or a kernel operation does that."
   - "Done means proven or says so. A record with `state: done` needs a sibling `evidence.yaml`, or an
     authored `verificationSource: authored-claim` with a `because:` sentence saying why no run proves it.
     `work/data`, `work/brand` and `work/policy-decision` are authored claims by nature - a data shape, a
