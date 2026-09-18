@@ -38,6 +38,27 @@ export const recordAssertion = (testInfo: TestInfo, entry: AssertionRecord): voi
 };
 
 /**
+ * One owned-resource lifecycle event (operator.yaml's `evidence`/`cleanup` writes: "record exact IDs...
+ * before removing local metadata" and "no unresolved owned resources for a pass"). Before this existed,
+ * `run-writer.ts` wrote a hardcoded empty `created`/`deleted` pair for every flow regardless of what a
+ * spec actually did, which cannot back a real cleanup claim for a flow that creates a row - a spec calls
+ * this once per created/deleted/verified-absent resource so the reporter can write the true ledger.
+ */
+export type ResourceEvent = {
+  readonly action: 'created' | 'deleted' | 'verified-absent';
+  readonly kind: string;
+  readonly id: string;
+  readonly note: string;
+};
+
+export const RESOURCE_ANNOTATION = 'uat-resource';
+
+/** Appends one owned-resource lifecycle event to this test's evidence trail. */
+export const recordResource = (testInfo: TestInfo, entry: ResourceEvent): void => {
+  testInfo.annotations.push({ type: RESOURCE_ANNOTATION, description: JSON.stringify(entry) });
+};
+
+/**
  * Runs one named checkpoint of a flow as a real Playwright step, takes a full-page screenshot with any
  * password field masked, attaches it under the step's own name, and records the step's start/end time
  * so the reporter's `walk.json` can index screenshot-by-step-by-time exactly as the op requires.
