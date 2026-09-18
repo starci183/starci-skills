@@ -3,13 +3,18 @@
   "kinds": ["frontend"],
   "tsconfig": "tsconfig.json",
   "roots": ["apps/*"],
+  "portProjection": {
+    "comment": "The one runtime projection for the whole product, resolved by the BE lane. Every port this file used to restate is read from it - by scripts/serve.mjs for the listeners and by each app's src/modules/config for the service base URLs.",
+    "file": "../ecommerce-app-be/metadata.json",
+    "env": "ECOMMERCE_APP_BE_METADATA"
+  },
   "apps": [
     {
       "id": "landing",
       "package": "@ecommerce/landing",
       "root": "apps/landing",
       "routes": "apps/landing/src/app",
-      "devPort": 3069,
+      "devPort": {"projectionKey": "ports.landing"},
       "public": true,
       "summary": "Marketing site and catalogue teaser; links into the authenticated shop app."
     },
@@ -18,19 +23,19 @@
       "package": "@ecommerce/shop",
       "root": "apps/shop",
       "routes": "apps/shop/src/app",
-      "devPort": 4069,
+      "devPort": {"projectionKey": "ports.shop"},
       "public": false,
       "summary": "Authenticated product app: browse, cart, checkout and account.",
       "consumes": [
         {
           "service": "order",
           "env": "NEXT_PUBLIC_ORDER_API_URL",
-          "localhostFallback": "http://localhost:6070"
+          "localhostFallback": {"projectionKey": "ports.orderApi"}
         },
         {
           "service": "identity",
           "env": "NEXT_PUBLIC_IDENTITY_API_URL",
-          "localhostFallback": "http://localhost:5070"
+          "localhostFallback": {"projectionKey": "ports.identityApi"}
         }
       ]
     }

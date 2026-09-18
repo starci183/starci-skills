@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import '@fontsource-variable/inter';
 import './globals.css';
-import { AppNav } from '../components/AppNav';
+import { ShopShell } from '../components/ShopShell';
 
 type RootLayoutProps = { readonly children: ReactNode };
 
@@ -10,19 +11,14 @@ export const metadata: Metadata = {
   description: 'Browse the catalogue, manage your cart and review your orders.',
 };
 
-/** The authenticated-app shell: a top bar with the section nav, then the routed page body beneath it. */
+/**
+ * The document shell every shop route mounts under. It stays a Server Component so it can export
+ * `metadata`; Grammar's Common root and the app chrome live in `ShopShell`, a client boundary.
+ */
 const RootLayout = ({ children }: RootLayoutProps) => (
   <html lang="en">
     <body>
-      <div className="app">
-        <header className="topbar">
-          <div className="topbar-inner">
-            <a className="brand" href="/browse">Northwind Shop</a>
-            <AppNav />
-          </div>
-        </header>
-        <main className="content">{children}</main>
-      </div>
+      <ShopShell>{children}</ShopShell>
     </body>
   </html>
 );

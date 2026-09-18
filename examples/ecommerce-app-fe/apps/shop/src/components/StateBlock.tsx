@@ -1,17 +1,33 @@
+'use client';
+
 import type { ReactNode } from 'react';
+import { EmptyNotice } from '@starci/grammar/common';
+import { DuckMascot } from './DuckMascot';
 
 type StateBlockProps = {
   readonly title: string;
+  readonly description?: string;
+  /**
+   * The brand mascot joins only genuine empty states (`mayAppearIn`: empty states, welcome
+   * surfaces). Refusal and error surfaces are the record's `neverIn` - pass `mascot` only where
+   * the surface is truly an empty one, never on a service-unavailable or danger render.
+   */
+  readonly mascot?: boolean;
   readonly children?: ReactNode;
 };
 
 /**
- * The honest "nothing to show" surface every gated route falls back to. `children` states *why* there is
- * nothing (the service reason, or the contract still pending) so the page never reads as a silent blank.
+ * The honest "nothing to show" surface every gated route falls back to, drawn with grammar's
+ * `EmptyNotice`. `description` states *why* there is nothing (the service reason, or the contract
+ * still pending) so the page never reads as a silent blank.
  */
-export const StateBlock = ({ title, children }: StateBlockProps) => (
-  <div className="empty">
-    <h3>{title}</h3>
-    {children ? <p className="muted" style={{ margin: 0 }}>{children}</p> : null}
+export const StateBlock = ({ title, description, mascot, children }: StateBlockProps) => (
+  <div className="flex flex-col items-center gap-4 py-10">
+    <EmptyNotice
+      message={title}
+      description={description}
+      iconSource={mascot ? DuckMascot : undefined}
+    />
+    {children}
   </div>
 );
