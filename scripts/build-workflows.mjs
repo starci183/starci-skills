@@ -180,7 +180,7 @@ export function buildFiles(skillRoot = root) {
         if(stacksKitTree && entry.isFile() && !relative.endsWith('.enc') && fs.existsSync(absolute+'.enc'))continue;
         if(stackExample && entry.isFile()){
           const authored=/\.(md|mjs|sh|ps1|conf)$/.test(entry.name)||['Dockerfile','.gitignore','.dockerignore'].includes(entry.name)||
-            /\/\.stacks\/(application-stacks\.yaml|(dev|vps)\/(compose|stack)\.yaml)$/.test(relative);
+            /\/\.starcistacks\/(application-stacks\.yaml|(dev|vps)\/(compose|stack)\.yaml)$/.test(relative);
           if(!authored)continue;
         }
         if(entry.isDirectory())visit(absolute);

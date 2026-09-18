@@ -2,7 +2,7 @@
 
 An application stack is the complete deployment description for one application: frontend, APIs, workers, jobs, datastores, ingress, and every required external dependency. A directory or service count does not prove that the application can run. See [Application runtime configuration and health](application-runtime-config-and-health.md) for the source-to-startup contract shared by host, container and remote placements.
 
-The canonical manifest is `.stacks/application-stacks.yaml`, schema `starci/application-stacks@1`. Development uses Docker Compose. An Ubuntu VPS uses Docker Swarm and `docker stack`. Whole-package Kubernetes deployment and cluster administration are explicitly deferred with a reason; a separately owned application workload may still run in Kubernetes or K3s and be consumed through its declared remote API boundary. Terraform and provider APIs remain optional provisioning choices rather than runtime requirements.
+The canonical manifest is `.starcistacks/application-stacks.yaml`, schema `starci/application-stacks@1`. Development uses Docker Compose. An Ubuntu VPS uses Docker Swarm and `docker stack`. Whole-package Kubernetes deployment and cluster administration are explicitly deferred with a reason; a separately owned application workload may still run in Kubernetes or K3s and be consumed through its declared remote API boundary. Terraform and provider APIs remain optional provisioning choices rather than runtime requirements.
 
 ## Ownership and component closure
 
@@ -23,7 +23,7 @@ Top-level `sources` give each application source a repository role, symbolic hos
 ## Finite layout
 
 ```text
-.stacks/
+.starcistacks/
   application-stacks.yaml
   dev/
     compose.yaml
@@ -38,13 +38,13 @@ Top-level `sources` give each application source a repository role, symbolic hos
   keys/README.md             # public recipient and recovery instructions only
 ```
 
-Generated output stays in a finite declared location. Development plaintext may use a regular file below a private, ignored `.stacks/dev/runtime/` directory and must never be committed. Decryption identities, Swarm unlock keys, join tokens, and recovery custody stay outside the repository.
+Generated output stays in a finite declared location. Development plaintext may use a regular file below a private, ignored `.starcistacks/dev/runtime/` directory and must never be committed. Decryption identities, Swarm unlock keys, join tokens, and recovery custody stay outside the repository.
 
 ## Development with Docker Compose and native application processes
 
 A supported development machine needs Docker Engine running Linux containers and Docker Compose v2. The default full-Docker profile does not need host Node.js. An explicitly selected native-app profile additionally requires the application repository's declared host runtime and runs exact `package.json` scripts; PostgreSQL, identity, queues and other declared dependencies remain in Compose. `prepare` verifies the selected profile, sources, revisions, build inputs, runtime, capacity, ports, encryption recipients, and declared inputs. `up` materializes exact credentials, renders and validates Compose, runs infrastructure and migrations in dependency order, starts the selected application processes, and waits for declared readiness.
 
-For a Docker application component, a profile binds `source`, `sourceRoot`, Compose `service`, exact build `context`, `dockerfile`, relevant package inputs, and either loopback readiness on a declared published port or an enabled Compose healthcheck. For a host process it binds `source`, `sourceRoot`, a real package script name, an existing regular non-link private file below `.stacks` for generated environment material, loopback readiness, and host ports. Ports are integers from 1 through 65535. HTTP(S) readiness uses a nonempty absolute path; TCP readiness uses an empty path. Dependency connections record only variable names, hosts, and ports: host applications use loopback plus published ports, while application containers use Compose service DNS plus container ports. Credentials remain in the existing encrypted/materialized secret path and are never placed in these endpoint declarations.
+For a Docker application component, a profile binds `source`, `sourceRoot`, Compose `service`, exact build `context`, `dockerfile`, relevant package inputs, and either loopback readiness on a declared published port or an enabled Compose healthcheck. For a host process it binds `source`, `sourceRoot`, a real package script name, an existing regular non-link private file below `.starcistacks` for generated environment material, loopback readiness, and host ports. Ports are integers from 1 through 65535. HTTP(S) readiness uses a nonempty absolute path; TCP readiness uses an empty path. Dependency connections record only variable names, hosts, and ports: host applications use loopback plus published ports, while application containers use Compose service DNS plus container ports. Credentials remain in the existing encrypted/materialized secret path and are never placed in these endpoint declarations.
 
 Every named volume mounted by a selected stateful Docker component has exactly one matching custody and backup declaration, and no other selected service mounts that custodied volume. Dependency images use immutable digest identities. All profiles for one closed development inventory share one exact exclusive group. The same host port may appear in two mutually exclusive profiles; it cannot collide within the selected profile. The lifecycle receipt binds the selected profile so a Docker and native copy of the same app cannot be treated as one healthy deployment.
 
@@ -52,7 +52,7 @@ Restart and container recreation reuse the same credential bytes. A generator mu
 
 ### Remote application APIs
 
-A selected profile may explicitly describe an application API that is external to the caller runtime. Its `external` component keeps the real `owner`, `failureDomain`, and uppercase `endpointRef`, and adds `remoteApi`. The remote boundary binds an opaque deployment record below `.stacks`, the existing owner contract inside the repository, a relative HTTP(S) readiness path, and an existing verification script, test, or runbook. These bounded regular file references are identity pointers; the checker does not interpret their content or assert contract coverage.
+A selected profile may explicitly describe an application API that is external to the caller runtime. Its `external` component keeps the real `owner`, `failureDomain`, and uppercase `endpointRef`, and adds `remoteApi`. The remote boundary binds an opaque deployment record below `.starcistacks`, the existing owner contract inside the repository, a relative HTTP(S) readiness path, and an existing verification script, test, or runbook. These bounded regular file references are identity pointers; the checker does not interpret their content or assert contract coverage.
 
 `remoteApi.callers` names each selected host or Docker application process that consumes the API and gives it a bounded timeout. Each caller declares exactly one authentication policy: `authRef` names an environment secret in custody, or `publicAuthRationale` explains why the API is intentionally unauthenticated. A Docker caller must receive the named Compose secret. A native caller's private environment binding is verified only by the later runtime check because the static checker never reads that file. The external API cannot also name a local Compose service, so a remote workload is not silently duplicated to make the local stack pass.
 
@@ -75,8 +75,8 @@ Development uses a file-backed declaration:
   source: generated
   generationAlgorithm: CSPRNG 32 bytes
   formatPolicy: 64 lowercase hexadecimal characters
-  encryptedRef: .stacks/dev/secrets/postgres-password.enc
-  materializedPath: .stacks/dev/runtime/secrets/postgres-password
+  encryptedRef: .starcistacks/dev/secrets/postgres-password.enc
+  materializedPath: .starcistacks/dev/runtime/secrets/postgres-password
   recipientPolicy: owner-and-recovery
   keyCustody: owner custody outside the repository
 ```
@@ -88,7 +88,7 @@ VPS uses an immutable, versioned external Swarm secret:
   source: generated
   generationAlgorithm: CSPRNG 32 bytes
   formatPolicy: 64 lowercase hexadecimal characters
-  encryptedRef: .stacks/vps/secrets/postgres-password.enc
+  encryptedRef: .starcistacks/vps/secrets/postgres-password.enc
   runtimeName: app-postgres-password-v3
   version: v3
   recipientPolicy: owner-and-recovery
@@ -127,7 +127,7 @@ Those properties require disposable and cold-host evidence: deterministic render
 
 ## Reference pattern
 
-The synthetic `examples/application-stacks/tiny-stateful` kit demonstrates the manifest, distinct dev and VPS runtimes, secret custody, and static checker input without making production-readiness claims. Application-specific audit evidence belongs in that application's reports.
+The `examples/todo-app-backend/.starcistacks` kit demonstrates the manifest, distinct dev and VPS runtimes, secret custody, and static checker input without making production-readiness claims. Application-specific audit evidence belongs in that application's reports.
 
 ## Primary references
 

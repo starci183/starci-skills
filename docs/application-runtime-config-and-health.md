@@ -24,7 +24,7 @@ Projects may map an established equivalent, but new Nest and Next source starts 
 | Next startup | `src/instrumentation.ts` when server startup work exists | Validate server runtime config before requests; do not make a browser bundle depend on server secrets |
 | Next health policy | `src/modules/platform/health/policy.ts`, `readiness.ts` | Server-only dependency policy and bounded readiness checks |
 | Next health transport | `src/app/health/live/route.ts`, `src/app/health/ready/route.ts` | Route adapters with no product page or session behavior |
-| Deployment binding | `.stacks/application-stacks.yaml`, `.stacks/dev/runtime/<component>.env`, declared source/build inputs and deployment/verification refs | Bind the selected host, container, or remote-API placement without storing credential values |
+| Deployment binding | `.starcistacks/application-stacks.yaml`, `.starcistacks/dev/runtime/<component>.env`, declared source/build inputs and deployment/verification refs | Bind the selected host, container, or remote-API placement without storing credential values |
 
 The env schema may use the project's installed validator or a small typed parser. The required behavior is one complete, tested parse with finite/range/URL/enum checks and redacted failures. Nest Terminus is an optional health adapter, not a required dependency. Next `instrumentation.register` is useful only for server initialization that must finish before requests; build-time public values and request-time server values remain different lifecycles.
 

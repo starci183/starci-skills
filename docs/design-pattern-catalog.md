@@ -157,7 +157,7 @@ Agent review asks whether the design meets the product invariant. Scripts check 
 
 **Avoid:** A destructive schema change and new binary that can only work when every process changes atomically; replaying old sagas through an incompatible definition; calling a rollback safe after irreversible data transformation.
 
-**Review/prove:** The actual supported old/new combination, resumable backfill, compatible rollback boundary and startup/readiness behavior. `.stacks` binds the selected placement and deployment authority. A remote application API hosted in K3s keeps its own deployment boundary; consuming it does not confer cluster control.
+**Review/prove:** The actual supported old/new combination, resumable backfill, compatible rollback boundary and startup/readiness behavior. `.starcistacks` binds the selected placement and deployment authority. A remote application API hosted in K3s keeps its own deployment boundary; consuming it does not confer cluster control.
 
 ## Review record and evidence boundaries
 

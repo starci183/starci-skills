@@ -21,7 +21,7 @@ reads:
   - id: application-stacks
     path: knowledge/application-stacks.json + docs/application-stacks.md + docs/application-stacks-vps.md + schemas/application-stacks.schema.json
     purpose:
-      en: When the selected scope touches application deployment, .stacks, bootstrap or recovery,
+      en: When the selected scope touches application deployment, .starcistacks, bootstrap or recovery,
         load the whole-application dev/VPS contract. Reconcile component ownership, encrypted
         credential custody, lifecycle commands and existing consumers. Run the static stacks
         check when validating a materialized stack; bind its exact inputs and limitations.

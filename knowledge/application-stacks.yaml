@@ -24,7 +24,7 @@ provenance:
 guidance:
   - id: STACK-SCOPE
     requirement: |
-      .stacks is the application-owned deployment package for the whole app. Inventory actual
+      .starcistacks is the application-owned deployment package for the whole app. Inventory actual
       frontend, APIs, workers, scheduled/init/migration jobs, stateful services, ingress and
       external dependencies from accepted architecture. Include only applicable components.
       Give every component an environment-specific managed service, explicit external binding
@@ -141,7 +141,7 @@ guidance:
   - id: STACK-EVIDENCE
     requirement: |
       Read docs/application-stacks.md, docs/application-stacks-vps.md and the synthetic kit
-      examples/application-stacks. Author .stacks/application-stacks.yaml against
+      examples/todo-app-backend/.starcistacks. Author .starcistacks/application-stacks.yaml against
       schemas/application-stacks.schema.json. Declare dev docker-compose and VPS docker-swarm.
       Render the actual deployment model with docker compose config or docker stack config and run
       `node <skill root>/bin/starci.mjs stacks check <repo-root> --environment dev|vps
@@ -154,5 +154,5 @@ guidance:
       Reconcile existing deployment A and application contracts B with requirement C as current
       A', B', C'. Retain useful fragments/custody, correct stale docs and affected consumers,
       and reverify. Preserve VPS Swarm as the default; do not silently replace its deployment
-      semantics with Compose, reset old data for a passing test or inherit stale acceptance. .stacks does
+      semantics with Compose, reset old data for a passing test or inherit stale acceptance. .starcistacks does
       not own SRS/SDS or workflow state. Runtime maintenance does not grant app deployment.

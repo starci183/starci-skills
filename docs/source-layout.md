@@ -66,7 +66,7 @@ In a separate frontend repository, `.starciwork` and every retired runtime or Wo
 and the same runtime/registry identity markers are rejected. In an explicitly combined repository,
 the one backend-owned `.starciwork` and explicitly bound host identity are shared, not duplicates.
 A repository-local `.claude` or `.workspaces` directory containing other project metadata is not a
-second runtime or registry merely by name. Likewise, `.stacks` may be legitimate deployment/project
+second runtime or registry merely by name. Likewise, `.starcistacks` may be legitimate deployment/project
 knowledge in the backend, frontend or host; the topology gate does not move, delete or assign runtime
 authority to it. This leaves one runtime identity and one product workspace while preserving separately
 owned project metadata.
@@ -75,7 +75,7 @@ For application deployment work, load `knowledge/application-stacks.json` and
 `docs/application-stacks.md`. One application manifest accounts for its backend,
 frontend and dependencies even when their source repositories differ. Repository
 placement does not establish service ownership or an independent recovery failure
-domain. The topology gate preserves existing `.stacks`; the application-stack check
+domain. The topology gate preserves existing `.starcistacks`; the application-stack check
 and real lifecycle evidence assess deployment completeness separately.
 
 Validate a bound pair before lifecycle work:

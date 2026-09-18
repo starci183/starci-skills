@@ -4,6 +4,8 @@ import {fileURLToPath} from 'node:url';
 import {parseYaml} from '../core/yaml.mjs';
 
 const RESULT='starci/application-stacks-check@1';
+const STACKS_DIR='.starcistacks';
+const LEGACY_STACKS_DIR='.stacks';
 const MAX_INPUT_BYTES=4*1024*1024;
 const slash=value=>String(value??'').replaceAll('\\','/');
 const inside=(root,target)=>{const rel=path.relative(path.resolve(root),path.resolve(target));return rel===''||(!rel.startsWith('..')&&!path.isAbsolute(rel));};
@@ -138,10 +140,10 @@ function resolvedPath(base,relative){
 }
 function regularRepoRef(root,value,{stacksOnly=false}={}){
   const named=slash(value);
-  if(!nonempty(value)||named.includes('#')||named==='.stacks/staging'||named.startsWith('.stacks/staging/'))return false;
-  if(stacksOnly&&!named.startsWith('.stacks/'))return false;
-  const base=stacksOnly?path.join(root,'.stacks'):root;
-  const relative=stacksOnly?String(value).replace(/^\.stacks[\\/]/,''):String(value);
+  if(!nonempty(value)||named.includes('#')||named==='.starcistacks/staging'||named.startsWith('.starcistacks/staging/'))return false;
+  if(stacksOnly&&!named.startsWith('.starcistacks/'))return false;
+  const base=stacksOnly?path.join(root,'.starcistacks'):root;
+  const relative=stacksOnly?String(value).replace(/^\.starcistacks[\\/]/,''):String(value);
   const target=resolvedPath(base,relative);
   try{return Boolean(target&&regular(target,{root:base})&&fs.statSync(target).size<=MAX_INPUT_BYTES);}catch{return false;}
 }
@@ -189,9 +191,9 @@ function validateProfileSources({root,manifest,model,profile,profileName,compone
     if(binding.mode==='host-process'){
       let pkg={};try{pkg=JSON.parse(fs.readFileSync(path.join(packageRoot,'package.json'),'utf8'));}catch{add('source-package-invalid',`${at}.sourceRoot`,'source package.json must be valid JSON');}
       if(!nonempty(binding.command)||!nonempty(pkg?.scripts?.[binding.command]))add('native-command-missing',`${at}.command`,'host process command must name an actual package.json script');
-      const envFile=resolvedPath(path.join(root,'.stacks'),String(binding.envFile??'').replace(/^\.stacks[\\/]/,''));
-      if(!envFile)add('native-env-path-invalid',`${at}.envFile`,'native env file must remain below .stacks; contents are not read by the checker');
-      else if(!regular(envFile,{root:path.join(root,'.stacks')}))add('native-env-unavailable',`${at}.envFile`,'selected native env file must exist as a regular non-link file; contents are not read by the checker');
+      const envFile=resolvedPath(path.join(root,'.starcistacks'),String(binding.envFile??'').replace(/^\.starcistacks[\\/]/,''));
+      if(!envFile)add('native-env-path-invalid',`${at}.envFile`,'native env file must remain below .starcistacks; contents are not read by the checker');
+      else if(!regular(envFile,{root:path.join(root,'.starcistacks')}))add('native-env-unavailable',`${at}.envFile`,'selected native env file must exist as a regular non-link file; contents are not read by the checker');
       if(!validReadiness(binding.readiness,binding.ports,'host'))add('native-readiness-invalid',`${at}.readiness`,'host readiness requires loopback, a declared port 1..65535, an HTTP(S) absolute path, or an empty TCP path');
     }else{
       if(!object(binding.build))add('docker-build-binding-missing',`${at}.build`,'application Docker service needs exact source build inputs');
@@ -234,7 +236,7 @@ function validateRemoteApis({root,spec,model,components,bindings,add}){
     if(binding.service!==undefined)add('remote-api-local-service-conflict',`${at}.service`,'a remote application API cannot also name a local Compose service');
     for(const field of ['owner','failureDomain','endpointRef'])if(!object(canonical)||canonical.ownership!=='external'||binding[field]!==canonical[field])add('remote-api-authority-mismatch',`${at}.${field}`,'selected remote API authority must exactly match the canonical environment component binding');
     if(!/^[A-Z][A-Z0-9_]*$/.test(String(binding.endpointRef??'')))add('remote-api-endpoint-ref-invalid',`${at}.endpointRef`,'remote API endpointRef must name a caller configuration key');
-    if(!regularRepoRef(root,api.deploymentRef,{stacksOnly:true}))add('remote-api-deployment-ref-unavailable',`${at}.remoteApi.deploymentRef`,'deploymentRef must resolve to a bounded regular non-link file below .stacks');
+    if(!regularRepoRef(root,api.deploymentRef,{stacksOnly:true}))add('remote-api-deployment-ref-unavailable',`${at}.remoteApi.deploymentRef`,'deploymentRef must resolve to a bounded regular non-link file below .starcistacks');
     if(!regularRepoRef(root,api.contractRef))add('remote-api-contract-ref-unavailable',`${at}.remoteApi.contractRef`,'contractRef must resolve to a bounded regular non-link repository file');
     if(!object(api.readiness)||!['http','https'].includes(api.readiness.scheme)||!/^\/(?!\/)[^?#]*$/.test(String(api.readiness.path??'')))add('remote-api-readiness-invalid',`${at}.remoteApi.readiness`,'remote API readiness requires HTTP(S) and one absolute path without authority, query, or fragment');
     if(!regularRepoRef(root,api.readiness?.verificationRef))add('remote-api-verification-ref-unavailable',`${at}.remoteApi.readiness.verificationRef`,'verificationRef must resolve to a bounded regular non-link repository script, test, or runbook');
@@ -337,14 +339,16 @@ function validateDevProfile({root,manifest,model,spec,components,ids,requiredCom
 }
 
 export function checkApplicationStacks({repoRoot,environment,deploymentModelFile}={}){
-  const root=path.resolve(String(repoRoot??'')),manifestFile=path.join(root,'.stacks','application-stacks.yaml'),errors=[];
+  const root=path.resolve(String(repoRoot??'')),manifestFile=path.join(root,STACKS_DIR,'application-stacks.yaml'),errors=[];
   const add=(code,at,message)=>errors.push({code,path:at,message});
   if(!['dev','vps'].includes(environment))add('environment-invalid','environment','environment must be dev or vps');
-  if(!regular(manifestFile,{root:path.join(root,'.stacks')}))add('manifest-unavailable','.stacks/application-stacks.yaml','manifest must be a regular file inside .stacks');
+  if(!directory(path.join(root,STACKS_DIR))&&directory(path.join(root,LEGACY_STACKS_DIR)))
+    add('STACKS_LEGACY_DIRECTORY',LEGACY_STACKS_DIR,`the stack directory must be renamed from ${LEGACY_STACKS_DIR} to ${STACKS_DIR}; a legacy ${LEGACY_STACKS_DIR} directory is not read as the contract`);
+  if(!regular(manifestFile,{root:path.join(root,STACKS_DIR)}))add('manifest-unavailable',`${STACKS_DIR}/application-stacks.yaml`,`manifest must be a regular file inside ${STACKS_DIR}`);
   if(!regular(deploymentModelFile))add('deployment-model-unavailable','deploymentModelFile','rendered deployment evidence must be a regular, non-symlink file');
-  for(const [file,at] of [[manifestFile,'.stacks/application-stacks.yaml'],[deploymentModelFile,'deploymentModelFile']])try{if(fs.statSync(file).size>MAX_INPUT_BYTES)add('input-too-large',at,'input exceeds the 4 MiB static-check limit');}catch{}
+  for(const [file,at] of [[manifestFile,`${STACKS_DIR}/application-stacks.yaml`],[deploymentModelFile,'deploymentModelFile']])try{if(fs.statSync(file).size>MAX_INPUT_BYTES)add('input-too-large',at,'input exceeds the 4 MiB static-check limit');}catch{}
   let manifest={},model={};
-  try{if(!errors.some(item=>['manifest-unavailable','input-too-large'].includes(item.code)&&item.path==='.stacks/application-stacks.yaml'))manifest=parseYaml(fs.readFileSync(manifestFile,'utf8'));}catch{add('manifest-invalid','.stacks/application-stacks.yaml','manifest YAML could not be parsed');}
+  try{if(!errors.some(item=>['manifest-unavailable','input-too-large'].includes(item.code)&&item.path===`${STACKS_DIR}/application-stacks.yaml`))manifest=parseYaml(fs.readFileSync(manifestFile,'utf8'));}catch{add('manifest-invalid',`${STACKS_DIR}/application-stacks.yaml`,'manifest YAML could not be parsed');}
   try{if(!errors.some(item=>['deployment-model-unavailable','input-too-large'].includes(item.code)&&item.path==='deploymentModelFile')){const text=fs.readFileSync(deploymentModelFile,'utf8');try{model=JSON.parse(text);}catch{model=parseYaml(text);}}}catch{add('deployment-model-invalid','deploymentModelFile','rendered deployment JSON or YAML could not be parsed');}
   if(!object(manifest))manifest={};if(!object(model))model={};
   for(const issue of validateSchema(manifest))add('schema-shape-invalid',issue.path,issue.message);
@@ -367,7 +371,7 @@ export function checkApplicationStacks({repoRoot,environment,deploymentModelFile
   if(!composeFiles.length)add('compose-files-empty',`environments.${environment}.composeFiles`,'declare repository-owned Compose source files');
   for(const [index,relative] of composeFiles.entries()){
     const target=path.resolve(root,String(relative));
-    if(!slash(relative).startsWith('.stacks/')||!inside(path.join(root,'.stacks'),target)||!regular(target,{root:path.join(root,'.stacks')}))add('compose-path-unsafe',`environments.${environment}.composeFiles[${index}]`,'Compose source must be a regular non-symlink file below .stacks');
+    if(!slash(relative).startsWith('.starcistacks/')||!inside(path.join(root,'.starcistacks'),target)||!regular(target,{root:path.join(root,'.starcistacks')}))add('compose-path-unsafe',`environments.${environment}.composeFiles[${index}]`,'Compose source must be a regular non-symlink file below .starcistacks');
   }
   const environmentComponents=object(spec?.components)?spec.components:{},seen=new Set();let managed=new Map();
   for(const [id,binding] of Object.entries(environmentComponents)){
@@ -431,8 +435,8 @@ export function checkApplicationStacks({repoRoot,environment,deploymentModelFile
     if(!['generated','provider-issued'].includes(secret?.source))add('secret-source-invalid',`${at}.source`,'secret source must be generated or provider-issued');
     if(secret?.source==='generated'&&(!String(secret?.generationAlgorithm??'').trim()||!String(secret?.formatPolicy??'').trim()))add('secret-generation-policy-missing',at,'generated secret needs algorithm and format policy');
     if(secret?.source==='provider-issued'&&!String(secret?.sourceOwner??'').trim())add('secret-source-owner-missing',`${at}.sourceOwner`,'provider-issued secret needs an owner');
-    if(!slash(secret?.encryptedRef).startsWith('.stacks/')||!String(secret?.encryptedRef??'').endsWith('.enc')||!inside(path.join(root,'.stacks'),enc)||!regular(enc,{root:path.join(root,'.stacks')})||!sopsEnvelope(enc))add('encrypted-ref-invalid',`${at}.encryptedRef`,'encrypted reference must be a recognizable SOPS envelope in an existing regular .enc file below .stacks');
-    if(environment==='dev'&&(!slash(secret?.materializedPath).startsWith('.stacks/')||String(secret?.materializedPath??'').endsWith('.enc')||!inside(path.join(root,'.stacks'),plain)||!safeAncestors(path.join(root,'.stacks'),plain)))add('materialized-path-invalid',`${at}.materializedPath`,'materialized secret path and its existing ancestors must remain below .stacks without symlinks');
+    if(!slash(secret?.encryptedRef).startsWith('.starcistacks/')||!String(secret?.encryptedRef??'').endsWith('.enc')||!inside(path.join(root,'.starcistacks'),enc)||!regular(enc,{root:path.join(root,'.starcistacks')})||!sopsEnvelope(enc))add('encrypted-ref-invalid',`${at}.encryptedRef`,'encrypted reference must be a recognizable SOPS envelope in an existing regular .enc file below .starcistacks');
+    if(environment==='dev'&&(!slash(secret?.materializedPath).startsWith('.starcistacks/')||String(secret?.materializedPath??'').endsWith('.enc')||!inside(path.join(root,'.starcistacks'),plain)||!safeAncestors(path.join(root,'.starcistacks'),plain)))add('materialized-path-invalid',`${at}.materializedPath`,'materialized secret path and its existing ancestors must remain below .starcistacks without symlinks');
     if(!String(secret?.recipientPolicy??'').trim()||!String(secret?.keyCustody??'').trim())add('secret-policy-missing',at,'secret recipient and key custody policies are required');
     const definition=modelSecrets[modelName];
     if(environment==='dev'){

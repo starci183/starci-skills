@@ -38,13 +38,13 @@ test('installed stack contract reaches replacing op modes and ships runnable exa
 test('stacks CLI refuses missing or malformed evidence without echoing file contents or mutation',t=>{
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'starci-stacks-cli-'));
   t.after(()=>{assert.equal(path.dirname(directory),fs.realpathSync(os.tmpdir()));assert.ok(path.basename(directory).startsWith('starci-stacks-cli-'));fs.rmSync(directory,{recursive:true,force:true});});
-  // checks/stacks.mjs (unmodifiable in this pass) hardcodes '.stacks/application-stacks.yaml' as the
-  // manifest location - matches docs/application-stacks.md too. The prior version of this fixture wrote
-  // to '.stacks/...' without ever creating that directory (only '.starcistacks' was made), which is a
-  // plain mkdir/write mismatch bug, not a directory rename; use '.stacks' consistently so the checker
-  // exercises the intended malformed-deployment-model scenario instead of always failing on a missing manifest.
-  fs.mkdirSync(path.join(directory,'.stacks'));
-  fs.writeFileSync(path.join(directory,'.stacks/application-stacks.yaml'),'schema: starci/application-stacks@1\n');
+  // checks/stacks.mjs hardcodes '.starcistacks/application-stacks.yaml' as the manifest location -
+  // matches docs/application-stacks.md too, since ex-stacks-rename renamed the checker's own hardcoded
+  // directory name from '.stacks' to '.starcistacks' to match what the examples tree already used. Write
+  // to '.starcistacks/...' consistently so the checker exercises the intended malformed-deployment-model
+  // scenario instead of always failing on a missing manifest.
+  fs.mkdirSync(path.join(directory,'.starcistacks'));
+  fs.writeFileSync(path.join(directory,'.starcistacks/application-stacks.yaml'),'schema: starci/application-stacks@1\n');
   const model=path.join(directory,'rendered.json'),sentinel='synthetic-secret-never-echo';
   fs.writeFileSync(model,'{"token":"'+sentinel+'",BROKEN');
   const before=fs.readFileSync(model);
