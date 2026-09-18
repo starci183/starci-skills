@@ -1,0 +1,33 @@
+schema: work/sds-component
+id: sds.plan.reconciliation
+title: What happens when the webhook never arrives
+state: todo
+responsibility: Polls the gateway directly for a payment intent's status and applies exactly the transition
+  a webhook would have applied, through the same idempotent ledger (br.plan.payment.idempotent), so a
+  reconcile and a late webhook racing each other apply an intent at most once between them.
+interfaces:
+  - Runs on a schedule against every pending intent older than a short grace window, and may also be
+    triggered by the owner from the usage screen ("check my payment").
+refs: [br.plan.payment.idempotent, fr.plan.reconcile]
+dependsOn: [sds.plan.subscription-lifecycle, integration.plan.sepay]
+
+sequence:
+  participants: [scheduler, api, sepay, postgres]
+  steps:
+    - {from: scheduler, to: api, message: "trigger reconcile for one pending intent older than 10 minutes, observable: internal-trigger"}
+    - {from: api, to: sepay, message: "GET the intent's current status, observable: http"}
+    - {from: api, to: postgres, message: "UPDATE the subscription to active, only if the intent was not already applied, observable: write"}
+    - {from: api, to: postgres, message: "no write at all, when the intent is still pending at the gateway, observable: read"}
+  note: A webhook that arrives after a reconcile already applied the same intent finds it already recorded
+    and writes nothing; this sequence and t-gateway-confirmed's sequence in sds.plan.subscription-lifecycle
+    converge on the same idempotency check rather than each carrying its own.
+
+requiresProof:
+  implementation:
+    required: true
+
+blockedBy:
+  - No module exists yet at src/plan/reconcile. The example backend is moving to NestJS; this component is
+    specified but not built.
+  - integration.plan.sepay is todo; a poll against a gateway that has never been called for real cannot
+    itself be proven live yet, only unit-tested against a fake once the module exists.

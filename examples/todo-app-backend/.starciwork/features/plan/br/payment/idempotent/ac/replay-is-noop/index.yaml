@@ -1,0 +1,8 @@
+schema: work/acceptance-criterion
+id: ac.plan.payment.idempotent.replay-is-noop
+rule: br.plan.payment.idempotent
+given: A payment intent already applied to a subscription, activating it
+when: The same intent is applied again, whether by a duplicate webhook or by a reconciliation poll
+then:
+  - The subscription is unchanged from its first activation.
+  - No second ledger entry is recorded for that intent.

@@ -1,0 +1,22 @@
+schema: work/business-rule
+id: br.plan.active-scope
+title: What counts as an active task toward the cap
+state: todo
+statements:
+  - An active task is a row currently owned by the person being capped; br.task.list.owned already means no
+    other person's row, and no shared row, can ever appear in that count, because this product has no sharing.
+  - A completed task does not count toward the cap; completing a task is how a person keeps working past a
+    cap without paying, and the cap must not punish that.
+  - This product has no soft-delete state for a task - br.task.delete.final removes the row outright - so
+    there is no deleted-but-present case to exclude today. If a soft delete is ever added, this rule must be
+    revisited before the count can be trusted again.
+authorityRefs:
+  - "product-intent: The cap counts work in flight, not work ever done; a person who finishes tasks should
+    never be told to delete history to make room for new ones."
+acceptanceCriteria: [excludes-complete]
+module: src/plan/cap-guard
+change: {rev: 1, kind: initial, at: 2026-09-18T07:00:30.000Z}
+refs: [br.task.list.owned, br.task.delete.final]
+blockedBy:
+  - No module exists yet at src/plan/cap-guard. This is a counting definition ready to implement against
+    the NestJS layout, but nothing has been built or run against it.

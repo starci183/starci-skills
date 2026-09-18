@@ -1,0 +1,27 @@
+schema: work/functional-requirement
+id: fr.plan.downgrade
+title: Downgrade to the free plan
+state: todo
+actors: [owner]
+trigger: The owner chooses to cancel or downgrade from the usage screen.
+mainFlow:
+  - The subscription becomes free immediately (t-downgrade), per decision.plan.downgrade.policy.
+  - No task is touched.
+exceptionFlows:
+  - The owner is left over the free cap; task creation is refused from then on until the count is back at
+    or under 20, exactly as an at-cap create is refused (br.plan.downgrade.freeze).
+postconditions:
+  - The downgrade is never refused for being over the new cap.
+composes:
+  - {rule: br.plan.downgrade.freeze, module: src/plan/subscription}
+refs: [decision.plan.downgrade.policy, sds.plan.subscription-lifecycle]
+
+requiresProof:
+  unit:
+    forEach: composes
+  uat:
+    required: true
+
+blockedBy:
+  - No module exists yet at src/plan/subscription; the example backend is moving to NestJS and this flow is
+    specified but not built.

@@ -1,0 +1,44 @@
+schema: work/contract
+id: contract.plan.create-precondition
+title: What task creation must ask the plan before it writes
+state: todo
+between:
+  provider: plan
+  consumer: task
+owner: plan
+surface:
+  - name: checkCanCreateTask
+    shape: "(personId) -> {allowed, reason?, upgrade?}"
+    guarantee: allowed is false only when the person's effective plan (read through
+      sds.plan.subscription-lifecycle's t-revert-on-read) has no room for one more active task
+      (br.plan.caps.limit, counted by br.plan.active-scope). A false result names the cap and the upgrade
+      path; it never explains by omission.
+    stability: Adding a field to a refusal is additive; removing allowed or changing when it is false is
+      breaking.
+guarantees:
+  - The check reads live state at call time; it is never cached across a create.
+consumerObligations:
+  - The task create path calls checkCanCreateTask before writing and honors a false result by refusing the
+    create and returning its reason and upgrade path unchanged.
+refs: [br.plan.caps.limit, sds.plan.cap-guard]
+
+requiresProof:
+  provider: {required: true}
+  consumer: {required: true}
+
+blockedBy:
+  - The provider side (sds.plan.cap-guard) has no implementation yet; see its own blockedBy.
+  - The consumer obligation cannot be met by this feature at all. fr.task.create and its implementation
+    (examples/todo-app-backend/app/src/task/ownership.mjs's createTaskStore().create, proved `done` by
+    impl.task.todo-app-backend.ownership) are owned by the task feature, already `done`, and this lane owns
+    only features/plan/**. This tree has no record family that lets a downstream feature attach a mandatory
+    precondition to an upstream, already-settled functional requirement without either editing code it does
+    not own or waiting for that feature's own lane to add the call. A contract can be authored unilaterally
+    by the consumer's would-be provider, but nothing in the layout requires the consumer to honor it, and
+    nothing flags fr.task.create as affected by a contract it never declared refs to. This is the layout gap
+    named in this feature's critique.
+
+conflictsWith:
+  - {record: fr.task.create, because: "fr.task.create's mainFlow creates a task for any non-empty title with
+      no precondition step and no dependency on this contract, so its done state and this contract's
+      consumerObligations describe two different, currently incompatible realities for the same code path."}

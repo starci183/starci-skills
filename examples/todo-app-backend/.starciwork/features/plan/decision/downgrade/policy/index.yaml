@@ -1,0 +1,29 @@
+schema: work/policy-decision
+id: decision.plan.downgrade.policy
+title: What happens when a downgrade leaves a person over the new cap
+state: done
+outcome: accept-and-freeze
+question: A paid person with 40 active tasks downgrades to free, which holds at most 20. Does the downgrade
+  happen at all, and if it does, what stops the count from growing further?
+options:
+  - id: refuse-downgrade
+    summary: Refuse the downgrade until the person is at or under 20 active tasks.
+    consequence: Simplest guard to write, but it holds someone hostage to a plan they are actively trying to
+      leave, over data they may not want to touch today; a "downgrade" that can be refused is really an
+      upgrade with no exit.
+  - id: accept-and-freeze
+    summary: Accept the downgrade immediately. Nothing already created is touched, but task creation is
+      frozen - refused the same way an at-cap create is refused - until the count is back at or under 20.
+    consequence: The person keeps everything and controls how they get back under the cap, by completing or
+      deleting; billing changes take effect the moment they are requested, which is what a downgrade means
+      everywhere else in the product.
+  - id: accept-and-trim
+    summary: Accept the downgrade and delete or archive tasks past the 20th until the count fits.
+    consequence: Nobody asked to lose data; a downgrade that deletes work is a support incident waiting to
+      happen, and "which 20" has no non-arbitrary answer.
+recommendation: accept-and-freeze
+recommendationReason: It is the only option that never destroys data and never blocks a billing change the
+  person asked for. The cost is a create refusal after the fact, and that refusal already exists as
+  ac.plan.caps.limit.refuses-over-cap; downgrade only needs to reach the same guard from a different starting
+  count, not invent a second one.
+blocks: [br.plan.downgrade.freeze]

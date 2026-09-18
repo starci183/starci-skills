@@ -61,6 +61,10 @@ environments:
         where: runtime/files/keycloak-admin-password.key
       - name: minio-root-password.key
         where: runtime/files/minio-root-password.key
+      - name: sepay-api-key.key
+        where: runtime/files/sepay-api-key.key
+      - name: sepay-webhook-secret.key
+        where: runtime/files/sepay-webhook-secret.key
       - name: uat
         where: secrets/uat
   vps:

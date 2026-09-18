@@ -1,0 +1,10 @@
+schema: work/ui-screen
+id: ui.plan.usage
+title: The usage screen and its upgrade action
+state: todo
+states: [under-cap, at-cap, over-cap-frozen, paid-unlimited]
+brand: {rev: 2}
+refs: [fr.plan.usage.view, fr.plan.upgrade]
+blockedBy:
+  - No screen exists yet. The frontend is moving to Next.js consuming the Grammar core package the way
+    nivo-fe does; no captures exist for any of the four states against that layout.

@@ -1,0 +1,62 @@
+schema: work/sds-component
+id: sds.plan.cap-guard
+title: The guard that refuses over the cap
+state: todo
+responsibility: Given a person's effective plan (read through t-revert-on-read, never the raw stored status)
+  and their active task count (br.plan.active-scope), decides whether one more task may be created, before
+  anything is written.
+interfaces:
+  - Every task create is meant to consult this guard before writing. Nothing in this tree does yet - see
+    conflictsWith below.
+refs: [br.plan.caps.limit, br.plan.active-scope]
+dependsOn: [sds.plan.subscription-lifecycle, contract.plan.create-precondition]
+
+stateMachine:
+  states: [unchecked, allowed, refused]
+  initial: unchecked
+  terminal: [allowed, refused]
+  transitions:
+    - id: t-under-cap
+      from: unchecked
+      to: allowed
+      on: active-count-below-cap
+      effect: The create proceeds.
+    - id: t-at-cap
+      from: unchecked
+      to: refused
+      on: active-count-at-or-over-cap
+      effect: The create is refused, naming the cap of 20 and the upgrade path (fr.plan.upgrade). Nothing is
+        written.
+
+sequence:
+  participants: [owner, api, postgres]
+  steps:
+    - {from: owner, to: api, message: "POST /tasks with a title, observable: http"}
+    - {from: api, to: postgres, message: "SELECT the owner's subscription and active task count, observable: read"}
+    - {from: api, to: owner, message: "the refusal, naming the cap and the upgrade path, when at or over it, observable: http"}
+    - {from: api, to: postgres, message: "INSERT the task, only when under the cap, observable: write"}
+  note: This is the sequence the guard is specified to run. It does not run today because nothing on the
+    real create path calls it - see conflictsWith.
+
+requiresProof:
+  implementation:
+    required: true
+  transitions:
+    forEach: stateMachine.transitions
+
+blockedBy:
+  - No module exists yet at src/plan/cap-guard. The example backend is moving to NestJS; this component is
+    specified but not built.
+  - Even once built, nothing calls it - fr.task.create's mainFlow ("The task is created, owned by the
+    submitter, not complete.") and its implementation
+    (examples/todo-app-backend/app/src/task/ownership.mjs's createTaskStore().create, proved by
+    impl.task.todo-app-backend.ownership) create unconditionally once the title is non-empty. This feature
+    owns only features/plan/**; it does not edit fr.task.create or the task module. See
+    contract.plan.create-precondition's conflictsWith for the record of that gap and this feature's report
+    for the critique it points to.
+
+conflictsWith:
+  - {record: fr.task.create, because: "fr.task.create's postcondition guarantees exactly one task is created
+      for any non-empty title from its owner, with no precondition step in its mainFlow and no way for
+      another feature to insert one without editing a done record this lane does not own; that guarantee
+      cannot hold once a free-plan owner is at the cap and the create must be refused instead."}

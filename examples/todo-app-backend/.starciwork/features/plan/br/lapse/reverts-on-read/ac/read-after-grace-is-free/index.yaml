@@ -1,0 +1,8 @@
+schema: work/acceptance-criterion
+id: ac.plan.lapse.reverts-on-read.read-after-grace-is-free
+rule: br.plan.lapse.reverts-on-read
+given: A subscription whose grace period elapsed with no renewal, now stored as lapsed
+when: The cap guard or the usage screen reads that person's effective plan
+then:
+  - The read returns free.
+  - The stored row still says lapsed; nothing wrote to it to produce this answer.
