@@ -75,6 +75,9 @@ class FakeSessionService {
   }
 
   async findActive(token: string): Promise<SessionRecord> {
+    if (!token) {
+      throw new SessionNotFoundException();
+    }
     const record = this.byToken.get(token);
     if (!record) {
       throw new SessionNotFoundException();
@@ -205,7 +208,7 @@ describe('todo-app-backend boot', () => {
 
   const graphql = (query: string, variables?: Record<string, unknown>, sessionToken?: string) => {
     const req = request(app.getHttpServer()).post('/graphql').send({ query, variables });
-    return sessionToken ? req.set('x-session-token', sessionToken) : req;
+    return sessionToken ? req.set('authorization', `Bearer ${sessionToken}`) : req;
   };
 
   beforeAll(async () => {
@@ -281,6 +284,26 @@ describe('todo-app-backend boot', () => {
 
     const afterSignOut = await graphql('query { tasks { taskId title complete } }', undefined, token);
     expect(afterSignOut.body.errors[0].extensions.code).toBe('SESSION_NOT_FOUND');
+  });
+
+  it('refuses an unauthenticated tasks query before any data is returned, with no Authorization header at all', async () => {
+    const noHeader = await graphql('query { tasks { taskId title complete } }');
+
+    expect(noHeader.body.data == null).toBe(true);
+    expect(noHeader.body.errors[0].extensions.code).toBe('SESSION_NOT_FOUND');
+  });
+
+  it('refuses a task mutation carrying a malformed Authorization header (no "Bearer " prefix) the same way', async () => {
+    const malformed = await request(app.getHttpServer())
+      .post('/graphql')
+      .set('authorization', 'not-a-bearer-token')
+      .send({
+        query: 'mutation CreateTask($input: CreateTaskInput!) { createTask(input: $input) { taskId } }',
+        variables: { input: { title: 'should never be created' } },
+      });
+
+    expect(malformed.body.data == null).toBe(true);
+    expect(malformed.body.errors[0].extensions.code).toBe('SESSION_NOT_FOUND');
   });
 
   it('answers a cross-origin preflight with Access-Control-Allow-Origin for http://localhost:3000', async () => {

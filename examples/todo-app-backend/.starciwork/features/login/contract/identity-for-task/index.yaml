@@ -9,11 +9,26 @@ owner: login
 surface:
   - name: actorOf
     shape: (request) -> {personId}, or throws a stable AbstractException subclass
+    transport: >-
+      GraphQL request header "Authorization: Bearer <sessionToken>" (RFC 6750 bearer-token form). The
+      token itself stays this app's own opaque, Postgres-backed session id (sds.login.session-store),
+      not a Keycloak-verified JWT, but the header name and value shape match nivo-fe/nivo-backend's own
+      convention for presenting an access token (nivo-fe apps/app/src/modules/api/graphql.ts sends
+      "authorization: Bearer <token>"). A missing header, an empty token, or a value with no "Bearer "
+      prefix all resolve to the empty string before any session lookup and are refused by
+      SessionNotFoundException before the lookup ever queries Postgres (session.service.ts#findActive) -
+      this is the fix for the auth bypass a real-browser uat.verify run found against the pre-refactor
+      REST controllers, where an absent header reached findOneBy({ token: undefined }) and TypeORM
+      silently matched an arbitrary session row instead of refusing. Rev 1/2 of this contract left the
+      header name implicit as the pre-refactor REST controllers' x-session-token, and rev 2's own
+      withdrawn text never named a header at all; this is the first revision to name the wire mechanism
+      as part of the surface, which is what let the original mismatch (frontend sending "Authorization:
+      Bearer", backend reading "x-session-token") go undetected until a live run caught it.
     guarantee: Resolves to the person of a live session. An absent or expired session throws
       SessionNotFoundException/SessionExpiredException (both AbstractException, both carrying a stable
       `code`) rather than returning a sentinel value; it never returns a partial person.
-    stability: A change to the shape, or to which exception subclass is thrown for which cause, is
-      breaking for task.
+    stability: A change to the shape, to the transport header name/value shape, or to which exception
+      subclass is thrown for which cause, is breaking for task.
 guarantees:
   - A returned personId belongs to a session that was live at the moment of the call.
   - An absent/expired session is a thrown, typed refusal, never "unknown" and never a null the caller
@@ -33,17 +48,24 @@ requiresProof:
     note: The consumer proves it honours its obligations.
 
 change:
-  rev: 2
+  rev: 3
   kind: breaking
-  at: 2026-09-18T14:20:00.000Z
-  withdraws: ["Returns the person of a live session, or null. Never throws, never a partial person.",
-    "null means unauthenticated, never \"unknown\"; task must not retry on it.",
-    "task treats null as a refusal and never invents an actor."]
-  reason: The withdrawn shape ("or null") never matched either the pre-refactor REST controllers or the
-    current session-actor.adapter.ts - both always throw SessionNotFoundException/SessionExpiredException
-    for an absent or expired session, and the consumer has always relied on that throw propagating as the
-    transport's own refusal, never on reading a null. This rev makes the contract describe the real,
-    already-tested mechanism instead of one the code never implemented.
+  at: 2026-09-18T16:40:00.000Z
+  withdraws: ["The session token travels as a custom \"x-session-token\" request header (implicit,
+      never named as part of this surface)."]
+  reason: >-
+    A real-browser uat.verify run (branch ex-uat-live, run 20260918T080854Z-f7ab26f0, against the
+    pre-refactor REST controllers) found the frontend sending "Authorization: Bearer <token>" while the
+    backend read "x-session-token" - an absent header reached findOneBy({ token: undefined }) and
+    matched an arbitrary session row, an auth bypass. By the time this lane started, both sides of the
+    reshaped GraphQL app had already been aligned onto "x-session-token" (verified: no live mismatch
+    exists on this base), but the header name itself was still never named as part of this contract's
+    surface - the exact gap that let the original mismatch go unnoticed. This rev (a) names the header
+    explicitly in surface[0].transport so a future change to either side is a contract change, not a
+    silent drift, and (b) renames the header itself to "Authorization: Bearer <token>", matching
+    nivo-fe/nivo-backend's own convention instead of this example's one-off custom header name. The
+    provider (session-actor.adapter.ts) also now refuses a missing/empty token before any database
+    query, closing the bypass class at its root rather than relying only on the header name matching.
 
 blockedBy:
   - {record: gap.task.collaborator-completion, because: "The consumer side (impl.task.todo-app-backend.ownership) went back to todo for the same reason: its owner-only guard has not been rebuilt to also honour an accepted editor collaborator, so it cannot re-prove this contract's consumer obligations until that gap closes."}

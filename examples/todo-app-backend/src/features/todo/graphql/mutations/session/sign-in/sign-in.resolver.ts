@@ -15,7 +15,7 @@ export class SignInResolver {
 
   @Mutation(() => SignInResponse, {
     name: 'signIn',
-    description: 'Sign in with an email + password; returns the session token to send back as x-session-token.',
+    description: 'Sign in with an email + password; returns the session token to send back as "Authorization: Bearer <token>".',
   })
   async signIn(@Args('input') input: SignInInput): Promise<SignInResponse> {
     const result = await this.commandBus.execute<SignInCommand, SignInCommandResult>(

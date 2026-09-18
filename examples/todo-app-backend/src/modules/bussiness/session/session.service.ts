@@ -54,6 +54,17 @@ export class SessionService {
   }
 
   async findActive(token: string): Promise<SessionRecord> {
+    // A missing/empty token is refused here, before any query is issued. This is deliberate, not
+    // cosmetic: real TypeORM criteria drop an `undefined` property from the generated WHERE clause
+    // rather than filtering on it, so `findOneBy(SessionEntity, { token: undefined })` would match the
+    // first row TypeORM's ordering happens to return instead of refusing - exactly the auth bypass a
+    // real-browser uat.verify run found against the pre-refactor REST controllers (an absent
+    // `Authorization` header reached `findOneBy({ token: undefined })` and matched an arbitrary
+    // session). Refusing on a falsy token before the call ever reaches the database makes that failure
+    // mode unreachable from here regardless of what the ORM does with `undefined`.
+    if (!token) {
+      throw new SessionNotFoundException({ reason: 'missing-token' });
+    }
     const row = await this.entityManager.findOneBy(SessionEntity, { token });
     if (!row) {
       throw new SessionNotFoundException();

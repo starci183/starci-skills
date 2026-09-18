@@ -9,7 +9,7 @@ describe('graphql', () => {
     vi.restoreAllMocks();
   });
 
-  it('sends the document, variables and x-session-token header, and unwraps the one top-level field', async () => {
+  it('sends the document, variables and an Authorization: Bearer <token> header, and unwraps the one top-level field', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       json: async () => ({ data: { tasks: [{ taskId: 't-1', title: 'Ship it', complete: false }] } }),
     });
@@ -21,18 +21,18 @@ describe('graphql', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain('/graphql');
     expect(init.method).toBe('POST');
-    expect(init.headers['x-session-token']).toBe('token-1');
+    expect(init.headers.authorization).toBe('Bearer token-1');
     expect(JSON.parse(init.body)).toEqual({ query: 'query { tasks { taskId } }', variables: { foo: 'bar' } });
   });
 
-  it('omits the x-session-token header when no token is given', async () => {
+  it('omits the Authorization header when no token is given', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ json: async () => ({ data: { signIn: { sessionToken: 'x' } } }) });
     global.fetch = fetchMock as unknown as typeof fetch;
 
     await graphql('mutation { signIn }');
 
     const [, init] = fetchMock.mock.calls[0];
-    expect(init.headers['x-session-token']).toBeUndefined();
+    expect(init.headers.authorization).toBeUndefined();
   });
 
   it('turns a GraphQL error into a refused Result carrying its extensions.code', async () => {

@@ -43,7 +43,7 @@ fail() {
 
 # Runs one GraphQL operation. Sets globals BODY (raw response text), HAS_ERRORS (0/1) and
 # ERROR_CODE (the first error's extensions.code, or empty). $1=query/mutation document, $2=JSON
-# variables object (or '{}'), $3=optional extra header ("x-session-token: ...").
+# variables object (or '{}'), $3=optional extra header ("Authorization: Bearer ...").
 graphql() {
   local doc="$1" vars="$2" extra_header="${3:-}"
   if [ -z "$vars" ]; then
@@ -135,47 +135,47 @@ pass
 
 ### 3. task CRUD
 step "createTask -> taskId"
-graphql "$CREATE_TASK" '{"input":{"title":"live-proof task"}}' "x-session-token: $TOKEN1"
+graphql "$CREATE_TASK" '{"input":{"title":"live-proof task"}}' "Authorization: Bearer $TOKEN1"
 assert_success
 TASK_ID=$(data_field createTask taskId)
 [ -n "$TASK_ID" ] || fail "no taskId in response: $BODY"
 pass
 
 step "tasks query contains the created task"
-graphql "$LIST_TASKS" '{}' "x-session-token: $TOKEN1"
+graphql "$LIST_TASKS" '{}' "Authorization: Bearer $TOKEN1"
 assert_success
 case "$BODY" in *"$TASK_ID"*) ;; *) fail "created task not in list: $BODY" ;; esac
 pass
 
 ### 4. br.task.complete.once: completing twice is idempotent
 step "completeTask (first time) -> complete:true"
-graphql "$COMPLETE_TASK" "{\"id\":\"$TASK_ID\"}" "x-session-token: $TOKEN1"
+graphql "$COMPLETE_TASK" "{\"id\":\"$TASK_ID\"}" "Authorization: Bearer $TOKEN1"
 assert_success
 FIRST_COMPLETE_BODY="$BODY"
 [ "$(data_field completeTask complete)" = "true" ] || fail "complete:true not in body: $BODY"
 pass
 
 step "completeTask (again) -> identical body (br.task.complete.once)"
-graphql "$COMPLETE_TASK" "{\"id\":\"$TASK_ID\"}" "x-session-token: $TOKEN1"
+graphql "$COMPLETE_TASK" "{\"id\":\"$TASK_ID\"}" "Authorization: Bearer $TOKEN1"
 assert_success
 [ "$BODY" = "$FIRST_COMPLETE_BODY" ] || fail "second complete body differs: '$BODY' vs '$FIRST_COMPLETE_BODY'"
 pass
 
 step "reopenTask -> complete:false"
-graphql "$REOPEN_TASK" "{\"id\":\"$TASK_ID\"}" "x-session-token: $TOKEN1"
+graphql "$REOPEN_TASK" "{\"id\":\"$TASK_ID\"}" "Authorization: Bearer $TOKEN1"
 assert_success
 [ "$(data_field reopenTask complete)" = "false" ] || fail "complete:false not in body: $BODY"
 pass
 
 ### 5. br.task.delete.final
 step "deleteTask -> deleted:true"
-graphql "$DELETE_TASK" "{\"id\":\"$TASK_ID\"}" "x-session-token: $TOKEN1"
+graphql "$DELETE_TASK" "{\"id\":\"$TASK_ID\"}" "Authorization: Bearer $TOKEN1"
 assert_success
 [ "$(data_field deleteTask deleted)" = "true" ] || fail "deleted:true not in body: $BODY"
 pass
 
 step "tasks query no longer contains the deleted task (br.task.delete.final)"
-graphql "$LIST_TASKS" '{}' "x-session-token: $TOKEN1"
+graphql "$LIST_TASKS" '{}' "Authorization: Bearer $TOKEN1"
 assert_success
 case "$BODY" in *"$TASK_ID"*) fail "deleted task still listed: $BODY" ;; esac
 pass
@@ -189,20 +189,20 @@ TOKEN2=$(data_field signIn sessionToken)
 pass
 
 step "demo2 creates a task -> taskId"
-graphql "$CREATE_TASK" '{"input":{"title":"demo2 private task"}}' "x-session-token: $TOKEN2"
+graphql "$CREATE_TASK" '{"input":{"title":"demo2 private task"}}' "Authorization: Bearer $TOKEN2"
 assert_success
 TASK2_ID=$(data_field createTask taskId)
 [ -n "$TASK2_ID" ] || fail "no taskId in response: $BODY"
 pass
 
 step "demo1 list does not contain demo2's task (br.task.list.owned)"
-graphql "$LIST_TASKS" '{}' "x-session-token: $TOKEN1"
+graphql "$LIST_TASKS" '{}' "Authorization: Bearer $TOKEN1"
 assert_success
 case "$BODY" in *"$TASK2_ID"*) fail "demo1 can see demo2's task: $BODY" ;; esac
 pass
 
 step "cleanup: demo2 deletes its own task"
-graphql "$DELETE_TASK" "{\"id\":\"$TASK2_ID\"}" "x-session-token: $TOKEN2"
+graphql "$DELETE_TASK" "{\"id\":\"$TASK2_ID\"}" "Authorization: Bearer $TOKEN2"
 assert_success
 pass
 
@@ -211,14 +211,14 @@ step "OPTIONS preflight from $ORIGIN carries Access-Control-Allow-Origin"
 CORS_HEADERS=$(curl -s -D - -o /dev/null -X OPTIONS "$API_URL/graphql" \
   -H "Origin: $ORIGIN" \
   -H "Access-Control-Request-Method: POST" \
-  -H "Access-Control-Request-Headers: x-session-token,content-type")
+  -H "Access-Control-Request-Headers: authorization,content-type")
 echo "$CORS_HEADERS" | grep -qi "^Access-Control-Allow-Origin: $ORIGIN" \
   || fail "no Access-Control-Allow-Origin header on OPTIONS: $CORS_HEADERS"
 pass
 
 step "POST from $ORIGIN carries Access-Control-Allow-Origin"
 CORS_HEADERS=$(curl -s -D - -o /dev/null -X POST "$API_URL/graphql" \
-  -H "Origin: $ORIGIN" -H "Content-Type: application/json" -H "x-session-token: $TOKEN1" \
+  -H "Origin: $ORIGIN" -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN1" \
   -d "$(node -e 'console.log(JSON.stringify({query:process.argv[1],variables:{}}))' "$LIST_TASKS")")
 echo "$CORS_HEADERS" | grep -qi "^Access-Control-Allow-Origin: $ORIGIN" \
   || fail "no Access-Control-Allow-Origin header on POST: $CORS_HEADERS"
@@ -232,7 +232,28 @@ assert_success
 pass
 
 step "tasks query after sign-out -> SESSION_NOT_FOUND"
-graphql "$LIST_TASKS" '{}' "x-session-token: $TOKEN1"
+graphql "$LIST_TASKS" '{}' "Authorization: Bearer $TOKEN1"
+assert_refused SESSION_NOT_FOUND
+pass
+
+### 8b. auth bypass regression (the class of bug a real-browser uat.verify run found on the
+### pre-refactor REST controllers: an absent Authorization header used to reach
+### findOneBy({ token: undefined }) and silently match an arbitrary session row instead of refusing).
+### Runs against the real Postgres session table, not a fake - only a live run can prove TypeORM's
+### actual criteria-building behavior, which the in-memory fake entity manager the Jest specs use does
+### not reproduce.
+step "tasks query with no Authorization header at all -> SESSION_NOT_FOUND, never another person's data"
+graphql "$LIST_TASKS" '{}'
+assert_refused SESSION_NOT_FOUND
+pass
+
+step "createTask with no Authorization header at all -> SESSION_NOT_FOUND, no row created"
+graphql "$CREATE_TASK" '{"input":{"title":"should never be created"}}'
+assert_refused SESSION_NOT_FOUND
+pass
+
+step "tasks query with a malformed Authorization header (no Bearer prefix) -> SESSION_NOT_FOUND"
+graphql "$LIST_TASKS" '{}' "Authorization: not-a-bearer-token"
 assert_refused SESSION_NOT_FOUND
 pass
 
