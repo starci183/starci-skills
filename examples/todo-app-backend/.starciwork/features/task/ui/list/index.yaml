@@ -7,4 +7,46 @@ brand: {rev: 2}
 refs: [fr.task.create]
 # Captures exist for brand rev 1 only; rev 2 changed the primary colour token. Not authored as
 # blockedBy: brand is already done, so citing it as a blocker would be stale on arrival.
-
+ui:
+  intent: >-
+    The create form precedes a task-list page section with its own heading; the list is never wrapped in a card and each task is one plain row, per COLLECTION-1. The representative direction is drawn for the refused state because it combines the densest actual Grammar anatomy this screen uses, including the accessibility-critical GrammarMessage(tone: danger, role=alert), while preserving the existing list when an empty title is refused by br.task.title.required.
+  surfaces:
+    - {name: list, route: /tasks, purpose: "create a task and read the task list", actors: [owner]}
+  states:
+    - {name: empty, trigger: "the list has no tasks", behavior: "an empty state says what to do next and the create form remains available"}
+    - {name: one-task, trigger: "one task has been created", behavior: "one plain task row appears in the task-list section"}
+    - {name: many-tasks, trigger: "multiple tasks exist", behavior: "equal plain task rows appear in the task-list section with no card wrapper"}
+    - {name: refused, trigger: "the owner submits an empty or whitespace-only title", behavior: "a GrammarMessage(tone: danger) appears above the create form; nothing is created and the task list remains unchanged"}
+  coverage:
+    scale: bounded
+    representativeScreens: [list]
+    map:
+      - {screen: list, state: empty, viewport: desktop-1280, components: ["GrammarTextField (task title)", "GrammarButton (create task)", "GrammarMessage (tone: danger, refused only)", "grammar-row CSS anatomy (plain task rows)"], derivation: "Derives from the refused representative direction: same GrammarTextField (task title), GrammarButton (create task), GrammarMessage (tone: danger, refused only) and task-list section anatomy; no rows are present and an empty state says what to do next."}
+      - {screen: list, state: one-task, viewport: desktop-1280, components: ["GrammarTextField (task title)", "GrammarButton (create task)", "GrammarMessage (tone: danger, refused only)", "grammar-row CSS anatomy (plain task rows)"], derivation: "Derives from the refused representative direction: the danger message is absent and one plain task row appears in the task-list section."}
+      - {screen: list, state: many-tasks, viewport: desktop-1280, components: ["GrammarTextField (task title)", "GrammarButton (create task)", "GrammarMessage (tone: danger, refused only)", "grammar-row CSS anatomy (plain task rows)"], derivation: "Derives from the refused representative direction: the danger message is absent and equal plain task rows repeat in the task-list section without a card wrapper."}
+      - {screen: list, state: refused, viewport: desktop-1280, components: ["GrammarTextField (task title)", "GrammarButton (create task)", "GrammarMessage (tone: danger, refused only)", "grammar-row CSS anatomy (plain task rows)"], derivation: "Representative direction; an empty or whitespace-only title is refused, nothing is created and the existing list remains unchanged.", directionAsset: assets/list-refused.png}
+  accessibility:
+    - Every interactive control is reachable by keyboard alone in visual order.
+    - GrammarMessage(tone: danger) carries role=alert and is announced without requiring focus.
+    - Text on the primary colour (#2F6BFF) keeps at least a 4.5:1 contrast ratio.
+  responsive:
+    - desktop-1280 is the representative viewport; mobile-390 keeps the same single-column order with no
+      hidden controls, derived rather than separately generated.
+  artworkSlots: []
+  observations: []
+  gaps:
+    - Grammar publishes row styling but no collection container; the task collection stays a page section with plain rows rather than an invented card component.
+assets:
+  - path: assets/list-refused.prompt.txt
+    role: prompt
+    provenance: authored-prompt-for-interface.draw
+  - path: assets/list-refused.png
+    role: direction
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/list-refused.prompt.txt
+      inputRefs: [ui.task.list, fr.task.create, br.task.title.required, brand]
+    provenance:
+      actor: codex
+      profile: gpt-5.6-sol
+      capturedAt: "2026-09-18T06:01:43.0535860Z"

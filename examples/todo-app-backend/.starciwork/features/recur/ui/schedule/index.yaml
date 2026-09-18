@@ -40,5 +40,15 @@ assets:
   - path: assets/schedule-refused.prompt.txt
     role: prompt
     provenance: authored-prompt-awaiting-interface.draw
+  - path: assets/schedule-refused.png
+    role: direction
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/schedule-refused.prompt.txt
+      inputRefs: [ui.recur.schedule, fr.recur.make-recurring, fr.recur.see-upcoming, fr.recur.end-rule, brand]
+    provenance:
+      actor: codex
+      profile: gpt-5.6-sol
+      capturedAt: "2026-09-18T06:10:35.1568108Z"
 blockedBy:
   - {record: gap.recur.direction-not-drawn, because: "interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has produced the refused representative direction or its sibling prompt bytes yet, only the prompt this record's assets entry names."}

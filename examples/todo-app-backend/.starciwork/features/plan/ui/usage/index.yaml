@@ -40,5 +40,15 @@ assets:
   - path: assets/usage-over-cap-frozen.prompt.txt
     role: prompt
     provenance: authored-prompt-awaiting-interface.draw
+  - path: assets/usage-over-cap-frozen.png
+    role: direction
+    generation:
+      tool: image_gen.imagegen
+      promptPath: assets/usage-over-cap-frozen.prompt.txt
+      inputRefs: [ui.plan.usage, fr.plan.usage.view, fr.plan.upgrade, brand]
+    provenance:
+      actor: codex
+      profile: gpt-5.6-sol
+      capturedAt: "2026-09-18T06:08:38.0462918Z"
 blockedBy:
   - {record: gap.plan.direction-not-drawn, because: "interface.draw has not run for this screen; no built-in image_gen.imagegen invocation has produced the over-cap-frozen representative direction or its sibling prompt bytes yet, only the prompt this record's assets entry names."}
