@@ -208,8 +208,8 @@ records:
   br.audit.append-only:
     schema: work/business-rule
     feature: audit
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.audit.log-line
@@ -221,17 +221,11 @@ records:
         - fr.audit.log.read
       tension:
         - decision.audit.erasure-method
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: The example's backend is moving to NestJS; src/audit/log does not exist yet. No evidence is
-          authored until a real Nest module and test prove the chain, not a description of one.
   br.audit.erasure.logged:
     schema: work/business-rule
     feature: audit
-    state: todo
-    effectiveState: todo
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.audit.erasure-request
@@ -242,8 +236,8 @@ records:
   br.audit.erasure.right:
     schema: work/business-rule
     feature: audit
-    state: todo
-    effectiveState: todo
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.audit.erasure-request
@@ -257,8 +251,8 @@ records:
   br.audit.retention:
     schema: work/business-rule
     feature: audit
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.audit.log-line
@@ -270,12 +264,6 @@ records:
         - br.audit.erasure.right
       tension:
         - decision.audit.erasure-method
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No storage layer exists yet under the Nest layout; there is nothing to run a retention
-          check against.
   br.login.password.sign-in:
     schema: work/business-rule
     feature: login
@@ -863,22 +851,13 @@ records:
   data.audit.erasure-request:
     schema: work/data
     feature: audit
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: decision.audit.erasure-method is now decided (crypto-shred), confirming this state
-          machine's t-execute effect was written against the answer that actually settled - no
-          further change to t-execute's effect or requiresProof is expected on that account. What
-          remains is that no implementation exists yet under the NestJS layout the example is moving
-          to.
+    state: done
+    effectiveState: done
   data.audit.log-line:
     schema: work/data
     feature: audit
-    state: todo
-    effectiveState: todo
+    state: done
+    effectiveState: done
   data.login.person:
     schema: work/data
     feature: login
@@ -1076,34 +1055,20 @@ records:
     schema: work/event
     feature: login
     state: todo
-    effectiveState: blocked
+    effectiveState: todo
     usedBy:
       subscribes:
         - fr.audit.log.append
         - sds.audit.log-chain
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: fr.login.sign-in's implementation now raises this event on the platform event bus after a
-          successful sign-in; audit's fr.audit.log.append still has nothing to subscribe to it with,
-          because no audit module exists yet under the NestJS layout.
   event.login.signed-out:
     schema: work/event
     feature: login
     state: todo
-    effectiveState: blocked
+    effectiveState: todo
     usedBy:
       subscribes:
         - fr.audit.log.append
         - sds.audit.log-chain
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: fr.login.sign-out's implementation now raises this event on the platform event bus after
-          the session is revoked; audit's fr.audit.log.append still has nothing to subscribe to it
-          with, because no audit module exists yet under the NestJS layout.
   event.task.completed:
     schema: work/event
     feature: task
@@ -1125,34 +1090,20 @@ records:
     schema: work/event
     feature: task
     state: todo
-    effectiveState: blocked
+    effectiveState: todo
     usedBy:
       subscribes:
         - fr.audit.log.append
         - sds.audit.log-chain
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: create-task's use case now raises this event on the platform event bus after the write
-          succeeds; audit's fr.audit.log.append still has nothing to subscribe to it with, because
-          no audit module exists yet under the NestJS layout.
   event.task.deleted:
     schema: work/event
     feature: task
     state: todo
-    effectiveState: blocked
+    effectiveState: todo
     usedBy:
       subscribes:
         - fr.audit.log.append
         - sds.audit.log-chain
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: delete-task's use case now raises this event on the platform event bus after the row is
-          gone; audit's fr.audit.log.append still has nothing to subscribe to it with, because no
-          audit module exists yet under the NestJS layout.
   fixture.todo-app.seed:
     schema: work/resource
     feature: null
@@ -1161,61 +1112,29 @@ records:
   fr.audit.erasure.complete:
     schema: work/functional-requirement
     feature: audit
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: decision.audit.erasure-method is now decided (crypto-shred), confirming this state
-          machine's t-execute effect was written against the answer that actually settled - no
-          further change to t-execute's effect or requiresProof is expected on that account. What
-          remains is that no implementation exists yet under the NestJS layout the example is moving
-          to.
+    state: done
+    effectiveState: done
   fr.audit.erasure.request:
     schema: work/functional-requirement
     feature: audit
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - ui.audit.privacy
-      blockedBy:
-        - fr.audit.erasure.complete
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: decision.audit.erasure-method is now decided (crypto-shred), confirming this state
-          machine's t-execute effect was written against the answer that actually settled - no
-          further change to t-execute's effect or requiresProof is expected on that account. What
-          remains is that no implementation exists yet under the NestJS layout the example is moving
-          to.
   fr.audit.export:
     schema: work/functional-requirement
     feature: audit
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - ui.audit.privacy
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation exists yet under the NestJS layout the example is moving to.
   fr.audit.log.append:
     schema: work/functional-requirement
     feature: audit
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: subscribes now names the five events this FR needs, and login's and task's implementations
-          actually raise all five today - the remaining absence is that no audit module exists yet
-          under the NestJS layout to host this trigger and wire it to them.
+    state: done
+    effectiveState: done
   fr.audit.log.read:
     schema: work/functional-requirement
     feature: audit
@@ -1563,6 +1482,7 @@ records:
     effectiveState: todo
     usedBy:
       blockedBy:
+        - journey.audit.right-to-be-forgotten
         - uat.audit.right-to-be-forgotten
   gap.audit.operator-role:
     schema: work/gap
@@ -1575,27 +1495,8 @@ records:
   gap.audit.unbuilt-module:
     schema: work/gap
     feature: audit
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - br.audit.append-only
-        - br.audit.retention
-        - event.login.signed-in
-        - event.login.signed-out
-        - event.task.created
-        - event.task.deleted
-        - fr.audit.erasure.complete
-        - fr.audit.erasure.request
-        - fr.audit.export
-        - fr.audit.log.append
-        - impl.audit.todo-app-backend.erasure
-        - impl.audit.todo-app-backend.log
-        - journey.audit.right-to-be-forgotten
-        - nfr.audit.retention
-        - nfr.audit.tamper-evidence
-        - sds.audit.erasure-request
-        - sds.audit.log-chain
+    state: done
+    effectiveState: done
   gap.login.device-field:
     schema: work/gap
     feature: login
@@ -1834,35 +1735,13 @@ records:
   impl.audit.todo-app-backend.erasure:
     schema: work/implementation
     feature: audit
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: decision.audit.erasure-method is now decided (crypto-shred), so this module has a settled
-          mechanism to build against; what remains is that no Nest module exists yet under the
-          layout the example is moving to.
+    state: done
+    effectiveState: done
   impl.audit.todo-app-backend.log:
     schema: work/implementation
     feature: audit
-    state: todo
-    effectiveState: blocked
-    usedBy:
-      blockedBy:
-        - sds.audit.log-chain
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: The owner has set the example's backend stack to NestJS, conforming to
-          checks/architecture.mjs and checks/code-patterns/nest*.mjs. No src/audit/ directory or
-          Nest module exists in this worktree. This record names the files the module will need (a
-          service holding the append/verify/readLine behaviour, a repository for the append-only
-          store, and a keystore service for per-person keys) but authors no verification, no
-          revision and no provenBy, because none of that would be true. Writing a passing
-          evidence.yaml against files that do not exist is exactly the failure this lane was told to
-          avoid.
+    state: done
+    effectiveState: done
   impl.login.todo-app-backend.auth:
     schema: work/implementation
     feature: login
@@ -2173,10 +2052,13 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.audit.unbuilt-module
+      - id: gap.audit.live-proof
         rootKind: gap
         cyclic: false
-        because: Depends on every fr in requirements, none of which are implemented yet.
+        because: "Every fr in requirements (fr.audit.erasure.request, fr.audit.erasure.complete,
+          fr.audit.export) is now done, closing the former gap.audit.unbuilt-module blocker. What
+          remains is requiresProof.uat: no uat.verify run has walked this journey against the
+          running product yet - the same absence gap.audit.live-proof names."
   journey.login.first-sign-in:
     schema: work/customer-journey
     feature: login
@@ -2270,28 +2152,13 @@ records:
   nfr.audit.retention:
     schema: work/non-functional-requirement
     feature: audit
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation and no fake-clock harness exist yet under the NestJS layout.
+    state: done
+    effectiveState: done
   nfr.audit.tamper-evidence:
     schema: work/non-functional-requirement
     feature: audit
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: "No implementation exists yet under the NestJS layout, so this measurement cannot be run.
-          This is also the record naming the check the earlier .mjs prototype (removed from this
-          worktree on the lead's instruction) used to satisfy the same property with node:test - the
-          design is not lost, only its executable form, and whoever writes the Nest module should
-          port that harness shape: mutate the store directly, then call the module's own verify
-          method, never the other way round."
+    state: done
+    effectiveState: done
   nfr.login.sign-in-timing:
     schema: work/non-functional-requirement
     feature: login
@@ -2384,41 +2251,16 @@ records:
   sds.audit.erasure-request:
     schema: work/sds-component
     feature: audit
-    state: todo
-    effectiveState: blocked
-    usedBy:
-      blockedBy:
-        - data.audit.erasure-request
-        - fr.audit.erasure.request
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: decision.audit.erasure-method is now decided (crypto-shred), confirming this state
-          machine's t-execute effect was written against the answer that actually settled - no
-          further change to t-execute's effect or requiresProof is expected on that account. What
-          remains is that no implementation exists yet under the NestJS layout the example is moving
-          to.
+    state: done
+    effectiveState: done
   sds.audit.log-chain:
     schema: work/sds-component
     feature: audit
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       dependsOn:
         - sds.audit.erasure-request
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: The owner has set the example's backend stack to NestJS, conforming to
-          checks/architecture.mjs and checks/code-patterns/nest*.mjs. No src/audit/ directory or
-          Nest module exists in this worktree. This record names the files the module will need (a
-          service holding the append/verify/readLine behaviour, a repository for the append-only
-          store, and a keystore service for per-person keys) but authors no verification, no
-          revision and no provenBy, because none of that would be true. Writing a passing
-          evidence.yaml against files that do not exist is exactly the failure this lane was told to
-          avoid.
   sds.login.session-store:
     schema: work/sds-component
     feature: login
@@ -2792,23 +2634,23 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 48
+    done: 65
     todo: 35
     stale: 0
-    blocked: 111
+    blocked: 94
     total: 194
   byFeature:
     audit:
-      done: 3
-      todo: 7
+      done: 20
+      todo: 3
       stale: 0
-      blocked: 16
+      blocked: 3
       total: 26
     login:
       done: 11
-      todo: 3
+      todo: 5
       stale: 0
-      blocked: 10
+      blocked: 8
       total: 24
     notify:
       done: 5
@@ -2836,9 +2678,9 @@ tally:
       total: 24
     task:
       done: 9
-      todo: 12
+      todo: 14
       stale: 0
-      blocked: 12
+      blocked: 10
       total: 33
   gaps:
     - id: gap.audit.direction-not-drawn
@@ -2862,9 +2704,10 @@ tally:
       closedBy: null
     - id: gap.audit.unbuilt-module
       feature: audit
-      state: todo
+      state: done
       closedBy:
         - impl.audit.todo-app-backend.log
+        - impl.audit.todo-app-backend.erasure
     - id: gap.login.device-field
       feature: login
       state: todo
@@ -2983,17 +2826,8 @@ tally:
       feature: task
       state: done
       closedBy: null
-  unbuiltModuleGaps: 5
+  unbuiltModuleGaps: 4
 frontier:
-  - id: br.audit.erasure.logged
-    feature: audit
-    title: An erasure is itself logged
-  - id: br.audit.erasure.right
-    feature: audit
-    title: A person may have what identifies them erased
-  - id: data.audit.log-line
-    feature: audit
-    title: Log line
   - id: gap.audit.emitted-events
     feature: audit
     title: login and task expose no emitted-event contract for audit to subscribe to
@@ -3003,9 +2837,12 @@ frontier:
   - id: gap.audit.operator-role
     feature: audit
     title: No operator/admin role exists to authorize reading the log
-  - id: gap.audit.unbuilt-module
-    feature: audit
-    title: No audit module exists under the NestJS layout yet
+  - id: event.login.signed-in
+    feature: login
+    title: A person signed in
+  - id: event.login.signed-out
+    feature: login
+    title: A person signed out
   - id: gap.login.device-field
     feature: login
     title: No device field exists on a session or person
@@ -3064,6 +2901,12 @@ frontier:
   - id: contract.task.list-for-dashboard
     feature: task
     title: What a dashboard may read about a person's tasks
+  - id: event.task.created
+    feature: task
+    title: A task was created
+  - id: event.task.deleted
+    feature: task
+    title: A task was deleted
   - id: gap.task.collaborator-completion
     feature: task
     title: The collaborator completion path is not implemented
@@ -3239,6 +3082,9 @@ unclassifiedEdges:
   - from: gap.audit.live-proof
     field: closedBy
     target: uat.audit.right-to-be-forgotten
+  - from: gap.audit.unbuilt-module
+    field: closedBy
+    target: impl.audit.todo-app-backend.erasure
   - from: gap.audit.unbuilt-module
     field: closedBy
     target: impl.audit.todo-app-backend.log

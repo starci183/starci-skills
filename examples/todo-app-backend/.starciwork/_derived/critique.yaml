@@ -57,18 +57,17 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.password.sign-in sends 49 other record(s) back to todo, would
-      stale 9 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      stale 13 evidence file(s), and touches 25 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
-      src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
-      src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
       src/features/pages/sign-in, src/features/pages/tasks/**,
-      src/features/todo/graphql/mutations/session, src/modules/bussiness/session,
-      src/modules/bussiness/task, src/modules/integrations/keycloak, src/modules/platform/events,
-      src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts,
-      src/plan/subscription, src/plan/subscription.ts, src/recur/generator.service.ts,
-      src/recur/occurrence.service.ts, src/recur/rule.service.ts, src/recur/zone.util.ts, src/share)
-      - this is the number a reviewer wants before approving the change.
+      src/features/todo/graphql/mutations/session, src/modules/bussiness/audit,
+      src/modules/bussiness/session, src/modules/bussiness/task, src/modules/integrations/keycloak,
+      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts,
+      src/plan/reconcile.ts, src/plan/subscription, src/plan/subscription.ts,
+      src/recur/generator.service.ts, src/recur/occurrence.service.ts, src/recur/rule.service.ts,
+      src/recur/zone.util.ts, src/share) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.login.session.restores
     kind: blast-radius
     severity: critical
@@ -123,18 +122,17 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.restores sends 48 other record(s) back to todo, would
-      stale 8 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      stale 12 evidence file(s), and touches 25 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
-      src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
-      src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
       src/features/pages/sign-in, src/features/pages/tasks/**,
-      src/features/todo/graphql/mutations/session, src/modules/bussiness/session,
-      src/modules/bussiness/task, src/modules/integrations/keycloak, src/modules/platform/events,
-      src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts,
-      src/plan/subscription, src/plan/subscription.ts, src/recur/generator.service.ts,
-      src/recur/occurrence.service.ts, src/recur/rule.service.ts, src/recur/zone.util.ts, src/share)
-      - this is the number a reviewer wants before approving the change.
+      src/features/todo/graphql/mutations/session, src/modules/bussiness/audit,
+      src/modules/bussiness/session, src/modules/bussiness/task, src/modules/integrations/keycloak,
+      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts,
+      src/plan/reconcile.ts, src/plan/subscription, src/plan/subscription.ts,
+      src/recur/generator.service.ts, src/recur/occurrence.service.ts, src/recur/rule.service.ts,
+      src/recur/zone.util.ts, src/share) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.login.session.single-device
     kind: blast-radius
     severity: critical
@@ -189,18 +187,17 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.single-device sends 48 other record(s) back to todo,
-      would stale 8 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      would stale 12 evidence file(s), and touches 25 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
-      src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
-      src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
       src/features/pages/sign-in, src/features/pages/tasks/**,
-      src/features/todo/graphql/mutations/session, src/modules/bussiness/session,
-      src/modules/bussiness/task, src/modules/integrations/keycloak, src/modules/platform/events,
-      src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts,
-      src/plan/subscription, src/plan/subscription.ts, src/recur/generator.service.ts,
-      src/recur/occurrence.service.ts, src/recur/rule.service.ts, src/recur/zone.util.ts, src/share)
-      - this is the number a reviewer wants before approving the change.
+      src/features/todo/graphql/mutations/session, src/modules/bussiness/audit,
+      src/modules/bussiness/session, src/modules/bussiness/task, src/modules/integrations/keycloak,
+      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts,
+      src/plan/reconcile.ts, src/plan/subscription, src/plan/subscription.ts,
+      src/recur/generator.service.ts, src/recur/occurrence.service.ts, src/recur/rule.service.ts,
+      src/recur/zone.util.ts, src/share) - this is the number a reviewer wants before approving the
+      change.
   - id: blast-radius:br.share.revoke.on-read
     kind: blast-radius
     severity: critical
@@ -304,13 +301,12 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.task.single-owner sends 23 other record(s) back to todo, would
-      stale 4 evidence file(s), and touches 15 code path(s) (src/app/tasks/**,
-      src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
-      src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
-      src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
-      src/modules/platform/databases/postgresql/primary, src/modules/platform/events,
-      src/plan/cap-guard.ts, src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription.ts)
-      - this is the number a reviewer wants before approving the change.
+      stale 8 evidence file(s), and touches 11 code path(s) (src/app/tasks/**,
+      src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/audit,
+      src/modules/bussiness/task, src/modules/platform/databases/postgresql/primary,
+      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments.ts,
+      src/plan/reconcile.ts, src/plan/subscription.ts) - this is the number a reviewer wants before
+      approving the change.
   - id: blast-radius:br.plan.caps.limit
     kind: blast-radius
     severity: critical
@@ -508,10 +504,8 @@ findings:
       - uat.audit.right-to-be-forgotten
       - ui.audit.privacy
     because: A breaking change to br.audit.append-only sends 11 other record(s) back to todo, would
-      stale 1 evidence file(s), and touches 6 code path(s) (src/audit/erasure-request.repository.ts,
-      src/audit/erasure.service.ts, src/audit/keystore.service.ts, src/audit/log,
-      src/audit/log.repository.ts, src/audit/log.service.ts) - this is the number a reviewer wants
-      before approving the change.
+      stale 8 evidence file(s), and touches 1 code path(s) (src/modules/bussiness/audit) - this is
+      the number a reviewer wants before approving the change.
   - id: blast-radius:br.recur.ending.preserves-history
     kind: blast-radius
     severity: critical
@@ -663,9 +657,8 @@ findings:
       - uat.audit.right-to-be-forgotten
       - ui.audit.privacy
     because: A breaking change to br.audit.erasure.right sends 8 other record(s) back to todo, would
-      stale 1 evidence file(s), and touches 3 code path(s) (src/audit/erasure,
-      src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts) - this is the number a
-      reviewer wants before approving the change.
+      stale 5 evidence file(s), and touches 1 code path(s) (src/modules/bussiness/audit) - this is
+      the number a reviewer wants before approving the change.
   - id: blast-radius:br.recur.generation.once
     kind: blast-radius
     severity: warn
@@ -716,9 +709,8 @@ findings:
       - uat.audit.right-to-be-forgotten
       - ui.audit.privacy
     because: A breaking change to br.audit.erasure.logged sends 7 other record(s) back to todo, would
-      stale 1 evidence file(s), and touches 3 code path(s) (src/audit/erasure,
-      src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts) - this is the number a
-      reviewer wants before approving the change.
+      stale 5 evidence file(s), and touches 1 code path(s) (src/modules/bussiness/audit) - this is
+      the number a reviewer wants before approving the change.
   - id: blast-radius:br.audit.retention
     kind: blast-radius
     severity: warn
@@ -731,11 +723,9 @@ findings:
       - nfr.audit.retention
       - sds.audit.erasure-request
       - sds.audit.log-chain
-    because: A breaking change to br.audit.retention sends 7 other record(s) back to todo, would stale 0
-      evidence file(s), and touches 6 code path(s) (src/audit/erasure-request.repository.ts,
-      src/audit/erasure.service.ts, src/audit/keystore.service.ts, src/audit/log,
-      src/audit/log.repository.ts, src/audit/log.service.ts) - this is the number a reviewer wants
-      before approving the change.
+    because: A breaking change to br.audit.retention sends 7 other record(s) back to todo, would stale 6
+      evidence file(s), and touches 1 code path(s) (src/modules/bussiness/audit) - this is the
+      number a reviewer wants before approving the change.
   - id: blast-radius:br.notify.unsubscribe.honored
     kind: blast-radius
     severity: warn
@@ -803,14 +793,6 @@ findings:
     because: gap.notify.unbuilt-module is used 18 time(s) (top decile of fan-in); it is owned by notify
       and read by 1 other feature(s) (task), so a change here is cross-feature coupling, not a local
       edit.
-  - id: fan-in-hotspot:gap.audit.unbuilt-module
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - gap.audit.unbuilt-module
-    because: gap.audit.unbuilt-module is used 17 time(s) (top decile of fan-in); it is owned by audit
-      and read by 2 other feature(s) (login, task), so a change here is cross-feature coupling, not
-      a local edit.
   - id: fan-in-hotspot:gap.plan.unbuilt-module
     kind: fan-in-hotspot
     severity: info
@@ -883,22 +865,22 @@ findings:
     because: sds.plan.subscription-lifecycle is used 9 time(s) (top decile of fan-in); it is owned by
       plan and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a
       change here is cross-feature coupling, not a local edit.
-  - id: unbound-sds:sds.audit.erasure-request
-    kind: unbound-sds
-    severity: warn
+  - id: fan-in-hotspot:br.plan.caps.limit
+    kind: fan-in-hotspot
+    severity: info
     records:
-      - sds.audit.erasure-request
-    because: sds.audit.erasure-request authors no owners entry, so it has no bound module and no
-      read-scope boundary - anything could claim to implement it, and nothing narrows what a
-      reviewer must open to check.
-  - id: unbound-sds:sds.audit.log-chain
-    kind: unbound-sds
-    severity: warn
+      - br.plan.caps.limit
+    because: br.plan.caps.limit is used 8 time(s) (top decile of fan-in); it is owned by plan and read
+      by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change here is
+      cross-feature coupling, not a local edit.
+  - id: fan-in-hotspot:br.task.single-owner
+    kind: fan-in-hotspot
+    severity: info
     records:
-      - sds.audit.log-chain
-    because: sds.audit.log-chain authors no owners entry, so it has no bound module and no read-scope
-      boundary - anything could claim to implement it, and nothing narrows what a reviewer must open
-      to check.
+      - br.task.single-owner
+    because: br.task.single-owner is used 8 time(s) (top decile of fan-in); it is owned by task and read
+      by 2 other feature(s) (login, share), so a change here is cross-feature coupling, not a local
+      edit.
   - id: unbound-sds:sds.notify.delivery-lifecycle
     kind: unbound-sds
     severity: warn
@@ -1043,6 +1025,14 @@ findings:
       - gap.login.live-proof
     because: integration.login.postgres is todo, blocked on gap.login.live-proof - a real product
       question, not missing code; it moves once that is settled.
+  - id: designed-todo:journey.audit.right-to-be-forgotten
+    kind: designed-todo
+    severity: info
+    records:
+      - journey.audit.right-to-be-forgotten
+      - gap.audit.live-proof
+    because: journey.audit.right-to-be-forgotten is todo, blocked on gap.audit.live-proof - a real
+      product question, not missing code; it moves once that is settled.
   - id: designed-todo:journey.login.first-sign-in
     kind: designed-todo
     severity: info
@@ -1143,22 +1133,6 @@ findings:
       - gap.task.live-proof
     because: uat.task.create is todo, blocked on gap.task.live-proof - a real product question, not
       missing code; it moves once that is settled.
-  - id: leftover-todo:br.audit.append-only
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.audit.append-only
-      - gap.audit.unbuilt-module
-    because: br.audit.append-only is todo, blocked on gap.audit.unbuilt-module - code that simply has
-      not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.audit.retention
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.audit.retention
-      - gap.audit.unbuilt-module
-    because: br.audit.retention is todo, blocked on gap.audit.unbuilt-module - code that simply has not
-      been written yet; the owner wants this count at zero.
   - id: leftover-todo:br.notify.delivery.once
     kind: leftover-todo
     severity: info
@@ -1344,14 +1318,6 @@ findings:
     because: contract.share.completion-guard-for-task is todo, blocked on
       gap.task.collaborator-completion - code that simply has not been written yet; the owner wants
       this count at zero.
-  - id: leftover-todo:data.audit.erasure-request
-    kind: leftover-todo
-    severity: info
-    records:
-      - data.audit.erasure-request
-      - gap.audit.unbuilt-module
-    because: data.audit.erasure-request is todo, blocked on gap.audit.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:data.notify.delivery-attempt
     kind: leftover-todo
     severity: info
@@ -1376,22 +1342,6 @@ findings:
       - gap.notify.unbuilt-module
     because: data.notify.preference is todo, blocked on gap.notify.unbuilt-module - code that simply has
       not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:event.login.signed-in
-    kind: leftover-todo
-    severity: info
-    records:
-      - event.login.signed-in
-      - gap.audit.unbuilt-module
-    because: event.login.signed-in is todo, blocked on gap.audit.unbuilt-module - code that simply has
-      not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:event.login.signed-out
-    kind: leftover-todo
-    severity: info
-    records:
-      - event.login.signed-out
-      - gap.audit.unbuilt-module
-    because: event.login.signed-out is todo, blocked on gap.audit.unbuilt-module - code that simply has
-      not been written yet; the owner wants this count at zero.
   - id: leftover-todo:event.task.completed
     kind: leftover-todo
     severity: info
@@ -1400,54 +1350,6 @@ findings:
       - gap.notify.unbuilt-module
     because: event.task.completed is todo, blocked on gap.notify.unbuilt-module - code that simply has
       not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:event.task.created
-    kind: leftover-todo
-    severity: info
-    records:
-      - event.task.created
-      - gap.audit.unbuilt-module
-    because: event.task.created is todo, blocked on gap.audit.unbuilt-module - code that simply has not
-      been written yet; the owner wants this count at zero.
-  - id: leftover-todo:event.task.deleted
-    kind: leftover-todo
-    severity: info
-    records:
-      - event.task.deleted
-      - gap.audit.unbuilt-module
-    because: event.task.deleted is todo, blocked on gap.audit.unbuilt-module - code that simply has not
-      been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.audit.erasure.complete
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.audit.erasure.complete
-      - gap.audit.unbuilt-module
-    because: fr.audit.erasure.complete is todo, blocked on gap.audit.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.audit.erasure.request
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.audit.erasure.request
-      - gap.audit.unbuilt-module
-    because: fr.audit.erasure.request is todo, blocked on gap.audit.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.audit.export
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.audit.export
-      - gap.audit.unbuilt-module
-    because: fr.audit.export is todo, blocked on gap.audit.unbuilt-module - code that simply has not
-      been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.audit.log.append
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.audit.log.append
-      - gap.audit.unbuilt-module
-    because: fr.audit.log.append is todo, blocked on gap.audit.unbuilt-module - code that simply has not
-      been written yet; the owner wants this count at zero.
   - id: leftover-todo:fr.notify.digest
     kind: leftover-todo
     severity: info
@@ -1584,22 +1486,6 @@ findings:
       - gap.task.collaborator-completion
     because: fr.task.reopen is todo, blocked on gap.task.collaborator-completion - code that simply has
       not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:impl.audit.todo-app-backend.erasure
-    kind: leftover-todo
-    severity: info
-    records:
-      - impl.audit.todo-app-backend.erasure
-      - gap.audit.unbuilt-module
-    because: impl.audit.todo-app-backend.erasure is todo, blocked on gap.audit.unbuilt-module - code
-      that simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:impl.audit.todo-app-backend.log
-    kind: leftover-todo
-    severity: info
-    records:
-      - impl.audit.todo-app-backend.log
-      - gap.audit.unbuilt-module
-    because: impl.audit.todo-app-backend.log is todo, blocked on gap.audit.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:impl.notify.todo-app-backend.pipeline
     kind: leftover-todo
     severity: info
@@ -1706,14 +1592,6 @@ findings:
       - gap.recur.unbuilt-module
     because: integration.recur.scheduler is todo, blocked on gap.recur.unbuilt-module - code that simply
       has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:journey.audit.right-to-be-forgotten
-    kind: leftover-todo
-    severity: info
-    records:
-      - journey.audit.right-to-be-forgotten
-      - gap.audit.unbuilt-module
-    because: journey.audit.right-to-be-forgotten is todo, blocked on gap.audit.unbuilt-module - code
-      that simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:journey.notify.told-about-completion
     kind: leftover-todo
     severity: info
@@ -1738,22 +1616,6 @@ findings:
       - gap.share.unbuilt-module
     because: journey.share.collaborate-on-a-task is todo, blocked on gap.share.unbuilt-module - code
       that simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:nfr.audit.retention
-    kind: leftover-todo
-    severity: info
-    records:
-      - nfr.audit.retention
-      - gap.audit.unbuilt-module
-    because: nfr.audit.retention is todo, blocked on gap.audit.unbuilt-module - code that simply has not
-      been written yet; the owner wants this count at zero.
-  - id: leftover-todo:nfr.audit.tamper-evidence
-    kind: leftover-todo
-    severity: info
-    records:
-      - nfr.audit.tamper-evidence
-      - gap.audit.unbuilt-module
-    because: nfr.audit.tamper-evidence is todo, blocked on gap.audit.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:nfr.notify.delivery.latency
     kind: leftover-todo
     severity: info
@@ -1786,22 +1648,6 @@ findings:
       - gap.share.unbuilt-module
     because: nfr.share.revoke.read-latency is todo, blocked on gap.share.unbuilt-module - code that
       simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:sds.audit.erasure-request
-    kind: leftover-todo
-    severity: info
-    records:
-      - sds.audit.erasure-request
-      - gap.audit.unbuilt-module
-    because: sds.audit.erasure-request is todo, blocked on gap.audit.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:sds.audit.log-chain
-    kind: leftover-todo
-    severity: info
-    records:
-      - sds.audit.log-chain
-      - gap.audit.unbuilt-module
-    because: sds.audit.log-chain is todo, blocked on gap.audit.unbuilt-module - code that simply has not
-      been written yet; the owner wants this count at zero.
   - id: leftover-todo:sds.notify.delivery-lifecycle
     kind: leftover-todo
     severity: info
