@@ -1,9 +1,82 @@
 {
   "name": "todo-app-frontend",
   "private": true,
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test:unit": "node --test src/**/*.test.mjs"
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@todo-app/grammar": "file:packages/grammar",
+    "next": "^15.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "swr": "^2.2.5"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.5.0",
+    "@testing-library/react": "^16.0.1",
+    "@types/node": "^22.7.0",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.2"
+  },
+  "starci": {
+    "codePatterns": {
+      "next": {
+        "schema": "starci/next-code-pattern-contract@1",
+        "dataLifecycle": {
+          "schema": "starci/next-data-lifecycle@1",
+          "swr": { "package": "swr", "major": 2 },
+          "hooks": [
+            {
+              "id": "task-list-query",
+              "path": "src/hooks/task/use-tasks.ts",
+              "export": "useTasks",
+              "kind": "query",
+              "resultBinding": "tasksQuery",
+              "identities": [
+                { "id": "viewer", "binding": "token", "gatesRequest": true, "resource": true }
+              ]
+            },
+            {
+              "id": "task-create-mutation",
+              "path": "src/hooks/task/use-create-task.ts",
+              "export": "useCreateTask",
+              "kind": "mutation",
+              "resultBinding": "createTask",
+              "identities": [
+                { "id": "viewer", "binding": "token", "gatesRequest": true, "resource": true }
+              ]
+            },
+            {
+              "id": "task-complete-mutation",
+              "path": "src/hooks/task/use-set-task-complete.ts",
+              "export": "useSetTaskComplete",
+              "kind": "mutation",
+              "resultBinding": "setTaskComplete",
+              "identities": [
+                { "id": "viewer", "binding": "token", "gatesRequest": true, "resource": true }
+              ]
+            },
+            {
+              "id": "task-delete-mutation",
+              "path": "src/hooks/task/use-delete-task.ts",
+              "export": "useDeleteTask",
+              "kind": "mutation",
+              "resultBinding": "deleteTask",
+              "identities": [
+                { "id": "viewer", "binding": "token", "gatesRequest": true, "resource": true }
+              ]
+            }
+          ]
+        }
+      }
+    }
   }
 }
-
