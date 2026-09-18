@@ -1,7 +1,7 @@
 schema: work/sds-component
 id: sds.audit.erasure-request
 title: The lifecycle of one request to be forgotten
-state: todo
+state: done
 responsibility: Verifies a request is really the subject (or an authorized operator acting for them),
   then destroys what makes that person's log lines readable, then confirms and logs the completion.
 interfaces:
@@ -9,6 +9,8 @@ interfaces:
     of the subject's lines still decrypt.
 refs: [br.audit.erasure.right, br.audit.erasure.logged]
 dependsOn: [sds.audit.log-chain]
+owners:
+  - {role: module, path: src/modules/bussiness/audit}
 
 stateMachine:
   states: [requested, verified, executing, complete, refused]
@@ -56,7 +58,13 @@ sequence:
     - {from: api, to: keystore, message: "destroy the subject's key and its personId mapping, observable: write"}
     - {from: api, to: log, message: "append the erasure-completed line, observable: write"}
   note: Only interactions an end-to-end run can observe are bound here, matching sds.login.session-store's
-    own note.
+    own note. Implementation note (impl.audit.todo-app-backend.erasure) - this example has no separate
+    re-authentication channel, so steps 3-4's challenge/response is satisfied by the same
+    `x-session-token` that already authenticated the GraphQL call - t-verify runs immediately inside
+    AuditErasureService.request rather than waiting on a second round-trip, since the only caller who
+    can ever reach t-request for a given personId is that person's own signed-in session (see
+    gap.audit.operator-role - there is no operator-initiated erasure yet). The state machine and its
+    transitions are unchanged; only this one sequence step's transport is collapsed.
 
 requiresProof:
   implementation:
@@ -64,5 +72,13 @@ requiresProof:
   transitions:
     forEach: stateMachine.transitions
 
-blockedBy:
-  - {record: gap.audit.unbuilt-module, because: "decision.audit.erasure-method is now decided (crypto-shred), confirming this state machine's t-execute effect was written against the answer that actually settled - no further change to t-execute's effect or requiresProof is expected on that account. What remains is that no implementation exists yet under the NestJS layout the example is moving to."}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: "impl.audit.todo-app-backend.erasure names the real module: AuditErasureService
+    (src/modules/bussiness/audit/audit-erasure.service.ts) implements t-request/t-verify/t-refuse/
+    t-execute/t-complete under exactly those method names, each proven in
+    audit-erasure.service.spec.ts. owners added naming the real capability directory; blockedBy removed
+    now that gap.audit.unbuilt-module is closed. sequence.note gained the re-authentication-collapse
+    clarification above."

@@ -2,7 +2,7 @@ schema: work/non-functional-requirement
 id: nfr.audit.retention
 title: A line survives its full retention window
 quality: compliance
-state: todo
+state: done
 observableCriterion: A line captured at time T is still present, positioned and chain-valid at T plus
   400 days, in a run using a fake clock rather than real elapsed time.
 measurement:
@@ -15,5 +15,12 @@ requiresProof:
   measurement:
     required: true
 
-blockedBy:
-  - {record: gap.audit.unbuilt-module, because: "No implementation and no fake-clock harness exist yet under the NestJS layout."}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: "gap.audit.unbuilt-module is closed. AuditLogService takes an injected Clock constructor
+    parameter (src/modules/bussiness/audit/audit-log.service.ts, defaulting to the real clock) so
+    audit-log.service.spec.ts can advance a fake clock past 400 days with no real wait and assert
+    sweepRetention's line count and chain validity are unchanged, plus a second case proving retention
+    holds independently of an active erasure against the same line's subject."

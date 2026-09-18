@@ -1,7 +1,7 @@
 schema: work/functional-requirement
 id: fr.audit.log.append
 title: Append a line for a tracked action
-state: todo
+state: done
 actors: [system]
 trigger: A tracked action completes elsewhere in the product - a sign-in, a sign-out, a task created,
   completed or deleted.
@@ -12,8 +12,8 @@ postconditions:
   - The line count increases by exactly one.
   - Recomputing the chain from the first line still reports valid.
 composes:
-  - {rule: br.audit.append-only, module: src/audit/log}
-  - {rule: br.audit.retention, module: src/audit/log}
+  - {rule: br.audit.append-only, module: src/modules/bussiness/audit}
+  - {rule: br.audit.retention, module: src/modules/bussiness/audit}
 subscribes: [event.task.created, event.task.completed, event.task.deleted, event.login.signed-in, event.login.signed-out]
 
 requiresProof:
@@ -24,5 +24,15 @@ requiresProof:
   uat:
     required: true
 
-blockedBy:
-  - {record: gap.audit.unbuilt-module, because: "subscribes now names the five events this FR needs, and login's and task's implementations actually raise all five today - the remaining absence is that no audit module exists yet under the NestJS layout to host this trigger and wire it to them."}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: "gap.audit.unbuilt-module is closed. AuditEventSubscriber (src/modules/bussiness/audit
+    /audit-event.subscriber.ts) subscribes to PlatformEventBus for exactly the five events `subscribes`
+    names and dispatches AppendLogLineCommand for each, proven per-event in
+    audit-event.subscriber.spec.ts; AuditLogService.append/verifyChain prove the postconditions in
+    audit-log.service.spec.ts. Also exercised end to end by scripts/live-proof-audit.sh against the
+    real dev stack. composes[].module corrected to the real capability directory. requiresProof.uat
+    stays unfulfilled here: uat.audit.right-to-be-forgotten (gap.audit.live-proof) has not run and is
+    outside this backend lane's scope."

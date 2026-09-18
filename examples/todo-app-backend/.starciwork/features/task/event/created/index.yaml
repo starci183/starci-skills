@@ -10,6 +10,12 @@ payload:
   - {name: sourceEventId, type: text, note: "Stable and unique per real create; the only thing a subscriber's dedupe key can honestly hash."}
 delivery: {guarantee: at-least-once, ordering: per-key}
 refs: [fr.task.create]
-blockedBy:
-  - {record: gap.audit.unbuilt-module, because: "create-task's use case now raises this event on the platform event bus after the write succeeds; audit's fr.audit.log.append still has nothing to subscribe to it with, because no audit module exists yet under the NestJS layout."}
-change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}
+change:
+  rev: 2
+  kind: editorial
+  at: 2026-09-18T12:00:00.000Z
+  reason: "blockedBy on gap.audit.unbuilt-module removed - it is done: AuditEventSubscriber
+    (examples/todo-app-backend/src/modules/bussiness/audit/audit-event.subscriber.ts) now subscribes
+    to this exact event on the platform event bus and turns it into an appended log line
+    (fr.audit.log.append), proven in that module's own audit-event.subscriber.spec.ts. This record's
+    own state is left for task's lane to advance."

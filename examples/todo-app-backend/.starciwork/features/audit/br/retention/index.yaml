@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.audit.retention
 title: A log line is kept for 400 days
-state: todo
+state: done
 statements:
   - A line stays present and readable-or-tombstoned in storage for 400 days from its capture time.
   - Retention is a floor, not a promise of permanent readability; erasure may end a line's readability
@@ -10,8 +10,15 @@ authorityRefs:
   - "owner-intent: 400 days covers a year plus an audit cycle's slack; shorter windows have lost the
     line an investigation needed."
 acceptanceCriteria: [available-through-window]
-module: src/audit/log
-blockedBy:
-  - {record: gap.audit.unbuilt-module, because: "No storage layer exists yet under the Nest layout; there is nothing to run a retention check against."}
+module: src/modules/bussiness/audit
 
-change: {rev: 1, kind: initial, at: 2026-09-18T06:01:00.000Z}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: "gap.audit.unbuilt-module is closed: AuditLogService takes an injected Clock
+    (src/modules/bussiness/audit/audit-log.service.ts) so audit-log.service.spec.ts can advance past 400
+    days without a real wait and assert sweepRetention's count and chain validity are unchanged, and a
+    second case proves retention and erasure are independent axes (the line still exists past the window
+    but no longer decrypts once its subject is erased). module corrected from the drafted src/audit/log
+    (never built) to the real Nest capability directory."

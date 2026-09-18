@@ -1,0 +1,28 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: fr.audit.erasure.request
+recordDigest: 86cf9050feac74382e735dfa7ba5161924b3c9a9fa30078b49e4c437ae09863b
+outcome: pass
+assertions:
+  - id: br.audit.erasure.right
+    command: npx jest -t "ac.audit.erasure.right.identifying-fields-unreadable"
+    exit: 0
+    outcome: pass
+    observation: npx jest -t "ac.audit.erasure.right.identifying-fields-unreadable" exited 0
+  - id: br.audit.erasure.logged
+    command: npx jest -t "ac.audit.erasure.logged.request-and-completion-are-lines"
+    exit: 0
+    outcome: pass
+    observation: npx jest -t "ac.audit.erasure.logged.request-and-completion-are-lines" exited 0
+  - id: handler
+    command: npx jest src/modules/bussiness/audit/request-erasure.handler.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/audit/request-erasure.handler.spec.ts exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T09:20:49.602Z

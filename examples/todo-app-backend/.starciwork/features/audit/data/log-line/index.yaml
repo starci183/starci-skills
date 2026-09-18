@@ -1,7 +1,7 @@
 schema: work/data
 id: data.audit.log-line
 title: Log line
-state: todo
+state: done
 fields:
   - {name: at, type: timestamp, required: true, note: "Capture time, set once, never revised."}
   - {name: action, type: text, required: true, note: "What happened, e.g. sign-in, task.created."}
@@ -25,3 +25,16 @@ conflictsWith:
       task.deleted line for the full retention window - append-only forbids scrubbing it, so a
       task's identifier does resolve to something for as long as the line is readable, through the
       log's own read and export paths."
+
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: "All three refs (br.audit.append-only, br.audit.retention, br.audit.erasure.right) are done:
+    this is exactly AuditLogLineEntity
+    (src/modules/platform/databases/postgresql/primary/entities/audit-log-line.entity.ts), field for
+    field, and its two invariants are what AuditLogService.verifyChain/append (never UPDATE/DELETE
+    against this table) and AuditKeystoreService (actor decrypts only while the key exists) hold,
+    proven in audit-log.service.spec.ts and audit-keystore.service.spec.ts. The conflictsWith tension
+    with br.task.delete.final is unchanged and stays recorded as a real, accepted tension, not
+    something this pass resolves."

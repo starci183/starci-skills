@@ -1,7 +1,7 @@
 schema: work/functional-requirement
 id: fr.audit.erasure.complete
 title: Complete an erasure
-state: todo
+state: done
 actors: [system]
 trigger: A verified erasure request is picked up by the erasure worker.
 mainFlow:
@@ -15,8 +15,8 @@ postconditions:
   - No reader, including export, can resolve the subject's identity from any line they produced.
   - Every line's bytes, position and hash are unchanged from before the request.
 composes:
-  - {rule: br.audit.erasure.right, module: src/audit/erasure}
-  - {rule: br.audit.erasure.logged, module: src/audit/erasure}
+  - {rule: br.audit.erasure.right, module: src/modules/bussiness/audit}
+  - {rule: br.audit.erasure.logged, module: src/modules/bussiness/audit}
 
 requiresProof:
   unit:
@@ -26,6 +26,18 @@ requiresProof:
   uat:
     required: true
 
-blockedBy:
-  - {record: fr.audit.erasure.request, because: "decision.audit.erasure-method is now decided (crypto-shred), but fr.audit.erasure.request - the step this one follows - has not been built yet; the same gap fr.audit.erasure.request records."}
-  - {record: gap.audit.unbuilt-module, because: "No implementation exists yet under the NestJS layout the example is moving to."}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T12:00:00.000Z
+  reason: "fr.audit.erasure.request and gap.audit.unbuilt-module are both closed. This example has no
+    background worker; the GraphQL completeErasure mutation
+    (features/todo/graphql/mutations/audit/complete-erasure) exposes the worker's pickup directly for
+    the caller who requested it to trigger, dispatching CompleteErasureCommand to
+    AuditErasureService.execute (src/modules/bussiness/audit/audit-erasure.service.ts) - t-execute, the
+    unreadability confirmation, then t-complete, refusing with ERASURE_NOT_CONFIRMED rather than
+    completing if any line still decrypted (the exceptionFlow above), all proven in
+    audit-erasure.service.spec.ts and complete-erasure.handler.spec.ts, and exercised end to end by
+    scripts/live-proof-audit.sh. composes[].module corrected to the real capability directory.
+    requiresProof.uat stays unfulfilled: uat.audit.right-to-be-forgotten (gap.audit.live-proof) has not
+    run and is outside this backend lane's scope."

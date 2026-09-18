@@ -18,4 +18,4 @@ requiresProof:
     forEach: requirements
 
 blockedBy:
-  - {record: gap.audit.unbuilt-module, because: "Depends on every fr in requirements, none of which are implemented yet."}
+  - {record: gap.audit.live-proof, because: "Every fr in requirements (fr.audit.erasure.request, fr.audit.erasure.complete, fr.audit.export) is now done, closing the former gap.audit.unbuilt-module blocker. What remains is requiresProof.uat: no uat.verify run has walked this journey against the running product yet - the same absence gap.audit.live-proof names."}
