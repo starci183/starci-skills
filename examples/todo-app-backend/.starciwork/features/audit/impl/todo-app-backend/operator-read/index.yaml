@@ -1,0 +1,8 @@
+schema: work/implementation
+id: impl.audit.todo-app-backend.operator-read
+title: The fail-closed operator check and the filtered whole-chain read
+repository: todo-app
+state: todo
+owners:
+  - {role: module, path: src/modules/bussiness/audit}
+proves: [fr.audit.log.read]

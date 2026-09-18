@@ -5,6 +5,7 @@ import { AuditKeystoreService } from './audit-keystore.service';
 import { AuditLogService } from './audit-log.service';
 import { AuditErasureService } from './audit-erasure.service';
 import { AuditEventSubscriber } from './audit-event.subscriber';
+import { AuditOperatorGuard } from './audit-operator.guard';
 import { AppendLogLineHandler } from './append-log-line.handler';
 import { RequestErasureHandler } from './request-erasure.handler';
 import { CompleteErasureHandler } from './complete-erasure.handler';
@@ -36,6 +37,7 @@ export class AuditModule extends ConfigurableModuleClass {
         AuditLogService,
         AuditErasureService,
         AuditEventSubscriber,
+        AuditOperatorGuard,
         AppendLogLineHandler,
         RequestErasureHandler,
         CompleteErasureHandler,

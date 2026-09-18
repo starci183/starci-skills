@@ -23,6 +23,35 @@ describe('AuditErasureService', () => {
     expect(record.verifiedAt).not.toBeNull();
   });
 
+  it('sds.audit.erasure-request t-verify as its own second round: confirm() on the still-pending request verifies it for its subject', async () => {
+    const { log, keystore, erasure } = build();
+    await log.append('person-1', 'sign-in', null); // a line first, so the subject has a key to keep
+    const requested = await (erasure as unknown as {
+      tRequest(personId: string): Promise<{ requestId: string }>;
+    }).tRequest('person-1'); // the state tRequest leaves behind, before chained verification
+
+    const verified = await erasure.confirm(requested.requestId, 'person-1');
+
+    expect(verified.state).toBe('verified');
+    expect(verified.personId).toBe('person-1');
+    expect(verified.verifiedAt).not.toBeNull();
+    expect(await keystore.getKeyIdForPerson('person-1')).not.toBeNull(); // t-verify touches no keys
+  });
+
+  it('sds.audit.erasure-request t-verify: confirm() by a stranger of a still-pending request refuses it (t-refuse), and nothing about the subject\'s keys is touched', async () => {
+    const { log, keystore, erasure } = build();
+    await log.append('person-1', 'sign-in', null);
+    const requested = await (erasure as unknown as {
+      tRequest(personId: string): Promise<{ requestId: string }>;
+    }).tRequest('person-1');
+    const keyIdBefore = await keystore.getKeyIdForPerson('person-1');
+
+    await expect(erasure.confirm(requested.requestId, 'someone-else')).rejects.toMatchObject({
+      code: 'ERASURE_REQUEST_FORBIDDEN',
+    });
+    expect(await keystore.getKeyIdForPerson('person-1')).toBe(keyIdBefore);
+  });
+
   it('ac.audit.erasure.logged.request-and-completion-are-lines: an erasure-requested line and an erasure-completed line both exist, in that order, and neither names the erased person', async () => {
     const { log, erasure } = build();
     await log.append('person-1', 'sign-in', null); // some ordinary activity first

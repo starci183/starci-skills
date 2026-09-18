@@ -4,6 +4,7 @@ import type { EntityManager } from 'typeorm';
 import { InjectPrimaryEntityManager, AuditLogLineEntity } from '../../platform/databases/postgresql/primary';
 import { AuditKeystoreService } from './audit-keystore.service';
 import { AuditLogLineRecord } from './types/audit-log-line-record';
+import type { ResolvedAuditLine } from './types/resolved-audit-line';
 
 const GENESIS = 'GENESIS';
 
@@ -109,16 +110,27 @@ export class AuditLogService {
 
   /** fr.audit.log.read's per-line resolution: a tombstoned line (destroyed key) reads back as
    * tombstoned rather than throwing. */
-  async readLine(row: AuditLogLineEntity): Promise<AuditLogLineRecord> {
+  async readLine(row: AuditLogLineEntity): Promise<ResolvedAuditLine> {
     const key = await this.keystore.getKeyMaterial(row.keyId);
     if (!key) {
-      return new AuditLogLineRecord(row.id, row.at, row.action, row.target, null, true);
+      return { at: row.at, action: row.action, target: row.target, actor: null, tombstoned: true };
     }
     const actor = this.keystore.unseal(key, row.actor);
     if (actor === null) {
-      return new AuditLogLineRecord(row.id, row.at, row.action, row.target, null, true);
+      return { at: row.at, action: row.action, target: row.target, actor: null, tombstoned: true };
     }
-    return new AuditLogLineRecord(row.id, row.at, row.action, row.target, actor, false);
+    return { at: row.at, action: row.action, target: row.target, actor, tombstoned: false };
+  }
+
+  /**
+   * Every line the log holds, oldest first, each resolved through readLine - the whole-chain read
+   * fr.audit.log.read's operator path (audit-operator-read.ts's filter/summary pair) runs over. Like
+   * findLinesForPerson it returns only resolved shapes: the response keeps the record's postcondition
+   * (no sealed actor blob, no keyId) by construction, tombstoned or not.
+   */
+  async readAllLines(): Promise<ResolvedAuditLine[]> {
+    const rows = await this.entityManager.find(AuditLogLineEntity, { order: { id: 'ASC' } });
+    return Promise.all(rows.map(row => this.readLine(row)));
   }
 
   /**
@@ -128,7 +140,7 @@ export class AuditLogService {
    * only the decrypted `actor` (which here always equals `personId`, since the filter already selected
    * their own key) or a tombstoned line if erasure raced this same read.
    */
-  async findLinesForPerson(personId: string): Promise<AuditLogLineRecord[]> {
+  async findLinesForPerson(personId: string): Promise<ResolvedAuditLine[]> {
     const keyId = await this.keystore.getKeyIdForPerson(personId);
     if (!keyId) return [];
     const rows = await this.entityManager.find(AuditLogLineEntity, { where: { keyId }, order: { id: 'ASC' } });
@@ -137,7 +149,7 @@ export class AuditLogService {
 
   /** fr.audit.export: identical resolution to findLinesForPerson - once a completed erasure destroys the
    * subject's key, this and the own-lines read agree by construction, both finding no keyId to filter on. */
-  async exportForPerson(personId: string): Promise<AuditLogLineRecord[]> {
+  async exportForPerson(personId: string): Promise<ResolvedAuditLine[]> {
     return this.findLinesForPerson(personId);
   }
 }

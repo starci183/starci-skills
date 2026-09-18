@@ -208,8 +208,8 @@ records:
   br.audit.append-only:
     schema: work/business-rule
     feature: audit
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.audit.log-line
@@ -221,17 +221,11 @@ records:
         - fr.audit.log.read
       tension:
         - decision.audit.erasure-method
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: The example's backend is moving to NestJS; src/audit/log does not exist yet. No evidence is
-          authored until a real Nest module and test prove the chain, not a description of one.
   br.audit.erasure.logged:
     schema: work/business-rule
     feature: audit
-    state: todo
-    effectiveState: todo
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.audit.erasure-request
@@ -242,8 +236,8 @@ records:
   br.audit.erasure.right:
     schema: work/business-rule
     feature: audit
-    state: todo
-    effectiveState: todo
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.audit.erasure-request
@@ -257,8 +251,8 @@ records:
   br.audit.retention:
     schema: work/business-rule
     feature: audit
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.audit.log-line
@@ -270,12 +264,6 @@ records:
         - br.audit.erasure.right
       tension:
         - decision.audit.erasure-method
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No storage layer exists yet under the Nest layout; there is nothing to run a retention
-          check against.
   br.login.password.sign-in:
     schema: work/business-rule
     feature: login
@@ -327,8 +315,8 @@ records:
   br.notify.delivery.once:
     schema: work/business-rule
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - contract.notify.new-device-signal
@@ -341,19 +329,11 @@ records:
       composes:
         - fr.notify.on-completion
         - fr.notify.on-new-device
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No code exists yet at src/notify/dedupe. The example is moving to a NestJS backend and this
-          module has not been written against that layout; the statement is agreed but not
-          implementable-and-proven until it is, so it stays todo rather than done on the strength of
-          a design alone.
   br.notify.digest.window:
     schema: work/business-rule
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.notify.notification
@@ -363,35 +343,21 @@ records:
         - fr.notify.digest
         - fr.notify.on-completion
         - fr.notify.on-new-device
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No code exists yet at src/notify/digest. The example is moving to a NestJS backend and this
-          module has not been written against that layout, so the rule stays todo rather than
-          claiming proof it does not have.
   br.notify.failure.classified:
     schema: work/business-rule
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.notify.delivery-attempt
         - integration.notify.smtp
         - sds.notify.delivery-lifecycle
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No code exists yet at src/notify/delivery. The example is moving to a NestJS backend and
-          this module has not been written against that layout, so the classification stays a
-          design, not a demonstrated fact.
   br.notify.unsubscribe.honored:
     schema: work/business-rule
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.notify.delivery-attempt
@@ -399,32 +365,20 @@ records:
         - sds.notify.delivery-lifecycle
       composes:
         - fr.notify.unsubscribe
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No code exists yet at src/notify/preferences. The example is moving to a NestJS backend and
-          this module has not been written against that layout, so the rule stays todo.
   br.plan.active-scope:
     schema: work/business-rule
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - fr.plan.usage.view
         - sds.plan.cap-guard
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/cap-guard. This is a counting definition ready to
-          implement against the NestJS layout, but nothing has been built or run against it.
   br.plan.caps.limit:
     schema: work/business-rule
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - br.plan.downgrade.freeze
@@ -436,50 +390,31 @@ records:
         - sds.plan.subscription-lifecycle
       composes:
         - fr.plan.upgrade
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/cap-guard. The example backend is moving to NestJS
-          (checks/architecture.mjs, checks/code-patterns/nest*.mjs); the guard is specified here but
-          not built against that layout, so there is nothing to run and nothing to prove.
   br.plan.downgrade.freeze:
     schema: work/business-rule
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.plan.subscription
         - sds.plan.subscription-lifecycle
       composes:
         - fr.plan.downgrade
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/subscription. The decision is settled; nothing has been
-          built or run against the NestJS layout.
   br.plan.lapse.reverts-on-read:
     schema: work/business-rule
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.plan.subscription
         - sds.plan.subscription-lifecycle
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/subscription. The example backend is moving to NestJS;
-          this rule is specified but not built or run against that layout.
   br.plan.payment.idempotent:
     schema: work/business-rule
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - data.plan.payment-intent
@@ -487,12 +422,6 @@ records:
         - sds.plan.reconciliation
       composes:
         - fr.plan.reconcile
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/payments. The example backend is moving to NestJS; this
-          rule is specified but not built or run against that layout.
   br.recur.ending.preserves-history:
     schema: work/business-rule
     feature: recur
@@ -613,9 +542,6 @@ records:
       composes:
         - fr.task.complete
         - fr.task.reopen
-      conflictsWith:
-        - contract.notify.task-completion-feed
-        - fr.notify.on-completion
       blockedBy:
         - fr.task.complete
         - fr.task.reopen
@@ -685,6 +611,11 @@ records:
     feature: null
     state: done
     effectiveState: done
+  contract.audit.emitted-events:
+    schema: work/contract
+    feature: audit
+    state: todo
+    effectiveState: todo
   contract.login.identity-for-task:
     schema: work/contract
     feature: login
@@ -715,46 +646,18 @@ records:
     schema: work/contract
     feature: notify
     state: todo
-    effectiveState: blocked
+    effectiveState: todo
     usedBy:
       refs:
         - fr.notify.on-completion
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: "Owned entirely by the notify side of an interface that task has now built: complete-task's
-          use case publishes event.task.completed on the platform event bus. What remains is that no
-          notify module exists yet under the NestJS/Next.js layout to host onTaskComplete and call
-          it."
   contract.plan.create-precondition:
     schema: work/contract
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       dependsOn:
         - sds.plan.cap-guard
-      blockedBy:
-        - journey.plan.hits-the-cap
-        - uat.plan.upgrade-after-cap
-    blockers:
-      - id: gap.plan.cap-guard-not-wired
-        rootKind: gap
-        cyclic: false
-        because: Even once built, nothing calls it today - fr.task.create's mainFlow ("The task is created,
-          owned by the submitter, not complete.") and its implementation
-          (impl.task.todo-app-backend.ownership) create unconditionally once the title is non-empty.
-          This feature owns only features/plan/**; it does not edit fr.task.create or the task
-          module, and appliesTo (above) is exactly this record's constraint on that record, not a
-          request the task feature has honored yet. gap.plan.cap-guard-not-wired names that absence
-          instead of citing contract.plan.create-precondition directly, which itself waits on this
-          record - the two are not both allowed to cite each other over the same fact.
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/cap-guard. The example backend is moving to NestJS; this
-          component is specified but not built.
   contract.share.completion-guard-for-task:
     schema: work/contract
     feature: share
@@ -790,22 +693,13 @@ records:
   data.audit.erasure-request:
     schema: work/data
     feature: audit
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: decision.audit.erasure-method is now decided (crypto-shred), confirming this state
-          machine's t-execute effect was written against the answer that actually settled - no
-          further change to t-execute's effect or requiresProof is expected on that account. What
-          remains is that no implementation exists yet under the NestJS layout the example is moving
-          to.
+    state: done
+    effectiveState: done
   data.audit.log-line:
     schema: work/data
     feature: audit
-    state: todo
-    effectiveState: todo
+    state: done
+    effectiveState: done
   data.login.person:
     schema: work/data
     feature: login
@@ -817,36 +711,18 @@ records:
   data.notify.delivery-attempt:
     schema: work/data
     feature: notify
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No entity or table exists yet. The example is moving to a NestJS/TypeORM backend and this
-          shape has not been created against that layout.
+    state: done
+    effectiveState: done
   data.notify.notification:
     schema: work/data
     feature: notify
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No entity or table exists yet. The example is moving to a NestJS/TypeORM backend and this
-          shape has not been created against that layout.
+    state: done
+    effectiveState: done
   data.notify.preference:
     schema: work/data
     feature: notify
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No entity or table exists yet. The example is moving to a NestJS/TypeORM backend and this
-          shape has not been created against that layout.
+    state: done
+    effectiveState: done
   data.plan.payment-intent:
     schema: work/data
     feature: plan
@@ -910,6 +786,15 @@ records:
     feature: audit
     state: done
     effectiveState: done
+  decision.audit.operator-role:
+    schema: work/policy-decision
+    feature: audit
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - fr.audit.log.read
+        - journey.audit.right-to-be-forgotten
   decision.login.session.devices:
     schema: work/policy-decision
     feature: login
@@ -1003,83 +888,48 @@ records:
     schema: work/event
     feature: login
     state: todo
-    effectiveState: blocked
+    effectiveState: todo
     usedBy:
       subscribes:
         - fr.audit.log.append
         - sds.audit.log-chain
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: fr.login.sign-in's implementation now raises this event on the platform event bus after a
-          successful sign-in; audit's fr.audit.log.append still has nothing to subscribe to it with,
-          because no audit module exists yet under the NestJS layout.
   event.login.signed-out:
     schema: work/event
     feature: login
     state: todo
-    effectiveState: blocked
+    effectiveState: todo
     usedBy:
       subscribes:
         - fr.audit.log.append
         - sds.audit.log-chain
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: fr.login.sign-out's implementation now raises this event on the platform event bus after
-          the session is revoked; audit's fr.audit.log.append still has nothing to subscribe to it
-          with, because no audit module exists yet under the NestJS layout.
   event.task.completed:
     schema: work/event
     feature: task
     state: todo
-    effectiveState: blocked
+    effectiveState: todo
     usedBy:
       subscribes:
         - fr.audit.log.append
         - fr.notify.on-completion
         - sds.audit.log-chain
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: complete-task's use case now raises this event on the platform event bus after the write
-          succeeds; notify still has nothing to subscribe to it with, because no notify module
-          exists yet under the NestJS/Next.js layout.
   event.task.created:
     schema: work/event
     feature: task
     state: todo
-    effectiveState: blocked
+    effectiveState: todo
     usedBy:
       subscribes:
         - fr.audit.log.append
         - sds.audit.log-chain
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: create-task's use case now raises this event on the platform event bus after the write
-          succeeds; audit's fr.audit.log.append still has nothing to subscribe to it with, because
-          no audit module exists yet under the NestJS layout.
   event.task.deleted:
     schema: work/event
     feature: task
     state: todo
-    effectiveState: blocked
+    effectiveState: todo
     usedBy:
       subscribes:
         - fr.audit.log.append
         - sds.audit.log-chain
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: delete-task's use case now raises this event on the platform event bus after the row is
-          gone; audit's fr.audit.log.append still has nothing to subscribe to it with, because no
-          audit module exists yet under the NestJS layout.
   fixture.todo-app.seed:
     schema: work/resource
     feature: null
@@ -1088,74 +938,44 @@ records:
   fr.audit.erasure.complete:
     schema: work/functional-requirement
     feature: audit
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: decision.audit.erasure-method is now decided (crypto-shred), confirming this state
-          machine's t-execute effect was written against the answer that actually settled - no
-          further change to t-execute's effect or requiresProof is expected on that account. What
-          remains is that no implementation exists yet under the NestJS layout the example is moving
-          to.
+    state: done
+    effectiveState: done
   fr.audit.erasure.request:
     schema: work/functional-requirement
     feature: audit
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - ui.audit.privacy
-      blockedBy:
-        - fr.audit.erasure.complete
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: decision.audit.erasure-method is now decided (crypto-shred), confirming this state
-          machine's t-execute effect was written against the answer that actually settled - no
-          further change to t-execute's effect or requiresProof is expected on that account. What
-          remains is that no implementation exists yet under the NestJS layout the example is moving
-          to.
   fr.audit.export:
     schema: work/functional-requirement
     feature: audit
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - ui.audit.privacy
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation exists yet under the NestJS layout the example is moving to.
   fr.audit.log.append:
     schema: work/functional-requirement
     feature: audit
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: subscribes now names the five events this FR needs, and login's and task's implementations
-          actually raise all five today - the remaining absence is that no audit module exists yet
-          under the NestJS layout to host this trigger and wire it to them.
+    state: done
+    effectiveState: done
   fr.audit.log.read:
     schema: work/functional-requirement
     feature: audit
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.audit.operator-role
-        rootKind: gap
+      - id: decision.audit.operator-role
+        rootKind: decision
         cyclic: false
-        because: The example has no operator/admin role today - data.login.person has no role field and no
-          existing record establishes who is authorized to read the log. This FR cannot be
-          implemented honestly until that authorization boundary is defined, by this feature or by
-          login.
+        because: "The operator authorization this FR's mainFlow step 1 names has no accepted source: the
+          example's session seam resolves only {token, personId, issuedAt, expiresAt} and
+          data.login.person has no role field (gap.audit.operator-role rev 2).
+          audit-operator-read.ts's fail-closed check stands built and unit-proven waiting for that
+          decision; until it is decided, only the caller's-own-lines read is reachable, which is not
+          this record's whole mainFlow, so it stays todo."
   fr.login.sign-in:
     schema: work/functional-requirement
     feature: login
@@ -1188,34 +1008,16 @@ records:
   fr.notify.digest:
     schema: work/functional-requirement
     feature: notify
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation exists. The example is moving to a NestJS backend and this module has not
-          been built against that layout.
+    state: done
+    effectiveState: done
   fr.notify.on-completion:
     schema: work/functional-requirement
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - contract.notify.task-completion-feed
-      blockedBy:
-        - journey.notify.told-about-completion
-        - nfr.notify.delivery.guarantee
-        - uat.notify.digest-and-unsubscribe
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: event.task.completed is now actually raised by complete-task's use case, which subscribes
-          names as the trigger instead of overloading contract.notify.task-completion-feed for it;
-          this record stays todo because no notify module exists yet under the NestJS/Next.js layout
-          to subscribe to it.
   fr.notify.on-new-device:
     schema: work/functional-requirement
     feature: notify
@@ -1237,30 +1039,22 @@ records:
   fr.notify.unsubscribe:
     schema: work/functional-requirement
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - ui.notify.preferences
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation exists at src/notify/preferences or app/notify under the NestJS/Next.js
-          layout the example is moving to; ui.notify.preferences (the only surface a person would
-          use to unsubscribe) now has its interface.draw direction and reached done, but nothing on
-          either side has been built against it yet.
   fr.plan.downgrade:
     schema: work/functional-requirement
     feature: plan
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
         cyclic: false
-        because: No module exists yet at src/plan/subscription; the example backend is moving to NestJS and
-          this flow is specified but not built.
+        because: No usage screen or downgrade action exists yet at app/plan for an owner to actually reach;
+          this backend-only lane does not build the frontend.
   fr.plan.reconcile:
     schema: work/functional-requirement
     feature: plan
@@ -1270,11 +1064,19 @@ records:
       refs:
         - sds.plan.reconciliation
     blockers:
-      - id: gap.plan.unbuilt-module
+      - id: gap.plan.live-proof
         rootKind: gap
         cyclic: false
-        because: No module exists yet at src/plan/reconcile; the example backend is moving to NestJS and
-          this flow is specified but not built.
+        because: uat.verify has not run this flow, or the journey it belongs to, against the running product
+          yet.
+      - id: gap.plan.sepay-not-reachable
+        rootKind: gap
+        cyclic: false
+        because: No call has been made against the real SePay sandbox yet. SepayClient
+          (src/modules/integrations/sepay/sepay.client.ts) makes the real HTTP calls this record's
+          endpoints name, and is unit-tested against an in-process fake override, but a fake proves
+          the guard (sds.plan.cap-guard, sds.plan.subscription-lifecycle, sds.plan.reconciliation),
+          never this integration itself.
   fr.plan.upgrade:
     schema: work/functional-requirement
     feature: plan
@@ -1287,12 +1089,17 @@ records:
         - journey.plan.hits-the-cap
         - uat.plan.upgrade-after-cap
     blockers:
-      - id: gap.plan.unbuilt-module
+      - id: gap.plan.live-proof
         rootKind: gap
         cyclic: false
-        because: No module exists yet at src/plan/subscription; the example backend is moving to NestJS and
-          this flow is specified but not built, so there is no unit suite and no UAT walk to point
-          to yet.
+        because: uat.verify has not run this flow against the running product yet, and
+          integration.plan.sepay (the live gateway leg the mainFlow's checkout step depends on) is
+          still todo.
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
+        cyclic: false
+        because: No usage screen or upgrade action exists yet at app/plan for an owner to actually reach;
+          this backend-only lane does not build the frontend.
   fr.plan.usage.view:
     schema: work/functional-requirement
     feature: plan
@@ -1304,12 +1111,11 @@ records:
       blockedBy:
         - journey.plan.hits-the-cap
     blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
         cyclic: false
-        because: No module exists yet at src/plan/cap-guard or the usage screen; the example backend is
-          moving to NestJS and the frontend to Next.js consuming the Grammar core package, and this
-          flow is specified but not built against either layout.
+        because: No usage screen exists yet at app/plan/usage-screen.tsx for an owner to actually open; this
+          backend-only lane does not build the frontend.
   fr.recur.edit-rule:
     schema: work/functional-requirement
     feature: recur
@@ -1432,6 +1238,7 @@ records:
         - event.task.completed
       blockedBy:
         - contract.share.completion-guard-for-task
+        - journey.notify.told-about-completion
     blockers:
       - id: br.task.complete.once
         rootKind: record
@@ -1453,7 +1260,8 @@ records:
     schema: work/functional-requirement
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: appliesTo-newer:sds.plan.cap-guard
     usedBy:
       refs:
         - event.task.created
@@ -1493,39 +1301,18 @@ records:
     effectiveState: todo
     usedBy:
       blockedBy:
+        - journey.audit.right-to-be-forgotten
         - uat.audit.right-to-be-forgotten
   gap.audit.operator-role:
     schema: work/gap
     feature: audit
     state: todo
     effectiveState: todo
-    usedBy:
-      blockedBy:
-        - fr.audit.log.read
   gap.audit.unbuilt-module:
     schema: work/gap
     feature: audit
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - br.audit.append-only
-        - br.audit.retention
-        - event.login.signed-in
-        - event.login.signed-out
-        - event.task.created
-        - event.task.deleted
-        - fr.audit.erasure.complete
-        - fr.audit.erasure.request
-        - fr.audit.export
-        - fr.audit.log.append
-        - impl.audit.todo-app-backend.erasure
-        - impl.audit.todo-app-backend.log
-        - journey.audit.right-to-be-forgotten
-        - nfr.audit.retention
-        - nfr.audit.tamper-evidence
-        - sds.audit.erasure-request
-        - sds.audit.log-chain
+    state: done
+    effectiveState: done
   gap.login.device-field:
     schema: work/gap
     feature: login
@@ -1572,6 +1359,14 @@ records:
     usedBy:
       blockedBy:
         - fr.notify.on-new-device
+  gap.notify.smtp-host-unreachable:
+    schema: work/gap
+    feature: notify
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - integration.notify.smtp
   gap.notify.task-completion-event:
     schema: work/gap
     feature: notify
@@ -1580,36 +1375,13 @@ records:
   gap.notify.unbuilt-module:
     schema: work/gap
     feature: notify
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - br.notify.delivery.once
-        - br.notify.digest.window
-        - br.notify.failure.classified
-        - br.notify.unsubscribe.honored
-        - contract.notify.task-completion-feed
-        - data.notify.delivery-attempt
-        - data.notify.notification
-        - data.notify.preference
-        - event.task.completed
-        - fr.notify.digest
-        - fr.notify.on-completion
-        - fr.notify.unsubscribe
-        - impl.notify.todo-app-backend.pipeline
-        - integration.notify.queue
-        - integration.notify.smtp
-        - nfr.notify.delivery.latency
-        - sds.notify.delivery-lifecycle
-        - uat.notify.digest-and-unsubscribe
+    state: done
+    effectiveState: done
   gap.plan.cap-guard-not-wired:
     schema: work/gap
     feature: plan
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - sds.plan.cap-guard
+    state: done
+    effectiveState: done
   gap.plan.direction-not-drawn:
     schema: work/gap
     feature: plan
@@ -1622,7 +1394,17 @@ records:
     effectiveState: todo
     usedBy:
       blockedBy:
+        - fr.plan.reconcile
+        - fr.plan.upgrade
         - uat.plan.upgrade-after-cap
+  gap.plan.no-load-harness:
+    schema: work/gap
+    feature: plan
+    state: todo
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - nfr.plan.cap-check.latency
   gap.plan.sepay-not-reachable:
     schema: work/gap
     feature: plan
@@ -1634,26 +1416,8 @@ records:
   gap.plan.unbuilt-module:
     schema: work/gap
     feature: plan
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - br.plan.active-scope
-        - br.plan.caps.limit
-        - br.plan.downgrade.freeze
-        - br.plan.lapse.reverts-on-read
-        - br.plan.payment.idempotent
-        - fr.plan.downgrade
-        - fr.plan.reconcile
-        - fr.plan.upgrade
-        - fr.plan.usage.view
-        - impl.plan.todo-app-backend.plan
-        - impl.plan.todo-app-frontend.usage
-        - nfr.plan.cap-check.latency
-        - sds.plan.cap-guard
-        - sds.plan.reconciliation
-        - sds.plan.subscription-lifecycle
-        - uat.plan.upgrade-after-cap
+    state: done
+    effectiveState: done
   gap.recur.direction-not-drawn:
     schema: work/gap
     feature: recur
@@ -1746,35 +1510,18 @@ records:
   impl.audit.todo-app-backend.erasure:
     schema: work/implementation
     feature: audit
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: decision.audit.erasure-method is now decided (crypto-shred), so this module has a settled
-          mechanism to build against; what remains is that no Nest module exists yet under the
-          layout the example is moving to.
+    state: done
+    effectiveState: done
   impl.audit.todo-app-backend.log:
     schema: work/implementation
     feature: audit
+    state: done
+    effectiveState: done
+  impl.audit.todo-app-backend.operator-read:
+    schema: work/implementation
+    feature: audit
     state: todo
-    effectiveState: blocked
-    usedBy:
-      blockedBy:
-        - sds.audit.log-chain
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: The owner has set the example's backend stack to NestJS, conforming to
-          checks/architecture.mjs and checks/code-patterns/nest*.mjs. No src/audit/ directory or
-          Nest module exists in this worktree. This record names the files the module will need (a
-          service holding the append/verify/readLine behaviour, a repository for the append-only
-          store, and a keystore service for per-person keys) but authors no verification, no
-          revision and no provenBy, because none of that would be true. Writing a passing
-          evidence.yaml against files that do not exist is exactly the failure this lane was told to
-          avoid.
+    effectiveState: todo
   impl.login.todo-app-backend.auth:
     schema: work/implementation
     feature: login
@@ -1795,48 +1542,24 @@ records:
   impl.notify.todo-app-backend.pipeline:
     schema: work/implementation
     feature: notify
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: "No file listed above exists. An earlier version of this lane's work wrote a plain .mjs
-          prototype of this module directly under app/src/notify and it has been removed: the owner
-          set the stack to a real NestJS backend that must pass this runtime's own architecture
-          checks (checks/architecture.mjs, checks/code-patterns/nest*.mjs) driven by an
-          architecture.json this repository does not yet have, and five lanes each inventing an
-          incompatible Nest scaffold was judged worse than one lane leaving this todo. This record
-          names the target shape and defers the actual module, its files and its tests to whoever
-          builds the shared Nest scaffold."
+    state: done
+    effectiveState: done
   impl.plan.todo-app-backend.plan:
     schema: work/implementation
     feature: plan
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: The example backend is moving to NestJS, conforming to checks/architecture.mjs and
-          checks/code-patterns/nest*.mjs. Nothing under src/plan exists yet in that layout; an
-          earlier draft of this module was written directly under app/src/plan as a plain .mjs
-          module and has been removed rather than kept as a second, incompatible scaffold. No test
-          has been run against real code, so no evidence.yaml exists for this record or for anything
-          it would prove.
+    state: done
+    effectiveState: done
   impl.plan.todo-app-frontend.usage:
     schema: work/implementation
     feature: plan
     state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: The frontend is moving to Next.js, consuming the Grammar core package the way nivo-fe does.
-          Nothing under app/plan exists yet in that layout; an earlier draft was written directly
-          under src/plan as a plain .mjs module and has been removed rather than kept as a second,
-          incompatible scaffold.
+    effectiveState: todo
+    usedBy:
+      blockedBy:
+        - fr.plan.downgrade
+        - fr.plan.upgrade
+        - fr.plan.usage.view
+        - uat.plan.upgrade-after-cap
   impl.recur.todo-app-backend.engine:
     schema: work/implementation
     feature: recur
@@ -1905,7 +1628,7 @@ records:
     feature: task
     state: done
     effectiveState: suspended
-    suspensionReason: evidence-marked-stale
+    suspensionReason: code-digest-mismatch
   impl.task.todo-app-backend.platform-events:
     schema: work/implementation
     feature: task
@@ -1945,21 +1668,11 @@ records:
   integration.notify.queue:
     schema: work/integration
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       dependsOn:
         - sds.notify.delivery-lifecycle
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: "No code reaches Redis: nothing under this feature exists yet (the example is moving to a
-          NestJS backend and no lane-owned module has been written against it), and a probe from
-          this worktree found no Redis listening on 6379 (connection refused), so even a manual
-          smoke check has no live boundary to run against right now. Marking this done on the
-          strength of Redis existing elsewhere in the stack for a different purpose would be exactly
-          the invented evidence the common brief refuses."
   integration.notify.smtp:
     schema: work/integration
     feature: notify
@@ -1969,15 +1682,13 @@ records:
       dependsOn:
         - sds.notify.delivery-lifecycle
     blockers:
-      - id: gap.notify.unbuilt-module
+      - id: gap.notify.smtp-host-unreachable
         rootKind: gap
         cyclic: false
-        because: "No live SMTP boundary is reachable from this worktree: no server is declared or running,
-          and this lane owns no infrastructure to add one honestly without also owning the shared
-          stacks file other lanes touch. Nothing in src/notify (none of which exists yet either) has
-          ever spoken to a real SMTP host, so this record cannot claim done, and no fake run counts
-          as this integration's proof - a run against a fake would only prove it against the fake,
-          per the common brief's own rule."
+        because: No dev SMTP host is declared in application-stacks.yaml or reachable from this worktree;
+          scripts/live-proof-notify.sh's dispatch attempt against the configured host fails
+          transiently for exactly that reason. No fake run counts as this integration's proof - a
+          run against a fake would only prove it against the fake, per the common brief's own rule.
   integration.plan.sepay:
     schema: work/integration
     feature: plan
@@ -1992,23 +1703,17 @@ records:
         - sds.plan.reconciliation
         - sds.plan.subscription-lifecycle
       blockedBy:
+        - fr.plan.reconcile
         - sds.plan.reconciliation
     blockers:
       - id: gap.plan.sepay-not-reachable
         rootKind: gap
         cyclic: false
-        because: No call has been made against the real SePay sandbox yet; there is no module to make one.
-          Tests written against a fake gateway response would settle sds.plan.subscription-lifecycle
-          and sds.plan.reconciliation's transitions, never this record - a fake proves the guard,
-          not the gateway. gap.plan.sepay-not-reachable names that absence instead of citing
-          sds.plan.reconciliation directly, which itself waits on this record - the two are not both
-          allowed to cite each other over the same fact.
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/subscription. The example backend is moving to NestJS
-          (checks/architecture.mjs); this component is specified but not built or run against that
-          layout, so provenBy is empty rather than claiming transitions that have never executed.
+        because: No call has been made against the real SePay sandbox yet. SepayClient
+          (src/modules/integrations/sepay/sepay.client.ts) makes the real HTTP calls this record's
+          endpoints name, and is unit-tested against an in-process fake override, but a fake proves
+          the guard (sds.plan.cap-guard, sds.plan.subscription-lifecycle, sds.plan.reconciliation),
+          never this integration itself.
   integration.recur.scheduler:
     schema: work/integration
     feature: recur
@@ -2026,10 +1731,22 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.audit.unbuilt-module
+      - id: decision.audit.operator-role
+        rootKind: decision
+        cyclic: false
+        because: "The journey's fourth step is an operator read - it cannot be walked while no accepted
+          record establishes who an operator is or how their claim is resolved
+          (gap.audit.operator-role rev 2: the session seam resolves only {token, personId, issuedAt,
+          expiresAt}). Audit's fail-closed check stands built for whatever the decision settles; the
+          step itself is unwalkable until then, so the journey names this decision as a root, not
+          the gap that only describes the absence."
+      - id: gap.audit.live-proof
         rootKind: gap
         cyclic: false
-        because: Depends on every fr in requirements, none of which are implemented yet.
+        because: "Every fr in requirements (fr.audit.erasure.request, fr.audit.erasure.complete,
+          fr.audit.export) is now done, closing the former gap.audit.unbuilt-module blocker. What
+          remains is requiresProof.uat: no uat.verify run has walked this journey against the
+          running product yet - the same absence gap.audit.live-proof names."
   journey.login.first-sign-in:
     schema: work/customer-journey
     feature: login
@@ -2041,36 +1758,39 @@ records:
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.notify.unbuilt-module
+      - id: br.task.complete.once
+        rootKind: record
+        cyclic: false
+        because: br.task.complete.once is todo at rev 2; its reversible statement has no evidence yet.
+      - id: gap.task.collaborator-completion
         rootKind: gap
         cyclic: false
-        because: event.task.completed is now actually raised by complete-task's use case, which subscribes
-          names as the trigger instead of overloading contract.notify.task-completion-feed for it;
-          this record stays todo because no notify module exists yet under the NestJS/Next.js layout
-          to subscribe to it.
+        because: "The withdrawn clause was what ac.task.single-owner.refuses-stranger and
+          sds.task.ownership-guard were proven against; both need a live re-check against the split
+          statements above, through contract.share.completion-guard-for-task, before this rule is
+          done again. sds.task.ownership-guard and contract.share.completion-guard-for-task were
+          each separately cited here for the same reason: the collaborator-completion path this rule
+          now describes has no implementation yet. gap.task.collaborator-completion names that one
+          absence instead of restating it as record-to-record edges (onto the acceptance criterion
+          the old clause was proven against, and onto records that themselves blocked back on this
+          one)."
   journey.plan.hits-the-cap:
     schema: work/customer-journey
     feature: plan
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.plan.cap-guard-not-wired
+      - id: gap.plan.live-proof
         rootKind: gap
         cyclic: false
-        because: Even once built, nothing calls it today - fr.task.create's mainFlow ("The task is created,
-          owned by the submitter, not complete.") and its implementation
-          (impl.task.todo-app-backend.ownership) create unconditionally once the title is non-empty.
-          This feature owns only features/plan/**; it does not edit fr.task.create or the task
-          module, and appliesTo (above) is exactly this record's constraint on that record, not a
-          request the task feature has honored yet. gap.plan.cap-guard-not-wired names that absence
-          instead of citing contract.plan.create-precondition directly, which itself waits on this
-          record - the two are not both allowed to cite each other over the same fact.
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
+        because: uat.verify has not run this flow against the running product yet, and
+          integration.plan.sepay (the live gateway leg the mainFlow's checkout step depends on) is
+          still todo.
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
         cyclic: false
-        because: No module exists yet at src/plan/subscription; the example backend is moving to NestJS and
-          this flow is specified but not built, so there is no unit suite and no UAT walk to point
-          to yet.
+        because: No usage screen or upgrade action exists yet at app/plan for an owner to actually reach;
+          this backend-only lane does not build the frontend.
   journey.recur.first-recurring-task:
     schema: work/customer-journey
     feature: recur
@@ -2124,28 +1844,13 @@ records:
   nfr.audit.retention:
     schema: work/non-functional-requirement
     feature: audit
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation and no fake-clock harness exist yet under the NestJS layout.
+    state: done
+    effectiveState: done
   nfr.audit.tamper-evidence:
     schema: work/non-functional-requirement
     feature: audit
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: "No implementation exists yet under the NestJS layout, so this measurement cannot be run.
-          This is also the record naming the check the earlier .mjs prototype (removed from this
-          worktree on the lead's instruction) used to satisfy the same property with node:test - the
-          design is not lost, only its executable form, and whoever writes the Nest module should
-          port that harness shape: mutate the store directly, then call the module's own verify
-          method, never the other way round."
+    state: done
+    effectiveState: done
   nfr.login.sign-in-timing:
     schema: work/non-functional-requirement
     feature: login
@@ -2163,37 +1868,22 @@ records:
         because: login exposes no device field on a session today; this record stays todo until
           event.login.new-device-signin is actually raised, which subscribes now names as the
           trigger instead of overloading contract.notify.new-device-signal for it.
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: event.task.completed is now actually raised by complete-task's use case, which subscribes
-          names as the trigger instead of overloading contract.notify.task-completion-feed for it;
-          this record stays todo because no notify module exists yet under the NestJS/Next.js layout
-          to subscribe to it.
   nfr.notify.delivery.latency:
     schema: work/non-functional-requirement
     feature: notify
     state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation exists to measure. The example is moving to a NestJS backend and neither
-          the pipeline nor a scheduler that closes windows on a clock (rather than on the next
-          enqueue call) has been built; today closing a window requires another admit call to
-          observe it, which the measurement above cannot honestly claim meets a wall-clock bound.
+    effectiveState: todo
   nfr.plan.cap-check.latency:
     schema: work/non-functional-requirement
     feature: plan
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.plan.unbuilt-module
+      - id: gap.plan.no-load-harness
         rootKind: gap
         cyclic: false
-        because: No create path or cap guard exists yet to measure; the example backend is moving to NestJS
-          and no load-test harness has been pointed at it.
+        because: No scripts/load/create.js or k6 installation exists in this repository to run the
+          measurement this record specifies.
   nfr.recur.generation.timeliness:
     schema: work/non-functional-requirement
     feature: recur
@@ -2235,41 +1925,16 @@ records:
   sds.audit.erasure-request:
     schema: work/sds-component
     feature: audit
-    state: todo
-    effectiveState: blocked
-    usedBy:
-      blockedBy:
-        - data.audit.erasure-request
-        - fr.audit.erasure.request
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: decision.audit.erasure-method is now decided (crypto-shred), confirming this state
-          machine's t-execute effect was written against the answer that actually settled - no
-          further change to t-execute's effect or requiresProof is expected on that account. What
-          remains is that no implementation exists yet under the NestJS layout the example is moving
-          to.
+    state: done
+    effectiveState: done
   sds.audit.log-chain:
     schema: work/sds-component
     feature: audit
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       dependsOn:
         - sds.audit.erasure-request
-    blockers:
-      - id: gap.audit.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: The owner has set the example's backend stack to NestJS, conforming to
-          checks/architecture.mjs and checks/code-patterns/nest*.mjs. No src/audit/ directory or
-          Nest module exists in this worktree. This record names the files the module will need (a
-          service holding the append/verify/readLine behaviour, a repository for the append-only
-          store, and a keystore service for per-person keys) but authors no verification, no
-          revision and no provenBy, because none of that would be true. Writing a passing
-          evidence.yaml against files that do not exist is exactly the failure this lane was told to
-          avoid.
   sds.login.session-store:
     schema: work/sds-component
     feature: login
@@ -2282,45 +1947,19 @@ records:
   sds.notify.delivery-lifecycle:
     schema: work/sds-component
     feature: notify
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - integration.notify.queue
-    blockers:
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No implementation exists. The example is moving to a NestJS backend and this component has
-          not been built against that layout, so every transition is unproven design rather than
-          demonstrated behavior.
   sds.plan.cap-guard:
     schema: work/sds-component
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - contract.plan.create-precondition
-      blockedBy:
-        - contract.plan.create-precondition
-    blockers:
-      - id: gap.plan.cap-guard-not-wired
-        rootKind: gap
-        cyclic: false
-        because: Even once built, nothing calls it today - fr.task.create's mainFlow ("The task is created,
-          owned by the submitter, not complete.") and its implementation
-          (impl.task.todo-app-backend.ownership) create unconditionally once the title is non-empty.
-          This feature owns only features/plan/**; it does not edit fr.task.create or the task
-          module, and appliesTo (above) is exactly this record's constraint on that record, not a
-          request the task feature has honored yet. gap.plan.cap-guard-not-wired names that absence
-          instead of citing contract.plan.create-precondition directly, which itself waits on this
-          record - the two are not both allowed to cite each other over the same fact.
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/cap-guard. The example backend is moving to NestJS; this
-          component is specified but not built.
   sds.plan.reconciliation:
     schema: work/sds-component
     feature: plan
@@ -2334,22 +1973,16 @@ records:
       - id: gap.plan.sepay-not-reachable
         rootKind: gap
         cyclic: false
-        because: No call has been made against the real SePay sandbox yet; there is no module to make one.
-          Tests written against a fake gateway response would settle sds.plan.subscription-lifecycle
-          and sds.plan.reconciliation's transitions, never this record - a fake proves the guard,
-          not the gateway. gap.plan.sepay-not-reachable names that absence instead of citing
-          sds.plan.reconciliation directly, which itself waits on this record - the two are not both
-          allowed to cite each other over the same fact.
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/reconcile. The example backend is moving to NestJS; this
-          component is specified but not built.
+        because: No call has been made against the real SePay sandbox yet. SepayClient
+          (src/modules/integrations/sepay/sepay.client.ts) makes the real HTTP calls this record's
+          endpoints name, and is unit-tested against an in-process fake override, but a fake proves
+          the guard (sds.plan.cap-guard, sds.plan.subscription-lifecycle, sds.plan.reconciliation),
+          never this integration itself.
   sds.plan.subscription-lifecycle:
     schema: work/sds-component
     feature: plan
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       refs:
         - br.plan.lapse.reverts-on-read
@@ -2361,15 +1994,6 @@ records:
       dependsOn:
         - sds.plan.cap-guard
         - sds.plan.reconciliation
-      blockedBy:
-        - integration.plan.sepay
-    blockers:
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: No module exists yet at src/plan/subscription. The example backend is moving to NestJS
-          (checks/architecture.mjs); this component is specified but not built or run against that
-          layout, so provenBy is empty rather than claiming transitions that have never executed.
   sds.recur.generation-engine:
     schema: work/sds-component
     feature: recur
@@ -2478,53 +2102,33 @@ records:
         cyclic: false
         because: uat.verify has not run this flow against the running product yet; no run folder under
           uat/digest-and-unsubscribe/runs/** exists with screens, video and a passing result.md,
-          only this designed flow shape.
+          only this designed flow shape. The backend half this flow depends on (notify pipeline,
+          GraphQL preferences/unsubscribe surface) is now real and end-to-end live-proven at the API
+          level by scripts/live-proof-notify.sh; what remains is a real browser walk through
+          ui.notify.preferences, which is outside this backend lane's scope.
       - id: gap.notify.new-device-event
         rootKind: gap
         cyclic: false
         because: login exposes no device field on a session today; this record stays todo until
           event.login.new-device-signin is actually raised, which subscribes now names as the
           trigger instead of overloading contract.notify.new-device-signal for it.
-      - id: gap.notify.unbuilt-module
-        rootKind: gap
-        cyclic: false
-        because: Cannot be walked. ui.notify.preferences (step 4's surface) has its interface.draw direction
-          and reached done, but no real implementation exists at src/notify/preferences or
-          app/notify yet for a person to actually sign in and use, and there is no real product
-          action that triggers a "notify-worthy event" (steps 2 and 5) because
-          fr.notify.on-completion and fr.notify.on-new-device - the only two things a real person
-          could do to produce one - are both todo, each conflictsWith a foreign gap. A synthetic
-          event injected outside the product would not be a UAT walk of the product surface; it
-          would be a call into internals wearing a UAT record's shape.
   uat.plan.upgrade-after-cap:
     schema: work/uat-flow
     feature: plan
     state: todo
     effectiveState: blocked
     blockers:
-      - id: gap.plan.cap-guard-not-wired
-        rootKind: gap
-        cyclic: false
-        because: Even once built, nothing calls it today - fr.task.create's mainFlow ("The task is created,
-          owned by the submitter, not complete.") and its implementation
-          (impl.task.todo-app-backend.ownership) create unconditionally once the title is non-empty.
-          This feature owns only features/plan/**; it does not edit fr.task.create or the task
-          module, and appliesTo (above) is exactly this record's constraint on that record, not a
-          request the task feature has honored yet. gap.plan.cap-guard-not-wired names that absence
-          instead of citing contract.plan.create-precondition directly, which itself waits on this
-          record - the two are not both allowed to cite each other over the same fact.
       - id: gap.plan.live-proof
         rootKind: gap
         cyclic: false
-        because: uat.verify has not run this flow against the running product yet; no run folder under
-          uat/upgrade-after-cap/runs/** exists with screens, video and a passing result.md, only
-          this designed flow shape.
-      - id: gap.plan.unbuilt-module
-        rootKind: gap
+        because: uat.verify has not run this flow against the running product yet, and
+          integration.plan.sepay (the live gateway leg the mainFlow's checkout step depends on) is
+          still todo.
+      - id: impl.plan.todo-app-frontend.usage
+        rootKind: record
         cyclic: false
-        because: No module exists yet at src/plan/subscription; the example backend is moving to NestJS and
-          this flow is specified but not built, so there is no unit suite and no UAT walk to point
-          to yet.
+        because: No usage screen or upgrade action exists yet at app/plan for an owner to actually reach;
+          this backend-only lane does not build the frontend.
   uat.recur.make-recurring:
     schema: work/uat-flow
     feature: recur
@@ -2614,36 +2218,36 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 76
-    todo: 37
-    stale: 3
-    blocked: 80
-    total: 196
+    done: 117
+    todo: 43
+    stale: 4
+    blocked: 37
+    total: 201
   byFeature:
     audit:
-      done: 3
-      todo: 7
+      done: 20
+      todo: 6
       stale: 0
-      blocked: 16
-      total: 26
+      blocked: 3
+      total: 29
     login:
       done: 16
-      todo: 2
+      todo: 4
       stale: 1
-      blocked: 5
+      blocked: 3
       total: 24
     notify:
-      done: 5
-      todo: 4
+      done: 19
+      todo: 6
       stale: 0
-      blocked: 21
-      total: 30
+      blocked: 6
+      total: 31
     plan:
-      done: 6
+      done: 17
       todo: 4
       stale: 0
-      blocked: 19
-      total: 29
+      blocked: 9
+      total: 30
     recur:
       done: 19
       todo: 3
@@ -2657,10 +2261,10 @@ tally:
       blocked: 5
       total: 26
     task:
-      done: 9
-      todo: 14
-      stale: 2
-      blocked: 8
+      done: 8
+      todo: 17
+      stale: 3
+      blocked: 5
       total: 33
   gaps:
     - id: gap.audit.direction-not-drawn
@@ -2681,12 +2285,14 @@ tally:
     - id: gap.audit.operator-role
       feature: audit
       state: todo
-      closedBy: null
+      closedBy:
+        - decision.audit.operator-role
     - id: gap.audit.unbuilt-module
       feature: audit
-      state: todo
+      state: done
       closedBy:
         - impl.audit.todo-app-backend.log
+        - impl.audit.todo-app-backend.erasure
     - id: gap.login.device-field
       feature: login
       state: todo
@@ -2721,6 +2327,11 @@ tally:
       state: todo
       closedBy:
         - event.login.new-device-signin
+    - id: gap.notify.smtp-host-unreachable
+      feature: notify
+      state: todo
+      closedBy:
+        - integration.notify.smtp
     - id: gap.notify.task-completion-event
       feature: notify
       state: todo
@@ -2728,12 +2339,12 @@ tally:
         - impl.task.todo-app-backend.platform-events
     - id: gap.notify.unbuilt-module
       feature: notify
-      state: todo
+      state: done
       closedBy:
         - impl.notify.todo-app-backend.pipeline
     - id: gap.plan.cap-guard-not-wired
       feature: plan
-      state: todo
+      state: done
       closedBy:
         - contract.plan.create-precondition
     - id: gap.plan.direction-not-drawn
@@ -2746,6 +2357,11 @@ tally:
       state: todo
       closedBy:
         - uat.plan.upgrade-after-cap
+    - id: gap.plan.no-load-harness
+      feature: plan
+      state: todo
+      closedBy:
+        - nfr.plan.cap-check.latency
     - id: gap.plan.sepay-not-reachable
       feature: plan
       state: todo
@@ -2753,7 +2369,7 @@ tally:
         - integration.plan.sepay
     - id: gap.plan.unbuilt-module
       feature: plan
-      state: todo
+      state: done
       closedBy:
         - impl.plan.todo-app-backend.plan
     - id: gap.recur.direction-not-drawn
@@ -2816,17 +2432,14 @@ tally:
       feature: task
       state: done
       closedBy: null
-  unbuiltModuleGaps: 3
+  unbuiltModuleGaps: 0
 frontier:
-  - id: br.audit.erasure.logged
+  - id: contract.audit.emitted-events
     feature: audit
-    title: An erasure is itself logged
-  - id: br.audit.erasure.right
+    title: The emitted-event contract audit subscribes to
+  - id: decision.audit.operator-role
     feature: audit
-    title: A person may have what identifies them erased
-  - id: data.audit.log-line
-    feature: audit
-    title: Log line
+    title: Who is an operator, and where does their role claim come from
   - id: gap.audit.emitted-events
     feature: audit
     title: login and task expose no emitted-event contract for audit to subscribe to
@@ -2836,42 +2449,54 @@ frontier:
   - id: gap.audit.operator-role
     feature: audit
     title: No operator/admin role exists to authorize reading the log
-  - id: gap.audit.unbuilt-module
+  - id: impl.audit.todo-app-backend.operator-read
     feature: audit
-    title: No audit module exists under the NestJS layout yet
+    title: The fail-closed operator check and the filtered whole-chain read
   - id: contract.login.identity-for-task
     feature: login
     title: How task learns who the actor is
+  - id: event.login.signed-in
+    feature: login
+    title: A person signed in
+  - id: event.login.signed-out
+    feature: login
+    title: A person signed out
   - id: gap.login.device-field
     feature: login
     title: No device field exists on a session or person
   - id: impl.login.todo-app-frontend.sign-in
     feature: login
     title: The sign-in route, feature and block
+  - id: contract.notify.task-completion-feed
+    feature: notify
+    title: What notify needs from task to notify on completion
   - id: gap.notify.live-proof
     feature: notify
     title: No uat.verify run has produced a live run for notify.digest-and-unsubscribe
   - id: gap.notify.new-device-event
     feature: notify
     title: login never emits a new-device sign-in signal today
+  - id: gap.notify.smtp-host-unreachable
+    feature: notify
+    title: No dev SMTP host is declared or reachable for a live send
   - id: gap.notify.task-completion-event
     feature: notify
     title: task never emits a completion event today
-  - id: gap.notify.unbuilt-module
+  - id: nfr.notify.delivery.latency
     feature: notify
-    title: No notify module exists under the NestJS/Next.js layout yet
-  - id: gap.plan.cap-guard-not-wired
-    feature: plan
-    title: Nothing on the create path calls the cap guard yet
+    title: A digested message goes out promptly after its window closes
   - id: gap.plan.live-proof
     feature: plan
     title: No uat.verify run has produced a live run for plan.upgrade-after-cap
+  - id: gap.plan.no-load-harness
+    feature: plan
+    title: No k6 load-test harness exists to measure the cap check's latency
   - id: gap.plan.sepay-not-reachable
     feature: plan
     title: No call has ever been made against the real SePay sandbox
-  - id: gap.plan.unbuilt-module
+  - id: impl.plan.todo-app-frontend.usage
     feature: plan
-    title: No plan module exists under the NestJS/Next.js layout yet
+    title: The usage screen and its upgrade action
   - id: gap.recur.live-proof
     feature: recur
     title: No uat.verify run has produced a live run for recur.make-recurring
@@ -2905,6 +2530,15 @@ frontier:
   - id: contract.task.list-for-dashboard
     feature: task
     title: What a dashboard may read about a person's tasks
+  - id: event.task.completed
+    feature: task
+    title: A task was completed
+  - id: event.task.created
+    feature: task
+    title: A task was created
+  - id: event.task.deleted
+    feature: task
+    title: A task was deleted
   - id: gap.task.live-proof
     feature: task
     title: No uat.verify run has produced a live run for task.create
@@ -3053,6 +2687,21 @@ unclassifiedEdges:
   - from: ac.task.title.required.refuses-empty
     field: rule
     target: br.task.title.required
+  - from: contract.audit.emitted-events
+    field: surface.name
+    target: event.login.signed-in
+  - from: contract.audit.emitted-events
+    field: surface.name
+    target: event.login.signed-out
+  - from: contract.audit.emitted-events
+    field: surface.name
+    target: event.task.completed
+  - from: contract.audit.emitted-events
+    field: surface.name
+    target: event.task.created
+  - from: contract.audit.emitted-events
+    field: surface.name
+    target: event.task.deleted
   - from: decision.plan.downgrade.policy
     field: blocks
     target: br.plan.downgrade.freeze
@@ -3083,6 +2732,12 @@ unclassifiedEdges:
   - from: gap.audit.live-proof
     field: closedBy
     target: uat.audit.right-to-be-forgotten
+  - from: gap.audit.operator-role
+    field: closedBy
+    target: decision.audit.operator-role
+  - from: gap.audit.unbuilt-module
+    field: closedBy
+    target: impl.audit.todo-app-backend.erasure
   - from: gap.audit.unbuilt-module
     field: closedBy
     target: impl.audit.todo-app-backend.log
@@ -3104,6 +2759,9 @@ unclassifiedEdges:
   - from: gap.notify.new-device-event
     field: closedBy
     target: event.login.new-device-signin
+  - from: gap.notify.smtp-host-unreachable
+    field: closedBy
+    target: integration.notify.smtp
   - from: gap.notify.task-completion-event
     field: closedBy
     target: impl.task.todo-app-backend.platform-events
@@ -3119,6 +2777,9 @@ unclassifiedEdges:
   - from: gap.plan.live-proof
     field: closedBy
     target: uat.plan.upgrade-after-cap
+  - from: gap.plan.no-load-harness
+    field: closedBy
+    target: nfr.plan.cap-check.latency
   - from: gap.plan.sepay-not-reachable
     field: closedBy
     target: integration.plan.sepay
@@ -3179,6 +2840,9 @@ unclassifiedEdges:
   - from: impl.audit.todo-app-backend.log
     field: proves
     target: sds.audit.log-chain
+  - from: impl.audit.todo-app-backend.operator-read
+    field: proves
+    target: fr.audit.log.read
   - from: impl.login.todo-app-backend.auth
     field: proves
     target: br.login.password.sign-in
@@ -3192,19 +2856,19 @@ unclassifiedEdges:
     field: proves
     target: ui.login.sign-in
   - from: impl.notify.todo-app-backend.pipeline
-    field: willProve
+    field: proves
     target: br.notify.delivery.once
   - from: impl.notify.todo-app-backend.pipeline
-    field: willProve
+    field: proves
     target: br.notify.digest.window
   - from: impl.notify.todo-app-backend.pipeline
-    field: willProve
+    field: proves
     target: br.notify.failure.classified
   - from: impl.notify.todo-app-backend.pipeline
-    field: willProve
+    field: proves
     target: br.notify.unsubscribe.honored
   - from: impl.notify.todo-app-backend.pipeline
-    field: willProve
+    field: proves
     target: sds.notify.delivery-lifecycle
   - from: impl.plan.todo-app-backend.plan
     field: proves
@@ -3223,10 +2887,10 @@ unclassifiedEdges:
     target: br.plan.payment.idempotent
   - from: impl.plan.todo-app-backend.plan
     field: proves
-    target: sds.plan.cap-guard
+    target: contract.plan.create-precondition
   - from: impl.plan.todo-app-backend.plan
     field: proves
-    target: sds.plan.reconciliation
+    target: sds.plan.cap-guard
   - from: impl.plan.todo-app-backend.plan
     field: proves
     target: sds.plan.subscription-lifecycle
