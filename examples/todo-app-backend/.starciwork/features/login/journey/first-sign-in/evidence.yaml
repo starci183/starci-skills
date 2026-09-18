@@ -1,0 +1,24 @@
+# Written by hand: this journey's requiresProof.uat points at uat.login.sign-in, whose own run is the
+# proof - both of this journey's steps ("lands on an empty list", "returns the next day, still signed
+# in") are exactly what that flow's signed-in/task-list-after-sign-in/session-restores-on-reload steps
+# walked for real. The former evidence.yaml here (removed, provenance starci-kernel, stale: true)
+# pointed at a run that had never actually happened; this one points at one that has.
+schema: work/evidence
+record: journey.login.first-sign-in
+outcome: pass
+assertions:
+  - id: uat-login-sign-in-run
+    command: cat ../../uat/sign-in/runs/20260918T090054Z-240aa95e/result.md
+    exit: 0
+    outcome: pass
+    observation: >-
+      uat.login.sign-in's run 20260918T090054Z-240aa95e records outcome: pass with every assertion
+      observed yes, including ux.sign-in.lands-on-task-list (signing in navigates to /tasks) and
+      br.login.session.restores (the list still renders after a reload with no re-authentication) -
+      this journey's two steps.
+provenance:
+  actor: example-evidence
+  tool: 'cat (run by hand, not scripts/example-evidence.mjs - the proof is another record''s own run,
+    not a fresh command)'
+  environment: local
+  capturedAt: 2026-09-18T09:01:30.000Z

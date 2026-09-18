@@ -14,9 +14,9 @@ codeDigest:
     - path: src/modules/bussiness/session/session.module.ts
       sha256: 2d14aaadfe1d0d9d1f6d6960f8c445f79fcc5ae66657fd4edecca4b244d03984
     - path: src/modules/bussiness/session/session.service.spec.ts
-      sha256: f72c048aa67ca08fa9fcd2892b901061caa9c37463ca2354727946f312d7b83f
+      sha256: f6fc245c4f8ff5ae2f1a1b6808c54ae29782ebec8aef81e25f49aed66d4889d5
     - path: src/modules/bussiness/session/session.service.ts
-      sha256: b1182944ea37491f55859069c12036097159f2df5a0dc459818de11d3967f6f6
+      sha256: b6e0b0f0f260c9f43dc204466d29795230475ba132183b93812b47b17fade7ad
     - path: src/modules/bussiness/session/sign-in.command.ts
       sha256: 6de433b280b1358369e98cbf31025ee05fb799f58c9540bbc74b98b22cbd2d5a
     - path: src/modules/bussiness/session/sign-in.handler.spec.ts
@@ -31,7 +31,7 @@ codeDigest:
       sha256: 401ced0572a611bb29b9667dccacb7b9e2a086a8bc2654e5fda4daaebcbd9673
     - path: src/modules/bussiness/session/types/session-record.ts
       sha256: 9f77414952e6b2c9559e9dcddf88e11d456ed18be4bb5fd93c78cc747ffca85c
-  digest: 534da9d05ac1801680dfbe08884c80d7a9c84bca41bd321552110e90b290b364
+  digest: 93bb96740706c484e9a6ff6ae0a94f43ecad7fa4173362725ee6dbb737766205
 outcome: pass
 assertions:
   - id: ac.login.session.restores.returning-within-the-window-stays-signed-in
@@ -45,4 +45,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T07:51:08.190Z
+  capturedAt: 2026-09-18T08:38:06.074Z

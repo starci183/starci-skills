@@ -6,38 +6,42 @@ import { recordAssertion, walkStep } from '../lib/steps';
 const API_BASE_URL = process.env.UAT_API_BASE_URL ?? 'http://localhost:3001';
 
 /**
- * A correctly-headed read against the real API (x-session-token, not the browser's own
- * "authorization: Bearer" - see uat.task.create.spec.ts's fr.task.create note for the same
- * mismatch), used only to establish ground truth for what this person's own list actually
- * contains; the browser is still what every recorded UX/business observation is read from.
+ * A correctly-headed read against the real API - "Authorization: Bearer <token>", the same header
+ * contract.login.identity-for-task's surface names (rev 3) and the browser itself now sends - used
+ * only to establish ground truth for what this person's own list actually contains; the browser is
+ * still what every recorded UX/business observation is read from.
+ *
+ * Ported from ex-uat-live's REST-era version (fetch('/tasks', {headers:{'x-session-token'}})): the
+ * transport moved to GraphQL, so this is one POST to /graphql with the `tasks` query, headed the same
+ * way the browser's own fetcher (`src/modules/api/graphql.ts`) heads it.
  */
 const apiListTasks = async (token: string): Promise<ReadonlyArray<{ taskId: string }> | null> => {
-  const res = await fetch(`${API_BASE_URL}/tasks`, { headers: { 'x-session-token': token } });
+  const res = await fetch(`${API_BASE_URL}/graphql`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    body: JSON.stringify({ query: 'query { tasks { taskId } }' }),
+  });
   if (!res.ok) return null;
-  const body = (await res.json().catch(() => null)) as { tasks?: Array<{ taskId: string }> } | null;
-  return body?.tasks ?? null;
+  const body = (await res.json().catch(() => null)) as { data?: { tasks?: Array<{ taskId: string }> } } | null;
+  return body?.data?.tasks ?? null;
 };
 
 /**
  * uat.login.sign-in (examples/todo-app-backend/.starciwork/features/login/uat/sign-in/index.yaml):
  *   1. Sign in with the seeded person.
  *   2. See the empty task list.
- *   3. Close the session cookie and return; still signed in.
+ *   3. Close the browser tab and return; still signed in (the token lives in localStorage, read back
+ *      as an Authorization: Bearer header - never a cookie; the record's step 3 wording was fixed to
+ *      say this in this same lane, see the record's own change entry).
  *   4. Submit a wrong password and read the refusal.
  *
- * Step 3's own wording ("session cookie") does not match the actual mechanism: src/modules/session's
- * token lives in `window.localStorage`, not a cookie. This spec is written against the real code, so it
- * reloads the page and reads localStorage back rather than a cookie jar; the record's prose is stale
- * against its own implementation (reported to the caller, not silently corrected here).
- *
- * Steps 1-3 need a session actually *created* on a backend - a write to the shared Postgres another
- * lane owns. This harness was authorized only to use a reachable shared API read-only, for step 4's
- * wrong-password refusal, which creates no session. `LIVE_LOGIN_AUTHORIZED`
+ * Steps 1-3 need a session actually *created* on a backend - a write to Postgres. `LIVE_LOGIN_AUTHORIZED`
  * (../lib/run-context.ts) gates the difference: when false, steps 1-3 are not attempted and their
- * assertions are recorded `observed: 'not-run'` rather than skipped silently or faked as passing.
+ * assertions are recorded `observed: 'not-run'` rather than skipped silently or faked as passing; when
+ * true (this lane's own compose stack, `UAT_LIVE_LOGIN_AUTHORIZED=true`), they are actually walked.
  */
 test.describe('uat.login.sign-in', () => {
-  test('walks ui.login.sign-in states and the wrong-password refusal', async ({ page }, testInfo) => {
+  test('walks ui.login.sign-in states, a real sign-in, and the wrong-password refusal', async ({ page }, testInfo) => {
     await page.goto('/sign-in');
 
     await walkStep(page, testInfo, 'empty', async () => {
@@ -63,19 +67,19 @@ test.describe('uat.login.sign-in', () => {
       await walkStep(page, testInfo, 'signed-in', async () => {
         await page.getByLabel('Email').fill(person.username);
         await page.getByLabel('Password').fill(personPassword);
-        const responsePromise = page.waitForResponse(response => response.url().includes('/auth/sign-in'), { timeout: 10_000 });
+        const responsePromise = page.waitForResponse(response => response.url().includes('/graphql'), { timeout: 10_000 });
         await page.getByRole('button', { name: 'Sign in' }).click();
         const response = await responsePromise;
-        signedInOk = response.ok();
+        const body = (await response.json().catch(() => null)) as { data?: { signIn?: { sessionToken?: string } }; errors?: unknown[] } | null;
+        signedInOk = response.ok() && !!body?.data?.signIn?.sessionToken;
         if (signedInOk) {
-          const body = (await response.json().catch(() => null)) as { sessionToken?: string } | null;
-          personToken = typeof body?.sessionToken === 'string' ? body.sessionToken : '';
+          personToken = body!.data!.signIn!.sessionToken as string;
         } else {
           recordAssertion(testInfo, {
             id: 'fr.login.sign-in',
             expected: 'yes',
             observed: 'no',
-            note: `POST /auth/sign-in for ${person.username} returned ${response.status()}; the seeded person could not sign in.`,
+            note: `signIn mutation for ${person.username} did not return a sessionToken (HTTP ${response.status()}, body ${JSON.stringify(body)}); the seeded person could not sign in.`,
           });
         }
       });
@@ -89,33 +93,28 @@ test.describe('uat.login.sign-in', () => {
         });
         await page.goto('/sign-in');
       } else {
-        // No route in this app navigates from /sign-in to /tasks on success (checked: no redirect
-        // anywhere in src/app or src/features; SignInFormBlock only clears submitting/refusal, so the
-        // form itself renders no success state at all) - a real person's only way there today is the
-        // address bar (grit #36). Recorded as its own observed `no` per the caller's instruction, kept
-        // separate from whether the list itself, once reached, is correct.
+        // grit #36, closed in this lane: useSignIn now calls router.push('/tasks') on a successful
+        // sign-in (src/hooks/auth/useSignIn.ts). Wait for the navigation instead of driving it by URL.
+        await page.waitForURL('**/tasks', { timeout: 10_000 });
         recordAssertion(testInfo, {
           id: 'ux.sign-in.lands-on-task-list',
           expected: 'yes',
-          observed: 'no',
-          note: 'Signing in does not navigate anywhere; this harness then navigated to /tasks by URL to keep walking the flow.',
+          observed: 'yes',
+          note: 'Signing in navigates to /tasks on its own (useSignIn calls router.push after setToken); no manual navigation was needed.',
         });
 
-        // Ground truth for what this person's own list actually contains, read through the correct
-        // header rather than trusted from the browser's own (mis-headed) fetch - see the module note.
+        // Ground truth for what this person's own list actually contains, read through the same
+        // Authorization: Bearer header the browser itself now sends (no header mismatch left to guard
+        // against on this base, but the cross-check stays as a live regression guard).
         const groundTruth = personToken ? await apiListTasks(personToken) : null;
         const expectedState = groundTruth === null ? null : groundTruth.length === 0 ? 'empty' : groundTruth.length === 1 ? 'one-task' : 'many-tasks';
         const mismatchNote = (state: string | null, count: number | undefined) =>
           `but a correctly-headed API read-back shows ${person.username} actually owns ${count ?? 0} task(s) ` +
-          `(expected data-state="${expectedState}"). src/modules/api/client.ts sends an "authorization: Bearer" ` +
-          'header while every backend task controller reads only "x-session-token", and ' +
-          'session.repository.ts#findActive\'s `findOneBy({ token })` with that undefined token silently ' +
-          "matches an arbitrary session instead of refusing - so the browser's own GET /tasks does not " +
-          'reliably read this person\'s own list. A real FE/BE integration + authorization defect this ' +
-          'live run surfaced, not a selector or environment gap.';
+          `(expected data-state="${expectedState}"). This would mean the browser's own GraphQL fetcher ` +
+          '(src/modules/api/graphql.ts) is not sending the same Authorization header the backend reads ' +
+          '(session-actor.adapter.ts) - a live regression of the auth-bypass class this lane closed.';
 
         await walkStep(page, testInfo, 'task-list-after-sign-in', async () => {
-          await page.goto('/tasks');
           const list = page.locator('[data-state]').first();
           await expect(list).toBeVisible({ timeout: 10_000 });
           const state = await list.getAttribute('data-state');
@@ -125,13 +124,13 @@ test.describe('uat.login.sign-in', () => {
             expected: 'yes',
             observed: matches ? 'yes' : 'no',
             note: expectedState === null
-              ? `After navigating to /tasks by URL, the browser rendered data-state="${state}", but the ` +
-                `correctly-headed API read-back for ${person.username} itself failed, so this cannot be ` +
-                "confirmed as that person's own list."
+              ? `The browser rendered data-state="${state}" at /tasks, but the correctly-headed API ` +
+                `read-back for ${person.username} itself failed, so this cannot be confirmed as that ` +
+                "person's own list."
               : matches
-                ? `After navigating to /tasks by URL, the browser rendered data-state="${state}", matching a ` +
+                ? `After landing on /tasks, the browser rendered data-state="${state}", matching a ` +
                   `correctly-headed API read-back of ${person.username}'s own ${groundTruth?.length ?? 0} task(s).`
-                : `After navigating to /tasks by URL, the browser rendered data-state="${state}", ${mismatchNote(state, groundTruth?.length)}`,
+                : `The browser rendered data-state="${state}" at /tasks, ${mismatchNote(state, groundTruth?.length)}`,
           });
         });
 
@@ -145,9 +144,9 @@ test.describe('uat.login.sign-in', () => {
             id: 'br.login.session.restores',
             expected: 'yes',
             observed: matches ? 'yes' : 'no',
-            note: 'The session token lives in localStorage, not a cookie - the record\'s own wording is ' +
-              'stale against src/modules/session - so reloading /tasks re-read it without ' +
-              `re-authenticating; the list rendered data-state="${state}" after reload. ` +
+            note: 'The session token lives in localStorage, read back as an Authorization: Bearer header ' +
+              '- never a cookie (the record\'s own step 3 wording now says this) - so reloading /tasks ' +
+              `re-read it without re-authenticating; the list rendered data-state="${state}" after reload. ` +
               (expectedState === null
                 ? `The correctly-headed API read-back for ${person.username} itself failed, so this cannot be ` +
                   "confirmed as that person's own list."
@@ -164,8 +163,9 @@ test.describe('uat.login.sign-in', () => {
         id: 'fr.login.sign-in',
         expected: 'yes',
         observed: 'not-run',
-        note: 'A successful sign-in writes a session row to the shared, other-lane-owned Postgres. This ' +
-          'lane is authorized only for the read-only wrong-password check below, so this step is not-run here.',
+        note: 'A successful sign-in writes a session row to Postgres. UAT_LIVE_LOGIN_AUTHORIZED is not ' +
+          'true in this environment, so this step is not-run here rather than attempted against ' +
+          'infrastructure this run does not own.',
       });
       recordAssertion(testInfo, {
         id: 'br.login.session.restores',
@@ -186,7 +186,7 @@ test.describe('uat.login.sign-in', () => {
     await walkStep(page, testInfo, 'working-and-refused', async () => {
       const submit = page.getByRole('button', { name: 'Sign in' });
       const responsePromise = page
-        .waitForResponse(response => response.url().includes('/auth/sign-in'), { timeout: 10_000 })
+        .waitForResponse(response => response.url().includes('/graphql'), { timeout: 10_000 })
         .catch(() => null);
       await submit.click();
       // 'working' is transient: the button relabels to 'Signing in...' only while the request is in flight.
@@ -198,7 +198,7 @@ test.describe('uat.login.sign-in', () => {
           id: 'ux.sign-in.error-feedback',
           expected: 'yes',
           observed: 'not-run',
-          note: 'No response observed from /auth/sign-in within the timeout; the API origin did not answer.',
+          note: 'No response observed from /graphql within the timeout; the API origin did not answer.',
         });
         recordAssertion(testInfo, {
           id: 'br.login.password.sign-in',
@@ -213,8 +213,8 @@ test.describe('uat.login.sign-in', () => {
       await expect(form).toHaveAttribute('data-state', 'refused', { timeout: 10_000 });
       // Scoped inside the form: a bare page.getByRole('alert') also matches Next.js's own
       // "__next-route-announcer__" (role="alert", always present once the app has done any
-      // navigation), which this run only discovered by actually reaching this checkpoint against a
-      // live app instead of stopping at "no response" as every prior run did.
+      // navigation) - ported from ex-uat-live, which only discovered this by actually reaching this
+      // checkpoint against a live app.
       const refusal = form.getByRole('alert');
       await expect(refusal).toBeVisible();
       await expect(refusal).toHaveText('That email and password do not match.');

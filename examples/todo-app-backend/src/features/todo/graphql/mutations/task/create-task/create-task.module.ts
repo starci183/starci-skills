@@ -4,7 +4,7 @@ import { ConfigurableModuleClass } from './create-task.module-definition';
 import { CreateTaskResolver } from './create-task.resolver';
 
 /**
- * `SessionService` (needed by the resolver to turn `x-session-token` into an actor id) is not imported
+ * `SessionService` (needed by the resolver to turn `Authorization: Bearer <token>` into an actor id) is not imported
  * here: `bussiness/session`'s SessionModule is registered exactly once, globally, from `app.module.ts`
  * (`SessionModule.register({ isGlobal: true })`), because five separate GraphQL action modules
  * (create/complete/reopen/delete/list task) all need the same authenticated-actor lookup. Registering

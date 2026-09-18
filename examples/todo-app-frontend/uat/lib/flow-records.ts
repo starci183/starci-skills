@@ -66,41 +66,38 @@ export const readFlowRecord = (feature: string, flow: string): UatFlowRecord => 
 };
 
 /**
- * Both shipped accounts.yaml records (login/sign-in, task/create) carry `{role, identity}`, not the
- * `{role, username, password}` shape this file originally assumed - `identity` names a shared
- * `work/resource` (e.g. `identity.todo-app.demo`), which is exactly what operator.yaml's `accounts` read
- * says this harness must resolve ("Resolve an existing suitable test account..."), not a literal login.
- * The one identity resource this example ships lists abstract roles it can play (person, owner,
- * stranger, ...) but never differentiates a concrete seeded row per role, while the realm
- * (.starcistacks/dev/infra/compose/realm-todo.json) only actually seeds two people: demo@todo.dev and
- * demo2@todo.dev. Task/create's `owner` and `stranger` both name the same identity yet must be two
- * distinct signed-in people for the ownership check to mean anything, so this harness treats
- * demo@todo.dev as that identity's default row and demo2@todo.dev as its second row for any role that
- * must differ from another role in the same flow - the exact distinction
- * scripts/live-proof.sh already relies on for its own br.task.list.owned check. This is a harness-side
- * resolution, not a fix to accounts.yaml itself: the record still only names an identity, and a caller
- * with a different real mapping may override any role via `UAT_USERNAME_<ROLE>`.
+ * Every role the shared `identity.todo-app.demo` resource declares (_resources/identities/todo-app-
+ * demo/resource.yaml: person, operator, owner, owner-at-cap, editor, viewer, stranger) resolves to one
+ * of the two demo Keycloak users actually seeded by
+ * .starcistacks/dev/infra/compose/realm-todo.json (DEMO-ONLY, committed for reader round-trip): the
+ * resource lists seven roles but the realm only seeds two concrete accounts, so role -> email is this
+ * fixed, small map rather than something accounts.yaml could name on its own once it moved from
+ * literal `{role, username, password}` entries to `{role, identity}` refs into the shared resource.
+ * 'viewer'/'stranger' get the second seeded user so a flow needing two distinct identities (task's
+ * owner/stranger) gets two distinct real logins; every other role reuses the first.
  */
-const SEEDED_ROWS_BY_IDENTITY: Readonly<Record<string, { readonly primary: string; readonly secondary: string }>> = {
-  'identity.todo-app.demo': { primary: 'demo@todo.dev', secondary: 'demo2@todo.dev' },
+const ROLE_EMAIL: Readonly<Record<string, string>> = {
+  person: 'demo@todo.dev',
+  operator: 'demo@todo.dev',
+  owner: 'demo@todo.dev',
+  'owner-at-cap': 'demo@todo.dev',
+  editor: 'demo@todo.dev',
+  viewer: 'demo2@todo.dev',
+  stranger: 'demo2@todo.dev',
 };
 
-/** Roles that must resolve to the identity's *second* seeded row, so they differ from a co-occurring primary role. */
-const SECOND_ROW_ROLES = new Set(['stranger']);
-
-const usernameForIdentity = (identity: string, role: string): string => {
-  const override = process.env[`UAT_USERNAME_${role.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`];
-  if (override) return override;
-  const rows = SEEDED_ROWS_BY_IDENTITY[identity];
-  if (!rows) {
-    throw new Error(
-      `No known seeded username for identity "${identity}" (role "${role}"); set UAT_USERNAME_${role.toUpperCase()}.`,
-    );
-  }
-  return SECOND_ROW_ROLES.has(role) ? rows.secondary : rows.primary;
-};
-
-/** Reads the record's own scoped test-account roster; the password field here is never used at runtime. */
+/**
+ * Reads the record's own scoped test-account roster and resolves each `{role, identity}` ref to a real
+ * seeded username via `ROLE_EMAIL` above. The password is never read from this file (see `ROLE_EMAIL`'s
+ * note and `run-context.ts#passwordFor`, which resolves it from the environment instead) - `password`
+ * stays on `DisposableAccount` only for shape compatibility and is always the empty string here.
+ *
+ * Fixed in this lane: this previously read `entry.username`/`entry.password` directly, which matched
+ * an older accounts.yaml shape; every accounts.yaml under examples/todo-app-backend/.starciwork now
+ * authors `{role, identity}` (see work-layout.yaml's uatFlow shape note), so those two fields were
+ * always `String(undefined)` - the literal text "undefined" - and every flow that called this would
+ * have typed that into a real sign-in form instead of a real email.
+ */
 export const readAccounts = (feature: string, flow: string): ReadonlyArray<DisposableAccount> => {
   const file = flowAccountsPath(feature, flow);
   if (!fs.existsSync(file)) return [];
@@ -110,21 +107,9 @@ export const readAccounts = (feature: string, flow: string): ReadonlyArray<Dispo
   }
   return raw.accounts.map(entry => {
     const role = String((entry as any).role);
-    const literalUsername = (entry as any).username;
-    const identity = (entry as any).identity;
-    const username =
-      literalUsername !== undefined
-        ? String(literalUsername)
-        : identity !== undefined
-          ? usernameForIdentity(String(identity), role)
-          : (() => {
-              throw new Error(`${file}: account for role "${role}" declares neither username nor identity.`);
-            })();
-    return {
-      role,
-      username,
-      password: (entry as any).password !== undefined ? String((entry as any).password) : '',
-    };
+    const email = ROLE_EMAIL[role];
+    if (!email) throw new Error(`${file}: no seeded demo user is known for role "${role}"; add it to ROLE_EMAIL.`);
+    return { role, username: email, password: '' };
   });
 };
 

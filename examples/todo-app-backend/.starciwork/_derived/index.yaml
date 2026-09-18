@@ -645,7 +645,8 @@ records:
     schema: work/business-rule
     feature: task
     state: todo
-    effectiveState: todo
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
     usedBy:
       refs:
         - contract.login.identity-for-task
@@ -1543,14 +1544,8 @@ records:
   gap.login.live-proof:
     schema: work/gap
     feature: login
-    state: todo
-    effectiveState: todo
-    usedBy:
-      blockedBy:
-        - integration.login.keycloak
-        - integration.login.postgres
-        - journey.login.first-sign-in
-        - uat.login.sign-in
+    state: done
+    effectiveState: done
   gap.login.migration-not-applied:
     schema: work/gap
     feature: login
@@ -1795,7 +1790,8 @@ records:
     schema: work/implementation
     feature: login
     state: todo
-    effectiveState: todo
+    effectiveState: suspended
+    suspensionReason: digest-mismatch
   impl.notify.todo-app-backend.pipeline:
     schema: work/implementation
     feature: notify
@@ -1908,7 +1904,8 @@ records:
     schema: work/implementation
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
   impl.task.todo-app-backend.platform-events:
     schema: work/implementation
     feature: task
@@ -1927,22 +1924,16 @@ records:
   integration.login.keycloak:
     schema: work/integration
     feature: login
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       dependsOn:
         - sds.login.session-store
-    blockers:
-      - id: gap.login.live-proof
-        rootKind: gap
-        cyclic: false
-        because: live proof needs the docker-compose dev stack (Keycloak on 8089) up, and this host cannot
-          start it.
   integration.login.postgres:
     schema: work/integration
     feature: login
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       dependsOn:
         - sds.login.session-store
@@ -1951,12 +1942,6 @@ records:
         - sds.share.invitation-lifecycle
         - sds.task.completion-state
         - sds.task.ownership-guard
-    blockers:
-      - id: gap.login.live-proof
-        rootKind: gap
-        cyclic: false
-        because: live proof needs the docker-compose dev stack (Postgres on 5432) up and the migrations
-          applied against it, and this host cannot start that stack.
   integration.notify.queue:
     schema: work/integration
     feature: notify
@@ -2048,17 +2033,8 @@ records:
   journey.login.first-sign-in:
     schema: work/customer-journey
     feature: login
-    state: todo
-    effectiveState: blocked
-    blockers:
-      - id: gap.login.live-proof
-        rootKind: gap
-        cyclic: false
-        because: "This journey's own requiresProof.uat names uat.login.sign-in, which is itself todo - no
-          uat/sign-in/runs/<runId>/ folder with real screenshots and a passing result.md exists yet,
-          only the designed flow. The former evidence.yaml here (provenance: starci-kernel, stale:
-          true) pointed at that same never-executed run; a lane's own toolkit script cannot honestly
-          re-mint starci-kernel provenance for a run that did not happen."
+    state: done
+    effectiveState: done
   journey.notify.told-about-completion:
     schema: work/customer-journey
     feature: notify
@@ -2465,18 +2441,12 @@ records:
   uat.login.sign-in:
     schema: work/uat-flow
     feature: login
-    state: todo
-    effectiveState: blocked
+    state: done
+    effectiveState: done
     usedBy:
       provenBy:
         - fr.login.sign-in
-    blockers:
-      - id: gap.login.live-proof
-        rootKind: gap
-        cyclic: false
-        because: uat.verify has not run this flow against the running product yet; no run folder under
-          uat/sign-in/runs/** exists with screens, video and a passing result.md, only this designed
-          flow shape.
+        - journey.login.first-sign-in
   uat.login.sign-in.runs.20260918T061141Z-af3dfbbc:
     schema: starci/uat-run-manifest@1
     feature: login
@@ -2488,6 +2458,11 @@ records:
     state: null
     effectiveState: null
   uat.login.sign-in.runs.20260918T080854Z-f7ab26f0:
+    schema: starci/uat-run-manifest@1
+    feature: login
+    state: null
+    effectiveState: null
+  uat.login.sign-in.runs.20260918T090054Z-240aa95e:
     schema: starci/uat-run-manifest@1
     feature: login
     state: null
@@ -2594,6 +2569,11 @@ records:
     feature: task
     state: null
     effectiveState: null
+  uat.task.create.runs.20260918T090054Z-240aa95e:
+    schema: starci/uat-run-manifest@1
+    feature: task
+    state: null
+    effectiveState: null
   ui.audit.privacy:
     schema: work/ui-screen
     feature: audit
@@ -2634,10 +2614,10 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 72
-    todo: 40
-    stale: 0
-    blocked: 84
+    done: 76
+    todo: 37
+    stale: 3
+    blocked: 80
     total: 196
   byFeature:
     audit:
@@ -2647,10 +2627,10 @@ tally:
       blocked: 16
       total: 26
     login:
-      done: 11
-      todo: 4
-      stale: 0
-      blocked: 9
+      done: 16
+      todo: 2
+      stale: 1
+      blocked: 5
       total: 24
     notify:
       done: 5
@@ -2677,9 +2657,9 @@ tally:
       blocked: 5
       total: 26
     task:
-      done: 10
-      todo: 15
-      stale: 0
+      done: 9
+      todo: 14
+      stale: 2
       blocked: 8
       total: 33
   gaps:
@@ -2718,14 +2698,14 @@ tally:
         - ui.login.sign-in
     - id: gap.login.live-proof
       feature: login
-      state: todo
+      state: done
       closedBy:
         - uat.login.sign-in
     - id: gap.login.migration-not-applied
       feature: login
       state: done
       closedBy:
-        - impl.task.todo-app-backend.platform-database
+        - gap.login.live-proof
     - id: gap.notify.direction-not-drawn
       feature: notify
       state: done
@@ -2865,10 +2845,6 @@ frontier:
   - id: gap.login.device-field
     feature: login
     title: No device field exists on a session or person
-  - id: gap.login.live-proof
-    feature: login
-    title: No live proof exists against the real Keycloak/Postgres stack, and no uat.verify run has
-      executed login.sign-in against it
   - id: impl.login.todo-app-frontend.sign-in
     feature: login
     title: The sign-in route, feature and block
@@ -3118,7 +3094,7 @@ unclassifiedEdges:
     target: uat.login.sign-in
   - from: gap.login.migration-not-applied
     field: closedBy
-    target: impl.task.todo-app-backend.platform-database
+    target: gap.login.live-proof
   - from: gap.notify.direction-not-drawn
     field: closedBy
     target: ui.notify.preferences
@@ -3446,6 +3422,18 @@ unclassifiedEdges:
   - from: uat.login.sign-in.runs.20260918T080854Z-f7ab26f0
     field: nodeId
     target: uat.login.sign-in
+  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
+    field: assertions.id
+    target: br.login.password.sign-in
+  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
+    field: assertions.id
+    target: br.login.session.restores
+  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
+    field: assertions.id
+    target: fr.login.sign-in
+  - from: uat.login.sign-in.runs.20260918T090054Z-240aa95e
+    field: nodeId
+    target: uat.login.sign-in
   - from: uat.notify.digest-and-unsubscribe
     field: proves
     target: br.notify.digest.window
@@ -3501,6 +3489,15 @@ unclassifiedEdges:
     field: assertions.id
     target: fr.task.create
   - from: uat.task.create.runs.20260918T080854Z-f7ab26f0
+    field: nodeId
+    target: uat.task.create
+  - from: uat.task.create.runs.20260918T090054Z-240aa95e
+    field: assertions.id
+    target: br.task.single-owner
+  - from: uat.task.create.runs.20260918T090054Z-240aa95e
+    field: assertions.id
+    target: fr.task.create
+  - from: uat.task.create.runs.20260918T090054Z-240aa95e
     field: nodeId
     target: uat.task.create
   - from: ui.audit.privacy

@@ -16,7 +16,7 @@ import { HealthModule } from './features/todo/http/health/health.module';
  * `PlatformEventsModule` and `SessionModule` are registered globally: `AppConfigService` and
  * `PlatformEventBus` are genuinely app-wide (every capability and integration needs one or the other),
  * and `SessionService` is needed by five separate GraphQL action modules for the same
- * `x-session-token` -> actor lookup (see `session-context.ts`'s comment) - each capability module that
+ * `Authorization: Bearer <token>` -> actor lookup (see `session-actor.adapter.ts`'s comment) - each capability module that
  * used to import them explicitly (`keycloak.module.ts`, `primary.module.ts`, `task.module.ts`,
  * `session.module.ts`) now relies on that global registration instead. Nothing else here needs to be
  * global, since `@nestjs/cqrs`'s `CqrsModule` and the primary database's own `TypeOrmCoreModule` are

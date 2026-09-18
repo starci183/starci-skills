@@ -194,7 +194,11 @@ export default class RunWriter implements Reporter {
     const resultMd = [
       `# ${record.title}`,
       '',
-      `Flow: \`${record.id}\`  Run: \`${this.runId}\`  Outcome: **${outcome}**`,
+      // Plain text after "Outcome: ", never markdown-bolded: scripts/check-example-work.mjs's concept
+      // 12 refuses a done uat-flow record whose run's result.md does not match /outcome:\s*pass/i, and
+      // the emphasis markers used to sit directly between the colon and the word, breaking that match
+      // for the first run this harness ever settled a done record against.
+      `Flow: \`${record.id}\`  Run: \`${this.runId}\`  Outcome: ${outcome}`,
       '',
       '## Steps walked',
       ...(walkEntries.length ? walkEntries.map(w => `- \`${w.step}\` (${w.startedAt} -> ${w.endedAt})`) : ['- (none reached)']),

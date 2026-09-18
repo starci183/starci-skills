@@ -158,6 +158,68 @@ exceptions:
     reason: >
       starci/uat-walk@1 output written by the Playwright uat harness for the
       first real uat.task.create run; a captured run receipt, JSON by the
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T090054Z-240aa95e/cleanup.json
+    reason: >
+      starci/uat-cleanup@1 output written by the Playwright uat harness for
+      the third real uat.login.sign-in run (ex-login-impl, against the
+      GraphQL/Authorization-Bearer rewrite with UAT_LIVE_LOGIN_AUTHORIZED=true);
+      a captured run receipt, JSON by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T090054Z-240aa95e/flows.json
+    reason: >
+      starci/uat-flows@1 output written by the Playwright uat harness for
+      the same ex-login-impl uat.login.sign-in run; a captured run receipt,
+      JSON by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T090054Z-240aa95e/readback.json
+    reason: >
+      starci/uat-readback@1 output written by the Playwright uat harness for
+      the same ex-login-impl uat.login.sign-in run; a captured run receipt,
+      JSON by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T090054Z-240aa95e/run-ledger.json
+    reason: >
+      starci/uat-run-ledger@1 output written by the Playwright uat harness
+      for the same ex-login-impl uat.login.sign-in run; a captured run
+      receipt, JSON by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T090054Z-240aa95e/ux-checks.json
+    reason: >
+      starci/uat-ux-checks@1 output written by the Playwright uat harness
+      for the same ex-login-impl uat.login.sign-in run; a captured run
+      receipt, JSON by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/login/uat/sign-in/runs/20260918T090054Z-240aa95e/walk.json
+    reason: >
+      starci/uat-walk@1 output written by the Playwright uat harness for the
+      same ex-login-impl uat.login.sign-in run; a captured run receipt, JSON
+      by the harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T090054Z-240aa95e/cleanup.json
+    reason: >
+      starci/uat-cleanup@1 output written by the Playwright uat harness for
+      the real uat.task.create run captured alongside the login lane's own
+      run (ex-login-impl, same live stack, same UAT_LIVE_LOGIN_AUTHORIZED=true
+      invocation); a captured run receipt, JSON by the harness's own writer
+      contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T090054Z-240aa95e/flows.json
+    reason: >
+      starci/uat-flows@1 output written by the Playwright uat harness for
+      the same uat.task.create run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T090054Z-240aa95e/readback.json
+    reason: >
+      starci/uat-readback@1 output written by the Playwright uat harness for
+      the same uat.task.create run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T090054Z-240aa95e/run-ledger.json
+    reason: >
+      starci/uat-run-ledger@1 output written by the Playwright uat harness
+      for the same uat.task.create run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T090054Z-240aa95e/ux-checks.json
+    reason: >
+      starci/uat-ux-checks@1 output written by the Playwright uat harness
+      for the same uat.task.create run; a captured run receipt, JSON by the
+      harness's own writer contract.
+  - path: examples/todo-app-backend/.starciwork/features/task/uat/create/runs/20260918T090054Z-240aa95e/walk.json
+    reason: >
+      starci/uat-walk@1 output written by the Playwright uat harness for the
+      same uat.task.create run; a captured run receipt, JSON by the
       harness's own writer contract.
   - path: examples/todo-app-backend/.starciwork/ledger-anchor.json
     reason: >

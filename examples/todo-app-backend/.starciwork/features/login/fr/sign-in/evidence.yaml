@@ -16,8 +16,18 @@ assertions:
     exit: 0
     outcome: pass
     observation: npx jest src/app.boot.spec.ts -t "drives sign-in" exited 0
+  - id: boot-refuses-unauthenticated-tasks
+    command: npx jest src/app.boot.spec.ts -t "refuses an unauthenticated tasks query"
+    exit: 0
+    outcome: pass
+    observation: npx jest src/app.boot.spec.ts -t "refuses an unauthenticated tasks query" exited 0
+  - id: frontend-lands-on-tasks-after-sign-in
+    command: cd ../todo-app-frontend && npx vitest run src/hooks/auth/useSignIn.spec.ts
+    exit: 0
+    outcome: pass
+    observation: cd ../todo-app-frontend && npx vitest run src/hooks/auth/useSignIn.spec.ts exited 0
 provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T07:51:16.886Z
+  capturedAt: 2026-09-18T08:39:58.795Z

@@ -48,4 +48,16 @@ describe('SessionService', () => {
     const days = Math.round((session.expiresAt.getTime() - session.issuedAt.getTime()) / (24 * 60 * 60 * 1000));
     expect(days).toBe(30);
   });
+
+  it('an operation without a session token is refused before any database read', async () => {
+    const entityManager = createFakeEntityManager<SessionEntity>('token');
+    const findOneBySpy = jest.spyOn(entityManager, 'findOneBy');
+    const service = new SessionService(entityManager as never, new AppConfigService());
+    await service.tAccept('person-1'); // a real session exists, so a bypass would have something to match.
+
+    await expect(service.findActive('')).rejects.toMatchObject({ code: 'SESSION_NOT_FOUND' });
+    await expect(service.findActive(undefined as unknown as string)).rejects.toMatchObject({ code: 'SESSION_NOT_FOUND' });
+
+    expect(findOneBySpy).not.toHaveBeenCalled();
+  });
 });

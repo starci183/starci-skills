@@ -5,7 +5,7 @@ import { SignOutInput } from './graphql-types/input';
 import { SignOutResponse } from './graphql-types/response';
 
 /** GraphQL mutation for signOut. `sessionToken` still travels in the request body (as the original
- * REST `SignOutRequest` did), not as the `x-session-token` header the task mutations read - sign-out is
+ * REST `SignOutRequest` did), not as the `Authorization: Bearer <token>` header the task mutations read - sign-out is
  * ending that exact token, so it is the input rather than ambient authentication. */
 @Resolver()
 export class SignOutResolver {

@@ -36,7 +36,9 @@ export type Result<T> = {
  *
  * @param query - The operation document.
  * @param variables - Its variables, if any.
- * @param token - The caller's own session token, sent as `x-session-token`; omitted for sign-in/sign-out.
+ * @param token - The caller's own session token, sent as `Authorization: Bearer <token>` - the same
+ *   header name and value shape nivo-fe's own graphql.ts sends its access token with - omitted for
+ *   sign-in/sign-out.
  * @returns The unwrapped payload, or why there is none.
  */
 export const graphql = async <T,>(
@@ -50,7 +52,7 @@ export const graphql = async <T,>(
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        ...(token ? { 'x-session-token': token } : {}),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify({ query, variables: variables ?? {} }),
     });

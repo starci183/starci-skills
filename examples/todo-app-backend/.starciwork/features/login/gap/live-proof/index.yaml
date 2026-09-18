@@ -1,17 +1,25 @@
 schema: work/gap
 id: gap.login.live-proof
 title: No live proof exists against the real Keycloak/Postgres stack, and no uat.verify run has executed login.sign-in against it
-state: todo
-statement: integration.login.keycloak's and integration.login.postgres's requiresProof.live both need a run
+state: done
+statement: >-
+  integration.login.keycloak's and integration.login.postgres's requiresProof.live both need a run
   against the real provider (a real Keycloak token exchange, a real Postgres migration and round-trip),
   not against FakeKeycloakClient or an in-memory Repository stand-in, and uat.login.sign-in - which would
   exercise exactly that pair - has never been executed by uat.verify against the running product either -
   there is no uat/sign-in/runs/<runId>/ folder with real screenshots, a playable video and a passing
-  result.md, only the designed flow this record and its accounts.yaml/fixtures ref describe. This host
-  cannot start the docker-compose dev stack (Keycloak on 8089, Postgres on 5432) that a live run needs, so
-  no such run has happened from here. This is a designed todo, not an oversight - it names exactly the two
-  integrations the owner's own requiresProof.live already curated as needing a real provider, together with
-  the one uat flow that would prove both at once, and it stays open until proof is captured on a host that
-  can boot that stack - it is not a stand-in for missing code, missing tests, or an unimplemented feature.
+  result.md, only the designed flow this record and its accounts.yaml/fixtures ref describe. Closed by
+  the ex-login-impl lane - its host could reach the todo-app-dev compose stack another lane already had
+  running (Keycloak on 8089, Postgres on 5432, reused read-only, this lane started neither), brought up
+  its own backend (ts-node-dev, port 3001) and frontend (next build && next start, port 3000) against it,
+  and ran uat.login.sign-in for real with UAT_LIVE_LOGIN_AUTHORIZED=true. See
+  runs/20260918T090054Z-240aa95e/result.md (outcome pass, every assertion observed yes) and this lane's
+  scripts/live-proof.sh run (22/22 steps, including three new auth-bypass regression checks against the
+  real Postgres session table).
 closedBy: uat.login.sign-in
-change: {rev: 1, kind: initial, at: 2026-09-18T08:00:00.000Z}
+verificationSource: authored-claim
+because: A gap closes through its closer being done, not through its own replayable command; uat.login.sign-in
+  (this gap's closedBy) carries the real evidence - runs/20260918T090054Z-240aa95e's result.md, screens
+  and video - and integration.login.keycloak/integration.login.postgres each carry their own
+  evidence.yaml naming scripts/live-proof.sh's 22/22-passing run.
+change: {rev: 2, kind: editorial, at: 2026-09-18T16:40:00.000Z, reason: "state flips to done now that the live run this gap named actually happened; the statement's history of why it was open is retained rather than deleted."}

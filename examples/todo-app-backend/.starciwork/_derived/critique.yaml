@@ -57,7 +57,7 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.password.sign-in sends 49 other record(s) back to todo, would
-      stale 13 evidence file(s), and touches 28 code path(s) (app/plan/upgrade-button.tsx,
+      stale 18 evidence file(s), and touches 28 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
@@ -123,7 +123,7 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.restores sends 48 other record(s) back to todo, would
-      stale 12 evidence file(s), and touches 28 code path(s) (app/plan/upgrade-button.tsx,
+      stale 16 evidence file(s), and touches 28 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
@@ -189,7 +189,7 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.single-device sends 48 other record(s) back to todo,
-      would stale 12 evidence file(s), and touches 28 code path(s) (app/plan/upgrade-button.tsx,
+      would stale 16 evidence file(s), and touches 28 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
@@ -304,7 +304,7 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.task.single-owner sends 23 other record(s) back to todo, would
-      stale 3 evidence file(s), and touches 15 code path(s) (src/app/tasks/**,
+      stale 4 evidence file(s), and touches 15 code path(s) (src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
@@ -765,7 +765,7 @@ findings:
       - impl.task.todo-app-backend.platform-events
       - sds.task.completion-state
     because: A breaking change to br.task.complete.once sends 7 other record(s) back to todo, would
-      stale 0 evidence file(s), and touches 3 code path(s) (src/modules/bussiness/task,
+      stale 1 evidence file(s), and touches 3 code path(s) (src/modules/bussiness/task,
       src/modules/platform/databases/postgresql/primary, src/modules/platform/events) - this is the
       number a reviewer wants before approving the change.
   - id: blast-radius:br.plan.active-scope
@@ -1036,30 +1036,6 @@ findings:
       - gap.recur.live-proof
     because: fr.recur.see-upcoming is todo, blocked on gap.recur.live-proof - a real product question,
       not missing code; it moves once that is settled.
-  - id: designed-todo:integration.login.keycloak
-    kind: designed-todo
-    severity: info
-    records:
-      - integration.login.keycloak
-      - gap.login.live-proof
-    because: integration.login.keycloak is todo, blocked on gap.login.live-proof - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:integration.login.postgres
-    kind: designed-todo
-    severity: info
-    records:
-      - integration.login.postgres
-      - gap.login.live-proof
-    because: integration.login.postgres is todo, blocked on gap.login.live-proof - a real product
-      question, not missing code; it moves once that is settled.
-  - id: designed-todo:journey.login.first-sign-in
-    kind: designed-todo
-    severity: info
-    records:
-      - journey.login.first-sign-in
-      - gap.login.live-proof
-    because: journey.login.first-sign-in is todo, blocked on gap.login.live-proof - a real product
-      question, not missing code; it moves once that is settled.
   - id: designed-todo:journey.plan.hits-the-cap
     kind: designed-todo
     severity: info
@@ -1124,14 +1100,6 @@ findings:
       - gap.audit.live-proof
     because: uat.audit.right-to-be-forgotten is todo, blocked on gap.audit.live-proof - a real product
       question, not missing code; it moves once that is settled.
-  - id: designed-todo:uat.login.sign-in
-    kind: designed-todo
-    severity: info
-    records:
-      - uat.login.sign-in
-      - gap.login.live-proof
-    because: uat.login.sign-in is todo, blocked on gap.login.live-proof - a real product question, not
-      missing code; it moves once that is settled.
   - id: designed-todo:uat.notify.digest-and-unsubscribe
     kind: designed-todo
     severity: info
@@ -1621,3 +1589,20 @@ findings:
       - gap.plan.unbuilt-module
     because: sds.plan.subscription-lifecycle is todo, blocked on gap.plan.unbuilt-module - code that
       simply has not been written yet; the owner wants this count at zero.
+  - id: stale-evidence-bulk-edit:br.task.single-owner
+    kind: stale-evidence-bulk-edit
+    severity: warn
+    records:
+      - br.task.single-owner
+    because: br.task.single-owner's evidence is stale with staleSince naming only itself - a bare digest
+      mismatch (the record's own bytes moved after capture), not a change in some other record it
+      depends on.
+  - id: stale-evidence-designed:impl.task.todo-app-backend.platform-database
+    kind: stale-evidence-designed
+    severity: info
+    records:
+      - impl.task.todo-app-backend.platform-database
+      - impl.share.todo-app-backend.invitations
+    because: impl.task.todo-app-backend.platform-database's evidence carries staleSince naming
+      impl.share.todo-app-backend.invitations as the record whose change caused this - a tracked,
+      designed staleness, not silent drift.

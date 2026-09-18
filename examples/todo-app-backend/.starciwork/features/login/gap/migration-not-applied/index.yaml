@@ -2,16 +2,21 @@ schema: work/gap
 id: gap.login.migration-not-applied
 title: No migration has been applied against the dev server
 state: done
-statement: This gap originally said the schema existed only in data.login.person, with no migration file at
+statement: >-
+  This gap originally said the schema existed only in data.login.person, with no migration file at
   all. That is no longer true - real TypeORM migrations now exist at
   src/modules/platform/databases/postgresql/primary/migrations/1758160000000-create-sessions-table.ts and
-  1758160000001-create-tasks-table.ts, owned and proved by impl.task.todo-app-backend.platform-database.
-  This gap is closed by those migration files existing as real, proved code. Whether they have been run
-  against a live dev Postgres server from this host is a separate, still-open fact - gap.login.live-proof
-  names it - and is not what this gap's own statement claims.
-closedBy: [impl.task.todo-app-backend.platform-database]
+  1758160000001-create-tasks-table.ts. What remained true until this lane - that nobody had run those
+  migrations against a live dev Postgres server - is exactly what gap.login.live-proof named, and this
+  gap folds into that one rather than restating the same absence under two names. Verified directly
+  against the shared todo-app-dev-postgres-1 container this lane reused (read-only, never started or
+  stopped by this lane) - select * from migrations returns both CreateSessionsTable1758160000000 and
+  CreateTasksTable1758160000001, and the sessions/tasks table columns match the current
+  SessionEntity/TaskEntity declarations exactly.
+closedBy: gap.login.live-proof
 verificationSource: authored-claim
-because: closedBy names an already-done implementation record, so no additional test run proves this
-  specific claim - the migration files' existence is independently verifiable by reading
-  src/modules/platform/databases/postgresql/primary/migrations/**, which
-  impl.task.todo-app-backend.platform-database owns and proves.
+because: This gap folds into gap.login.live-proof, whose own evidence (integration.login.postgres's
+  evidence.yaml, migrations-applied assertion) is the replayable proof; this record's own statement
+  above additionally names the exact psql output verified directly against the shared Postgres
+  container.
+change: {rev: 1, kind: editorial, at: 2026-09-18T16:40:00.000Z, reason: "state flips to done alongside gap.login.live-proof, which it folds into and which is now itself done."}
