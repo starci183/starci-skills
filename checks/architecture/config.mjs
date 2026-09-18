@@ -313,10 +313,13 @@ export function loadArchitectureConfig(repositoryRoot, configFile) {
   for (const key of ['routes', 'features', 'components', 'hooks', 'modules', 'transport']) requireAuthoredDirectories(root, frontend[key], `Architecture frontend.${key}`);
   const discovered = discoveredProjects(root, workspaces);
   const projects = pathList(authored.projects ?? authored.tsconfig, discovered, 'Architecture TypeScript project');
+  const singleAppComposition = backend.apps === undefined && !existingDirectory(root, 'apps')
+    && existingDirectory(root, 'src/features') && existingDirectory(root, 'src/modules')
+    && existingRegularFile(root, 'src/main.ts') && existingRegularFile(root, 'src/app.module.ts');
   const resolvedBackend = {
     modules: pathList(backend.modules, ['src/modules'], 'Architecture backend.modules'),
     features: pathList(backend.features, ['src/features'], 'Architecture backend.features'),
-    apps: pathList(backend.apps, ['apps'], 'Architecture backend.apps'),
+    apps: pathList(backend.apps, singleAppComposition ? ['src'] : ['apps'], 'Architecture backend.apps'),
     legacyRoots: optionalPathList(backend.legacyRoots, 'Architecture backend.legacyRoots'),
     moduleRegistration: moduleRegistrationConfig(backend.moduleRegistration),
   };
