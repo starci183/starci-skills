@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.notify.delivery.once
 title: A delivery may be attempted twice; the person is told once
-state: todo
+state: done
 statements:
   - "The transport that carries a notification out of the product is at-least-once: a network retry, a
     redelivered queue message or a re-run producer can call the pipeline again for the same event."
@@ -10,7 +10,5 @@ authorityRefs:
   - "owner-intent: A person who is told about the same task completing twice trusts the product less,
     not more."
 acceptanceCriteria: [dedupe-collapses-retry]
-module: src/notify/dedupe
-change: {rev: 1, kind: initial, at: 2026-09-18T06:00:00.000Z}
-blockedBy:
-  - {record: gap.notify.unbuilt-module, because: "No code exists yet at src/notify/dedupe. The example is moving to a NestJS backend and this module has not been written against that layout; the statement is agreed but not implementable-and-proven until it is, so it stays todo rather than done on the strength of a design alone."}
+module: src/modules/bussiness/notify
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "The NestJS Nest scaffold this record was waiting on now exists: DedupeService (src/modules/bussiness/notify/dedupe.service.ts) hashes kind+sourceEventId+recipientId per decision.notify.dedupe-key and admits by primary key, proven by dedupe.service.spec.ts's ac.notify.delivery.once.dedupe-collapses-retry case and exercised end to end by notify.service.spec.ts and scripts/live-proof-notify.sh. gap.notify.unbuilt-module's blocker is resolved; module updated from the retired src/notify/dedupe prototype path to the real house-shape directory."}

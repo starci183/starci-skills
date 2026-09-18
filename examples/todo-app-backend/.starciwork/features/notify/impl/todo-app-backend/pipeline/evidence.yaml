@@ -1,0 +1,152 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: impl.notify.todo-app-backend.pipeline
+recordDigest: 2b03638b00eeaf6d98db7bbe9cf6406df59a13d98ad4bbb998934eaafeabdeb7
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/features/todo/graphql/mutations/notify/unsubscribe/graphql-types/input.ts
+      sha256: d23a74dfbbddc77221ab17548879bbd75fe7dceab6fa144311eb0859dc6171ba
+    - path: src/features/todo/graphql/mutations/notify/unsubscribe/graphql-types/response.ts
+      sha256: c9a885fbb32ae20c6b08d1fb967621e855935bf47d8d28ac2a8bdbd4dc44c2d5
+    - path: src/features/todo/graphql/mutations/notify/unsubscribe/unsubscribe.module-definition.ts
+      sha256: 553421dc5426ca2794762235b8749e59c155be7832a602da9b40845f1e6e912b
+    - path: src/features/todo/graphql/mutations/notify/unsubscribe/unsubscribe.module.ts
+      sha256: 7f490eaa94f55aecf8eb0d30985e5767ac4c7efd7990e1d82b0281efa66dd9dc
+    - path: src/features/todo/graphql/mutations/notify/unsubscribe/unsubscribe.resolver.ts
+      sha256: 883667cad7ba434c5915615d746a3155b4c41afe0227b788248fb171f5315ff4
+    - path: src/features/todo/graphql/mutations/notify/update-notification-preferences/graphql-types/input.ts
+      sha256: 7626af2c5c9da5a04f8d95b9a8bda69defba43ca44206d5f621d773bd446de78
+    - path: src/features/todo/graphql/mutations/notify/update-notification-preferences/graphql-types/response.ts
+      sha256: 3d9a5f41711f3af76b9916fe6ffee82e20b15e8237a0ff5371a81e7055e2dd50
+    - path: src/features/todo/graphql/mutations/notify/update-notification-preferences/update-notification-preferences.module-definition.ts
+      sha256: 553421dc5426ca2794762235b8749e59c155be7832a602da9b40845f1e6e912b
+    - path: src/features/todo/graphql/mutations/notify/update-notification-preferences/update-notification-preferences.module.ts
+      sha256: b912421dec0f71b8911da4cebd1007f5c14c567d68344f5710b2831cc0d99ba8
+    - path: src/features/todo/graphql/mutations/notify/update-notification-preferences/update-notification-preferences.resolver.ts
+      sha256: e3f1436b1492baf9af75eb35322bc23570fec22cca3f7f18e9b1675a112c0bd0
+    - path: src/features/todo/graphql/queries/notify/notification-preferences/graphql-types/response.ts
+      sha256: 8c7cc3f6ae54212f37d28f4c8e641549339d41bd66ab12be796f56503931419c
+    - path: src/features/todo/graphql/queries/notify/notification-preferences/notification-preferences.module-definition.ts
+      sha256: 553421dc5426ca2794762235b8749e59c155be7832a602da9b40845f1e6e912b
+    - path: src/features/todo/graphql/queries/notify/notification-preferences/notification-preferences.module.ts
+      sha256: d59688b2f51c526acb0c9136fa617cb2231b471bff6c765dd64f87d08a8af984
+    - path: src/features/todo/graphql/queries/notify/notification-preferences/notification-preferences.resolver.ts
+      sha256: 0e35d74ce465109019ebdcf924b2757307d241c0632dcd10432ae3be3f018482
+    - path: src/modules/bussiness/notify/dedupe.service.spec.ts
+      sha256: 404f7c7325d9f6f3369b01cf859d4e8528f6b481edb944b6f23f20ca47010221
+    - path: src/modules/bussiness/notify/dedupe.service.ts
+      sha256: 3a8b7ca0085066a9ed88765eaa5aafa92072d9cc555df86f5ff439a7e7035644
+    - path: src/modules/bussiness/notify/delivery.service.spec.ts
+      sha256: bd0b15f4b3d21dc90bd037b1e96d3a1b50d10a99e4da5b38244c4e89b95f2019
+    - path: src/modules/bussiness/notify/delivery.service.ts
+      sha256: 8e5a6346e34de9db54340541a71a7d177a001b73e54589c05c11b2e1fa6dc11c
+    - path: src/modules/bussiness/notify/digest.service.spec.ts
+      sha256: 878a8c50a45053dac0bef8801fd1f8bbc4a6d1aab8291655a74dc0bfc33106b3
+    - path: src/modules/bussiness/notify/digest.service.ts
+      sha256: baf384e27a29f8ef7ac1018f072bf08cb9abd13ea94ec37e784c5ff62451b8ca
+    - path: src/modules/bussiness/notify/index.ts
+      sha256: 33aaefcc3c2d8366cf8da4a4ccc4836e2ce5e300ecec1fd56540edc34dbef281
+    - path: src/modules/bussiness/notify/notification-preferences.handler.spec.ts
+      sha256: 8fb81741fceff291faa8d8a695f4243ced48285efcaddfc61fcf4f2df803e863
+    - path: src/modules/bussiness/notify/notification-preferences.handler.ts
+      sha256: d982041928893a010c6a8e952e9d8e9d1ac615143d7e65551209318bca45bc01
+    - path: src/modules/bussiness/notify/notification-preferences.query.ts
+      sha256: a266029ac90e1dade10566e47f2d68a5c110e420c4262eb21378fcd2ebc5514d
+    - path: src/modules/bussiness/notify/notify-event.subscriber.spec.ts
+      sha256: 2bf3db137eb4febc8eacaaf0f4cf1a4e7641df5f3d67b893b3cb04ab3d149793
+    - path: src/modules/bussiness/notify/notify-event.subscriber.ts
+      sha256: 97f7991a6e7adb36b6633c2ee558dc6e14f701b3d9719b3b0c50186ac11823a6
+    - path: src/modules/bussiness/notify/notify.module-definition.ts
+      sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
+    - path: src/modules/bussiness/notify/notify.module.ts
+      sha256: 5f9490f341da7d93d0df83d57b85032744a50c9207e1771342c933c430051d8a
+    - path: src/modules/bussiness/notify/notify.scheduler.spec.ts
+      sha256: 8453f1bf5f736599f4c749fe46e9b939da851d2f4c3ed96e9de804a7b0321afb
+    - path: src/modules/bussiness/notify/notify.scheduler.ts
+      sha256: 48825e4ca78550ee55c8d68806c05ae5fc22b7a7ac88b15b651a0a1881d4c0d9
+    - path: src/modules/bussiness/notify/notify.service.spec.ts
+      sha256: c069c1a5a4297a0e54d3934f8a6304f1f7461c55d44bf9e460cee802430d967b
+    - path: src/modules/bussiness/notify/notify.service.ts
+      sha256: 0c8fa63e55ce584e014e4cb026dd5100f6bf287ced5c629915a19d596e23552e
+    - path: src/modules/bussiness/notify/preferences.service.spec.ts
+      sha256: 083cf2f761c0f2fcf4ee160a0d6db9b07ca5d122c72e2fdd607abbce57048c55
+    - path: src/modules/bussiness/notify/preferences.service.ts
+      sha256: 51c7f688d8d2f5c10a0b9bdc0ce74666e372c8c27b28dfe83cf6b11e6a8a48ff
+    - path: src/modules/bussiness/notify/types/delivery-attempt-record.ts
+      sha256: 52e170ec96c44e524204d46deb4b347f22cfef93bc2133f8c92f6fc371720825
+    - path: src/modules/bussiness/notify/types/digest-window-record.ts
+      sha256: 91caed8bb069dbafc44075098d9c70a48041449c59d5b8bf1831b3e8222798e6
+    - path: src/modules/bussiness/notify/types/notification-record.ts
+      sha256: d88a48d1e0a202d42da129166eecd1d9b097df50354011b91323b4f8c5b1c086
+    - path: src/modules/bussiness/notify/types/preference-record.ts
+      sha256: d66148b8a3074461115328d8360134d985ea7f9f68bd0b23b7996496659ee4f7
+    - path: src/modules/bussiness/notify/unsubscribe.command.ts
+      sha256: 063508d9797d496b17ab8528728bb0ad62097bb8c53135cdbb6d8d908ca79ca5
+    - path: src/modules/bussiness/notify/unsubscribe.handler.spec.ts
+      sha256: 918cc59a430a7a4cf9006397671bb9bc940a2be334431d6caad5d0377614e1b0
+    - path: src/modules/bussiness/notify/unsubscribe.handler.ts
+      sha256: b53d5fafcaad569b3fbd9a6e69d80ca1f176c67e7353567de2711286365bb720
+    - path: src/modules/bussiness/notify/update-notification-preferences.command.ts
+      sha256: 8d3693fb910c9a5ef443e14eac10fe3d4ffd5d15aae6cb98452c4a50bf4cfc93
+    - path: src/modules/bussiness/notify/update-notification-preferences.handler.spec.ts
+      sha256: cd4f1ad7213f073a4ed3d7b57a4246a89801d66ae2f8f51529aadc7e11b972bc
+    - path: src/modules/bussiness/notify/update-notification-preferences.handler.ts
+      sha256: 239cd82c5aa03751a0bf19838db5ba6f1f3e35859b55f08dca5b798680e0451e
+    - path: src/modules/integrations/notify-queue/index.ts
+      sha256: def7caab61d61b6db02f1b98bafcbbf4d776909f424246af896a804fc7c7f8d0
+    - path: src/modules/integrations/notify-queue/notify-queue.client.ts
+      sha256: e962acde1138c9bab805d9dbf1fda7a26410fb7ac84232d49158a860e7d389cd
+    - path: src/modules/integrations/notify-queue/notify-queue.contracts.ts
+      sha256: 25211279abd5898bf4ca50e7d74eaa3e04aa12da1043584cebde5c6cc0c4b514
+    - path: src/modules/integrations/notify-queue/notify-queue.module-definition.ts
+      sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
+    - path: src/modules/integrations/notify-queue/notify-queue.module.ts
+      sha256: a6c878a2dff854957f0d2159c9067ac0d42feb852cb10fb5ee62faf5149ec149
+    - path: src/modules/integrations/notify-queue/resp.ts
+      sha256: 0440713d5fd22db22257613fc8b44e94225d25b07e0cedfed471d3788e649b9a
+    - path: src/modules/integrations/notify-queue/testing/fake-notify-queue.client.ts
+      sha256: 40642ee60fc1f3f672933b5cbf2cab9c7709872c4ab00dd51b06fa5db7fc5d32
+    - path: src/modules/integrations/notify-smtp/index.ts
+      sha256: 58f6493a0ba5f284af2618908af1950a40045ac7520cdd74378b2be9a6889f97
+    - path: src/modules/integrations/notify-smtp/notify-smtp.client.ts
+      sha256: 17073f58b03e55f25f93249c1d16920fd3cde0028597522a85fd24eaec3b17ba
+    - path: src/modules/integrations/notify-smtp/notify-smtp.contracts.ts
+      sha256: bbeeebc3b098160c2a1274b5df5812e60f002b7554668f875d0e17b3bf90fcc4
+    - path: src/modules/integrations/notify-smtp/notify-smtp.module-definition.ts
+      sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
+    - path: src/modules/integrations/notify-smtp/notify-smtp.module.ts
+      sha256: d20f8dfaa45687a804d6d2ed64a73c25e2a6bfb8760c62b0e37819c1d5669746
+    - path: src/modules/integrations/notify-smtp/testing/fake-notify-smtp.client.ts
+      sha256: bf9697772ff77a8e92357c1fdaa0cbe5bf5fa1d774715a01f00914520e0426c3
+    - path: src/modules/shared/exceptions/errors/notify/notify-smtp-permanent-rejection.ts
+      sha256: 6ccfe97e7cd91f61e5e2d83f47567a44520fcbaf1478be999b9962bb684f3cff
+    - path: src/modules/shared/exceptions/errors/notify/notify-smtp-transient-failure.ts
+      sha256: 07ce4dcb71c85fef6915a7b73acc5faf3c79cd6ddc10431457499912a25e3f33
+  digest: 6e0dc18502165587cb6453657985767adfcea74f3c64fdaf9ae0b99d80c5472b
+outcome: pass
+assertions:
+  - id: unit
+    command: npx jest src/modules/bussiness/notify src/modules/integrations/notify-smtp
+      src/modules/integrations/notify-queue
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/notify src/modules/integrations/notify-smtp
+      src/modules/integrations/notify-queue exited 0
+  - id: typecheck
+    command: npx tsc --noEmit
+    exit: 0
+    outcome: pass
+    observation: npx tsc --noEmit exited 0
+  - id: live
+    command: bash scripts/live-proof-notify.sh
+    exit: 0
+    outcome: pass
+    observation: bash scripts/live-proof-notify.sh exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T09:23:48.147Z

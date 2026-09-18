@@ -1,7 +1,7 @@
 schema: work/functional-requirement
 id: fr.notify.digest
 title: Collapse several events into one message
-state: todo
+state: done
 actors: [owner, person]
 trigger: A second (or later) event for the same person and channel is admitted while their window is
   still open.
@@ -14,13 +14,12 @@ exceptionFlows:
 postconditions:
   - No person receives more than one message per open-then-closed window per channel.
 composes:
-  - {rule: br.notify.digest.window, module: src/notify/digest}
+  - {rule: br.notify.digest.window, module: src/modules/bussiness/notify}
 
 requiresProof:
   unit:
     forEach: composes
   e2e:
-    command: npm run test:e2e -- notify/digest
+    command: bash scripts/live-proof-notify.sh
 
-blockedBy:
-  - {record: gap.notify.unbuilt-module, because: "No implementation exists. The example is moving to a NestJS backend and this module has not been built against that layout."}
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "Implemented by NotifyService (src/modules/bussiness/notify/notify.service.ts), which dispatches an entire flushed digest group as one rendered NotifySmtpMessage. `requiresProof.e2e.command` corrected from the aspirational `npm run test:e2e -- notify/digest` (this repository's package.json has no test:e2e script) to the real command this feature's e2e proof actually runs. Proven by digest.service.spec.ts, notify.service.spec.ts's fr.notify.digest case, and a live run of scripts/live-proof-notify.sh against the real dev stack. gap.notify.unbuilt-module's blocker is resolved."}

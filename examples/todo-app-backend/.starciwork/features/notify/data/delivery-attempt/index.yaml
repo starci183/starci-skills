@@ -1,7 +1,7 @@
 schema: work/data
 id: data.notify.delivery-attempt
 title: Delivery attempt
-state: todo
+state: done
 fields:
   - {name: notificationId, type: text, required: true}
   - {name: state, type: text, required: true, note: "queued | sending | delivered | bounced | suppressed. See sds.notify.delivery-lifecycle."}
@@ -15,5 +15,7 @@ invariants:
   - endedAt is set if and only if state is delivered, bounced or suppressed.
   - failureClass is set if and only if the attempt is or was in a failure-carrying state.
 refs: [br.notify.failure.classified, br.notify.unsubscribe.honored]
-blockedBy:
-  - {record: gap.notify.unbuilt-module, because: "No entity or table exists yet. The example is moving to a NestJS/TypeORM backend and this shape has not been created against that layout."}
+module: src/modules/platform/databases/postgresql/primary/entities/notify-delivery-attempt.entity.ts
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "NotifyDeliveryAttemptEntity exists exactly to this shape (notify_delivery_attempts table, one row per notification); gap.notify.unbuilt-module's blocker is resolved."}
+verificationSource: authored-claim
+because: "work/data's done is an authored claim by nature; NotifyDeliveryAttemptEntity's fields and invariants match this record exactly, and the table is exercised live by scripts/live-proof-notify.sh."

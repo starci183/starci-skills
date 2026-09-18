@@ -1,0 +1,23 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: fr.notify.digest
+recordDigest: 8fc6a5a9ba1f0a95db1b71b5f306ee84776db18687ca4b3f8e20fdf951c8fbfb
+outcome: pass
+assertions:
+  - id: unit
+    command: npx jest digest.service.spec.ts notify.service.spec.ts -t digest
+    exit: 0
+    outcome: pass
+    observation: npx jest digest.service.spec.ts notify.service.spec.ts -t digest exited 0
+  - id: e2e
+    command: bash scripts/live-proof-notify.sh
+    exit: 0
+    outcome: pass
+    observation: bash scripts/live-proof-notify.sh exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T09:19:09.140Z

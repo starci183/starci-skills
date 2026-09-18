@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.notify.digest.window
 title: Several events in a person's quiet window become one message
-state: todo
+state: done
 statements:
   - Every notification admitted for one person and one channel before their window closes joins the
     same group.
@@ -11,7 +11,5 @@ authorityRefs:
   - "owner-intent: A separate email for every task completed in one busy minute is the failure mode
     this rule exists to prevent."
 acceptanceCriteria: [collapses-into-one-message]
-module: src/notify/digest
-change: {rev: 1, kind: initial, at: 2026-09-18T06:01:00.000Z}
-blockedBy:
-  - {record: gap.notify.unbuilt-module, because: "No code exists yet at src/notify/digest. The example is moving to a NestJS backend and this module has not been written against that layout, so the rule stays todo rather than claiming proof it does not have."}
+module: src/modules/bussiness/notify
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "DigestService (src/modules/bussiness/notify/digest.service.ts) implements the one-rolling-window-per-channel design decision.notify.digest-window chose: a window opens on the first admitted event, closes windowMs later, and is read only at close. Proven by digest.service.spec.ts's ac.notify.digest.window.collapses-into-one-message case, notify.service.spec.ts's end-to-end admit-then-flush case, and scripts/live-proof-notify.sh against the real dev stack (two real task completions joining one window, flushed by the real NotifyScheduler timer). gap.notify.unbuilt-module's blocker is resolved; module updated from the retired src/notify/digest prototype path."}

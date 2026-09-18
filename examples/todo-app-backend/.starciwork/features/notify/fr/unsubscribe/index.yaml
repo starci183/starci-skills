@@ -1,7 +1,7 @@
 schema: work/functional-requirement
 id: fr.notify.unsubscribe
 title: Stop receiving notifications on a channel
-state: todo
+state: done
 actors: [person]
 trigger: The person unsubscribes from a channel.
 mainFlow:
@@ -12,16 +12,14 @@ exceptionFlows:
 postconditions:
   - No message on that channel is sent to that person until they re-subscribe.
 composes:
-  - {rule: br.notify.unsubscribe.honored, module: src/notify/preferences}
+  - {rule: br.notify.unsubscribe.honored, module: src/modules/bussiness/notify}
 
 requiresProof:
   unit:
     forEach: composes
   e2e:
-    command: npm run test:e2e -- notify/unsubscribe
+    command: bash scripts/live-proof-notify.sh
   uat:
     required: true
 
-blockedBy:
-  - {record: gap.notify.unbuilt-module, because: "No implementation exists at src/notify/preferences or app/notify under the NestJS/Next.js layout the example is moving to; ui.notify.preferences (the only surface a person would use to unsubscribe) now has its interface.draw direction and reached done, but nothing on either side has been built against it yet."}
-change: {rev: 1, kind: editorial, at: 2026-09-18T10:00:00.000Z, reason: "Replaced the blockedBy edge on ui.notify.preferences (stale: that record reached done once interface.draw ran) with gap.notify.unbuilt-module, which names the real remaining reason - no notify module exists yet."}
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "GraphQL now exposes updateNotificationPreferences and unsubscribe mutations (src/features/todo/graphql/mutations/notify/**) backing this requirement's `unsubscribe from a channel` trigger, and PreferencesService/NotifyService (src/modules/bussiness/notify) enforce it on every admission. `requiresProof.e2e.command` corrected from the aspirational `npm run test:e2e -- notify/unsubscribe` (no such script exists in this repository) to the real command. Proven by unsubscribe.handler.spec.ts, notify.service.spec.ts's fr.notify.unsubscribe case, and a live run of scripts/live-proof-notify.sh (real unsubscribe mutation, then a real task completion lands suppressed). `requiresProof.uat.required` stays true and unmet: uat.notify.digest-and-unsubscribe (not owned by this lane) has not been walked - see gap.notify.live-proof. gap.notify.unbuilt-module's blocker is resolved."}

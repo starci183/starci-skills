@@ -1,7 +1,7 @@
 schema: work/sds-component
 id: sds.notify.delivery-lifecycle
 title: The life of one delivery attempt
-state: todo
+state: done
 responsibility: Carries one notification from admission to a terminal outcome, retrying a transient
   failure a bounded number of times and never attempting a send that preference already rules out.
 interfaces:
@@ -9,6 +9,8 @@ interfaces:
     directly.
 refs: [br.notify.delivery.once, br.notify.digest.window, br.notify.failure.classified, br.notify.unsubscribe.honored]
 dependsOn: [integration.notify.smtp, integration.notify.queue]
+owners:
+  - {role: module, path: src/modules/bussiness/notify}
 
 stateMachine:
   states: [queued, sending, delivered, bounced, suppressed]
@@ -67,5 +69,4 @@ requiresProof:
   transitions:
     forEach: stateMachine.transitions
 
-blockedBy:
-  - {record: gap.notify.unbuilt-module, because: "No implementation exists. The example is moving to a NestJS backend and this component has not been built against that layout, so every transition is unproven design rather than demonstrated behavior."}
+change: {rev: 2, kind: clarifying, at: 2026-09-18T12:00:00.000Z, reason: "DeliveryService (src/modules/bussiness/notify/delivery.service.ts) implements all six transitions, named identically (t-suppress, t-dispatch, t-deliver, t-bounce, t-retry, t-give-up) so the record and the code read together, per this codebase's own tComplete/tReopen/tBegin/tAccept convention. NotifyService.dispatchGroup drives t-dispatch either on: window-closed (via DigestService.flush, scheduled through NotifyQueuePort and the real NotifyScheduler timer) or on: immediate (a retry's redispatch after backoff, also via the queue) - both readings of window-closed-or-immediate are real code paths, not just prose. Every transition has a passing delivery.service.spec.ts case (see evidence.yaml), and scripts/live-proof-notify.sh exercises t-suppress and a real t-dispatch attempt against the real dev stack. gap.notify.unbuilt-module's blocker is resolved; owners added naming the module this design was missing (OWNER_PATH_MISSING)."}
