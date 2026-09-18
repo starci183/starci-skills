@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.recur.ending.preserves-history
 title: Ending a rule does not delete what it already made
-state: todo
+state: done
 statements:
   - Ending a rule stops it from generating any occurrence dated after the day it ended.
   - No occurrence the rule already materialised is deleted. Each one already completed or skipped stays
@@ -9,7 +9,5 @@ statements:
 authorityRefs:
   - "product-intent: a person's completed history must not depend on whether they later stopped the rule that produced it."
 acceptanceCriteria: [ended-rule-keeps-past-occurrences]
-module: src/recur/occurrence
-change: {rev: 1, kind: initial, at: 2026-09-18T05:13:00.000Z}
-blockedBy:
-  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The example's backend target moved to NestJS and this feature has not been built there; there is no occurrence store to orphan against."}
+module: src/modules/bussiness/recur
+change: {rev: 2, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "impl.recur.todo-app-backend.engine now exists: module corrected from the stale pre-migration path src/recur/occurrence to the real module root src/modules/bussiness/recur (OccurrenceService.orphanEndedOccurrences), and the gap.recur.unbuilt-module blockedBy edge is removed since that gap is now closed by this feature's implementation. ac.recur.ending.preserves-history.ended-rule-keeps-past-occurrences passes at src/modules/bussiness/recur/end-recurrence.handler.spec.ts."}

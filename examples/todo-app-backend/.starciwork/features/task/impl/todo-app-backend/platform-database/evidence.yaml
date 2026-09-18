@@ -33,6 +33,14 @@ codeDigest:
       sha256: f07588abb29e3d0f6344c771c0d3e537a8720dad18e5e4e0e817725a58ce7a5e
   digest: d3cb079b772b78edee99b97cfcf9095fa94b08c106e286b2c89eb66d3b5b4f68
 outcome: pass
+stale: true
+staleSince: {record: impl.recur.todo-app-backend.engine}
+staleReason: "The recur feature added RuleEntity and OccurrenceEntity plus one migration
+  (1758246000000-create-recur-tables.ts) under this same shared module
+  (src/modules/platform/databases/postgresql/primary), which changes this record's owned-directory
+  codeDigest even though nothing about SessionEntity/TaskEntity or their own migrations changed. The
+  assertions below were not re-run by this addition and still describe SessionEntity/TaskEntity's own
+  behaviour correctly; only the recorded codeDigest is stale against the directory's current contents."
 assertions:
   - id: data.task.task
     command: npx jest src/modules/bussiness/task

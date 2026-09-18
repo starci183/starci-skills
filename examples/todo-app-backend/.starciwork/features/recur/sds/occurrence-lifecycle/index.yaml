@@ -1,7 +1,9 @@
 schema: work/sds-component
 id: sds.recur.occurrence-lifecycle
 title: How an occurrence is born, finished, and outlives its rule
-state: todo
+state: done
+owners:
+  - {role: module, path: src/modules/bussiness/recur}
 responsibility: "Holds one row per materialised occurrence, its owner, its due instant and its status.
   \"scheduled\" is not a row: an occurrence a rule will fire on next week is a date the generator has not
   reached yet, computed live from the rule (see sds.recur.generation-engine), not a pending record someone
@@ -61,5 +63,4 @@ requiresProof:
   transitions:
     forEach: stateMachine.transitions
 
-blockedBy:
-  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The example's backend target moved to NestJS and this feature has not been built there; none of these five transitions has a function behind it."}
+change: {rev: 1, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "impl.recur.todo-app-backend.engine now implements every transition (OccurrenceService.materialise/complete/skip/orphanEndedOccurrences, GeneratorService for t-materialise's timer) - the gap.recur.unbuilt-module blockedBy edge is removed since that gap is now closed, and owners is added naming the real module root. t-materialise/t-complete/t-skip/t-orphan each have their own test (occurrence.service.spec.ts, complete-occurrence.handler.spec.ts, skip-occurrence.handler.spec.ts, end-recurrence.handler.spec.ts); t-materialise's timer half is also proven live (scripts/live-proof-recur.sh observes a real integration.recur.scheduler tick materialise a real row). t-complete/t-skip are not yet exposed over the GraphQL surface this feature's own brief scoped to makeRecurring/editRecurrence/endRecurrence/upcomingOccurrences, so the sequence's \"observable: http\" note for those two transitions remains aspirational until a future lane adds that surface; this is a scope boundary, not a defect, and is called out in the reporting lane's final report rather than silently edited into this record's sequence."}

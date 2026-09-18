@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.recur.timezone.owner-local-time
 title: An occurrence's due instant follows the owner's clock, not a fixed offset
-state: todo
+state: done
 statements:
   - A rule stores an IANA time zone and a local time of day. An occurrence's due instant is resolved from
     that local time and zone at generation time, never from a UTC offset fixed once at rule creation.
@@ -15,7 +15,5 @@ authorityRefs:
   - "decision.recur.timezone.anchor: the owner's wall clock, not a stored offset."
   - "decision.recur.timezone.dst: earliest-of-fold, shift-forward-by-gap."
 acceptanceCriteria: [dst-spring-forward-shifts-by-gap, dst-fall-back-picks-earliest, distinct-zones-differ]
-module: src/recur/zone
-change: {rev: 1, kind: initial, at: 2026-09-18T05:14:00.000Z}
-blockedBy:
-  - {record: gap.recur.unbuilt-module, because: "No implementation yet. The example's backend target moved to NestJS and this feature has not been built there; there is no zone-conversion module to run these fixed instants against."}
+module: src/modules/bussiness/recur
+change: {rev: 2, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "impl.recur.todo-app-backend.engine now exists: module corrected from the stale pre-migration path src/recur/zone to the real module root src/modules/bussiness/recur (zone.util.ts's resolveLocalTimeToUtc), and the gap.recur.unbuilt-module blockedBy edge is removed since that gap is now closed by this feature's implementation. All three acceptance criteria pass at src/modules/bussiness/recur/zone.util.spec.ts against the pinned spring-forward (2026-03-29T01:30:00.000Z) and fall-back (2024-11-03T05:30:00.000Z) instants."}

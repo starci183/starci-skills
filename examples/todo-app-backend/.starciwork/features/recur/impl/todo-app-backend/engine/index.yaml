@@ -1,15 +1,25 @@
 schema: work/implementation
 id: impl.recur.todo-app-backend.engine
 title: The rule, occurrence and generation engine
-state: todo
+state: done
 repository: todo-app
 owners:
-  - {role: module, path: src/recur/rule.service.ts}
-  - {role: module, path: src/recur/occurrence.service.ts}
-  - {role: module, path: src/recur/generator.service.ts}
-  - {role: module, path: src/recur/zone.util.ts}
+  - {role: module, path: src/modules/bussiness/recur}
+  - {role: feature, path: src/features/todo/graphql/mutations/recur}
+  - {role: feature, path: src/features/todo/graphql/queries/recur}
 proves: [br.recur.generation.once, br.recur.impossible-date.skips, br.recur.occurrence.owned-by-rule-owner,
   br.recur.ending.preserves-history, br.recur.timezone.owner-local-time, sds.recur.occurrence-lifecycle,
   sds.recur.generation-engine]
-blockedBy:
-  - {record: gap.recur.unbuilt-module, because: "Not implemented. The example's backend target moved to NestJS; none of these files exist yet under src/recur, and no command has been run against them. The pinned instants in ac.recur.timezone.owner-local-time.dst-spring-forward-shifts-by-gap, ac.recur.timezone.owner-local-time.dst-fall-back-picks-earliest and ac.recur.impossible-date.skips.skips-nonexistent-day are written precisely enough to implement and test against once that module exists - gap.recur.unbuilt-module names that one absence instead of citing each pinned acceptance criterion as if it were itself the missing thing."}
+# owners corrected from the stale pre-migration file paths (src/recur/rule.service.ts etc, none of which
+# ever existed) to the real module root and its two GraphQL feature directories, matching this codebase's
+# own owners-names-directories convention (schemas/work-layout.yaml). Two new entities (RuleEntity,
+# OccurrenceEntity) and one migration were added under the already-shared
+# src/modules/platform/databases/postgresql/primary module - that module's own ownership stays recorded
+# once, on impl.task.todo-app-backend.platform-database, the same way it already covers TaskEntity/
+# SessionEntity; this record does not re-claim it.
+#
+# data.recur.occurrence extends data.task.task: every occurrence's base task fields are written through
+# CommandBus.execute(new CreateTaskCommand(...)) (GeneratorService), the task capability's own create
+# seam, so TaskCreationPolicyRegistry and event.task.created both see every occurrence exactly like any
+# other task - never a hand-rolled insert into `tasks`.
+change: {rev: 1, kind: editorial, at: 2026-09-18T16:00:00.000Z, reason: "Implemented. gap.recur.unbuilt-module is closed by this record (closedBy on that gap); every br/sds this record proves is itself done, proven by real jest specs plus scripts/live-proof-recur.sh's live run against the dev stack (including a real integration.recur.scheduler tick)."}
