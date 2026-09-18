@@ -151,11 +151,23 @@ export function checkWorkTree(workRoot, problems) {
       }
     }
 
-    // ---- concept 2: gap family ----
+    // ---- concept 2: gap family (closedBy is a list - a bare string is normalised to one) ----
     if (schema === 'work/gap') {
       if (!['todo', 'done'].includes(data.state)) problems.push(`${rec.shown}: work/gap state must be todo or done`);
       if (!data.statement) problems.push(`${rec.shown}: work/gap needs a statement`);
-      if (data.closedBy && !records.has(data.closedBy)) problems.push(`${rec.shown}: closedBy names ${data.closedBy}, which no record owns`);
+      if (data.closedBy != null) {
+        const closers = typeof data.closedBy === 'string' ? [data.closedBy] : Array.isArray(data.closedBy) ? data.closedBy : null;
+        if (!closers) {
+          problems.push(`${rec.shown}: closedBy must be a record id or a list of record ids, not ${JSON.stringify(data.closedBy)}`);
+        } else {
+          const unresolved = closers.filter(c => !records.has(c));
+          for (const c of unresolved) problems.push(`${rec.shown}: closedBy names ${c}, which no record owns`);
+          if (data.state === 'done' && !unresolved.length) {
+            const notDone = closers.filter(c => records.get(c)?.state !== 'done');
+            for (const c of notDone) problems.push(`${rec.shown}: work/gap is done but closedBy's ${c} is ${records.get(c)?.state ?? '(no state)'}, not done - a gap is closed only once every one of its closers is`);
+          }
+        }
+      }
     }
 
     // ---- concept 4: decision vocabulary ----

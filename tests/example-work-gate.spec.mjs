@@ -86,6 +86,34 @@ test('concept 2: gap records need a valid state, a statement, and a resolving cl
   assert.ok(badClosedBy.some(p => p.includes('closedBy names br.f.ghost')), badClosedBy.join('\n'));
 });
 
+test('concept 7: gap.closedBy accepts a bare id (normalised to one entry) or a list, every entry must resolve, and a done gap needs every closer done', () => {
+  const bareStringOk = refusalsFor({
+    'features/f/gap/absence/index.yaml': 'schema: work/gap\nid: gap.f.absence\ntitle: t\nstate: todo\nstatement: s\nclosedBy: impl.f.thing\n',
+    'features/f/impl/thing/index.yaml': 'schema: work/implementation\nid: impl.f.thing\ntitle: t\nstate: todo\nrepository: r\nowners: [{role: module, path: src/f}]\n',
+  });
+  assert.equal(bareStringOk.length, 0, bareStringOk.join('\n'));
+
+  const listOneMissing = refusalsFor({
+    'features/f/gap/absence/index.yaml': 'schema: work/gap\nid: gap.f.absence\ntitle: t\nstate: todo\nstatement: s\nclosedBy: [impl.f.thing, impl.f.ghost]\n',
+    'features/f/impl/thing/index.yaml': 'schema: work/implementation\nid: impl.f.thing\ntitle: t\nstate: todo\nrepository: r\nowners: [{role: module, path: src/f}]\n',
+  });
+  assert.ok(listOneMissing.some(p => p.includes('closedBy names impl.f.ghost, which no record owns')), listOneMissing.join('\n'));
+
+  const doneButOneCloserNotDone = refusalsFor({
+    'features/f/gap/absence/index.yaml': 'schema: work/gap\nid: gap.f.absence\ntitle: t\nstate: done\nstatement: s\nclosedBy: [impl.f.a, impl.f.b]\n',
+    'features/f/impl/a/index.yaml': 'schema: work/implementation\nid: impl.f.a\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/impl/b/index.yaml': 'schema: work/implementation\nid: impl.f.b\ntitle: t\nstate: todo\nrepository: r\nowners: [{role: module, path: src/f}]\n',
+  });
+  assert.ok(doneButOneCloserNotDone.some(p => p.includes("closedBy's impl.f.b is todo, not done")), doneButOneCloserNotDone.join('\n'));
+
+  const doneWithBothClosersDone = refusalsFor({
+    'features/f/gap/absence/index.yaml': 'schema: work/gap\nid: gap.f.absence\ntitle: t\nstate: done\nstatement: s\nclosedBy: [impl.f.a, impl.f.b]\nverificationSource: authored-claim\nbecause: closed\n',
+    'features/f/impl/a/index.yaml': 'schema: work/implementation\nid: impl.f.a\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',
+    'features/f/impl/b/index.yaml': 'schema: work/implementation\nid: impl.f.b\ntitle: t\nstate: done\nrepository: r\nowners: [{role: module, path: src/f}]\nverificationSource: authored-claim\nbecause: c\n',
+  });
+  assert.equal(doneWithBothClosersDone.filter(p => p.includes('gap')).length, 0, doneWithBothClosersDone.join('\n'));
+});
+
 test('concept 3: conflictsWith rev must match; tension is refused off policy-decision and needs 2+ ids', () => {
   const revMismatch = refusalsFor({
     'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: t\nstate: todo\nconflictsWith:\n  - {record: br.f.b, rev: 5, because: "x"}\n',

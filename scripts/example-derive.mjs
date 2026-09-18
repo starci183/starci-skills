@@ -278,8 +278,11 @@ export function computeDerived(workRoot) {
     featureCounts[bucket]++; featureCounts.total++;
   }
 
+  // closedBy is a list of record ids (schemas/work-layout.yaml, concept 7); a bare string is the common
+  // one-closer case and is normalised the same way here as scripts/check-example-work.mjs's gate treats it.
+  const normalizeClosedBy = v => v == null ? null : Array.isArray(v) ? v : [v];
   const gaps = [...records.values()].filter(r => r.schema === 'work/gap')
-    .map(r => ({id: r.id, feature: r.feature, state: r.state, closedBy: r.data.closedBy ?? null}))
+    .map(r => ({id: r.id, feature: r.feature, state: r.state, closedBy: normalizeClosedBy(r.data.closedBy)}))
     .sort((a, b) => a.id.localeCompare(b.id));
   const unbuiltModuleGaps = gaps.filter(g => g.id.endsWith('.unbuilt-module') && g.state === 'todo').length;
 

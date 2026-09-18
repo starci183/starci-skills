@@ -170,6 +170,15 @@ test('tally: done/todo/stale/blocked partition every record with a lifecycle sta
   assert.deepEqual(derived.tally.gaps, [{id: 'gap.f.absence', feature: 'f', state: 'todo', closedBy: null}]);
 });
 
+test('tally: a gap\'s closedBy is normalised to a list even when authored as a bare id (concept 7)', () => {
+  const workRoot = tree({
+    'features/f/gap/absence/index.yaml': 'schema: work/gap\nid: gap.f.absence\ntitle: Missing\nstate: todo\nstatement: s\nclosedBy: impl.f.thing\n',
+    'features/f/impl/thing/index.yaml': 'schema: work/implementation\nid: impl.f.thing\ntitle: t\nstate: todo\nrepository: r\nowners: [{role: module, path: src/f}]\n',
+  });
+  const derived = computeDerived(workRoot);
+  assert.deepEqual(derived.tally.gaps, [{id: 'gap.f.absence', feature: 'f', state: 'todo', closedBy: ['impl.f.thing']}]);
+});
+
 test('_derived/ is excluded from the record walk: re-running after --write does not see its own output', () => {
   const workRoot = tree({
     'features/f/br/a/index.yaml': 'schema: work/business-rule\nid: br.f.a\ntitle: A\nstate: todo\n',
