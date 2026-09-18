@@ -1,0 +1,25 @@
+{
+  "schema": "starci/architecture-config@1",
+  "kinds": ["backend"],
+  "backend": {
+    "moduleRegistration": {
+      "providerIdentity": "exported-class-token",
+      "handlerDecorators": []
+    }
+  },
+  "owners": [
+    {"id": "feature-sign-in", "root": "src/features/sign-in", "entry": "src/features/sign-in/index.ts"},
+    {"id": "feature-sign-out", "root": "src/features/sign-out", "entry": "src/features/sign-out/index.ts"},
+    {"id": "feature-create-task", "root": "src/features/create-task", "entry": "src/features/create-task/index.ts"},
+    {"id": "feature-complete-task", "root": "src/features/complete-task", "entry": "src/features/complete-task/index.ts"},
+    {"id": "feature-reopen-task", "root": "src/features/reopen-task", "entry": "src/features/reopen-task/index.ts"},
+    {"id": "feature-delete-task", "root": "src/features/delete-task", "entry": "src/features/delete-task/index.ts"},
+    {"id": "feature-list-tasks", "root": "src/features/list-tasks", "entry": "src/features/list-tasks/index.ts"},
+    {"id": "module-domain-session", "root": "src/modules/domain/session", "entry": "src/modules/domain/session/index.ts"},
+    {"id": "module-domain-task", "root": "src/modules/domain/task", "entry": "src/modules/domain/task/index.ts"},
+    {"id": "module-platform-config", "root": "src/modules/platform/config", "entry": "src/modules/platform/config/index.ts"},
+    {"id": "module-platform-errors", "root": "src/modules/platform/errors", "entry": "src/modules/platform/errors/index.ts"},
+    {"id": "module-integrations-keycloak", "root": "src/modules/integrations/keycloak", "entry": "src/modules/integrations/keycloak/index.ts"},
+    {"id": "module-integrations-postgres", "root": "src/modules/integrations/postgres", "entry": "src/modules/integrations/postgres/index.ts"}
+  ]
+}

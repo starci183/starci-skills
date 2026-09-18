@@ -14,3 +14,7 @@
 .starcistacks/*/runtime/config/*.yaml
 !.starcistacks/*/runtime/config/*.yaml.enc
 
+node_modules/
+dist/
+*.tsbuildinfo
+
