@@ -167,3 +167,12 @@ observations:
       and touches both edges. Only the row's content is inset by the row's own padding.
       Rows opt into this shipped geometry via `starci-core-static-row` — an app-owned row
       without the class renders no separator at all.
+  - id: direction-scale-drift
+    lane: ui
+    kind: known-drift
+    summary: |-
+      Image models inflate type scale — surface labels ship at 0.875rem (0.75rem nested)
+      but directions routinely draw them 1.3–1.5x larger. Scale is token truth, not
+      direction truth: the image fixes containment and composition; the component's own
+      CSS fixes size. A direction drawn with oversized labels is not falsified for it —
+      but an implementation capture that reproduces the oversized size is.
