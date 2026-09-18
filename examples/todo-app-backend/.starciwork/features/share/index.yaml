@@ -1,0 +1,6 @@
+schema: work/feature
+id: share
+title: A task shared with other people
+description: An owner invites collaborators onto their own task. A collaborator holds a role - viewer or
+  editor - through an invitation that is pending until accepted, expires after fourteen days, and can be
+  revoked. Removal takes effect on the collaborator's next read, never by a sweep.

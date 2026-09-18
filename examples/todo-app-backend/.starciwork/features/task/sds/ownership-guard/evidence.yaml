@@ -5,10 +5,16 @@ schema: work/evidence
 record: sds.task.ownership-guard
 recordDigest: 1b4e7d0a3c6f9b24c1f0b9e2d7a5c3f8e1b6d4a9c2f5b8e1d4a7c0f3b6e9d2a5
 outcome: pass
+stale: true
+staleReason: Proven when this component had only t-owner and t-stranger, describing an owner-or-nobody
+  guard for every mutation. The rebuilt responsibility adds t-collaborator and defers complete to
+  contract.share.completion-guard-for-task, which has no implementation yet; t-owner and t-stranger still
+  hold for delete, but the record as a whole is not proven until t-collaborator is.
 assertions:
   - id: t-owner
     outcome: pass
-    observation: npm run test:unit -- src/task/ownership/allows exited 0
+    observation: "npm run test:unit -- src/task/ownership/allows exited 0, for delete only; complete was not
+      distinguished at the time this ran"
   - id: t-stranger
     outcome: pass
     observation: npm run test:unit -- src/task/ownership/refuses exited 0

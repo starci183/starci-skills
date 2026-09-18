@@ -1,0 +1,11 @@
+schema: work/ui-screen
+id: ui.share.invite
+title: The invitation screen and the collaborator list
+state: todo
+states: [empty, inviting, pending-list, accepted, refused]
+brand: {rev: 2}
+refs: [fr.share.invite, fr.share.list]
+blockedBy:
+  - Not built yet. The example frontend is moving to Next.js consuming the Grammar core package the way
+    nivo-fe does; this screen has no source until that scaffold lands, so none of the five states above has
+    a real render to point at.

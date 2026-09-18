@@ -1,0 +1,20 @@
+schema: work/data
+id: data.share.invitation
+title: Invitation
+state: done
+fields:
+  - {name: id, type: text, required: true, note: "Opaque, assigned at invite, never reused."}
+  - {name: taskId, type: text, required: true, note: Bound at invite and never rewritten.}
+  - {name: ownerId, type: text, required: true, note: The person who sent the invitation.}
+  - {name: email, type: text, required: true, note: The invited person's address; not yet a personId.}
+  - {name: role, type: text, required: true, note: "One of: viewer, editor."}
+  - {name: status, type: text, required: true, default: pending, note: "One of: pending, accepted, expired, revoked. Computed at read time for expiry; written directly for accept and revoke."}
+  - {name: sentAt, type: timestamp, required: true}
+  - {name: acceptedAt, type: timestamp, required: false}
+  - {name: revokedAt, type: timestamp, required: false}
+invariants:
+  - status is pending, accepted, expired or revoked, and never anything else.
+  - acceptedAt is set if and only if status has ever been accepted.
+  - Once status is expired or revoked, it never returns to pending or accepted.
+  - Exactly one row exists per (taskId, email) pair at a time.
+appliesTo: [br.share.invite.expiry, br.share.revoke.on-read, br.share.role.permissions]

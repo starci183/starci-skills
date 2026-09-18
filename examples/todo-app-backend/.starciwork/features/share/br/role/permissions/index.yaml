@@ -1,0 +1,17 @@
+schema: work/business-rule
+id: br.share.role.permissions
+title: A collaborator holds exactly one of two roles
+state: todo
+statements:
+  - A collaborator is a viewer or an editor, never both and never neither.
+  - A viewer may read the task and its collaborators, and nothing else.
+  - An editor may read the task and complete it, in addition to everything a viewer may do.
+authorityRefs:
+  - "owner-intent: Sharing extends the owner's own two capabilities on the task - read and complete -
+    to somebody else; it does not extend delete, which stays owner-only regardless of role."
+acceptanceCriteria: [viewer-read-only, editor-can-complete]
+module: src/share/access.service.ts
+change: {rev: 1, kind: initial, at: 2026-09-18T06:00:00.000Z}
+blockedBy:
+  - The example is moving to a real NestJS backend; src/share/access.service.ts does not exist yet, so
+    nothing has proven either acceptance criterion.

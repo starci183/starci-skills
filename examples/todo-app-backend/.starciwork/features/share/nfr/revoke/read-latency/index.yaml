@@ -1,0 +1,19 @@
+schema: work/non-functional-requirement
+id: nfr.share.revoke.read-latency
+title: Checking a collaborator's live status adds no perceptible cost to a read
+quality: latency
+state: todo
+observableCriterion: A task read that must re-check an invitation's status answers in under 200 ms at the
+  95th percentile for a task with up to twenty collaborators, matching nfr.task.list.latency's own bound.
+measurement:
+  how: k6 run scripts/load/share-status.js with 20 seeded collaborators and 50 virtual users for 60 seconds
+  threshold: p95 < 200ms
+  environment: dev
+appliesTo: [br.share.revoke.on-read, br.share.invite.expiry]
+blockedBy:
+  - No load run has actually been made against src/share; this lane only ran node:test unit tests, which
+    say nothing about latency under load.
+
+requiresProof:
+  measurement:
+    required: true

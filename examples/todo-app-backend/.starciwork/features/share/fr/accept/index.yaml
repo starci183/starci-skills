@@ -1,0 +1,27 @@
+schema: work/functional-requirement
+id: fr.share.accept
+title: Accept an invitation
+state: todo
+actors: [collaborator]
+trigger: The invited person accepts a pending invitation addressed to them.
+mainFlow:
+  - The invited person accepts within the fourteen-day window.
+  - The invitation becomes accepted and the role becomes active immediately.
+exceptionFlows:
+  - Accepting past the fourteen-day window is refused; the invitation reads expired.
+  - Accepting with an email other than the invited one is refused.
+  - Accepting a revoked invitation is refused.
+postconditions:
+  - Exactly one collaborator with the invited role exists on the task.
+composes:
+  - {rule: br.share.invite.expiry, module: src/share/invitation.service.ts}
+  - {rule: br.share.role.permissions, module: src/share/access.service.ts}
+blockedBy:
+  - br.share.invite.expiry and br.share.role.permissions are both todo; the NestJS module they compose
+    does not exist yet.
+
+requiresProof:
+  unit:
+    forEach: composes
+  uat:
+    required: true

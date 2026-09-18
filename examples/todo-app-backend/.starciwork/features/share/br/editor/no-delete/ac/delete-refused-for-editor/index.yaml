@@ -1,0 +1,8 @@
+schema: work/acceptance-criterion
+id: ac.share.editor.no-delete.delete-refused-for-editor
+rule: br.share.editor.no-delete
+given: A task has an accepted editor collaborator
+when: That collaborator attempts to delete the task
+then:
+  - The attempt is refused.
+  - The task still exists afterward.

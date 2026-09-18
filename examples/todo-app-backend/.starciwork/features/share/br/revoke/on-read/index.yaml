@@ -1,0 +1,17 @@
+schema: work/business-rule
+id: br.share.revoke.on-read
+title: A removed collaborator loses access on their next read, not by a sweep
+state: todo
+statements:
+  - Revoking a collaborator marks the invitation revoked immediately.
+  - No background process is required for the revocation to take effect; the very next read that checks
+    the invitation already sees it revoked.
+authorityRefs:
+  - "owner-intent: An owner who removes somebody expects the door to be shut now, not at the next run of a
+    job they cannot see or time."
+acceptanceCriteria: [removed-loses-access-next-read]
+module: src/share/invitation.service.ts
+change: {rev: 1, kind: initial, at: 2026-09-18T06:00:00.000Z}
+blockedBy:
+  - The example is moving to a real NestJS backend; src/share/invitation.service.ts does not exist yet, so
+    the acceptance criterion has not been run.

@@ -1,0 +1,68 @@
+schema: work/sds-component
+id: sds.share.invitation-lifecycle
+title: Where an invitation lives and how it ends
+state: todo
+responsibility: Holds one row per invited email per task, its role and its status. Expiry and revocation
+  are both enforced on read, never by a sweep, so a stopped or never-run background job can never leave an
+  invitation looking more alive than it is.
+interfaces:
+  - The share module is the only writer of an invitation row; task reads collaborator status only through
+    it, never directly.
+refs: [br.share.invite.expiry, br.share.revoke.on-read, br.share.role.permissions]
+dependsOn: [integration.login.postgres]
+blockedBy:
+  - "This component is designed but not built: the example is moving to a real NestJS backend and
+    src/share/invitation.service.ts does not exist yet. No transition below has been run."
+
+stateMachine:
+  states: [requested, pending, accepted, expired, revoked]
+  initial: requested
+  terminal: [expired, revoked]
+  transitions:
+    - id: t-invite
+      from: requested
+      to: pending
+      on: invitation-sent
+      guard: The email is well formed and the role is viewer or editor.
+      effect: One row is written with sentAt and a fourteen-day expiry.
+    - id: t-accept
+      from: pending
+      to: accepted
+      on: invitation-accepted
+      guard: now is before sentAt plus fourteen days, and the accepting person's email matches the row.
+      effect: acceptedAt is set and the invited role becomes active.
+    - id: t-expire
+      from: pending
+      to: expired
+      on: read-after-ttl
+      guard: now is later than sentAt plus fourteen days and the row was never accepted.
+      effect: The read reports expired; no later accept can succeed against this row.
+    - id: t-revoke-pending
+      from: pending
+      to: revoked
+      on: owner-revokes
+      effect: The row is marked revoked; a later accept attempt is refused.
+    - id: t-revoke-accepted
+      from: accepted
+      to: revoked
+      on: owner-revokes
+      effect: The row is marked revoked; the collaborator's next read already sees it, with no sweep involved.
+
+sequence:
+  participants: [owner, api, collaborator, postgres]
+  steps:
+    - {from: owner, to: api, message: "POST /tasks/:id/collaborators with an email and a role, observable: http"}
+    - {from: api, to: postgres, message: "INSERT one invitation row with a fourteen-day expiry, observable: write"}
+    - {from: collaborator, to: api, message: "POST /invitations/:id/accept, observable: http"}
+    - {from: api, to: postgres, message: "UPDATE the row to accepted, or refuse it past the expiry, observable: write"}
+    - {from: collaborator, to: api, message: "a later request against the shared task, observable: http"}
+    - {from: api, to: postgres, message: "SELECT the invitation row to re-check it is still accepted, observable: read"}
+    - {from: api, to: collaborator, message: "the refusal, once the owner has revoked or the window has passed, observable: http"}
+  note: Only interactions an end-to-end run can observe are bound here. The internal order in which the
+    share module checks expiry versus revocation on that final read is the implementation's business.
+
+requiresProof:
+  implementation:
+    required: true
+  transitions:
+    forEach: stateMachine.transitions

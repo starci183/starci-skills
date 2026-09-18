@@ -2,18 +2,23 @@ schema: work/functional-requirement
 id: fr.task.complete
 title: Complete a task
 state: todo
-actors: [owner]
-trigger: The owner marks a task complete.
+actors: [owner, collaborator]
+trigger: The owner, or an accepted editor collaborator, marks a task complete.
 mainFlow:
-  - The owner names one of their own tasks.
+  - The actor names a task they own, or a task on which they hold an accepted editor invitation.
   - The task becomes complete.
 exceptionFlows:
-  - A task the reader does not own is refused.
+  - A task the actor neither owns nor holds an accepted editor invitation on is refused.
 composes:
   - {rule: br.task.single-owner, module: src/task/ownership}
   - {rule: br.task.complete.once, module: src/task/complete}
+  - {rule: br.share.role.permissions, module: src/share/access.service.ts}
+refs: [contract.share.completion-guard-for-task]
 blockedBy:
   - br.task.complete.once is todo at rev 2; its reversible statement has no evidence yet.
+  - br.task.single-owner is todo at rev 2; the split it made between complete and delete is not proven.
+  - "contract.share.completion-guard-for-task is todo: neither its provider (share) nor its consumer call
+    from this flow exists, so an editor completing a shared task is a specified path with no implementation."
 
 requiresProof:
   unit:

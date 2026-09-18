@@ -1,0 +1,23 @@
+schema: work/functional-requirement
+id: fr.share.revoke
+title: Revoke a collaborator
+state: todo
+actors: [owner]
+trigger: The owner revokes a pending or accepted invitation on their own task.
+mainFlow:
+  - The owner names one collaborator on their own task.
+  - The invitation becomes revoked.
+exceptionFlows:
+  - Revoking an already expired or already revoked invitation is refused.
+postconditions:
+  - The collaborator's next read of the task finds their access gone, with no sweep in between.
+composes:
+  - {rule: br.share.revoke.on-read, module: src/share/invitation.service.ts}
+blockedBy:
+  - br.share.revoke.on-read is todo; the NestJS module it composes does not exist yet.
+
+requiresProof:
+  unit:
+    forEach: composes
+  uat:
+    required: true

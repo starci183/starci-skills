@@ -1,0 +1,14 @@
+schema: work/data
+id: data.share.collaborator
+title: Collaborator
+state: done
+fields:
+  - {name: taskId, type: text, required: true}
+  - {name: email, type: text, required: true, note: Identifies the collaborator until they sign in; matched
+      against the signed-in actor's own email at guard time.}
+  - {name: role, type: text, required: true, note: "One of: viewer, editor. Mirrors the accepted invitation's role."}
+  - {name: status, type: text, required: true, note: The owning data.share.invitation's status, re-read, never cached.}
+invariants:
+  - A collaborator row exists only for an invitation that was accepted at least once.
+  - role and status are always read from the current data.share.invitation row, never stored separately.
+appliesTo: [br.share.role.permissions, br.share.revoke.on-read]
