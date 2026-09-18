@@ -6,7 +6,7 @@ import {hasReplayableStagedResult} from './job-worker.mjs';
 import {createJobs} from './jobs.mjs';
 import {rankJobs,updateProgressBudget,progressExhausted} from './scheduler.mjs';
 import {ADAPTIVE_CAPACITY,OWNER_PREFERENCE_MULTIPLIER,loadRuntimes} from './schedule.mjs';
-import {canonicalTarget} from './chains.mjs';
+import {canonicalTarget} from '../model/index.mjs';
 import {acknowledgeRuntimeBaseline,beginDetectionCandidate,candidateBindingWriterResource,candidateRecord,candidateWriterResource,freezeDetectionCandidate,maxConcurrentWriters,prepareCandidateDependencies,readCandidateBridge,readCandidatePacket,readCandidateSnapshot,scopeMatches} from './candidate-bridge.mjs';
 import {candidateRootBindingDigest} from './candidate-roots.mjs';
 import {normalizeResolvedReferences} from '../models/validator-transport.mjs';

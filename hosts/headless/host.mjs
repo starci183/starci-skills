@@ -4,7 +4,7 @@ import {spawn as spawnChild,spawnSync} from 'node:child_process';
 import {RESULT_SCHEMA,buildArgs,classifyReceipt,loadOrcaCalls,verifyLiveSchema} from '../orca/calls.mjs';
 import {hostDescriptor} from '../index.mjs';
 import {HEADLESS_PROVIDERS} from '../../models/functions.mjs';
-import {canonicalTarget} from '../../kernel/chains.mjs';
+import {canonicalTarget} from '../../model/index.mjs';
 import {repositoryRoot} from '../../kernel/reports.mjs';
 
 /**

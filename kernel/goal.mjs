@@ -9,7 +9,7 @@ import {resolveLedgerRoot} from './routing.mjs';
 import {loadRuntimes} from './schedule.mjs';
 import {goalRevOf} from './ask.mjs';
 import {loadsFileFor,readLoads} from './loads.mjs';
-import {resolveExecutionChain} from './chains.mjs';
+import {resolveExecutionChain} from '../model/index.mjs';
 import {GOAL_RECORD,WORK_LEDGER,addOp,allowlistsOverlap,byId,describeNode,dynamicBudget,firstLine,hostMissing,kindRole,
   launchOperator,ledgerBinding,ledgerItem,liveStatus,locateSharedTreePaths,need,parseGate,parseQuota,parseRef,plain,required,slash,tail,toOp,
   unique,workModule,workOpId} from './common.mjs';

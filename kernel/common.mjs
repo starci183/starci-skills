@@ -3,7 +3,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {skillRoot} from '../core/runtime-root.mjs';
 import {ORCA_HOST} from '../hosts/orca/calls.mjs';
-import {canonicalTarget} from './chains.mjs';
+import {canonicalTarget} from '../model/index.mjs';
 import {resolveLedgerRoot} from './routing.mjs';
 import * as graph from './graph.mjs';
 import {DECISION_OPERATION} from './io.mjs';

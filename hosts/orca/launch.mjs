@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {readDistJson} from '../../core/runtime-root.mjs';
-import {resolveExecutionChain} from '../../kernel/chains.mjs';
+import {resolveExecutionChain} from '../../model/index.mjs';
 import {createOrcaCalls,defaultOrcaExecutable,getPath} from './calls.mjs';
 import {HOST_ENV,createHeadlessHost,headlessRoot} from '../headless/host.mjs';
 import {attestOperationWorker,formatOrcaDisplayName,planOperationAgentLaunch} from '../../execution/supervision.mjs';
