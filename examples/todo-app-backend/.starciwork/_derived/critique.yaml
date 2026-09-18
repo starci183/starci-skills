@@ -59,9 +59,9 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.password.sign-in sends 51 other record(s) back to todo, would
-      stale 37 evidence file(s), and touches 21 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks, src/components/blocks/sign-in-form,
-      src/components/blocks/task-list, src/features/pages/sign-in, src/features/pages/tasks,
+      stale 36 evidence file(s), and touches 20 code path(s) (app/plan/upgrade-button.tsx,
+      app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
+      src/components/blocks/task-list/**, src/components/login/sign-in, src/features/pages/tasks/**,
       src/features/todo/graphql/mutations/recur, src/features/todo/graphql/mutations/session,
       src/features/todo/graphql/queries/recur, src/features/todo/http/webhooks/sepay,
       src/modules/bussiness/audit, src/modules/bussiness/plan, src/modules/bussiness/recur,
@@ -125,9 +125,9 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.restores sends 50 other record(s) back to todo, would
-      stale 35 evidence file(s), and touches 21 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks, src/components/blocks/sign-in-form,
-      src/components/blocks/task-list, src/features/pages/sign-in, src/features/pages/tasks,
+      stale 34 evidence file(s), and touches 20 code path(s) (app/plan/upgrade-button.tsx,
+      app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
+      src/components/blocks/task-list/**, src/components/login/sign-in, src/features/pages/tasks/**,
       src/features/todo/graphql/mutations/recur, src/features/todo/graphql/mutations/session,
       src/features/todo/graphql/queries/recur, src/features/todo/http/webhooks/sepay,
       src/modules/bussiness/audit, src/modules/bussiness/plan, src/modules/bussiness/recur,
@@ -191,9 +191,9 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.single-device sends 50 other record(s) back to todo,
-      would stale 35 evidence file(s), and touches 21 code path(s) (app/plan/upgrade-button.tsx,
-      app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks, src/components/blocks/sign-in-form,
-      src/components/blocks/task-list, src/features/pages/sign-in, src/features/pages/tasks,
+      would stale 34 evidence file(s), and touches 20 code path(s) (app/plan/upgrade-button.tsx,
+      app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
+      src/components/blocks/task-list/**, src/components/login/sign-in, src/features/pages/tasks/**,
       src/features/todo/graphql/mutations/recur, src/features/todo/graphql/mutations/session,
       src/features/todo/graphql/queries/recur, src/features/todo/http/webhooks/sepay,
       src/modules/bussiness/audit, src/modules/bussiness/plan, src/modules/bussiness/recur,
@@ -234,8 +234,8 @@ findings:
       - ui.share.invite
       - ui.task.list
     because: A breaking change to br.share.revoke.on-read sends 27 other record(s) back to todo, would
-      stale 18 evidence file(s), and touches 10 code path(s) (app/share, src/app/tasks,
-      src/components/blocks/task-list, src/features/pages/tasks,
+      stale 17 evidence file(s), and touches 10 code path(s) (app/share, src/app/tasks/**,
+      src/components/blocks/task-list/**, src/features/pages/tasks/**,
       src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/sepay,
       src/modules/platform/events) - this is the number a reviewer wants before approving the
@@ -273,8 +273,8 @@ findings:
       - ui.share.invite
       - ui.task.list
     because: A breaking change to br.share.role.permissions sends 27 other record(s) back to todo, would
-      stale 19 evidence file(s), and touches 10 code path(s) (app/share, src/app/tasks,
-      src/components/blocks/task-list, src/features/pages/tasks,
+      stale 18 evidence file(s), and touches 10 code path(s) (app/share, src/app/tasks/**,
+      src/components/blocks/task-list/**, src/features/pages/tasks/**,
       src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/sepay,
       src/modules/platform/events) - this is the number a reviewer wants before approving the
@@ -309,8 +309,8 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.task.single-owner sends 24 other record(s) back to todo, would
-      stale 18 evidence file(s), and touches 10 code path(s) (src/app/tasks,
-      src/components/blocks/task-list, src/features/pages/tasks,
+      stale 17 evidence file(s), and touches 10 code path(s) (src/app/tasks/**,
+      src/components/blocks/task-list/**, src/features/pages/tasks/**,
       src/features/todo/http/webhooks/sepay, src/modules/bussiness/audit,
       src/modules/bussiness/plan, src/modules/bussiness/task, src/modules/integrations/sepay,
       src/modules/platform/databases/postgresql/primary, src/modules/platform/events) - this is the
@@ -368,8 +368,8 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.share.editor.no-delete sends 18 other record(s) back to todo, would
-      stale 14 evidence file(s), and touches 9 code path(s) (src/app/tasks,
-      src/components/blocks/task-list, src/features/pages/tasks,
+      stale 13 evidence file(s), and touches 9 code path(s) (src/app/tasks/**,
+      src/components/blocks/task-list/**, src/features/pages/tasks/**,
       src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan,
       src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/sepay,
       src/modules/platform/events) - this is the number a reviewer wants before approving the
@@ -581,8 +581,8 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.task.title.required sends 11 other record(s) back to todo, would
-      stale 9 evidence file(s), and touches 8 code path(s) (src/app/tasks,
-      src/components/blocks/task-list, src/features/pages/tasks,
+      stale 8 evidence file(s), and touches 8 code path(s) (src/app/tasks/**,
+      src/components/blocks/task-list/**, src/features/pages/tasks/**,
       src/features/todo/http/webhooks/sepay, src/modules/bussiness/plan, src/modules/bussiness/task,
       src/modules/integrations/sepay, src/modules/platform/events) - this is the number a reviewer
       wants before approving the change.
@@ -1223,11 +1223,3 @@ findings:
       - gap.share.frontend-unbuilt
     because: impl.share.todo-app-frontend.invite-screen is todo, blocked on gap.share.frontend-unbuilt -
       code that simply has not been written yet; the owner wants this count at zero.
-  - id: stale-evidence-bulk-edit:ui.task.list
-    kind: stale-evidence-bulk-edit
-    severity: warn
-    records:
-      - ui.task.list
-    because: ui.task.list's evidence is stale with no staleSince at all - a bare digest mismatch with
-      nothing recorded about why, even where the record's own staleReason prose describes a real
-      revision (bulk-edit-after-capture territory either way).
