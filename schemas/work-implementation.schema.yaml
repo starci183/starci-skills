@@ -1,0 +1,129 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:work:implementation:1
+type: object
+additionalProperties: false
+description: A module of real code, named where it actually lives, and the records it claims to realise. It
+  is the only family that reaches out of the tree into a repository, so it pins a revision - a claim about
+  source without the commit it was true at is a claim about nothing in particular. Its central field is
+  `verificationSource`, which says whether the verification line was observed by the kernel or written by
+  hand. Prose the kernel did not produce is a claim, and it must be labelled as one; a tree that cannot tell
+  a run from an assertion eventually reports the assertions as runs.
+required:
+  - schema
+  - id
+  - title
+  - state
+  - repository
+  - directory
+  - files
+  - revision
+  - proves
+  - verification
+  - verificationSource
+properties:
+  schema:
+    const: work/implementation
+    description: Record family discriminator. Every record names its own family so a file can be validated
+      without inferring its meaning from the directory it happens to sit in.
+  id:
+    type: string
+    pattern: ^impl(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){3,}$
+    description: "The module's stable id, a lowercase dot-path under the impl family:
+      impl.<feature>.<repository>.<module...>; example impl.task.todo-app.ownership. The repository is part
+      of the id because the same feature is implemented in more than one repository, and two modules that
+      differ only by which side of the product they are on must not collide."
+  title:
+    $ref: "#/$defs/prose"
+    description: What this module is, in the product's terms rather than the directory's. It is what a
+      reader sees before deciding whether to open the code.
+  state:
+    $ref: "#/$defs/state"
+  repository:
+    $ref: "#/$defs/slug"
+    description: The repository this module lives in, by the name the workspace record gives it. It is named
+      rather than pathed so the record stays valid on any machine that has the workspace's repositories.
+  directory:
+    $ref: "#/$defs/prose"
+    description: The module's directory inside that repository, repository-relative; example
+      src/task/ownership. It is the address everything else about this record is scoped to.
+  files:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/prose"
+    description: The files that make up the module, relative to its directory. Listing them keeps the record
+      specific enough to be checked - a directory alone grows and shrinks without anyone noticing that what
+      was proven is no longer all of what is there.
+  revision:
+    type: string
+    pattern: ^(?:[a-f0-9]{40}|[a-f0-9]{64})$
+    description: The commit the rest of this record is true at, as a full hex sha. It is required because
+      every other field here describes source that moves; without the revision, a reader cannot tell whether
+      this record describes the code in front of them or the code as it was.
+  proves:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/recordId"
+    description: The records this module realises, by id - the rules it enforces, the design components it
+      implements, the screens it builds. This is the authored forward edge of the graph; a record on the
+      other end does not restate it in reverse, because two copies of one edge is two things that can
+      disagree with no way to settle which is right.
+  verification:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/prose"
+    description: What was done to check this module, one line each, concrete enough to repeat - the command
+      and its result, or an honest statement that only the source was read. It is required so that the basis
+      for the claim is on the record next to the claim.
+  verificationSource:
+    enum:
+      - kernel-observed
+      - authored-claim
+    description: "Where the verification lines came from: kernel-observed means the runtime ran it and saw
+      the result; authored-claim means a person or an agent wrote the sentence. The two read identically as
+      prose and mean completely different things, so the label is required rather than inferred. Without it,
+      the cheapest way to make a tree look proven is to write more sentences, and that is exactly the failure
+      this field exists to make impossible."
+  evidence:
+    $ref: "#/$defs/slug"
+    description: The single evidence directory under this record's evidence/ folder that carries the proof
+      it was observed working. It is optional because a module can honestly be at todo with no run behind it
+      yet, and at most one, because a module has one current answer to whether its checks pass.
+  blockedBy:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/prose"
+    description: What is standing in the way, in sentences that name the record responsible. It is prose
+      rather than lifecycle state because an impediment is a fact about the world, not a status - the module
+      is still todo, and the blocker explains why it has not moved.
+$defs:
+  prose:
+    type: string
+    minLength: 1
+    description: A nonempty sentence a person reads. An empty string is an unwritten field pretending to be
+      a written one, so it is refused at the type.
+  slug:
+    type: string
+    pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+    description: A lowercase hyphenated name with no dots. Casing and separators are fixed so that an id
+      written twice by two authors is the same string.
+  recordId:
+    type: string
+    pattern: ^(?:br|fr|nfr|data|decision|journey|sds|impl|ui|uat)(?:\.[a-z0-9]+(?:-[a-z0-9]+)*){2,}$
+    description: The id of any record in the tree, family prefix included. Requiring a known prefix means a
+      dangling reference is caught as a malformed id rather than surviving as a plausible-looking string.
+  state:
+    enum:
+      - todo
+      - done
+    description: "Whether this leaf is outstanding or finished, and nothing else. There is deliberately no
+      third authored value: `stale` is derived by the checker when an input a done record was proved against
+      has moved, and authoring it would let a record claim a status the checker is supposed to compute -
+      which is how a tree starts reporting its own opinion of its freshness instead of a measured one."
