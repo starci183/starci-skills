@@ -216,6 +216,7 @@ For older projects, `.work` becomes `.starciwork`, and `.starci` or `.starcitemp
 - [The 5-plus design: one flow, declared inputs and outputs, the owner decides](docs/5-plus.md)
 - [The workflow kernel](docs/workflow-kernel.md) · [operation kinds, lanes and routes](docs/kinds.md) · [running a workflow from a chat](docs/workflow-chat.md)
 - [What an operator of an installed runtime must do after an update](upgrades/index.yaml)
+- [Todo-app grit ledger: where the runtime lied, blocked legitimate code, or had no home for a real need](docs/examples/todo-app-grit.md)
 
 Agent instructions live in [SKILL.md](SKILL.md); humans do not need to preload the entire knowledge catalog. Runtime maintenance rules live in [UPDATE.json](UPDATE.json). [README.json](README.json) is a machine-readable summary, not the user guide.
 
