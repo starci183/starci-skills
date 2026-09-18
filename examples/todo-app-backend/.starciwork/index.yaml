@@ -11,4 +11,7 @@ features:
   - id: share
     directory: features/share
     description: A task shared with other people through role-bounded, expiring invitations.
+  - id: audit
+    directory: features/audit
+    description: An append-only record of what happened, and the right to have it erased.
 

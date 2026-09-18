@@ -1,0 +1,26 @@
+schema: work/functional-requirement
+id: fr.audit.export
+title: Export a person's data from the log
+state: todo
+actors: [person]
+trigger: A signed-in person asks for every log line naming them.
+mainFlow:
+  - Every line resolving to that person through their live key is decrypted and returned.
+exceptionFlows:
+  - Once the person's key has been destroyed by a completed erasure, export returns nothing - the
+    same key an erasure destroys is the key export depends on, so the two agree by construction.
+postconditions:
+  - The export contains no other person's lines.
+composes:
+  - {rule: br.audit.append-only, module: src/audit/log}
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- audit/export
+  uat:
+    required: true
+
+blockedBy:
+  - No implementation exists yet under the NestJS layout the example is moving to.

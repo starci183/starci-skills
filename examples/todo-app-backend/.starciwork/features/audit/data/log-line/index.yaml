@@ -1,0 +1,27 @@
+schema: work/data
+id: data.audit.log-line
+title: Log line
+state: todo
+fields:
+  - {name: at, type: timestamp, required: true, note: "Capture time, set once, never revised."}
+  - {name: action, type: text, required: true, note: "What happened, e.g. sign-in, task.created."}
+  - {name: target, type: text, required: false, note: "The affected thing's id, e.g. a task id.
+      Never the acting person's own identifying data - that lives only in actor."}
+  - {name: keyId, type: text, required: true, note: "Opaque, one per person, not derived from and not
+      equal to the person's real id. Points at a key in the keystore, or at nothing once destroyed."}
+  - {name: actor, type: text, required: true, note: "The acting person's id, sealed under keyId's key
+      (AES-256-GCM). Unreadable once that key is destroyed; never re-sealed or removed."}
+  - {name: prevHash, type: text, required: true, note: "The previous line's hash, or GENESIS for the first."}
+  - {name: hash, type: text, required: true, note: "sha256 of prevHash plus this line's other fields."}
+invariants:
+  - Once appended, at, action, target, keyId, actor, prevHash and hash never change.
+  - actor decrypts to a real person's id only while that person's key exists in the keystore.
+appliesTo: [br.audit.append-only, br.audit.retention, br.audit.erasure.right]
+conflictsWith:
+  - record: br.task.delete.final
+    rev: 1
+    because: "stays-gone requires a deleted task's identifier to resolve to nothing anywhere, now and
+      after a restart, but target here is exactly that identifier, kept byte-for-byte in a
+      task.deleted line for the full retention window - append-only forbids scrubbing it, so a
+      task's identifier does resolve to something for as long as the line is readable, through the
+      log's own read and export paths."

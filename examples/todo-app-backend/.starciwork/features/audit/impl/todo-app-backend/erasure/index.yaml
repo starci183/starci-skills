@@ -1,0 +1,13 @@
+schema: work/implementation
+id: impl.audit.todo-app-backend.erasure
+title: The erasure-request module
+state: todo
+repository: todo-app
+directory: src/audit
+files: [erasure.service.ts, erasure-request.repository.ts]
+proves: [br.audit.erasure.right, br.audit.erasure.logged, sds.audit.erasure-request]
+
+blockedBy:
+  - "No Nest module exists yet, and decision.audit.erasure-method is still open. Authoring this against
+    an undecided mechanism would make the implementation the thing that quietly settled the decision,
+    which is backwards: the decision record is supposed to settle it in the open, not the code."

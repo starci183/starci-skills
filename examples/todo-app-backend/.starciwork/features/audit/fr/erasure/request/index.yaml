@@ -1,0 +1,27 @@
+schema: work/functional-requirement
+id: fr.audit.erasure.request
+title: Request erasure
+state: todo
+actors: [person]
+trigger: A signed-in person asks to have what identifies them removed from the log.
+mainFlow:
+  - A fresh requestId is minted and an erasure-request row is created in state requested.
+  - An erasure-requested line is appended, naming the requestId, not the person.
+postconditions:
+  - Exactly one erasure-request row exists per submission, in state requested.
+composes:
+  - {rule: br.audit.erasure.right, module: src/audit/erasure}
+  - {rule: br.audit.erasure.logged, module: src/audit/erasure}
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- audit/erasure-request
+  uat:
+    required: true
+
+blockedBy:
+  - decision.audit.erasure-method is open; sds.audit.erasure-request's t-request assumes its
+    recommended answer. No implementation is authored against an open decision.
+  - No implementation exists yet under the NestJS layout the example is moving to.

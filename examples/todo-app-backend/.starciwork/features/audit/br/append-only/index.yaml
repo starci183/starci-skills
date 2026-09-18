@@ -1,0 +1,15 @@
+schema: work/business-rule
+id: br.audit.append-only
+title: A log line is never altered
+state: todo
+statements:
+  - Once a line is appended, its stored bytes and its position in the chain never change again.
+  - Any alteration of a line, or removal of a line, is detectable by recomputing the chain.
+authorityRefs:
+  - "owner-intent: A log nobody can trust is worthless; the check has to be real, not a promise."
+acceptanceCriteria: [chain-detects-tamper]
+module: src/audit/log
+blockedBy:
+  - The example's backend is moving to NestJS; src/audit/log does not exist yet. No evidence is
+    authored until a real Nest module and test prove the chain, not a description of one.
+change: {rev: 1, kind: initial, at: 2026-09-18T06:00:00.000Z}

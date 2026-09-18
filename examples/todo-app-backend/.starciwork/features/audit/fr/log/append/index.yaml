@@ -1,0 +1,33 @@
+schema: work/functional-requirement
+id: fr.audit.log.append
+title: Append a line for a tracked action
+state: todo
+actors: [system]
+trigger: A tracked action completes elsewhere in the product - a sign-in, a sign-out, a task created,
+  completed or deleted.
+mainFlow:
+  - The acting person's id and the action are handed to the log.
+  - One line is appended, sealed and hashed onto the chain.
+postconditions:
+  - The line count increases by exactly one.
+  - Recomputing the chain from the first line still reports valid.
+composes:
+  - {rule: br.audit.append-only, module: src/audit/log}
+  - {rule: br.audit.retention, module: src/audit/log}
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- audit/log-append
+  uat:
+    required: true
+
+blockedBy:
+  - "No caller wires this trigger today. login and task expose no emitted-event contract (sign-in,
+    sign-out, task.created, task.completed, task.deleted) for this feature to subscribe to - see
+    sds.audit.log-chain's blockedBy for the full account. Until that gap is closed by a contract owned
+    by login or task, or a decision routes around it, this FR can only be wired by calling directly
+    into login's and task's implementation modules, which is not a trigger this record can honestly
+    call done."
+  - No implementation exists yet under the NestJS layout the example is moving to.

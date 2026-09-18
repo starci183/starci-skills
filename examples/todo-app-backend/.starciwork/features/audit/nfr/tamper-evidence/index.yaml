@@ -1,0 +1,30 @@
+schema: work/non-functional-requirement
+id: nfr.audit.tamper-evidence
+title: Any alteration or removal of a stored line is detectable
+quality: integrity
+state: todo
+observableCriterion: For a log of N appended lines, mutating any single stored field on any single
+  line, or removing any single line, causes a full-chain recomputation to report a break at or before
+  the mutated/removed line's original index, on 100% of a fuzz over every line and every mutable field.
+  An unmutated log always recomputes as fully valid.
+measurement:
+  how: A property-style test (or a plain loop, if the Nest module's test tooling has no fuzz library)
+    that, for each line index and each field of that line, takes a fresh log, applies exactly one
+    out-of-band mutation to the underlying store (not through the module's own write path - a real
+    tamper does not ask permission), recomputes the chain, and asserts a break is reported. Repeats
+    for a line-removal mutation at each index. A green run with zero mutations attempted is not a
+    passing run of this criterion; the harness must assert it actually executed >0 mutation cases.
+  threshold: 100% of attempted mutations detected; 0 false positives on the unmutated baseline
+  environment: dev
+appliesTo: [br.audit.append-only]
+
+requiresProof:
+  measurement:
+    required: true
+
+blockedBy:
+  - "No implementation exists yet under the NestJS layout, so this measurement cannot be run. This is
+    also the record naming the check the earlier .mjs prototype (removed from this worktree on the
+    lead's instruction) used to satisfy the same property with node:test - the design is not lost,
+    only its executable form, and whoever writes the Nest module should port that harness shape:
+    mutate the store directly, then call the module's own verify method, never the other way round."

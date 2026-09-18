@@ -1,0 +1,24 @@
+schema: work/business-rule
+id: br.audit.erasure.right
+title: A person may have what identifies them erased
+state: todo
+statements:
+  - A verified erasure request makes every existing log line the person produced permanently
+    unreadable to any reader, without deleting the line, rewriting its content or breaking the chain.
+  - Erasure removes only what identifies the person. The line's action, target and position stay.
+authorityRefs:
+  - "owner-intent: the log is a record of events, not a permanent record of the people in them."
+acceptanceCriteria: [identifying-fields-unreadable]
+module: src/audit/erasure
+openQuestions:
+  - "decision.audit.erasure-method has not settled how identifying fields are actually removed: it
+    recommends crypto-shredding (destroying the person's encryption key rather than editing any line),
+    but the record stays todo until that decision closes and a Nest module implements it."
+conflictsWith:
+  - record: br.audit.retention
+    rev: 1
+    because: "retention promises a line is never lost within 400 days; a verified erasure request can
+      arrive on day one of that window and must still take effect immediately, so the two rules cannot
+      both be satisfied by 'keep everything, always, for 400 days' - retention has to mean the line's
+      existence and chain position, not the readability of every field in it."
+change: {rev: 1, kind: initial, at: 2026-09-18T06:02:00.000Z}

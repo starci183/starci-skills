@@ -1,0 +1,21 @@
+schema: work/customer-journey
+id: journey.audit.right-to-be-forgotten
+title: A person asks to be forgotten, and later checks it held
+state: todo
+crossesFeatures: [audit, login, task]
+steps:
+  - {actor: person, does: "Signs in, creates and completes a few tasks, expects: an ordinary session."}
+  - {actor: person, does: "Requests erasure and confirms it, expects: a plain acknowledgement."}
+  - {actor: person, does: "Later exports their own data, expects: nothing comes back."}
+  - {actor: operator, does: "Reads the log for the same period, expects: the lines are still there, in
+      order, but no longer name that person."}
+requirements: [fr.audit.erasure.request, fr.audit.erasure.complete, fr.audit.export]
+
+requiresProof:
+  uat:
+    required: true
+  requirements:
+    forEach: requirements
+
+blockedBy:
+  - Depends on every fr in requirements, none of which are implemented yet.

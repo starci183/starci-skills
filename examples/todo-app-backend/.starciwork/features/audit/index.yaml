@@ -1,0 +1,6 @@
+schema: work/feature
+id: audit
+title: An append-only record of what happened, and the right to have it erased
+description: Every meaningful action across the product leaves a line naming who, what, when and from
+  where. The log is retained for 400 days and no line is ever altered. A person may also ask to be
+  forgotten; that request destroys what identifies them without touching the log's bytes or its chain.

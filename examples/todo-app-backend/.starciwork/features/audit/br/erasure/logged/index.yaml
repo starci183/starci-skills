@@ -1,0 +1,15 @@
+schema: work/business-rule
+id: br.audit.erasure.logged
+title: An erasure is itself logged
+state: todo
+statements:
+  - Both the request and the completion of an erasure become their own appended log lines.
+  - Those lines name the erasure request, never the identity that was erased, so the record of having
+    erased someone does not itself become a permanent record of who they were.
+authorityRefs:
+  - "owner-intent: an erasure nobody can point to did not verifiably happen."
+acceptanceCriteria: [request-and-completion-are-lines]
+module: src/audit/erasure
+openQuestions:
+  - Depends on decision.audit.erasure-method the same way br.audit.erasure.right does.
+change: {rev: 1, kind: initial, at: 2026-09-18T06:03:00.000Z}

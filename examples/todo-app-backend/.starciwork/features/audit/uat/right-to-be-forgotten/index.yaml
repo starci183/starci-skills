@@ -1,0 +1,14 @@
+schema: work/uat-flow
+id: uat.audit.right-to-be-forgotten
+title: Sign in, create tasks, request erasure, confirm it held
+state: todo
+accounts: accounts.yaml
+steps:
+  - Sign in with the seeded person and create two tasks.
+  - Request erasure and confirm it.
+  - Export the person's data and see nothing.
+  - As the seeded operator, read the log for the same window and see the lines, unnamed.
+proves: [fr.audit.erasure.request, fr.audit.erasure.complete, fr.audit.export, fr.audit.log.read]
+
+blockedBy:
+  - No screen and no implementation exist yet to walk.

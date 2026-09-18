@@ -1,0 +1,50 @@
+schema: work/sds-component
+id: sds.audit.log-chain
+title: The hash-chained, per-person-sealed log
+state: todo
+responsibility: Appends one line per tracked action, hashing each line onto the previous one, and
+  seals the acting person's id under a key addressed by an opaque keyId rather than the person's own id.
+interfaces:
+  - The keystore is the only place a keyId resolves back to a person; a line never carries that link
+    itself.
+refs: [br.audit.append-only, br.audit.retention]
+dependsOn: [contract.login.identity-for-task]
+
+stateMachine:
+  states: [open, appended]
+  initial: open
+  terminal: [appended]
+  transitions:
+    - id: t-append
+      from: open
+      to: appended
+      on: line-submitted
+      guard: An actor and an action are given.
+      effect: The actor's id is sealed under its keyId's key, the content is hashed onto the previous
+        line's hash, and the line is pushed. Nothing before it is read or rewritten.
+
+sequence:
+  participants: [api, keystore, chain]
+  steps:
+    - {from: api, to: keystore, message: "the actor's keyId and key, created on first use, observable: read"}
+    - {from: api, to: chain, message: "append one sealed, hashed line, observable: write"}
+
+requiresProof:
+  implementation:
+    required: true
+  transitions:
+    forEach: stateMachine.transitions
+
+blockedBy:
+  - "No implementation exists: the example is moving to a NestJS backend and this module has not been
+    written under that layout yet. This record stays todo, and no provenBy or evidence is authored
+    for it, until impl.audit.todo-app-backend.log names a real Nest module and a real test proves
+    t-append and the tamper check in ac.audit.append-only.chain-detects-tamper."
+  - "Separately, dependsOn names contract.login.identity-for-task because that is the only stable,
+    existing surface that gives this module a personId to seal. Nothing equivalent is exposed for the
+    events this log actually needs to capture - a task being created, completed or deleted, or a
+    person signing in or out. login and task expose request/response contracts (actorOf, and task's
+    own todo contract.task.list-for-dashboard) but no emitted-event contract a subscriber can bind to.
+    There is no existing record id this can honestly point at with conflictsWith, because
+    conflictsWith needs a record that exists and this is an absence, not a contradiction - see the
+    critique in the audit lane's report."

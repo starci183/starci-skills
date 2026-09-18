@@ -1,0 +1,11 @@
+schema: work/ui-screen
+id: ui.audit.privacy
+title: The privacy screen - request erasure, export data
+state: todo
+states: [idle, exporting, requesting-erasure, erasure-pending, erasure-complete, erasure-refused]
+brand: {rev: 2}
+refs: [fr.audit.erasure.request, fr.audit.export]
+
+blockedBy:
+  - The frontend example is moving to Next.js consuming the Grammar core package; no screen exists to
+    describe states against yet, and drawing one against the toy frontend would be thrown away with it.

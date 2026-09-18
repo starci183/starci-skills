@@ -1,0 +1,72 @@
+schema: work/sds-component
+id: sds.audit.erasure-request
+title: The lifecycle of one request to be forgotten
+state: todo
+responsibility: Verifies a request is really the subject (or an authorized operator acting for them),
+  then destroys what makes that person's log lines readable, then confirms and logs the completion.
+interfaces:
+  - No caller can reach executing without a verified request; no caller can reach complete while any
+    of the subject's lines still decrypt.
+refs: [br.audit.erasure.right, br.audit.erasure.logged]
+dependsOn: [sds.audit.log-chain]
+
+stateMachine:
+  states: [requested, verified, executing, complete, refused]
+  initial: requested
+  terminal: [complete, refused]
+  transitions:
+    - id: t-request
+      to: requested
+      on: person-requests-erasure
+      guard: The request names an existing person id and gets a fresh requestId.
+      effect: One erasure-request row is created directly in state requested (there is no prior state
+        to transition from - the row and its state machine instance come into existence together),
+        and an erasure-requested line is appended naming the requestId, never the person.
+    - id: t-verify
+      from: requested
+      to: verified
+      on: identity-confirmed
+      guard: The requester is proven to be the subject, or an operator authorized to act for them.
+      effect: verifiedAt is set.
+    - id: t-refuse
+      from: requested
+      to: refused
+      on: identity-not-confirmed
+      effect: refusedAt is set; nothing about the subject's keys is touched.
+    - id: t-execute
+      from: verified
+      to: executing
+      on: worker-picks-up-request
+      effect: The subject's key and the keystore's personId-to-keyId mapping are destroyed. No log
+        line is read, rewritten or deleted.
+    - id: t-complete
+      from: executing
+      to: complete
+      on: subject-confirmed-unreadable
+      guard: Every line the subject produced now fails to decrypt.
+      effect: completedAt is set, and an erasure-completed line is appended naming the requestId.
+
+sequence:
+  participants: [person, api, keystore, log]
+  steps:
+    - {from: person, to: api, message: "POST /privacy/erasure naming their own id, observable: http"}
+    - {from: api, to: log, message: "append the erasure-requested line, observable: write"}
+    - {from: api, to: person, message: "a re-authentication challenge, observable: http"}
+    - {from: person, to: api, message: "the re-authentication response, observable: http"}
+    - {from: api, to: keystore, message: "destroy the subject's key and its personId mapping, observable: write"}
+    - {from: api, to: log, message: "append the erasure-completed line, observable: write"}
+  note: Only interactions an end-to-end run can observe are bound here, matching sds.login.session-store's
+    own note.
+
+requiresProof:
+  implementation:
+    required: true
+  transitions:
+    forEach: stateMachine.transitions
+
+blockedBy:
+  - "decision.audit.erasure-method is open. This state machine assumes its recommended answer
+    (crypto-shred), and t-execute's effect is written against that assumption; if the decision settles
+    on something else, t-execute's effect and requiresProof both change. No implementation is
+    authored against an open decision, so this stays todo even once a Nest module exists to host it."
+  - "No implementation exists yet under the NestJS layout the example is moving to."
