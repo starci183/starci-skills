@@ -1,0 +1,31 @@
+Screen: The task list and its create form (task.list), route /tasks, actor: owner
+State: many-tasks - more than one task exists
+Behavior to depict: the list section renders with a heading and every row stacked; each row is a plain list item, never a card, per COLLECTION-1
+
+Business grounding (accepted, do not invent beyond these):
+  - fr.task.create
+
+Brand (brand/index.yaml rev 2, read do not restate elsewhere):
+  - primary: #2F6BFF
+  - surface: #FFFFFF
+  - typography: Inter, sans-serif
+  - don't: Never place text on the primary colour below a 4.5:1 contrast ratio.
+
+Relevant UI knowledge:
+  - knowledge/ui/composition/collection.yaml (COLLECTION-1, COLLECTION-2)
+
+Actual installed Grammar anatomy (@todo-app/grammar (examples/todo-app-frontend/packages/grammar/src/index.tsx)) - depict exactly these components, no invented ones:
+  - GrammarTextField (title)
+  - GrammarButton (type: submit, create)
+  - GrammarMessage (tone: danger, refused only)
+  - GrammarButton {type, isDisabled?, onClick?, children: string}
+  - GrammarTextField {id, label, kind?, value, onChange}
+  - GrammarMessage {tone: 'danger', children: string | null} (role=alert on danger)
+
+Layout note: The list is a page section with its own heading, never wrapped in a card (COLLECTION-1); one row is one plain list item.
+
+Forbidden treatments: no card wrapper around a list of entities; no text on the primary colour below
+4.5:1 contrast; no invented component outside the Grammar set named above; no fabricated brand mark
+beyond brand/assets/**.
+
+Viewport: desktop-1280, single column, product-shaped placeholder content only (no real person data).

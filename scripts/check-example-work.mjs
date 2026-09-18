@@ -237,6 +237,35 @@ export function checkWorkTree(workRoot, problems) {
       const ok = typeof m === 'string' ? m.length > 0 : Array.isArray(m) && m.length > 0 && m.every(x => typeof x === 'string' && x.length > 0);
       if (!ok) problems.push(`${rec.shown}: business-rule module must be a non-empty string or a non-empty list of strings`);
     }
+
+    // ---- concept 10: a ui record is done only with a generated direction asset and full state coverage ----
+    if (schema === 'work/ui-screen' && data.state === 'done') {
+      const assets = Array.isArray(data.assets) ? data.assets : [];
+      const hasDirection = assets.some(a => a && typeof a === 'object' && a.generation && a.generation.tool === 'image_gen.imagegen');
+      if (!hasDirection) {
+        problems.push(`${rec.shown}: state is done but no asset carries generation.tool: image_gen.imagegen - a ui record is done only with at least one interface.draw direction, never an authored claim`);
+      }
+      const uiSpec = data.ui;
+      if (uiSpec) {
+        const stateNames = (uiSpec.states ?? []).map(s => s?.name).filter(Boolean);
+        const covered = new Set((uiSpec.coverage?.map ?? []).map(m => m?.state));
+        for (const name of stateNames) {
+          if (!covered.has(name)) problems.push(`${rec.shown}: ui.coverage.map names no entry for state "${name}", which ui.states lists`);
+        }
+      }
+    }
+
+    // ---- concept 11: a generation-carrying asset is ui-owned direction, never an implementation capture ----
+    if (Array.isArray(data.assets)) {
+      for (const a of data.assets) {
+        if (!a || typeof a !== 'object' || !a.generation) continue;
+        if (schema === 'work/implementation') {
+          problems.push(`${rec.shown}: implementation asset ${a.path} carries generation - implementation captures are real running-page screenshots and never carry ImageGen generation provenance`);
+        } else if (schema !== 'work/ui-screen') {
+          problems.push(`${rec.shown}: asset ${a.path} carries generation but the owning record is ${schema}, not work/ui-screen - a generated direction asset is ui-owned only`);
+        }
+      }
+    }
   }
 
   return {records: records.size, refs: refs.length, evidence: evidenceFiles.length};

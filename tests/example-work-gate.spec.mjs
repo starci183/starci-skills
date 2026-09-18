@@ -254,3 +254,37 @@ test('concept 9: work/implementation refuses legacy directory/files/targetFiles 
   });
   assert.equal(moduleAsList.length, 0, moduleAsList.join('\n'));
 });
+
+test('concept 10: a done ui-screen needs an asset carrying image_gen.imagegen generation, and coverage.map must name every listed state', () => {
+  const doneNoGeneration = refusalsFor({
+    'features/f/ui/x/index.yaml': 'schema: work/ui-screen\nid: ui.f.x\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\nassets: [{path: assets/a.png, role: direction, provenance: p}]\n',
+  });
+  assert.ok(doneNoGeneration.some(p => p.includes('no asset carries generation.tool: image_gen.imagegen')), doneNoGeneration.join('\n'));
+
+  const missingCoverage = refusalsFor({
+    'features/f/ui/x/index.yaml': 'schema: work/ui-screen\nid: ui.f.x\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n' +
+      'assets: [{path: assets/a.png, role: direction, provenance: p, generation: {tool: image_gen.imagegen, promptPath: assets/a.prompt.txt, inputRefs: []}}]\n' +
+      'ui: {intent: i, surfaces: [], states: [{name: empty, trigger: t, behavior: b}, {name: full, trigger: t, behavior: b}], coverage: {scale: bounded, representativeScreens: [x], map: [{screen: x, state: empty, viewport: desktop, components: [], derivation: d}]}, accessibility: [], responsive: [], assets: [], observations: [], gaps: []}\n',
+  });
+  assert.ok(missingCoverage.some(p => p.includes('coverage.map names no entry for state "full"')), missingCoverage.join('\n'));
+
+  const good = refusalsFor({
+    'features/f/ui/x/index.yaml': 'schema: work/ui-screen\nid: ui.f.x\ntitle: t\nstate: done\nverificationSource: authored-claim\nbecause: c\n' +
+      'assets: [{path: assets/a.png, role: direction, provenance: p, generation: {tool: image_gen.imagegen, promptPath: assets/a.prompt.txt, inputRefs: []}}]\n' +
+      'ui: {intent: i, surfaces: [], states: [{name: empty, trigger: t, behavior: b}], coverage: {scale: bounded, representativeScreens: [x], map: [{screen: x, state: empty, viewport: desktop, components: [], derivation: d}]}, accessibility: [], responsive: [], assets: [], observations: [], gaps: []}\n',
+  });
+  assert.equal(good.length, 0, good.join('\n'));
+});
+
+test('concept 11: a generation-carrying asset is refused outside work/ui-screen, with a dedicated message for work/implementation', () => {
+  const onImplementation = refusalsFor({
+    'features/f/impl/x/index.yaml': 'schema: work/implementation\nid: impl.f.x\ntitle: t\nstate: todo\nrepository: r\nowners: [{role: module, path: a.ts}]\nassets: [{path: assets/running.png, generation: {tool: image_gen.imagegen, promptPath: p, inputRefs: []}}]\n',
+  });
+  assert.ok(onImplementation.some(p => p.includes('implementation captures are real running-page screenshots')), onImplementation.join('\n'));
+
+  const onOtherFamily = refusalsFor({
+    'features/f/fr/x/index.yaml': 'schema: work/functional-requirement\nid: fr.f.x\ntitle: t\nstate: todo\nassets: [{path: assets/a.png, generation: {tool: image_gen.imagegen, promptPath: p, inputRefs: []}}]\n',
+  });
+  assert.ok(onOtherFamily.some(p => p.includes('a generated direction asset is ui-owned only')), onOtherFamily.join('\n'));
+});
+
