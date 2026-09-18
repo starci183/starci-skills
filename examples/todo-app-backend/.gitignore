@@ -9,4 +9,8 @@
 !.starcistacks/*/secrets/*.enc
 .starcistacks/*/runtime/env/*.env
 !.starcistacks/*/runtime/env/*.env.enc
+.starcistacks/*/runtime/files/*.key
+!.starcistacks/*/runtime/files/*.key.enc
+.starcistacks/*/runtime/config/*.yaml
+!.starcistacks/*/runtime/config/*.yaml.enc
 

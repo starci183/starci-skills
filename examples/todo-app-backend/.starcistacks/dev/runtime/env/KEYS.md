@@ -3,6 +3,12 @@
 Every row is one secret. The `.enc` member is the tracked record; the decrypted member is produced by
 `npm run sync` and is never committed.
 
+DEMO-ONLY: every `.enc` file in this example is encrypted to the age identity committed at
+`runtime/env/demo.agekey`, so that a reader can `sops -d` them and see a genuine, round-tripping SOPS
+document. Every decrypted value is a placeholder string, never a real credential. That identity, and every
+`.enc` file encrypted to it, exists purely to teach the shape of the layout; none of it may be reused for a
+real deployment, and no real secret may ever be encrypted to this public key.
+
 | Key | Encrypted owner | Purpose |
 |---|---|---|
 | `DATABASE_URL` | `runtime/env/app.env.enc` | Postgres connection for the api |

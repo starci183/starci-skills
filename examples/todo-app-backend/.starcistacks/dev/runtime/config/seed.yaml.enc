@@ -1,4 +1,16 @@
-# SOPS-encrypted seed configuration: the realm, its clients and the first workspace owner.
-ENC[AES256_GCM,data:c2VlZCBjb25maWd1cmF0aW9u,type:str]
-sops_version: 3.9.0
-
+seed: ENC[AES256_GCM,data:SaKqsJ10ZCEzDnobiQZToHtuDqlLmOl0liqnu9z9G9JHdh8=,iv:BImEgQVMZ1ynhv8yGqBL/maJucZHD0I1rNl+ArDeCb8=,tag:tmiXF2ZzhnW2d1KnVgFbsg==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSB5OWluQU1meStjeFE2L3BF
+            c3RlUHhidk1PSGdxS1lkNXNzbW5WSjU0L3lFCjU1bTI4UFFBWGVJNkFQd2dpWW5u
+            bUV6VkJMclpnUkovTy9kTlFHbVVISWsKLS0tIDgxVzFjR1JoRjA5Mk15NythNmdK
+            cXpEK0dtYTluM1k3QVlDSnUzSkRkQW8KE9AN8khGXMxuibTPqhMQ8U+dnglAo+ZW
+            GH/iClAVcucjBEW5oJpCobuXuu9ceVjeTrtm6sR8tVOd+56nyaSEfA==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1fpvksnujfqcrf6z0000uxnqn9phkjxm0p5kd8ecwt3tjtmdv5uqsuzfsh6
+    lastmodified: "2026-09-18T03:50:31Z"
+    mac: ENC[AES256_GCM,data:FYyda6xEEXz8gnGVqePPYZeH2yyidKKAZPTwO+YPxe9UqEhKr4se/luYe+wjjSQ2e/7mDNaSfbFGF7CyT2aLszgR0eLmEwRcmxngb4alPlSKAACN98uLFqlkTJC1SFI/u++JSeLeGr4thoUjZYmQwEO5pFTm7aSt10W5BJdPjec=,iv:udyjhKbYh1O3Oc/TBPMcVGiHWQgwJjhzKchX/toXsiI=,tag:qqc+blcywHnKouJT9rcLmg==,type:str]
+    unencrypted_suffix: _unencrypted
+    version: 3.13.2

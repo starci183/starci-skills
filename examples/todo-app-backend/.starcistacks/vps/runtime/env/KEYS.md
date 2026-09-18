@@ -1,5 +1,9 @@
 # Runtime secret keys
 
+DEMO-ONLY: `runtime/env/app.env.enc` is encrypted to the DEMO-ONLY age identity committed at
+`../../dev/runtime/env/demo.agekey` (shared across dev and vps for this example only), so a reader can
+`sops -d` it and get a placeholder value. Never reuse that identity, or this pattern, outside the example.
+
 | Key | Encrypted owner | Purpose |
 |---|---|---|
 | `DATABASE_URL` | `runtime/env/app.env.enc` | Postgres connection for the api |
