@@ -1,0 +1,23 @@
+schema: work/data
+id: data.audit.erasure-request
+title: Erasure request
+state: todo
+fields:
+  - {name: requestId, type: text, required: true, note: "Opaque, the id every log line about this
+      erasure names instead of the person."}
+  - {name: personId, type: text, required: true, note: "The subject. Held only in this record's own
+      row, which is itself deleted once the request reaches complete or refused - it is not the log."}
+  - {name: state, type: text, required: true, note: "requested | verified | executing | complete | refused"}
+  - {name: requestedAt, type: timestamp, required: true}
+  - {name: verifiedAt, type: timestamp, required: false}
+  - {name: refusedAt, type: timestamp, required: false}
+  - {name: executingAt, type: timestamp, required: false}
+  - {name: completedAt, type: timestamp, required: false}
+invariants:
+  - personId is dropped from this record once state reaches complete; only requestId and the
+    timestamps remain, so this table does not itself become a second place a person's identity lingers.
+appliesTo: [br.audit.erasure.right, br.audit.erasure.logged]
+blockedBy:
+  - The dropped-personId-on-completion invariant is stated here but not yet implemented in
+    src/audit/erasure.mjs, which keeps personId in the in-memory request record for the life of the
+    process. sds.audit.erasure-request tracks this as the same gap.

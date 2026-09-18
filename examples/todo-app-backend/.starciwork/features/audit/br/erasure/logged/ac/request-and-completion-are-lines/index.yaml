@@ -1,0 +1,8 @@
+schema: work/acceptance-criterion
+id: ac.audit.erasure.logged.request-and-completion-are-lines
+rule: br.audit.erasure.logged
+given: An erasure request that runs to completion
+when: The log is read afterward
+then:
+  - An erasure-requested line and an erasure-completed line both exist, in that order.
+  - Neither line's actor field resolves to the erased person; both name only the request.

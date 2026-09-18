@@ -8,4 +8,7 @@ features:
   - id: task
     directory: features/task
     description: A task a person creates, completes and deletes.
+  - id: audit
+    directory: features/audit
+    description: An append-only record of what happened, and the right to have it erased.
 

@@ -1,0 +1,20 @@
+schema: work/non-functional-requirement
+id: nfr.audit.retention
+title: A line survives its full retention window
+quality: compliance
+state: todo
+observableCriterion: A line captured at time T is still present, positioned and chain-valid at T plus
+  400 days, in a run using a fake clock rather than real elapsed time.
+measurement:
+  how: A Nest test harness that injects a controllable clock into the log module, advances it past
+    400 days without invoking any deletion path, and asserts line count and verifyChain are unchanged.
+  threshold: 0 lines lost, chain valid, at T+400d
+  environment: dev
+appliesTo: [br.audit.retention]
+
+requiresProof:
+  measurement:
+    required: true
+
+blockedBy:
+  - No implementation and no fake-clock harness exist yet under the NestJS layout.

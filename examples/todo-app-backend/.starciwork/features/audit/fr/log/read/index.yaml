@@ -1,0 +1,30 @@
+schema: work/functional-requirement
+id: fr.audit.log.read
+title: Read the log
+state: todo
+actors: [operator]
+trigger: An authorized operator asks to see recent activity, optionally filtered by action or target.
+mainFlow:
+  - The operator's authorization is checked.
+  - Matching lines are returned, each resolved through readLine so a tombstoned line reads as
+    tombstoned rather than throwing.
+exceptionFlows:
+  - An unauthorized reader is refused before any line is touched.
+postconditions:
+  - No response ever includes a sealed actor blob or a keyId a reader could use to correlate lines
+    across an erasure.
+composes:
+  - {rule: br.audit.append-only, module: src/audit/log}
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- audit/log-read
+  uat:
+    required: true
+
+blockedBy:
+  - "The example has no operator/admin role today - data.login.person has no role field and no
+    existing record establishes who is authorized to read the log. This FR cannot be implemented
+    honestly until that authorization boundary is defined, by this feature or by login."

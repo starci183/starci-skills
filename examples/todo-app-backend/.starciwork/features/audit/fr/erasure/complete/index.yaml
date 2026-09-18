@@ -1,0 +1,31 @@
+schema: work/functional-requirement
+id: fr.audit.erasure.complete
+title: Complete an erasure
+state: todo
+actors: [system]
+trigger: A verified erasure request is picked up by the erasure worker.
+mainFlow:
+  - The subject's key and the keystore's personId-to-keyId mapping are destroyed.
+  - Every line the subject produced is confirmed unreadable.
+  - The request moves to complete and an erasure-completed line is appended, naming the requestId.
+exceptionFlows:
+  - If any of the subject's lines still decrypts after key destruction, completion is refused rather
+    than reported as done.
+postconditions:
+  - No reader, including export, can resolve the subject's identity from any line they produced.
+  - Every line's bytes, position and hash are unchanged from before the request.
+composes:
+  - {rule: br.audit.erasure.right, module: src/audit/erasure}
+  - {rule: br.audit.erasure.logged, module: src/audit/erasure}
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- audit/erasure-complete
+  uat:
+    required: true
+
+blockedBy:
+  - decision.audit.erasure-method is open; the same gap fr.audit.erasure.request records.
+  - No implementation exists yet under the NestJS layout the example is moving to.

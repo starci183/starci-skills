@@ -1,0 +1,16 @@
+schema: work/business-rule
+id: br.audit.retention
+title: A log line is kept for 400 days
+state: todo
+statements:
+  - A line stays present and readable-or-tombstoned in storage for 400 days from its capture time.
+  - Retention is a floor, not a promise of permanent readability; erasure may end a line's readability
+    before the window closes, but the line itself is never dropped early.
+authorityRefs:
+  - "owner-intent: 400 days covers a year plus an audit cycle's slack; shorter windows have lost the
+    line an investigation needed."
+acceptanceCriteria: [available-through-window]
+module: src/audit/log
+blockedBy:
+  - No storage layer exists yet under the Nest layout; there is nothing to run a retention check against.
+change: {rev: 1, kind: initial, at: 2026-09-18T06:01:00.000Z}

@@ -1,0 +1,17 @@
+schema: work/acceptance-criterion
+id: ac.audit.append-only.chain-detects-tamper
+rule: br.audit.append-only
+given: A log with several appended lines, each line's hash covering its own content and the previous
+  line's hash
+when: A test mutates one stored field on an already-appended line, or removes one line from the
+  middle of the store, then asks the module to recompute the chain from the first line forward
+then:
+  - The recomputation reports the exact index where the recomputed hash first stops matching the
+    stored one, not merely "invalid" - a removed line must surface as a broken prevHash link at the
+    line that followed it, and a changed field must surface as a content mismatch at that line.
+  - The same recomputation over an untouched log reports every line valid.
+  - "The check that proves this: a node:test (or Nest e2e) suite that appends N lines, snapshots the
+    chain, mutates the underlying storage directly (bypassing the module's own write path, the way a
+    rogue admin or a compromised disk would), and asserts the recomputed break index equals the
+    mutated line's index. A test that only calls the module's own append/verify pair without an
+    out-of-band mutation does not prove tamper-evidence; it proves the happy path."

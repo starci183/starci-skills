@@ -1,0 +1,34 @@
+schema: work/policy-decision
+id: decision.audit.erasure-method
+title: How an erasure actually removes identifying data from an append-only, hash-chained log
+state: todo
+outcome: open
+question: br.audit.append-only says a line's bytes never change. br.audit.retention says a line is
+  never lost inside 400 days. br.audit.erasure.right says a verified request makes a person
+  unreadable in every line they produced, on demand, inside that same window. What operation
+  satisfies all three at once?
+options:
+  - id: hard-delete-line
+    summary: Delete the person's lines outright when erasure completes.
+    consequence: "Satisfies erasure. Breaks append-only (a line disappears) and breaks retention: the
+      line is lost before 400 days for every reader, not just the erased person's identity."
+  - id: redact-in-place
+    summary: Overwrite the identifying field in place with a placeholder, keep the rest of the line.
+    consequence: "Satisfies erasure and keeps the line's position. Breaks append-only directly: the
+      hash covers the field being overwritten, so the stored hash would have to be recomputed and
+      rewritten too, and a chain whose own hashes get revised on request is not tamper-evident of
+      anything, including the revision itself."
+  - id: crypto-shred
+    summary: Seal the identifying field under a key unique to the person; erasure destroys the key,
+      never the line.
+    consequence: "The line's bytes and hash never change, so append-only and the tamper-evidence check
+      both hold across an erasure. The line is never dropped, so retention holds. What 'never lost'
+      has to mean is narrowed to the line's existence and chain position, not the permanent
+      readability of every field in it - a real change to br.audit.retention's plain-language
+      statement, not just an implementation detail, which is why this decision stays open rather than
+      a settled fact of the design."
+recommendation: crypto-shred
+recommendationReason: It is the only option under which append-only, retention and erasure are
+  simultaneously true statements about the same stored bytes. The other two options each resolve the
+  conflict by quietly breaking one of the rules they were supposed to satisfy.
+blocks: [br.audit.erasure.right, br.audit.erasure.logged, sds.audit.erasure-request]
