@@ -1510,6 +1510,11 @@ records:
     feature: audit
     state: todo
     effectiveState: todo
+  impl.audit.todo-app-frontend.privacy:
+    schema: work/implementation
+    feature: audit
+    state: done
+    effectiveState: done
   impl.login.todo-app-backend.auth:
     schema: work/implementation
     feature: login
@@ -2207,18 +2212,18 @@ records:
     effectiveState: done
 tally:
   overall:
-    done: 132
+    done: 133
     todo: 32
     stale: 2
     blocked: 36
-    total: 202
+    total: 203
   byFeature:
     audit:
-      done: 20
+      done: 21
       todo: 6
       stale: 0
       blocked: 3
-      total: 29
+      total: 30
     login:
       done: 16
       todo: 4
@@ -2804,6 +2809,9 @@ unclassifiedEdges:
   - from: impl.audit.todo-app-backend.operator-read
     field: proves
     target: fr.audit.log.read
+  - from: impl.audit.todo-app-frontend.privacy
+    field: proves
+    target: ui.audit.privacy
   - from: impl.login.todo-app-backend.auth
     field: proves
     target: br.login.password.sign-in
