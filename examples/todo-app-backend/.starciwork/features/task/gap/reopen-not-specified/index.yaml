@@ -1,0 +1,11 @@
+schema: work/gap
+id: gap.task.reopen-not-specified
+title: Nothing names the reopen code as proving the reversible statement
+state: todo
+statement: br.task.complete.once rev 2 added "the owner may reopen a task they completed," and
+  impl.task.todo-app-backend.reopen-task's code at src/features/reopen-task/** is real and passes its own
+  unit tests, but no fr.task.reopen (or equivalent functional-requirement) record exists to require it, so
+  that implementation's own proves list stays empty and nothing has ever run an acceptance check against
+  the reversible statement itself.
+closedBy: br.task.complete.once
+change: {rev: 1, kind: initial, at: 2026-09-18T10:00:00.000Z}

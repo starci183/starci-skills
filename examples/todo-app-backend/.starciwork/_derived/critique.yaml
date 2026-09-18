@@ -851,7 +851,7 @@ findings:
     severity: info
     records:
       - gap.recur.unbuilt-module
-    because: gap.recur.unbuilt-module is used 14 time(s) (top decile of fan-in); it is owned by recur
+    because: gap.recur.unbuilt-module is used 15 time(s) (top decile of fan-in); it is owned by recur
       and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
       here is cross-feature coupling, not a local edit.
   - id: fan-in-hotspot:gap.notify.unbuilt-module
@@ -934,53 +934,6 @@ findings:
     because: br.task.single-owner is used 8 time(s) (top decile of fan-in); it is owned by task and read
       by 2 other feature(s) (login, share), so a change here is cross-feature coupling, not a local
       edit.
-  - id: fan-in-hotspot:br.audit.append-only
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - br.audit.append-only
-    because: br.audit.append-only is used 7 time(s) (top decile of fan-in); it is owned by audit and
-      read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
-      here is cross-feature coupling, not a local edit.
-  - id: fan-in-hotspot:br.task.complete.once
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - br.task.complete.once
-    because: br.task.complete.once is used 7 time(s) (top decile of fan-in); it is owned by task and
-      read by 1 other feature(s) (notify), so a change here is cross-feature coupling, not a local
-      edit.
-  - id: blocker-cycle:contract.plan.create-precondition
-    kind: blocker-cycle
-    severity: critical
-    records:
-      - contract.plan.create-precondition
-      - sds.plan.cap-guard
-    because: "A blockedBy ring never reaches a gap or an open decision:
-      contract.plan.create-precondition → sds.plan.cap-guard → contract.plan.create-precondition. It
-      never resolves on its own. Candidate anchors already in the tree for the same feature(s) that
-      no ring member currently points at: gap.plan.direction-not-drawn, gap.plan.live-proof,
-      gap.plan.unbuilt-module - one of the ring's records should point outward at one of these
-      instead of at another ring member. Edges: contract.plan.create-precondition is blockedBy
-      sds.plan.cap-guard (\"The provider side (sds.plan.cap-guard) has no implementation yet; see
-      its own blockedBy.\"); sds.plan.cap-guard is blockedBy contract.plan.create-precondition
-      (\"Even once built, nothing calls it today - fr.task.create's mainFlow (\"The task is
-      created,...\")."
-  - id: blocker-cycle:integration.plan.sepay
-    kind: blocker-cycle
-    severity: critical
-    records:
-      - integration.plan.sepay
-      - sds.plan.reconciliation
-    because: "A blockedBy ring never reaches a gap or an open decision: integration.plan.sepay →
-      sds.plan.reconciliation → integration.plan.sepay. It never resolves on its own. Candidate
-      anchors already in the tree for the same feature(s) that no ring member currently points at:
-      gap.plan.direction-not-drawn, gap.plan.live-proof, gap.plan.unbuilt-module - one of the ring's
-      records should point outward at one of these instead of at another ring member. Edges:
-      integration.plan.sepay is blockedBy sds.plan.reconciliation (\"No call has been made against
-      the real SePay sandbox yet; there is no module to make one. ...\"); sds.plan.reconciliation is
-      blockedBy integration.plan.sepay (\"integration.plan.sepay is todo; a poll against a gateway
-      that has never been called for re...\")."
   - id: done-proves-not-done:impl.login.todo-app-frontend.sign-in
     kind: done-proves-not-done
     severity: warn
@@ -1207,6 +1160,14 @@ findings:
       - contract.task.list-for-dashboard
     because: decision.task.list.scope is still open and holds 2 record(s) (br.task.list.owned,
       contract.task.list-for-dashboard) - none of them can move until this is decided.
+  - id: designed-todo:br.task.complete.once
+    kind: designed-todo
+    severity: info
+    records:
+      - br.task.complete.once
+      - gap.task.reopen-not-specified
+    because: br.task.complete.once is todo, blocked on gap.task.reopen-not-specified - a real product
+      question, not missing code; it moves once that is settled.
   - id: designed-todo:contract.notify.new-device-signal
     kind: designed-todo
     severity: info
@@ -1223,6 +1184,22 @@ findings:
       - gap.notify.task-completion-event
     because: contract.notify.task-completion-feed is todo, blocked on gap.notify.task-completion-event -
       a real product question, not missing code; it moves once that is settled.
+  - id: designed-todo:contract.plan.create-precondition
+    kind: designed-todo
+    severity: info
+    records:
+      - contract.plan.create-precondition
+      - gap.plan.cap-guard-not-wired
+    because: contract.plan.create-precondition is todo, blocked on gap.plan.cap-guard-not-wired - a real
+      product question, not missing code; it moves once that is settled.
+  - id: designed-todo:contract.share.completion-guard-for-task
+    kind: designed-todo
+    severity: info
+    records:
+      - contract.share.completion-guard-for-task
+      - gap.task.reopen-not-specified
+    because: contract.share.completion-guard-for-task is todo, blocked on gap.task.reopen-not-specified
+      - a real product question, not missing code; it moves once that is settled.
   - id: designed-todo:contract.task.list-for-dashboard
     kind: designed-todo
     severity: info
@@ -1343,6 +1320,14 @@ findings:
       - gap.notify.direction-not-drawn
     because: fr.notify.unsubscribe is todo, blocked on gap.notify.direction-not-drawn - a real product
       question, not missing code; it moves once that is settled.
+  - id: designed-todo:fr.task.complete
+    kind: designed-todo
+    severity: info
+    records:
+      - fr.task.complete
+      - gap.task.reopen-not-specified
+    because: fr.task.complete is todo, blocked on gap.task.reopen-not-specified - a real product
+      question, not missing code; it moves once that is settled.
   - id: designed-todo:impl.audit.todo-app-backend.erasure
     kind: designed-todo
     severity: info
@@ -1375,6 +1360,14 @@ findings:
       - gap.notify.task-completion-event
     because: journey.notify.told-about-completion is todo, blocked on gap.notify.task-completion-event -
       a real product question, not missing code; it moves once that is settled.
+  - id: designed-todo:journey.plan.hits-the-cap
+    kind: designed-todo
+    severity: info
+    records:
+      - journey.plan.hits-the-cap
+      - gap.plan.cap-guard-not-wired
+    because: journey.plan.hits-the-cap is todo, blocked on gap.plan.cap-guard-not-wired - a real product
+      question, not missing code; it moves once that is settled.
   - id: designed-todo:nfr.notify.delivery.guarantee
     kind: designed-todo
     severity: info
@@ -1401,6 +1394,22 @@ findings:
       - gap.audit.emitted-events
     because: sds.audit.log-chain is todo, blocked on gap.audit.emitted-events - a real product question,
       not missing code; it moves once that is settled.
+  - id: designed-todo:sds.plan.cap-guard
+    kind: designed-todo
+    severity: info
+    records:
+      - sds.plan.cap-guard
+      - gap.plan.cap-guard-not-wired
+    because: sds.plan.cap-guard is todo, blocked on gap.plan.cap-guard-not-wired - a real product
+      question, not missing code; it moves once that is settled.
+  - id: designed-todo:sds.task.completion-state
+    kind: designed-todo
+    severity: info
+    records:
+      - sds.task.completion-state
+      - gap.task.reopen-not-specified
+    because: sds.task.completion-state is todo, blocked on gap.task.reopen-not-specified - a real
+      product question, not missing code; it moves once that is settled.
   - id: designed-todo:uat.audit.right-to-be-forgotten
     kind: designed-todo
     severity: info
@@ -1434,11 +1443,12 @@ findings:
     severity: info
     records:
       - uat.plan.upgrade-after-cap
+      - gap.plan.cap-guard-not-wired
       - gap.plan.direction-not-drawn
       - gap.plan.live-proof
-    because: uat.plan.upgrade-after-cap is todo, blocked on gap.plan.direction-not-drawn,
-      gap.plan.live-proof - a real product question, not missing code; it moves once that is
-      settled.
+    because: uat.plan.upgrade-after-cap is todo, blocked on gap.plan.cap-guard-not-wired,
+      gap.plan.direction-not-drawn, gap.plan.live-proof - a real product question, not missing code;
+      it moves once that is settled.
   - id: designed-todo:uat.recur.make-recurring
     kind: designed-todo
     severity: info
@@ -1679,23 +1689,6 @@ findings:
       - gap.task.collaborator-completion
     because: br.task.single-owner is todo, blocked on gap.task.collaborator-completion - code that
       simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:contract.plan.create-precondition
-    kind: leftover-todo
-    severity: info
-    records:
-      - contract.plan.create-precondition
-      - gap.plan.unbuilt-module
-    because: contract.plan.create-precondition is todo, blocked on gap.plan.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:contract.share.completion-guard-for-task
-    kind: leftover-todo
-    severity: info
-    records:
-      - contract.share.completion-guard-for-task
-      - gap.task.collaborator-completion
-    because: contract.share.completion-guard-for-task is todo, blocked on
-      gap.task.collaborator-completion - code that simply has not been written yet; the owner wants
-      this count at zero.
   - id: leftover-todo:data.notify.delivery-attempt
     kind: leftover-todo
     severity: info
@@ -1832,14 +1825,6 @@ findings:
       - gap.share.unbuilt-module
     because: fr.share.revoke is todo, blocked on gap.share.unbuilt-module - code that simply has not
       been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.task.complete
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.task.complete
-      - gap.task.collaborator-completion
-    because: fr.task.complete is todo, blocked on gap.task.collaborator-completion - code that simply
-      has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:impl.audit.todo-app-backend.log
     kind: leftover-todo
     severity: info
@@ -1871,6 +1856,14 @@ findings:
       - impl.plan.todo-app-frontend.usage
       - gap.plan.unbuilt-module
     because: impl.plan.todo-app-frontend.usage is todo, blocked on gap.plan.unbuilt-module - code that
+      simply has not been written yet; the owner wants this count at zero.
+  - id: leftover-todo:impl.recur.todo-app-backend.engine
+    kind: leftover-todo
+    severity: info
+    records:
+      - impl.recur.todo-app-backend.engine
+      - gap.recur.unbuilt-module
+    because: impl.recur.todo-app-backend.engine is todo, blocked on gap.recur.unbuilt-module - code that
       simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:impl.recur.todo-app-frontend.schedule
     kind: leftover-todo
@@ -1925,9 +1918,11 @@ findings:
     severity: info
     records:
       - integration.plan.sepay
+      - gap.plan.sepay-not-reachable
       - gap.plan.unbuilt-module
-    because: integration.plan.sepay is todo, blocked on gap.plan.unbuilt-module - code that simply has
-      not been written yet; the owner wants this count at zero.
+    because: integration.plan.sepay is todo, blocked on gap.plan.sepay-not-reachable,
+      gap.plan.unbuilt-module - code that simply has not been written yet; the owner wants this
+      count at zero.
   - id: leftover-todo:integration.recur.scheduler
     kind: leftover-todo
     severity: info
@@ -1944,14 +1939,6 @@ findings:
       - gap.audit.unbuilt-module
     because: journey.audit.right-to-be-forgotten is todo, blocked on gap.audit.unbuilt-module - code
       that simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:journey.plan.hits-the-cap
-    kind: leftover-todo
-    severity: info
-    records:
-      - journey.plan.hits-the-cap
-      - gap.plan.unbuilt-module
-    because: journey.plan.hits-the-cap is todo, blocked on gap.plan.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:journey.recur.first-recurring-task
     kind: leftover-todo
     severity: info
@@ -2024,22 +2011,16 @@ findings:
       - gap.notify.unbuilt-module
     because: sds.notify.delivery-lifecycle is todo, blocked on gap.notify.unbuilt-module - code that
       simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:sds.plan.cap-guard
-    kind: leftover-todo
-    severity: info
-    records:
-      - sds.plan.cap-guard
-      - gap.plan.unbuilt-module
-    because: sds.plan.cap-guard is todo, blocked on gap.plan.unbuilt-module - code that simply has not
-      been written yet; the owner wants this count at zero.
   - id: leftover-todo:sds.plan.reconciliation
     kind: leftover-todo
     severity: info
     records:
       - sds.plan.reconciliation
+      - gap.plan.sepay-not-reachable
       - gap.plan.unbuilt-module
-    because: sds.plan.reconciliation is todo, blocked on gap.plan.unbuilt-module - code that simply has
-      not been written yet; the owner wants this count at zero.
+    because: sds.plan.reconciliation is todo, blocked on gap.plan.sepay-not-reachable,
+      gap.plan.unbuilt-module - code that simply has not been written yet; the owner wants this
+      count at zero.
   - id: leftover-todo:sds.plan.subscription-lifecycle
     kind: leftover-todo
     severity: info

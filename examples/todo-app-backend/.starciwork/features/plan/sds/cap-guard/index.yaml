@@ -47,7 +47,7 @@ requiresProof:
 
 blockedBy:
   - {record: gap.plan.unbuilt-module, because: "No module exists yet at src/plan/cap-guard. The example backend is moving to NestJS; this component is specified but not built."}
-  - {record: contract.plan.create-precondition, because: "Even once built, nothing calls it today - fr.task.create's mainFlow (\"The task is created, owned by the submitter, not complete.\") and its implementation (impl.task.todo-app-backend.ownership) create unconditionally once the title is non-empty. This feature owns only features/plan/**; it does not edit fr.task.create or the task module, and appliesTo (above) is exactly this record's constraint on that record, not a request the task feature has honored yet."}
+  - {record: gap.plan.cap-guard-not-wired, because: "Even once built, nothing calls it today - fr.task.create's mainFlow (\"The task is created, owned by the submitter, not complete.\") and its implementation (impl.task.todo-app-backend.ownership) create unconditionally once the title is non-empty. This feature owns only features/plan/**; it does not edit fr.task.create or the task module, and appliesTo (above) is exactly this record's constraint on that record, not a request the task feature has honored yet. gap.plan.cap-guard-not-wired names that absence instead of citing contract.plan.create-precondition directly, which itself waits on this record - the two are not both allowed to cite each other over the same fact."}
 
 # fr.task.create's postcondition guarantees exactly one task is created for any non-empty title from its
 # owner, with no precondition step in its mainFlow; that guarantee cannot hold once a free-plan owner is at

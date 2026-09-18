@@ -14,3 +14,5 @@ change:
   withdraws: ["A complete task is never reopened."]
   reason: The owner decided completion is reversible. The withdrawn clause was proven, so its evidence
     becomes history and the rule returns to todo until the reversible statement is proven in its place.
+blockedBy:
+  - {record: gap.task.reopen-not-specified, because: "impl.task.todo-app-backend.reopen-task's code at src/features/reopen-task/** is real and passes its own unit tests, but no fr.task.reopen (or equivalent) record requires it, so nothing has ever run an acceptance check against the reversible statement above."}

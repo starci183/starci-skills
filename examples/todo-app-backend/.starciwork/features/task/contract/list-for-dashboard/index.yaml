@@ -22,5 +22,4 @@ requiresProof:
   consumer: {required: true}
 
 blockedBy:
-  - {record: br.task.list.owned, because: "br.task.list.owned is todo, and decision.task.list.scope has not chosen whether an organization owner reads member tasks. A contract written before that decision would encode the wrong boundary."}
-  - {record: decision.task.list.scope, because: "br.task.list.owned is todo, and decision.task.list.scope has not chosen whether an organization owner reads member tasks. A contract written before that decision would encode the wrong boundary."}
+  - {record: decision.task.list.scope, because: "br.task.list.owned is todo, and decision.task.list.scope has not chosen whether an organization owner reads member tasks. A contract written before that decision would encode the wrong boundary - decision.task.list.scope is the open question br.task.list.owned's own openQuestions names, so this waits on the decision rather than restating br.task.list.owned itself as a second, dead-end blocker."}

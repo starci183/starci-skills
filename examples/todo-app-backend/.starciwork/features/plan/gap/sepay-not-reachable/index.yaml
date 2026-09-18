@@ -1,0 +1,12 @@
+schema: work/gap
+id: gap.plan.sepay-not-reachable
+title: No call has ever been made against the real SePay sandbox
+state: todo
+statement: integration.plan.sepay names the sandbox endpoints and requires a live proof, but no module
+  exists yet at src/plan/payments (gap.plan.unbuilt-module) and no request has ever reached SePay's sandbox
+  merchant account for real - a fake-gateway test would settle sds.plan.subscription-lifecycle's or
+  sds.plan.reconciliation's transitions, never this integration itself, which is the one fact
+  integration.plan.sepay and sds.plan.reconciliation were each citing the other over before this record
+  gave it one name.
+closedBy: integration.plan.sepay
+change: {rev: 1, kind: initial, at: 2026-09-18T10:00:00.000Z}
