@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseYaml} from '../core/yaml.mjs';
+import {readWorkspace, resolveOwnedDirs, missingOwnedDirs, declaresOwnPaths, hashOwnedDirs} from './example-ownership.mjs';
 
 /**
  * The layout says an id mirrors its directory while remaining the identity. That sentence is only true if
@@ -19,7 +20,7 @@ import {parseYaml} from '../core/yaml.mjs';
  * for what they needed. Each gets one rule here, not a field bolted on per complaint.
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event']);
+export const FAMILIES = new Set(['br', 'ac', 'fr', 'nfr', 'data', 'journey', 'decision', 'sds', 'ui', 'impl', 'uat', 'contract', 'integration', 'gap', 'event']);
 const EXEMPT = new Set(['work/catalog', 'work/workspace', 'work/brand', 'work/feature', 'work/disposable-accounts', 'starci/application-stacks']);
 const ID_RE = /^(br|ac|fr|nfr|data|journey|decision|sds|ui|impl|uat|contract|integration|gap|event)\.[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
@@ -52,10 +53,11 @@ const sha256File = file => crypto.createHash('sha256').update(fs.readFileSync(fi
  * refusal strings to `problems`. Exported so the fixture test can point it at a throwaway tree instead of
  * the real example tree.
  */
-export function checkWorkTree(workRoot, problems) {
+export function checkWorkTree(workRoot, problems, warnings = []) {
   const records = new Map(); // id -> {schema, state, change, file, shown, dir, data}
   const refs = [];
   const evidenceFiles = [];
+  const workspaceDoc = readWorkspace(workRoot);
 
   const collect = (node, file, trail) => {
     if (typeof node === 'string') {
@@ -98,6 +100,33 @@ export function checkWorkTree(workRoot, problems) {
       const current = sha256File(siblingFile);
       if (current !== record.recordDigest && record.stale !== true) {
         problems.push(`${shown}: recordDigest ${record.recordDigest} no longer matches ${sibling.id}'s current digest ${current}; refused unless it carries stale: true`);
+      }
+    }
+
+    // ---- trust concept 1: codeDigest freshness ----
+    // A code change should be able to stale a proof without anyone editing the record. If capture-time
+    // codeDigest no longer matches what resolveOwnedDirs/hashOwnedDirs compute from the code on disk
+    // right now, the evidence is refused unless it already carries stale: true (the same escape valve
+    // recordDigest staleness above uses).
+    if (record.codeDigest?.digest) {
+      const recEntry = records.get(record.record);
+      if (recEntry) {
+        const dirs = resolveOwnedDirs(record.record, recEntry, records, workspaceDoc, workRoot);
+        const fresh = hashOwnedDirs(dirs);
+        const freshDigest = fresh?.digest ?? null;
+        if (freshDigest !== record.codeDigest.digest && record.stale !== true) {
+          problems.push(`${shown}: codeDigest ${record.codeDigest.digest} no longer matches the code currently under ${sibling.id}'s owners/module (now ${freshDigest ?? '(no files found)'}); refused unless it carries stale: true [CODE_DIGEST_STALE]`);
+        }
+      }
+    }
+
+    // ---- trust concept 2: replayable evidence ----
+    // Every assertion must carry the exact `command` that was run, not only a prose `observation`, so
+    // scripts/example-verify.mjs can re-run it later and compare outcomes. An assertion missing `command`
+    // is refused as not replayable.
+    for (const assertion of Array.isArray(record.assertions) ? record.assertions : []) {
+      if (!assertion || typeof assertion.command !== 'string' || !assertion.command.trim()) {
+        problems.push(`${shown}: assertion ${assertion?.id ?? '(unnamed)'} carries no command - evidence without a replayable command is refused [PROOF_NOT_REPLAYABLE]`);
       }
     }
   }
@@ -151,11 +180,23 @@ export function checkWorkTree(workRoot, problems) {
       }
     }
 
-    // ---- concept 2: gap family ----
+    // ---- concept 2: gap family (closedBy is a list - a bare string is normalised to one) ----
     if (schema === 'work/gap') {
       if (!['todo', 'done'].includes(data.state)) problems.push(`${rec.shown}: work/gap state must be todo or done`);
       if (!data.statement) problems.push(`${rec.shown}: work/gap needs a statement`);
-      if (data.closedBy && !records.has(data.closedBy)) problems.push(`${rec.shown}: closedBy names ${data.closedBy}, which no record owns`);
+      if (data.closedBy != null) {
+        const closers = typeof data.closedBy === 'string' ? [data.closedBy] : Array.isArray(data.closedBy) ? data.closedBy : null;
+        if (!closers) {
+          problems.push(`${rec.shown}: closedBy must be a record id or a list of record ids, not ${JSON.stringify(data.closedBy)}`);
+        } else {
+          const unresolved = closers.filter(c => !records.has(c));
+          for (const c of unresolved) problems.push(`${rec.shown}: closedBy names ${c}, which no record owns`);
+          if (data.state === 'done' && !unresolved.length) {
+            const notDone = closers.filter(c => records.get(c)?.state !== 'done');
+            for (const c of notDone) problems.push(`${rec.shown}: work/gap is done but closedBy's ${c} is ${records.get(c)?.state ?? '(no state)'}, not done - a gap is closed only once every one of its closers is`);
+          }
+        }
+      }
     }
 
     // ---- concept 4: decision vocabulary ----
@@ -236,6 +277,71 @@ export function checkWorkTree(workRoot, problems) {
       const m = data.module;
       const ok = typeof m === 'string' ? m.length > 0 : Array.isArray(m) && m.length > 0 && m.every(x => typeof x === 'string' && x.length > 0);
       if (!ok) problems.push(`${rec.shown}: business-rule module must be a non-empty string or a non-empty list of strings`);
+    }
+
+    // ---- trust concept 3: proves and owners are checked ----
+    // A done record whose `proves` names a target that is itself not done is refused: proof cannot outrun
+    // what it proves. A dangling `proves` target is already caught by the generic ref-resolution check
+    // above, so only a resolving-but-not-done target is new here.
+    if (Array.isArray(data.proves) && data.state === 'done') {
+      for (const targetId of data.proves) {
+        const target = records.get(targetId);
+        if (target && target.state !== 'done') {
+          problems.push(`${rec.shown}: state is done but proves ${targetId}, which is ${target.state ?? '(no state)'}, not done [PROVES_TARGET_NOT_DONE]`);
+        }
+      }
+    }
+    // `owners[].path` / `module` name module-root directories (schemas/work-layout.yaml's `impl` shape
+    // entry; scripts/example-ownership.mjs's moduleRootOf normalises a legacy file or `/**` glob path down
+    // to that root). A done record naming one that does not exist on disk is refused; a todo one is only
+    // warned, since the module a todo record targets may not have been built yet.
+    if (declaresOwnPaths(data)) {
+      const dirs = resolveOwnedDirs(id, rec, records, workspaceDoc, workRoot);
+      const missing = missingOwnedDirs(dirs);
+      if (missing.length) {
+        const list = missing.map(m => m.rel).join(', ');
+        const message = `${rec.shown}: owners/module names a directory that does not exist on disk: ${list} [OWNER_PATH_MISSING]`;
+        if (data.state === 'done') problems.push(message); else warnings.push(message);
+      }
+    }
+
+    // ---- trust concept 4: an sds-component binds to a module ----
+    // A design component's read-scope boundary is a module boundary: a `done` sds-component must name at
+    // least one owners[] directory (checked for existence by the OWNER_PATH_MISSING rule above, since
+    // work/sds-component is not exempted from declaresOwnPaths). A `todo` one with no owners at all is
+    // only warned - the module a design targets may not exist yet.
+    if (schema === 'work/sds-component') {
+      const hasOwners = Array.isArray(data.owners) && data.owners.some(o => o && o.path);
+      if (!hasOwners) {
+        const message = `${rec.shown}: work/sds-component ${data.state === 'done' ? 'is done but carries' : 'carries'} no owners naming a module directory - a design component's read-scope boundary is a module boundary, not a prose claim`;
+        if (data.state === 'done') problems.push(message); else warnings.push(message);
+      }
+    }
+
+    // ---- trust concept 8: implementation is held until its ui direction is drawn ----
+    // docs/kinds.md's `implementation/frontend` lane is "held until the feature's ui node is done" -
+    // drawing precedes implementing. A done work/implementation that names a work/ui-screen in its own
+    // `proves`, or whose `repository` is the workspace's frontend repository, is refused
+    // (IMPL_BEFORE_DIRECTION) unless every relevant ui-screen is itself done: the ones it explicitly
+    // proves, or - when it proves none by id - every ui-screen its own feature owns (a frontend
+    // implementation is for some screen even when it did not name one via proves).
+    if (schema === 'work/implementation' && data.state === 'done') {
+      const provesUi = (Array.isArray(data.proves) ? data.proves : []).filter(pid => records.get(pid)?.schema === 'work/ui-screen');
+      const repos = Array.isArray(workspaceDoc?.repositories) ? workspaceDoc.repositories : [];
+      const isFrontendRepo = data.repository ? repos.find(r => r?.name === data.repository)?.role === 'fe' : false;
+      if (provesUi.length || isFrontendRepo) {
+        let relevantUi = provesUi;
+        if (!relevantUi.length) {
+          const feature = path.relative(workRoot, rec.dir).replaceAll('\\', '/').split('/')[1];
+          relevantUi = [...records.entries()]
+            .filter(([, r]) => r.schema === 'work/ui-screen' && path.relative(workRoot, r.dir).replaceAll('\\', '/').split('/')[1] === feature)
+            .map(([uid]) => uid);
+        }
+        const notDone = relevantUi.filter(uid => records.get(uid)?.state !== 'done');
+        if (relevantUi.length && notDone.length) {
+          problems.push(`${rec.shown}: state is done but its ui direction is not - ${notDone.join(', ')} ${notDone.length > 1 ? 'are' : 'is'} not done yet (docs/kinds.md's implementation/frontend lane is held until the feature's ui node is done) [IMPL_BEFORE_DIRECTION]`);
+        }
+      }
     }
 
     // ---- concept 10: a ui record is done only with a generated direction asset and full state coverage ----
@@ -332,17 +438,131 @@ export function checkWorkTree(workRoot, problems) {
     }
   }
 
+  // ---- trust concept 5: blockers form a DAG rooted in gaps or open decisions ----
+  // `blockedBy` is meant to explain *why* work waits, and the layout says the honest root of a wait is
+  // either a `work/gap` (a named absence) or an open `work/policy-decision` - never a loop back on itself.
+  // A cycle is a structural impossibility (nothing can wait on something that is waiting on it) and is
+  // refused (BLOCKER_CYCLE). A chain that dead-ends at an ordinary record - neither a cycle nor a gap/open-
+  // decision root - is not refused: this example tree currently has roughly a dozen such chains across
+  // several features (an implementation waiting on another implementation that itself has not landed,
+  // with no gap ever authored for the absence), and refusing every one of them tree-wide would be a much
+  // larger red surface than this lane is scoped to fix record-by-record. It is warned (BLOCKER_UNROOTED)
+  // instead, naming the actual unrooted target, so the fact is visible without forcing a gap to be
+  // authored for every such chain in one sweep.
+  const blockedByOf = rec => Array.isArray(rec?.data?.blockedBy)
+    ? rec.data.blockedBy.filter(e => e && typeof e === 'object' && typeof e.record === 'string').map(e => e.record)
+    : [];
+
+  /** DFS from `startId` looking for a path back to `startId` itself. Returns the cycle as an array of ids
+   * (startId ... startId) or null. O(V*(V+E)) run once per record is fine at this tree's size (a few
+   * hundred records), and keeps the algorithm obviously correct rather than a from-scratch Tarjan. */
+  const cyclePathFrom = startId => {
+    const visited = new Set();
+    const path = [];
+    const dfs = current => {
+      visited.add(current);
+      path.push(current);
+      for (const next of blockedByOf(records.get(current))) {
+        if (!records.has(next)) continue;
+        if (next === startId) return [...path, next];
+        if (visited.has(next)) continue;
+        const found = dfs(next);
+        if (found) return found;
+      }
+      path.pop();
+      return null;
+    };
+    return dfs(startId);
+  };
+
+  /** Every direct or transitive `blockedBy` root reachable from `startId`, stopping at a gap, an open
+   * decision, a cycle back into the walk, or a dead end with no further blockedBy of its own - the same
+   * shape scripts/example-derive.mjs's own resolveBlockers computes, reimplemented here (not imported: this
+   * module and example-derive.mjs already import from each other in the other direction, and importing
+   * back would create a cycle in the module graph itself, not just the data). Returns a Map(id -> kind),
+   * kind one of gap|decision|record|cyclic|missing. */
+  const rootsFrom = startId => {
+    const roots = new Map();
+    const visitEdge = (targetId, visited) => {
+      if (roots.has(targetId)) return;
+      const target = records.get(targetId);
+      if (!target) { roots.set(targetId, 'missing'); return; } // dangling ref already caught elsewhere
+      if (visited.has(targetId)) { roots.set(targetId, 'cyclic'); return; }
+      const isGap = target.schema === 'work/gap';
+      const isOpenDecision = target.schema === 'work/policy-decision' && target.data?.outcome === 'open';
+      const subEdges = blockedByOf(target);
+      if (isGap || isOpenDecision || !subEdges.length) {
+        roots.set(targetId, isGap ? 'gap' : isOpenDecision ? 'decision' : 'record');
+        return;
+      }
+      const nextVisited = new Set(visited);
+      nextVisited.add(targetId);
+      for (const sub of subEdges) visitEdge(sub, nextVisited);
+    };
+    for (const edge of blockedByOf(records.get(startId))) visitEdge(edge, new Set([startId]));
+    return roots;
+  };
+
+  const cyclicAlready = new Set();
+  for (const [id, rec] of records) {
+    if (!blockedByOf(rec).length || cyclicAlready.has(id)) continue;
+    const cycle = cyclePathFrom(id);
+    if (cycle) {
+      for (const member of cycle) cyclicAlready.add(member);
+      problems.push(`${rec.shown}: blockedBy forms a cycle: ${cycle.join(' -> ')} [BLOCKER_CYCLE]`);
+    }
+  }
+  for (const [id, rec] of records) {
+    if (!blockedByOf(rec).length) continue;
+    for (const [rootId, kind] of rootsFrom(id)) {
+      if (kind === 'record') {
+        warnings.push(`${rec.shown}: blockedBy chain reaches ${rootId}, which is neither a work/gap nor an open work/policy-decision - the chain's real root is unnamed [BLOCKER_UNROOTED]`);
+      }
+    }
+  }
+
   return {records: records.size, refs: refs.length, evidence: evidenceFiles.length};
+}
+
+/**
+ * Concept 6 (shape truth): schemas/work-layout.yaml's `shape.families` is the schema's own claim about
+ * which family folders exist; this script's `FAMILIES` set is the executable form of the same claim. The
+ * two are two copies of one fact and must never independently drift - `schemaPath` is a parameter (not a
+ * hardcoded read of the real file) purely so a fixture can exercise both a mismatched and a matching
+ * shape.families without touching the real schema file.
+ */
+export function checkFamiliesDrift(problems, schemaPath = path.join(root, 'schemas', 'work-layout.yaml')) {
+  let doc;
+  try {
+    doc = parseYaml(fs.readFileSync(schemaPath, 'utf8'));
+  } catch (error) {
+    problems.push(`${schemaPath}: could not be read as YAML to check shape.families (${error.message}) [FAMILIES_DRIFT]`);
+    return;
+  }
+  const declared = Array.isArray(doc?.shape?.families) ? doc.shape.families : null;
+  if (!declared) {
+    problems.push(`${schemaPath}: shape.families is missing; it must list exactly the families this script's own FAMILIES set recognizes [FAMILIES_DRIFT]`);
+    return;
+  }
+  const declaredSet = new Set(declared);
+  const missing = [...FAMILIES].filter(f => !declaredSet.has(f));
+  const extra = declared.filter(f => !FAMILIES.has(f));
+  if (missing.length || extra.length) {
+    problems.push(`${schemaPath}: shape.families disagrees with this script's FAMILIES set - missing [${missing.join(', ')}], extra [${extra.join(', ')}] [FAMILIES_DRIFT]`);
+  }
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const problems = [];
+  const warnings = [];
+  checkFamiliesDrift(problems);
   let records = 0, refs = 0, evidence = 0;
   for (const workRoot of walk(path.join(root, 'examples')).filter(file => file.endsWith(`.starciwork${path.sep}index.yaml`)).map(path.dirname)) {
-    const counts = checkWorkTree(workRoot, problems);
+    const counts = checkWorkTree(workRoot, problems, warnings);
     records += counts.records; refs += counts.refs; evidence += counts.evidence;
   }
   for (const problem of problems) console.log(`REFUSED ${problem}`);
-  console.log(`${records} record(s), ${refs} ref(s), ${evidence} evidence file(s): ${problems.length ? `${problems.length} refused` : 'every id matches its place, every ref resolves, and every new-concept rule is satisfied'}`);
+  for (const warning of warnings) console.log(`WARN ${warning}`);
+  console.log(`${records} record(s), ${refs} ref(s), ${evidence} evidence file(s): ${problems.length ? `${problems.length} refused` : 'every id matches its place, every ref resolves, and every new-concept rule is satisfied'}${warnings.length ? `, ${warnings.length} warned` : ''}`);
   process.exitCode = problems.length ? 1 : 0;
 }
