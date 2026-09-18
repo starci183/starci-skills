@@ -5,10 +5,16 @@ schema: work/evidence
 record: br.task.single-owner
 recordDigest: 566b5549a49b1799b9c7e7701cc7d8d26d062e55accf5c327eb148235477b304
 outcome: pass
+stale: true
+staleReason: Proven against rev 1's single clause, which rev 2 withdrew because it conflated ownership with
+  sole authority to complete. The delete half of that observation still holds today, but nothing has proven
+  the split statements - owner-or-editor may complete, owner alone may delete - since neither
+  contract.share.completion-guard-for-task nor its call from fr.task.complete exists yet.
 assertions:
   - id: ac.task.single-owner.refuses-stranger
     outcome: pass
-    observation: npm run test:unit -- src/task/ownership exited 0
+    observation: "npm run test:unit -- src/task/ownership exited 0, at rev 1's stranger-only definition of
+      refuses-stranger; not re-run against the rev 2 wording, which also covers an editor attempting delete."
 provenance:
   actor: starci-kernel
   tool: starci-kernel

@@ -1,0 +1,16 @@
+schema: work/business-rule
+id: br.share.editor.no-delete
+title: An editor may never delete
+state: todo
+statements:
+  - No role a collaborator can hold ever authorizes deleting the task. Deletion stays with the owner alone,
+    unconditionally, regardless of any role sharing grants.
+authorityRefs:
+  - "owner-intent: Sharing is meant to let somebody help finish the work, never to let somebody else remove
+    it. Widening delete would make an invitation as dangerous to accept as it is useful."
+acceptanceCriteria: [delete-refused-for-editor]
+module: src/share/access.service.ts
+change: {rev: 1, kind: initial, at: 2026-09-18T06:00:00.000Z}
+blockedBy:
+  - The example is moving to a real NestJS backend; src/share/access.service.ts does not exist yet, so the
+    acceptance criterion has not been run.

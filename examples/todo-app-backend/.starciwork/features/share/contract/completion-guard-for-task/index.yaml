@@ -1,0 +1,42 @@
+schema: work/contract
+id: contract.share.completion-guard-for-task
+title: What fr.task.complete may rely on when a task is shared
+state: todo
+between:
+  provider: share
+  consumer: task
+owner: share
+surface:
+  - name: mayComplete
+    shape: (actor, task) -> {allowed, reason}
+    guarantee: true only for the owner, or for a collaborator whose invitation is, at this exact call, an
+      accepted editor. The invitation is re-read live; a revoked or expired one is never cached as accepted.
+    stability: Widening who may complete is additive for task; narrowing it, or changing what accepted
+      means, is breaking.
+  - name: mayDelete
+    shape: (actor, task) -> {allowed, reason}
+    guarantee: true only for the owner. No role sharing grants ever makes this true for anyone else.
+    stability: This guarantee is never loosened; br.share.editor.no-delete makes any such change a
+      breaking change to that rule first.
+guarantees:
+  - A revoked or expired collaborator fails mayComplete on their very next call, per br.share.revoke.on-read.
+  - mayDelete answers exactly as it would if sharing did not exist, per br.share.editor.no-delete.
+consumerObligations:
+  - task calls mayComplete on every attempt to complete a task it did not itself create for the caller, and
+    never substitutes its own owner-only check for it once this contract is proven.
+  - task continues to enforce delete itself, or calls mayDelete; either way the answer for a non-owner is
+    always refusal.
+  - task treats a null or throwing actor as unauthenticated, never as an owner.
+refs: [br.task.single-owner, br.share.role.permissions, br.share.revoke.on-read, br.share.editor.no-delete]
+
+requiresProof:
+  provider:
+    required: true
+    note: share proves mayComplete and mayDelete honour the guarantees above.
+  consumer:
+    required: true
+    note: task proves fr.task.complete calls mayComplete instead of its own single-owner-only check.
+
+blockedBy:
+  - "Neither side exists yet: share's guard (this lane) and task's call site (fr.task.complete, blocked on
+    br.task.single-owner rev 2) are both todo. This contract records the shape they must meet once built."

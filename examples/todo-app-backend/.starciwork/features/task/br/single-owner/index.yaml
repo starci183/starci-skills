@@ -1,11 +1,27 @@
 schema: work/business-rule
 id: br.task.single-owner
 title: A task has exactly one owner
-state: done
+state: todo
 statements:
-  - A task belongs to exactly one person, and only that person may complete or delete it.
+  - A task belongs to exactly one person, who is its owner and never changes.
+  - Only the owner may delete a task; sharing grants no role that authorizes deletion.
+  - The owner may always complete their own task; an accepted editor collaborator may also complete it,
+    per br.share.role.permissions and contract.share.completion-guard-for-task.
 authorityRefs:
   - "owner-intent: One person's list is private to them; sharing is a later product, not a default."
 acceptanceCriteria: [refuses-stranger]
 module: src/task/ownership
-change: {rev: 1, kind: initial, at: 2026-09-18T02:10:00.000Z}
+change:
+  rev: 2
+  kind: breaking
+  at: 2026-09-18T06:20:00.000Z
+  withdraws: ["A task belongs to exactly one person, and only that person may complete or delete it."]
+  reason: The share feature lets an owner grant an editor collaborator the right to complete a task the
+    owner still exclusively owns and can still exclusively delete. The withdrawn clause conflated
+    ownership (unchanged) with sole authority to complete (now shared with an accepted editor), so it no
+    longer describes the product. Delete stays owner-only exactly as before; only the complete half moved,
+    and it moved into a contract this record now names instead of re-describing.
+blockedBy:
+  - The withdrawn clause was what ac.task.single-owner.refuses-stranger and sds.task.ownership-guard were
+    proven against. Both need a live re-check against the split statements above, through
+    contract.share.completion-guard-for-task, before this rule is done again.

@@ -1,0 +1,11 @@
+schema: work/implementation
+id: impl.share.todo-app-frontend.invite-screen
+title: The invitation screen and its create/revoke controls
+state: todo
+repository: todo-app-frontend
+directory: app/share
+proves: [ui.share.invite]
+blockedBy:
+  - Not written yet. The example frontend is moving to Next.js and must consume the Grammar core package
+    the way nivo-fe does; this screen will live at app/share/invite-screen.tsx once that scaffold and its
+    Grammar wiring land, and no prior .mjs draft is being carried forward into it.

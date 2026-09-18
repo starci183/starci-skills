@@ -1,35 +1,42 @@
 schema: work/sds-component
 id: sds.task.ownership-guard
 title: The guard that refuses a stranger
-state: done
-responsibility: Every mutation names the actor and compares it with the row's owner before writing.
+state: todo
+responsibility: Every mutation names the actor. Delete compares the actor with the row's owner exactly as
+  before. Complete now defers to contract.share.completion-guard-for-task, which answers true for the owner
+  or for a live accepted editor collaborator, and refuses everyone else, before either mutation writes.
 interfaces:
   - No write path reaches the repository without passing this guard.
+  - The complete path calls the share module's mayComplete through contract.share.completion-guard-for-task
+    instead of comparing actor to owner directly.
 refs: [br.task.single-owner]
-dependsOn: [integration.login.postgres]
+dependsOn: [integration.login.postgres, contract.share.completion-guard-for-task]
+blockedBy:
+  - br.task.single-owner is todo at rev 2. Its t-owner/t-stranger transitions below described an
+    owner-or-nobody guard for every mutation; that is still true for delete but no longer for complete,
+    and this component has not been rebuilt to call contract.share.completion-guard-for-task. Its previous
+    proof stood for the withdrawn rev 1 statement, not for this one.
 
 stateMachine:
-  states: [unchecked, owned, foreign]
+  states: [unchecked, owned, collaborating, foreign]
   initial: unchecked
-  terminal: [owned, foreign]
+  terminal: [owned, collaborating, foreign]
   transitions:
-    - {id: t-owner, from: unchecked, to: owned, on: actor-matches-owner, effect: The write proceeds.}
-    - {id: t-stranger, from: unchecked, to: foreign, on: actor-differs, effect: The write is refused and nothing is written.}
+    - {id: t-owner, from: unchecked, to: owned, on: actor-matches-owner, effect: The write proceeds; true for delete and complete alike.}
+    - {id: t-collaborator, from: unchecked, to: collaborating, on: actor-is-accepted-editor, effect: A complete write proceeds; a delete write is refused regardless of this transition.}
+    - {id: t-stranger, from: unchecked, to: foreign, on: actor-differs-and-is-not-an-accepted-editor, effect: The write is refused and nothing is written.}
 
 sequence:
   participants: [browser, api, postgres]
   steps:
     - {from: browser, to: api, message: "PATCH /tasks/:id with the actor's session, observable: http"}
     - {from: api, to: postgres, message: "SELECT the row's owner, observable: read"}
-    - {from: api, to: browser, message: "the refusal, when the actor is not the owner, observable: http"}
-    - {from: api, to: postgres, message: "UPDATE the row, only when the actor is the owner, observable: write"}
+    - {from: api, to: postgres, message: "SELECT any accepted invitation for the actor on this task, when the actor is not the owner and the write is a completion, observable: read"}
+    - {from: api, to: browser, message: "the refusal, when neither check passes, observable: http"}
+    - {from: api, to: postgres, message: "UPDATE the row, only when the actor is the owner, or is an accepted editor completing it, observable: write"}
 
 requiresProof:
   implementation:
     required: true
   transitions:
     forEach: stateMachine.transitions
-
-provenBy:
-  implementation: [impl.task.todo-app-backend.ownership]
-  transitions: [t-owner, t-stranger]

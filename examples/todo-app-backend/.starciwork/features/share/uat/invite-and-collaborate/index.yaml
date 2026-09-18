@@ -1,0 +1,18 @@
+schema: work/uat-flow
+id: uat.share.invite-and-collaborate
+title: Invite an editor, have them complete a task, then revoke them
+state: todo
+accounts: accounts.yaml
+steps:
+  - Sign in as the owner and create a task.
+  - Invite a second person as editor and a third as viewer.
+  - Sign in as the editor, accept the invitation, and complete the task.
+  - Sign in as the viewer, accept the invitation, and attempt to complete the task.
+  - See the viewer's attempt refused, and the task still complete.
+  - Sign in as the owner and revoke the editor.
+  - Sign in as the editor and read the task again.
+  - See the editor's access already gone, with no wait and no sweep in between.
+proves: [fr.share.invite, fr.share.accept, fr.share.revoke, br.share.role.permissions, br.share.revoke.on-read]
+blockedBy:
+  - No app exists to walk. The example is moving to a real NestJS backend and a Next.js frontend; this
+    flow has never been run because there is nothing running yet.
