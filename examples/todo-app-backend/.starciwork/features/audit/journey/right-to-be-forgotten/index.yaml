@@ -19,4 +19,14 @@ requiresProof:
 
 blockedBy:
   - {record: gap.audit.live-proof, because: "Every fr in requirements (fr.audit.erasure.request, fr.audit.erasure.complete, fr.audit.export) is now done, closing the former gap.audit.unbuilt-module blocker. What remains is requiresProof.uat: no uat.verify run has walked this journey against the running product yet - the same absence gap.audit.live-proof names."}
-  - {record: decision.audit.operator-role, because: "The journey's fourth step is an operator read - it cannot be walked while no accepted record establishes who an operator is or how their claim is resolved (gap.audit.operator-role rev 2: the session seam resolves only {token, personId, issuedAt, expiresAt}). Audit's fail-closed check stands built for whatever the decision settles; the step itself is unwalkable until then, so the journey names this decision as a root, not the gap that only describes the absence."}
+
+change:
+  rev: 1
+  kind: clarifying
+  at: 2026-09-19T12:00:00.000Z
+  reason: "Dropped the stale blockedBy on decision.audit.operator-role: the decision is now decided
+    (audit-verified-roster) and the operator read is built and unit-proven (fr.audit.log.read), so the
+    journey's fourth step (an operator reading the log) is no longer blocked on an unsettled who-is-an-operator
+    question - a resolved blocker's edge goes away rather than lingering on a done record. The journey
+    stays todo: its remaining blocker, gap.audit.live-proof, is the live uat run it still needs, which is
+    outside this backend lane."

@@ -1,7 +1,7 @@
 schema: work/functional-requirement
 id: fr.audit.log.read
 title: Read the log
-state: todo
+state: done
 actors: [operator]
 trigger: An authorized operator asks to see recent activity, optionally filtered by action or target.
 mainFlow:
@@ -14,7 +14,7 @@ postconditions:
   - No response ever includes a sealed actor blob or a keyId a reader could use to correlate lines
     across an erasure.
 composes:
-  - {rule: br.audit.append-only, module: src/audit/log}
+  - {rule: br.audit.append-only, module: src/modules/bussiness/audit}
 
 requiresProof:
   unit:
@@ -24,5 +24,19 @@ requiresProof:
   uat:
     required: true
 
-blockedBy:
-  - {record: decision.audit.operator-role, because: "The operator authorization this FR's mainFlow step 1 names has no accepted source: the example's session seam resolves only {token, personId, issuedAt, expiresAt} and data.login.person has no role field (gap.audit.operator-role rev 2). audit-operator-read.ts's fail-closed check stands built and unit-proven waiting for that decision; until it is decided, only the caller's-own-lines read is reachable, which is not this record's whole mainFlow, so it stays todo."}
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-19T12:00:00.000Z
+  reason: "decision.audit.operator-role is now decided (audit-verified-roster), so the blockedBy edge on it
+    is satisfied and dropped - the layout refuses a stale blockedBy on a done record. The operator read is
+    therefore live: AuditLogHandler checks the verified claim (audit-operator-read.ts) before any line is
+    touched, an allowlisted operator reads the whole chain filtered by an action the contract emits
+    (contract.audit.emitted-events' five sealed kinds) via readAllLines -> matchOperatorFilter ->
+    toAuditLineSummary, a tombstoned line reads back as tombstoned, and the summary shape carries exactly
+    at/action/target - never a sealed actor blob or keyId (postconditions). Proven at unit level bound to
+    impl.audit.todo-app-backend.operator-read's fresh evidence (audit-log.handler.spec.ts +
+    audit-operator.guard.spec.ts). composes[].module corrected to the real capability directory, matching
+    fr.audit.log.append. requiresProof.e2e and the live uat run stay unfulfilled here as they do for every
+    audit backend record: uat.audit.right-to-be-forgotten (gap.audit.live-proof) has not produced a run and
+    is outside this backend lane."
