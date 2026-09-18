@@ -3,7 +3,7 @@
 # and schemas/work-layout.yaml's work/evidence section for what that distinction means).
 schema: work/evidence
 record: fr.task.create
-recordDigest: 19adec7896719e7b1f8733b7bb3b769690cc27016c52c56ea942f535dfb48507
+recordDigest: 45818e4d4d72c387739eaa8e551509671ea00ad26be3a58e5cb15b8865cd08b6
 outcome: pass
 assertions:
   - id: unit-composed-rules
@@ -16,4 +16,4 @@ provenance:
   actor: example-evidence
   tool: scripts/example-evidence.mjs
   environment: local
-  capturedAt: 2026-09-18T05:29:45.705Z
+  capturedAt: 2026-09-18T06:05:28.055Z
