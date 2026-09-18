@@ -28,14 +28,15 @@ requiresProof:
     required: true
 
 change:
-  rev: 2
+  rev: 3
   kind: editorial
-  at: 2026-09-18T16:00:00.000Z
-  reason: The unit half is satisfied - br.plan.caps.limit is done, and upgrade-plan.handler.spec.ts /
-    confirm-payment.handler.spec.ts unit-prove t-checkout-started and t-gateway-confirmed against a fake
-    SepayClient. The remaining blocker is the uat half alone, narrowed from "not built" to the real
-    absences below.
+  at: 2026-09-18T15:00:00.000Z
+  reason: impl.plan.todo-app-frontend.usage reached done - the usage screen and its upgrade action exist
+    at src/app/plan/usage with rendered proof - so its blockedBy edge here is stale (the gate refuses a
+    blocker whose target is done) and is removed. The remaining blocker is the uat half alone, which is
+    real and unchanged.
+  withdraws:
+    - "No usage screen or upgrade action exists yet at app/plan for an owner to actually reach; this backend-only lane does not build the frontend."
 
 blockedBy:
-  - {record: impl.plan.todo-app-frontend.usage, because: "No usage screen or upgrade action exists yet at app/plan for an owner to actually reach; this backend-only lane does not build the frontend."}
   - {record: gap.plan.live-proof, because: "uat.verify has not run this flow against the running product yet, and integration.plan.sepay (the live gateway leg the mainFlow's checkout step depends on) is still todo."}

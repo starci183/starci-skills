@@ -17,13 +17,16 @@ requiresProof:
     required: true
 
 change:
-  rev: 2
+  rev: 3
   kind: editorial
-  at: 2026-09-18T16:00:00.000Z
-  reason: The backend half exists and is unit-proven - PlanUsageHandler (plan-usage.handler.spec.ts)
-    computes exactly the count/cap pair this mainFlow describes, exposed as the planUsage GraphQL query.
-    Only the usage screen itself (app/plan/usage-screen.tsx) is missing, which is what still blocks the
-    uat this record requires.
+  at: 2026-09-18T15:00:00.000Z
+  reason: impl.plan.todo-app-frontend.usage reached done - the usage screen exists at src/app/plan/usage
+    with rendered proof - so its blockedBy edge here is stale (the gate refuses a blocker whose target
+    is done) and is removed. The remaining blocker is the uat half this record requires, named
+    explicitly as gap.plan.live-proof (the same root fr.plan.upgrade already cites) so the blockedBy
+    chain roots at the real gap.
+  withdraws:
+    - "No usage screen exists yet at app/plan/usage-screen.tsx for an owner to actually open; this backend-only lane does not build the frontend."
 
 blockedBy:
-  - {record: impl.plan.todo-app-frontend.usage, because: "No usage screen exists yet at app/plan/usage-screen.tsx for an owner to actually open; this backend-only lane does not build the frontend."}
+  - {record: gap.plan.live-proof, because: "The screen exists and is render-proven, but this record requires live uat proof and uat.verify has not run the usage surface against the running product yet."}

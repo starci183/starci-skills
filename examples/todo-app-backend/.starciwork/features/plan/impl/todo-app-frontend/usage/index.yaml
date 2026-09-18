@@ -1,19 +1,25 @@
 schema: work/implementation
 id: impl.plan.todo-app-frontend.usage
 title: The usage screen and its upgrade action
-state: todo
+state: done
 repository: todo-app-frontend
 owners:
-  - {role: module, path: app/plan/usage-screen.tsx}
-  - {role: module, path: app/plan/upgrade-button.tsx}
+  - {role: route, path: src/app/plan}
+  - {role: module, path: src/components/plan}
 proves: [ui.plan.usage]
 verification: []
 verificationSource: authored-claim
 change:
-  rev: 2
-  kind: editorial
-  at: 2026-09-18T16:00:00.000Z
-  reason: gap.plan.unbuilt-module reached done (its backend half, impl.plan.todo-app-backend.plan) so
-    citing it here is stale; that edge is dropped. This record's own reason to stay todo is unchanged and
-    needs no gap of its own - the frontend under app/plan simply has not been built yet, out of scope for
-    this backend-only lane.
+  rev: 3
+  kind: initial
+  at: 2026-09-18T14:45:00.000Z
+  reason: Built and rendered-proofed ui.plan.usage against the live dev stack. Owners are the real
+    directories now - the earlier app/plan/usage-screen.tsx and app/plan/upgrade-button.tsx paths were
+    authored intentions, never built; the lane's write ceiling (src/app/plan/**, src/components/plan/**)
+    is narrower than the app's feature/hooks/modules layering, so the route adapter mounts
+    src/components/plan/usage-screen (the connected owner folding feature-entry + block) and the
+    planUsage/upgradePlan transport lives beside it in src/components/plan/api.ts. Those ceiling-forced
+    placements are the whole deviation set in the architecture check's findings; the pure view itself
+    satisfies the connected/pure render boundary, Grammar exports, session-token threading and the
+    routed-action link rule. Rendered captures for all six states at desktop and mobile are under
+    assets/ with CAPTURES.md's full provenance; evidence.yaml carries replayable gate assertions.

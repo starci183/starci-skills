@@ -27,5 +27,5 @@ change:
     on their own uat requirement (no usage screen exists yet)."
 
 blockedBy:
-  - {record: fr.plan.upgrade, because: "fr.plan.upgrade is todo: no usage screen exists yet for the owner to upgrade from, and the live SePay leg is unproven."}
-  - {record: fr.plan.usage.view, because: "fr.plan.usage.view is todo: no usage screen exists yet for the owner to see their count against the cap."}
+  - {record: fr.plan.upgrade, because: "fr.plan.upgrade is todo: the usage screen and upgrade action exist, but its required live uat proof has not run and the live SePay leg is unproven (gap.plan.live-proof)."}
+  - {record: fr.plan.usage.view, because: "fr.plan.usage.view is todo: the usage screen exists and is render-proven, but its required live uat proof has not run (gap.plan.live-proof)."}

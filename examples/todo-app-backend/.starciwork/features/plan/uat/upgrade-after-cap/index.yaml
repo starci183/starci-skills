@@ -21,14 +21,14 @@ cleanup:
   - "revert the plan to free through the gateway sandbox test API"
 blockedBy:
   - {record: fr.plan.upgrade, because: "Nothing to walk yet - fr.plan.upgrade is todo. The backend cap guard is built and wired (contract.plan.create-precondition is done), but no usage screen or upgrade action exists yet at app/plan for a person to actually reach."}
-  - {record: impl.plan.todo-app-frontend.usage, because: "No implementation exists at app/plan/usage-screen.tsx or app/plan/upgrade-button.tsx yet, so there is no real usage screen or upgrade action for an owner to reach even though ui.plan.usage itself reached done."}
   - {record: gap.plan.live-proof, because: "uat.verify has not run this flow against the running product yet; no run folder under uat/upgrade-after-cap/runs/** exists with screens, video and a passing result.md, only this designed flow shape."}
 change:
-  rev: 2
+  rev: 3
   kind: editorial
-  at: 2026-09-18T16:00:00.000Z
-  reason: "contract.plan.create-precondition reached done (the cap guard is built and really wired into
-    task creation, proven by create-precondition.contract.spec.ts) and gap.plan.unbuilt-module's backend
-    half closed, so both are dropped as blockers. The remaining, real reason this flow cannot be walked
-    is the frontend: no usage screen exists yet (impl.plan.todo-app-frontend.usage) and no uat.verify run
-    has ever executed it (gap.plan.live-proof) - this backend-only lane closes neither."
+  at: 2026-09-18T15:00:00.000Z
+  reason: impl.plan.todo-app-frontend.usage reached done - the usage screen and upgrade action exist at
+    src/app/plan/usage with rendered proof - so its blockedBy edge here is stale (the gate refuses a
+    blocker whose target is done) and is removed. The flow still cannot be walked - fr.plan.upgrade is
+    todo and no uat.verify run has executed this surface (gap.plan.live-proof) - both unchanged.
+  withdraws:
+    - "No implementation exists at app/plan/usage-screen.tsx or app/plan/upgrade-button.tsx yet, so there is no real usage screen or upgrade action for an owner to reach even though ui.plan.usage itself reached done."
