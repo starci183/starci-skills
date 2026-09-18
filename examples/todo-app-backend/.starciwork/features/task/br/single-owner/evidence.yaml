@@ -66,20 +66,33 @@ outcome: pass
 stale: true
 staleSince: {record: br.task.single-owner, rev: 2}
 staleReason: >-
-  This run's own command (ac.task.single-owner.refuses-stranger) exits 0 today and codeDigest matches
-  the code on disk, so the recordDigest/codeDigest pair is honestly fresh - not a stand-in for a check
-  that no longer applies. What it proves is narrower than what rev 2 now states. rev 2 withdrew "A task
-  belongs to exactly one person, and only that person may complete or delete it" and split it in two:
-  delete stays owner-only (unchanged, and this is exactly what the delete-task.handler.spec.ts and
-  reopen-task.handler.spec.ts halves of this run prove: a stranger is refused). The complete half moved
-  to "the owner may always complete; an accepted editor collaborator may also complete it, per
-  contract.share.completion-guard-for-task" - a new capability this run's complete-task.handler.spec.ts
-  half never exercises: it only proves a stranger is refused, which is necessary but not sufficient for
-  rev 2's complete statement, and cannot prove the editor-may-complete half at all, because that guard
-  (contract.share.completion-guard-for-task) and its call from fr.task.complete do not exist yet
-  (gap.task.collaborator-completion). The honest position: keep this evidence for the delete/reopen
-  half and the stranger-negative half of complete, which it actually re-proves today, while flagging
-  that it does not speak for rev 2's complete statement in full.
+  Which half is unproven: rev 2's complete statement - "The owner may always complete their own task; an
+  accepted editor collaborator may also complete it, per br.share.role.permissions and
+  contract.share.completion-guard-for-task." - specifically its accepted-editor arm. Why this run cannot
+  speak for it: this file's one assertion is a Jest name filter, `npx jest -t
+  "ac.task.single-owner.refuses-stranger"`, and the only tests in src/modules/bussiness/task carrying that
+  name are complete-task.handler.spec.ts:27, delete-task.handler.spec.ts:20 and
+  reopen-task.handler.spec.ts:20 - three stranger negatives. Re-measured on 2026-09-18 against the code on
+  disk: that command exits 0 with "3 passed, 233 skipped", and codeDigest above still matches
+  src/modules/bussiness/task exactly (e316c2dd01ff768a908cde2c9005f4d2bd80dcf1a81e7c0eeb8737066ee91ea8 over
+  27 files). So this is not a broken or expired run kept on file as a stand-in - it is a sound run whose
+  scope is narrower than the record beside it. The 233 tests it skipped include the whole of
+  completion-authority.spec.ts, which is where the widened-authority behavior actually lives today ("a
+  registered widened authority lets a non-owner complete/reopen once registered", "delete stays owner-only
+  through OwnershipGuard even after a widened CompletionAuthority is registered"); a name filter that never
+  selects them proves nothing about them, and the stranger negative is necessary but not sufficient for
+  rev 2's complete statement. task.service.spec.ts:8 still carries a test named with the sentence rev 2
+  withdrew ("a task belongs to exactly one person, and only that person may complete or delete it"), which
+  this run likewise skipped - the grit ledger's item 32, and a second reason the module's own test names
+  cannot be read as speaking for rev 2. What this evidence does still honestly prove: the delete half, which
+  rev 2 left unchanged, and the refuse-a-stranger part of complete and reopen. Two further notes: the
+  record's bytes moved again at rev 3, which removed the resolved gap.task.collaborator-completion citation
+  and retained all three statements verbatim, so recordDigest above no longer equals the record's current
+  digest either - and per this layout that is not cleared by editing recordDigest to match; only a fresh
+  run, which is a kernel act, retires the staleness. What is missing for done is one run that names the
+  accepted-editor arm of ac.task.single-owner.refuses-stranger (whose `when` already covers an accepted
+  editor attempting a delete) and the collaborator completion path through
+  contract.share.completion-guard-for-task, whose own provider/consumer proof is still todo.
 assertions:
   - id: ac.task.single-owner.refuses-stranger
     command: npx jest -t "ac.task.single-owner.refuses-stranger"
