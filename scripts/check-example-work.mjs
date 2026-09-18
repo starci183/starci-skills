@@ -266,6 +266,70 @@ export function checkWorkTree(workRoot, problems) {
         }
       }
     }
+
+    // ---- concept 12: a done uat-flow needs a settled run with screens, video and a passing result.md ----
+    if (schema === 'work/uat-flow' && data.state === 'done') {
+      const evidenceFile = path.join(rec.dir, 'evidence.yaml');
+      if (!fs.existsSync(evidenceFile)) {
+        problems.push(`${rec.shown}: state is done but there is no sibling evidence.yaml naming the run it settled on`);
+      } else {
+        const ev = parseYaml(fs.readFileSync(evidenceFile, 'utf8'));
+        if (!ev?.run) {
+          problems.push(`${rec.shown}: evidence.yaml has no run pointing at runs/<runId> - a done uat-flow must name the exact run it settled on`);
+        } else {
+          const runDir = path.join(rec.dir, ev.run);
+          const screensDir = path.join(runDir, 'screens');
+          const videosDir = path.join(runDir, 'videos');
+          const resultFile = path.join(runDir, 'result.md');
+          const hasFiles = dir => fs.existsSync(dir) && fs.readdirSync(dir).length > 0;
+          if (!hasFiles(screensDir)) problems.push(`${rec.shown}: run ${ev.run} has no screens/ with at least one screenshot`);
+          if (!hasFiles(videosDir)) problems.push(`${rec.shown}: run ${ev.run} has no videos/ with at least one playable recording`);
+          if (!fs.existsSync(resultFile)) {
+            problems.push(`${rec.shown}: run ${ev.run} has no result.md`);
+          } else if (!/outcome:\s*pass/i.test(fs.readFileSync(resultFile, 'utf8'))) {
+            problems.push(`${rec.shown}: run ${ev.run}'s result.md does not record outcome: pass`);
+          }
+        }
+      }
+    }
+
+    // ---- concept 13: typed _resources use the plain work/resource schema, never an @N suffix ----
+    if (rec.file.replaceAll('\\', '/').includes('/_resources/') && /\/resource\.yaml$/.test(rec.file.replaceAll('\\', '/'))) {
+      if (schema !== 'work/resource') {
+        problems.push(`${rec.shown}: _resources custody uses schema work/resource, not "${schema}" - the op text says work/resource@1, but this layout forbids the @N suffix here`);
+      }
+    }
+  }
+
+  // ---- concept 13 (continued): uat-flow environment/fixtures/accounts refs resolve to a real _resources entry ----
+  const resourceKind = (id) => records.get(id)?.data?.kind;
+  for (const [id, rec] of records) {
+    if (rec.schema !== 'work/uat-flow') continue;
+    const data = rec.data;
+    if (data.environment) {
+      const target = records.get(data.environment);
+      if (!target || target.schema !== 'work/resource') problems.push(`${rec.shown}: environment ${data.environment} does not resolve to a work/resource`);
+      else if (resourceKind(data.environment) !== 'environment') problems.push(`${rec.shown}: environment ${data.environment} resolves to a work/resource of kind "${resourceKind(data.environment)}", not environment`);
+    }
+    if (Array.isArray(data.fixtures)) {
+      for (const fid of data.fixtures) {
+        const target = records.get(fid);
+        if (!target || target.schema !== 'work/resource') problems.push(`${rec.shown}: fixture ${fid} does not resolve to a work/resource`);
+        else if (resourceKind(fid) !== 'fixture') problems.push(`${rec.shown}: fixture ${fid} resolves to a work/resource of kind "${resourceKind(fid)}", not fixture`);
+      }
+    }
+    if (typeof data.accounts === 'string') {
+      const accountsFile = path.join(rec.dir, data.accounts);
+      if (fs.existsSync(accountsFile)) {
+        const accountsDoc = parseYaml(fs.readFileSync(accountsFile, 'utf8'));
+        for (const account of accountsDoc?.accounts ?? []) {
+          if (!account?.identity) continue;
+          const target = records.get(account.identity);
+          if (!target || target.schema !== 'work/resource') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} does not resolve to a work/resource`);
+          else if (resourceKind(account.identity) !== 'identity') problems.push(`${rec.shown}: accounts.yaml identity ${account.identity} resolves to a work/resource of kind "${resourceKind(account.identity)}", not identity`);
+        }
+      }
+    }
   }
 
   return {records: records.size, refs: refs.length, evidence: evidenceFiles.length};

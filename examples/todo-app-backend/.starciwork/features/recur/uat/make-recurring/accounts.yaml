@@ -1,3 +1,4 @@
 schema: work/disposable-accounts
+disposable: true
 accounts:
-  - {role: owner, username: uat-recur-owner, password: uat-recur-owner-disposable}
+  - {role: owner, identity: identity.todo-app.demo}

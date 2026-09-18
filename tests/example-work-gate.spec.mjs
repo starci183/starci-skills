@@ -288,3 +288,64 @@ test('concept 11: a generation-carrying asset is refused outside work/ui-screen,
   assert.ok(onOtherFamily.some(p => p.includes('a generated direction asset is ui-owned only')), onOtherFamily.join('\n'));
 });
 
+test('concept 12: a done uat-flow needs a sibling evidence.yaml naming a run with screens, videos and a passing result.md', () => {
+  const noEvidence = refusalsFor({
+    'features/f/uat/x/index.yaml': 'schema: work/uat-flow\nid: uat.f.x\ntitle: t\nstate: done\n',
+  });
+  assert.ok(noEvidence.some(p => p.includes('no sibling evidence.yaml naming the run')), noEvidence.join('\n'));
+
+  const workRoot = tree({
+    'features/f/uat/x/index.yaml': 'schema: work/uat-flow\nid: uat.f.x\ntitle: t\nstate: done\n',
+    'features/f/uat/x/evidence.yaml': 'schema: work/evidence\nrecord: uat.f.x\noutcome: pass\nrun: runs/run-1\n',
+  });
+  const missingRunFolder = [];
+  checkWorkTree(workRoot, missingRunFolder);
+  assert.ok(missingRunFolder.some(p => p.includes('has no screens/')), missingRunFolder.join('\n'));
+  assert.ok(missingRunFolder.some(p => p.includes('has no videos/')), missingRunFolder.join('\n'));
+  assert.ok(missingRunFolder.some(p => p.includes('has no result.md')), missingRunFolder.join('\n'));
+
+  write(workRoot, 'features/f/uat/x/runs/run-1/screens/step-1.png', 'x');
+  write(workRoot, 'features/f/uat/x/runs/run-1/videos/walk.webm', 'x');
+  write(workRoot, 'features/f/uat/x/runs/run-1/result.md', 'outcome: fail\n');
+  const failingOutcome = [];
+  checkWorkTree(workRoot, failingOutcome);
+  assert.ok(failingOutcome.some(p => p.includes('does not record outcome: pass')), failingOutcome.join('\n'));
+
+  write(workRoot, 'features/f/uat/x/runs/run-1/result.md', 'outcome: pass\n');
+  const passing = [];
+  checkWorkTree(workRoot, passing);
+  assert.equal(passing.length, 0, passing.join('\n'));
+});
+
+test('concept 13: _resources custody is the plain work/resource schema (no @N), and a uat-flow\'s environment/fixtures/accounts refs resolve to the right kind', () => {
+  const wrongSchema = refusalsFor({
+    '_resources/environments/dev/resource.yaml': 'schema: work/resource@1\nid: environment.f.dev\nkind: environment\nowner: o\nrevision: r\ndetails: {}\n',
+  });
+  assert.ok(wrongSchema.some(p => p.includes('this layout forbids the @N suffix here')), wrongSchema.join('\n'));
+
+  const badEnvRef = refusalsFor({
+    'features/f/uat/x/index.yaml': 'schema: work/uat-flow\nid: uat.f.x\ntitle: t\nstate: todo\nenvironment: environment.f.ghost\n',
+  });
+  assert.ok(badEnvRef.some(p => p.includes('environment environment.f.ghost does not resolve')), badEnvRef.join('\n'));
+
+  const wrongKind = refusalsFor({
+    'features/f/uat/x/index.yaml': 'schema: work/uat-flow\nid: uat.f.x\ntitle: t\nstate: todo\nenvironment: fixture.f.seed\n',
+    '_resources/fixtures/seed/resource.yaml': 'schema: work/resource\nid: fixture.f.seed\nkind: fixture\nowner: o\nrevision: r\ndetails: {}\n',
+  });
+  assert.ok(wrongKind.some(p => p.includes('resolves to a work/resource of kind "fixture", not environment')), wrongKind.join('\n'));
+
+  const badIdentity = refusalsFor({
+    'features/f/uat/x/index.yaml': 'schema: work/uat-flow\nid: uat.f.x\ntitle: t\nstate: todo\naccounts: accounts.yaml\n',
+    'features/f/uat/x/accounts.yaml': 'schema: work/disposable-accounts\naccounts: [{role: person, identity: identity.f.ghost}]\n',
+  });
+  assert.ok(badIdentity.some(p => p.includes('accounts.yaml identity identity.f.ghost does not resolve')), badIdentity.join('\n'));
+
+  const good = refusalsFor({
+    'features/f/uat/x/index.yaml': 'schema: work/uat-flow\nid: uat.f.x\ntitle: t\nstate: todo\nenvironment: environment.f.dev\nfixtures: [fixture.f.seed]\naccounts: accounts.yaml\n',
+    'features/f/uat/x/accounts.yaml': 'schema: work/disposable-accounts\naccounts: [{role: person, identity: identity.f.demo}]\n',
+    '_resources/environments/dev/resource.yaml': 'schema: work/resource\nid: environment.f.dev\nkind: environment\nowner: o\nrevision: r\ndetails: {}\n',
+    '_resources/fixtures/seed/resource.yaml': 'schema: work/resource\nid: fixture.f.seed\nkind: fixture\nowner: o\nrevision: r\ndetails: {}\n',
+    '_resources/identities/demo/resource.yaml': 'schema: work/resource\nid: identity.f.demo\nkind: identity\nowner: o\nrevision: r\ndetails: {}\n',
+  });
+  assert.equal(good.length, 0, good.join('\n'));
+});

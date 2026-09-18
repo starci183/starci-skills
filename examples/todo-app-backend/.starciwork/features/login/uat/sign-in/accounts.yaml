@@ -1,4 +1,4 @@
 schema: work/disposable-accounts
+disposable: true
 accounts:
-  - {role: person, username: uat-person, password: uat-person-disposable}
-
+  - {role: person, identity: identity.todo-app.demo}

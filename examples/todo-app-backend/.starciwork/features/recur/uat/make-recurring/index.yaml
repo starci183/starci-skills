@@ -2,14 +2,24 @@ schema: work/uat-flow
 id: uat.recur.make-recurring
 title: Make a task recurring, see its upcoming occurrences, then end it
 state: todo
+entry: /tasks/:taskId/schedule
+actor: owner
 accounts: accounts.yaml
+environment: environment.todo-app.dev
+fixtures: [fixture.todo-app.seed]
 steps:
-  - Sign in as the owner.
-  - Turn a task into a rule that fires every weekday at 09:00 in the owner's own time zone.
-  - See the upcoming occurrences preview, and confirm none of them is a weekend date.
-  - Wait for (or trigger) a generation run, and see the day's occurrence appear with status materialised.
-  - Complete that occurrence, and see its status become completed.
-  - End the rule, and confirm the completed occurrence's status is unchanged, and no new occurrence
-    appears after the day the rule ended.
-proves: [fr.recur.make-recurring, fr.recur.see-upcoming, fr.recur.end-rule, br.recur.generation.once,
-  br.recur.ending.preserves-history]
+    - {order: 1, actor: owner, action: "Sign in as the owner.", expected: "the task list loads", checks: []}
+    - {order: 2, actor: owner, action: "Turn a task into a rule that fires every weekday at 09:00 in the owner's own time zone.", expected: "the rule is saved as active", checks: [{id: completion, expected: yes}]}
+    - {order: 3, actor: owner, action: "See the upcoming occurrences preview.", expected: "none of the previewed dates is a weekend date", checks: []}
+    - {order: 4, actor: owner, action: "Wait for (or trigger) a generation run.", expected: "the day's occurrence appears with status materialised", checks: [{id: loading, expected: yes}]}
+    - {order: 5, actor: owner, action: "Complete that occurrence.", expected: "its status becomes completed", checks: [{id: completion, expected: yes}]}
+    - {order: 6, actor: owner, action: "End the rule.", expected: "the completed occurrence status is unchanged, and no new occurrence appears after the end day", checks: []}
+effects:
+  - "insert one task row"
+  - "save one recurrence rule"
+  - "run one generation pass"
+cleanup:
+  - "delete the run-owned task, rule and occurrence rows by recorded id"
+proves: [fr.recur.make-recurring, fr.recur.see-upcoming, fr.recur.end-rule, br.recur.generation.once, br.recur.ending.preserves-history]
+blockedBy:
+  - {record: gap.recur.live-proof, because: "uat.verify has not run this flow against the running product yet; no run folder under uat/make-recurring/runs/** exists with screens, video and a passing result.md, only this designed flow shape."}

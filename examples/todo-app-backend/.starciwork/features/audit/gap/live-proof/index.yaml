@@ -1,0 +1,10 @@
+schema: work/gap
+id: gap.audit.live-proof
+title: No uat.verify run has produced a live run for audit.right-to-be-forgotten
+state: todo
+statement: uat.audit.right-to-be-forgotten names its entry, actor, ordered steps, fixtures, effects and cleanup
+  in the op's own shape, but no uat.verify run has executed it against the running product yet - there is
+  no uat/right-to-be-forgotten/runs/<runId>/ folder with real screenshots, a playable video and a passing result.md,
+  only the designed flow this record and its accounts.yaml/fixtures ref describe.
+closedBy: uat.audit.right-to-be-forgotten
+change: {rev: 1, kind: initial, at: 2026-09-18T08:00:00.000Z}

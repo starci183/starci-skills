@@ -2,14 +2,25 @@ schema: work/uat-flow
 id: uat.plan.upgrade-after-cap
 title: Hit the cap, get refused, upgrade, create past it
 state: todo
+entry: /plan/usage
+actor: owner-at-cap
 accounts: accounts.yaml
+environment: environment.todo-app.dev
+fixtures: [fixture.todo-app.seed]
 steps:
-  - Sign in as an owner already at 20 active tasks.
-  - Attempt to create a 21st task and see the refusal naming the cap and the upgrade path.
-  - Start checkout for the paid plan and complete it at the gateway sandbox.
-  - Return to the app once the gateway acknowledges and see the usage screen show no cap.
-  - Create the 21st task and see it appear.
+    - {order: 1, actor: owner-at-cap, action: "Sign in as an owner already at 20 active tasks.", expected: "the usage screen shows the at-cap state", checks: []}
+    - {order: 2, actor: owner-at-cap, action: "Attempt to create a 21st task.", expected: "the create is refused, naming the cap and the upgrade path", checks: [{id: errorFeedback, expected: yes}, {id: validation, expected: yes}]}
+    - {order: 3, actor: owner-at-cap, action: "Start checkout for the paid plan and complete it at the gateway sandbox.", expected: "the gateway acknowledges the payment", checks: [{id: loading, expected: yes}]}
+    - {order: 4, actor: owner-at-cap, action: "Return to the app once the gateway acknowledges.", expected: "the usage screen shows no cap", checks: [{id: completion, expected: yes}]}
+    - {order: 5, actor: owner-at-cap, action: "Create the 21st task.", expected: "it appears in the list", checks: [{id: completion, expected: yes}]}
+effects:
+  - "seed 20 active task rows for the owner"
+  - "authorized paid AI/gateway sandbox checkout call"
+cleanup:
+  - "delete the 21 run-owned task rows by recorded id"
+  - "revert the plan to free through the gateway sandbox test API"
 blockedBy:
   - {record: fr.plan.upgrade, because: "Nothing to walk yet - fr.plan.upgrade, ui.plan.usage and the cap guard itself are all todo, and the cap guard is not wired into task creation at all (contract.plan.create-precondition)."}
   - {record: ui.plan.usage, because: "Nothing to walk yet - fr.plan.upgrade, ui.plan.usage and the cap guard itself are all todo, and the cap guard is not wired into task creation at all (contract.plan.create-precondition)."}
   - {record: contract.plan.create-precondition, because: "Nothing to walk yet - fr.plan.upgrade, ui.plan.usage and the cap guard itself are all todo, and the cap guard is not wired into task creation at all (contract.plan.create-precondition)."}
+  - {record: gap.plan.live-proof, because: "uat.verify has not run this flow against the running product yet; no run folder under uat/upgrade-after-cap/runs/** exists with screens, video and a passing result.md, only this designed flow shape."}
