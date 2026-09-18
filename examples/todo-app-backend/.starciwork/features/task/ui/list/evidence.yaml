@@ -1,6 +1,10 @@
 schema: work/evidence
 record: ui.task.list
 recordDigest: d7a3aebd655a435d5d948980970724d631340ae45d146d711063b01e2c781007
+# impl.task.todo-app-frontend.task-list landed real code against this direction after the evidence
+# was captured, so its codeDigest no longer matches the implementation on disk; the direction proof
+# itself (assets + verify-direction.mjs) is unchanged and still green.
+stale: true
 codeDigest:
   algorithm: sha256
   files:

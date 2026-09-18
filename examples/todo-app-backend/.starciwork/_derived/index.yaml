@@ -1629,8 +1629,8 @@ records:
   impl.task.todo-app-frontend.task-list:
     schema: work/implementation
     feature: task
-    state: todo
-    effectiveState: todo
+    state: done
+    effectiveState: done
   integration.login.keycloak:
     schema: work/integration
     feature: login
@@ -2204,12 +2204,13 @@ records:
     schema: work/ui-screen
     feature: task
     state: done
-    effectiveState: done
+    effectiveState: suspended
+    suspensionReason: evidence-marked-stale
 tally:
   overall:
     done: 132
-    todo: 32
-    stale: 2
+    todo: 31
+    stale: 3
     blocked: 36
     total: 202
   byFeature:
@@ -2251,8 +2252,8 @@ tally:
       total: 26
     task:
       done: 23
-      todo: 6
-      stale: 1
+      todo: 5
+      stale: 2
       blocked: 4
       total: 34
   gaps:
@@ -2521,9 +2522,6 @@ frontier:
   - id: gap.task.share-edge-hold
     feature: task
     title: br.task.single-owner's done flag is held by an out-of-lane blocker edge
-  - id: impl.task.todo-app-frontend.task-list
-    feature: task
-    title: The list screen and the create form
   - id: nfr.task.list.latency
     feature: task
     title: A list read feels immediate
