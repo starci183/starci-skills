@@ -26,4 +26,4 @@ conflictsWith:
     this requirement has no real trigger to attach to."}
 
 blockedBy:
-  - {record: gap.notify.task-completion-event, because: "task exposes no completion event today; this record stays todo until event.task.completed is actually raised, which subscribes now names as the trigger instead of overloading contract.notify.task-completion-feed for it."}
+  - {record: gap.notify.unbuilt-module, because: "event.task.completed is now actually raised by complete-task's use case, which subscribes names as the trigger instead of overloading contract.notify.task-completion-feed for it; this record stays todo because no notify module exists yet under the NestJS/Next.js layout to subscribe to it."}

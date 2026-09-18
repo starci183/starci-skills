@@ -4,12 +4,10 @@ title: Signing in on a new device ends the old session
 state: todo
 statements:
   - A person holds at most one live session; a new sign-in ends the previous one.
-openQuestions:
-  - Whether this is right for a person with a phone and a laptop is undecided; decision.login.session.devices owns it.
 acceptanceCriteria:
   - second-sign-in-ends-the-first
 module: src/modules/bussiness/session
 blockedBy:
-  - {record: decision.login.session.devices, because: "which devices may hold a session is undecided"}
+  - {record: gap.login.device-field, because: "decision.login.session.devices is now decided (single-device), settling this statement, but sds.login.session-store's stateMachine and data.login.person's fields carry no device identity and session.mjs's accept()/actorOf() take no device argument - there is no device field to evict a prior session against yet."}
 change: {rev: 1, kind: initial, at: 2026-09-18T01:04:00.000Z}
 

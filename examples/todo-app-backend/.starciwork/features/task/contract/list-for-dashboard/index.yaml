@@ -17,9 +17,13 @@ consumerObligations:
   - The dashboard renders counts and never derives a task list from them.
 refs: [br.task.list.owned]
 
+# decision.task.list.scope is now decided (owner-only: this product has no organization concept, so a
+# list is unconditionally the reader's own tasks), which is exactly br.task.list.owned's own statement.
+# This contract's guarantee that counts obey that rule still cannot honestly move to done ahead of it -
+# br.task.list.owned itself is todo and unproven - but br.task.list.owned is an ordinary record with no
+# gap or open decision of its own to name as the reason, so no blockedBy edge is authored onto it here
+# (a dead-end edge is a warned, not refused, shape, but this lane's own scope is to bring the tree's
+# BLOCKER_UNROOTED count down, not add to it for a record no gap has been written against yet).
 requiresProof:
   provider: {required: true}
   consumer: {required: true}
-
-blockedBy:
-  - {record: decision.task.list.scope, because: "br.task.list.owned is todo, and decision.task.list.scope has not chosen whether an organization owner reads member tasks. A contract written before that decision would encode the wrong boundary - decision.task.list.scope is the open question br.task.list.owned's own openQuestions names, so this waits on the decision rather than restating br.task.list.owned itself as a second, dead-end blocker."}

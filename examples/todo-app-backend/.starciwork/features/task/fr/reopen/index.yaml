@@ -1,0 +1,24 @@
+schema: work/functional-requirement
+id: fr.task.reopen
+title: Reopen a completed task
+state: todo
+actors: [owner]
+trigger: The owner reopens a task they previously completed.
+mainFlow:
+  - The owner names a task they own that is currently complete.
+  - The task reads incomplete again and its completion timestamp is cleared.
+exceptionFlows:
+  - A task the actor does not own is refused.
+composes:
+  - {rule: br.task.complete.once, module: src/features/reopen-task}
+
+requiresProof:
+  unit:
+    forEach: composes
+  e2e:
+    command: npm run test:e2e -- tasks/reopen
+  uat:
+    required: true
+
+blockedBy:
+  - {record: br.task.complete.once, because: "br.task.complete.once is todo at rev 2; its reversible statement's evidence was withdrawn along with the rule it replaced and must be regenerated - a kernel/uat lane's job, not something this record's own authoring can settle."}

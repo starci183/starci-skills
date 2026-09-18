@@ -1,11 +1,18 @@
 schema: work/gap
 id: gap.audit.emitted-events
 title: login and task expose no emitted-event contract for audit to subscribe to
-state: todo
-statement: A task being created, completed or deleted, and a person signing in or out, are the events
-  fr.audit.log.append needs to seal a line for. login and task expose request/response contracts
-  (contract.login.identity-for-task, contract.task.list-for-dashboard) but, at this commit, neither
-  feature's implementation actually raises any of event.task.created, event.task.completed,
-  event.task.deleted, event.login.signed-in or event.login.signed-out - the event records specify the
-  shape each will have once emitted, not a signal that fires today.
+state: done
+statement: login and task now expose an emitted-event contract for audit to subscribe to -
+  impl.task.todo-app-backend.platform-events's typed in-process PlatformEventBus is done, and
+  create-task, complete-task, delete-task, sign-in and sign-out each publish event.task.created,
+  event.task.completed, event.task.deleted, event.login.signed-in and event.login.signed-out on it after
+  their respective writes succeed. fr.audit.log.append itself remains unbuilt - gap.audit.unbuilt-module
+  names that separately - so no subscriber exists yet to actually seal a line from these signals, but the
+  signals themselves fire today.
+closedBy: [impl.task.todo-app-backend.platform-events]
+verificationSource: authored-claim
+because: closedBy names an already-done implementation record, so no additional test run proves this
+  specific claim - that login and task raise these five events is independently verifiable by reading
+  create-task's, complete-task's, delete-task's, sign-in's and sign-out's use cases, which
+  impl.task.todo-app-backend.platform-events owns and proves.
 change: {rev: 1, kind: initial, at: 2026-09-18T07:05:00.000Z}

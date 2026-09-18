@@ -22,9 +22,10 @@ refs: [br.notify.delivery.once, fr.notify.on-new-device]
 conflictsWith:
   - {record: br.login.session.single-device, rev: 1, because: "the login session store has no device
     field: sds.login.session-store's stateMachine and data.login.person's fields carry no device
-    identity, session.mjs's accept()/actorOf() take no device argument, and
-    decision.login.session.devices - which is exactly the open question of how many devices a session
-    model allows - is still open. There is no deviceId this surface could honestly be given."}
+    identity, and session.mjs's accept()/actorOf() take no device argument.
+    decision.login.session.devices is now decided (single-device), so the question of how many devices a
+    session model allows is settled, but the field itself still does not exist. There is no deviceId this
+    surface could honestly be given."}
 
 requiresProof:
   provider:
@@ -36,4 +37,4 @@ requiresProof:
     note: notify proves it only ever reads deviceId from this surface.
 
 blockedBy:
-  - {record: decision.login.session.devices, because: "Owned entirely by the notify side of an interface that login has not built, and blocked further upstream by decision.login.session.devices being open. This record cannot move to done without a change in features/login, which this lane does not own."}
+  - {record: gap.login.device-field, because: "Owned entirely by the notify side of an interface that login has not built. decision.login.session.devices is now decided (single-device), but that settles the question, not the field: sds.login.session-store and data.login.person still carry no device identity, so there is no deviceId this surface could honestly be given yet. This record cannot move to done without a change in features/login, which this lane does not own."}

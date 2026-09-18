@@ -10,5 +10,5 @@ payload:
 delivery: {guarantee: at-least-once, ordering: per-key}
 refs: [fr.login.sign-in]
 blockedBy:
-  - {record: gap.audit.emitted-events, because: "fr.login.sign-in's implementation raises no event today; audit's fr.audit.log.append has nothing to subscribe to yet."}
+  - {record: gap.audit.unbuilt-module, because: "fr.login.sign-in's implementation now raises this event on the platform event bus after a successful sign-in; audit's fr.audit.log.append still has nothing to subscribe to it with, because no audit module exists yet under the NestJS layout."}
 change: {rev: 1, kind: initial, at: 2026-09-18T07:00:00.000Z}

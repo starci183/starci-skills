@@ -37,4 +37,4 @@ requiresProof:
     note: notify proves it only ever hashes a sourceEventId the provider actually supplied.
 
 blockedBy:
-  - {record: gap.notify.task-completion-event, because: "Owned entirely by the notify side of an interface that task has not built. This record cannot move to done without a change in features/task, which this lane does not own."}
+  - {record: gap.notify.unbuilt-module, because: "Owned entirely by the notify side of an interface that task has now built: complete-task's use case publishes event.task.completed on the platform event bus. What remains is that no notify module exists yet under the NestJS/Next.js layout to host onTaskComplete and call it."}

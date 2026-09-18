@@ -9,4 +9,4 @@ owners:
 proves: [br.audit.erasure.right, br.audit.erasure.logged, sds.audit.erasure-request]
 
 blockedBy:
-  - {record: decision.audit.erasure-method, because: "No Nest module exists yet, and decision.audit.erasure-method is still open. Authoring this against an undecided mechanism would make the implementation the thing that quietly settled the decision, which is backwards: the decision record is supposed to settle it in the open, not the code."}
+  - {record: gap.audit.unbuilt-module, because: "decision.audit.erasure-method is now decided (crypto-shred), so this module has a settled mechanism to build against; what remains is that no Nest module exists yet under the layout the example is moving to."}
