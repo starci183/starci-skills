@@ -12,6 +12,7 @@
     {"id": "feature-todo-http-health", "root": "src/features/todo/http/health", "entry": "src/features/todo/http/health/health.module.ts"},
     {"id": "module-bussiness-session", "root": "src/modules/bussiness/session", "entry": "src/modules/bussiness/session/index.ts"},
     {"id": "module-bussiness-task", "root": "src/modules/bussiness/task", "entry": "src/modules/bussiness/task/index.ts"},
+    {"id": "module-bussiness-share", "root": "src/modules/bussiness/share", "entry": "src/modules/bussiness/share/index.ts"},
     {"id": "module-platform-config", "root": "src/modules/platform/config", "entry": "src/modules/platform/config/index.ts"},
     {"id": "module-shared-exceptions", "root": "src/modules/shared/exceptions", "entry": "src/modules/shared/exceptions/index.ts"},
     {"id": "module-platform-events", "root": "src/modules/platform/events", "entry": "src/modules/platform/events/index.ts"},
