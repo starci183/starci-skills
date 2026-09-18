@@ -7,7 +7,8 @@
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "start": "node dist/main.js",
     "start:dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/main.ts",
-    "test": "jest"
+    "test": "jest",
+    "test:e2e": "node test/e2e/run.js"
   },
   "dependencies": {
     "@nestjs/apollo": "^12.2.2",
