@@ -1,0 +1,33 @@
+PASS UI schema and brand rev 3
+PASS top-level/ui asset bindings agree
+PASS asset hash assets/preferences-refused.prompt.txt
+PASS asset hash assets/preferences-refused.png
+PASS PNG header and dimensions assets/preferences-refused.png
+PASS real tool, no invented model assets/preferences-refused.png
+PASS retained exact prompt assets/preferences-refused.png
+PASS one selected representative direction
+PASS coverage loading desktop-1280
+PASS coverage loading mobile-390
+PASS coverage subscribed desktop-1280
+PASS coverage subscribed mobile-390
+PASS coverage unsubscribed desktop-1280
+PASS coverage unsubscribed mobile-390
+PASS coverage saving desktop-1280
+PASS coverage saving mobile-390
+PASS coverage refused desktop-1280
+PASS coverage refused mobile-390
+PASS current brand input bytes
+PASS accepted input fr.notify.unsubscribe
+PASS accepted input sds.notify.delivery-lifecycle
+PASS accepted input knowledge/ui/proof/brand.yaml
+PASS accepted input knowledge/ui/proof/contrast.yaml
+PASS accepted input knowledge/ui/composition/layout.yaml
+PASS accepted input knowledge/ui/composition/collection.yaml
+PASS accepted input knowledge/ui/composition/cta.yaml
+PASS accepted input knowledge/ui/composition/responsive.yaml
+PASS brand/Grammar/knowledge prompt provenance order assets/preferences-refused.prompt.txt
+PASS retained visual review
+PASS product shell, feature navigation, account presence
+INFO structural/hash checks complement manual visual review; no browser/render/API proof.
+
+exit: 0

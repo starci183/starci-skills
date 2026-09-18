@@ -1,7 +1,18 @@
-# Visual review
+# Visual review: ui.share.invite
 
-The direction shows the refused invitation state at desktop-1280: an email invite form and refusal sentence are presented beside an unchanged collaborator collection with accepted and pending status badges and revoke actions.
+Reviewed by Codex from the actual generated image on 2026-09-18T12:30:38.429Z.
+Outcome: accepted as a proposed direction with the implementation gaps named in index.yaml.
 
-Real `@starci/grammar/common` anatomy depicted: `SurfaceCard`, `Input`, `Text`, `Button`, `SurfaceListCard`, and `Badge`, with application-owned collaborator rows. The representative refused direction derives empty by removing the collection, inviting by applying pending state to the invite `Button`, pending-list and accepted by changing the row set and `Badge` tone, and the non-refused variants by removing the assertive-live `Text`.
+- Task breadcrumb and Back to task place the screen. Invalid retained email, Viewer/Editor choices, refusal, Send invitation and two unchanged collaborators are visible.
+- Removed the initial outer card around the collaborator collection and corrected refusal ink. Revoke labels remain dark within danger outlines. Pending expiry copy is 14 days.
+- No mascot. Invalid-email refusal is grounded in fr.share.invite; this image does not invent a duplicate-invitation backend rule.
 
-This is a visual direction generated from the retained prompt. It is not a render or screenshot of the running product, and it does not prove exact Grammar rendering, component props, semantic DOM, accessibility behavior, interaction behavior, invitation delivery, or API behavior.
+Final PNG: assets/invite-refused.png (1536 x 1024), sha256 3e3040354d9ae1e9d874f7a04f0731166def52e465bfb739c7b630daf1f321b7.
+Exact final prompt: assets/invite-refused.prompt.txt, sha256 6033834c00bceffb22af88a9f2dbae3a59a079725a19725c8ec9d8624c668638.
+
+Coverage: 10 explicit state/screen/viewport entries; desktop-1280 is a design target, not a browser-captured viewport. Mobile-390 entries derive from the same direction and retain all controls.
+The initial image and its exact prompt are retained as the final edit reference; they are not the selected direction.
+
+Truth boundary: image_gen.imagegen generated every pixel. No image model field was exposed. The PNG is not a running-product screenshot and proves neither exact Grammar rendering, CSS colour values, focus/keyboard behavior nor API outcomes. Implementation must use brand rev 3 tokens rather than sampling the raster, reuse the actual turtle master where allowed, address declared Grammar/theme/link gaps, and provide real implementation captures and independent browser UAT.
+
+Checks: BRAND-1/2/3, CONTRAST-1, LAYOUT-1/2/3, COLLECTION-1/2, CTA-1/2/3/4 and RESPONSIVE-1/3 were applied as direction criteria. Contrast numbers belong to the source tokens; no pixel-level accessibility pass is claimed.

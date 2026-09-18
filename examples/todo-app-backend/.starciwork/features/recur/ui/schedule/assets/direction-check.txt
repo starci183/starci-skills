@@ -1,0 +1,35 @@
+PASS UI schema and brand rev 3
+PASS top-level/ui asset bindings agree
+PASS asset hash assets/schedule-refused.prompt.txt
+PASS asset hash assets/schedule-refused.png
+PASS PNG header and dimensions assets/schedule-refused.png
+PASS real tool, no invented model assets/schedule-refused.png
+PASS retained exact prompt assets/schedule-refused.png
+PASS one selected representative direction
+PASS coverage no-rule desktop-1280
+PASS coverage no-rule mobile-390
+PASS coverage active desktop-1280
+PASS coverage active mobile-390
+PASS coverage ended desktop-1280
+PASS coverage ended mobile-390
+PASS coverage refused desktop-1280
+PASS coverage refused mobile-390
+PASS current brand input bytes
+PASS accepted input fr.recur.make-recurring
+PASS accepted input fr.recur.see-upcoming
+PASS accepted input fr.recur.end-rule
+PASS accepted input data.recur.rule
+PASS accepted input sds.recur.generation-engine
+PASS accepted input sds.recur.occurrence-lifecycle
+PASS accepted input knowledge/ui/proof/brand.yaml
+PASS accepted input knowledge/ui/proof/contrast.yaml
+PASS accepted input knowledge/ui/composition/layout.yaml
+PASS accepted input knowledge/ui/composition/collection.yaml
+PASS accepted input knowledge/ui/composition/cta.yaml
+PASS accepted input knowledge/ui/composition/responsive.yaml
+PASS brand/Grammar/knowledge prompt provenance order assets/schedule-refused.prompt.txt
+PASS retained visual review
+PASS product shell, feature navigation, account presence
+INFO structural/hash checks complement manual visual review; no browser/render/API proof.
+
+exit: 0

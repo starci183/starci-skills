@@ -2,64 +2,403 @@ schema: work/ui-screen
 id: ui.audit.privacy
 title: The privacy screen - request erasure, export data
 state: done
-brand: {rev: 2}
-refs: [fr.audit.erasure.request, fr.audit.export]
+brand:
+  rev: 3
+refs:
+  - fr.audit.erasure.request
+  - fr.audit.export
 ui:
-  intent: >-
-    Two independent actions on one screen; never merge export and erasure into one control since they have separate acceptance criteria. The representative direction is drawn for the erasure-refused state because it
-    combines the densest actual Grammar anatomy this screen uses (SurfaceCard, both Button actions and
-    the refusal line) and, where the state is an error/refusal, the accessibility-critical assertive-live
-    Text carrying the refusal and the brand's contrast don't (Never place text on the primary colour below
-    a 4.5:1 contrast ratio.). @starci/grammar/common ships no Message/Alert renderer, no danger tone on
-    Text, and no destructive button variant; the refusal is a plain Text line and the erasure action stays
-    an ordinary Button.
+  intent: A real Todo app workspace with top navigation, current feature, synthetic account presence
+    and secondary destinations. The privacy screen - request erasure, export data. The
+    representative state is erasure-refused.
   surfaces:
-    - {name: privacy, route: /privacy, purpose: "export personal data and request erasure", actors: [person]}
+    - name: privacy
+      route: /privacy
+      purpose: export personal data and request erasure
+      actors:
+        - person
   states:
-    - {name: idle, trigger: "first paint", behavior: "export and request-erasure actions are both available, no message shown"}
-    - {name: exporting, trigger: "export clicked, response pending", behavior: "the export GrammarButton is disabled and shows a busy label"}
-    - {name: requesting-erasure, trigger: "request-erasure clicked, a confirmation is pending", behavior: "a confirm/cancel pair of GrammarButton replaces the single request action"}
-    - {name: erasure-pending, trigger: "erasure confirmed, not yet complete", behavior: "both actions are disabled with a pending status message (non-danger)"}
-    - {name: erasure-complete, trigger: "erasure has completed", behavior: "a non-danger GrammarMessage confirms completion; both actions are removed"}
-    - {name: erasure-refused, trigger: "the erasure request is rejected, for example a hold applies", behavior: "a GrammarMessage(tone: danger) states the refusal reason; the request action remains available to retry once the hold clears"}
+    - name: idle
+      trigger: first paint
+      behavior: export and request-erasure actions are both available, no message shown
+    - name: exporting
+      trigger: export clicked, response pending
+      behavior: the export Button is disabled and shows a busy label
+    - name: requesting-erasure
+      trigger: request-erasure clicked, a confirmation is pending
+      behavior: a confirm/cancel pair of Button replaces the single request action
+    - name: erasure-pending
+      trigger: erasure confirmed, not yet complete
+      behavior: both actions are disabled with a pending status message (non-danger)
+    - name: erasure-complete
+      trigger: erasure has completed
+      behavior: "a non-danger Text(live: polite) confirms completion; both actions are removed"
+    - name: erasure-refused
+      trigger: The erasure request is refused or cannot be submitted
+      behavior: Show the actual refusal reason through assertive Text. Do not invent a legal hold. Export
+        remains independent; retry must respect authentication and refusal cause.
   coverage:
     scale: bounded
-    representativeScreens: [privacy]
+    representativeScreens:
+      - privacy
     map:
-      - {screen: privacy, state: idle, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Privacy, composition: joined)", "Button (export, variant: secondary)", "Button (request erasure, variant: outline)"], derivation: "Derives from the erasure-refused representative direction: same SurfaceCard, Button (export), Button (request erasure) anatomy, minus the refusal Text; export and request-erasure actions are both available, no message shown."}
-      - {screen: privacy, state: exporting, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Privacy, composition: joined)", "Button (export, variant: secondary, isPending)", "Button (request erasure, variant: outline)"], derivation: "Derives from the erasure-refused representative direction: same SurfaceCard, Button (export), Button (request erasure) anatomy, minus the refusal Text; the export Button is isPending and shows its busy label."}
-      - {screen: privacy, state: requesting-erasure, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Privacy, composition: joined)", "Button (export, variant: secondary)", "Button (confirm, variant: primary)", "Button (cancel, variant: ghost)"], derivation: "Derives from the erasure-refused representative direction: same SurfaceCard, Button (export) anatomy; a confirm (variant: primary)/cancel (variant: ghost) Button pair replaces the single request-erasure Button."}
-      - {screen: privacy, state: erasure-pending, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Privacy, composition: joined)", "Button (export, variant: secondary, isDisabled)", "Button (request erasure, variant: outline, isDisabled)", "Text (live: polite, non-danger pending status)"], derivation: "Derives from the erasure-refused representative direction: same SurfaceCard, Button (export), Button (request erasure) anatomy, with both isDisabled and a `live: polite` Text pending line in place of the refusal Text."}
-      - {screen: privacy, state: erasure-complete, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Privacy, composition: joined)", "Text (live: polite, non-danger completion status)"], derivation: "Derives from the erasure-refused representative direction: same SurfaceCard anatomy; both action Buttons are removed and a `live: polite` Text confirms completion in place of the refusal Text."}
-      - {screen: privacy, state: erasure-refused, viewport: desktop-1280, components: ["SurfaceCard (ariaLabel: Privacy, composition: joined)", "Button (export, variant: secondary)", "Button (request erasure, variant: outline)", "Text (live: assertive, the refusal sentence)"], derivation: "Representative direction; generated by interface.draw once gap.audit.direction-not-drawn closes.", directionAsset: assets/privacy-erasure-refused.png}
+      - screen: privacy
+        state: idle
+        viewport: desktop-1280
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Privacy, composition: joined)"
+          - "Button (export, variant: secondary)"
+          - "Button (request erasure, variant: outline)"
+        derivation: Derives from erasure-refused with the same workspace shell. export and request-erasure
+          actions are both available, no message shown
+        directionAsset: assets/privacy-erasure-refused.png
+      - screen: privacy
+        state: idle
+        viewport: mobile-390
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Privacy, composition: joined)"
+          - "Button (export, variant: secondary)"
+          - "Button (request erasure, variant: outline)"
+        derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
+          compactNavigation own the compact shell; include all four destinations and account access.
+          Form fields stack and row actions wrap without hiding controls or horizontal page
+          scrolling. export and request-erasure actions are both available, no message shown"
+        directionAsset: assets/privacy-erasure-refused.png
+      - screen: privacy
+        state: exporting
+        viewport: desktop-1280
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Privacy, composition: joined)"
+          - "Button (export, variant: secondary, isPending)"
+          - "Button (request erasure, variant: outline)"
+        derivation: Derives from erasure-refused with the same workspace shell. the export Button is
+          disabled and shows a busy label
+        directionAsset: assets/privacy-erasure-refused.png
+      - screen: privacy
+        state: exporting
+        viewport: mobile-390
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Privacy, composition: joined)"
+          - "Button (export, variant: secondary, isPending)"
+          - "Button (request erasure, variant: outline)"
+        derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
+          compactNavigation own the compact shell; include all four destinations and account access.
+          Form fields stack and row actions wrap without hiding controls or horizontal page
+          scrolling. the export Button is disabled and shows a busy label"
+        directionAsset: assets/privacy-erasure-refused.png
+      - screen: privacy
+        state: requesting-erasure
+        viewport: desktop-1280
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Privacy, composition: joined)"
+          - "Button (export, variant: secondary)"
+          - Button (confirm; danger capability required)
+          - "Button (cancel, variant: ghost)"
+        derivation: Derives from erasure-refused with the same workspace shell. a confirm/cancel pair of
+          Button replaces the single request action
+        directionAsset: assets/privacy-erasure-refused.png
+      - screen: privacy
+        state: requesting-erasure
+        viewport: mobile-390
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Privacy, composition: joined)"
+          - "Button (export, variant: secondary)"
+          - Button (confirm; danger capability required)
+          - "Button (cancel, variant: ghost)"
+        derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
+          compactNavigation own the compact shell; include all four destinations and account access.
+          Form fields stack and row actions wrap without hiding controls or horizontal page
+          scrolling. a confirm/cancel pair of Button replaces the single request action"
+        directionAsset: assets/privacy-erasure-refused.png
+      - screen: privacy
+        state: erasure-pending
+        viewport: desktop-1280
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Privacy, composition: joined)"
+          - "Button (export, variant: secondary, isDisabled)"
+          - "Button (request erasure, variant: outline, isDisabled)"
+          - "Text (live: polite, non-danger pending status)"
+        derivation: Derives from erasure-refused with the same workspace shell. both actions are disabled
+          with a pending status message (non-danger)
+        directionAsset: assets/privacy-erasure-refused.png
+      - screen: privacy
+        state: erasure-pending
+        viewport: mobile-390
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Privacy, composition: joined)"
+          - "Button (export, variant: secondary, isDisabled)"
+          - "Button (request erasure, variant: outline, isDisabled)"
+          - "Text (live: polite, non-danger pending status)"
+        derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
+          compactNavigation own the compact shell; include all four destinations and account access.
+          Form fields stack and row actions wrap without hiding controls or horizontal page
+          scrolling. both actions are disabled with a pending status message (non-danger)"
+        directionAsset: assets/privacy-erasure-refused.png
+      - screen: privacy
+        state: erasure-complete
+        viewport: desktop-1280
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Privacy, composition: joined)"
+          - "Text (live: polite, non-danger completion status)"
+        derivation: "Derives from erasure-refused with the same workspace shell. a non-danger Text(live:
+          polite) confirms completion; both actions are removed"
+        directionAsset: assets/privacy-erasure-refused.png
+      - screen: privacy
+        state: erasure-complete
+        viewport: mobile-390
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Privacy, composition: joined)"
+          - "Text (live: polite, non-danger completion status)"
+        derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
+          compactNavigation own the compact shell; include all four destinations and account access.
+          Form fields stack and row actions wrap without hiding controls or horizontal page
+          scrolling. a non-danger Text(live: polite) confirms completion; both actions are removed"
+        directionAsset: assets/privacy-erasure-refused.png
+      - screen: privacy
+        state: erasure-refused
+        viewport: desktop-1280
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Privacy, composition: joined)"
+          - "Button (export, variant: secondary)"
+          - "Button (request erasure, variant: outline)"
+          - "Text (live: assertive, the refusal sentence)"
+        derivation: Representative direction. Show the actual refusal reason through assertive Text. Do not
+          invent a legal hold. Export remains independent; retry must respect authentication and
+          refusal cause.
+        directionAsset: assets/privacy-erasure-refused.png
+      - screen: privacy
+        state: erasure-refused
+        viewport: mobile-390
+        components:
+          - WorkspaceShell (header, primary, primaryLabel, compactHeader, compactNavigation)
+          - TextAction (href, actual destination)
+          - "Text (synthetic account presence: Alex)"
+          - "SurfaceCard (ariaLabel: Privacy, composition: joined)"
+          - "Button (export, variant: secondary)"
+          - "Button (request erasure, variant: outline)"
+          - "Text (live: assertive, the refusal sentence)"
+        derivation: "Derived compact projection; mobile-390: WorkspaceShell compactHeader and
+          compactNavigation own the compact shell; include all four destinations and account access.
+          Form fields stack and row actions wrap without hiding controls or horizontal page
+          scrolling. Show the actual refusal reason through assertive Text. Do not invent a legal
+          hold. Export remains independent; retry must respect authentication and refusal cause."
+        directionAsset: assets/privacy-erasure-refused.png
   accessibility:
-    - Every interactive control is reachable by keyboard alone in visual order.
-    - "The refusal Text carries `live: \"assertive\"` and is announced without requiring focus; Common
-      sets no `role=\"alert\"` and Text has no danger tone, so severity is carried by the sentence and
-      the live region alone. Pending/complete status uses `live: \"polite\"` since it is not an error."
-    - Text on the primary colour (#2F6BFF) keeps at least a 4.5:1 contrast ratio.
+    - Keyboard order follows visual and DOM order; all control names remain visible.
+    - "Text(live: assertive) announces refusal; plain foreground copy, no invented Message/Alert
+      export."
+    - "Primary labels use installed --color-black on #2F6BFF (unrounded contrast 4.667946:1);
+      white-on-primary is prohibited."
+    - Danger outline/edge communicates destructive consequence alongside a visible action verb; dark
+      labels remain legible.
+    - Exactly one main landmark; navigation has a name; focus remains visible and returns to the
+      action after a dismissed confirmation.
+    - Decorative turtle uses empty alt text; the adjacent copy supplies meaning.
   responsive:
-    - desktop-1280 is the representative viewport; mobile-390 keeps the same single-column order with no
-      hidden controls, derived rather than separately generated.
+    - "desktop-1280: WorkspaceShell header and primary slots; heading, content and footer remain
+      within readable page measure."
+    - "mobile-390: WorkspaceShell compactHeader and compactNavigation own the compact shell; include
+      all four destinations and account access. Form fields stack and row actions wrap without
+      hiding controls or horizontal page scrolling."
   artworkSlots: []
-  observations: []
-  gaps: []
+  observations:
+    - Direction is an ImageGen design input, not a running-product capture, exact Grammar rendering,
+      interaction or API proof.
+    - Read brand/index.yaml rev 3 for palette and master provenance; generated colours and glyphs
+      are approximate until implementation uses the exact CSS tokens.
+    - Privacy navigation, user presence and footer are visible. Export is separate from erasure,
+      with independent labels and consequences.
+    - Benign export uses a blue action with black ink. Erasure is a danger-outline action with dark
+      label and explicit irreversible copy. Refusal says submission failed, without claiming success
+      or inventing a legal hold.
+    - No turtle anywhere on this destructive surface. Confirmation and completed/pending states
+      remain explicitly mapped.
+  gaps:
+    - code: THEME_IMPLEMENTATION_REQUIRED
+      detail: Only the accent override is wired here. Activate the accepted Core token vocabulary, load
+        Inter and supply black primary-label ink in a separately authorized implementation.
+    - code: GRAMMAR_REQUIRED
+      detail: Installed ButtonVariant has no danger variant. Delete/revoke/erasure/end-rule danger
+        direction requires a Grammar-owned capability; no invented prop or app-local red is
+        authorized.
+  status: reviewed-proposed-direction
+  shell:
+    kind: workspace
+    owner: WorkspaceShell
+    primaryLabel: The privacy screen - request erasure, export data
+    header: Todo app, destination navigation, Alex account presence and Sign out
+    navigation:
+      - label: Tasks
+        href: /tasks
+        status: existing route
+      - label: Notifications
+        href: /notify/preferences
+        status: direction route; not implemented here
+      - label: Plan
+        href: /plan/usage
+        status: direction route; not implemented here
+      - label: Privacy
+        href: /privacy
+        status: direction route; not implemented here
+    footer:
+      - label: Privacy policy
+        href: /privacy-policy
+        status: proposed unimplemented policy route
+      - label: Terms
+        href: /terms
+        status: proposed unimplemented policy route
+  links:
+    - label: Tasks
+      href: /tasks
+      status: existing route
+    - label: Notifications
+      href: /notify/preferences
+      status: direction route; not implemented here
+    - label: Plan
+      href: /plan/usage
+      status: direction route; not implemented here
+    - label: Privacy
+      href: /privacy
+      status: direction route; not implemented here
+    - label: Privacy policy
+      href: /privacy-policy
+      status: proposed unimplemented policy route
+    - label: Terms
+      href: /terms
+      status: proposed unimplemented policy route
+  assets:
+    - path: assets/privacy-erasure-refused.prompt.txt
+      role: prompt
+      sha256: 84f35a17a04bc812718d2d0d1dd45bbd51c82d403abb41f9e550c895df9a1ee8
+      provenance: Exact prompt sent to image_gen.imagegen for this final PNG.
+    - path: assets/privacy-erasure-refused.png
+      role: direction
+      sha256: e660c47df2949dd0808dc3c3b3c927668da9864260d460042b45540810436cf8
+      width: 1536
+      height: 1024
+      generation:
+        tool: image_gen.imagegen
+        promptPath: assets/privacy-erasure-refused.prompt.txt
+        inputRefs:
+          - brand
+          - fr.audit.erasure.request
+          - fr.audit.export
+          - sds.audit.erasure-request
+          - knowledge/ui/proof/brand.yaml
+          - knowledge/ui/proof/contrast.yaml
+          - knowledge/ui/composition/layout.yaml
+          - knowledge/ui/composition/collection.yaml
+          - knowledge/ui/composition/cta.yaml
+          - knowledge/ui/composition/responsive.yaml
+      provenance:
+        actor: codex
+        tool: image_gen.imagegen
+        capturedAt: 2026-09-18T12:25:43.315Z
+        kind: generated-proposed-direction
+        modelDisclosure: Tool response did not expose a model field; no model claimed.
+  acceptedInputs:
+    brand:
+      record: brand
+      path: examples/todo-app-backend/.starciwork/brand/index.yaml
+      rev: 3
+      sha256: fdb90a1c8a386ecb72ed9a825374f0d365ed3b05886fc2cd605df55511e0e9bd
+    business:
+      - id: fr.audit.erasure.request
+        path: examples/todo-app-backend/.starciwork/features/audit/fr/erasure/request/index.yaml
+        sha256: 86cf9050feac74382e735dfa7ba5161924b3c9a9fa30078b49e4c437ae09863b
+      - id: fr.audit.export
+        path: examples/todo-app-backend/.starciwork/features/audit/fr/export/index.yaml
+        sha256: eb58436b6c6f3ba08a6d8d50e134a0c62d01df5b5d62814d37dd96b3b1715c21
+      - id: sds.audit.erasure-request
+        path: examples/todo-app-backend/.starciwork/features/audit/sds/erasure-request/index.yaml
+        sha256: ade73cc12ecbd2a8f19f0a24d97229178507b46bde2c5976df6d9e74de9fe75c
+    knowledge:
+      - path: knowledge/ui/proof/brand.yaml
+        sha256: e86445d107aae66407e7c5375b128d96603c8002b170f24d11a206c1bd0088bd
+      - path: knowledge/ui/proof/contrast.yaml
+        sha256: 2d6c753af1d0779b2ba77a1f10382a53913581cf554fbecc8f23f39f213964ba
+      - path: knowledge/ui/composition/layout.yaml
+        sha256: 9b463073664a88f4f05cde693de7b60591d229c118780fddaee6a29023b70033
+      - path: knowledge/ui/composition/collection.yaml
+        sha256: bbf10c4b27f912648f1a1fedf82d8927889eb4890289ad6976ea8a512a70aec8
+      - path: knowledge/ui/composition/cta.yaml
+        sha256: b0591e87db2506884dcff3e2161fcee7436b3c3daa2d4ff27caab98ab4b8ae74
+      - path: knowledge/ui/composition/responsive.yaml
+        sha256: 56ea005ac1466e12a9a7bcb3cef93cd8a29b2dcdb32023b27e14186ea7c719a7
+    grammar:
+      record: brand
+      location: brand.grammar.inspectedFiles
+      version: 0.4.13
+      installation: prior draw checkout with identical frontend lockfile; current node_modules absent
+  interactions:
+    - Export and erasure remain independent. Erasure confirmation names the irreversible result;
+      confirm has danger treatment and Cancel is secondary.
 assets:
   - path: assets/privacy-erasure-refused.prompt.txt
     role: prompt
-    provenance: authored-prompt-awaiting-interface.draw
+    sha256: 84f35a17a04bc812718d2d0d1dd45bbd51c82d403abb41f9e550c895df9a1ee8
+    provenance: Exact prompt sent to image_gen.imagegen for this final PNG.
   - path: assets/privacy-erasure-refused.png
     role: direction
+    sha256: e660c47df2949dd0808dc3c3b3c927668da9864260d460042b45540810436cf8
+    width: 1536
+    height: 1024
     generation:
       tool: image_gen.imagegen
       promptPath: assets/privacy-erasure-refused.prompt.txt
-      inputRefs: [ui.audit.privacy, fr.audit.erasure.request, fr.audit.export, brand]
+      inputRefs:
+        - brand
+        - fr.audit.erasure.request
+        - fr.audit.export
+        - sds.audit.erasure-request
+        - knowledge/ui/proof/brand.yaml
+        - knowledge/ui/proof/contrast.yaml
+        - knowledge/ui/composition/layout.yaml
+        - knowledge/ui/composition/collection.yaml
+        - knowledge/ui/composition/cta.yaml
+        - knowledge/ui/composition/responsive.yaml
     provenance:
       actor: codex
-      profile: gpt-5.6-sol
-      capturedAt: 2026-09-18T07:42:00.301Z
+      tool: image_gen.imagegen
+      capturedAt: 2026-09-18T12:25:43.315Z
+      kind: generated-proposed-direction
+      modelDisclosure: Tool response did not expose a model field; no model claimed.
 change:
-  rev: 3
-  kind: editorial
-  at: 2026-09-18T10:00:00.000Z
-  reason: interface.draw ran and produced the erasure-refused representative direction image and its sibling prompt with a real image_gen.imagegen invocation; gap.audit.direction-not-drawn is closed, its blockedBy edge is removed, and this record reaches done on the strength of the evidence.yaml this same run wrote.
+  rev: 4
+  kind: clarifying
+  at: 2026-09-18T12:20:51.695Z
+  reason: "Owner-directed redraw against brand rev 3: real shell/auth composition, full web UX,
+    explicit mobile/state derivations and honest Grammar/link implementation gaps."

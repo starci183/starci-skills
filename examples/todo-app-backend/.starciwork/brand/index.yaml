@@ -1,16 +1,339 @@
 schema: work/brand
 id: brand
+kind: brand
 state: done
-rev: 2
-colour:
-  primary: "#2F6BFF"
-  surface: "#FFFFFF"
-typography:
-  sans: Inter
-donts:
-  - Never place text on the primary colour below a 4.5 to 1 contrast ratio.
-review:
-  reviewer: brand owner
-  authority: Owner settled rev 2.
-  reviewedAt: 2026-09-18T05:00:00.000Z
-
+rev: 3
+brand:
+  identity:
+    name: Todo app
+    product: todo-app
+    family: common
+    tokenVocabulary: core, with imported Tailwind black/white primitives
+    ownerRulingsVerbatim: |-
+      - **Mascot: a turtle** (con rùa). A friendly, calm turtle — it suits a product
+        about keeping tasks steadily moving. It may appear in: the auth split-screen
+        illustration panel, empty states, welcome/marketing surfaces, loading idles.
+        It must never appear in destructive/danger contexts or inside form controls.
+      - **Primary colour stays `#2F6BFF`** (blue — already settled at rev 2, owner
+        confirms). Danger keeps the grammar token `--starci-core-danger`, do not
+        redefine it.
+      - **Auth aesthetic**: split-screen — illustration/mascot panel on the LEFT,
+        form on the RIGHT. The owner calls this "thẩm mỹ": the v3 empty-canvas
+        centered card was wrong.
+      - **Real web UX**: sign-in must carry the furniture a real site has — email and
+        password fields, a forgot-password link, a create-account link, and policy /
+        terms footer links. These links may point at unimplemented routes (record that
+        honestly in the ui record — links exist in direction before the feature does).
+    decisions:
+      - subject: mascot
+        options:
+          - turtle
+        chosen: turtle
+        authority: OP-BRIEF.md
+      - subject: primary
+        options:
+          - "#2F6BFF"
+        chosen: "#2F6BFF"
+        authority: Owner confirms rev 2 in OP-BRIEF.md
+      - subject: dangerMayMatchPrimary
+        options:
+          - false
+        chosen: false
+        authority: Owner keeps grammar danger and blue primary
+      - subject: auth
+        options:
+          - illustration-left-form-right
+        chosen: illustration-left-form-right
+        authority: OP-BRIEF.md
+  color:
+    tokens:
+      - token: --starci-core-accent
+        value: "#2F6BFF"
+        role: primary
+        foreground: "#000000"
+        source:
+          path: src/app/globals.css
+          line: 16
+          declaration: "--starci-core-accent: #2F6BFF;"
+      - token: --color-white
+        value: "#FFFFFF"
+        role: surface
+        foreground: oklch(21.03% 0.0015 354.13)
+        source:
+          path: node_modules/tailwindcss/theme.css
+          line: 323
+          declaration: "--color-white: #fff;"
+      - token: --color-black
+        value: "#000000"
+        role: primary-text
+        source:
+          path: node_modules/tailwindcss/theme.css
+          line: 322
+          declaration: "--color-black: #000;"
+      - token: --starci-core-danger
+        value: oklch(65.32% 0.2335 37.78)
+        role: danger
+        foreground: oklch(21.03% 0.0015 354.13)
+        source:
+          path: node_modules/@starci/grammar/dist/core/styles.css
+          line: 25
+          declaration: "--starci-core-danger: oklch(65.32% 0.2335 37.78);"
+      - token: --starci-core-canvas
+        value: oklch(97.02% 0.0015 354.13)
+        role: canvas
+        source:
+          path: node_modules/@starci/grammar/dist/core/styles.css
+          line: 14
+          declaration: "--starci-core-canvas: oklch(97.02% 0.0015 354.13);"
+      - token: --starci-core-surface
+        value: oklch(100% 0.0008 354.13)
+        role: grammar-surface
+        source:
+          path: node_modules/@starci/grammar/dist/core/styles.css
+          line: 15
+          declaration: "--starci-core-surface: oklch(100% 0.0008 354.13);"
+      - token: --starci-core-surface-secondary
+        value: oklch(95.24% 0.0012 354.13)
+        role: surface-secondary
+        source:
+          path: node_modules/@starci/grammar/dist/core/styles.css
+          line: 16
+          declaration: "--starci-core-surface-secondary: oklch(95.24% 0.0012 354.13);"
+      - token: --starci-core-foreground
+        value: oklch(21.03% 0.0015 354.13)
+        role: foreground
+        source:
+          path: node_modules/@starci/grammar/dist/core/styles.css
+          line: 17
+          declaration: "--starci-core-foreground: oklch(21.03% 0.0015 354.13);"
+      - token: --starci-core-muted
+        value: oklch(55.17% 0.003 354.13)
+        role: muted
+        source:
+          path: node_modules/@starci/grammar/dist/core/styles.css
+          line: 18
+          declaration: "--starci-core-muted: oklch(55.17% 0.003 354.13);"
+      - token: --starci-core-border
+        value: oklch(90% 0.0015 354.13)
+        role: border
+        source:
+          path: node_modules/@starci/grammar/dist/core/styles.css
+          line: 19
+          declaration: "--starci-core-border: oklch(90% 0.0015 354.13);"
+      - token: --starci-core-separator
+        value: oklch(92% 0.0015 354.13)
+        role: separator
+        source:
+          path: node_modules/@starci/grammar/dist/core/styles.css
+          line: 20
+          declaration: "--starci-core-separator: oklch(92% 0.0015 354.13);"
+    policy:
+      dangerMayMatchPrimary: false
+      minContrast: 4.5
+    primaryAlias:
+      token: --accent
+      value: var(--starci-core-accent)
+      source: src/app/globals.css
+      line: 17
+    surface: "#FFFFFF"
+    usage:
+      - Primary actions use the exact blue token and black label ink from the installed
+        --color-black primitive; black on primary measures above 4.5:1.
+      - Danger uses the unchanged --starci-core-danger token for an edge, outline or fill with dark
+        foreground; do not use small danger-coloured text on white.
+      - Body text and link labels use foreground on white/canvas; blue underline or selection edge
+        carries link/current context.
+      - Core palette is the direction source, not a claim that the existing neutral Common root
+        activates Core CSS.
+  typography:
+    sans: Inter
+    authority: Settled at rev 2
+    intent: Use Grammar Heading and Text sizes; body md, secondary sm, labels medium/semibold.
+      Product-specific numeric type scale is unruled.
+    implementation: Inter is not loaded in the existing app; globals.css currently uses system-ui. Font
+      loading belongs to interface.implement.
+  mascot:
+    name: turtle
+    description: A friendly, calm turtle (con rùa), suited to keeping tasks steadily moving.
+    status: generated-placeholder-pending-owner-asset-acceptance
+    allowedIn:
+      - auth illustration panel
+      - empty states
+      - welcome/marketing surfaces
+      - loading idles
+    forbiddenIn:
+      - danger contexts
+      - destructive contexts
+      - inside form controls
+    rules:
+      - Reuse this one master; preserve blue shell, pale neutral body and calm expression.
+      - On refused auth, keep the turtle confined to the separate welcome illustration panel; the
+        form/refusal region carries no mascot.
+      - Do not use the turtle as a logo, action icon or decorative danger companion.
+    assets:
+      - path: assets/turtle-master.png
+        sha256: 9290de9aea7fa6950d39ae55f1fb19d3f7d160eecc9c89c17bf2547fc70b183d
+        width: 1254
+        height: 1254
+        format: png
+        background: white canvas
+        purpose: master placeholder
+        provenance:
+          tool: image_gen.imagegen
+          promptPath: assets/turtle-master.prompt.txt
+          modelDisclosure: The tool response did not expose a model field; no model identity is claimed.
+          generatedAt: 2026-09-18T12:14:51.613Z
+          source: built-in tool output copied without pixel modification
+          rights: Generated for this brief; no third-party reference image supplied. Final asset acceptance is
+            pending.
+  logo:
+    status: unruled
+    assets: []
+    usage: Use the existing product name Todo app as plain text; no invented symbol or approved wordmark
+      claim.
+  iconography:
+    status: unruled
+    set: []
+    custom: []
+    forbidden:
+      - additional icon packages without owner ruling
+    usage: No pictographic icon set selected. These directions use visible text actions and native
+      checkboxes, with no decorative icon library.
+  imagery:
+    style: Flat illustration in the declared brand hues and neutrals.
+    photography: false
+    auth: At desktop measure place the turtle illustration panel on the LEFT and the form on the RIGHT.
+      At narrow widths place compact illustration before the form; retain every link.
+    emptyStates: Task-list empty state includes the turtle master, a concise explanation and the
+      existing add-task control.
+    forbidden:
+      - photography
+      - off-palette illustration
+      - mascot inside a control
+      - mascot in a danger/destructive surface
+    promptRules:
+      - Cite examples/todo-app-backend/.starciwork/brand/index.yaml rev 3 first, then inspected
+        Grammar anatomy, then relevant knowledge rule ids.
+      - Name Todo app, common anatomy/core token vocabulary, exact palette and turtle placement
+        policy.
+      - Use the master as an input reference when a turtle appears. Generated directions are not
+        shipped-product captures.
+  voice:
+    status: unruled beyond owner request
+    rule: Plausible, concise English; name the action, outcome and recovery without inventing product
+      promises.
+  motion:
+    status: unruled
+    rule: No bespoke animation selected. Retain published Grammar pending states and reduced-motion
+      behavior; static drawings make no motion proof.
+  forbidden:
+    - Never place text on the primary colour below a 4.5 to 1 contrast ratio.
+    - never show the mascot in a danger or destructive surface
+    - never render the auth form without the illustration panel at desktop measure
+    - Never redefine --starci-core-danger or introduce a second red.
+  artworkSlots:
+    - id: auth-turtle
+      surfaces:
+        - sign-in
+      placement: left illustration panel at desktop; compact illustration before form at mobile
+      master: assets/turtle-master.png
+      purpose: calm welcome
+      decorative: true
+    - id: empty-turtle
+      surfaces:
+        - list
+      states:
+        - empty
+      placement: empty-state section outside form controls
+      master: assets/turtle-master.png
+      purpose: explain absence and invite the first task
+      decorative: true
+  sources:
+    - repository: todo-app-frontend
+      path: src/app/globals.css
+      inspectionRoot: examples/todo-app-frontend
+      kind: css
+      sha256: 577de6779fa1d6b8bd1e038a0a22a4941b6975a4ef1c3c54f59bc2df4bae1b10
+    - repository: todo-app-frontend
+      path: node_modules/@starci/grammar/dist/core/styles.css
+      inspectionRoot: C:/Users/Hi/orca/workspaces/.claude/ex-draw-v3/examples/todo-app-frontend
+      kind: css
+      sha256: 592b30ad3171136180bd579f9a55a2dafd4009a117f562b07f2eab4850f83af6
+    - repository: todo-app-frontend
+      path: node_modules/@starci/grammar/dist/common/styles.css
+      inspectionRoot: C:/Users/Hi/orca/workspaces/.claude/ex-draw-v3/examples/todo-app-frontend
+      kind: css
+      sha256: 9f70f3e7507715cb77c8b8fc1c9a906811395dc6c9ed85c09d9451cee7e6cb10
+    - repository: todo-app-frontend
+      path: node_modules/tailwindcss/theme.css
+      inspectionRoot: C:/Users/Hi/orca/workspaces/.claude/ex-draw-v3/examples/todo-app-frontend
+      kind: css
+      sha256: 443d7af364200f8ec8352dc78e39485a118a1840d498c97967bf0ae402b39167
+  grammar:
+    package: "@starci/grammar"
+    version: 0.4.13
+    entry: ./common
+    resolvedPath: C:/Users/Hi/orca/workspaces/.claude/ex-draw-v3/examples/todo-app-frontend/node_modules/@starci/grammar
+    inspection: Read-only use of prior draw worktree; current worktree has no node_modules. Both
+      frontend lockfiles are byte-identical.
+    lockfileSha256: 8a6dd6172fc1066895a6c18a985e1feeddddfa30d422ee6d7e4d29d097bd0f1f
+    inspectedLockfileSha256: 8a6dd6172fc1066895a6c18a985e1feeddddfa30d422ee6d7e4d29d097bd0f1f
+    inspectedFiles:
+      - path: package.json
+        sha256: 9fffbd5601e4e120d763b2108a35cf7fca4e4de551ddbfbc465ff69972880824
+      - path: dist/common/index.d.ts
+        sha256: bbc937cd139b4161dfb5de23a643965a5295027348865e009188866730fa6cb5
+      - path: dist/common/renderers.js
+        sha256: 2897925f312cab3652328a3ce70345d68c8d65c805b762fd5b1696cfca4bea3c
+      - path: dist/common/styles.css
+        sha256: 9f70f3e7507715cb77c8b8fc1c9a906811395dc6c9ed85c09d9451cee7e6cb10
+      - path: dist/core/styles.css
+        sha256: 592b30ad3171136180bd579f9a55a2dafd4009a117f562b07f2eab4850f83af6
+      - path: dist/core/primitive/GrammarRoot/index.js
+        sha256: 4b832516df8a321c52c00f47581eab796f517bd889f34b92ed596232d9b935fb
+      - path: dist/core/primitive/Button/index.d.ts
+        sha256: c20aef8e21f3effd069b1b600d7fec1185480d75392e7382f52c9bdee9c7952a
+      - path: dist/core/primitive/Text/index.d.ts
+        sha256: dec5365bf3664ec51f933b5020adeaec681387d1438333cd1852af4437c58355
+      - path: dist/core/primitive/Input/index.d.ts
+        sha256: 103288fc562967b7c753496fecff79526d4186f7ab6e541def5230eab865b655
+      - path: dist/core/primitive/TextAction/index.d.ts
+        sha256: 9c870cf2b6e89e31c0cef2049027a2372b61285de2b599f9f4029ca1c890b525
+      - path: dist/core/primitive/PressableField/index.d.ts
+        sha256: 9644a0674bdc203aa944850bb1ac350943e616ffb08bee2a758133c82185504f
+      - path: dist/core/primitive/Progress/index.d.ts
+        sha256: 4bbe2d0b56652a582163431fa7e3fa688a5fb088e6c3745337ecfd26411ea15b
+      - path: dist/core/composition/WorkspaceShell/index.d.ts
+        sha256: f2f8bda9de00fbb255d3489d3e9fe98b06f9685c8ebd654b43d1b6fde688dd03
+      - path: dist/core/composition/WorkspaceShell/index.js
+        sha256: 3ea6d8307d6be52f1fb5e0d8de357226196d866a94ffe5ee903353145c2c715b
+      - path: dist/core/composition/Sidebar/index.d.ts
+        sha256: 5f01d19dcd6a5ce1b70ef1a5a41e15c8194c950836cef8b11a44056f25b4b18c
+      - path: dist/core/composition/PrimaryRailLayout/index.d.ts
+        sha256: 538aa89be017c0aa8e5b32e2378f6e683671c0188ff46e804bcbfcd408d519e3
+  limitations:
+    - No current-worktree dependency installation or browser rendering is claimed.
+    - Common CSS declares structure and token consumers, not the Core palette. Core CSS import and
+      family scope are not active in the existing app; this lane is limited to the accent override.
+    - The existing primary foreground is not rewired by this lane. Implementation must provide the
+      direction's black primary label through an authorized Grammar theme capability.
+    - Grammar ButtonVariant has no destructive variant; danger treatment needs a Grammar capability
+      before implementation.
+    - Master is a generated placeholder, not final owner acceptance.
+assets:
+  - path: assets/turtle-master.png
+    role: mascot-master
+  - path: assets/turtle-master.prompt.txt
+    role: prompt
+completion:
+  review:
+    rev: 3
+    reviewer: brand owner
+    authority: Owner settled rev 3 — turtle mascot, split-screen auth, real sign-in UX
+    reviewedAt: 2026-09-18T12:14:51.613Z
+change:
+  rev: 3
+  kind: clarifying
+  at: 2026-09-18T12:14:51.613Z
+  reason: Recorded owner rulings, traced real tokens, wired primary accent, generated turtle
+    placeholder and established product-wide image and auth rules.

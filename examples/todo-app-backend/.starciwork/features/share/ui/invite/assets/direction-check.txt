@@ -1,0 +1,41 @@
+PASS UI schema and brand rev 3
+PASS top-level/ui asset bindings agree
+PASS asset hash assets/invite-refused.prompt.txt
+PASS asset hash assets/invite-refused.png
+PASS PNG header and dimensions assets/invite-refused.png
+PASS real tool, no invented model assets/invite-refused.png
+PASS retained exact prompt assets/invite-refused.png
+PASS asset hash assets/invite-refused.initial.prompt.txt
+PASS asset hash assets/invite-refused.initial.png
+PASS PNG header and dimensions assets/invite-refused.initial.png
+PASS real tool, no invented model assets/invite-refused.initial.png
+PASS retained exact prompt assets/invite-refused.initial.png
+PASS one selected representative direction
+PASS coverage empty desktop-1280
+PASS coverage empty mobile-390
+PASS coverage inviting desktop-1280
+PASS coverage inviting mobile-390
+PASS coverage pending-list desktop-1280
+PASS coverage pending-list mobile-390
+PASS coverage accepted desktop-1280
+PASS coverage accepted mobile-390
+PASS coverage refused desktop-1280
+PASS coverage refused mobile-390
+PASS current brand input bytes
+PASS accepted input fr.share.invite
+PASS accepted input fr.share.list
+PASS accepted input fr.share.revoke
+PASS accepted input knowledge/ui/proof/brand.yaml
+PASS accepted input knowledge/ui/proof/contrast.yaml
+PASS accepted input knowledge/ui/composition/layout.yaml
+PASS accepted input knowledge/ui/composition/collection.yaml
+PASS accepted input knowledge/ui/composition/cta.yaml
+PASS accepted input knowledge/ui/composition/responsive.yaml
+PASS brand/Grammar/knowledge prompt provenance order assets/invite-refused.prompt.txt
+PASS brand/Grammar/knowledge prompt provenance order assets/invite-refused.initial.prompt.txt
+PASS retained visual review
+PASS product shell, feature navigation, account presence
+PASS no mascot slot on destructive/refusal surface
+INFO structural/hash checks complement manual visual review; no browser/render/API proof.
+
+exit: 0

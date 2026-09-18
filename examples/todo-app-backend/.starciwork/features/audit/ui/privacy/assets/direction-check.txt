@@ -1,0 +1,37 @@
+PASS UI schema and brand rev 3
+PASS top-level/ui asset bindings agree
+PASS asset hash assets/privacy-erasure-refused.prompt.txt
+PASS asset hash assets/privacy-erasure-refused.png
+PASS PNG header and dimensions assets/privacy-erasure-refused.png
+PASS real tool, no invented model assets/privacy-erasure-refused.png
+PASS retained exact prompt assets/privacy-erasure-refused.png
+PASS one selected representative direction
+PASS coverage idle desktop-1280
+PASS coverage idle mobile-390
+PASS coverage exporting desktop-1280
+PASS coverage exporting mobile-390
+PASS coverage requesting-erasure desktop-1280
+PASS coverage requesting-erasure mobile-390
+PASS coverage erasure-pending desktop-1280
+PASS coverage erasure-pending mobile-390
+PASS coverage erasure-complete desktop-1280
+PASS coverage erasure-complete mobile-390
+PASS coverage erasure-refused desktop-1280
+PASS coverage erasure-refused mobile-390
+PASS current brand input bytes
+PASS accepted input fr.audit.erasure.request
+PASS accepted input fr.audit.export
+PASS accepted input sds.audit.erasure-request
+PASS accepted input knowledge/ui/proof/brand.yaml
+PASS accepted input knowledge/ui/proof/contrast.yaml
+PASS accepted input knowledge/ui/composition/layout.yaml
+PASS accepted input knowledge/ui/composition/collection.yaml
+PASS accepted input knowledge/ui/composition/cta.yaml
+PASS accepted input knowledge/ui/composition/responsive.yaml
+PASS brand/Grammar/knowledge prompt provenance order assets/privacy-erasure-refused.prompt.txt
+PASS retained visual review
+PASS product shell, feature navigation, account presence
+PASS no mascot slot on destructive/refusal surface
+INFO structural/hash checks complement manual visual review; no browser/render/API proof.
+
+exit: 0
