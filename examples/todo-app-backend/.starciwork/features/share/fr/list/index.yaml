@@ -1,7 +1,7 @@
 schema: work/functional-requirement
 id: fr.share.list
 title: List a task's collaborators
-state: todo
+state: done
 actors: [owner, collaborator]
 trigger: The owner or a collaborator reads a task's collaborator list.
 mainFlow:
@@ -12,14 +12,26 @@ exceptionFlows:
 postconditions:
   - The returned status for each row is computed at read time, never cached from an earlier read.
 composes:
-  - {rule: br.share.revoke.on-read, module: src/share/invitation.service.ts}
-  - {rule: br.share.invite.expiry, module: src/share/invitation.service.ts}
-blockedBy:
-  - {record: br.share.revoke.on-read, because: "br.share.revoke.on-read and br.share.invite.expiry are both todo; the NestJS module they compose does not exist yet."}
-  - {record: br.share.invite.expiry, because: "br.share.revoke.on-read and br.share.invite.expiry are both todo; the NestJS module they compose does not exist yet."}
+  - {rule: br.share.revoke.on-read, module: src/modules/bussiness/share}
+  - {rule: br.share.invite.expiry, module: src/modules/bussiness/share}
 
 requiresProof:
   unit:
     forEach: composes
   uat:
     required: true
+
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: br.share.revoke.on-read and br.share.invite.expiry are both done; ListCollaboratorsHandler
+    dispatches to InvitationService.listFor, proven by list-collaborators.handler.spec.ts,
+    invitation.service.spec.ts (the stranger exceptionFlow and the read-time status recompute) and
+    scripts/live-proof-share.sh's collaborators-query steps against the real GraphQL endpoint. A reader
+    is recognised as "a collaborator" only once their invitation is bound to their personId (i.e.
+    accepted at least once) - a still-pending invitee has no session-derived identity on the row yet to
+    match against, so they are not distinguishable from a stranger for this query until they accept;
+    see the final report for this narrowing. requiresProof.uat.required is not yet satisfied by a
+    recorded uat.verify walk - see the same gap.share.live-proof note on fr.share.invite's own change
+    entry.

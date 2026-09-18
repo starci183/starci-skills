@@ -1,0 +1,84 @@
+# Written by scripts/example-evidence.mjs by actually running the assertion commands below
+# against --cwd; this is example-toolkit provenance, not a starci-kernel run (see the script header
+# and schemas/work-layout.yaml's work/evidence section for what that distinction means).
+schema: work/evidence
+record: impl.share.todo-app-backend.invitations
+recordDigest: ed7375dfd036d132a822e6f7a446782cefd48ebfec91ca9b3d893a44c5368914
+codeDigest:
+  algorithm: sha256
+  files:
+    - path: src/modules/bussiness/share/accept-invitation.command.ts
+      sha256: 49507678ddf6d0fdf264504c7bf568b40a91671f0af1b6eb8b03d8ef3953700d
+    - path: src/modules/bussiness/share/accept-invitation.handler.spec.ts
+      sha256: b2bcbf246d42df93223d163780dbbc3d2a1f6bd78b750f06053e977e52d4568b
+    - path: src/modules/bussiness/share/accept-invitation.handler.ts
+      sha256: c1b2aeca5890c9c9fd81b7fe061c2cad95f24db5be1e165929bfc19436f2b37f
+    - path: src/modules/bussiness/share/access.service.ts
+      sha256: dcfbe26067970f9663616113ad202e0396b44cdc2748ea4e1b709ef8291928a0
+    - path: src/modules/bussiness/share/collaborator-cache.ts
+      sha256: fe0ddb6da48b6e46e9ac7f44900934f0abc18ac8b7e3abaf2968a517aa2bee75
+    - path: src/modules/bussiness/share/completion-authority.spec.ts
+      sha256: f524cfadd1dc3ba38fa40b88c8d5864eaa8a7b023d7cf2da8b7ec5fbcb5532eb
+    - path: src/modules/bussiness/share/completion-authority.ts
+      sha256: ac590a85a8d281bc953729100e496f23064cc3fa0493c935ccd406cc031ef78d
+    - path: src/modules/bussiness/share/index.ts
+      sha256: 34ec99d0f2bdebefced367a836358c48bb15fd2ab13da52e48a06a91a2dd04c0
+    - path: src/modules/bussiness/share/invitation.service.spec.ts
+      sha256: 7f11ad7f7fb1d48eb40f79cc03b8d0cc286c973206da9f5c9ce9441efd6f886e
+    - path: src/modules/bussiness/share/invitation.service.ts
+      sha256: 9eeaa816be4579dd21b6c751f629af4dd45d7cb3fbefc3b6a8853f5e77e9bd42
+    - path: src/modules/bussiness/share/invite.command.ts
+      sha256: 7312372fe27f444b3f8917b344e1c6a3dc3c0cddd58cb58ddea1378ef6831288
+    - path: src/modules/bussiness/share/invite.handler.spec.ts
+      sha256: 115ebc716fdca6f623740daeb31ce46d77cf0923a6cb8af1b5b23e55dfecf79f
+    - path: src/modules/bussiness/share/invite.handler.ts
+      sha256: b0a9ad9cdf6214579ecae768fcaa4fa76e34030889fa12d0807fc5f5e78481f7
+    - path: src/modules/bussiness/share/list-collaborators.handler.spec.ts
+      sha256: c5c604c3da6bae38eb811b7eb24afeef408fffeb8c930372c19ec30565d8699c
+    - path: src/modules/bussiness/share/list-collaborators.handler.ts
+      sha256: 237df5a95f9cc6803210392decc49d01fbaa45b94eb0086975bc54b92c507f99
+    - path: src/modules/bussiness/share/list-collaborators.query.ts
+      sha256: 44947e030660cc3224b2468d3f869c1fd5bf5a60bb0f9b09b4cc527af025112e
+    - path: src/modules/bussiness/share/revoke-collaborator.command.ts
+      sha256: e9df841f53bbdd255c7275f22f31a4d984f288436cd313446455ab94e2615287
+    - path: src/modules/bussiness/share/revoke-collaborator.handler.spec.ts
+      sha256: 89bdd5ccb06d9ad39b1e22d07754358af749ece829630e8534d7db91dc0ec0af
+    - path: src/modules/bussiness/share/revoke-collaborator.handler.ts
+      sha256: 8f5b018340d25a4ee8da849c09de4662582b7820170d50f061f537f9d594f4cb
+    - path: src/modules/bussiness/share/share.module-definition.ts
+      sha256: 59adafa087ae2f7a61a197c2e231a1181c5aac058895aef9f949e22d7af77e67
+    - path: src/modules/bussiness/share/share.module.ts
+      sha256: fee70f87ae9f73fd68612062760e796e6a99136296fbf194db19ba3f19da31e0
+    - path: src/modules/bussiness/share/types/invitation-record.ts
+      sha256: d4267fc628e9aabc10b697600b3ea34d851d9a7f183ab5557e2a59b241724f32
+  digest: a3a66ae6738331e1dc71bde7dada6e4d0b2e738814fc1e07802c22d54fc67fdf
+outcome: pass
+assertions:
+  - id: unit
+    command: npx jest src/modules/bussiness/share/invitation.service.spec.ts
+      src/modules/bussiness/share/invite.handler.spec.ts
+      src/modules/bussiness/share/accept-invitation.handler.spec.ts
+      src/modules/bussiness/share/revoke-collaborator.handler.spec.ts
+      src/modules/bussiness/share/list-collaborators.handler.spec.ts
+    exit: 0
+    outcome: pass
+    observation: npx jest src/modules/bussiness/share/invitation.service.spec.ts
+      src/modules/bussiness/share/invite.handler.spec.ts
+      src/modules/bussiness/share/accept-invitation.handler.spec.ts
+      src/modules/bussiness/share/revoke-collaborator.handler.spec.ts
+      src/modules/bussiness/share/list-collaborators.handler.spec.ts exited 0
+  - id: typecheck
+    command: npx tsc --noEmit
+    exit: 0
+    outcome: pass
+    observation: npx tsc --noEmit exited 0
+  - id: live-proof
+    command: bash scripts/live-proof-share.sh
+    exit: 0
+    outcome: pass
+    observation: bash scripts/live-proof-share.sh exited 0
+provenance:
+  actor: example-evidence
+  tool: scripts/example-evidence.mjs
+  environment: local
+  capturedAt: 2026-09-18T09:13:55.042Z

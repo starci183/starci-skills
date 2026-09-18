@@ -57,18 +57,18 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.password.sign-in sends 49 other record(s) back to todo, would
-      stale 9 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      stale 11 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
       src/features/pages/sign-in, src/features/pages/tasks/**,
       src/features/todo/graphql/mutations/session, src/modules/bussiness/session,
-      src/modules/bussiness/task, src/modules/integrations/keycloak, src/modules/platform/events,
-      src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts,
-      src/plan/subscription, src/plan/subscription.ts, src/recur/generator.service.ts,
-      src/recur/occurrence.service.ts, src/recur/rule.service.ts, src/recur/zone.util.ts, src/share)
-      - this is the number a reviewer wants before approving the change.
+      src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/keycloak,
+      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts,
+      src/plan/reconcile.ts, src/plan/subscription, src/plan/subscription.ts,
+      src/recur/generator.service.ts, src/recur/occurrence.service.ts, src/recur/rule.service.ts,
+      src/recur/zone.util.ts) - this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.login.session.restores
     kind: blast-radius
     severity: critical
@@ -123,18 +123,18 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.restores sends 48 other record(s) back to todo, would
-      stale 8 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      stale 10 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
       src/features/pages/sign-in, src/features/pages/tasks/**,
       src/features/todo/graphql/mutations/session, src/modules/bussiness/session,
-      src/modules/bussiness/task, src/modules/integrations/keycloak, src/modules/platform/events,
-      src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts,
-      src/plan/subscription, src/plan/subscription.ts, src/recur/generator.service.ts,
-      src/recur/occurrence.service.ts, src/recur/rule.service.ts, src/recur/zone.util.ts, src/share)
-      - this is the number a reviewer wants before approving the change.
+      src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/keycloak,
+      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts,
+      src/plan/reconcile.ts, src/plan/subscription, src/plan/subscription.ts,
+      src/recur/generator.service.ts, src/recur/occurrence.service.ts, src/recur/rule.service.ts,
+      src/recur/zone.util.ts) - this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.login.session.single-device
     kind: blast-radius
     severity: critical
@@ -189,18 +189,18 @@ findings:
       - ui.plan.usage
       - ui.task.list
     because: A breaking change to br.login.session.single-device sends 48 other record(s) back to todo,
-      would stale 8 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
+      would stale 10 evidence file(s), and touches 29 code path(s) (app/plan/upgrade-button.tsx,
       app/plan/usage-screen.tsx, src/app/sign-in, src/app/tasks/**,
       src/audit/erasure-request.repository.ts, src/audit/erasure.service.ts,
       src/audit/keystore.service.ts, src/audit/log.repository.ts, src/audit/log.service.ts,
       src/components/blocks/sign-in-form, src/components/blocks/task-list/**,
       src/features/pages/sign-in, src/features/pages/tasks/**,
       src/features/todo/graphql/mutations/session, src/modules/bussiness/session,
-      src/modules/bussiness/task, src/modules/integrations/keycloak, src/modules/platform/events,
-      src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts, src/plan/reconcile.ts,
-      src/plan/subscription, src/plan/subscription.ts, src/recur/generator.service.ts,
-      src/recur/occurrence.service.ts, src/recur/rule.service.ts, src/recur/zone.util.ts, src/share)
-      - this is the number a reviewer wants before approving the change.
+      src/modules/bussiness/share, src/modules/bussiness/task, src/modules/integrations/keycloak,
+      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments, src/plan/payments.ts,
+      src/plan/reconcile.ts, src/plan/subscription, src/plan/subscription.ts,
+      src/recur/generator.service.ts, src/recur/occurrence.service.ts, src/recur/rule.service.ts,
+      src/recur/zone.util.ts) - this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.share.revoke.on-read
     kind: blast-radius
     severity: critical
@@ -233,11 +233,11 @@ findings:
       - ui.share.invite
       - ui.task.list
     because: A breaking change to br.share.revoke.on-read sends 26 other record(s) back to todo, would
-      stale 4 evidence file(s), and touches 12 code path(s) (app/share, src/app/tasks/**,
-      src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
-      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments.ts,
-      src/plan/reconcile.ts, src/plan/subscription.ts, src/share, src/share/invitation.service.ts) -
-      this is the number a reviewer wants before approving the change.
+      stale 8 evidence file(s), and touches 11 code path(s) (app/share, src/app/tasks/**,
+      src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/share,
+      src/modules/bussiness/task, src/modules/platform/events, src/plan/cap-guard.ts,
+      src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription.ts) - this is the number a
+      reviewer wants before approving the change.
   - id: blast-radius:br.share.role.permissions
     kind: blast-radius
     severity: critical
@@ -270,11 +270,11 @@ findings:
       - ui.share.invite
       - ui.task.list
     because: A breaking change to br.share.role.permissions sends 26 other record(s) back to todo, would
-      stale 4 evidence file(s), and touches 12 code path(s) (app/share, src/app/tasks/**,
-      src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
-      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments.ts,
-      src/plan/reconcile.ts, src/plan/subscription.ts, src/share, src/share/access.service.ts) -
-      this is the number a reviewer wants before approving the change.
+      stale 9 evidence file(s), and touches 11 code path(s) (app/share, src/app/tasks/**,
+      src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/share,
+      src/modules/bussiness/task, src/modules/platform/events, src/plan/cap-guard.ts,
+      src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription.ts) - this is the number a
+      reviewer wants before approving the change.
   - id: blast-radius:br.task.single-owner
     kind: blast-radius
     severity: critical
@@ -363,11 +363,11 @@ findings:
       - uat.task.create
       - ui.task.list
     because: A breaking change to br.share.editor.no-delete sends 17 other record(s) back to todo, would
-      stale 3 evidence file(s), and touches 11 code path(s) (src/app/tasks/**,
-      src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/task,
-      src/modules/platform/events, src/plan/cap-guard.ts, src/plan/payments.ts,
-      src/plan/reconcile.ts, src/plan/subscription.ts, src/share, src/share/access.service.ts) -
-      this is the number a reviewer wants before approving the change.
+      stale 4 evidence file(s), and touches 10 code path(s) (src/app/tasks/**,
+      src/components/blocks/task-list/**, src/features/pages/tasks/**, src/modules/bussiness/share,
+      src/modules/bussiness/task, src/modules/platform/events, src/plan/cap-guard.ts,
+      src/plan/payments.ts, src/plan/reconcile.ts, src/plan/subscription.ts) - this is the number a
+      reviewer wants before approving the change.
   - id: blast-radius:br.plan.downgrade.freeze
     kind: blast-radius
     severity: critical
@@ -590,9 +590,8 @@ findings:
       - uat.share.invite-and-collaborate
       - ui.share.invite
     because: A breaking change to br.share.invite.expiry sends 10 other record(s) back to todo, would
-      stale 1 evidence file(s), and touches 3 code path(s) (app/share, src/share,
-      src/share/invitation.service.ts) - this is the number a reviewer wants before approving the
-      change.
+      stale 6 evidence file(s), and touches 2 code path(s) (app/share, src/modules/bussiness/share)
+      - this is the number a reviewer wants before approving the change.
   - id: blast-radius:br.task.list.owned
     kind: blast-radius
     severity: critical
@@ -835,30 +834,6 @@ findings:
     because: br.notify.delivery.once is used 9 time(s) (top decile of fan-in); it is owned by notify and
       read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
       here is cross-feature coupling, not a local edit.
-  - id: fan-in-hotspot:br.share.invite.expiry
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - br.share.invite.expiry
-    because: br.share.invite.expiry is used 9 time(s) (top decile of fan-in); it is owned by share and
-      read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
-      here is cross-feature coupling, not a local edit.
-  - id: fan-in-hotspot:br.share.revoke.on-read
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - br.share.revoke.on-read
-    because: br.share.revoke.on-read is used 9 time(s) (top decile of fan-in); it is owned by share and
-      read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
-      here is cross-feature coupling, not a local edit.
-  - id: fan-in-hotspot:br.share.role.permissions
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - br.share.role.permissions
-    because: br.share.role.permissions is used 9 time(s) (top decile of fan-in); it is owned by share
-      and read by 1 other feature(s) (task), so a change here is cross-feature coupling, not a local
-      edit.
   - id: fan-in-hotspot:br.task.complete.once
     kind: fan-in-hotspot
     severity: info
@@ -867,14 +842,6 @@ findings:
     because: br.task.complete.once is used 9 time(s) (top decile of fan-in); it is owned by task and
       read by 1 other feature(s) (notify), so a change here is cross-feature coupling, not a local
       edit.
-  - id: fan-in-hotspot:gap.share.unbuilt-module
-    kind: fan-in-hotspot
-    severity: info
-    records:
-      - gap.share.unbuilt-module
-    because: gap.share.unbuilt-module is used 9 time(s) (top decile of fan-in); it is owned by share and
-      read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
-      here is cross-feature coupling, not a local edit.
   - id: fan-in-hotspot:sds.plan.subscription-lifecycle
     kind: fan-in-hotspot
     severity: info
@@ -883,6 +850,46 @@ findings:
     because: sds.plan.subscription-lifecycle is used 9 time(s) (top decile of fan-in); it is owned by
       plan and read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a
       change here is cross-feature coupling, not a local edit.
+  - id: fan-in-hotspot:br.plan.caps.limit
+    kind: fan-in-hotspot
+    severity: info
+    records:
+      - br.plan.caps.limit
+    because: br.plan.caps.limit is used 8 time(s) (top decile of fan-in); it is owned by plan and read
+      by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change here is
+      cross-feature coupling, not a local edit.
+  - id: fan-in-hotspot:br.task.single-owner
+    kind: fan-in-hotspot
+    severity: info
+    records:
+      - br.task.single-owner
+    because: br.task.single-owner is used 8 time(s) (top decile of fan-in); it is owned by task and read
+      by 2 other feature(s) (login, share), so a change here is cross-feature coupling, not a local
+      edit.
+  - id: fan-in-hotspot:br.audit.append-only
+    kind: fan-in-hotspot
+    severity: info
+    records:
+      - br.audit.append-only
+    because: br.audit.append-only is used 7 time(s) (top decile of fan-in); it is owned by audit and
+      read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
+      here is cross-feature coupling, not a local edit.
+  - id: fan-in-hotspot:br.share.revoke.on-read
+    kind: fan-in-hotspot
+    severity: info
+    records:
+      - br.share.revoke.on-read
+    because: br.share.revoke.on-read is used 7 time(s) (top decile of fan-in); it is owned by share and
+      read by 0 other feature(s) (none - fan-in is entirely within its own feature), so a change
+      here is cross-feature coupling, not a local edit.
+  - id: fan-in-hotspot:br.share.role.permissions
+    kind: fan-in-hotspot
+    severity: info
+    records:
+      - br.share.role.permissions
+    because: br.share.role.permissions is used 7 time(s) (top decile of fan-in); it is owned by share
+      and read by 1 other feature(s) (task), so a change here is cross-feature coupling, not a local
+      edit.
   - id: unbound-sds:sds.audit.erasure-request
     kind: unbound-sds
     severity: warn
@@ -945,14 +952,6 @@ findings:
     records:
       - sds.recur.occurrence-lifecycle
     because: sds.recur.occurrence-lifecycle authors no owners entry, so it has no bound module and no
-      read-scope boundary - anything could claim to implement it, and nothing narrows what a
-      reviewer must open to check.
-  - id: unbound-sds:sds.share.invitation-lifecycle
-    kind: unbound-sds
-    severity: warn
-    records:
-      - sds.share.invitation-lifecycle
-    because: sds.share.invitation-lifecycle authors no owners entry, so it has no bound module and no
       read-scope boundary - anything could claim to implement it, and nothing narrows what a
       reviewer must open to check.
   - id: unbound-sds:sds.task.completion-state
@@ -1059,6 +1058,14 @@ findings:
       - gap.plan.cap-guard-not-wired
     because: journey.plan.hits-the-cap is todo, blocked on gap.plan.cap-guard-not-wired - a real product
       question, not missing code; it moves once that is settled.
+  - id: designed-todo:journey.share.collaborate-on-a-task
+    kind: designed-todo
+    severity: info
+    records:
+      - journey.share.collaborate-on-a-task
+      - gap.share.live-proof
+    because: journey.share.collaborate-on-a-task is todo, blocked on gap.share.live-proof - a real
+      product question, not missing code; it moves once that is settled.
   - id: designed-todo:journey.task.first-task
     kind: designed-todo
     severity: info
@@ -1075,6 +1082,14 @@ findings:
       - gap.notify.new-device-event
     because: nfr.notify.delivery.guarantee is todo, blocked on gap.notify.new-device-event - a real
       product question, not missing code; it moves once that is settled.
+  - id: designed-todo:nfr.share.revoke.read-latency
+    kind: designed-todo
+    severity: info
+    records:
+      - nfr.share.revoke.read-latency
+      - gap.share.load-proof
+    because: nfr.share.revoke.read-latency is todo, blocked on gap.share.load-proof - a real product
+      question, not missing code; it moves once that is settled.
   - id: designed-todo:sds.plan.cap-guard
     kind: designed-todo
     severity: info
@@ -1271,46 +1286,6 @@ findings:
       - gap.recur.unbuilt-module
     because: br.recur.timezone.owner-local-time is todo, blocked on gap.recur.unbuilt-module - code that
       simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.share.editor.no-delete
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.share.editor.no-delete
-      - gap.share.unbuilt-module
-    because: br.share.editor.no-delete is todo, blocked on gap.share.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.share.invite.expiry
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.share.invite.expiry
-      - gap.share.unbuilt-module
-    because: br.share.invite.expiry is todo, blocked on gap.share.unbuilt-module - code that simply has
-      not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.share.revoke.on-read
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.share.revoke.on-read
-      - gap.share.unbuilt-module
-    because: br.share.revoke.on-read is todo, blocked on gap.share.unbuilt-module - code that simply has
-      not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.share.role.permissions
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.share.role.permissions
-      - gap.share.unbuilt-module
-    because: br.share.role.permissions is todo, blocked on gap.share.unbuilt-module - code that simply
-      has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:br.task.complete.once
-    kind: leftover-todo
-    severity: info
-    records:
-      - br.task.complete.once
-      - gap.task.collaborator-completion
-    because: br.task.complete.once is todo, blocked on gap.task.collaborator-completion - code that
-      simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:br.task.single-owner
     kind: leftover-todo
     severity: info
@@ -1319,14 +1294,6 @@ findings:
       - gap.task.collaborator-completion
     because: br.task.single-owner is todo, blocked on gap.task.collaborator-completion - code that
       simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:contract.login.identity-for-task
-    kind: leftover-todo
-    severity: info
-    records:
-      - contract.login.identity-for-task
-      - gap.task.collaborator-completion
-    because: contract.login.identity-for-task is todo, blocked on gap.task.collaborator-completion -
-      code that simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:contract.notify.task-completion-feed
     kind: leftover-todo
     severity: info
@@ -1536,38 +1503,6 @@ findings:
       - gap.recur.unbuilt-module
     because: fr.recur.see-upcoming is todo, blocked on gap.recur.unbuilt-module - code that simply has
       not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.share.accept
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.share.accept
-      - gap.share.unbuilt-module
-    because: fr.share.accept is todo, blocked on gap.share.unbuilt-module - code that simply has not
-      been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.share.invite
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.share.invite
-      - gap.share.unbuilt-module
-    because: fr.share.invite is todo, blocked on gap.share.unbuilt-module - code that simply has not
-      been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.share.list
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.share.list
-      - gap.share.unbuilt-module
-    because: fr.share.list is todo, blocked on gap.share.unbuilt-module - code that simply has not been
-      written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.share.revoke
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.share.revoke
-      - gap.share.unbuilt-module
-    because: fr.share.revoke is todo, blocked on gap.share.unbuilt-module - code that simply has not
-      been written yet; the owner wants this count at zero.
   - id: leftover-todo:fr.task.complete
     kind: leftover-todo
     severity: info
@@ -1576,14 +1511,6 @@ findings:
       - gap.task.collaborator-completion
     because: fr.task.complete is todo, blocked on gap.task.collaborator-completion - code that simply
       has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:fr.task.reopen
-    kind: leftover-todo
-    severity: info
-    records:
-      - fr.task.reopen
-      - gap.task.collaborator-completion
-    because: fr.task.reopen is todo, blocked on gap.task.collaborator-completion - code that simply has
-      not been written yet; the owner wants this count at zero.
   - id: leftover-todo:impl.audit.todo-app-backend.erasure
     kind: leftover-todo
     severity: info
@@ -1640,37 +1567,13 @@ findings:
       - gap.recur.unbuilt-module
     because: impl.recur.todo-app-frontend.schedule is todo, blocked on gap.recur.unbuilt-module - code
       that simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:impl.share.todo-app-backend.access
-    kind: leftover-todo
-    severity: info
-    records:
-      - impl.share.todo-app-backend.access
-      - gap.share.unbuilt-module
-    because: impl.share.todo-app-backend.access is todo, blocked on gap.share.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:impl.share.todo-app-backend.invitations
-    kind: leftover-todo
-    severity: info
-    records:
-      - impl.share.todo-app-backend.invitations
-      - gap.share.unbuilt-module
-    because: impl.share.todo-app-backend.invitations is todo, blocked on gap.share.unbuilt-module - code
-      that simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:impl.share.todo-app-frontend.invite-screen
     kind: leftover-todo
     severity: info
     records:
       - impl.share.todo-app-frontend.invite-screen
-      - gap.share.unbuilt-module
-    because: impl.share.todo-app-frontend.invite-screen is todo, blocked on gap.share.unbuilt-module -
-      code that simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:impl.task.todo-app-backend.ownership
-    kind: leftover-todo
-    severity: info
-    records:
-      - impl.task.todo-app-backend.ownership
-      - gap.task.collaborator-completion
-    because: impl.task.todo-app-backend.ownership is todo, blocked on gap.task.collaborator-completion -
+      - gap.share.frontend-unbuilt
+    because: impl.share.todo-app-frontend.invite-screen is todo, blocked on gap.share.frontend-unbuilt -
       code that simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:integration.notify.queue
     kind: leftover-todo
@@ -1730,14 +1633,6 @@ findings:
       - gap.recur.unbuilt-module
     because: journey.recur.first-recurring-task is todo, blocked on gap.recur.unbuilt-module - code that
       simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:journey.share.collaborate-on-a-task
-    kind: leftover-todo
-    severity: info
-    records:
-      - journey.share.collaborate-on-a-task
-      - gap.share.unbuilt-module
-    because: journey.share.collaborate-on-a-task is todo, blocked on gap.share.unbuilt-module - code
-      that simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:nfr.audit.retention
     kind: leftover-todo
     severity: info
@@ -1777,14 +1672,6 @@ findings:
       - nfr.recur.generation.timeliness
       - gap.recur.unbuilt-module
     because: nfr.recur.generation.timeliness is todo, blocked on gap.recur.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:nfr.share.revoke.read-latency
-    kind: leftover-todo
-    severity: info
-    records:
-      - nfr.share.revoke.read-latency
-      - gap.share.unbuilt-module
-    because: nfr.share.revoke.read-latency is todo, blocked on gap.share.unbuilt-module - code that
       simply has not been written yet; the owner wants this count at zero.
   - id: leftover-todo:sds.audit.erasure-request
     kind: leftover-todo
@@ -1844,27 +1731,11 @@ findings:
       - gap.recur.unbuilt-module
     because: sds.recur.occurrence-lifecycle is todo, blocked on gap.recur.unbuilt-module - code that
       simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:sds.share.invitation-lifecycle
-    kind: leftover-todo
-    severity: info
+  - id: stale-evidence-bulk-edit:impl.task.todo-app-backend.platform-database
+    kind: stale-evidence-bulk-edit
+    severity: warn
     records:
-      - sds.share.invitation-lifecycle
-      - gap.share.unbuilt-module
-    because: sds.share.invitation-lifecycle is todo, blocked on gap.share.unbuilt-module - code that
-      simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:sds.task.completion-state
-    kind: leftover-todo
-    severity: info
-    records:
-      - sds.task.completion-state
-      - gap.task.collaborator-completion
-    because: sds.task.completion-state is todo, blocked on gap.task.collaborator-completion - code that
-      simply has not been written yet; the owner wants this count at zero.
-  - id: leftover-todo:sds.task.ownership-guard
-    kind: leftover-todo
-    severity: info
-    records:
-      - sds.task.ownership-guard
-      - gap.task.collaborator-completion
-    because: sds.task.ownership-guard is todo, blocked on gap.task.collaborator-completion - code that
-      simply has not been written yet; the owner wants this count at zero.
+      - impl.task.todo-app-backend.platform-database
+    because: impl.task.todo-app-backend.platform-database's evidence is stale with no staleSince at all
+      - a bare digest mismatch with nothing recorded about why, even where the record's own
+      staleReason prose describes a real revision (bulk-edit-after-capture territory either way).

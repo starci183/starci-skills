@@ -5,6 +5,9 @@ import { CreateTaskSingleMutationModule } from './task/create-task/create-task.m
 import { CompleteTaskSingleMutationModule } from './task/complete-task/complete-task.module';
 import { ReopenTaskSingleMutationModule } from './task/reopen-task/reopen-task.module';
 import { DeleteTaskSingleMutationModule } from './task/delete-task/delete-task.module';
+import { InviteSingleMutationModule } from './share/invite/invite.module';
+import { AcceptInvitationSingleMutationModule } from './share/accept-invitation/accept-invitation.module';
+import { RevokeCollaboratorSingleMutationModule } from './share/revoke-collaborator/revoke-collaborator.module';
 
 /** Every GraphQL mutation module the todo API exposes, gathered exactly like nivo's own
  * `mutations/index.ts` gathers `MUTATION_MODULES`. */
@@ -15,4 +18,7 @@ export const MUTATION_MODULES: Array<DynamicModule | (new () => unknown)> = [
   CompleteTaskSingleMutationModule.register({}),
   ReopenTaskSingleMutationModule.register({}),
   DeleteTaskSingleMutationModule.register({}),
+  InviteSingleMutationModule.register({}),
+  AcceptInvitationSingleMutationModule.register({}),
+  RevokeCollaboratorSingleMutationModule.register({}),
 ];

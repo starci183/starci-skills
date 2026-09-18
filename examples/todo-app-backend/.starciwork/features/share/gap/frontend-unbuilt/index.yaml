@@ -1,0 +1,12 @@
+schema: work/gap
+id: gap.share.frontend-unbuilt
+title: No share invite screen exists under the Next.js layout yet
+state: todo
+statement: gap.share.unbuilt-module closed on its backend half (src/modules/bussiness/share exists,
+  proven by jest and scripts/live-proof-share.sh - lane be-share, backend-only per its brief). The
+  frontend half it also named - app/share/invite-screen.tsx, consuming the Grammar core package the way
+  nivo-fe does - still does not exist. This record names that remaining half on its own so
+  impl.share.todo-app-frontend.invite-screen has a real, currently-open gap to cite instead of one that
+  has since closed.
+closedBy: impl.share.todo-app-frontend.invite-screen
+change: {rev: 1, kind: initial, at: 2026-09-18T16:00:00.000Z}

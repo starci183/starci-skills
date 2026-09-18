@@ -45,8 +45,10 @@ change:
     transport's own refusal, never on reading a null. This rev makes the contract describe the real,
     already-tested mechanism instead of one the code never implemented.
 
-blockedBy:
-  - {record: gap.task.collaborator-completion, because: "The consumer side (impl.task.todo-app-backend.ownership) went back to todo for the same reason: its owner-only guard has not been rebuilt to also honour an accepted editor collaborator, so it cannot re-prove this contract's consumer obligations until that gap closes."}
+# gap.task.collaborator-completion closed (lane be-share): share's provider half is real and tested.
+# The consumer side (impl.task.todo-app-backend.ownership) re-proving this contract's own consumer
+# obligations against br.task.single-owner rev 2 is lane login-impl/task's call, not this lane's, so
+# this record stays todo with no blockedBy of its own rather than citing a resolved gap.
 
 # provenBy is written by starci-kernel from requiresProof and the provers' own proves edges.
 provenBy:

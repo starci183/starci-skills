@@ -14,5 +14,7 @@ change:
   withdraws: ["A complete task is never reopened."]
   reason: The owner decided completion is reversible. The withdrawn clause was proven, so its evidence
     becomes history and the rule returns to todo until the reversible statement is proven in its place.
-blockedBy:
-  - {record: gap.task.collaborator-completion, because: "This rule's evidence must be regenerated for both statements now that rev 2 withdrew the old one - a kernel/uat lane's job, not this record's own authoring. That regeneration is bound up with fr.task.complete's own composed proof, which spans both actors this rule's module serves; the collaborator half of that proof has no implementation yet, which is the one absence gap.task.collaborator-completion names."}
+# gap.task.collaborator-completion closed (lane be-share: share's half of contract.share.completion-guard-for-task
+# is now real and tested). This rule's evidence still needs regenerating for both statements now that rev 2
+# withdrew the old one - a kernel/uat lane's job, not this record's own authoring - so it stays todo with no
+# blockedBy of its own rather than citing a resolved gap or fabricating a fresh one this lane cannot verify.

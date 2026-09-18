@@ -1,7 +1,7 @@
 schema: work/business-rule
 id: br.share.invite.expiry
 title: An invitation expires after fourteen days
-state: todo
+state: done
 statements:
   - An invitation not accepted within fourteen days of being sent can no longer be accepted.
   - Expiry is computed the moment an invitation is read, never by a background sweep.
@@ -9,7 +9,12 @@ authorityRefs:
   - "owner-intent: An open invitation to somebody's task is a standing exposure; bounding it removes the
     need for the owner to remember and manually close it."
 acceptanceCriteria: [expires-after-14-days, accept-before-expiry-succeeds]
-module: src/share/invitation.service.ts
-change: {rev: 1, kind: initial, at: 2026-09-18T06:00:00.000Z}
-blockedBy:
-  - {record: gap.share.unbuilt-module, because: "The example is moving to a real NestJS backend; src/share/invitation.service.ts does not exist yet, so nothing has proven either acceptance criterion."}
+module: src/modules/bussiness/share
+change:
+  rev: 2
+  kind: clarifying
+  at: 2026-09-18T16:00:00.000Z
+  reason: impl.share.todo-app-backend.invitations is built (src/modules/bussiness/share, not the
+    earlier-guessed src/share); invitation.service.spec.ts proves both acceptance criteria by backdating
+    sentAt rather than waiting fourteen real days, and scripts/live-proof-share.sh proves the
+    non-expiry half live against the real stack. gap.share.unbuilt-module's blockedBy is resolved.
